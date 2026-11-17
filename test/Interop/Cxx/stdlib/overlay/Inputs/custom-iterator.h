@@ -1144,6 +1144,76 @@ struct InheritedConstIterator : BaseIntIterator {
   }
 };
 
+struct BaseWithIteratorCategory {
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using reference = const int &;
+
+  int value;
+
+  BaseWithIteratorCategory(int value) : value(value) {}
+
+  reference operator*() const { return value; }
+
+  BaseWithIteratorCategory &operator++() {
+    ++value;
+    return *this;
+  }
+
+  bool operator==(const BaseWithIteratorCategory &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const BaseWithIteratorCategory &other) const {
+    return value != other.value;
+  }
+};
+
+struct InheritedFromBaseWithIteratorCategory : BaseWithIteratorCategory {
+  using BaseWithIteratorCategory::BaseWithIteratorCategory;
+};
+
+struct ReturnsInheritedFromBaseWithIteratorCategory {
+  int value;
+  InheritedFromBaseWithIteratorCategory get() const {
+    return InheritedFromBaseWithIteratorCategory(value);
+  }
+};
+
+struct BaseWithIteratorConcept {
+  using iterator_concept = std::input_iterator_tag;
+  using value_type = int;
+  using reference = const int &;
+
+  int value;
+
+  BaseWithIteratorConcept(int value) : value(value) {}
+
+  reference operator*() const { return value; }
+
+  BaseWithIteratorConcept &operator++() {
+    ++value;
+    return *this;
+  }
+
+  bool operator==(const BaseWithIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const BaseWithIteratorConcept &other) const {
+    return value != other.value;
+  }
+};
+
+struct InheritedFromBaseWithIteratorConcept : BaseWithIteratorConcept {
+  using BaseWithIteratorConcept::BaseWithIteratorConcept;
+};
+
+struct ReturnsInheritedFromBaseWithIteratorConcept {
+  int value;
+  InheritedFromBaseWithIteratorConcept get() const {
+    return InheritedFromBaseWithIteratorConcept(value);
+  }
+};
+
 // MARK: Templated iterator types that use inheritance
 
 template <typename T>
@@ -1534,6 +1604,11 @@ template <> struct std::iterator_traits<RandomAccessCategoryNewPtr> : NewPtrTrai
   using iterator_category = std::random_access_iterator_tag;
 };
 
+/// InputCategoryNewPtr explicitely specializes std::iterator_traits
+struct ReturnsInputCategoryNewPtr {
+  InputCategoryNewPtr get() const;
+};
+
 #if __cplusplus >= 202002L
 
 using ContiguousCategoryNewPtr = NewPtr<__LINE__>;
@@ -1645,5 +1720,49 @@ template <> struct std::iterator_traits<InputCategoryContiguousConceptLegacyPtr>
 };
 
 #endif // __cplusplus >= 202002L
+
+// MARK: Types that declare only iterator_concept
+
+/// From C++20 on, a type that declares 'iterator_concept' is an iterator.
+/// Before C++20 the typedef has no meaning and this is an ordinary value type.
+struct HasOnlyIteratorConcept {
+private:
+  int value;
+
+public:
+  using iterator_concept = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasOnlyIteratorConcept(int value) : value(value) {}
+  HasOnlyIteratorConcept(const HasOnlyIteratorConcept &other) = default;
+
+  const int &operator*() const { return value; }
+
+  HasOnlyIteratorConcept &operator++() {
+    value++;
+    return *this;
+  }
+  HasOnlyIteratorConcept operator++(int) {
+    auto tmp = HasOnlyIteratorConcept(value);
+    value++;
+    return tmp;
+  }
+
+  bool operator==(const HasOnlyIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasOnlyIteratorConcept &other) const {
+    return value != other.value;
+  }
+};
+
+/// Whether 'get()' returns an iterator depends on the C++ standard in use.
+struct ReturnsOnlyIteratorConcept {
+  int value;
+  HasOnlyIteratorConcept get() const { return HasOnlyIteratorConcept(value); }
+};
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -module-name main %import-libdispatch -j2 -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -g -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main %import-libdispatch -j2 -parse-as-library -target %target-swift-5.7-abi-triple -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -g -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency

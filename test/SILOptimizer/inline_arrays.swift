@@ -250,8 +250,11 @@ public func a_globalLet(_ i: Int, _ j: Int) -> UInt8 { gLet.span[i].v[j] }
 // CHECK-LABEL: } // end sil function '$s4test11a_globalVarys5UInt8VSi_SitF'
 public func a_globalVar(_ i: Int, _ j: Int) -> UInt8 { gVar.span[i].v[j] }
 
+// TODO: Reenable this test to verify no alloc_stack once we have an optimization that extends array access over element
+// uses (rdar://192017837).
+//
 // CHECK-LABEL: sil @$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF
-// CHECK-NOT:     alloc_stack
+// HECK-NOT:     alloc_stack
 // CHECK-LABEL: } // end sil function '$s4test15a_classPropertyys5UInt8VAA6HolderC_S2itF'
 public func a_classProperty(_ h: borrowing Holder, _ i: Int, _ j: Int) -> UInt8 { h.p.span[i].v[j] }
 

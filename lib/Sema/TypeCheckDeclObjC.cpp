@@ -196,7 +196,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for classes.
-  if (auto *CD = T->getClassOrBoundGenericClass()) {
+  if (auto *CD = T->getClassDecl()) {
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
           .highlight(TypeRange)
@@ -212,7 +212,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   // Special diagnostic for structs.
-  if (auto *SD = T->getStructOrBoundGenericStruct()) {
+  if (auto *SD = T->getStructDecl()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
       diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
@@ -228,8 +228,9 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     return;
   }
 
-  // Special diagnostic for enums.
-  if (T->is<EnumType>()) {
+  // Special diagnostic for non-generic enums.
+  if (auto enumTy = T->getAs<EnumType>();
+      enumTy && !enumTy->hasGenericArgs()) {
     // New dialog mentioning @c.
     diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
                    language)
@@ -260,7 +261,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
     // See if the superclass is not @objc.
     if (auto superclass = layout.explicitSuperclass) {
-      if (!superclass->getClassOrBoundGenericClass()->isObjC()) {
+      if (!superclass->getClassDecl()->isObjC()) {
         diags.diagnose(TypeRange.Start, diag::not_objc_class_constraint,
                        superclass)
             .limitBehavior(behavior);
@@ -400,28 +401,6 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       return false;
     }
 
-    // The C++ ABI decides whether the callee owns a non-trivial class passed
-    // by value (it does not under Itanium, it does under Microsoft), so
-    // `borrowing` and `consuming` each contradict one ABI. Only the default
-    // ownership follows the ABI.
-    auto ownership = param->getValueOwnership();
-    if (language == ForeignLanguage::Cxx &&
-        (ownership == ValueOwnership::Shared ||
-         ownership == ValueOwnership::Owned) &&
-        importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
-      softenIfAccessNote(AFD, Reason.getAttr(),
-                         diags
-                             .diagnose(param->getStartLoc(),
-                                       diag::cxx_param_ownership_unsupported,
-                                       AFD, param,
-                                       ownership == ValueOwnership::Owned)
-                             .highlight(param->getSourceRange())
-                             .limitBehavior(behavior));
-      Reason.describe(AFD);
-
-      return false;
-    }
-
     if (param->getTypeInContext()->hasError())
       return false;
 
@@ -439,7 +418,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     // Permit '()' when this method overrides a method with a
     // foreign error convention that replaces NSErrorPointer with ()
     // and this is the replaced parameter.
-    AbstractFunctionDecl *overridden;
+    AbstractFunctionDecl *overridden = nullptr;
     if (param->getTypeInContext()->isVoid() && AFD->hasThrows() &&
         (overridden = AFD->getOverriddenDecl())) {
       auto foreignError = overridden->getForeignErrorConvention();
@@ -498,7 +477,7 @@ static bool checkObjCInForeignClassContext(const ValueDecl *VD,
   if (!type)
     return false;
 
-  auto clazz = type->getClassOrBoundGenericClass();
+  auto clazz = type->getClassDecl();
   if (!clazz)
     return false;
 
@@ -695,10 +674,8 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   case ForeignRepresentableKind::None:
     // Special case: If the type is Unmanaged<T>, then return true, because
     // Unmanaged<T> can be represented in Objective-C (if T can be).
-    if (auto BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->isUnmanaged()) {
-        return true;
-      }
+    if (type->isUnmanaged()) {
+      return true;
     }
     return false;
 
@@ -741,7 +718,8 @@ bool swift::isRepresentableInLanguage(
     return false;
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
-  if (AFD->isOperator()) {
+  // A `@cxx` implementation of a C++ operator may be a Swift operator.
+  if (AFD->isOperator() && language != ForeignLanguage::Cxx) {
     AFD->diagnose((isa<ProtocolDecl>(AFD->getDeclContext())
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
@@ -950,7 +928,8 @@ bool swift::isRepresentableInLanguage(
         type = OptionalType::get(type);
       }
 
-      completionHandlerParams.push_back(AnyFunctionType::Param(type));
+      completionHandlerParams.push_back(
+          AnyFunctionType::Param::bodyAccess(type));
 
       // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {
@@ -1090,16 +1069,15 @@ bool swift::isRepresentableInLanguage(
     if (nsErrorTy) {
       errorParameterType = OptionalType::get(nsErrorTy);
       errorParameterType
-        = BoundGenericType::get(
+        = NominalType::get(
             ctx.getAutoreleasingUnsafeMutablePointerDecl(),
             nullptr,
-            errorParameterType);
+            errorParameterType, ctx);
       errorParameterType = OptionalType::get(errorParameterType);
     }
 
     // Determine the parameter index at which the error will go.
-    unsigned errorParameterIndex;
-    bool foundErrorParameterIndex = false;
+    std::optional<unsigned> errorParameterIndex;
 
     // If there is an explicit @objc attribute with a name, look for
     // the "error" selector piece.
@@ -1111,15 +1089,13 @@ bool swift::isRepresentableInLanguage(
           // the error parameter.
           auto piece = selectorPieces[i-1];
           if (piece == ctx.Id_error) {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
 
           // If the first selector piece ends with "Error", it's here.
           if (i == 1 && camel_case::getLastWord(piece.str()) == "Error") {
-            errorParameterIndex = i-1;
-            foundErrorParameterIndex = true;
+            errorParameterIndex = i - 1;
             break;
           }
         }
@@ -1128,7 +1104,7 @@ bool swift::isRepresentableInLanguage(
 
     // If the selector did not provide an index for the error, find
     // the last parameter that is not a trailing closure.
-    if (!foundErrorParameterIndex) {
+    if (!errorParameterIndex) {
       auto *paramList = AFD->getParameters();
       errorParameterIndex = paramList->size();
 
@@ -1140,11 +1116,12 @@ bool swift::isRepresentableInLanguage(
       // 'initFoo'.
       if (auto *CD = dyn_cast<ConstructorDecl>(AFD))
         if (CD->isObjCZeroParameterWithLongSelector())
-          --errorParameterIndex;
+          --errorParameterIndex.value();
 
       while (errorParameterIndex > 0) {
         // Skip over trailing closures.
-        auto type = paramList->get(errorParameterIndex - 1)->getTypeInContext();
+        auto type =
+            paramList->get(errorParameterIndex.value() - 1)->getTypeInContext();
 
         // It can't be a trailing closure unless it has a specific form.
         // Only consider the rvalue type.
@@ -1156,7 +1133,7 @@ bool swift::isRepresentableInLanguage(
 
         // Is it a function type?
         if (!type->is<AnyFunctionType>()) break;
-        --errorParameterIndex;
+        --errorParameterIndex.value();
       }
     }
 
@@ -1167,7 +1144,7 @@ bool swift::isRepresentableInLanguage(
     switch (kind) {
     case ForeignErrorConvention::ZeroResult:
       errorConvention = ForeignErrorConvention::getZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1176,7 +1153,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonZeroResult:
       errorConvention = ForeignErrorConvention::getNonZeroResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType,
@@ -1185,7 +1162,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::ZeroPreservedResult:
       errorConvention = ForeignErrorConvention::getZeroPreservedResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1193,7 +1170,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NilResult:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -1201,7 +1178,7 @@ bool swift::isRepresentableInLanguage(
 
     case ForeignErrorConvention::NonNilError:
       errorConvention = ForeignErrorConvention::getNilResult(
-                          errorParameterIndex,
+                          errorParameterIndex.value(),
                           ForeignErrorConvention::IsNotOwned,
                           ForeignErrorConvention::IsNotReplaced,
                           canErrorParameterType);
@@ -2006,6 +1983,10 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   } else {
     // Cannot be @objc.
+    //
+    // Note: a top-level @objc function (SE-0495) is intentionally not marked
+    // @objc here; like @c/@_cdecl it is a plain C entry point validated by
+    // TypeCheckForeignFunctionRequest and identified via getCDeclKind().
   }
 
   // If this declaration should not be exposed to Objective-C, we're done.
@@ -4078,7 +4059,7 @@ private:
     if (!implTy->isUnmanaged() || !reqTy->isAnyClassReferenceType())
       return false;
 
-    auto boundGenericType = implTy->getAs<BoundGenericType>();
+    auto boundGenericType = implTy->getAs<NominalType>();
     if (!boundGenericType || boundGenericType->getGenericArgs().size() != 1)
       return false;
 
@@ -4150,12 +4131,48 @@ private:
     return MatchOutcome::WrongType;
   }
 
+  /// The importer drops the `T &` result of e.g. `operator+=`, but the
+  /// implementation must still return it, as a pointer. Returns \p type, the
+  /// imported type of \p decl, with that result restored.
+  static Type restoreCxxOperatorResult(const ValueDecl *decl, Type type) {
+    const auto *clangFD =
+        dyn_cast_or_null<clang::FunctionDecl>(decl->getClangDecl());
+    if (!clangFD || !clangFD->isOverloadedOperator() ||
+        !clangFD->getReturnType()->isLValueReferenceType())
+      return type;
+    const auto *fnTy = type->getAs<AnyFunctionType>();
+    if (!fnTy || !fnTy->getResult()->isVoid())
+      return type;
+    const auto *record = clangFD->getReturnType()->getPointeeCXXRecordDecl();
+    if (!record)
+      return type;
+    const auto *referent = dyn_cast_or_null<NominalTypeDecl>(
+        decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
+            record));
+    if (!referent)
+      return type;
+    // A reference to a foreign reference type is the type itself.
+    Type result = referent->getDeclaredInterfaceType();
+    if (!result->isForeignReferenceType()) {
+      auto kind = clangFD->getReturnType()->getPointeeType().isConstQualified()
+                      ? PTK_UnsafePointer
+                      : PTK_UnsafeMutablePointer;
+      result = result->wrapInPointer(kind);
+      if (!result)
+        return type;
+    }
+    return FunctionType::get(fnTy->getParams(), {}, result, fnTy->getExtInfo());
+  }
+
   static Type getMemberType(ValueDecl *decl) {
+    Type type;
     if (auto fn = dyn_cast<AbstractFunctionDecl>(decl))
       if (fn->hasImplicitSelfDecl())
         // Strip off the uncurried `self` parameter.
-        return fn->getMethodInterfaceType();
-    return decl->getInterfaceType();
+        type = fn->getMethodInterfaceType();
+    if (!type)
+      type = decl->getInterfaceType();
+    return restoreCxxOperatorResult(decl, type);
   }
 
   /// Describes an availability mismatch between a requirement and a candidate
@@ -4178,6 +4195,21 @@ private:
     auto &ctx = cand->getASTContext();
     if (ctx.LangOpts.DisableAvailabilityChecking)
       return std::nullopt;
+
+    if (const auto *clangFD =
+            dyn_cast_or_null<clang::FunctionDecl>(req->getClangDecl())) {
+      // Member operators are imported unavailable in favor of synthesized Swift
+      // operators; that doesn't apply to the C++ operator.
+      if (clangFD->isOverloadedOperator() && req->isUnavailable())
+        return std::nullopt;
+
+      // A pure virtual method of a value type is imported unavailable, as it
+      // has no implementation to call. Implementing it is diagnosed as such
+      // once it matches.
+      if (const auto *method = dyn_cast<clang::CXXMethodDecl>(clangFD))
+        if (method->isPureVirtual() && req->isUnavailable())
+          return std::nullopt;
+    }
 
     std::optional<AvailabilityContext> baseRequirementAvailability;
 
@@ -4330,6 +4362,7 @@ private:
         dyn_cast_or_null<clang::FunctionDecl>(interface->getClangDecl());
     if (!clangFD)
       return false;
+    StringRef cxxName = cast<ValueDecl>(interface)->getCDeclName();
 
     // A @cxx implementation must be the C++ function's one and only
     // definition. Reject a match to a function that is already defined in the
@@ -4345,7 +4378,7 @@ private:
       unsigned reason = clangFD->isDefined()     ? 0
                         : clangFD->isConstexpr() ? 2
                                                  : 1;
-      diagnose(cand, diag::cxx_func_defined, cand, clangFD->getName(), reason);
+      diagnose(cand, diag::cxx_func_defined, cand, cxxName, reason);
       return true;
     }
 
@@ -4384,19 +4417,57 @@ private:
           return param->getType()->isRValueReferenceType();
         });
     if (usesRValueReferences) {
-      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand,
-               clangFD->getName());
+      diagnose(cand, diag::cxx_rvalue_references_unsupported, cand, cxxName);
       return true;
     }
 
-    // An lvalue reference parameter is implemented by an `inout` or a by-value
-    // parameter. C++ callers may pass aliasing references, which `inout` and
-    // by-value parameters let the optimizer assume away, so the implementation
+    auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
+
+    // Check value ownership.
+    for (unsigned i = 0, n = params->size(); i != n; ++i) {
+      auto *param = params->get(i);
+      auto ownership = param->getValueOwnership();
+      clang::QualType clangType = clangFD->getParamDecl(i)->getType();
+
+      // A `const T &` parameter is borrowed for the call, so the implementation
+      // must spell it `borrowing`.
+      if (clangType->isLValueReferenceType() &&
+          clangType->getPointeeType().isConstQualified()) {
+        if (ownership == ValueOwnership::Shared)
+          continue;
+        auto diag = diagnose(param->getStartLoc(),
+                             diag::cxx_const_ref_param_requires_borrowing, cand,
+                             cxxName, param);
+        diag.highlight(param->getSourceRange());
+        if (const auto *repr = param->getTypeRepr()) {
+          if (const auto *ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr))
+            diag.fixItReplace(ownershipRepr->getSpecifierLoc(), "borrowing");
+          else
+            diag.fixItInsert(repr->getStartLoc(), "borrowing ");
+        }
+        return true;
+      }
+
+      // The C++ ABI decides whether the callee owns a non-trivial class passed
+      // by value (it does not under Itanium, it does under Microsoft), so
+      // `borrowing` and `consuming` each contradict one ABI.
+      if ((ownership == ValueOwnership::Shared ||
+           ownership == ValueOwnership::Owned) &&
+          importer::isNonTrivialCxxRecord(param->getTypeInContext())) {
+        diagnose(param->getStartLoc(), diag::cxx_param_ownership_unsupported,
+                 cand, cxxName, param, ownership == ValueOwnership::Owned)
+            .highlight(param->getSourceRange());
+        return true;
+      }
+    }
+
+    // An lvalue reference parameter is implemented by an `inout` or a
+    // `borrowing` parameter. C++ callers may pass aliasing references, which
+    // such parameters let the optimizer assume away, so the implementation
     // must be marked `@unsafe`. A reference to a foreign reference type is
     // exempt: the parameter carries the object, not the reference.
     if (cand->getExplicitSafety() != ExplicitSafety::Unsafe) {
       auto *loader = cand->getASTContext().getClangModuleLoader();
-      auto *params = cast<AbstractFunctionDecl>(cand)->getParameters();
       bool diagnosed = false;
       for (unsigned i = 0, n = clangFD->getNumParams(); i != n; ++i) {
         const auto *clangParam = clangFD->getParamDecl(i);
@@ -4410,8 +4481,7 @@ private:
           continue;
 
         if (!diagnosed) {
-          diagnose(cand, diag::cxx_references_require_unsafe, cand,
-                   clangFD->getName())
+          diagnose(cand, diag::cxx_references_require_unsafe, cand, cxxName)
               .fixItInsert(
                   cand->getAttributeInsertionLoc(/*forModifier=*/false),
                   "@unsafe ");
@@ -4501,7 +4571,7 @@ private:
     // TODO: Support returning a foreign reference type unretained.
     const auto *resultClass = candFD->getResultInterfaceType()
                                   ->lookThroughAllOptionalTypes()
-                                  ->getClassOrBoundGenericClass();
+                                  ->getClassDecl();
     if (!resultClass || !resultClass->hasRefCountingAnnotations())
       return false;
     if (importer::getOwnershipOfReturnedFRT(clangFD, cand->getASTContext()) ==
@@ -4512,7 +4582,7 @@ private:
     unsigned reason =
         importer::ReturnOwnershipInfo(clangFD).hasReturnsUnretained ? 1 : 0;
     diagnose(cand, diag::cdecl_unretained_result_unsupported, cand, isCxx,
-             clangFD->getName(), reason);
+             cast<ValueDecl>(interface)->getCDeclName(), reason);
     return true;
   }
 
@@ -4957,7 +5027,7 @@ static void diagnoseForeignRefCountingOperation(FuncDecl *FD,
         /*isReceiver=*/false);
 
   for (auto [paramTy, isReceiver] : operands) {
-    auto *classDecl = paramTy->getClassOrBoundGenericClass();
+    auto *classDecl = paramTy->getClassDecl();
 
     // Immortal foreign reference types have no retain/release to implement.
     if (!classDecl || !classDecl->hasRefCountingAnnotations())
@@ -4988,15 +5058,20 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
-  assert(lang && "missing @c/@cxx?");
-  ObjCReason::Kind kind;
-  if (*lang == ForeignLanguage::ObjectiveC)
-    kind = ObjCReason::ExplicitlyUnderscoreCDecl;
-  else if (*lang == ForeignLanguage::Cxx)
-    kind = ObjCReason::ExplicitlyCxxDecl;
-  else
-    kind = ObjCReason::ExplicitlyCDecl;
-  ObjCReason reason(kind, attr);
+  assert(lang && "missing @c/@cxx/@objc?");
+  // Diagnose with the spelling that requested the export. @objc on a
+  // top-level function (SE-0495) checks Objective-C representability like
+  // @_cdecl.
+  ObjCReason reason = [&] {
+    if (auto objcAttr = dyn_cast<ObjCAttr>(attr))
+      return objCReasonForObjCAttr(objcAttr);
+    if (*lang == ForeignLanguage::Cxx)
+      return ObjCReason(ObjCReason::ExplicitlyCxxDecl, attr);
+    auto kind = lang == ForeignLanguage::ObjectiveC
+                        ? ObjCReason::ExplicitlyUnderscoreCDecl
+                        : ObjCReason::ExplicitlyCDecl;
+    return ObjCReason(kind, attr);
+  }();
 
   std::optional<ForeignAsyncConvention> asyncConvention;
   std::optional<ForeignErrorConvention> errorConvention;
@@ -5022,6 +5097,35 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     reason.setAttrInvalid();
+
+    // Suggest @objc when a top-level @c function uses types valid under
+    // @objc. Only with ObjC interop enabled, and never for @implementation
+    // functions, where @c must match the imported declaration.
+    if (auto *cdeclAttr = dyn_cast<CDeclAttr>(attr);
+        cdeclAttr && !cdeclAttr->Underscored &&
+        FD->getDeclContext()->isModuleScopeContext() &&
+        ctx.LangOpts.EnableObjCInterop &&
+        !FD->getAttrs().hasAttribute<ObjCImplementationAttr>()) {
+      // Probe ObjC representability without emitting diagnostics.
+      DiagnosticTransaction transaction(ctx.Diags);
+      auto objcReason = ObjCReason(ObjCReason::ExplicitlyUnderscoreCDecl, attr);
+      std::optional<ForeignAsyncConvention> asyncConv;
+      std::optional<ForeignErrorConvention> errorConv;
+      bool validInObjC =
+          isRepresentableInLanguage(FD, objcReason, asyncConv, errorConv);
+      transaction.abort();
+
+      if (validInObjC) {
+        // Build the replacement text: @objc or @objc(name).
+        std::string replacement;
+        if (cdeclAttr->Name.empty())
+          replacement = "@objc";
+        else
+          replacement = ("@objc(" + cdeclAttr->Name + ")").str();
+        ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_suggest_objc)
+            .fixItReplace(attr->getRangeWithAt(), replacement);
+      }
+    }
   }
   return {};
 }

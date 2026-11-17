@@ -150,6 +150,75 @@ bb0:
   return %r : $()
 }
 
+// The dealloc_ref operand reaches the stack allocation through a phi.
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @promoted_dealloc_ref_through_phi
+// CHECK:     @swift_initStackObject
+// CHECK-NOT: call void @swift_deallocClassInstance
+// CHECK:     ret void
+sil @promoted_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [stack] $TestClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d1 : $TestClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d2 : $TestClass)
+bb3(%p : $TestClass):
+  dealloc_ref %p : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// StripObjectHeaders marks such an object as bare, so its header is never
+// initialized and must not be passed to the runtime (rdar://192296774).
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bare_dealloc_ref_through_phi
+// CHECK:     %reference.raw = alloca
+// CHECK-NOT: call {{.*}} @swift_
+// CHECK:     ret void
+sil @bare_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [bare] [stack] $TestClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d1 : $TestClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d2 : $TestClass)
+bb3(%p : $TestClass):
+  dealloc_ref %p : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @not_promoted_dealloc_ref_through_phi
+// CHECK:     @swift_allocObject
+// CHECK:     call void @swift_deallocClassInstance
+// CHECK:     ret void
+sil @not_promoted_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [stack] $BigClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
+  br bb3(%d1 : $BigClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
+  br bb3(%d2 : $BigClass)
+bb3(%p : $BigClass):
+  dealloc_ref %p : $BigClass
+  dealloc_stack_ref %o1 : $BigClass
+
+  %r = tuple()
+  return %r : $()
+}
+
 sil @not_inlined_destructor :  $@convention(thin) (TestClass) -> ()
 sil @unknown_func :  $@convention(thin) (@inout TestStruct) -> ()
 

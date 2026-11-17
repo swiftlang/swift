@@ -255,9 +255,12 @@ ManagedValue ManagedValue::formallyMaterialize(SILGenFunction &SGF,
     return ManagedValue::forOwnedAddressRValue(
         temporary, SGF.enterDestroyCleanup(temporary));
   }
-  auto object = SGF.emitFormalEvaluationManagedBeginBorrow(loc, getValue());
-  return SGF.emitFormalEvaluationManagedStoreBorrow(loc, object.getValue(),
-                                                    temporary);
+  // As in materialize(), a value without ownership is stored trivially rather
+  // than borrowed.
+  SILValue object = getValue();
+  if (object->getOwnershipKind() != OwnershipKind::None)
+    object = SGF.emitFormalEvaluationManagedBeginBorrow(loc, object).getValue();
+  return SGF.emitFormalEvaluationManagedStoreBorrow(loc, object, temporary);
 }
 
 void ManagedValue::print(raw_ostream &os) const {

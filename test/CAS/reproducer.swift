@@ -10,7 +10,7 @@
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
 // RUN: %target-swift-frontend-plain @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key

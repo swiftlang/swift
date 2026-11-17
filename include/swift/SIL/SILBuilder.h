@@ -869,11 +869,11 @@ public:
     lowering.emitLoweredStore(*this, Loc, Value, Addr, Qual, ExpansionKind);
   }
 
-  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
+  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV, SILValue valueHint = SILValue()) {
     ASSERT(isLoadableOrOpaque(LV->getType()) &&
            !LV->getType().isTrivial(getFunction()));
     return insert(new (getModule())
-                      LoadBorrowInst(getSILDebugLocation(Loc), LV));
+                      LoadBorrowInst(getSILDebugLocation(Loc), LV, valueHint));
   }
 
   BeginBorrowInst *createBeginBorrow(
@@ -1105,6 +1105,13 @@ public:
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
 
+  /// Create a debug_value for an undef empty tuple. Used when the type of the
+  /// variable cannot be represented.
+  DebugValueInst *createVoidVariableDebugValue(
+      SILLocation Loc, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
+
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
   }
@@ -1248,20 +1255,21 @@ public:
                                                      base, inToken, tokenTy));
   }
 
-  ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty,
-                                             bool WithoutActuallyEscaping) {
-    return createConvertFunction(Loc, Op, Ty, WithoutActuallyEscaping,
+  ConvertFunctionInst *
+  createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                        ConvertFunctionInst::Kind ConversionKind =
+                            ConvertFunctionInst::Kind::Ordinary) {
+    return createConvertFunction(Loc, Op, Ty, ConversionKind,
                                  Op->getOwnershipKind());
   }
 
   ConvertFunctionInst *
   createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
-                        bool WithoutActuallyEscaping,
+                        ConvertFunctionInst::Kind ConversionKind,
                         ValueOwnershipKind forwardingOwnershipKind) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getModule(), F,
-        WithoutActuallyEscaping, forwardingOwnershipKind));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getModule(), F, ConversionKind,
+                                              forwardingOwnershipKind));
   }
 
   ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,
@@ -1601,6 +1609,13 @@ public:
                                                    SILValue Operand) {
     return insert(new (getModule()) UncheckedOwnershipInst(
         getSILDebugLocation(Loc), Operand, Operand->getOwnershipKind()));
+  }
+
+  UncheckedOwnershipInst *createUncheckedOwnership(SILLocation Loc,
+                                  SILValue Operand,
+                                  ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(new (getModule()) UncheckedOwnershipInst(
+        getSILDebugLocation(Loc), Operand, forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastInst *
@@ -2112,7 +2127,7 @@ public:
     SILType opTy = operand->getType();
     if (opTy.is<TupleType>())
       return createDestructureTuple(loc, operand);
-    if (opTy.getStructOrBoundGenericStruct())
+    if (opTy.getStructDecl())
       return createDestructureStruct(loc, operand);
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }
@@ -3442,6 +3457,10 @@ private:
 /// SIL instructions.
 class SILBuilderWithScope : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
+    // Instructions in a debug reconstruction block are scaffolding for a DWARF
+    // expression rather than real code, so they carry no debug scope.
+    if (I->getParent() && I->getParent()->isDebugReconstructionBlock())
+      return;
     ASSERT(I->getDebugScope() && "instruction has no debug scope");
     SILBasicBlock::iterator II(*I);
     auto End = I->getParent()->end();

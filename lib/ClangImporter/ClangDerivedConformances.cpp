@@ -143,45 +143,6 @@ lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   return {constMethod, mutMethod};
 }
 
-/// Alternative to `NominalTypeDecl::lookupDirect`.
-/// This function does not attempt to load extensions of the nominal decl.
-static TinyPtrVector<ValueDecl *>
-lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
-  ASTContext &ctx = decl->getASTContext();
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-  TinyPtrVector<ValueDecl *> result;
-
-  if (id.isOperator()) {
-    auto underlyingId = getOperatorName(ctx, id);
-    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
-    for (auto it : underlyingFuncs) {
-      if (auto synthesizedFunc =
-              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
-        result.push_back(synthesizedFunc);
-    }
-  } else {
-    // See if there is a Clang decl with the given name.
-    result = evaluateOrDefault(ctx.evaluator,
-                               ClangRecordMemberLookup({decl, id}), {});
-  }
-
-  // Check if there are any synthesized Swift members that match the name.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
-    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-      if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
-          namedMember->getName().getBaseIdentifier().is(id.str()) &&
-          // Make sure we don't add duplicate entries, as that would wrongly
-          // imply that lookup is ambiguous.
-          !llvm::is_contained(result, namedMember)) {
-        result.push_back(namedMember);
-      }
-    }
-  }
-  return result;
-}
-
 template <typename Decl>
 static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
                                                  Identifier id) {
@@ -613,11 +574,8 @@ categorizeIteratorFromTypeTag(const clang::TypeDecl *tyDecl) {
   return category;
 }
 
-std::optional<CxxIteratorCategory>
-CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
-                                 CxxRecordDeclDescriptor desc) const {
-  auto *decl = desc.decl;
-  auto &sema = desc.sema;
+static const clang::TypeDecl *
+findIteratorTypeTag(clang::Sema &sema, const clang::CXXRecordDecl *decl) {
   auto &ctx = decl->getASTContext();
 
   // Look for a non-primary specialization of std::iterator_traits<decl>.
@@ -650,34 +608,35 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
     // Only look for iterator_concept if we are using C++20 or above.
     auto *conceptDecl = lookupCxxTypeMember(sema, decl, "iterator_concept");
     if (conceptDecl)
-      return categorizeIteratorFromTypeTag(conceptDecl);
+      return conceptDecl;
 
     // iterator_concept should take precedence, but if it is absent, fallback
     // to iterator_category.
   }
 
-  if (auto *categoryDecl = lookupCxxTypeMember(sema, decl, "iterator_category")) {
-    auto info = categorizeIteratorFromTypeTag(categoryDecl);
-    if (info == CxxIteratorCategory::Contiguous)
-      info = CxxIteratorCategory::RandomAccess;
-    return info;
-  }
-
-  return {};
+  return lookupCxxTypeMember(sema, decl, "iterator_category");
 }
 
-bool swift::hasIteratorCategory(const clang::CXXRecordDecl *clangDecl) {
-  clang::IdentifierInfo *name =
-      &clangDecl->getASTContext().Idents.get("iterator_category");
-  auto members = clangDecl->lookup(name);
-  if (members.empty())
+std::optional<CxxIteratorCategory>
+CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
+                                 CxxRecordDeclDescriptor desc) const {
+  auto *tag = findIteratorTypeTag(desc.sema, desc.decl);
+  if (!tag)
+    return {};
+
+  auto info = categorizeIteratorFromTypeTag(tag);
+  if (tag->getName() == "iterator_category" &&
+      info == CxxIteratorCategory::Contiguous)
+    info = CxxIteratorCategory::RandomAccess;
+  return info;
+}
+
+bool swift::hasIteratorCategoryOrIteratorConcept(
+    clang::Sema &sema, const clang::CXXRecordDecl *clangDecl) {
+  auto *def = clangDecl->getDefinition();
+  if (!def)
     return false;
-  // NOTE: If this is a templated typedef, Clang might have instantiated
-  // several equivalent typedef decls, so members.isSingleResult() may
-  // return false here. But if they aren't equivalent, Clang should have
-  // already complained about this. Let's assume that they are equivalent.
-  // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  return isa<clang::TypeDecl>(members.front());
+  return findIteratorTypeTag(sema, def) != nullptr;
 }
 
 ValueDecl *
@@ -718,11 +677,6 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator) ||
       !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator))
     return; // Don't even bother if we don't have protocols for input iterators
-
-  // FIXME: hasIteratorCategory() is more conservative than it should be because
-  // it doesn't consider an inherited iterator_category, nor iterator_concept.
-  // For now, checking this maintains existing behavior and ensures consistency
-  // across ClangImporter, where clang::Sema isn't always readily available.
 
   auto iterInfo = evaluateOrDefault(
       ctx.evaluator, CxxIteratorInfoRequest({clangDecl, clangSema}), {});
@@ -999,7 +953,7 @@ static void conformToCxxIterableIfNeeded(
   // Substitute generic `Self` parameter.
   auto declSelfTy = decl->getDeclaredInterfaceType();
   auto borrowingIteratorTy =
-      BoundGenericType::get(borrowingIteratorNominal, Type(), {declSelfTy});
+      NominalType::get(borrowingIteratorNominal, Type(), {declSelfTy}, ctx);
 
   auto dereferenceResultDecl = cxxIteratorProto->getAssociatedType(
       ctx.getIdentifier("DereferenceResult"));
@@ -1087,19 +1041,10 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   if (!begin || !end)
     return;
 
-  // Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, begin() and end() are always
-  // renamed; with it they keep their original names and the renamed spellings
-  // become migration stubs.
-  if (ctx.LangOpts.hasFeature(
-          Feature::ImportUnsafeCxxMethodsAsAlwaysUnsafe)) {
-    ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
-           "begin() and end() should keep their names");
-  } else {
-    ASSERT(begin->getBaseName() == "__beginUnsafe" &&
-           "begin() should always be __Unsafe");
-    ASSERT(end->getBaseName() == "__endUnsafe" &&
-           "end() should always be __Unsafe");
-  }
+  // begin() and end() keep their original names; the renamed spellings are
+  // migration stubs.
+  ASSERT(begin->getBaseName() == "begin" && end->getBaseName() == "end" &&
+         "begin() and end() should keep their names");
   ASSERT(!begin->isMutating() && !end->isMutating() &&
          "begin() and end() should not be mutating");
 
@@ -1201,16 +1146,16 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       if (!rawMutableIteratorProto)
         return false;
 
-      // Check if present: `func __beginMutatingUnsafe() -> RawMutableIterator`
-      auto beginMutatingId = ctx.getIdentifier("__beginMutatingUnsafe");
+      // Check if present: `func beginMutating() -> RawMutableIterator`
+      auto beginMutatingId = ctx.getIdentifier("beginMutating");
       auto beginMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginMutatingId);
       if (!beginMutating)
         return false;
       auto rawMutableIteratorTy = beginMutating->getResultInterfaceType();
 
-      // Check if present: `func __endMutatingUnsafe() -> RawMutableIterator`
-      auto endMutatingId = ctx.getIdentifier("__endMutatingUnsafe");
+      // Check if present: `func endMutating() -> RawMutableIterator`
+      auto endMutatingId = ctx.getIdentifier("endMutating");
       auto endMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endMutatingId);
       if (!endMutating)
@@ -1502,6 +1447,15 @@ static void conformToCxxVector(ClangImporter::Implementation &impl,
   auto *RawIterator = dyn_cast_or_null<TypeAliasDecl>(
       impl.importDecl(const_iterator, impl.CurrentVersion));
   if (!Element || !Size || !RawIterator)
+    return;
+
+  // Before synthesizing the conformance to CxxVector, check if `RawIterator`
+  // conforms to `UnsafeCxxRandomAccessIterator`.
+  auto cxxRandomAccessIteratorProto =
+      ctx.getProtocol(KnownProtocolKind::UnsafeCxxRandomAccessIterator);
+  if (!cxxRandomAccessIteratorProto ||
+      !checkConformance(RawIterator->getUnderlyingType(),
+                        cxxRandomAccessIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,

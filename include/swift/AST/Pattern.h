@@ -154,10 +154,7 @@ public:
 
   /// Set the type of this pattern, given that it was previously not
   /// type-checked.
-  void setType(Type ty) {
-    assert(!ty || !ty->hasTypeVariable());
-    Ty = ty;
-  }
+  void setType(Type ty);
 
   /// Retrieve the delayed interface type of this pattern, if it has one.
   ///
@@ -252,8 +249,8 @@ public:
   /// \c mostRestrictiveSubpatterns is non-null, the pointed-to vector will be
   /// populated with references to the subpatterns that cause the pattern to
   /// have stricter than "shared" ownership behavior for diagnostic purposes.
-  ValueOwnership getOwnership(
-    SmallVectorImpl<Pattern*> *mostRestrictiveSubpatterns = nullptr) const;
+  LoweredOwnership getOwnership(
+      SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns = nullptr) const;
 
   static bool classof(const Pattern *P) { return true; }
 
@@ -498,9 +495,9 @@ public:
   static TypedPattern *
   createImplicit(ASTContext &ctx, Pattern *pattern, Type type) {
     auto tp = new (ctx) TypedPattern(pattern, /*typeRepr*/nullptr);
+    tp->setImplicit();
     if (!type.isNull())
       tp->setType(type);
-    tp->setImplicit();
     return tp;
   }
 

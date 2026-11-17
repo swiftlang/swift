@@ -26,8 +26,6 @@ TypeWalker::Action TypeDeclFinder::walkToTypePre(Type T) {
   // we see sugar that's purely structural, like `(Int)`. Fortunately, paren
   // types are the only such purely structural sugar at the time this comment
   // was written, and they're not so common in the first place.
-  if (auto *BGT = T->getAs<BoundGenericType>())
-    return visitBoundGenericType(BGT);
   if (auto *NT = T->getAs<NominalType>())
     return visitNominalType(NT);
 
@@ -36,11 +34,6 @@ TypeWalker::Action TypeDeclFinder::walkToTypePre(Type T) {
 
 TypeWalker::Action
 SimpleTypeDeclFinder::visitNominalType(NominalType *ty) {
-  return Callback(ty->getDecl());
-}
-
-TypeWalker::Action
-SimpleTypeDeclFinder::visitBoundGenericType(BoundGenericType *ty) {
   return Callback(ty->getDecl());
 }
 

@@ -35,6 +35,7 @@ struct ParsedSpecAttr {
   Identifier spiGroupID;
   ModuleDecl *spiModule;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
+  bool specializedSpelling;
 };
 
 /// The parser for an individual SIL function.

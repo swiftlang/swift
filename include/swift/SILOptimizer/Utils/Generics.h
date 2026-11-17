@@ -279,6 +279,15 @@ public:
   /// Returns true if there are any conversions from indirect to direct values.
   bool hasConversions() const { return Conversions.any(); }
 
+  /// Returns true if the specialized function keeps indirect parameters or
+  /// results, which would be converted to direct ones with the default
+  /// re-abstraction. Such a specialization has the abstraction of the original
+  /// function (e.g. as required for a witness in a specialized witness table)
+  /// and must get a different name than the re-abstracted specialization.
+  bool isNotReabstracted() const {
+    return !ConvertIndirectToDirect && hasConversions();
+  }
+
   /// Returns true if the argument at `ArgIdx` is a dropped argument.
   /// See `droppedArguments`.
   bool isDroppedArgument(unsigned ArgIdx) const {
@@ -495,6 +504,17 @@ ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF,
 /// externally defined specialization and should only be used when the function
 /// body is not required for further optimization or inlining (-Onone).
 SILFunction *lookupPrespecializedSymbol(SILModule &M, StringRef FunctionName);
+
+/// Returns the exported specialization of \p origF for \p subs, if its type
+/// is \p specializedType, or null. Callers reuse it instead of creating their
+/// own copy of the specialization.
+/// E.g. with '@specialized(exported: true, where T == Int)' on 'Box<T>',
+/// \p origF 'Box.get()' and \p subs 'T == Int' give the exported 'Box.get()'
+/// for 'Int', if its type is \p specializedType.
+SILFunction *lookupExportedSpecialization(SILOptFunctionBuilder &funcBuilder,
+                                          SILFunction *origF,
+                                          SubstitutionMap subs,
+                                          CanSILFunctionType specializedType);
 
 } // end namespace swift
 

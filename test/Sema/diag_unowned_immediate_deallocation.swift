@@ -1,8 +1,10 @@
-// RUN: %target-typecheck-verify-swift -module-name ModuleName -enable-upcoming-feature ImmutableWeakCaptures
+// RUN: %target-typecheck-verify-swift -module-name ModuleName -enable-upcoming-feature ImmutableWeakCaptures -swift-version 4 -verify-additional-prefix swift4-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -module-name ModuleName -verify-additional-prefix future- %}
 
 // REQUIRES: swift_feature_ImmutableWeakCaptures
 
 protocol ClassProtocol : class {
+// expected-future-warning@-1 {{using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead}}
   init()
   init?(failable: Void)
   init(throwing: Void) throws
@@ -325,6 +327,7 @@ func testTupleAndParenBinding() throws {
 }
 
 func testInitializationThroughClassArchetypeDiag<T : ClassProtocol>(_ t: T, _ p: ClassProtocol) throws {
+// expected-future-error@-1 {{use of protocol 'ClassProtocol' as a type must be written 'any ClassProtocol'}}
   weak let t1: T? = T() // expected-warning {{instance will be immediately deallocated because variable 't1' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'t1' declared here}}
@@ -332,6 +335,7 @@ func testInitializationThroughClassArchetypeDiag<T : ClassProtocol>(_ t: T, _ p:
   weak let t2: ClassProtocol? = T(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't2' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-2 {{'t2' declared here}}
+  // expected-future-error@-3 {{use of protocol 'ClassProtocol' as a type must be written 'any ClassProtocol'}}
 
   unowned let t3 = try type(of: t).init(throwing: ()) // expected-warning {{instance will be immediately deallocated because variable 't3' is 'unowned'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
@@ -343,6 +347,7 @@ func testInitializationThroughClassArchetypeDiag<T : ClassProtocol>(_ t: T, _ p:
 
   let optionalTType: T.Type? = T.self
   let optionalPType: ClassProtocol.Type? = type(of: p)
+  // expected-future-error@-1 {{use of protocol 'ClassProtocol' as a type must be written 'any ClassProtocol'}}
 
   weak let t5 = optionalTType?.init(failable: ()) // expected-warning {{instance will be immediately deallocated because variable 't5' is 'weak'}}
   // expected-note@-1 {{a strong reference is required to prevent the instance from being deallocated}}
@@ -452,10 +457,13 @@ func testGenericWeakClassDiag() {
 // The diagnostic doesn't currently support tuple shuffles.
 func testDontDiagnoseThroughTupleShuffles() {
   unowned let (c1, (c2, c3)): (c: C, (b: C, a: C)) = ((a: D(), b: C()), c: D())
-  // expected-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
-  // expected-warning@-2 {{implicit reordering of tuple elements from '_:c:' to 'c:_:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-2 {{implicit reordering of tuple elements from '_:c:' to 'c:_:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-future-error@-3 {{cannot implicitly reorder tuple elements from 'a:b:' to 'b:a:'}}
+  // expected-future-error@-4 {{cannot implicitly reorder tuple elements from '_:c:' to 'c:_:'}}
   unowned let c4 = ((a: C(), b: C()) as (b: C, a: C)).0
-  // expected-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{cannot implicitly reorder tuple elements from 'a:b:' to 'b:a:'}}
 
   _ = c1; _ = c2; _ = c3; _ = c4
 }

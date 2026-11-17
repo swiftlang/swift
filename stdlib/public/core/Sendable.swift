@@ -61,7 +61,7 @@
 /// The `Sendable` protocol inherits from `SendableMetatype`, so any generic
 /// type `T` with a requirement `T: Sendable` will have the implied requirement
 /// `T: SendableMetatype`.
-@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }
+@_marker public protocol SendableMetatype: ~Copyable, ~Escapable, ~Deinitable { }
 
 /// A thread-safe type whose values can be shared across arbitrary isolation
 /// domains without introducing a risk of data races.
@@ -194,7 +194,7 @@
 /// For a generic type `T`, its metatype `T.Type` does not necessarily conform
 /// to `Sendable`. Please see the `SendableMetatype` protocol for more
 /// information.
-@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }
+@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable, ~Deinitable { }
 
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,

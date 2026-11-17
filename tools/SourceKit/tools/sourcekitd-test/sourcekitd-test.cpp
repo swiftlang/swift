@@ -154,8 +154,6 @@ getBufferForFilename(StringRef Filename,
 
 static void notification_receiver(sourcekitd_response_t resp);
 
-static SourceKitRequest ActiveRequest = SourceKitRequest::None;
-
 #define KEY(NAME, CONTENT) static sourcekitd_uid_t Key##NAME;
 #define REQUEST(NAME, CONTENT) static sourcekitd_uid_t Request##NAME;
 #define KIND(NAME, CONTENT) static sourcekitd_uid_t Kind##NAME;
@@ -728,7 +726,6 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
 
   sourcekitd_object_t Req = sourcekitd_request_dictionary_create(nullptr,
                                                                  nullptr, 0);
-  ActiveRequest = Opts.Request;
   switch (Opts.Request) {
   case SourceKitRequest::None:
     llvm::errs() << "request is not set\n";
@@ -1359,7 +1356,7 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     sourcekitd_request_release(files);
   }
 
-  int64_t BeforeInstructions;
+  int64_t BeforeInstructions = 0;
   if (Opts.measureInstructions)
     BeforeInstructions = getSourceKitInstructionCount();
 
@@ -1420,7 +1417,14 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            TestOptions *InitOpts) {
   bool KeepResponseAlive = false;
   bool IsError = sourcekitd_response_is_error(Resp);
-  if (IsError) {
+  if (IsError && Opts.AllowErrorResponse) {
+    // An allowed error response is an expected result of the request, so print
+    // it to stdout in order with the other responses.
+    char *Desc = sourcekitd_response_description_copy(Resp);
+    llvm::outs() << Desc << '\n';
+    free(Desc);
+
+  } else if (IsError) {
     sourcekitd_response_description_dump(Resp);
 
   } else if (!Opts.PrintResponse) {
@@ -1674,7 +1678,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
   if (!KeepResponseAlive)
     sourcekitd_response_dispose(Resp);
-  return IsError;
+  return IsError && !Opts.AllowErrorResponse;
 }
 
 sourcekitd_variant_t LatestSemaAnnotations = {{0,0,0}};

@@ -11,15 +11,15 @@
 // constraining a generic parameter
 
 // CHECK-LABEL: .Ord_CI@
-// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Ord_CI]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Ord_CI]A : Deinitable, Self.[Ord_CI]A : Escapable>
 protocol Ord_CI { associatedtype A: ~Copyable }
 
 // CHECK-LABEL: .Ord_II@
-// CHECK: Requirement signature: <Self where Self : Escapable, Self.[Ord_II]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self : Escapable, Self.[Ord_II]A : Deinitable, Self.[Ord_II]A : Escapable>
 protocol Ord_II: ~Copyable { associatedtype A: ~Copyable }
 
 // CHECK-LABEL: .Ord_IIII@
-// CHECK: Requirement signature: <Self>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self.[Ord_IIII]A : Deinitable>
 protocol Ord_IIII: ~Copyable, ~Escapable { associatedtype A: ~Copyable, ~Escapable }
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Ord_CI
@@ -48,15 +48,15 @@ func test1<X, Y, Z>(_ x: X, y: Y, z: Z) where
 // constraining a generic parameter
 
 // CHECK-LABEL: .Pri_CI@
-// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Pri_CI]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Copyable, Self : Escapable, Self.[Pri_CI]A : Deinitable, Self.[Pri_CI]A : Escapable>
 protocol Pri_CI<A> { associatedtype A: ~Copyable }
 
 // CHECK-LABEL: .Pri_II@
-// CHECK: Requirement signature: <Self where Self : Escapable, Self.[Pri_II]A : Escapable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self : Escapable, Self.[Pri_II]A : Deinitable, Self.[Pri_II]A : Escapable>
 protocol Pri_II<A>: ~Copyable { associatedtype A: ~Copyable }
 
 // CHECK-LABEL: .Pri_IIII@
-// CHECK: Requirement signature: <Self>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self.[Pri_IIII]A : Deinitable>
 protocol Pri_IIII<A>: ~Copyable, ~Escapable { associatedtype A: ~Copyable, ~Escapable }
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Pri_CI
@@ -111,11 +111,11 @@ struct ImplyP<V> where V: Pri_CI {}
 func implied1<T>(_ t: ImplyP<T>) {}
 
 // CHECK-LABEL: .P3@
-// CHECK: Requirement signature: <Self where Self.[P3]B : Copyable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self.[P3]B : Copyable>
 protocol P3 where Self: (~Copyable & ~Escapable) { associatedtype B: ~Escapable }
 
 // CHECK-LABEL: .P4@
-// CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Escapable>
+// CHECK: Requirement signature: <Self where Self : Copyable, Self.[P4]B : Copyable, Self.[P4]C : Deinitable, Self.[P4]C : Escapable, Self.[P4]D : Deinitable>
 protocol P4<B, D>: ~Escapable {
   associatedtype B: ~Escapable
   associatedtype C: ~Copyable
@@ -129,7 +129,7 @@ func test3<T>(_ p: T) where T: P4 {}
 
 
 // CHECK-LABEL: .View@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable,
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable,
 // CHECK-SAME:                                    Self.[View]Body : View,
 // CHECK-SAME:                                    Self.[View]Body.[View]Body : Copyable>
 protocol View<Body>: ~Copyable {
@@ -150,7 +150,7 @@ func test4_2(_ v: some View) {}
 
 
 // CHECK-LABEL: .View2@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable,
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable,
 // CHECK-SAME:                                    Self.[View2]Body : View2>
 protocol View2<Body>: ~Copyable {
   associatedtype Body: ~Copyable, View2 where Body.Body: ~Copyable
@@ -169,7 +169,7 @@ func test5_1<V: View2>(_ v: V) {}
 func test5_2(_ v: some View2) {}
 
 // CHECK-LABEL: .Red@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable,
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable,
 // CHECK-SAME:                                    Self.[Red]R : Blue,
 // CHECK-SAME:                                    Self.[Red]R.[Blue]B : Copyable
 protocol Red<R>: ~Copyable {
@@ -177,7 +177,7 @@ protocol Red<R>: ~Copyable {
 }
 
 // CHECK-LABEL: .Blue@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable,
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable,
 // CHECK-SAME:                                    Self.[Blue]B : Red,
 // CHECK-SAME:                                    Self.[Blue]B.[Red]R : Copyable>
 protocol Blue<B>: ~Copyable {
@@ -190,7 +190,7 @@ func test6(_: some Red) {}
 
 
 // CHECK-LABEL: .Base@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable, Self.[Base]Elm : Escapable, Self.[Base]Iter : Escapable>
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable, Self.[Base]Elm : Deinitable, Self.[Base]Elm : Escapable, Self.[Base]Iter : Deinitable, Self.[Base]Iter : Escapable>
 protocol Base<Elm>: ~Copyable {
   associatedtype Elm: ~Copyable
   associatedtype Iter: ~Copyable
@@ -287,13 +287,13 @@ func testExpansion2<T>(_ t: borrowing T) where
 
 
 // CHECK-LABEL: .Iterable@
-// CHECK-NEXT: Requirement signature: <Self where Self : Escapable, Self.[Iterable]Element : Escapable>
+// CHECK-NEXT: Requirement signature: <Self where Self : Deinitable, Self : Escapable, Self.[Iterable]Element : Deinitable, Self.[Iterable]Element : Escapable>
 protocol Iterable<Element>: ~Copyable {
   associatedtype Element: ~Copyable
 }
 
 // CHECK-LABEL: .PersistedDictionary@
-// CHECK-NEXT: Requirement signature: <Self where Self : Iterable, Self.[Iterable]Element == Self.[PersistedDictionary]Value, Self.[PersistedDictionary]Key : Escapable, Self.[PersistedDictionary]Strategy : Escapable>
+// CHECK-NEXT: Requirement signature: <Self where Self : Iterable, Self.[Iterable]Element == Self.[PersistedDictionary]Value, Self.[PersistedDictionary]Key : Deinitable, Self.[PersistedDictionary]Key : Escapable, Self.[PersistedDictionary]Strategy : Deinitable, Self.[PersistedDictionary]Strategy : Escapable>
 protocol PersistedDictionary<Key, Value>: ~Copyable, Iterable<Self.Value> {
   associatedtype Key: ~Copyable
   associatedtype Value: ~Copyable

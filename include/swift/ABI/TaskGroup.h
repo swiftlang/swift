@@ -47,8 +47,13 @@ public:
   /// Only mark the task group as cancelled, without performing the follow-up
   /// work of cancelling all the child tasks.
   ///
-  /// Returns true if the group was already cancelled before this call.
-  bool statusCancel();
+  /// Returns true if the group was already cancelled before this call. The
+  /// first cancellation of the group decides its reason.
+  bool statusCancel(size_t reason);
+
+  /// The reason of the first cancellation of the group. Only meaningful if
+  /// the group is cancelled.
+  size_t getCancellationReason();
 
   // Add a child task to the task group. Always called while holding the
   // status record lock of the task group's owning task.

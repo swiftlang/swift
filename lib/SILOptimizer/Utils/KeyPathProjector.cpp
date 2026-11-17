@@ -45,7 +45,7 @@ public:
     }
     
     bool isStruct() override {
-        return root->getType().getStructOrBoundGenericStruct() != nullptr;
+        return root->getType().getStructDecl() != nullptr;
     }
 private:
     SILValue root;
@@ -68,7 +68,7 @@ protected:
     
     bool isStruct() override {
         auto type = component.getComponentType();
-        return type.getStructOrBoundGenericStruct() != nullptr;
+        return type.getStructDecl() != nullptr;
     }
     
     ~ComponentProjector() override {};
@@ -112,7 +112,21 @@ public:
         parentAccessType = AccessType::Modify;
       
       parent->project(parentAccessType, [&](SILValue parentValue) {
-        auto addr = builder.createStructElementAddr(loc, parentValue, storedProperty);
+        SILValue addr =
+            builder.createStructElementAddr(loc, parentValue, storedProperty);
+
+        // The modern projection of a C array reinterprets its stored
+        // counterpart as a different type.
+        if (storedProperty->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+          SILType componentTy =
+              builder.getFunction()
+                  .getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                  component.getComponentType())
+                  .getAddressType();
+          if (addr->getType() != componentTy)
+            addr = builder.createUncheckedAddrCast(loc, addr, componentTy);
+        }
+
         // If we're setting, destroy the old value (the callback expects uninitialized memory)
         if (accessType == AccessType::Set)
           builder.createDestroyAddr(loc, addr);
@@ -133,7 +147,7 @@ public:
         insertEndAccess(beginAccess, builder);
         
         // Handle the case where the storedProperty is in a super class.
-        while (Ref->getType().getClassOrBoundGenericClass() !=
+        while (Ref->getType().getClassDecl() !=
                storedProperty->getDeclContext()) {
           SILType superCl = Ref->getType().getSuperclass();
           ASSERT(superCl && "the property should be in the decl or in a superclass of it");
@@ -611,7 +625,7 @@ public:
   bool isStruct() override {
     auto components = keyPath->getPattern()->getComponents();
     auto resultType = components.back().getComponentType();
-    return resultType.getStructOrBoundGenericStruct() != nullptr;
+    return resultType.getStructDecl() != nullptr;
   }
   
 private:

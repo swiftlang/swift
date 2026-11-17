@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <limits.h>
 #include <optional>
 #include <vector>
@@ -135,6 +136,19 @@ enum class NonRecursivePrintOption : uint32_t {
 };
 using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 
+/// The most restrictive interface that a declaration or type can be printed in.
+/// The cases are ordered from least to most restrictive.
+enum class InterfaceVisibility : uint8_t {
+  /// Printed in every interface.
+  Public,
+  /// Printed in the private and package interfaces.
+  SPI,
+  /// Printed only in the package interface.
+  Package,
+  /// Not printed in any interface.
+  None,
+};
+
 /// Options for printing AST nodes.
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
@@ -178,6 +192,14 @@ public:
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print the 'unsafe' of implicit 'unsafe' expressions.
+  ///
+  /// This compensates for codegen that defensively wraps with UnsafeExpr, so
+  /// that 'unsafe' isn't printed into files that don't check strict memory
+  /// safety. Avoid introducing more uses of this; we need to compute where
+  /// UnsafeExpr is actually needed.
+  bool PrintImplicitUnsafe = true;
+
   /// Whether to print expressions.
   bool PrintExprs = false;
   
@@ -189,6 +211,10 @@ public:
 
   /// Use \c let for a read-only computed property.
   bool InferPropertyIntroducerFromAccessors = false;
+
+  /// Print pattern bindings with the introducer they were declared with,
+  /// instead of inferring \c let or \c var from whether they are settable.
+  bool PrintPatternBindingIntroducerAsWritten = false;
 
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
@@ -258,6 +284,22 @@ public:
     InterfaceContentKind = mode;
   }
 
+  /// Whether something with the given visibility is printed in the interface
+  /// described by these options.
+  bool printsInterfaceVisibility(InterfaceVisibility visibility) const {
+    switch (visibility) {
+    case InterfaceVisibility::Public:
+      return true;
+    case InterfaceVisibility::SPI:
+      return !printPublicInterface();
+    case InterfaceVisibility::Package:
+      return printPackageInterface();
+    case InterfaceVisibility::None:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
   /// spelling of the type name.
@@ -286,7 +328,8 @@ public:
 
     /// If there is an exported module name and the named module is the main
     /// module or has been loaded by the main module, use it instead of the
-    /// regular name.
+    /// regular name. A loaded module must also be visible through the imports
+    /// printed in the interface, so that clients can refer to it.
     IfLoaded,
 
     /// Always use the regular name.
@@ -308,10 +351,6 @@ public:
 
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
-
-  /// Add a `@_silgen_name` attribute to each function that
-  /// is compatible with one that specifies its mangled name.
-  bool PrintSyntheticSILGenName = false;
 
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
@@ -352,7 +391,13 @@ public:
   /// if SkipImplicit or SkipUnavailable is set.
   bool AlwaysPrintNonSendableExtensions = true;
 
+  /// Whether to print imported declarations with the \c swift_private
+  /// clang attribute.
   bool SkipSwiftPrivateClangDecls = false;
+
+  /// Whether to print only the visible projection of imported declarations
+  /// which use C arrays.
+  bool SkipHiddenCArrayProjections = true;
 
   /// Whether to skip underscored declarations from system modules.
   bool SkipPrivateSystemDecls = false;
@@ -430,11 +475,19 @@ public:
   /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
   bool SuppressUnsafeAlways = false;
 
+  /// Suppress the kind in `@_semantics("availability.osversion(<kind>)")` and
+  /// emit `@_semantics("availability.osversion")` instead.
+  bool SuppressOSVersionQueryKind = false;
+
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
 
   /// Suppress printing of @c in favor of @_cdecl.
   bool SuppressCAttribute = false;
+
+  /// Suppress printing of Deinitable and ~Deinitable in the inheritance
+  /// clauses of protocols.
+  bool SuppressDeinitableProtocol = false;
 
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
@@ -468,6 +521,10 @@ public:
 
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
+
+  /// Suppress 'consuming' on parameters whose function type implies it, as one
+  /// with at-most-once semantics does.
+  bool SuppressImpliedConsumingParams = false;
 
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
@@ -744,6 +801,7 @@ public:
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
     result.PrintHomogeneousTuplesCompactly = true;
+    result.SuppressImpliedConsumingParams = true;
     return result;
   }
 

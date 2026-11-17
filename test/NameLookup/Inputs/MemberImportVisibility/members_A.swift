@@ -122,3 +122,19 @@ public struct EquatableInA: Equatable {
     false
   }
 }
+
+public struct DynamicMemberAttributesInA { }
+
+@dynamicMemberLookup
+public struct DynamicMemberScopesInA {
+  public subscript<T>(dynamicMember keyPath: KeyPath<DynamicMemberAttributesInA, T>) -> T { fatalError() }
+}
+
+@dynamicMemberLookup
+public struct DynamicMemberLookupInA {
+  public init() {}
+  public subscript<T>(dynamicMember keyPath: KeyPath<DynamicMemberScopesInA, T>) -> T? {
+    get { nil }
+    set { }
+  }
+}

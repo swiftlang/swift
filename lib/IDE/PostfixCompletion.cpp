@@ -257,28 +257,20 @@ getOperatorCompletionTypes(DeclContext *DC, Type LHSType, OperatorDecl *Op) {
   CodeCompletionExpr LHS(Loc);
   CodeCompletionExpr RHS(Loc);
 
-  UnresolvedDeclRefExpr UDRE(DeclNameRef(Op->getName()),
-                             getDeclRefKindOfOperator(Op), DeclNameLoc(Loc));
-  DiagnosticTransaction IgnoreDiags(DC->getASTContext().Diags);
-  Expr *OpExpr = resolveDeclRefExpr(&UDRE, DC);
-  IgnoreDiags.abort();
-  if (isa<ErrorExpr>(OpExpr)) {
-    // If we couldn't resolve the operator (e.g. because there is only an
-    // operator definition but no decls that implement it), we can't call the
-    // operator.
-    return {};
-  }
+  UnresolvedDeclRefExpr OpExpr(DeclNameRef(Op->getName()),
+                               getDeclRefKindOfOperator(Op), DeclNameLoc());
 
+  auto &ctx = CS.getASTContext();
   Expr *OpCallExpr;
   switch (Op->getKind()) {
   case DeclKind::PrefixOperator:
     // Don't insert prefix operators in postfix position.
     return {};
   case DeclKind::PostfixOperator:
-    OpCallExpr = PostfixUnaryExpr::create(DC->getASTContext(), OpExpr, &LHS);
+    OpCallExpr = PostfixUnaryExpr::create(ctx, &OpExpr, &LHS);
     break;
   case DeclKind::InfixOperator:
-    OpCallExpr = BinaryExpr::create(DC->getASTContext(), &LHS, OpExpr, &RHS,
+    OpCallExpr = BinaryExpr::create(ctx, &LHS, &OpExpr, &RHS,
                                     /*implicit*/ true);
     break;
   default:

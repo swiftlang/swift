@@ -81,13 +81,13 @@ public func subclassgeneric_concrete() {
 // CHECK-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // CHECK:       cacheIsNull:
-// macosx-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// ios-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// watchos-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// tvos-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// linux-gnu-NEXT:     [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// linux-android-NEXT: [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
-// windows-msvc-NEXT: [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMD")
+// macosx-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// ios-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// watchos-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// tvos-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// linux-gnu-NEXT:     [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// linux-android-NEXT: [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
+// windows-msvc-NEXT: [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMd", ptr @"$s32conditional_conformance_subclass15SubclassGenericCyAA4IsP2VGMR")
 
 // CHECK:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0

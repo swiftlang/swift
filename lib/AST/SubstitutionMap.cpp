@@ -89,11 +89,8 @@ bool SubstitutionMap::empty() const {
   return getGenericSignature().isNull();
 }
 
-bool SubstitutionMap::hasAnySubstitutableParams() const {
-  auto genericSig = getGenericSignature();
-  if (!genericSig) return false;
-
-  return !genericSig->areAllParamsConcrete();
+bool SubstitutionMap::isEffectivelyGeneric() const {
+  return getGenericSignature().isEffectivelyGeneric();
 }
 
 RecursiveTypeProperties SubstitutionMap::getRecursiveProperties() const {
@@ -519,6 +516,7 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<ArchetypeType>() &&
           !substType->isTypeVariableOrMember() &&
           !substType->is<PlaceholderType>() &&
+          !substType->is<HoleType>() &&
           !substType->is<ErrorType>()) {
         ABORT([&](auto &out) {
           out << "Unexpected abstract conformance in substitution map:\n";

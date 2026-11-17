@@ -198,6 +198,14 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
       callVisitUse(op);
       continue;
     }
+    if (auto *pesi = dyn_cast<PackElementSetInst>(user)) {
+      // Storing an address into a pack escapes it: a later pack_element_get
+      // can read it back out, and its uses aren't followed.
+      if (op == pesi->getValueOperand())
+        recordEscape(op);
+      callVisitUse(op);
+      continue;
+    }
 
     // First, eliminate "end point uses" that we just need to check liveness at
     // and do not need to check transitive uses of.
@@ -219,7 +227,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<DiagnoseInst>(user) ||
         isa<UncheckedRefCastAddrInst>(user) || isa<KeyPathInst>(user) ||
         isa<RetainValueAddrInst>(user) || isa<ReleaseValueAddrInst>(user) ||
-        isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
+        isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
         isa<MergeIsolationRegionInst>(user) ||

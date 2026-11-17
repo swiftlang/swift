@@ -75,7 +75,6 @@ private struct AnalyzedInstructions {
   var loopReadOnlyEffects: StackWithCount<Instruction>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
-  var scopedInsts: Stack<UnaryInstruction>
 
   // loop blocks that dominate all exiting and latch blocks
   var dominatingBlocks: BasicBlockSet
@@ -90,7 +89,6 @@ private struct AnalyzedInstructions {
     self.loopReadOnlyEffects = StackWithCount<Instruction>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
-    self.scopedInsts = Stack<UnaryInstruction>(context)
     self.dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
   }
   
@@ -99,7 +97,6 @@ private struct AnalyzedInstructions {
     loopReadOnlyEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
-    scopedInsts.deinitialize()
     dominatingBlocks.deinitialize()
   }
 }
@@ -141,8 +138,6 @@ private func analyzeInstructions(
         continue // Don't set `hasOtherMemReadingInsts`
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
-      case let beginAccessInst as BeginAccessInst:
-        analyzedInstructions.scopedInsts.append(beginAccessInst)
       default:
         break
       }
@@ -201,14 +196,15 @@ private func collectSpeculativelyMovableInstructions(in loop: Loop,
       case is LoadInst:
         movableInstructions.loadsAndStores.append(inst)
       case let storeInst as StoreInst:
-        movableInstructions.loadsAndStores.append(inst)
-        
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
-        if storeCounter * analyzedInstructions.loopSideEffects.count >= 8000 {
-          break
+        if storeCounter * analyzedInstructions.loopSideEffects.count < 8000 {
+          storeCounter += 1
+          // `hoistAndSinkLoadsAndStores` would erase a store after `speculativelyHoistInstructions` hoisted it.
+          if collectSpeculativelyHoistableStoreInstruction(in: loop, storeInst: storeInst, analyzedInstructions, &movableInstructions, context) {
+            break
+          }
         }
-        storeCounter += 1
-        collectSpeculativelyHoistableStoreInstruction(in: loop, storeInst: storeInst, analyzedInstructions, &movableInstructions, context)
+        movableInstructions.loadsAndStores.append(inst)
 
       case let refElementAddrInst as RefElementAddrInst:
         movableInstructions.speculativelyHoistable.append(refElementAddrInst)
@@ -221,25 +217,25 @@ private func collectSpeculativelyMovableInstructions(in loop: Loop,
 
 /// Collect a `store` instruction as speculatively hoistable if appropriate. If
 /// its destination is (part of) a stack allocation inside the loop, also
-/// potentially hoist that.
+/// potentially hoist that. Returns true if the store is collected.
 private func collectSpeculativelyHoistableStoreInstruction(
   in loop: Loop,
   storeInst: StoreInst,
   _ analyzedInstructions: AnalyzedInstructions,
   _ movableInstructions: inout MovableInstructions,
   _ context: FunctionPassContext
-) {
+) -> Bool {
 
   // Only attempt to hoist trivial stores for now. Hoisting an init or assign
   // store could have visible side effects depending on the type's inits and
   // deinit.
   if storeInst.storeOwnership != .trivial {
-    return
+    return false
   }
 
   // If the stored value is produced inside the loop, we cannot hoist the store.
   if loop.contains(block: storeInst.source.parentBlock) {
-    return
+    return false
   }
 
   let accessPath = storeInst.destination.accessPath
@@ -253,13 +249,13 @@ private func collectSpeculativelyHoistableStoreInstruction(
   guard let baseAddress = accessPath.base.address
   else {
     log("Access base is unknown. Cannot hoist.")
-    return
+    return false
   }
 
   guard baseAddress.type.isTrivial(in: storeInst.parentFunction)
   else {
     log("Access base is non-trivial. Cannot hoist.\n\(baseAddress).")
-    return
+    return false
   }
 
   if !storesUniqueReadableValue(
@@ -267,7 +263,7 @@ private func collectSpeculativelyHoistableStoreInstruction(
     accessPath: accessPath, storeInst: storeInst, context)
   {
     log("Found an instruction with a read or write effect that prevents store hoisting.")
-    return
+    return false
   }
 
   // We can only hoist the store if doing so would have no observable effects on
@@ -304,21 +300,22 @@ private func collectSpeculativelyHoistableStoreInstruction(
     // if the store writes directly to the alloc_stack.
     if storeInst.destination != allocStackInst {
       log("Store destination is not the alloc_stack. Cannot hoist.\n\(storeInst.destination)")
-      return
+      return false
     }
     log("Hoisting alloc_stack and store.")
     movableInstructions.speculativelyHoistable.append(allocStackInst)
     movableInstructions.speculativelyHoistable.append(storeInst)
-    return
+    return true
   }
 
   if !analyzedInstructions.dominatingBlocks.contains(storeInst.parentBlock) {
     log("Store writes to an address outside the loop. Not safe to hoist speculatively.")
-    return
+    return false
   }
 
   log("Store dominates all loop exits and latches. Safe to hoist.")
   movableInstructions.speculativelyHoistable.append(storeInst)
+  return true
 }
 
 
@@ -690,12 +687,12 @@ private extension AnalyzedInstructions {
         return false
       }
 
-      guard !loadInst.isDeleted, loadInst.operand.value.accessPath.contains(accessPath) else {
+      guard !loadInst.isDeleted, loadInst.address.accessPath.contains(accessPath) else {
         newLoads.push(loadInst)
         continue
       }
 
-      guard let projectionPath =  loadInst.operand.value.accessPath.getProjection(to: accessPath),
+      guard let projectionPath =  loadInst.address.accessPath.getProjection(to: accessPath),
             let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
         newLoads.push(loadInst)
         return false
@@ -908,7 +905,7 @@ private extension MovableInstructions {
       // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
       let rootVal = currentVal ?? ssaUpdater.getValue(atBeginOf: block)
 
-      if loadInst.operand.value.accessPath == accessPath {
+      if loadInst.address.accessPath == accessPath {
         if loadInst.loadOwnership == .copy {
           let builder = Builder(before: loadInst, context)
           let copy = builder.createCopyValue(operand: rootVal)
@@ -920,7 +917,7 @@ private extension MovableInstructions {
         continue
       }
       
-      guard let projectionPath = accessPath.getProjection(to: loadInst.operand.value.accessPath) else {
+      guard let projectionPath = accessPath.getProjection(to: loadInst.address.accessPath) else {
         continue
       }
     
@@ -1099,7 +1096,7 @@ private extension Instruction {
     case let storeInst as StoreInst:
       return mayReadOrWrite(address: storeInst.destinationOperand.value, aliasAnalysis)
     case let loadInst as LoadInst:
-      return mayWrite(toAddress: loadInst.operand.value, aliasAnalysis)
+      return mayWrite(toAddress: loadInst.address, aliasAnalysis)
     case is CondFailInst:
       return false
     default:
@@ -1141,7 +1138,7 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
-    if let path = accessPath.getProjection(to: self.operand.value.accessPath),
+    if let path = accessPath.getProjection(to: self.address.accessPath),
        // If the accessPath is wider than load, it needs to be materializable.
        // Otherwise we won't be able to project it.
        path.isMaterializable {
@@ -1149,7 +1146,7 @@ private extension LoadInst {
       return true
     }
     
-    if self.operand.value.accessPath.isEqualOrContains(accessPath) {
+    if self.address.accessPath.isEqualOrContains(accessPath) {
       // The load is wider than the access path.
       return true
     }
@@ -1234,22 +1231,7 @@ private extension ScopedInstruction {
     guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock) && !($0 is TermInst) }) else {
       return false
     }
-    
-    // Instruction specific preconditions
-    switch self {
-    case is BeginAccessInst, is LoadBorrowInst:
-      guard (analyzedInstructions.scopedInsts
-        .allSatisfy { otherScopedInst in
-          guard self != otherScopedInst else { return true }
 
-          return operands.first!.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
-        }) else {
-        return false
-      }
-    default:
-      break
-    }
-    
     var scope = InstructionRange(begin: self, ends: endInstructions, context)
     defer { scope.deinitialize() }
     
@@ -1288,7 +1270,7 @@ private extension AccessPath {
     case .box(let inst as Instruction), .class(let inst as Instruction),
       .index(let inst as Instruction),
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
-      .storeBorrow(let inst as Instruction),
+      .storeBorrow(let inst as Instruction), .borrowMutateAccessor(let inst as Instruction),
       .tail(let inst as Instruction):
       if loop.contains(block: inst.parentBlock) {
         return false

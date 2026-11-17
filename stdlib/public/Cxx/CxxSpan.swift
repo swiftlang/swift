@@ -69,23 +69,28 @@ public protocol CxxSpan<Element> {
   init(_ unsafePointer: UnsafePointer<Element>!, _ count: Size)
 
   func size() -> Size
-  func __dataUnsafe() -> UnsafePointer<Element>?
+  @unsafe(always)
+  func data() -> UnsafePointer<Element>?
 }
 
 extension CxxSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @export(implementation)
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
-    unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
-                  "UnsafeBufferPointer should not point to nil")
-    unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
+    guard let baseAddress = unsafeBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeBufferPointer.count))
   }
 
   @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
-                  "UnsafeMutableBufferPointer should not point to nil")
-    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    guard let baseAddress = unsafeMutableBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeMutableBufferPointer.count))
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
@@ -100,6 +105,13 @@ extension CxxSpan where Element: ~Copyable {
     }
     unsafe self.init(p)
   }
+
+  @available(*, deprecated, renamed: "data()")
+  @unsafe
+  @export(implementation)
+  public func __dataUnsafe() -> UnsafePointer<Element>? {
+    unsafe data()
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -111,7 +123,7 @@ extension Span where Element: ~Copyable {
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = unsafe UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let buffer = unsafe UnsafeBufferPointer(start: span.data(), count: Int(span.size()))
     let newSpan = unsafe Span(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
     self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
@@ -127,7 +139,7 @@ extension MutableSpan where Element: ~Copyable {
   public init<T: CxxMutableSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = unsafe UnsafeMutableBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
+    let buffer = unsafe UnsafeMutableBufferPointer(start: span.data(), count: Int(span.size()))
     let newSpan = unsafe MutableSpan(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
     self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
@@ -142,16 +154,19 @@ public protocol CxxMutableSpan<Element> {
   init(_ unsafeMutablePointer: UnsafeMutablePointer<Element>!, _ count: Size)
 
   func size() -> Size
-  func __dataUnsafe() -> UnsafeMutablePointer<Element>?
+  @unsafe(always)
+  func data() -> UnsafeMutablePointer<Element>?
 }
 
 extension CxxMutableSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
-                  "UnsafeMutableBufferPointer should not point to nil")
-    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    guard let baseAddress = unsafeMutableBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeMutableBufferPointer.count))
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
@@ -165,5 +180,12 @@ extension CxxMutableSpan where Element: ~Copyable {
       _fixLifetime(span)
     }
     unsafe self.init(p)
+  }
+
+  @available(*, deprecated, renamed: "data()")
+  @unsafe
+  @export(implementation)
+  public func __dataUnsafe() -> UnsafeMutablePointer<Element>? {
+    unsafe data()
   }
 }

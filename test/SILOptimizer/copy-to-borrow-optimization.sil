@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-to-borrow-optimization %s | %FileCheck %s --check-prefix=EFFECTS
 
 sil_stage canonical
 
@@ -49,6 +50,10 @@ final class Klass {
 }
 
 class C {}
+
+class RawSpanBox {
+  @_hasStorage var span: RawSpan
+}
 
 struct S {
   let c: C
@@ -2791,3 +2796,295 @@ bb0(%0 : @owned $ClassLet):
   return %r : $()
 }
 
+
+struct NCWithDeinit: ~Copyable {
+  @_hasStorage let c: C
+  deinit
+}
+
+sil @nc_with_deinit_deinit : $@convention(method) (@owned NCWithDeinit) -> ()
+sil @use_nc_with_deinit : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+
+sil_moveonlydeinit NCWithDeinit {
+  @nc_with_deinit_deinit
+}
+
+// The destroy of the struct calls the deinit and must not be removed.
+// CHECK-LABEL: sil [ossa] @dont_remove_destroy_of_value_with_deinit :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[S:%.*]] = struct $NCWithDeinit ([[C]]
+// CHECK:         destroy_value [[S]]
+// CHECK:       } // end sil function 'dont_remove_destroy_of_value_with_deinit'
+sil [ossa] @dont_remove_destroy_of_value_with_deinit : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0
+  %2 = struct $NCWithDeinit (%1)
+  %3 = function_ref @use_nc_with_deinit : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed NCWithDeinit) -> ()
+  destroy_value %2
+  %6 = tuple ()
+  return %6
+}
+
+// rdar://190060113
+//
+// The lifetime of the copy ends in a `destructure_struct` with only trivial results, so there is no
+// `destroy_value`. The borrow scope of the source must still cover this use. The test fails in the SIL
+// verifier ("Found outside of lifetime use?!") if the use ends up after the `end_borrow`.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_trivial_destructure :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         destructure_struct [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_trivial_destructure'
+sil [ossa] @copy_ends_in_trivial_destructure : $@convention(thin) (@in_guaranteed RawSpan) -> Int {
+bb0(%0 : $*RawSpan):
+  %1 = load_borrow %0 : $*RawSpan
+  %2 = copy_value %1 : $RawSpan
+  end_borrow %1 : $RawSpan
+  (%3, %4) = destructure_struct %2 : $RawSpan
+  return %4 : $Int
+}
+
+// Same hole as above, but the lifetime of the copy ends in an `unchecked_enum_data` which extracts a trivial
+// payload out of a non-trivial enum.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_trivial_enum_data :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         unchecked_enum_data [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_trivial_enum_data'
+sil [ossa] @copy_ends_in_trivial_enum_data : $@convention(thin) (@in_guaranteed MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = load_borrow %0 : $*MultiPayload
+  %2 = copy_value %1 : $MultiPayload
+  end_borrow %1 : $MultiPayload
+  %3 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
+  return %3 : $MyInt
+}
+
+// The lifetime of the copy ends in a `switch_enum` whose non-payload successor has no destroy. The borrow
+// scope of the source must cover the `switch_enum`.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_switch_enum_none_case :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         switch_enum [[B]]
+// CHECK:       bb1({{.*}} : @guaranteed $Klass):
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_switch_enum_none_case'
+sil [ossa] @copy_ends_in_switch_enum_none_case : $@convention(thin) (@in_guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : $*FakeOptional<Klass>):
+  %1 = load_borrow %0 : $*FakeOptional<Klass>
+  %2 = copy_value %1 : $FakeOptional<Klass>
+  end_borrow %1 : $FakeOptional<Klass>
+  switch_enum %2 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%4 : @owned $Klass):
+  destroy_value %4 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The lifetime of the loaded value ends in a `destructure_struct` with only trivial results. The borrow scope
+// of the base reference must be extended over the `destructure_struct`.
+//
+// CHECK-LABEL: sil [ossa] @load_copy_ends_in_trivial_destructure :
+// CHECK:         [[BB:%.*]] = begin_borrow %0
+// CHECK:         [[LB:%.*]] = load_borrow
+// CHECK-NEXT:    destructure_struct [[LB]]
+// CHECK-NEXT:    end_borrow [[LB]]
+// CHECK-NEXT:    end_borrow [[BB]]
+// CHECK:       } // end sil function 'load_copy_ends_in_trivial_destructure'
+sil [ossa] @load_copy_ends_in_trivial_destructure : $@convention(thin) (@owned RawSpanBox) -> Int {
+bb0(%0 : @owned $RawSpanBox):
+  %1 = begin_borrow %0 : $RawSpanBox
+  %2 = ref_element_addr %1 : $RawSpanBox, #RawSpanBox.span
+  %3 = load [copy] %2 : $*RawSpan
+  end_borrow %1 : $RawSpanBox
+  (%4, %5) = destructure_struct %3 : $RawSpan
+  destroy_value %0 : $RawSpanBox
+  return %5 : $Int
+}
+
+// A write to the loaded address before a trivial `destructure_struct` must prevent the `load_borrow`
+// conversion, even though there is no destroy.
+//
+// CHECK-LABEL: sil [ossa] @load_copy_trivial_destructure_after_write :
+// CHECK:         load [copy]
+// CHECK-NOT:     load_borrow
+// CHECK:       } // end sil function 'load_copy_trivial_destructure_after_write'
+sil [ossa] @load_copy_trivial_destructure_after_write : $@convention(thin) (@inout MultiPayload, MyInt) -> MyInt {
+bb0(%0 : $*MultiPayload, %1 : $MyInt):
+  %2 = load [copy] %0 : $*MultiPayload
+  %3 = enum $MultiPayload, #MultiPayload.b!enumelt, %1 : $MyInt
+  store %3 to [assign] %0 : $*MultiPayload
+  %5 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
+  return %5 : $MyInt
+}
+
+// Check that a callee which takes its @in argument (with copy_addr [take] or load [take])
+// is considered to write to the argument's memory. Otherwise a `load [copy]` from the argument
+// is wrongly converted to a `load_borrow` with a lifetime overlapping the call.
+
+sil [ossa] @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  copy_addr [take] %0 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = load [take] %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_copy_addr_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_copy_addr_take_in_callee'
+sil [ossa] @load_copy_before_copy_addr_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_load_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_load_take_in_callee'
+sil [ossa] @load_copy_before_load_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// The load_borrow stays within the access scope it loads from.
+// CHECK-LABEL: sil [ossa] @load_copy_within_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load_borrow [[A]]
+// CHECK:         apply {{%.*}}([[L]])
+// CHECK-NEXT:    end_borrow [[L]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_within_access_scope'
+sil [ossa] @load_copy_within_access_scope : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  %3 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %2
+  end_access %1
+  %7 = tuple ()
+  return %7
+}
+
+// A load_borrow would outlive the access scope it loads from.
+// CHECK-LABEL: sil [ossa] @load_copy_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_outlives_access_scope'
+sil [ossa] @load_copy_outlives_access_scope : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  %3 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// The lifetime of the load ends without a destroy, after the access scope ends.
+// CHECK-LABEL: sil [ossa] @load_copy_nondestroying_end_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK-NEXT:    unchecked_enum_data [[L]]
+// CHECK:       } // end sil function 'load_copy_nondestroying_end_outlives_access_scope'
+sil [ossa] @load_copy_nondestroying_end_outlives_access_scope : $@convention(thin) (@inout MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  %4 = unchecked_enum_data %2, #MultiPayload.b!enumelt
+  return %4
+}
+
+// The access scope must be found through a mark_dependence.
+// CHECK-LABEL: sil [ossa] @load_copy_through_mark_dependence_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [nonescaping] [[A]]
+// CHECK-NEXT:    load [copy] [[MD]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_through_mark_dependence_outlives_access_scope'
+sil [ossa] @load_copy_through_mark_dependence_outlives_access_scope : $@convention(thin) (@inout C, @guaranteed C) -> () {
+bb0(%0 : $*C, %1 : @guaranteed $C):
+  %2 = begin_access [read] [static] %0
+  %3 = mark_dependence [nonescaping] %2 on %1
+  %4 = load [copy] %3
+  end_access %2
+  %6 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %4
+  %9 = tuple ()
+  return %9
+}
+
+struct AccessorNT {
+  var c: C
+}
+
+sil @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+
+// The store through the nonmutating mutate accessor result writes the alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @nonmutating_mutate_accessor_result_written :
+// CHECK:         load [copy] %0
+// CHECK-NOT:     store_borrow
+// CHECK-LABEL: } // end sil function 'nonmutating_mutate_accessor_result_written'
+sil [ossa] @nonmutating_mutate_accessor_result_written : $@convention(thin) (@in_guaranteed AccessorNT, @owned C) -> () {
+bb0(%0 : $*AccessorNT, %1 : @owned $C):
+  %2 = load [copy] %0
+  %3 = alloc_stack $AccessorNT
+  store %2 to [init] %3
+  %5 = function_ref @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  store %1 to [assign] %6
+  destroy_addr %3
+  dealloc_stack %3
+  %10 = tuple ()
+  return %10
+}

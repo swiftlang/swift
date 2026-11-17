@@ -612,6 +612,26 @@ static void findFavoredChoicesBasedOnArity(
     favoredChoice(choice);
 }
 
+/// Returns true if an argument of \p argumentType matches a parameter of
+/// \p paramType exactly, or only by converting the execution semantics of the
+/// argument.
+static bool matchesExceptForExecutionSemantics(Type argumentType,
+                                               Type paramType) {
+  if (argumentType->isEqual(paramType))
+    return true;
+
+  auto *paramFnType = paramType->getAs<FunctionType>();
+  auto *argumentFnType = argumentType->getAs<FunctionType>();
+  if (!paramFnType || !argumentFnType)
+    return false;
+
+  auto paramSemantics = paramFnType->getExecutionSemantics();
+  return canConvertExecutionSemantics(argumentFnType->getExecutionSemantics(),
+                                      paramSemantics) &&
+         argumentFnType->withExecutionSemantics(paramSemantics)
+             ->isEqual(paramFnType);
+}
+
 /// Preserves old behavior where, for unary calls, the solver would not previously
 /// consider choices that didn't match on the number of parameters (regardless of
 /// defaults and variadics) and only exact matches were favored.
@@ -724,7 +744,8 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
             (isa<LiteralExpr>(argument) || isa<BinaryExpr>(argument)))
           return;
 
-        if (argumentType->isEqual(param.getPlainType())) {
+        if (matchesExceptForExecutionSemantics(argumentType,
+                                               param.getPlainType())) {
           if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (func->isAsyncContext() !=
                 cs.isAsynchronousContext(choice->getDeclContext()))
@@ -984,8 +1005,10 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
   }
 
   // Check protocol requirement(s) if this parameter is a
-  // generic parameter type.
-  if (genericSig && paramType->isTypeParameter()) {
+  // generic parameter type or dependent member type.
+  if (paramType->isTypeParameter()) {
+    ASSERT(genericSig);
+
     // Light-weight check if cases where `checkRequirements` is not
     // applicable.
     auto checkProtocolRequirementsOnly = [&]() -> unsigned {
@@ -996,19 +1019,14 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
             return conformance &&
                    !cs.isConformanceUnavailable(conformance, locator);
           })) {
-        if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
-          auto *paramDecl = GP->getDecl();
-          if (paramDecl && paramDecl->isOpaqueType())
-            return 100;
-        }
         return 70;
       }
 
       return 0;
     };
 
-    // If candidate is not fully resolved or is matched against a
-    // dependent member type (i.e. `Self.T`), let's check conformances
+    // If the candidate type is not fully resolved or if the parameter type is
+    // a dependent member type (i.e. `Self.T`), let's check conformances
     // only and lower the score.
     if (candidateType->hasTypeVariable() ||
         candidateType->hasUnboundGenericType() ||
@@ -1016,9 +1034,8 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
       return checkProtocolRequirementsOnly();
     }
 
-    // Cannot match anything but generic type parameters here.
-    if (!paramType->is<GenericTypeParamType>())
-      return std::nullopt;
+    // We must have a generic parameter type by now.
+    ASSERT(paramType->is<GenericTypeParamType>());
 
     bool hasUnsatisfiableRequirements = false;
     SmallVector<Requirement, 4> requirements;
@@ -1036,10 +1053,35 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
         });
       };
 
-      recordReferencesGenericParams(requirement.getFirstType());
+      switch (requirement.getKind()) {
+      case RequirementKind::Layout:
+        // RHS of a layout requirement is not a type.
+        break;
 
-      if (requirement.getKind() != RequirementKind::Layout)
+      case RequirementKind::Conformance:
+        // The introduction of the Deinitable protocol, which almost
+        // everything conforms to, changed the favoring computation.
+        // Ignore Deinitable to get the old behavior back for now.
+        //
+        // FIXME: Get rid of this, obviously.
+        if (requirement.getProtocolDecl()->isSpecificProtocol(
+            KnownProtocolKind::Deinitable)) {
+          continue;
+        }
+
+        // Desugared conformance requirements don't have type parameters
+        // on the RHS.
+        break;
+
+      case RequirementKind::Superclass:
+      case RequirementKind::SameType:
+      case RequirementKind::SameShape:
+        // Consider the RHS type.
         recordReferencesGenericParams(requirement.getSecondType());
+        break;
+      }
+
+      recordReferencesGenericParams(requirement.getFirstType());
 
       if (llvm::any_of(toExamine, [&](GenericTypeParamType *GP) {
             return paramType->isEqual(GP);
@@ -1462,12 +1504,8 @@ static DisjunctionInfo computeDisjunctionInfo(
   forEachDisjunctionChoice(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-        GenericSignature genericSig;
-        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-          genericSig = GF->getGenericSignature();
-        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-          genericSig = SD->getGenericSignature();
-        }
+        auto genericSig = decl->getInnermostDeclContext()
+                              ->getGenericSignatureOfContext();
 
         auto matchings =
             matchArguments(choice->getOverloadChoice(), overloadType);

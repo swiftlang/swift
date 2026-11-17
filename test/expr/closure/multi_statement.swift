@@ -442,7 +442,7 @@ func test_non_optional_guard_let_is_diagnosed() {
 
   fn {
     if true {
-      guard let v = $0 else { // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+      guard let v = $0 else { // expected-warning {{initializer for conditional binding has non-optional type 'Int'}}
         return
       }
 
@@ -454,7 +454,7 @@ func test_non_optional_guard_let_is_diagnosed() {
     switch $0 {
     case (let val):
       fn {
-        guard let x = val else {  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
+        guard let x = val else {  // expected-warning {{initializer for conditional binding has non-optional type 'Int'}}
           return
         }
 

@@ -149,10 +149,6 @@ void Parser::performIDEInspectionSecondPassImpl(
 
   DeclContext *DC = info.ParentContext;
 
-  // Forget about the fact that we may have already computed local
-  // discriminators.
-  Context.evaluator.clearCachedOutput(LocalDiscriminatorsRequest{DC});
-
   // Clear any ASTScopes that were expanded.
   SF.clearScope();
 
@@ -169,7 +165,7 @@ void Parser::performIDEInspectionSecondPassImpl(
     parseExprOrStmt(Result);
     if (!Result.isNull()) {
       auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
-      TLCD->setBody(Brace);
+      TLCD->setBody(Brace, /*resetDiscriminators*/ true);
     }
     break;
   }
@@ -334,7 +330,11 @@ static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, SILParserStateBase *SIL,
                PersistentParserState *PersistentState)
-    : Parser(BufferID, SF, &SF.getASTContext().Diags, SIL, PersistentState) {}
+    : Parser(BufferID, SF,
+             SF.shouldSuppressParserDiagnostics()
+                 ? nullptr
+                 : &SF.getASTContext().Diags,
+             SIL, PersistentState) {}
 
 Parser::Parser(unsigned BufferID, SourceFile &SF, DiagnosticEngine *LexerDiags,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
@@ -472,7 +472,13 @@ public:
 
 Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                SILParserStateBase *SIL, PersistentParserState *PersistentState)
-    : SourceMgr(SF.getASTContext().SourceMgr), Diags(SF.getASTContext().Diags),
+    : SourceMgr(SF.getASTContext().SourceMgr),
+      Diags(SF.shouldSuppressParserDiagnostics()
+                ? SuppressedDiagQueue
+                      .emplace(SF.getASTContext().Diags,
+                               /*emitOnDestruction=*/false)
+                      .getDiags()
+                : SF.getASTContext().Diags),
       SF(SF), L(Lex.release()), SIL(SIL), CurDeclContext(&SF),
       Context(SF.getASTContext()),
       TokReceiver(SF.shouldCollectTokens()

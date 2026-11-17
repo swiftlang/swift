@@ -24,11 +24,13 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/LanguageMode.h"
 #include "llvm/ADT/SmallVector.h"
@@ -669,8 +671,9 @@ static bool parameterTypesMatch(const ValueDecl *derivedDecl,
     auto *baseParam = baseParams->get(i);
     auto *derivedParam = derivedParams->get(i);
 
-    // Make sure inout-ness and varargs match.
-    if (baseParam->isInOut() != derivedParam->isInOut() ||
+    // Make sure ownership specifiers and varargs match.
+    if (!paramSpecifiersMatch(baseDecl, baseParam->getSpecifier(),
+                                       derivedParam->getSpecifier()) ||
         baseParam->isVariadic() != derivedParam->isVariadic()) {
       return false;
     }
@@ -1238,6 +1241,10 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
 
   checkOverrideAccessControl(baseDecl, decl, ctx);
 
+  if (!isa<AccessorDecl>(decl))
+    diagnoseImplicitForceUnwrapOfIUOParams(decl, baseDecl,
+                                           /*isWitness=*/false);
+
   bool mayHaveMismatchedOptionals =
       (attempt == OverrideCheckingAttempt::MismatchedOptional ||
        attempt == OverrideCheckingAttempt::BaseNameWithMismatchedOptional);
@@ -1608,7 +1615,8 @@ namespace  {
     UNINTERESTING_ATTR(Borrowing)
     UNINTERESTING_ATTR(CDecl)
     UNINTERESTING_ATTR(COM)
-    UNINTERESTING_ATTR(Called)
+    UNINTERESTING_ATTR(Callable)
+    UNINTERESTING_ATTR(ScopeParams)
     UNINTERESTING_ATTR(Concurrent)
     UNINTERESTING_ATTR(Consuming)
     UNINTERESTING_ATTR(Coroutine)
@@ -1676,6 +1684,7 @@ namespace  {
     UNINTERESTING_ATTR(UIApplicationMain)
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
+    UNINTERESTING_ATTR(Once)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
@@ -1702,6 +1711,7 @@ namespace  {
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
     UNINTERESTING_ATTR(ReferenceOwnership)
+    UNINTERESTING_ATTR(CArrayProjection)
 
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
@@ -1911,8 +1921,12 @@ checkOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   if (baseAccessor && overrideAccessor) {
     // Skip implicit accessors since they're synthesized with availability that
     // matches the accessors that they were derived from and therefore
-    // diagnostics for them will be redundant.
-    if (baseAccessor->isImplicit())
+    // diagnostics for them will be redundant. An explicit unavailable accessor
+    // that overrides an implicit one (e.g. the setter of a stored property) is
+    // still reachable through dynamic dispatch, though.
+    if (baseAccessor->isImplicit() &&
+        (overrideAccessor->isImplicit() ||
+         result.first != OverrideAvailability::OverrideUnavailable))
       return {OverrideAvailability::Ignored, std::nullopt};
 
     // If we're checking an accessor that's overriding another accessor, ignore
@@ -2233,28 +2247,59 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     break;
   }
   case OverrideAvailability::OverrideUnavailable: {
+    // An unavailable override is still reachable through dynamic dispatch, so
+    // it must be rejected.
     auto unavailableAttr = constraint->getAttr();
     auto domain = unavailableAttr.getDomain();
     auto parsedAttr = unavailableAttr.getParsedAttr();
 
+    // Marking a refined protocol requirement unavailable is fine.
+    if (isa<ProtocolDecl>(override->getDeclContext()))
+      break;
+
+    // `@_spi_available` overrides are printed as unavailable in public
+    // interfaces so this diagnostic cannot be enforced in swiftinterfaces.
+    if (override->getDeclContext()->isInSwiftinterface())
+      break;
+
+    // Only unconditional unavailability is banned, since it is meant to
+    // represent unreachability at runtime.
+    if (constraint->getReason() !=
+        AvailabilityRestriction::Reason::UnavailableUnconditionally)
+      break;
+
+    std::optional<LanguageMode> warnUntilLanguageMode;
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Universal:
     case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     case AvailabilityDomain::Kind::PackageDescription:
     case AvailabilityDomain::Kind::Platform:
-      // FIXME: [availability] Diagnose as an error in a future Swift version.
+      // Diagnosing overrides that are unavailable in these domains would be
+      // source breaking for Swift 6 and earlier.
+      warnUntilLanguageMode = LanguageMode::future;
       break;
     case AvailabilityDomain::Kind::Embedded:
     case AvailabilityDomain::Kind::Custom:
-      if (parsedAttr->getLocation().isValid())
-        ctx.Diags.diagnose(override, diag::override_unavailable, override)
-            .fixItRemove(parsedAttr->getRangeWithAt());
-      else
-        ctx.Diags.diagnose(override, diag::override_unavailable, override);
-      ctx.Diags.diagnose(base, diag::overridden_here);
       break;
     }
+
+    auto diag =
+        ctx.Diags.diagnose(override, diag::override_unavailable, override);
+    diag.warnUntilLanguageMode(warnUntilLanguageMode);
+
+    // Only suggest removing the attribute if it was written on the override,
+    // rather than inherited from an enclosing extension or added by a macro.
+    auto attrLoc = parsedAttr->getLocation();
+    bool isAttrWrittenOnOverride =
+        attrLoc.isValid() &&
+        llvm::is_contained(override->getAttrs(), parsedAttr) &&
+        ctx.SourceMgr.findBufferContainingLoc(attrLoc) ==
+            ctx.SourceMgr.findBufferContainingLoc(override->getLoc());
+    if (isAttrWrittenOnOverride)
+      diag.fixItRemove(parsedAttr->getRangeWithAt());
+    diag.flush();
+    ctx.Diags.diagnose(base, diag::overridden_here);
     break;
   }
   case OverrideAvailability::OverrideLessAvailable: {
@@ -2267,22 +2312,21 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     break;
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true)) {
-    // If the override is unsafe but the base declaration is not, then the
-    // inheritance itself is unsafe.
-    auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
-    ConcreteDeclRef overrideRef(override);
-    ConcreteDeclRef baseRef(base, subs);
-    if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
-      // Don't diagnose @unsafe overrides if the subclass is @unsafe.
-      auto overridingClass = override->getDeclContext()->getSelfClassDecl();
-      bool shouldDiagnose = !overridingClass || !isUnsafe(overridingClass);
+  // If the override is unsafe but the base declaration is not, then the
+  // inheritance itself is unsafe.
+  auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+  ConcreteDeclRef overrideRef(override);
+  ConcreteDeclRef baseRef(base, subs);
+  if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
+    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+    bool shouldDiagnose = !overridingClass || !isUnsafe(overridingClass);
 
-      if (shouldDiagnose) {
-        diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
-      }
+    if (shouldDiagnose) {
+      diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
     }
   }
+
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
   AttributeOverrideChecker attrChecker(base, override);

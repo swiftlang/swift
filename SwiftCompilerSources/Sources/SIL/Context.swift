@@ -108,6 +108,11 @@ extension Context {
     return _bridged.lookupWitnessTable(conformance.bridged).witnessTable
   }
 
+  /// Like `lookupWitnessTable`, but deserializes the witness table if it's not in the module yet.
+  public func loadWitnessTable(for conformance: Conformance) -> WitnessTable? {
+    return _bridged.loadWitnessTable(conformance.bridged).witnessTable
+  }
+
   /// Replaces opaque result types in `conformance` with their underlying types.
   ///
   /// If an associated type is an opaque result type, the associated conformance is abstract.

@@ -783,6 +783,24 @@ entry:
   return %retval : $()
 }
 
+sil [ossa] @yield_unwind : $@yield_once (@owned T) -> (@yields @inout T, @out T) {
+bb0(%0 : $*T, %1 : @owned $T):
+  %2 = alloc_stack $T
+  store %1 to [init] %2 : $*T
+  yield (%2 : $*T), resume bb1, unwind bb2
+
+bb1:
+  copy_addr [take] %2 to [init] %0 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  unwind
+}
+
 sil [ossa] @test : $@convention(thin) (@guaranteed KlassOrBool) -> () {
 bb0(%0 : @guaranteed $KlassOrBool):
   %1 = alloc_stack $KlassOrBool                   
@@ -1201,3 +1219,18 @@ bb6:
   return %26
 }
 
+
+sil @borrow_with_index : $@convention(method) (@in_guaranteed T, @guaranteed Inner) -> @guaranteed_address T
+sil @use_guaranteed_T : $@convention(thin) (@in_guaranteed T) -> ()
+
+// The result of a borrow accessor is not a projection of an address index argument.
+sil [ossa] @test_borrow_accessor_with_address_index : $@convention(thin) (@in T, @guaranteed Inner) -> () {
+bb0(%0 : $*T, %1 : @guaranteed $Inner):
+  %2 = function_ref @borrow_with_index : $@convention(method) (@in_guaranteed T, @guaranteed Inner) -> @guaranteed_address T
+  %3 = apply %2(%0, %1) : $@convention(method) (@in_guaranteed T, @guaranteed Inner) -> @guaranteed_address T
+  destroy_addr %0
+  %5 = function_ref @use_guaranteed_T : $@convention(thin) (@in_guaranteed T) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@in_guaranteed T) -> ()
+  %7 = tuple ()
+  return %7
+}

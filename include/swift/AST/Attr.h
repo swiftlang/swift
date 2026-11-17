@@ -32,8 +32,8 @@
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/StorageImpl.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/EnumTraits.h"
 #include "swift/Basic/Feature.h"
@@ -46,7 +46,6 @@
 #include "swift/Basic/Version.h"
 #include "swift/Basic/WarningGroupBehavior.h"
 #include "llvm/ADT/DenseMapInfo.h"
-#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -147,11 +146,6 @@ enum : unsigned {
 enum : unsigned {
   NumNonexhaustiveModeBits = countBitsUsed(
       static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
-};
-
-enum : unsigned {
-  NumExecutionSemanticsBits = countBitsUsed(
-      static_cast<unsigned>(ExecutionSemantics::Last_ExecutionSemantics))
 };
 
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
@@ -301,12 +295,12 @@ protected:
       mode : NumNonexhaustiveModeBits
     );
 
-    SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
-      threading : 3
+    SWIFT_INLINE_BITFIELD(CArrayProjectionAttr, DeclAttribute, 2,
+      projection : 2
     );
 
-    SWIFT_INLINE_BITFIELD(CalledAttr, DeclAttribute, NumExecutionSemanticsBits,
-      Semantics : NumExecutionSemanticsBits
+    SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
+      threading : 3
     );
   } Bits;
   // clang-format on
@@ -837,7 +831,10 @@ public:
   : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
-  const StringRef Value;
+  ///
+  /// The type checker can refine this, e.g., by adding the inferred kind of an
+  /// OS version query function.
+  StringRef Value;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Semantics;
@@ -2048,8 +2045,8 @@ public:
   ValueDecl *getTargetFunctionDecl(const ValueDecl *forDecl) const;
 
   /// \p forDecl is the value decl that the attribute belongs to.
-  GenericSignature
-  getSpecializedSignature(const AbstractFunctionDecl *forDecl) const;
+  /// '@_specialize' is on functions; '@specialized' on functions and types.
+  GenericSignature getSpecializedSignature(const Decl *forDecl) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialize ||
@@ -2168,6 +2165,55 @@ public:
                                 GenericSignature specializedSignature,
                                 DeclNameRef replacedFunction,
                                 LazyMemberLoader *resolver, uint64_t data);
+
+  /// A specialization of a member from a '@specialized' attribute on its type
+  /// or on an extension of it (see getTypeLevelSpecializations).
+  struct TypeLevelSpecialization {
+    GenericSignature signature;
+    bool exported;
+    /// The module of the attribute: the type's, or an extension's.
+    const ModuleDecl *module;
+  };
+
+  /// Get the specializations of \p member in \p result, from '@specialized' on
+  /// its type, or on an extension if exported. E.g. for 'Box.get()', with
+  /// '@specialized(exported: true, where T == Int) struct Box<T>' in module A
+  /// and '@specialized(exported: true, where T == UInt8) extension Box {}' in
+  /// module B: ('T == Int', exported, A) and ('T == UInt8', exported, B).
+  static void
+  getTypeLevelSpecializations(const AbstractFunctionDecl *member,
+                              SmallVectorImpl<TypeLevelSpecialization> &result);
+
+  /// Adds to \p result the specialized types, e.g. 'Box<Int>', one per
+  /// exported '@specialized' attribute on \p decl, a type or an extension of
+  /// one.
+  static void getExportedTypeSpecializations(const Decl *decl,
+                                             SmallVectorImpl<CanType> &result);
+
+  /// The module that owns the metadata of \p type, e.g. 'Box<Int>', if an
+  /// exported '@specialized' attribute declares it: the type's module, or that
+  /// of an extension with the attribute. None in regular Swift, whose runtime
+  /// instantiates generic metadata.
+  static ModuleDecl *getExportedTypeSpecializationOwner(CanType type);
+
+  /// Whether the metadata owner owns \p conformance's witness table, e.g. for
+  /// 'Box<Int>: P' when the type's module or the owner declares
+  /// 'extension Box: P'.
+  static bool
+  isExportedConformanceSpecialization(const ProtocolConformance *conformance);
+
+  /// Whether \p decl is a '@specialized' declaration without a body (a free
+  /// function or a member in an extension, in a source file): it names an
+  /// imported module's declaration instead of declaring one, e.g.:
+  ///   @specialized(exported: true, where T == Int)
+  ///   public func sum<T: FixedWidthInteger>(_ a: T, _ b: T) -> T
+  static bool isSpecializationDeclaration(const Decl *decl);
+
+  /// Adds to \p result the modules that \p module links (as
+  /// ModuleDecl::collectLinkLibraries), whose exported specializations it uses.
+  static void
+  getModulesWithUsedSpecializations(const ModuleDecl *module,
+                                    SmallVectorImpl<ModuleDecl *> &result);
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Specialized;
@@ -3885,6 +3931,64 @@ public:
   }
 };
 
+/// Which of the C array projections the declaration in question belongs to.
+///
+/// This type is sometimes used to indicate which counterpart projections ought
+/// to be imported; in that context, \c Modern is a sentinel indicating that
+/// no C arrays are involved and no special behavior is needed. The order of
+/// the cases is significant for this type of logic.
+enum class CArrayProjection : uint8_t {
+  /// The modern projection, using an \c InlineArray . To avoid introducing
+  /// dependencies on \c InlineArray 's type metadata, a modern projection of a
+  /// \c VarDecl is always computed, never stored.
+  Modern = 0,
+  /// The legacy projection, using a homogeneous tuple.
+  Legacy = 1,
+  /// The hidden storage projection, using \c Builtin.FixedArray . Hidden
+  /// storage is used when a stored C array property has no legacy projection.
+  HiddenStorage = 2
+};
+
+StringRef getCArrayProjectionSpelling(CArrayProjection value);
+
+/// Indicates that the declaration contains an imported C array and therefore
+/// may be one of two projections.
+class CArrayProjectionAttr : public DeclAttribute {
+  ValueDecl *counterpart;
+
+public:
+  CArrayProjectionAttr(CArrayProjection projection, ValueDecl *counterpart)
+    : DeclAttribute(DeclAttrKind::CArrayProjection, SourceLoc(),
+                    SourceRange(), /*isImplicit=*/true),
+      counterpart(counterpart) {
+    Bits.CArrayProjectionAttr.projection = static_cast<uint8_t>(projection);
+  }
+
+  /// Which of the projections the attached declaration is.
+  CArrayProjection getProjection() const {
+    return static_cast<CArrayProjection>(Bits.CArrayProjectionAttr.projection);
+  }
+
+  /// The declaration that is the other half of this one's pair.
+  ValueDecl *getCounterpart() const {
+    return counterpart;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::CArrayProjection;
+  }
+
+  CArrayProjectionAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CArrayProjectionAttr(getProjection(),
+                                          getCounterpart());
+  }
+
+  bool isEquivalent(const CArrayProjectionAttr *other,
+                    Decl *attachedTo) const {
+    return getProjection() == other->getProjection()
+              && getCounterpart() == other->getCounterpart();
+  }
+};
 
 /// Threading model for COM coclass, specified via `@com(threading:)`.
 //Must match COMThreadingModel in the COM module.
@@ -3939,47 +4043,56 @@ public:
   }
 };
 
-class CalledAttr : public DeclAttribute {
+/// Returns the attribute that gives a function type the execution semantics
+/// \p semantics, as spelled in source: `@once` or `@callable(once)`.
+const char *getExecutionSemanticsAttrSpelling(ExecutionSemantics semantics);
+
+/// The `@callable(once)` attribute on a closure, which makes it at-most-once.
+/// `@once` uses the simple \c OnceAttr.
+class CallableAttr : public DeclAttribute {
 public:
-  CalledAttr(SourceLoc atLoc, SourceRange range, ExecutionSemantics semantics,
-             bool implicit = false)
-      : DeclAttribute(DeclAttrKind::Called, atLoc, range, implicit) {
-    Bits.CalledAttr.Semantics = unsigned(semantics);
-  }
-
-  CalledAttr(ExecutionSemantics semantics)
-      : CalledAttr(SourceLoc(), SourceRange(), semantics) {}
-
-  bool isAtMostOnce() const {
-    return getSemantics() == ExecutionSemantics::AtMostOnce;
-  }
-
-  bool isExactlyOnce() const {
-    return getSemantics() == ExecutionSemantics::Once;
-  }
-
-  ExecutionSemantics getSemantics() const {
-    return ExecutionSemantics(Bits.CalledAttr.Semantics);
-  }
-
-  const char *getSemanticsName() const {
-    return getSemanticsName(getSemantics());
-  }
-
-  /// Returns the source spelling of the argument of `@called` for the given
-  /// execution semantics, such as `atMostOnce`.
-  static const char *getSemanticsName(ExecutionSemantics semantics);
+  CallableAttr(SourceLoc atLoc, SourceRange range, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Callable, atLoc, range, implicit) {}
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Called;
+    return DA->getKind() == DeclAttrKind::Callable;
   }
 
-  CalledAttr *clone(ASTContext &ctx) const {
-    return new (ctx) CalledAttr(AtLoc, Range, getSemantics(), isImplicit());
+  CallableAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CallableAttr(AtLoc, Range, isImplicit());
   }
 
-  bool isEquivalent(const CalledAttr *other, Decl *attachedTo) const {
-    return getSemantics() == other->getSemantics();
+  bool isEquivalent(const CallableAttr *other, Decl *attachedTo) const {
+    return true;
+  }
+};
+
+/// The `@_scopeParams` attribute, which declares the explicit scope parameters
+/// of a function or type, e.g. `@_scopeParams(a, b)`.
+class ScopeParamsAttr : public DeclAttribute {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsAttr(SourceLoc atLoc, SourceRange range,
+                  ScopeParamListRepr *params, bool implicit = false)
+      : DeclAttribute(DeclAttrKind::ScopeParams, atLoc, range, implicit),
+        Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::ScopeParams;
+  }
+
+  ScopeParamsAttr *clone(ASTContext &ctx) const {
+    return new (ctx) ScopeParamsAttr(AtLoc, Range, Params, isImplicit());
+  }
+
+  bool isEquivalent(const ScopeParamsAttr *other, Decl *attachedTo) const {
+    return llvm::equal(Params->getParams(), other->Params->getParams(),
+                       [](Located<ScopeName> lhs, Located<ScopeName> rhs) {
+                         return lhs.Item == rhs.Item;
+                       });
   }
 };
 
@@ -4477,13 +4590,9 @@ protected:
       Kind : 8
     );
 
-    SWIFT_INLINE_BITFIELD_FULL(CalledTypeAttr, TypeAttribute, 8,
-      Semantics : 8
-    );
-
     SWIFT_INLINE_BITFIELD_FULL(ScopedTypeAttr, TypeAttribute, 32,
       : NumPadBits,
-      NumSpecifiers : 32
+      NumRestrictions : 32
     );
   } Bits;
   // clang-format on
@@ -4687,123 +4796,55 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-/// Wrapper for `Identifier`s which syntactically refer to scopes to reduce risk
-/// of confusion / implementation bugs.
-class ScopeName {
-  Identifier Name;
-
-public:
-  explicit ScopeName(Identifier name) : Name(name) {}
-
-  Identifier getIdentifier() const { return Name; }
-
-  friend bool operator==(ScopeName lhs, ScopeName rhs) {
-    return lhs.Name == rhs.Name;
-  }
-  friend bool operator!=(ScopeName lhs, ScopeName rhs) { return !(lhs == rhs); }
-};
-
-/// A scope as written, e.g. `&a`, `self`, or `immortal`, before resolution.
-class ScopeDescriptor {
-public:
-  /// Does this scope descriptor refer to something by name, `self`, or
-  /// `immortal`?
-  enum class Subject : uint8_t { Name, Self, Immortal };
-
-private:
-  /// The name (null unless the subject is `Name`), whether this is an access
-  /// (`&`), and the subject.
-  llvm::PointerIntPair<llvm::PointerIntPair<Identifier, 1, bool>, 2, Subject>
-      Storage;
-  SourceLoc Loc;
-
-  ScopeDescriptor(Subject subject, Identifier name, bool isAccess,
-                  SourceLoc loc)
-      : Storage({name, isAccess}, subject), Loc(loc) {}
-
-public:
-  /// Create a scope descriptor that refers to a name, e.g. `a`
-  static ScopeDescriptor forScopeName(Located<ScopeName> name) {
-    return {Subject::Name, name.Item.getIdentifier(), /*isAccess=*/false,
-            name.Loc};
-  }
-
-  /// Create a scope descriptor that describes the access of a value, e.g. `&a`
-  static ScopeDescriptor forAccessedValue(Located<Identifier> name) {
-    return {Subject::Name, name.Item, /*isAccess=*/true, name.Loc};
-  }
-
-  static ScopeDescriptor forSelf(SourceLoc selfLoc, bool isAccess) {
-    return {Subject::Self, Identifier(), isAccess, selfLoc};
-  }
-
-  static ScopeDescriptor forImmortal(SourceLoc immortalLoc) {
-    return {Subject::Immortal, Identifier(), /*isAccess=*/false, immortalLoc};
-  }
-
-  Subject getSubject() const { return Storage.getInt(); }
-
-  /// Whether this is `&a`, the scope of an access to the value `a`, rather than
-  /// a scope itself.
-  bool isAccess() const { return Storage.getPointer().getInt(); }
-
-  ScopeName getScopeName() const {
-    ASSERT(getSubject() == Subject::Name && !isAccess());
-    return ScopeName(Storage.getPointer().getPointer());
-  }
-
-  Identifier getAccessedValue() const {
-    ASSERT(getSubject() == Subject::Name && isAccess());
-    return Storage.getPointer().getPointer();
-  }
-
-  SourceLoc getLoc() const { return Loc; }
-};
-
-/// A single scope restriction within a `@_scoped` attribute, e.g. `left: &a` in
-/// `@_scoped(left: &a, right: b)`.
-class ScopeSpecifier {
-  /// Null when not specifying a scope restriction by name, e.g. `array` in
-  /// `@_scoped(array)`.
-  Identifier LabelName;
-  SourceLoc LabelLoc;
-  ScopeDescriptor Scope;
-
-public:
-  ScopeSpecifier(std::optional<Located<ScopeName>> label, ScopeDescriptor scope)
-      : Scope(scope) {
-    if (label) {
-      LabelName = label->Item.getIdentifier();
-      LabelLoc = label->Loc;
-      ASSERT(!LabelName.empty());
-    }
-  }
-
-  std::optional<Located<ScopeName>> getLabel() const {
-    if (LabelName.empty())
-      return std::nullopt;
-    return Located<ScopeName>(ScopeName(LabelName), LabelLoc);
-  }
-
-  ScopeDescriptor getScope() const { return Scope; }
-};
-
 class ScopedTypeAttr final
     : public SimpleTypeAttrWithArgs<TypeAttrKind::Scoped>,
-      private llvm::TrailingObjects<ScopedTypeAttr, ScopeSpecifier> {
+      private llvm::TrailingObjects<ScopedTypeAttr, ScopeRestrictionRepr> {
   friend TrailingObjects;
 
   ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
-                 ArrayRef<ScopeSpecifier> specifiers);
+                 ArrayRef<ScopeRestrictionRepr> restrictions);
 
 public:
   static ScopedTypeAttr *create(const ASTContext &ctx, SourceLoc atLoc,
                                 SourceLoc kwLoc, SourceRange parens,
-                                ArrayRef<ScopeSpecifier> specifiers);
+                                ArrayRef<ScopeRestrictionRepr> restrictions);
 
-  ArrayRef<ScopeSpecifier> getSpecifiers() const {
-    return getTrailingObjects(Bits.ScopedTypeAttr.NumSpecifiers);
+  ArrayRef<ScopeRestrictionRepr> getRestrictions() const {
+    return getTrailingObjects(Bits.ScopedTypeAttr.NumRestrictions);
   }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_accessScope` attribute, which binds the access of a parameter to a
+/// scope, e.g. `borrowing @_accessScope(s) [Int]`.
+class AccessScopeTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::AccessScope> {
+  ScopeRepr Scope;
+
+public:
+  AccessScopeTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeRepr scope)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Scope(scope) {}
+
+  ScopeRepr getScope() const { return Scope; }
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The `@_scopeParams` attribute on a function type, which declares its
+/// explicit scope parameters, e.g.
+/// `@_scopeParams(a) (@_scoped(a) Ref) -> @_scoped(a) Ref`.
+class ScopeParamsTypeAttr
+    : public SimpleTypeAttrWithArgs<TypeAttrKind::ScopeParams> {
+  ScopeParamListRepr *Params;
+
+public:
+  ScopeParamsTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parens,
+                      ScopeParamListRepr *params)
+      : SimpleTypeAttr(atLoc, kwLoc, parens), Params(params) {}
+
+  ScopeParamListRepr *getParamList() const { return Params; }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
@@ -4901,37 +4942,12 @@ public:
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
 
-class CalledTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Called> {
+/// The `@callable(once)` type attribute, which makes a function type
+/// at-most-once. `@once` uses the simple \c OnceTypeAttr.
+class CallableTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Callable> {
 public:
-  enum class Semantics : uint8_t { AtMostOnce, ExactlyOnce };
-
-private:
-  SourceLoc SemanticsLoc;
-
-public:
-  CalledTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
-                 Located<Semantics> semantics)
-      : SimpleTypeAttr(atLoc, kwLoc, parensRange), SemanticsLoc(semantics.Loc) {
-    Bits.CalledTypeAttr.Semantics = uint8_t(semantics.Item);
-  }
-
-  bool isAtMostOnce() const { return getSemantics() == Semantics::AtMostOnce; }
-  bool isExactlyOnce() const {
-    return getSemantics() == Semantics::ExactlyOnce;
-  }
-
-  Semantics getSemantics() const {
-    return Semantics(Bits.CalledTypeAttr.Semantics);
-  }
-
-  /// Returns the execution semantics of function types with this attribute.
-  ExecutionSemantics getExecutionSemantics() const;
-  SourceLoc getSemanticsLoc() const { return SemanticsLoc; }
-
-  const char *getSemanticsName() const {
-    return getSemanticsName(getSemantics());
-  }
-  static const char *getSemanticsName(Semantics semantics);
+  CallableTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange)
+      : SimpleTypeAttr(atLoc, kwLoc, parensRange) {}
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };
@@ -4944,6 +4960,12 @@ void simple_display(llvm::raw_ostream &out, const DeclAttribute *attr);
 inline SourceLoc extractNearestSourceLoc(const DeclAttribute *attr) {
   return attr->getLocation();
 }
+
+/// Returns the `@once` or `@callable(once)` attribute in \p attrs that gives a
+/// closure its execution semantics, if any. If both are written, the first one
+/// in source order wins, and the attribute checker diagnoses the other one.
+const DeclAttribute *getExecutionSemanticsAttr(const DeclAttributes &attrs,
+                                               const SourceManager &SM);
 
 /// Determine whether the given attribute is available, looking up the
 /// attribute by name.

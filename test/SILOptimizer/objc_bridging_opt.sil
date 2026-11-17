@@ -9,6 +9,7 @@ import Swift
 import SwiftShims
 
 class NSString {}
+class NSMutableString : NSString {}
 class NSArray {}
 
 enum E {
@@ -392,3 +393,66 @@ bb6:
   return %27 : $()
 }
 
+
+// Bridging a (potentially) mutable NSMutableString to a String creates a copy.
+// Therefore the round-trip cannot be replaced with the original value.
+// CHECK-LABEL: sil [ossa] @dontOptimizeMutableSubclass
+// CHECK:        [[BF:%[0-9]+]] = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ
+// CHECK:        [[S:%[0-9]+]] = apply [[BF]]
+// CHECK:        [[BT:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:        [[R:%[0-9]+]] = apply [[BT]]([[S]])
+// CHECK:        return [[R]]
+// CHECK:      } // end sil function 'dontOptimizeMutableSubclass'
+sil [ossa] @dontOptimizeMutableSubclass : $@convention(thin) (@guaranteed NSMutableString) -> @owned NSString {
+bb0(%0 : @guaranteed $NSMutableString):
+  %1 = upcast %0 : $NSMutableString to $NSString
+  %2 = enum $Optional<NSString>, #Optional.some!enumelt, %1 : $NSString
+  %3 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %4 = metatype $@thin String.Type
+  %5 = apply %3(%2, %4) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %6 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %7 = apply %6(%5) : $@convention(method) (@guaranteed String) -> @owned NSString
+  destroy_value %5 : $String
+  return %7 : $NSString
+}
+
+// CHECK-LABEL: sil [ossa] @dontOptimizeOptionalMutableSubclass
+// CHECK:        apply
+// CHECK:        [[BT:%[0-9]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:        apply [[BT]]
+// CHECK:      } // end sil function 'dontOptimizeOptionalMutableSubclass'
+sil [ossa] @dontOptimizeOptionalMutableSubclass : $@convention(thin) (@owned Optional<NSMutableString>) -> @owned Optional<NSString> {
+bb0(%0 : @owned $Optional<NSMutableString>):
+  %1 = upcast %0 : $Optional<NSMutableString> to $Optional<NSString>
+  switch_enum %1 : $Optional<NSString>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $NSString):
+  %4 = function_ref @$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %5 = enum $Optional<NSString>, #Optional.some!enumelt, %3 : $NSString
+  %6 = metatype $@thin String.Type
+  %7 = apply %4(%5, %6) : $@convention(method) (@guaranteed Optional<NSString>, @thin String.Type) -> @owned String
+  %8 = enum $Optional<String>, #Optional.some!enumelt, %7 : $String
+  destroy_value %5 : $Optional<NSString>
+  br bb3(%8 : $Optional<String>)
+
+bb2:
+  %11 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%11 : $Optional<String>)
+
+bb3(%13 : @owned $Optional<String>):
+  switch_enum %13 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  %15 = enum $Optional<NSString>, #Optional.none!enumelt
+  br bb6(%15 : $Optional<NSString>)
+
+bb5(%17 : @owned $String):
+  %18 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %19 = apply %18(%17) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %20 = enum $Optional<NSString>, #Optional.some!enumelt, %19 : $NSString
+  destroy_value %17 : $String
+  br bb6(%20 : $Optional<NSString>)
+
+bb6(%23 : @owned $Optional<NSString>):
+  return %23 : $Optional<NSString>
+}

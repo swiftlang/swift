@@ -1144,6 +1144,7 @@ bb0(%0 : @owned $Wrapper):
   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
   end_borrow %1
   destroy_value %copy
   destroy_value %0
@@ -1163,6 +1164,7 @@ bb0:
   %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %copy = copy_value %5
+  end_borrow %5
   %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %7 = apply %6(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %copy

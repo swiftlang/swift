@@ -133,6 +133,8 @@ private:
   template <bool templateArgument>
   clang::QualType convertPointerType(CanType pointeeType, PointerKind kind);
 
+  clang::QualType convertCArrayType(Type eltTy, const APInt &size);
+
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
 
@@ -147,8 +149,6 @@ private:
   clang::QualType visitExistentialMetatypeType(ExistentialMetatypeType *type);
   clang::QualType visitProtocolType(ProtocolType *type);
   clang::QualType visitClassType(ClassType *type);
-  clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
-  clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
   template <bool templateArgument = false>
   clang::QualType visitFunctionType(FunctionType *type);
@@ -167,7 +167,9 @@ private:
   clang::QualType visitSILBlockStorageType(SILBlockStorageType *type);
   clang::QualType visitSugarType(SugarType *type);
   clang::QualType visitType(TypeBase *type);
-  clang::QualType visit(Type type);
+
+  /// We delete this because we want all recursive calls to be to convert.
+  clang::QualType visit(Type type) = delete;
 };
 
 } // end namespace swift

@@ -89,6 +89,14 @@ bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_arrayDownCastTestIndirect(OpaqueValue *source,
+                                      const Metadata *targetType,
+                                      const Metadata *sourceValueType,
+                                      const Metadata *targetValueType) {
+  abort();
+}
+
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 void _swift_setDownCastIndirect(OpaqueValue *destination,
                                 OpaqueValue *source,
                                 const Metadata *sourceValueType,

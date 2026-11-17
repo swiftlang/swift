@@ -123,7 +123,8 @@
 /// in-place mutation; the more permissive shape is what makes `withValue`
 /// composable with code that itself wants to send the value to another
 /// isolation region.
-@available(SwiftStdlib 6.5, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.5)
 @frozen
 @safe
 public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
@@ -144,7 +145,6 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///
   /// - Parameter value: The value to wrap. The wrapper takes ownership of
   ///   it.
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public init(_ value: consuming sending Value) {
@@ -166,7 +166,6 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   /// further operations on it are possible.
   ///
   /// - Returns: The previously wrapped value, in a disconnected region.
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public consuming func consume() -> sending Value {
@@ -188,7 +187,6 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///
   /// - Parameter newValue: The replacement value.
   /// - Returns: The previously wrapped value, in a disconnected region.
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @discardableResult
@@ -221,7 +219,6 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   ///   the wrapped value.
   /// - Returns: The value returned by `body`.
   /// - Throws: Any error thrown by `body`.
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public mutating func withValue<Return: ~Copyable, Failure>(

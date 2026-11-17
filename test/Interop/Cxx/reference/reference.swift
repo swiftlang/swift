@@ -5,7 +5,6 @@
 // RUN: %target-run %t/reference
 //
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import Reference
 import StdlibUnittest
@@ -73,6 +72,14 @@ ReferenceTestSuite.test("func-rvalue-reference") {
   expectNotEqual(61, getStaticInt())
   setStaticInt(61)
   expectEqual(61, cxxF())
+}
+
+ReferenceTestSuite.test("pass-func-reference") {
+  expectNotEqual(73, getStaticInt())
+  setStaticInt(73)
+  expectEqual(73, callFuncRef(getStaticInt))
+  expectEqual(73, callFuncRvalueRef(consuming: getStaticInt))
+  expectEqual(73, callFuncRef(getFuncRef()))
 }
 
 ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {

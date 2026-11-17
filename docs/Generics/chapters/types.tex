@@ -745,12 +745,6 @@ The root of the type kind hierarchy. Its instances are always uniqued and alloca
 \item \texttt{ClassType},
 \item \texttt{ProtocolType}.
 \end{itemize}
-\item \texttt{BoundGenericNominalType} and its three subclasses:
-\begin{itemize}
-\item \texttt{BoundGenericStructType},
-\item \texttt{BoundGenericEnumType},
-\item \texttt{BoundGenericClassType}.
-\end{itemize}
 \item \texttt{GenericTypeParamType}, \texttt{DependentMemberType}, the two type parameter types.
 \item \texttt{ArchetypeType}, and its three subclasses:
 \begin{itemize}
@@ -871,16 +865,16 @@ visitor.visit(ty);
 \end{Verbatim}
 The \texttt{TypeVisitor} also defines various methods corresponding to abstract base classes in the \texttt{TypeBase} hierarchy, so, for example, you can override \texttt{visitNominalType()} to handle all nominal types at once.
 
-The \texttt{TypeVisitor} preserves information if it receives a sugared type; for example, visiting \texttt{Int?}\ will call \texttt{visitOptionalType()}, while visiting \texttt{Optional<Int>} will call \texttt{visitBoundGenericEnumType()}. In the common situation where the semantics of your operation do not depend on type sugar, you can use the \texttt{CanTypeVisitor} template class instead. Here, the \texttt{visit()} method takes a \texttt{CanType}, so \texttt{Int?}\ will need to be canonicalized to \texttt{Optional<Int>} before being passed in.
+The \texttt{TypeVisitor} preserves information if it receives a sugared type; for example, visiting \texttt{Int?}\ will call \texttt{visitOptionalType()}, while visiting \texttt{Optional<Int>} will call \texttt{visitEnumType()}. In the common situation where the semantics of your operation do not depend on type sugar, you can use the \texttt{CanTypeVisitor} template class instead. Here, the \texttt{visit()} method takes a \texttt{CanType}, so \texttt{Int?}\ will need to be canonicalized to \texttt{Optional<Int>} before being passed in.
 
 \paragraph{Nominal types.} The below methods on \texttt{TypeBase} perform a desugaring cast to a nominal type (so they will also accept a type alias type or other sugared type), and then they return the nominal type declaration, or \texttt{nullptr} if the type isn't of a nominal kind:
 \begin{itemize}
-\item \texttt{getAnyNominal()} returns the nominal type declaration of \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
-\item \texttt{getNominalOrBoundGenericNominal()} returns the nominal type declaration of a \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
-\item \texttt{getStructOrBoundGenericStruct()} returns the type declaration of a \texttt{StructType} or \texttt{BoundGenericStructType}, or \texttt{nullptr}.
-\item \texttt{getEnumOrBoundGenericEnum()} returns the enum declaration of an \texttt{EnumType} or \texttt{BoundGenericEnumType}, or \texttt{nullptr}.
-\item \texttt{getClassOrBoundGenericClass()} returns the class declaration of a \texttt{ClassType} or \texttt{BoundGenericClassType}, or \texttt{nullptr}.
-\item \texttt{getNominalParent()} returns the parent type stored by an \texttt{UnboundGenericType}, \texttt{NominalType} or \texttt{BoundGenericNominalType}, or \texttt{nullptr}.
+\item \texttt{getAnyNominal()} returns the nominal type declaration of \texttt{UnboundGenericType} or \texttt{NominalType}, or \texttt{nullptr}.
+\item \texttt{getNominalDecl()} returns the nominal type declaration of a \texttt{NominalType}, or \texttt{nullptr}.
+\item \texttt{getStructDecl()} returns the type declaration of a \texttt{StructType}, or \texttt{nullptr}.
+\item \texttt{getEnumDecl()} returns the enum declaration of an \texttt{EnumType}, or \texttt{nullptr}.
+\item \texttt{getClassDecl()} returns the class declaration of a \texttt{ClassType}, or \texttt{nullptr}.
+\item \texttt{getNominalParent()} returns the parent type stored by an \texttt{UnboundGenericType} or \texttt{NominalType}, or \texttt{nullptr}.
 \end{itemize}
 
 \paragraph{Recursive properties.} Various predicates determine if a type recursively contains other types with certain properties. These are computed when a type is constructed and are therefore cheap to check:

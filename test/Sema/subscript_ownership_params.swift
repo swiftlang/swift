@@ -28,7 +28,7 @@ struct Borrowing {
 // offers the ownership fix-its rather than saying subscripts cannot do this.
 struct MissingOwnership {
   subscript(nc: NC) -> Int { return nc.value }
-  // expected-error@-1 {{parameter of noncopyable type 'NC' must specify ownership}}
+  // expected-error@-1 {{parameter of non-'Copyable' type 'NC' must specify ownership}}
   // expected-note@-2 {{add 'borrowing' for an immutable reference}}
   // expected-note@-3 {{add 'inout' for a mutable reference}}
   // expected-note@-4 {{add 'consuming' to take the value from the caller}}

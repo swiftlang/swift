@@ -14,7 +14,6 @@
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Lifetimes
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 
@@ -364,6 +363,18 @@ suite.test("append repeating negative count")
   a.initialize {
     expectCrashLater()
     $0.append(repeating: 0, count: -1, as: UInt8.self)
+  }
+}
+
+suite.test("append repeating overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    $0.append(0)
+    expectCrashLater()
+    $0.append(repeating: 1, count: 8, as: UInt16.self)
   }
 }
 

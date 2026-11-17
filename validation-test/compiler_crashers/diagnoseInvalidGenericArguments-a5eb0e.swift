@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"71b7ae11","signature":"swift::diagnoseInvalidGenericArguments(swift::SourceLoc, swift::ValueDecl*, unsigned int, unsigned int, bool, swift::SourceRange)","signatureAssert":"Assertion failed: (!baseName.isSpecial() && \"Can't retrieve the identifier of a special base name\"), function getBaseIdentifier","signatureNext":"InvalidTypeSpecializationArity::diagnoseAsError"}
+// {"kind":"typecheck","original":"71b7ae11","signature":"swift::diagnoseInvalidGenericArguments(swift::SourceLoc, swift::ValueDecl*, unsigned int, unsigned int, bool, swift::SourceRange)","signatureAssert":"Assertion failed: (!isSpecial() && \"Cannot retrieve identifier from special names\"), function getIdentifier","signatureNext":"InvalidTypeSpecializationArity::diagnoseAsError"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @dynamicMemberLookup struct a< b > {
   subscript <c>(dynamicMember d: WritableKeyPath<b, c>) -> a {

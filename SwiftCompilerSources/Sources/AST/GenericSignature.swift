@@ -36,9 +36,9 @@ public struct GenericSignature: CustomStringConvertible, NoReflectionChildren {
 
   public var isEmpty: Bool { bridged.impl == nil }
 
-  /// Whether every generic parameter in this signature is constrained to a
-  /// concrete type.
-  public var areAllParamsConcrete: Bool { bridged.areAllParamsConcrete() }
+  /// Whether this signature has at least one generic parameter that is not
+  /// fixed to a concrete type.
+  public var isEffectivelyGeneric: Bool { bridged.isEffectivelyGeneric() }
 
   /// Whether every generic parameter in this signature is either constrained
   /// to a concrete type or class-constrained (the two forms permitted by

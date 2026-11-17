@@ -35,6 +35,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -121,7 +122,8 @@ public:
 
 static SmallVector<const clang::NamedDecl *, 4>
 directRecordMemberLookup(ClangImporter &Importer,
-                         const clang::RecordDecl *whereDecl, DeclName name) {
+                         const clang::RecordDecl *whereDecl, DeclName name,
+                         UnifiedStatsReporter *stats) {
   SmallVector<const clang::NamedDecl *, 4> result;
 
   // Class template instances aren't in the lookup table.
@@ -134,6 +136,10 @@ directRecordMemberLookup(ClangImporter &Importer,
       auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
       if (!namedDecl)
         continue;
+
+      if (stats)
+        ++stats->getFrontendCounters()
+              .ClangRecordMemberLookupTemplateMembersScanned;
 
       auto memberName = Importer.importName(namedDecl);
       if (!memberName)
@@ -169,11 +175,17 @@ directRecordMemberLookup(ClangImporter &Importer,
     if (!seen.insert(found).second)
       continue; // Already saw this Clang decl via a different context entry
 
+    if (stats)
+      ++stats->getFrontendCounters().ClangRecordMemberLookupCandidates;
+
     auto *foundCtx = found->getNonTransparentDeclContext();
     if (auto *foundCtxDecl = dyn_cast<clang::RecordDecl>(foundCtx)) {
       // Context of found decl is also a decl; compare canonical decl of each
-      if (foundCtxDecl->getCanonicalDecl() == whereCanonical)
+      if (foundCtxDecl->getCanonicalDecl() == whereCanonical) {
+        if (stats)
+          ++stats->getFrontendCounters().ClangRecordMemberLookupMatched;
         result.push_back(found);
+      }
     }
   }
 
@@ -202,6 +214,11 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     auto *foundDecl = foundEntry.dyn_cast<clang::NamedDecl *>();
     if (!foundDecl)
       continue; // What we found wasn't a NamedDecl
+    if (!seenDecls.insert(foundDecl).second)
+      continue; // We've already seen this; a re-declaration?
+
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupCandidates;
 
     auto *foundCtx = foundDecl->getNonTransparentDeclContext();
 
@@ -223,8 +240,9 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     if (!wasFound)
       continue;
 
-    if (!seenDecls.insert(foundDecl).second)
-      continue; // We've already seen this; a re-declaration?
+    if (auto *stats = ctx.Stats)
+      ++stats->getFrontendCounters().ClangNamespaceMemberLookupMatched;
+
     if (auto *importedDecl =
             ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
       collector.add(cast<ValueDecl>(importedDecl));
@@ -340,7 +358,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       cxxRecordDecl && importer::getPrivateFileIDAttrs(cxxRecordDecl).empty();
 
   auto directResults =
-      directRecordMemberLookup(Importer, clangRecordDecl, name);
+      directRecordMemberLookup(Importer, clangRecordDecl, name, ctx.Stats);
 
   // It's possible that there are entries in the lookup table that end up
   // getting mangled as unsafe, but were not added to the look up table as
@@ -356,8 +374,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (id.starts_with("__") && id.ends_with("Unsafe") && id != "__Unsafe") {
       auto unUnsafeId = id.drop_front(2).drop_back(6);
       DeclName unUnsafeName(ctx.getIdentifier(unUnsafeId));
-      auto moreResults =
-          directRecordMemberLookup(Importer, clangRecordDecl, unUnsafeName);
+      auto moreResults = directRecordMemberLookup(Importer, clangRecordDecl,
+                                                  unUnsafeName, ctx.Stats);
       directResults.append(moreResults.begin(), moreResults.end());
     }
   }
@@ -428,11 +446,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
     // If the derived class already has its own directly-synthesized
     // property with the looked-up name, don't clone a same-named
-    // synthesized property from the base on top of it. This is the case
-    // e.g. when SWIFT_REFCOUNTED_PTR is applied to both a base and a
-    // derived smart pointer: each gets its own `asReference` and
-    // surfacing the base's clone too would leave the derived with two
-    // copies.
+    // synthesized property from the base on top of it, which would leave
+    // the derived class with two copies.
     bool derivedHasOwnSynthesizedVar = false;
     for (auto m : inheritingDecl->getCurrentMembersWithoutLoading()) {
       auto ownVD = dyn_cast<VarDecl>(m);
@@ -538,8 +553,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   if (result.empty() && !inheritance) {
     if (name.isSimpleName("pointee")) {
-      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
+      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl)){
         result.push_back(pointee);
+        if (auto *legacyPointee =
+                importer::getDeclForCounterpartCArrayProjection(pointee))
+          result.push_back(legacyPointee);
+      }
     } else if (name.getBaseName() == "successor" &&
                name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
@@ -552,8 +571,55 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     } else if (name.getBaseName().isSubscript()) {
       for (auto *sub : Importer.Impl.lookupAndImportSubscripts(inheritingDecl))
         result.push_back(sub);
+    } else if (name.isSimpleName("asReference")) {
+      if (auto *asReference =
+              Importer.Impl.lookupAndImportAsReference(inheritingDecl))
+        result.push_back(asReference);
     }
   }
+
+  return result;
+}
+
+TinyPtrVector<ValueDecl *>
+importer::lookupDirectWithoutExtensions(NominalTypeDecl *decl, DeclName name) {
+  ASTContext &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  TinyPtrVector<ValueDecl *> result;
+
+  if (name.getBaseName().isOperator()) {
+    auto underlyingId = getOperatorName(ctx, name.getBaseIdentifier());
+    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
+    for (auto it : underlyingFuncs) {
+      if (auto synthesizedFunc =
+              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
+        result.push_back(synthesizedFunc);
+    }
+  } else {
+    // See if there is a Clang decl with the given name.
+    result = evaluateOrDefault(ctx.evaluator,
+                               ClangRecordMemberLookup({decl, name}), {});
+  }
+
+  // Check if there are any synthesized Swift members that match the name.
+  for (auto member : decl->getCurrentMembersWithoutLoading()) {
+    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+      if (namedMember->hasName() && namedMember->getName().matchesRef(name) &&
+          // Make sure we don't add duplicate entries, as that would wrongly
+          // imply that lookup is ambiguous.
+          !llvm::is_contained(result, namedMember)) {
+        result.push_back(namedMember);
+      }
+    }
+  }
+
+  // ClangRecordMemberLookup matches by base name only.
+  if (name.isCompoundName())
+    llvm::erase_if(result, [&](ValueDecl *found) {
+      return !found->getName().matchesRef(name);
+    });
 
   return result;
 }
@@ -774,7 +840,6 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     setter = importUnderlyingFunction(*this, CXXSetter, Struct);
     if (!setter)
       return {};
-    markUnavailable(setter, "use .pointee property");
   }
 
   if (CXXGetter == CXXSetter) {
@@ -783,17 +848,41 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     getter = importUnderlyingFunction(*this, CXXGetter, Struct);
     if (!getter)
       return {};
-    markUnavailable(getter, "use .pointee property");
   }
 
   SwiftDeclSynthesizer synth{*this};
-  auto *pointee = synth.makeDereferencedPointeeProperty(getter, setter);
+  auto *pointee = forEachCArrayProjection(
+      (getter ? getter : setter)->getAttrs()
+                                    .hasAttribute<CArrayProjectionAttr>(),
+      [&](CArrayProjection projection) -> VarDecl * {
+        FuncDecl *projectedGetter = importer::getDeclForCArrayProjection(
+                     getter, projection),
+                 *projectedSetter = importer::getDeclForCArrayProjection(
+                     setter, projection);
+        if ((getter && !projectedGetter) || (setter && !projectedSetter))
+          return nullptr;
+
+        if (projectedSetter)
+          markUnavailable(projectedSetter, "use .pointee property");
+        if (projectedGetter && projectedGetter != projectedSetter)
+          markUnavailable(projectedGetter, "use .pointee property");
+
+        auto *projectedPointee = synth.makeDereferencedPointeeProperty(
+            projectedGetter, projectedSetter);
+        if (projectedPointee)
+          Struct->addMember(projectedPointee);
+        return projectedPointee;
+      },
+      /*addAlternate=*/false);
   if (!pointee)
     return {};
 
-  importAttributes(CXXGetter ? CXXGetter.method : CXXSetter.method, pointee);
+  auto *clangOperator = CXXGetter ? CXXGetter.method : CXXSetter.method;
+  importAttributes(clangOperator, pointee);
+  if (auto *legacyPointee =
+          importer::getDeclForCounterpartCArrayProjection(pointee))
+    importAttributes(clangOperator, legacyPointee);
 
-  Struct->addMember(pointee);
   auto pointeeAndOpStar =
       std::make_tuple(pointee, getter ? getter : setter, setter);
   importedPointeeCache[Struct] = pointeeAndOpStar;
@@ -947,7 +1036,7 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
 
   llvm::SmallVector<SubscriptDecl *, 1> subscripts;
   for (auto &[_, pair] : CXXSubscripts) {
-    auto [CXXGetter, CXXSetter] = pair;
+    auto CXXGetter = pair.first, CXXSetter = pair.second;
     ASSERT((CXXGetter || CXXSetter) &&
            "subscript should have at least getter or setter");
 
@@ -1007,31 +1096,73 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     FuncDecl *getter = importSubscriptOverload(CXXGetter),
              *setter = importSubscriptOverload(CXXSetter);
 
-    // Mark subscript setter as mutating in Swift even if C++ operator is const.
-    if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
-        !Struct->getDeclaredType()->isForeignReferenceType())
-      setter->setSelfAccessKind(SelfAccessKind::Mutating);
-
     if (!getter && !setter)
       // Didn't end up with a usable getter or setter, so nothing to synthesize
       continue;
 
     SwiftDeclSynthesizer synth{*this};
-    auto *subscript = synth.makeSubscript(getter, setter);
+
+    // Builds a subscript from the given accessors and adds it to the type.
+    auto addSubscript = [&](FuncDecl *getter,
+                            FuncDecl *setter) -> SubscriptDecl * {
+      // Mark subscript setter as mutating in Swift even if C++ operator is
+      // const.
+      if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
+          !Struct->getDeclaredType()->isForeignReferenceType())
+        setter->setSelfAccessKind(SelfAccessKind::Mutating);
+
+      auto *subscript = synth.makeSubscript(getter, setter);
+      if (!subscript)
+        return nullptr;
+
+      Struct->addMember(subscript);
+      result.push_back(subscript);
+      return subscript;
+    };
+
+    /// Import attributes from the Clang operator[] decl(s) onto the
+    /// synthesized accessor thunks (importAttributes is a no-op on
+    /// SubscriptDecl itself).
+    auto importSubscriptAttributes = [&](SubscriptDecl *subscript) {
+      if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
+          getterAccessor && CXXGetter)
+        importAttributes(CXXGetter.method, getterAccessor);
+      if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
+          setterAccessor && CXXSetter)
+        importAttributes(CXXSetter.method, setterAccessor);
+    };
+
+    auto *subscript = addSubscript(getter, setter);
     if (!subscript)
       continue;
 
-    // Import attributes from the Clang operator[] decl(s) onto the synthesized
-    // accessor thunks (importAttributes is a no-op on SubscriptDecl itself).
-    if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
-        getterAccessor && CXXGetter)
-      importAttributes(CXXGetter.method, getterAccessor);
-    if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
-        setterAccessor && CXXSetter)
-      importAttributes(CXXSetter.method, setterAccessor);
+    // If the underlying functions use C arrays, they have a legacy projection
+    // as well, and so does a subscript built from them.
+    SubscriptDecl *legacySubscript = nullptr;
+    if ((getter && getter->getAttrs().hasAttribute<CArrayProjectionAttr>()) ||
+        (setter && setter->getAttrs().hasAttribute<CArrayProjectionAttr>())) {
+      FuncDecl *legacyGetter =
+                   importer::getDeclForCounterpartCArrayProjection(getter),
+               *legacySetter =
+                   importer::getDeclForCounterpartCArrayProjection(setter);
+      bool hasLegacy = (!getter || legacyGetter) && (!setter || legacySetter);
 
-    Struct->addMember(subscript);
-    result.push_back(subscript);
+      if (hasLegacy) {
+        for (auto *fn : {legacyGetter, legacySetter}) {
+          if (fn)
+            markUnavailable(fn, "use subscript");
+        }
+        legacySubscript = addSubscript(legacyGetter, legacySetter);
+      }
+      synth.registerCArrayProjections(subscript, legacySubscript,
+                                      /*addAlternate=*/false);
+
+      applyAvailabilityFloor(subscript);
+    }
+
+    importSubscriptAttributes(subscript);
+    if (legacySubscript)
+      importSubscriptAttributes(legacySubscript);
   }
 
   return result;

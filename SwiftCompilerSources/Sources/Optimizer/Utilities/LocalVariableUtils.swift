@@ -196,6 +196,10 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       if let store = localAccess.instruction as? StoringInstruction {
         self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination) ? .value : .no
 
+      } else if localAccess.instruction is InjectEnumAddrInst {
+        // inject_enum_addr only sets the tag of a payload that was already initialized via init_enum_data_addr (or
+        // has no payload). It does not kill the dependence of the stored payload.
+        self._isFullyAssigned = .no
       } else {
         self._isFullyAssigned = .value
       }
@@ -283,6 +287,9 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
 
   let isLiveIn: Bool
   let isLiveOut: Bool
+  // True if the variable's memory is visible to the caller after a throw or unwind. An @out result is uninitialized
+  // on the error path, but an @inout argument or captured variable remains live.
+  let isLiveOutOnError: Bool
 
   // All mapped accesses have a valid instruction.
   //
@@ -309,20 +316,25 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
     case is AllocBoxInst, is AllocStackInst:
       self.isLiveIn = false
       self.isLiveOut = false
+      self.isLiveOutOnError = false
     case let arg as FunctionArgument:
       switch arg.convention {
       case .indirectIn:
         self.isLiveIn = true
         self.isLiveOut = false
+        self.isLiveOutOnError = false
       case .indirectInout, .indirectInoutAliasable:
         self.isLiveIn = true
         self.isLiveOut = true
+        self.isLiveOutOnError = true
       case .indirectOut:
         self.isLiveIn = false
         self.isLiveOut = true
+        self.isLiveOutOnError = false
       case .directGuaranteed: // Box captured by closure
         self.isLiveIn = true
         self.isLiveOut = true
+        self.isLiveOutOnError = true
       default:
         return nil
       }
@@ -561,16 +573,21 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
     // Find all uses of partial_apply [on_stack].
     if let pai = value as? PartialApplyInst, !pai.mayEscape {
-      var walker = NonEscapingClosureDefUseWalker(context)
-      defer { walker.deinitialize() }
-      if walker.walkDown(closure: pai) == .abortWalk {
-        return .abortWalk
-      }
-      for operand in walker.applyOperandStack {
-        visit(LocalVariableAccess(.apply, operand))
-      }
+      return visitNonEscapingClosure(pai)
     }
     // No other dependent uses can access to memory at this address.
+    return .continueWalk
+  }
+
+  private mutating func visitNonEscapingClosure(_ pai: PartialApplyInst) -> WalkResult {
+    var walker = NonEscapingClosureDefUseWalker(context)
+    defer { walker.deinitialize() }
+    if walker.walkDown(closure: pai) == .abortWalk {
+      return .abortWalk
+    }
+    for operand in walker.applyOperandStack {
+      visit(LocalVariableAccess(.apply, operand))
+    }
     return .continueWalk
   }
 
@@ -590,6 +607,12 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
+    // Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping partial_apply converted by
+    // convert_escape_to_noescape. If ClosureLifetimeFixup will promote it to partial_apply [on_stack], then handle it
+    // like partial_apply [on_stack].
+    if let pai = operand.instruction as? PartialApplyInst, pai.nonEscapingClosureConversion != nil {
+      return visitNonEscapingClosure(pai)
+    }
     visit(LocalVariableAccess(.escape, operand))
     return .continueWalk
   }
@@ -974,10 +997,12 @@ extension LocalVariableReachableAccess {
       if let blockInfo, blockInfo.hasDealloc {
         break
       }
-      // Assume that only a ReturnInst can return a live-out value.
-      // All other function exits are considered dead-ends.
-      if block.terminator is ReturnInstruction, accessMap.isLiveOut {
-        accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
+      // A ReturnInst returns all live-out values. A throw or unwind returns live-out values that remain initialized
+      // on the error path (@inout, @inout_aliasable, and captured boxes, but not @out). 'unreachable' is a dead-end.
+      let terminator = block.terminator
+      if terminator is ReturnInstruction ? accessMap.isLiveOut
+                                         : terminator.isFunctionExiting && accessMap.isLiveOutOnError {
+        accessStack.push(LocalVariableAccess(.outgoingArgument, terminator))
       } else if block.successors.isEmpty, mode == .livenessUses {
         accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {

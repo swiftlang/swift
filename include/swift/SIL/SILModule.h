@@ -42,6 +42,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -121,7 +122,7 @@ class SILGenModule;
 } // namespace Lowering
 
 /// A stage of SIL processing.
-enum class SILStage {
+enum class SILStage : uint8_t {
   /// "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
   /// optimization and diagnostic passes.
   ///
@@ -149,6 +150,10 @@ enum class SILStage {
   /// stage of SIL as "address lowering".
   Lowered,
 };
+
+/// The last SILStage. Update it when a stage is added after it: code that
+/// stores a stage in a fixed number of bits checks its width against this.
+constexpr SILStage LastSILStage = SILStage::Lowered;
 
 /// The textual spelling of \p stage, as it appears in a `sil_stage` line and in
 /// a function's `[stage=...]` attribute.
@@ -329,6 +334,8 @@ private:
   /// deinits must be specialized before IRGen runs.
   std::vector<SILType> noncopyableTypesWithEmittedMetadata;
 
+  std::vector<CanType> exportedTypeSpecializations;
+
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
@@ -365,7 +372,8 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// A module-wide lower bound on the stage of every function in the module.
+  /// A lower bound on the stage of every function in the module's function
+  /// list. Erased (zombie) functions are not in the list and are not covered.
   SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
@@ -399,6 +407,13 @@ private:
   /// functions.
   using LocalArchetypeKey = std::pair<GenericEnvironment *, SILFunction *>;
   llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
+
+  /// The keys of RootLocalArchetypeDefs whose value is a PlaceholderValue.
+  /// This lets reclaimUnresolvedLocalArchetypeDefinitions() visit only the
+  /// placeholders instead of the whole map: it is called once per function by
+  /// some clients (e.g. CrossModuleOptimization), so scanning the module-wide
+  /// map there is quadratic in the number of local archetypes in the module.
+  llvm::DenseSet<LocalArchetypeKey> UnresolvedLocalArchetypeKeys;
 
   /// The number of PlaceholderValues in RootLocalArchetypeDefs.
   int numUnresolvedLocalArchetypes = 0;
@@ -441,6 +456,11 @@ private:
   // Specialization attributes which need to be added to a function once it is created.
   // The key of this map is the function name.
   llvm::StringMap<std::vector<SILSpecializeAttr *>> pendingSpecializeAttrs;
+
+  /// The exported specialized bodies, e.g. 'sum<Int>', that '@specialized'
+  /// declarations without a body or extensions ask for, in this module or in
+  /// imported ones, each with whether this module creates it.
+  llvm::StringMap<bool> exportedSpecializationsOfImportedFunctions;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
@@ -719,6 +739,17 @@ public:
 
   void addNonCopyableTypeWithEmittedMetadata(SILType type) {
     noncopyableTypesWithEmittedMetadata.push_back(type);
+  }
+
+  /// The specializations that exported '@specialized' attributes on types
+  /// declared in this module declare. In Embedded Swift, this module emits
+  /// their metadata.
+  ArrayRef<CanType> getExportedTypeSpecializations() const {
+    return exportedTypeSpecializations;
+  }
+
+  void addExportedTypeSpecialization(CanType type) {
+    exportedTypeSpecializations.push_back(type);
   }
 
   using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
@@ -1045,6 +1076,10 @@ public:
   /// verifier type-equality check must be skipped. It changes large loadable
   /// parameters and results to indirect, rewriting a nested function type
   /// wherever it appears, an aggregate field included.
+  ///
+  /// This is a conservative approximation keyed to the stage floor. Under
+  /// -enable-sil-opaque-values, AddressLowering also rewrites function types,
+  /// before the floor reaches Lowered, and this still answers false then.
   bool haveFunctionTypesBeenRewritten() const {
     return StageFloor >= SILStage::Lowered;
   }
@@ -1088,23 +1123,18 @@ public:
   /// fetched in the given module?
   bool isTypeMetadataForLayoutAccessible(SILType type);
 
-  void verify(bool isCompleteOSSA = true,
-              bool checkLinearLifetime = true) const;
+  void verify(bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify(CalleeCache *calleeCache,
-              bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
-  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
-  /// blocks.
+  /// Run the SIL verifier on SIL with incomplete OSSA lifetimes, e.g. before
+  /// SILGenCleanup. Linear lifetimes are not checked.
   void verifyIncompleteOSSA() const {
-    verify(/*isCompleteOSSA=*/false);
+    verify(/*checkLinearLifetime=*/false);
   }
-
-  /// Check linear OSSA lifetimes, assuming complete OSSA.
-  void verifyOwnership() const;
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
@@ -1235,6 +1265,23 @@ public:
 
   void addPendingSpecializeAttr(StringRef functionName, SILSpecializeAttr *attr) {
     pendingSpecializeAttrs[functionName].push_back(attr);
+  }
+
+  /// Records the exported specialized body of \p target, a function of another
+  /// module, for \p specializedSig, which a '@specialized' declaration without
+  /// a body or extension asks for: in this module if \p createdHere, else in
+  /// an imported module.
+  void addExportedSpecializationOfImportedFunction(
+      SILDeclRef target, GenericSignature specializedSig, bool createdHere);
+
+  /// Whether \p name is such an exported specialized body.
+  bool isExportedSpecializationOfImportedFunction(StringRef name) const {
+    return exportedSpecializationsOfImportedFunctions.contains(name);
+  }
+
+  /// Whether this module creates \p name, such an exported specialized body.
+  bool createsExportedSpecializationOfImportedFunction(StringRef name) const {
+    return exportedSpecializationsOfImportedFunctions.lookup(name);
   }
 };
 

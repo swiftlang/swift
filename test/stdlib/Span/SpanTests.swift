@@ -678,6 +678,38 @@ suite.test("initialize from raw memory")
   expectEqual(first, 0x07060504)
 }
 
+suite.test("Span init(ofOne:)")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let inline: InlineArray<5, UInt8> = [UInt8.zero, 1, 2, 3, 4]
+
+  let span = Span(ofOne: inline)
+  let bytes = span.bytes
+  for o in bytes.byteOffsets {
+    let b = bytes.unsafeLoad(fromByteOffset: o, as: UInt8.self)
+    let i = inline[o]
+    expectEqual(b, i)
+  }
+
+  let s = "A very long string, indeed not a smol one."
+  let strSpan = Span(ofOne: s)
+  expectEqual(strSpan.count, 1)
+}
+
+private struct NCInt: ~Copyable {
+  var value: Int
+  init(_ value: Int) { self.value = value }
+}
+
+suite.test("Span init(ofOne:) with noncopyable Element")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  let nc = NCInt(42)
+  let span = Span(ofOne: nc)
+  expectEqual(span.count, 1)
+  expectEqual(span[0].value, 42)
+}
+
 private func send(_: some Sendable & ~Escapable) {}
 
 private struct NCSendable: ~Copyable, Sendable {}
@@ -743,6 +775,20 @@ suite.test("init(viewing:) traps on non-stride byteCount")
 
   expectCrashLater()
   _ = Span<Int>(viewing: raw)
+}
+
+suite.test("init from RawSpan with 1-byte elements")
+.require(.minimumStdlib(.stdlib_6_4)).code {
+  let buf = UnsafeMutableRawBufferPointer.allocate(byteCount: 8, alignment: 8)
+  defer { unsafe buf.deallocate() }
+  _ = unsafe buf.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
+  let raw = unsafe RawSpan(_unsafeBytes: buf[1..<6])
+
+  let signed = Span<Int8>(viewing: raw)
+  expectEqual(signed.count, 5)
+  expectEqual(signed[4], 5)
+
+  expectEqual(Span<Int8>(viewing: RawSpan()).count, 0)
 }
 
 suite.test("safe bytes property")

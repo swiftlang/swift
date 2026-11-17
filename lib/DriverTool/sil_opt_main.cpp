@@ -220,12 +220,6 @@ struct SILOptOptions {
                                              "context to downstream implicit module dependencies"));
 
   llvm::cl::opt<bool>
-  DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable-sil-ownership-verifier",
-      llvm::cl::desc(
-          "Do not verify SIL ownership invariants during SIL verification"));
-
-  llvm::cl::opt<bool>
   EnableSILOpaqueValues = llvm::cl::opt<bool>("enable-sil-opaque-values",
                         llvm::cl::desc("Compile the module with sil-opaque-values enabled."));
 
@@ -585,10 +579,6 @@ struct SILOptOptions {
       llvm::cl::desc(
           "The swift version to assume AST declarations correspond to"));
 
-  llvm::cl::opt<bool> EnableAddressDependencies = llvm::cl::opt<bool>(
-      "enable-address-dependencies",
-      llvm::cl::desc("Enable enforcement of lifetime dependencies on addressable values."));
-
   llvm::cl::opt<bool> DisaleAggressiveReg2Mem = llvm::cl::opt<bool>(
       "disable-aggressive-reg2mem",
       llvm::cl::desc("Disable aggressive reg2mem optimizations."),
@@ -636,9 +626,11 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll) {
-    Module->verify();
+    // If no passes were run, the module was already verified after parsing.
+    if (!options.Passes.empty())
+      Module->verify();
     SILPassManager pm(Module, isMandatory, IRGenMod);
-    pm.runSwiftModuleVerification();
+    pm.runMandatoryModuleVerification();
   }
 }
 
@@ -867,7 +859,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.VerifyNone = options.SILVerifyNone;
   SILOpts.RemoveRuntimeAsserts = options.RemoveRuntimeAsserts;
   SILOpts.AssertConfig = options.AssertConfId;
-  SILOpts.VerifySILOwnership = !options.DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = options.RemarksFilename;
   SILOpts.OptRecordPasses = options.RemarksPasses;
   SILOpts.EnableStackProtection = true;
@@ -935,7 +926,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnablePackMetadataStackPromotion =
       options.EnablePackMetadataStackPromotion;
 
-  SILOpts.EnableAddressDependencies = options.EnableAddressDependencies;
   if (options.DisaleAggressiveReg2Mem)
     SILOpts.UseAggressiveReg2MemForCodeSize = false;
   if (options.EnableCalleeAllocatedCoroAbi)

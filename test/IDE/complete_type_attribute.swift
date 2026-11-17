@@ -11,6 +11,8 @@
 // TYPEATTR-DAG: Keyword/None:                       isolated(any)[#Type Attribute#]; name=isolated(any)
 // TYPEATTR-DAG: Keyword/None:                       noDerivative[#Type Attribute#]; name=noDerivative
 // TYPEATTR-DAG: Keyword/None:                       Sendable[#Type Attribute#]; name=Sendable
+// TYPEATTR-DAG: Keyword/None:                       once[#Type Attribute#]; name=once
+// TYPEATTR-DAG: Keyword/None:                       callable(once)[#Type Attribute#]; name=callable(once)
 // TYPEATTR-NOT: Type Attribute
 // TYPEATTR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // TYPEATTR-NOT: Type Attribute
@@ -25,6 +27,8 @@
 // TYPEATTR_INHERIT-DAG: Keyword/None:               isolated(any)[#Type Attribute#]; name=isolated(any)
 // TYPEATTR_INHERIT-DAG: Keyword/None:               noDerivative[#Type Attribute#]; name=noDerivative
 // TYPEATTR_INHERIT-DAG: Keyword/None:               Sendable[#Type Attribute#]; name=Sendable
+// TYPEATTR_INHERIT-DAG: Keyword/None:               once[#Type Attribute#]; name=once
+// TYPEATTR_INHERIT-DAG: Keyword/None:               callable(once)[#Type Attribute#]; name=callable(once)
 //
 // TYPEATTR_INHERIT-DAG: Keyword/None:               retroactive[#Type Attribute#]; name=retroactive
 // TYPEATTR_INHERIT-DAG: Keyword/None:               unchecked[#Type Attribute#]; name=unchecked

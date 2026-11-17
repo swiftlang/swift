@@ -439,7 +439,7 @@ func testThrowNil() throws {
 // condition may have contained a SequenceExpr.
 func r23684220(_ b: Any) {
   if let _ = b ?? b {} // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Any', so the right side is never used}}
-  // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Any'}}
+  // expected-warning@-1 {{initializer for conditional binding has non-optional type 'Any'}}
 }
 
 

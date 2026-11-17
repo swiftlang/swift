@@ -24,6 +24,12 @@ sil_global hidden @globalX : $X
 
 sil_global hidden @globalOtherX : $X
 
+class C {
+  @_hasStorage var x: X
+}
+
+sil_global hidden @globalC : $C
+
 sil hidden @Xinit : $@convention(method) (@thin X.Type) -> X {
 bb0(%0 : $@thin X.Type):
   %1 = alloc_stack $X, var, name "self"
@@ -592,4 +598,29 @@ bb0:
   end_access %4 : $*X
   %10 = tuple ()
   return %10 : $()
+}
+
+// A `load_borrow` with a value hint loads the same reference as the hinted value.
+// Therefore the second access is dominated by the first access with identical storage.
+// CHECK-LABEL: sil [ossa] @testDomLoadBorrowValueHint : $@convention(thin) () -> () {
+// CHECK:         begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK:         begin_access [read] [static] [no_nested_conflict]
+// CHECK-LABEL: } // end sil function 'testDomLoadBorrowValueHint'
+sil [ossa] @testDomLoadBorrowValueHint : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = load_borrow %0 : $*C
+  %2 = ref_element_addr %1 : $C, #C.x
+  %3 = begin_access [read] [dynamic] [no_nested_conflict] %2 : $*X
+  %4 = load [trivial] %3 : $*X
+  end_access %3 : $*X
+  %6 = load_borrow %0 : $*C, value_hint %1 : $C
+  %7 = ref_element_addr %6 : $C, #C.x
+  %8 = begin_access [read] [dynamic] [no_nested_conflict] %7 : $*X
+  %9 = load [trivial] %8 : $*X
+  end_access %8 : $*X
+  end_borrow %6 : $C
+  end_borrow %1 : $C
+  %r = tuple ()
+  return %r : $()
 }

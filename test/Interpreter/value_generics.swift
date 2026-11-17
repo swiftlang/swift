@@ -61,3 +61,38 @@ A< -4, 8>().foo()
 
 // CHECK: Lower: -5, Upper: 8
 A< -5, 8>().foo()
+
+struct PackAndValue<each T, let N: Int> {
+  var count: Int { N }
+}
+
+func makePackAndValue<each U>(_: repeat (each U).Type) -> PackAndValue<repeat each U, 3> {
+  PackAndValue()
+}
+
+func makePackAndValue<each U, let M: Int>(
+  _: repeat (each U).Type, array: InlineArray<M, Int>
+) -> PackAndValue<repeat each U, M> {
+  PackAndValue()
+}
+
+func makeMixedPackAndValue<each U>(
+  _: repeat (each U).Type
+) -> PackAndValue<Int, repeat each U, Bool, 4> {
+  PackAndValue()
+}
+
+// CHECK: {{^}}3{{$}}
+print(makePackAndValue(Int.self, String.self).count)
+
+// CHECK: PackAndValue<Pack{Int, String}, 3>
+print(type(of: makePackAndValue(Int.self, String.self)))
+
+// CHECK: PackAndValue<Pack{}, 3>
+print(type(of: makePackAndValue()))
+
+// CHECK: {{^}}5{{$}}
+print(makePackAndValue(Int.self, array: [1, 2, 3, 4, 5]).count)
+
+// CHECK: PackAndValue<Pack{Int, Double, Bool}, 4>
+print(type(of: makeMixedPackAndValue(Double.self)))

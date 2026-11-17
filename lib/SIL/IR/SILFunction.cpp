@@ -13,6 +13,9 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
+#include "swift/Demangling/Demangler.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
+#include "swift/Serialization/SerializedSILLoader.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/DiagnosticGroups.h"
@@ -20,6 +23,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -118,16 +122,19 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
-                          AvailabilityRange availability) {
+                          AvailabilityRange availability,
+                          bool isSpecializedSpelling) {
   auto erasedSpecializedSig =
       SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
                                                   typeErasedParams);
 
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
 
-  return ::new (buf) SILSpecializeAttr(exported, kind, erasedSpecializedSig,
-                                       specializedSig, typeErasedParams, target,
-                                       spiGroup, spiModule, availability);
+  auto *attr = ::new (buf) SILSpecializeAttr(
+      exported, kind, erasedSpecializedSig, specializedSig, typeErasedParams,
+      target, spiGroup, spiModule, availability);
+  attr->specializedSpelling = isSpecializedSpelling;
+  return attr;
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
@@ -285,12 +292,14 @@ void SILFunction::init(
   this->IsPerformanceConstraint = false;
   this->NeedBreakInfiniteLoops = false;
   this->NeedCompleteLifetimes = false;
-  // Set by AddressLowering when it lowers this function in the Raw-stage
-  // mandatory pipeline, and copied from a clone's source by SILCloner. Functions
-  // born after the module advances past Raw are reported lowered by the
-  // stage term in hasLoweredAddresses(), so no creation-time seed is needed.
+  this->HasInfiniteSpecializationLoop = false;
+  // Set whenever the body is in lowered-address form before the stage says so:
+  // by the pass that lowers it (AddressLowering), and by a copy of a function
+  // that has it (clones, snapshots). A body at a stage past Raw is reported
+  // lowered by the stage term in hasLoweredAddresses() and needs no flag.
   this->HasLoweredAddresses = false;
   this->HasOwnershipForTrivialValues = false;
+  this->HasUnresolvedLifetimes = false;
 
   // A function is born at the stage floor. Content created after the module
   // commits to a stage is built to that stage's rules.
@@ -321,11 +330,9 @@ bool SILFunction::hasLoweredAddresses() const {
          getFunctionStage() != SILStage::Raw;
 }
 
-SILStage SILFunction::getFunctionStage() const {
-  return SILStage(FunctionStage);
-}
-
 void SILFunction::setFunctionStage(SILStage stage) {
+  static_assert(unsigned(LastSILStage) < (1u << NumFunctionStageBits),
+                "SILStage does not fit in SILFunction::FunctionStage");
   assert(stage >= getFunctionStage() && "regressing per-function stage?!");
   assert(stage >= getModule().getStageFloor() &&
          "per-function stage below the module stage floor?!");
@@ -334,6 +341,7 @@ void SILFunction::setFunctionStage(SILStage stage) {
 
 void SILFunction::inheritDerivedFrom(const SILFunction *from) {
   setHasLoweredAddresses(from->hasLoweredAddresses());
+  setHasUnresolvedLifetimes(from->hasUnresolvedLifetimes());
   // Only ever move forward. The clone was born at the module's stage floor,
   // which can already be ahead of a source that predates a commit, such as a
   // snapshot.
@@ -443,6 +451,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
   newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
+  newSnapshot->HasUnresolvedLifetimes = HasUnresolvedLifetimes;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
@@ -666,6 +675,104 @@ bool SILFunction::isNoReturnFunction(TypeExpansionContext context) const {
       .isNoReturnFunction(getModule(), context);
 }
 
+/// Whether \p name is the specialized body exported by an exported
+/// `@specialized` attribute of the generic function \p parent.
+static bool isExportedSpecializedBodyOf(const SILFunction *parent,
+                                        StringRef name) {
+  auto genericSig =
+      parent->getLoweredFunctionType()->getInvocationGenericSignature();
+  if (!genericSig)
+    return false;
+  auto matches = [&](GenericSignature specializedSig) {
+    return Mangle::GenericSpecializationMangler::manglePrespecialization(
+               parent->getASTContext(), parent->getName().str(), genericSig,
+               specializedSig) == name;
+  };
+  // A deserialized function keeps its SIL attributes, but has no declaration.
+  for (auto *attr : parent->getSpecializeAttrs())
+    if (attr->isExported() && attr->isSpecializedSpelling() &&
+        matches(attr->getSpecializedSignature()))
+      return true;
+
+  // An erased function loses its SIL attributes, but keeps its declaration.
+  if (auto *decl = parent->getDeclRef().getAbstractFunctionDecl()) {
+    for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
+      if (attr->isExported() && matches(attr->getSpecializedSignature(decl)))
+        return true;
+    // A member also gets exported specializations from its type's attributes
+    // (see SILFunctionBuilder, which also skips default argument generators).
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
+    if (!parent->getDeclRef().isDefaultArgGenerator())
+      SpecializedAttr::getTypeLevelSpecializations(decl, typeLevelSigs);
+    if (llvm::any_of(typeLevelSigs, [&](auto &specialization) {
+          return specialization.exported && matches(specialization.signature);
+        }))
+      return true;
+  }
+  return false;
+}
+
+/// The mangled name of the generic function that the pre-specialization
+/// \p name was made from, e.g. `sum<T>` for `sum<Int>`. Remangles \p name
+/// without its pre-specialization part, or returns an empty string. Embedded
+/// Swift only: the result uses the Embedded mangling ('$e').
+static std::string getPrespecializedParentName(StringRef name) {
+  Demangle::Demangler dem;
+  auto *global = dem.demangleSymbol(name);
+  if (!global)
+    return std::string();
+  // The pre-specialization is a separate child of the Global node, next to the
+  // generic function's own node, so copy every other child.
+  auto *parent = dem.createNode(Demangle::Node::Kind::Global);
+  for (auto *child : *global)
+    if (child->getKind() !=
+        Demangle::Node::Kind::GenericSpecializationPrespecialized)
+      parent->addChild(child, dem);
+  auto mangled = Demangle::mangleNode(parent, Mangle::ManglingFlavor::Embedded);
+  return mangled.isSuccess() ? mangled.result() : std::string();
+}
+
+bool SILFunction::isExportedSpecialization() const {
+  // Exported specialized bodies are pre-specializations, mangled with a 'Ts5'
+  // suffix.
+  auto &langOpts = getASTContext().LangOpts;
+  if (!langOpts.hasFeature(Feature::Embedded) ||
+      !langOpts.hasFeature(Feature::ExtendedSpecializedAttribute) ||
+      !getName().ends_with("Ts5"))
+    return false;
+
+  // Asked for by a '@specialized' declaration without a body, in this module or
+  // an imported one.
+  if (getModule().isExportedSpecializationOfImportedFunction(getName()))
+    return true;
+
+  // Library side, created in this module: the specialization info knows the
+  // generic function.
+  if (isSpecialization())
+    return isExportedSpecializedBodyOf(getSpecializationInfo()->getParent(),
+                                       getName());
+
+  // Client side, deserialized: find the generic function by name, reading only
+  // its declaration (with its attributes) if it isn't loaded.
+  auto parentName = getPrespecializedParentName(getName());
+  if (parentName.empty())
+    return false;
+  auto *parent = getModule().lookUpFunction(parentName);
+  if (!parent)
+    parent = getModule().getSILLoader()->lookupSILFunction(
+        parentName, /*linkage=*/std::nullopt);
+  return parent && isExportedSpecializedBodyOf(parent, getName());
+}
+
+bool SILFunction::hasBodyForImportedSpecialization() const {
+  // A loaded body that may be specialized: not '@_optimize(none)', 'dynamic'
+  // or marked never to be specialized.
+  return isDefinition() &&
+         getOptimizationMode() != OptimizationMode::NoOptimization &&
+         !isDynamicallyReplaceable() &&
+         !hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_NEVER);
+}
+
 bool SILFunction::hasNonUniqueDefinition() const {
   // Non-uniqueness is a property of the Embedded linkage model.
   if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
@@ -673,6 +780,12 @@ bool SILFunction::hasNonUniqueDefinition() const {
 
   // If this function is the entrypoint, it is unique.
   if (getName() == getASTContext().getEntryPointFunctionName())
+    return false;
+
+  // A specialized body exported by `@specialized(exported: true)` has a unique
+  // definition in the module that declares it. Clients reference it instead of
+  // emitting their own copies, so separately linked libraries share one copy.
+  if (isExportedSpecialization())
     return false;
 
   // Any module that uses a generic function can create the same
@@ -1111,7 +1224,7 @@ bool SILFunction::hasDynamicSelfMetadata() const {
   if (selfTy.isForeignReferenceType())
     return false;
 
-  return !!selfTy.getClassOrBoundGenericClass();
+  return !!selfTy.getClassDecl();
 }
 
 bool SILFunction::hasName(const char *Name) const {

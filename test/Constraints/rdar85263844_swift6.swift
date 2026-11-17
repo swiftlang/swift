@@ -1,9 +1,11 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6 -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6 -solver-enable-promote-supertypes -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-ignore-unrelated -solver-enable-promote-supertypes -verify-additional-prefix future- %}
 
 // rdar://85263844 - initializer 'init(_:)' requires the types be equivalent
 func rdar85263844(arr: [(q: String, a: Int)]) -> AnySequence<(question: String, answer: Int)> {
   AnySequence(arr.map { $0 })
-  // expected-warning@-1 {{tuple conversion from '(q: String, a: Int)' to '(question: String, answer: Int)' mismatches labels; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-1 {{tuple conversion from '(q: String, a: Int)' to '(question: String, answer: Int)' mismatches labels; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{tuple conversion from '(q: String, a: Int)' to '(question: String, answer: Int)' mismatches labels}}
 }
 
 // Another case for rdar://85263844
@@ -23,7 +25,8 @@ extension S4 where T == (outer: Int, y: Int) {
     // generate constraints for it, it continues to compile. We should fix
     // tuple subtyping for Swift 6 mode to not accept label mismatches.
     self.init(arr.map { (inner: $0, y: $0) })
-    // expected-warning@-1 {{tuple conversion from '(inner: Int, y: Int)' to '(outer: Int, y: Int)' mismatches labels}}
+    // expected-swift6-warning@-1 {{tuple conversion from '(inner: Int, y: Int)' to '(outer: Int, y: Int)' mismatches labels}}
+    // expected-future-error@-2 {{tuple conversion from '(inner: Int, y: Int)' to '(outer: Int, y: Int)' mismatches labels}}
   }
 }
 

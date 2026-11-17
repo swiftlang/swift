@@ -24,6 +24,26 @@
 
 using namespace swift;
 
+PluginLoader::PluginLoader(
+    ASTContext &Ctx, DependencyTracker *DepTracker,
+    std::optional<std::vector<std::pair<std::string, std::string>>> Remap,
+    bool disableSandbox)
+    : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
+  if (Remap && !Remap->empty()) {
+    SmallVector<llvm::MappedPrefix, 4> prefixes;
+    llvm::MappedPrefix::transformPairs(*Remap, prefixes);
+    PathRemapper.emplace();
+    PathRemapper->addRange(prefixes);
+    PathRemapper->sort();
+  }
+}
+
+std::string PluginLoader::remapPath(StringRef path) {
+  if (!PathRemapper)
+    return path.str();
+  return PathRemapper->mapToString(path);
+}
+
 void PluginLoader::setRegistry(PluginRegistry *newValue) {
   assert(Registry == nullptr && "Too late to set a new plugin registry");
   Registry = newValue;
@@ -103,24 +123,10 @@ PluginLoader::getPluginMap() {
                                  copy(prefixMappedExecPath)};
   };
 
-  std::optional<llvm::PrefixMapper> mapper;
-  if (!PathRemap.empty()) {
-    SmallVector<llvm::MappedPrefix, 4> prefixes;
-    llvm::MappedPrefix::transformPairs(PathRemap, prefixes);
-    mapper.emplace();
-    mapper->addRange(prefixes);
-    mapper->sort();
-  }
-  auto remapPath = [&mapper](StringRef path) {
-    if (!mapper)
-      return path.str();
-    return mapper->mapToString(path);
-  };
-
   auto fs = getPluginLoadingFS(Ctx);
   std::error_code ec;
 
-  auto validateLibrary = [&](StringRef path) -> llvm::Expected<std::string> {
+  auto validatePlugin = [&](StringRef path) -> llvm::Expected<std::string> {
     auto remappedPath = remapPath(path);
     if (!Ctx.SearchPathOpts.ResolvedPluginVerification || path.empty())
       return remappedPath;
@@ -205,15 +211,22 @@ PluginLoader::getPluginMap() {
       // Respect resolved plugin config above other search path, and it can
       // overwrite plugins found by other options or previous resolved
       // configuration.
+      // Verify the library, or the executable if it is an executable plugin.
+      bool isExecutablePlugin = val.LibraryPath.empty();
+      StringRef pluginPath =
+          isExecutablePlugin ? val.ExecutablePath : val.LibraryPath;
       for (auto &moduleName : val.ModuleNames) {
-        auto libPath = validateLibrary(val.LibraryPath);
-        if (!libPath) {
+        auto verifiedPath = validatePlugin(pluginPath);
+        if (!verifiedPath) {
           Ctx.Diags.diagnose(SourceLoc(), diag::resolved_macro_changed,
-                             remapPath(val.LibraryPath),
-                             toString(libPath.takeError()));
+                             remapPath(pluginPath),
+                             toString(verifiedPath.takeError()));
           continue;
         }
-        try_emplace(moduleName, *libPath, remapPath(val.ExecutablePath),
+        std::string libPath = isExecutablePlugin ? "" : *verifiedPath;
+        std::string execPath =
+            isExecutablePlugin ? *verifiedPath : remapPath(val.ExecutablePath);
+        try_emplace(moduleName, libPath, execPath,
                     /*overwrite*/ true, val.LibraryPath, val.ExecutablePath);
       }
       continue;
@@ -240,7 +253,13 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
 }
 
 llvm::Expected<CompilerPlugin *> PluginLoader::getInProcessPlugins() {
-  auto inProcPluginServerPath = Ctx.SearchPathOpts.InProcessPluginServerPath;
+  // The resolved server path from the dependency scanner can be prefix mapped,
+  // the same as the resolved plugin paths.
+  auto &resolvedServerPath =
+      Ctx.SearchPathOpts.ResolvedInProcessPluginServerPath;
+  auto inProcPluginServerPath =
+      resolvedServerPath.empty() ? Ctx.SearchPathOpts.InProcessPluginServerPath
+                                 : remapPath(resolvedServerPath);
   if (inProcPluginServerPath.empty()) {
     return llvm::createStringError(
         llvm::inconvertibleErrorCode(),

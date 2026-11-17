@@ -20,7 +20,6 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeCheckRequests.h"
-#include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -29,6 +28,7 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -137,50 +137,6 @@ static bool isTypeTooComplex(Type t) {
 }
 
 namespace {
-
-/// A helper class used to check whether one type is structurally contained
-/// the other type either completely or partially.
-class TypeComparator : public TypeMatcher<TypeComparator> {
-  bool IsContained = false;
-
-public:
-  bool isEqual(CanType T1, CanType T2) { return T1 == T2; }
-  /// Check whether the type T1 is different from T2 and contained in the type
-  /// T2.
-  bool isStrictlyContainedIn(CanType T1, CanType T2) {
-    if (isEqual(T1, T2))
-      return false;
-    return T2.findIf([&T1, this](Type T) -> bool {
-      return isEqual(T->getCanonicalType(), T1);
-    });
-  }
-
-  /// Check whether the type T1 is strictly or partially contained in the type
-  /// T2.
-  /// Partially contained means that if you drop the common structural "prefix"
-  /// of T1 and T2 and get T1' and T2' then T1' is strictly contained in T2'.
-  bool isPartiallyContainedIn(CanType T1, CanType T2) {
-    if (isStrictlyContainedIn(T1, T2))
-      return true;
-    match(T1, T2);
-    return IsContained;
-  }
-
-  /// This method is invoked aftre skipping a common prefix of two types,
-  /// when a structural difference is found.
-  bool mismatch(TypeBase *firstType, TypeBase *secondType,
-                Type sugaredFirstType) {
-    auto firstCanType = firstType->getCanonicalType();
-    auto secondCanType = secondType->getCanonicalType();
-    if (isEqual(firstCanType, secondCanType))
-      return false;
-    if (isStrictlyContainedIn(firstCanType, secondCanType)) {
-      IsContained = true;
-      return false;
-    }
-    return false;
-  }
-};
 
 class SpecializedFunction {
 private:
@@ -298,44 +254,6 @@ void SpecializedFunction::computeTypeReplacements(const ApplySite &apply) {
   }
 }
 
-/// Checks if a second substitution map is an expanded version of
-/// the first substitution map.
-/// This is the case if at least one of the substitution type in Subs2 is
-/// "bigger" than the corresponding substitution type in Subs1.
-/// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
-static bool growingSubstitutions(SubstitutionMap Subs1,
-                                 SubstitutionMap Subs2) {
-  auto Replacements1 = Subs1.getReplacementTypes();
-  auto Replacements2 = Subs2.getReplacementTypes();
-  assert(Replacements1.size() == Replacements2.size());
-  TypeComparator TypeCmp;
-  // Perform component-wise comparisons for substitutions.
-  for (unsigned idx : indices(Replacements1)) {
-    auto Type1 = Replacements1[idx]->getCanonicalType();
-    auto Type2 = Replacements2[idx]->getCanonicalType();
-    // If types are the same, the substitution type does not grow.
-    if (TypeCmp.isEqual(Type2, Type1))
-      continue;
-    // If the new substitution type is getting smaller, the
-    // substitution type does not grow.
-    if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
-      continue;
-    if (TypeCmp.isPartiallyContainedIn(Type1, Type2)) {
-      LLVM_DEBUG(llvm::dbgs() << "Type:\n"; Type1.dump(llvm::dbgs());
-                 llvm::dbgs() << "is (partially) contained in type:\n";
-                 Type2.dump(llvm::dbgs());
-                 llvm::dbgs() << "Replacements[" << idx
-                              << "] has got bigger since last time.\n");
-      return true;
-    }
-    // None of the types is contained in the other type.
-    // They are not comparable in this sense.
-  }
-
-  // The substitution list is not growing.
-  return false;
-}
-
 /// Checks whether specializing a given generic apply would create an infinite
 /// cycle in the generic specializations graph. This can be the case if there is
 /// a loop in the specialization graph and generic parameters at each iteration
@@ -352,7 +270,10 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply, bool isMandatory)
 
   // If there is a specialization loop and it is not infinite, we should allow this in embedded swift.
   // Still, there is a hard coded limit, but 10 should be good enough for real world scenarios.
-  int numAcceptedCycles = isMandatory ? 10 : 1;
+  // The limit applies to each call chain separately. If a function contains multiple growing call
+  // sites, the number of specializations grows exponentially with the limit. Therefore, once the
+  // limit is reached for a function, no more growing specializations of it are accepted at all.
+  int numAcceptedCycles = isMandatory ? (Callee->hasInfiniteSpecializationLoop() ? 0 : 10) : 1;
 
   // Name of the function to be specialized.
   auto GenericFunc = Callee;
@@ -404,8 +325,11 @@ static bool createsInfiniteSpecializationLoop(ApplySite Apply, bool isMandatory)
         // Accept a cycles up to a limit. This is necessary to generate
         // efficient code for some library functions, like compactMap, which
         // contain small specialization cycles.
-        if (numAcceptedCycles == 0)
+        if (numAcceptedCycles == 0) {
+          if (isMandatory)
+            Callee->setHasInfiniteSpecializationLoop();
           return true;
+        }
         --numAcceptedCycles;
       }
     }
@@ -449,7 +373,7 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   }
 
 
-  if (Subs.hasAnySubstitutableParams() &&
+  if (Subs.isEffectivelyGeneric() &&
       Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
     return true;
 
@@ -458,15 +382,17 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
-  // The `self` parameter of a borrow accessor with an indirect return
-  // cannot be promoted, since the returned address might point into the
-  // parameter.
+  // The `self` parameter of a borrow accessor cannot be promoted, since the
+  // returned address might point into the parameter, or the returned value
+  // might borrow from the parameter's memory location.
   //
   // TODO: It may be possible to promote `self` and the result if and only
   // if both the parameter and result do or do not get promoted in unison.
   if (substType->getNumResults() == 1
-      && substType->getSingleResult().getConvention()
-           == ResultConvention::GuaranteedAddress
+      && (substType->getSingleResult().getConvention()
+            == ResultConvention::GuaranteedAddress
+          || substType->getSingleResult().getConvention()
+            == ResultConvention::Guaranteed)
       && substType->getSelfParameterIndex() == paramIdx) {
     return false;
   }
@@ -558,7 +484,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         bool isMandatory,
                                         OptRemark::Emitter *ORE) {
-  assert(ParamSubs.hasAnySubstitutableParams());
+  assert(ParamSubs.isEffectivelyGeneric());
 
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
@@ -968,8 +894,7 @@ CanSILFunctionType
 ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
-  if ((SpecializedGenericSig &&
-       SpecializedGenericSig->areAllParamsConcrete()) ||
+  if (!SpecializedGenericSig.isEffectivelyGeneric() ||
       !HasUnboundGenericParams) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
@@ -2030,8 +1955,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
     CalleeParamSubMap = CallerParamSubMap;
   }
 
-  HasUnboundGenericParams =
-      SpecializedGenericSig && !SpecializedGenericSig->areAllParamsConcrete();
+  HasUnboundGenericParams = SpecializedGenericSig.isEffectivelyGeneric();
 
   createSubstitutedAndSpecializedTypes();
 
@@ -2118,6 +2042,9 @@ GenericFuncSpecializer::GenericFuncSpecializer(
         GenericFunc, ReInfo.getSerializedKind());
     if (ReInfo.isPrespecialized()) {
       ClonedName = Mangler.manglePrespecialized(ParamSubs);
+    } else if (ReInfo.isNotReabstracted()) {
+      ClonedName = Mangler.mangleNotReabstracted(ParamSubs,
+                                                 ReInfo.getDroppedArgs());
     } else {
       ClonedName = Mangler.mangleReabstracted(ParamSubs,
                                               ReInfo.needAlternativeMangling(),
@@ -2452,7 +2379,7 @@ static SILFunction *specializeAccessorThunk(SILFunction *thunk,
 
 bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
   SubstitutionMap subs = kpi->getSubstitutions();
-  if (!subs.hasAnySubstitutableParams())
+  if (!subs.isEffectivelyGeneric())
     return false;
   // Partial specialization would leave generic thunks behind, which is exactly
   // what we're trying to avoid.
@@ -2701,6 +2628,34 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   return true;
 }
 
+/// Fixes up the uses of \p closure, which replaced a closure of type
+/// \p oldType, and of its copies: kills the operands of debug uses whose
+/// variable type can't follow the new type, and replaces each copy, which still
+/// has the old type, with a copy that has the new type.
+///
+/// No other uses need fixing up. trySpecializeApplyOfGeneric only lets a
+/// partial_apply change type if each use, through copies, is an apply of the
+/// partial_apply itself or a re-abstraction, which the caller replaces, or a
+/// use that doesn't depend on the type, such as a destroy_value. Any other use,
+/// such as a return or an apply that takes a copy, gets a thunk that keeps the
+/// old type instead.
+static void fixUpUsesOfRetypedClosure(SILValue closure, SILType oldType) {
+  SmallVector<Operand *, 8> uses(closure->getUses());
+  for (Operand *use : uses) {
+    SILInstruction *user = use->getUser();
+    if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
+      if (!dvi->varTypeFollowsOperand())
+        dvi->killOperand(use->getOperandNumber(), oldType);
+    } else if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+      auto *newCVI =
+          SILBuilderWithScope(cvi).createCopyValue(cvi->getLoc(), closure);
+      cvi->replaceAllUsesWith(newCVI);
+      cvi->eraseFromParent();
+      fixUpUsesOfRetypedClosure(newCVI, oldType);
+    }
+  }
+}
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite
@@ -2852,7 +2807,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     // Let go of borrows introduced for stack closures.
     if (pai->isOnStack() && pai->getFunction()->hasOwnership()) {
       pai->visitOnStackLifetimeEnds([&](Operand *op) -> bool {
-        // A `@called(atMostOnce)` closure's context can be consumed directly by
+        // An at-most-once closure's context can be consumed directly by
         // a `try_apply`, a terminator with no single "next instruction" to
         // insert after -- the cleanup has to be duplicated at the start of
         // every successor block instead.
@@ -2874,6 +2829,10 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
         pai->getResultIsolation(), pai->getExecutionSemantics(),
         pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
+    // The specialized closure can have different conventions, such as a direct
+    // result instead of an indirect one.
+    if (newPAI->getType() != pai->getType())
+      fixUpUsesOfRetypedClosure(newPAI, pai->getType());
     return newPAI;
   }
   }
@@ -3067,7 +3026,7 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
     assert(VoidTy.isVoid());
     returnValue = Builder.createTuple(Loc, VoidTy, {});
   }
-  Builder.createReturn(Loc, returnValue);
+  createThunkReturn(Builder, Loc, returnValue);
 
   return as;
 }
@@ -3282,6 +3241,41 @@ lookupOrCreatePrespecialization(SILOptFunctionBuilder &funcBuilder,
   return declaration;
 }
 
+SILFunction *
+swift::lookupExportedSpecialization(SILOptFunctionBuilder &funcBuilder,
+                                    SILFunction *origF, SubstitutionMap subs,
+                                    CanSILFunctionType specializedType) {
+  SILModule &M = funcBuilder.getModule();
+  auto genericSig =
+      origF->getLoweredFunctionType()->getInvocationGenericSignature();
+  for (auto *SA : origF->getSpecializeAttrs()) {
+    // Only exported '@specialized' attributes.
+    if (!SA->isExported() || !SA->isSpecializedSpelling())
+      continue;
+    // Its concrete types must be the ones 'subs' gives, e.g. 'T == Int'.
+    auto specializedSig = SA->getSpecializedSignature();
+    if (!llvm::all_of(genericSig.getGenericParams(), [&](auto param) {
+          return specializedSig.getReducedType(param) ==
+                 Type(param).subst(subs)->getCanonicalType();
+        }))
+      continue;
+    // Its function type must be the one the caller expects, or the calling
+    // convention would differ.
+    ReabstractionInfo reInfo(M.getSwiftModule(), M.isWholeModule(), origF,
+                             specializedSig, /*isPrespecialization=*/true);
+    if (reInfo.getSpecializedType() != specializedType)
+      continue;
+    // The definition if this module has it, otherwise an external declaration.
+    Mangle::GenericSpecializationMangler mangler(
+        origF->getASTContext(), origF, reInfo.getSerializedKind());
+    return lookupOrCreatePrespecialization(
+        funcBuilder, origF,
+        mangler.manglePrespecialized(reInfo.getCalleeParamSubstitutionMap()),
+        reInfo);
+  }
+  return nullptr;
+}
+
 static bool usePrespecialized(
     SILOptFunctionBuilder &funcBuilder, ApplySite apply, SILFunction *refF,
     ReabstractionInfo &prespecializedReInfo, SpecializedFunction &result) {
@@ -3308,6 +3302,17 @@ static bool usePrespecialized(
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
       continue;
+    // A body that another module asked for exists only if this function's body
+    // can be specialized (see SILGenModule::prepareExportedSpecialization).
+    if (auto *decl = refF->getDeclRef().getDecl())
+      if (SA->isSpecializedSpelling() && SA->getSPIModule() &&
+          SA->getSPIModule() != decl->getModuleContext()) {
+        if (!refF->isDefinition())
+          funcBuilder.getModule().loadFunction(
+              refF, SILModule::LinkingMode::LinkNormal);
+        if (!refF->hasBodyForImportedSpecialization())
+          continue;
+      }
     // Check whether SPI allows using this function.
     auto spiGroup = SA->getSPIGroup();
     if (!spiGroup.empty()) {
@@ -3390,7 +3395,15 @@ static bool usePrespecialized(
 
         if (lowered.isBuiltinBridgeObject() && layout->isBridgeObject()) {
           newSubs.push_back(genericParam->getASTContext().TheBridgeObjectType);
-        } else if (lowered.hasRetainablePointerRepresentation()) {
+        } else if (layout->isClass() &&
+                   entry.value()->satisfiesClassConstraint() &&
+                   lowered.hasRetainablePointerRepresentation()) {
+          // Only apply a _Class pre-specialization if the type is really a
+          // class type. A struct wrapping a single reference or an Optional
+          // reference has the same layout, but is not a class type. The
+          // pre-specialized code may depend on the type being a class, e.g. the
+          // array implementation uses `_ContiguousArrayStorage<AnyObject>`
+          // only for class element types.
           if (layout->isNativeClass()) {
             newSubs.push_back(
                 genericParam->getASTContext().TheNativeObjectType);
@@ -3620,6 +3633,9 @@ void swift::trySpecializeApplyOfGeneric(
       if (FAS && FAS.getCallee() == PAI)
         continue;
 
+      // FIXME: Only a re-abstraction of the partial_apply itself is replaced
+      // below, not a re-abstraction of a copy, which then captures a closure of
+      // the new type.
       auto *PAIUser = dyn_cast<PartialApplyInst>(User);
       if (PAIUser && isPartialApplyOfReabstractionThunk(PAIUser)) {
         CanSILFunctionType NewPAType =
@@ -3773,8 +3789,7 @@ void swift::trySpecializeApplyOfGeneric(
           SILBuilderWithScope builder(Apply.getInstruction());
           auto fnType = PAI->getType();
           result =
-              builder.createConvertFunction(Apply.getLoc(), NewPAI, fnType,
-                                            /*withoutActuallyEscaping*/ false);
+              builder.createConvertFunction(Apply.getLoc(), NewPAI, fnType);
         }
         // This is a partial_apply of a re-abstraction thunk. Just skip this.
         assert(PAI->getType() == result->getType());

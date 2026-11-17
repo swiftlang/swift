@@ -21,6 +21,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILSymbolVisitor.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/GlobalDecl.h"
 
 #include "GenDecl.h"
 #include "GenericArguments.h"
@@ -144,6 +145,15 @@ getAddrOfLLVMVariableForClangDecl(IRGenModule &IGM, ValueDecl *decl,
 
   if (isa<clang::ObjCInterfaceDecl>(clangDecl))
     return IGM.getAddrOfObjCClass(cast<ClassDecl>(decl), NotForDefinition);
+
+  if (auto *clangVar = dyn_cast<clang::VarDecl>(clangDecl)) {
+    auto addr = IGM.getAddrOfClangGlobalDecl(clangVar, NotForDefinition);
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr))
+      IGM.overrideLinkageForWeakLinkedClangDecl(
+          globalVar, decl->getModuleContext(),
+          llvm::GlobalValue::ExternalWeakLinkage);
+    return addr;
+  }
 
   llvm::report_fatal_error("Unexpected clang decl kind");
 }

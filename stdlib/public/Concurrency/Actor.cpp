@@ -231,6 +231,37 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
+#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+namespace {
+/// Job that allows to use executor API to schedule a block of task-less
+/// synchronous code.
+class IsolatedDeinitJob : public Job {
+private:
+  void *__ptrauth_swift_isolated_deinit_job_object Object;
+  DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
+
+public:
+  IsolatedDeinitJob(JobPriority priority, void *object,
+                    DeinitWorkFunction * work)
+      : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
+        Work(work) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *_job) {
+    auto *job = cast<IsolatedDeinitJob>(_job);
+    void *object = job->Object;
+    DeinitWorkFunction *work = job->Work;
+    swift_cxx_deleteObject(job);
+    return work(object);
+  }
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::IsolatedDeinit;
+  }
+};
+} // namespace
+#endif
+
 /// This function establishes the Task's context and attempts to invoke
 /// it. The invocation may fail and the Task may not be run if the
 /// passed in exclusion value is not what is in the ActiveTaskStatus
@@ -1068,7 +1099,32 @@ class alignas(sizeof(void *) * 2) ActiveActorStatus {
   uint32_t Flags;
   LLVM_ATTRIBUTE_UNUSED uint32_t Unused = {};
 #endif
+  /// The first unprioritized job, signed with the address of the actor's
+  /// status storage. The signature is deterministic, so a status that is
+  /// rebuilt with the same job compares equal in a compare-exchange.
   Job *FirstJob;
+
+  static Job *signFirstJob(Job *job, const void *slot) {
+#if SWIFT_PTRAUTH
+    if (job)
+      job = ptrauth_sign_unauthenticated(
+          job, ptrauth_key_process_independent_data,
+          ptrauth_blend_discriminator(
+              slot, SpecialPointerAuthDiscriminators::ActorStatusFirstJob));
+#endif
+    return job;
+  }
+
+  static Job *authFirstJob(Job *job, const void *slot) {
+#if SWIFT_PTRAUTH
+    if (job)
+      job = ptrauth_auth_data(
+          job, ptrauth_key_process_independent_data,
+          ptrauth_blend_discriminator(
+              slot, SpecialPointerAuthDiscriminators::ActorStatusFirstJob));
+#endif
+    return job;
+  }
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   ActiveActorStatus(uint32_t flags, dispatch_lock_t drainLockValue, Job *job)
@@ -1224,12 +1280,24 @@ public:
 #endif
   }
 
-  Job *getFirstUnprioritizedJob() const { return FirstJob; }
-  ActiveActorStatus withFirstUnprioritizedJob(Job *firstJob) const {
+  /// Check whether there are any unprioritized jobs.
+  bool hasUnprioritizedJobs() const { return FirstJob != nullptr; }
+
+  /// Get the first unprioritized job. `slot` is the address of the actor's
+  /// status storage that this status was loaded from.
+  Job *getFirstUnprioritizedJob(const void *slot) const {
+    return authFirstJob(FirstJob, slot);
+  }
+
+  /// Return a copy of this status with a new first unprioritized job. `slot`
+  /// is the address of the actor's status storage that the result will be
+  /// stored to.
+  ActiveActorStatus withFirstUnprioritizedJob(Job *firstJob,
+                                              const void *slot) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-    return ActiveActorStatus(Flags, DrainLock, firstJob);
+    return ActiveActorStatus(Flags, DrainLock, signFirstJob(firstJob, slot));
 #else
-    return ActiveActorStatus(Flags, firstJob);
+    return ActiveActorStatus(Flags, signFirstJob(firstJob, slot));
 #endif
   }
 
@@ -1251,7 +1319,8 @@ public:
   }
 #endif
 
-  void traceStateChanged(HeapObject *actor, bool distributedActorIsRemote) {
+  void traceStateChanged(HeapObject *actor, const void *slot,
+                         bool distributedActorIsRemote) {
     // Convert our state to a consistent raw value. These values currently match
     // the enum values, but this explicit conversion provides room for change.
     uint8_t traceState = 255;
@@ -1270,20 +1339,23 @@ public:
       break;
     }
     concurrency::trace::actor_state_changed(
-        actor, getFirstUnprioritizedJob(), traceState, distributedActorIsRemote,
-        isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
+        actor, getFirstUnprioritizedJob(slot), traceState,
+        distributedActorIsRemote, isMaxPriorityEscalated(),
+        static_cast<uint8_t>(getMaxPriority()));
   }
 };
 
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
 
+using SignedJobQueueLink = Job *__ptrauth_swift_actor_job_queue_link;
+
 /// Given that a job is enqueued normally on a default actor, get/set
 /// the next job in the actor's queue.
 static Job *getNextJob(Job *job) {
-  return *reinterpret_cast<Job **>(job->SchedulerPrivate);
+  return *reinterpret_cast<SignedJobQueueLink *>(job->SchedulerPrivate);
 }
 static void setNextJob(Job *job, Job *next) {
-  *reinterpret_cast<Job **>(job->SchedulerPrivate) = next;
+  *reinterpret_cast<SignedJobQueueLink *>(job->SchedulerPrivate) = next;
 }
 
 struct JobQueueTraits {
@@ -1337,7 +1409,8 @@ protected:
 class DefaultActorImplFooter {
 protected:
 #if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-  using PriorityQueue = swift::PriorityQueue<Job *, JobQueueTraits>;
+  using PriorityQueue =
+      swift::PriorityQueue<Job *, JobQueueTraits, SignedJobQueueLink>;
 
   // When enqueued, jobs are atomically added to a linked list with the head
   // stored inside ActiveActorStatus. This list contains jobs in the LIFO order
@@ -1600,7 +1673,8 @@ static SWIFT_ATTRIBUTE_ALWAYS_INLINE void traceActorStateTransition(DefaultActor
   SWIFT_TASK_DEBUG_LOG("Actor %p transitioned from %#x to %#x (%s)", actor,
                        oldState.getOpaqueFlags(), newState.getOpaqueFlags(),
                        __FUNCTION__);
-  newState.traceStateChanged(actor, distributedActorIsRemote);
+  newState.traceStateChanged(actor, &actor->_status(),
+                             distributedActorIsRemote);
 }
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
@@ -1642,15 +1716,30 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
   concurrency::trace::actor_enqueue(this, job);
   bool distributedActorIsRemote = swift_distributed_actor_is_remote(this);
 
+  // Isolated deinits need some special handling, as they may destroy the actor
+  // even with a defensive retain applied.
+  bool isIsolatedDeinitJob = isa<IsolatedDeinitJob>(job);
+  JobPriority requestedPriority = priority;
+
   auto oldState = _status().load(std::memory_order_relaxed);
   SwiftDefensiveRetainRAII thisRetainHelper{this};
   while (true) {
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
-    Job *currentHead = oldState.getFirstUnprioritizedJob();
+    Job *currentHead = oldState.getFirstUnprioritizedJob(&_status());
     setNextJob(job, currentHead);
-    newState = newState.withFirstUnprioritizedJob(job);
+    newState = newState.withFirstUnprioritizedJob(job, &_status());
+
+    // Isolated deinits can't escalate priority, so on an active actor they get
+    // at most whatever priority the actor has. Start from the requested
+    // priority each time, as a failed CAS may leave the actor idle.
+    if (isIsolatedDeinitJob) {
+      priority = requestedPriority;
+      if (!oldState.isIdle() && priority > oldState.getMaxPriority())
+        priority = oldState.getMaxPriority();
+      job->setPriority(priority);
+    }
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1708,6 +1797,11 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
       if (oldState.getMaxPriority() != newState.getMaxPriority()) {
         // We still need `this`, assert that we did a defensive retain.
         assert(thisRetainHelper.isRetained());
+
+        // A defensive retain doesn't save us if the job is an isolated deinit.
+        // Isolated deinits don't need priority escalation, so we ensure they
+        // never escalate, and thus should never get here.
+        assert(!isIsolatedDeinitJob);
 
         if (newState.isRunning()) {
           // Actor is running on a thread, escalate the thread running it
@@ -1831,13 +1925,13 @@ void DefaultActorImpl::processIncomingQueue() {
   while (true) {
     // If there aren't any new jobs in the incoming queue, we can return
     // immediately without updating the status.
-    if (!oldState.getFirstUnprioritizedJob()) {
+    if (!oldState.hasUnprioritizedJobs()) {
       return;
     }
     assert(oldState.isAnyRunning());
 
     auto newState = oldState;
-    newState = newState.withFirstUnprioritizedJob(nullptr);
+    newState = newState.withFirstUnprioritizedJob(nullptr, &_status());
 
     if (_status().compare_exchange_weak(
             oldState, newState,
@@ -1850,7 +1944,7 @@ void DefaultActorImpl::processIncomingQueue() {
     }
   }
 
-  handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
+  handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob(&_status()));
 }
 
 // Called with actor lock held on current thread
@@ -2002,10 +2096,9 @@ void DefaultActorImpl::destroy() {
 
     swift_Concurrency_fatalError(0,
                       "Object %p of class %s deallocated with non-zero retain "
-                      "count %zd. This object's deinit, or something called "
-                      "from it, may have created a strong reference to self "
-                      "which outlived deinit, resulting in a dangling "
-                      "reference.\n",
+                      "count %zd. Possible unsafe concurrent access to stored "
+                      "property containing this object, or escape of self from "
+                      "its deinit.\n",
                       object,
                       descriptor ? descriptor->Name.get() : "<unknown>",
                       retainCount);
@@ -2019,7 +2112,8 @@ void DefaultActorImpl::destroy() {
   // Tasks on an actor are supposed to keep the actor alive until they start
   // running and we can only get here if ref count of the object = 0 which means
   // there should be no more tasks enqueued on the actor.
-  assert(!oldState.getFirstUnprioritizedJob() && "actor has queued jobs at destruction");
+  assert(!oldState.hasUnprioritizedJobs() &&
+         "actor has queued jobs at destruction");
 
   if (oldState.isIdle()) {
     assert(prioritizedJobs.empty() && "actor has queued jobs at destruction");
@@ -2135,7 +2229,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(!oldState.getFirstUnprioritizedJob());
+      assert(!oldState.hasUnprioritizedJobs());
       // We cannot assert here that prioritizedJobs is empty,
       // because lock is not held yet. Raise a flag to assert after getting the lock.
       assertNoJobs = true;
@@ -2154,7 +2248,7 @@ retry:;
     // check for higher priority jobs that could have been scheduled in the
     // meantime. And processing is more efficient when done in larger batches.
     if (asDrainer) {
-      newState = newState.withFirstUnprioritizedJob(nullptr);
+      newState = newState.withFirstUnprioritizedJob(nullptr, &_status());
     }
 
     // This needs an acquire since we are taking a lock
@@ -2167,7 +2261,7 @@ retry:;
       }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
       if (asDrainer) {
-        handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
+        handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob(&_status()));
       }
       return true;
     }
@@ -2218,7 +2312,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
     auto newState = oldState;
     // Lock is still held at this point, so it is safe to access prioritizedJobs
-    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritizedJob()) {
+    if (!prioritizedJobs.empty() || oldState.hasUnprioritizedJobs()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
@@ -2709,37 +2803,6 @@ swift_task_immediateImpl(AsyncTask *task,
     _swift_task_setCurrent(originalTask);
   }
 }
-
-#if !SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
-namespace {
-/// Job that allows to use executor API to schedule a block of task-less
-/// synchronous code.
-class IsolatedDeinitJob : public Job {
-private:
-  void *Object;
-  DeinitWorkFunction *__ptrauth_swift_deinit_work_function Work;
-
-public:
-  IsolatedDeinitJob(JobPriority priority, void *object,
-                    DeinitWorkFunction * work)
-      : Job({JobKind::IsolatedDeinit, priority}, &process), Object(object),
-        Work(work) {}
-
-  SWIFT_CC(swiftasync)
-  static void process(Job *_job) {
-    auto *job = cast<IsolatedDeinitJob>(_job);
-    void *object = job->Object;
-    DeinitWorkFunction *work = job->Work;
-    swift_cxx_deleteObject(job);
-    return work(object);
-  }
-
-  static bool classof(const Job *job) {
-    return job->Flags.getKind() == JobKind::IsolatedDeinit;
-  }
-};
-} // namespace
-#endif
 
 SWIFT_CC(swift)
 static void swift_task_deinitOnExecutorImpl(void *object,

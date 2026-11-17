@@ -489,7 +489,7 @@ void ClangSyntaxPrinter::printSymbolUSRAttribute(const ValueDecl *D) const {
 void ClangSyntaxPrinter::printKnownCType(
     Type t, PrimitiveTypeMapping &typeMapping) const {
   auto info =
-      typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+      typeMapping.getKnownCTypeInfo(t->getNominalDecl());
   assert(info.has_value() && "not a known type");
   os << info->name;
   if (info->canBeNullable)

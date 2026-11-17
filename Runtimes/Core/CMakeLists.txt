@@ -86,6 +86,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 include(AvailabilityMacros)
 
@@ -205,7 +206,6 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -empty-abi-descriptor>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<NOT:$<BOOL:${SwiftCore_ENABLE_OBJC_INTEROP}>>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -disable-objc-interop>"
-  "$<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -Xclang -Xcc -fbuiltin-headers-in-system-modules>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 

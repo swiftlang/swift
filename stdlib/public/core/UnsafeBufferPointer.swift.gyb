@@ -1051,10 +1051,10 @@ extension Unsafe${Mutable}BufferPointer:
 
 extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @safe
-  @export(implementation)
+  @export(implementation) @_transparent
+  @available(*, deprecated, message: "Pointers are always well-aligned.")
   public func _isWellAligned() -> Bool {
-    guard let p = baseAddress else { return true }
-    return p._isWellAligned()
+    true
   }
 }
 

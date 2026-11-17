@@ -503,16 +503,23 @@ getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
   return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
 }
 
-AvailabilityRange AvailabilityDomain::getRemappedRange(
-    AvailabilityDomain toDomain, const llvm::VersionTuple &version,
-    AvailabilityVersionKind versionKind, const ASTContext &ctx) const {
+bool AvailabilityDomain::requiresVersionRemapping(
+    AvailabilityDomain toDomain, const llvm::VersionTuple &version) const {
   // Precondition: The target domain inherits from this domain.
   DEBUG_ASSERT(contains(toDomain));
 
-  // Currently, the only visionOS requires remapping versions from iOS.
-  if (getPlatformKind() == PlatformKind::iOS &&
-      AvailabilityDomain::forPlatform(PlatformKind::visionOS)
-          .contains(toDomain)) {
+  // Currently, the only visionOS requires remapping versions from iOS. Since
+  // version 26, the versions of visionOS and iOS are the same.
+  return getPlatformKind() == PlatformKind::iOS &&
+         AvailabilityDomain::forPlatform(PlatformKind::visionOS)
+             .contains(toDomain) &&
+         version < llvm::VersionTuple(26);
+}
+
+AvailabilityRange AvailabilityDomain::getRemappedRange(
+    AvailabilityDomain toDomain, const llvm::VersionTuple &version,
+    AvailabilityVersionKind versionKind, const ASTContext &ctx) const {
+  if (requiresVersionRemapping(toDomain, version)) {
     std::optional<clang::VersionTuple> remappedVersion;
     switch (versionKind) {
     case AvailabilityVersionKind::Introduced:

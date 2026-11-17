@@ -306,6 +306,8 @@ struct SILDeclRef {
   ClosureExpr *getClosureExpr() const;
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
+  /// If this is a 'defer' body, get the function decl representing its body
+  FuncDecl *getDeferBodyFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
   AccessorDecl *getAccessorDecl() const;
   FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
@@ -526,6 +528,10 @@ struct SILDeclRef {
 
   /// True if the decl ref references a thunk handling potentially distributed actor functions
   bool isDistributedThunk() const;
+
+  /// True if the decl ref references a C++ constructor of an already allocated
+  /// instance of C++ foreign reference type.
+  bool isForeignReferenceInitializer() const;
 
   /// If this is a distributed-thunk decl ref, return its distributed thunk.
   FuncDecl *getDistributedThunk() const;

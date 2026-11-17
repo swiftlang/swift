@@ -326,7 +326,8 @@ ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
       constructorDecl,
       SubstitutionMap::get(constructorDecl->getGenericSignature(),
                            {wrappedType}, {diffConf}));
-  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  PreparedArguments args(
+      {AnyFunctionType::Param::bodyAccess(optionalOfWrappedTanType)});
   args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
 
   auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),
@@ -456,7 +457,7 @@ RValue Transform::transform(RValue &&input,
 // Single @objc protocol value metatypes can be converted to the ObjC
 // Protocol class type.
 static bool isProtocolClass(Type t) {
-  auto classDecl = t->getClassOrBoundGenericClass();
+  auto classDecl = t->getClassDecl();
   if (!classDecl)
     return false;
 
@@ -593,10 +594,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - casts for classes
-  if (outputSubstType->getClassOrBoundGenericClass() &&
-      inputSubstType->getClassOrBoundGenericClass()) {
-    auto class1 = inputSubstType->getClassOrBoundGenericClass();
-    auto class2 = outputSubstType->getClassOrBoundGenericClass();
+  if (outputSubstType->getClassDecl() &&
+      inputSubstType->getClassDecl()) {
+    auto class1 = inputSubstType->getClassDecl();
+    auto class2 = outputSubstType->getClassDecl();
 
     // CF <-> Objective-C via toll-free bridging.
     if ((class1->getForeignClassKind() == ClassDecl::ForeignKind::CFType) ^
@@ -618,10 +619,10 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   // - upcasts for collections
-  if (outputSubstType->getStructOrBoundGenericStruct() &&
-      inputSubstType->getStructOrBoundGenericStruct()) {
-    auto *inputStruct = inputSubstType->getStructOrBoundGenericStruct();
-    auto *outputStruct = outputSubstType->getStructOrBoundGenericStruct();
+  if (outputSubstType->getStructDecl() &&
+      inputSubstType->getStructDecl()) {
+    auto *inputStruct = inputSubstType->getStructDecl();
+    auto *outputStruct = outputSubstType->getStructDecl();
 
     // Attempt collection upcast only if input and output declarations match.
     if (inputStruct == outputStruct) {
@@ -649,7 +650,7 @@ ManagedValue Transform::transform(ManagedValue v,
   }
 
   //  - upcasts from an archetype
-  if (outputSubstType->getClassOrBoundGenericClass()) {
+  if (outputSubstType->getClassDecl()) {
     if (auto archetypeType = dyn_cast<ArchetypeType>(inputSubstType)) {
       if (archetypeType->getSuperclass()) {
         // Replace the cleanup with a new one on the superclass value so we
@@ -699,7 +700,7 @@ ManagedValue Transform::transform(ManagedValue v,
     auto inputLoweredTy = SGF.getLoweredType(AbstractionPattern::getOpaque(),
                                              inputSubstType);
     // FIXME: Gross workaround for incorrect opaque type erasure
-    if (loweredTy.getNominalOrBoundGenericNominal() &&
+    if (loweredTy.getNominalDecl() &&
         inputLoweredTy.is<OpaqueTypeArchetypeType>()) {
       // Woohoo!
       inputSubstType = loweredTy.getASTType();
@@ -2953,8 +2954,8 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
   if (innerASTTy == outerASTTy) {
     return innerValue;
   }
-  if (innerASTTy->getClassOrBoundGenericClass()
-      && outerASTTy->getClassOrBoundGenericClass()) {
+  if (innerASTTy->getClassDecl()
+      && outerASTTy->getClassDecl()) {
     if (outerASTTy->isExactSuperclassOf(innerASTTy)) {
       return SGF.B.createUpcast(loc, innerValue, outerType);
     } else if (innerASTTy->isExactSuperclassOf(outerASTTy)) {
@@ -3014,17 +3015,27 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     }
 
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
-      auto forwardedArg =
-          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (forwardedArg->getType().isObject() && fTy->hasGuaranteedResult()) {
-        forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
-      }
-      forwardedArgs.push_back(forwardedArg);
+      forwardedArgs.push_back(
+          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
     }
 
     forwardedArgs.push_back(arg.getValue());
   }
+}
+
+/// Emit a @guaranteed borrow accessor result as a borrow introducer and emit
+/// unchecked_ownership which SILGenCleanup with fixup.
+static SILValue prepareGuaranteedResultForReturn(SILGenFunction &SGF,
+                                                 SILLocation loc,
+                                                 SILValue result) {
+  if (!result->isBorrowAccessorResult() ||
+      result->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return result;
+  }
+  auto borrowIntroducerResult =
+      SGF.emitManagedBorrowedRValueWithCleanup(result);
+  return SGF.B.createUncheckedOwnership(loc, borrowIntroducerResult).getValue();
 }
 
 namespace {
@@ -6333,8 +6344,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     if (linearMapFnType != linearMapUnsubstFnType) {
       auto unsubstType =
           SILType::getPrimitiveObjectType(linearMapUnsubstFnType);
-      linearMap = B.createConvertFunction(loc, linearMap, unsubstType,
-                                          /*withoutActuallyEscaping*/ false);
+      linearMap = B.createConvertFunction(loc, linearMap, unsubstType);
     }
     auto thunkedFn = createPartialApplyOfThunk(
         *this, loc, thunk, interfaceSubs, dynamicSelfType, toType, linearMap,
@@ -6741,7 +6751,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
     auto *classDecl = thunkFnTy->getParameters()
                           .back()
                           .getInterfaceType()
-                          ->getClassOrBoundGenericClass();
+                          ->getClassDecl();
     assert(classDecl && "Expected last argument to have class type");
     auto classMetatype = MetatypeType::get(
         classDecl->getDeclaredInterfaceType(), MetatypeRepresentation::Thick);
@@ -6774,6 +6784,12 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       return false;
     auto selfParamIndex = origFnTy->getNumParameters() - 1;
     if (!config.parameterIndices->contains(selfParamIndex))
+      return false;
+    // A mutating self tangent is not returned from the reverse-mode pullback
+    // but passed as inout, so there is no self result to reorder.
+    // Forward-mode differentials still need this self-reordering.
+    if (kind == AutoDiffDerivativeFunctionKind::VJP &&
+        origFnTy->getSelfParameter().isIndirectMutating())
       return false;
     return config.parameterIndices->getNumIndices() > 1;
   };
@@ -6839,9 +6855,8 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   auto targetLinearMapUnsubstFnType =
       SILType::getPrimitiveObjectType(targetLinearMapFnType);
   if (linearMap.getType() != targetLinearMapUnsubstFnType) {
-    linearMap = thunkSGF.B.createConvertFunction(
-        loc, linearMap, targetLinearMapUnsubstFnType,
-        /*withoutActuallyEscaping*/ false);
+    linearMap = thunkSGF.B.createConvertFunction(loc, linearMap,
+                                                 targetLinearMapUnsubstFnType);
   }
 
   // Return original results and thunked differential/pullback.
@@ -6914,13 +6929,19 @@ ManagedValue Transform::transformFunction(ManagedValue fn,
   }
 
   // We do not, conversion is trivial.
+  //
+  // Only a thick function can have execution semantics; thin-to-thick adds
+  // them.
   auto expectedEI = expectedFnType->getExtInfo().intoBuilder();
-  auto newEI = expectedEI.withRepresentation(fnType->getRepresentation())
-                   .withNoEscape(fnType->getRepresentation() ==
-                                         SILFunctionType::Representation::Thick
-                                     ? fnType->isNoEscape()
-                                     : expectedFnType->isNoEscape())
-                   .build();
+  bool isThick =
+      fnType->getRepresentation() == SILFunctionType::Representation::Thick;
+  auto newEI =
+      expectedEI.withRepresentation(fnType->getRepresentation())
+          .withNoEscape(isThick ? fnType->isNoEscape()
+                                : expectedFnType->isNoEscape())
+          .withExecutionSemantics(
+              isThick ? expectedFnType->getExecutionSemantics() : std::nullopt)
+          .build();
   auto newFnType =
       adjustFunctionType(expectedFnType, newEI, fnType->getCalleeConvention(),
                          fnType->getWitnessMethodConformanceOrInvalid());
@@ -7326,6 +7347,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       emitApplyWithRethrow(loc, derivedRef,
                             SILType::getPrimitiveObjectType(derivedFTy),
                             subs, args);
+    implResult = prepareGuaranteedResultForReturn(*this, loc, implResult);
 
     // Reabstract the return.
     result = resultPlanner->execute(implResult, derivedFTy);
@@ -7491,7 +7513,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           NormalDifferentiableFunctionTypeComponent(derivativeId->getKind()),
           diffFn);
     }
-    return SGF.emitGlobalFunctionRef(loc, witness);
+
+    return SGF.emitGlobalFunctionRef(
+        loc, SGF.SGM.getBackDeploymentEntryPoint(
+                 witness, SGF.F.getResilienceExpansion()));
   case WitnessDispatchKind::Dynamic:
     assert(!witness.getDerivativeFunctionIdentifier());
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
@@ -7838,6 +7863,8 @@ void SILGenFunction::emitProtocolWitness(
   case SILCoroutineKind::None: {
     SILValue witnessResultValue =
       emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
+    witnessResultValue =
+        prepareGuaranteedResultForReturn(*this, loc, witnessResultValue);
 
     // Reabstract the result value.
     reqtResultValue = resultPlanner->execute(witnessResultValue, witnessFTy);

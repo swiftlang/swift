@@ -19,7 +19,7 @@ func consume<T>(_ t: T) {
 import Generic
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s7Generic11OneArgumentVyAA7IntegerVGMD")
+// CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s7Generic11OneArgumentVyAA7IntegerVGMd", ptr @"$s7Generic11OneArgumentVyAA7IntegerVGMR")
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(ptr noalias {{%[0-9]+}}, ptr [[METADATA]])
 // CHECK: }
 func doit() {

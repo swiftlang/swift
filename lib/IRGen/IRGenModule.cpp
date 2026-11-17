@@ -72,6 +72,7 @@
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenExistential.h"
 #include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
@@ -822,6 +823,7 @@ namespace RuntimeConstants {
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
+  const auto FirstParamSwiftAsync = llvm::Attribute::SwiftAsync;
   const auto WillReturn = llvm::Attribute::WillReturn;
 
   RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
@@ -920,6 +922,16 @@ namespace RuntimeConstants {
 
   RuntimeAvailability TypedCoroAllocAvailability(ASTContext &context) {
     auto featureAvailability = context.getTypedCoroAllocAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  OnceClosureDestroyedErrorAvailability(ASTContext &context) {
+    auto featureAvailability =
+        context.getOnceClosureDestroyedErrorAvailability();
     if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1064,6 +1076,15 @@ namespace RuntimeConstants {
   }
 
   RuntimeAvailability
+  TaskCancellationShieldAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getTaskCancellationShieldAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
   TaskCancellationScopeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getTaskCancellationScopeAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
@@ -1124,10 +1145,10 @@ namespace RuntimeConstants {
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr) {
   return Attr == llvm::Attribute::ZExt;
 }
-// Similar to the 'return' attribute we assume that the 'returned' attributed is
-// associated with the first function parameter.
-static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr) {
-  return Attr == llvm::Attribute::Returned;
+// These runtime-function attributes apply to the first parameter.
+static bool isFirstParameterAttribute(llvm::Attribute::AttrKind Attr) {
+  return Attr == llvm::Attribute::Returned ||
+         Attr == llvm::Attribute::SwiftAsync;
 }
 
 static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effects) {
@@ -1236,7 +1257,7 @@ llvm::Constant *swift::getRuntimeFn(
     for (auto Attr : attrs) {
       if (isReturnAttribute(Attr))
         buildRetAttr.addAttribute(Attr);
-      else if (isReturnedAttribute(Attr))
+      else if (isFirstParameterAttribute(Attr))
         buildFirstParamAttr.addAttribute(Attr);
       else
         buildFnAttr.addAttribute(Attr);
@@ -1372,7 +1393,7 @@ llvm::Function *IRGenModule::getOrCreateDeadMethodErrorAsyncStub() {
 }
 
 static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
-static bool isReturnedAttribute(llvm::Attribute::AttrKind Attr);
+static bool isFirstParameterAttribute(llvm::Attribute::AttrKind Attr);
 
 #ifdef CHECK_RUNTIME_EFFECT_ANALYSIS
 void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
@@ -1424,7 +1445,7 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
     for (auto Attr : theAttrs) {                                               \
       if (isReturnAttribute(Attr))                                             \
         attrs = attrs.addRetAttribute(getLLVMContext(), Attr);                 \
-      else if (isReturnedAttribute(Attr))                                      \
+      else if (isFirstParameterAttribute(Attr))                                \
         attrs = attrs.addParamAttribute(getLLVMContext(), 0, Attr);            \
       else                                                                     \
         attrs = attrs.addFnAttribute(getLLVMContext(), Attr);                  \
@@ -1626,6 +1647,13 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // @export(interface) conformances, which have a unique strong definition
   // in the owning module.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    // The module that owns an exported conformance specialization emits its
+    // witness table.
+    if (SpecializedAttr::isExportedConformanceSpecialization(
+            wt->getConformance()))
+      return SpecializedAttr::getExportedTypeSpecializationOwner(
+                 wt->getConformance()->getType()->getCanonicalType()) !=
+             SIL.getSwiftModule();
     if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
       switch (normal->getEffectiveCodeGenerationModel()) {
         case CodeGenerationModel::Interface:
@@ -1638,6 +1666,14 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 
     return true;
   }
+
+  // The conformances of a back-deployed type from another module are only
+  // emitted where the type is used, and must provide conformance records
+  // for dynamic casts even if nothing references them directly.
+  if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance()))
+    if (LinkEntity::forProtocolConformanceDescriptor(normal)
+            .isBackDeployedIntoClient())
+      return false;
 
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate
@@ -1756,11 +1792,16 @@ void IRGenModule::constructInitialFnAttributes(
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
   }
 
-  // When the Clang configuration disables builtins Clang stamps
-  // its functions with the "no-builtins" attribute. Mirror that on
+  // When the Clang configuration disables builtins Clang stamps its functions
+  // with the "no-builtins" or "no-builtin-<name>" attributes. Mirror that on
   // the Swift side (otherwise the mismatch prevents function inlining.)
-  if (getClangASTContext().getLangOpts().NoBuiltin) {
+  const auto &clangLangOpts = getClangASTContext().getLangOpts();
+  if (clangLangOpts.NoBuiltin) {
     Attrs.addAttribute("no-builtins");
+  } else {
+    for (const std::string &builtinName : clangLangOpts.NoBuiltinFuncs) {
+      Attrs.addAttribute("no-builtin-" + builtinName);
+    }
   }
 
   // Mark as 'nounwind' to avoid referencing exception personality symbols, this
@@ -2338,6 +2379,8 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 bool IRGenModule::finalize() {
+  emitEmbeddedExistentialBoxDeallocator(*this);
+
   if (getOptions().DumpAbstractTypeLayoutInfo !=
       IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
     for (auto type : Context.getRecoveredHiddenTypes()) {
@@ -2503,7 +2546,7 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   if (!Triple.isOSDarwin() && !Context.LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  auto *clDecl = objectType.getClassOrBoundGenericClass();
+  auto *clDecl = objectType.getClassDecl();
   if (!clDecl)
     return false;
 
@@ -2683,6 +2726,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   auto &ctx = getSwiftModule()->getASTContext();
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
+}
+
+bool IRGenModule::isBorrowRuntimeAvailable() {
+  auto &ctx = getSwiftModule()->getASTContext();
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  return deploymentAvailability.isContainedIn(ctx.getBorrowingAvailability());
 }
 
 bool IRGenModule::isTypedAllocationAvailable() {

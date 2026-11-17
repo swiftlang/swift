@@ -4,7 +4,7 @@
 public protocol NonCopyableWithVar: ~Copyable {}
 extension NonCopyableWithVar where Self: ~Copyable {
     public var value: Int32 {
-        get { 0 } // expected-error{{copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
+        get { 0 } // expected-error{{copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug}}
         set {}
     }
 }

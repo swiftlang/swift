@@ -78,7 +78,12 @@ InheritedTypeResult InheritedTypeRequest::evaluate(
   if (auto *typeRepr = inheritedEntry.getTypeRepr()) {
     // Check for suppressed inferrable conformances.
     if (auto itr = dyn_cast<InverseTypeRepr>(typeRepr)) {
-      Type inheritedTy = resolution->resolveType(itr->getConstraint());
+      // Resolve the constraint the same way as in a composition, so that
+      // checks for suppressible protocols see the same context.
+      auto inverted = resolution->withOptions(
+          resolution->getOptions().withoutContext(true).withContext(
+              TypeResolverContext::Inverted));
+      Type inheritedTy = inverted.resolveType(itr->getConstraint());
       return InheritedTypeResult::forSuppressed(inheritedTy, itr);
     }
     inheritedType = resolution->resolveType(typeRepr);
@@ -110,7 +115,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
       continue;
 
     // If we found a class, return it.
-    if (result->getClassOrBoundGenericClass()) {
+    if (result->getClassDecl()) {
       return result;
     }
 
@@ -118,7 +123,7 @@ SuperclassTypeRequest::evaluate(Evaluator &evaluator,
     if (result->isExistentialType()) {
       if (auto superclassType =
             result->getExistentialLayout().explicitSuperclass) {
-        if (superclassType->getClassOrBoundGenericClass()) {
+        if (superclassType->getClassDecl()) {
           return superclassType;
         }
       }

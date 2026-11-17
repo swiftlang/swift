@@ -13,21 +13,21 @@ func cond() -> Bool { return true }
 func test1() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
   if cond() {
-// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
+// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$syycMd", ptr @"$syycMR")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T0]])
     use_metadata(voidToVoid)
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
-// CHECK-NOT: @"$syycMD"
+// CHECK-NOT: @"$syycMd"
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
-// CHECK-NOT: @"$syycMD"
+// CHECK-NOT: @"$syycMd"
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T0]])
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
+// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$syycMd", ptr @"$syycMR")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T1]])
   use_metadata(voidToVoid)
 }
@@ -37,17 +37,17 @@ func test2() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
   if cond() {
 // CHECK: call swiftcc i1 @"$s18metadata_dominance4condSbyF"()
-// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
+// CHECK: [[T0:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$syycMd", ptr @"$syycMR")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T0]])
     if cond() {
       use_metadata(voidToVoid)
     } else {
-// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
+// CHECK: [[T1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$syycMd", ptr @"$syycMR")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T1]])
       use_metadata(voidToVoid)
     }
   }
-// CHECK: [[T2:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$syycMD")
+// CHECK: [[T2:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$syycMd", ptr @"$syycMR")
 // CHECK: call swiftcc void @"$s18metadata_dominance04use_A0yyxlF"(ptr {{.*}}, ptr [[T2]])
   use_metadata(voidToVoid)
 }

@@ -92,3 +92,42 @@ func emplace_ignore_ao() {
     // CHECK-NEXT: dealloc_stack [[TMP]]
     let _: AO = Builtin.emplace(do_emplace)
 }
+
+struct MyError: Error {}
+
+// A generic error is address-only, so without opaque values the closure writes
+// it straight into the caller's indirect error result.
+// CHECK-LABEL: sil {{.*}} @$s{{.*}}_throws_generic
+// CHECK: bb0([[ERR_OUT:%.*]] : $*E, [[BODY:%.*]] : @guaranteed
+func emplace_throws_generic<E: Error>(_ body: (Builtin.RawPointer) throws(E) -> ()) throws(E) -> Loadable {
+    // CHECK: [[TMP:%.*]] = alloc_stack $Loadable
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
+    // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
+    // CHECK-NEXT: try_apply [[BODY]]([[ERR_OUT]], [[PTR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+    // CHECK: [[ERROR]]:
+    // CHECK-NEXT: end_lifetime [[TMP]]
+    // CHECK-NEXT: dealloc_stack [[TMP]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: throw_addr
+    // CHECK: [[NORMAL]]({{.*}}):
+    // CHECK-NEXT: [[RESULT:%.*]] = load [take] [[TMP]]
+    // CHECK-NEXT: dealloc_stack [[TMP]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: return [[RESULT]]
+    return try Builtin.emplace(body)
+}
+
+// A concrete loadable error is thrown directly, with or without opaque values.
+// CHECK-LABEL: sil {{.*}} @$s{{.*}}_throws_concrete
+func emplace_throws_concrete(_ body: (Builtin.RawPointer) throws(MyError) -> ()) throws(MyError) -> Loadable {
+    // CHECK: [[TMP:%.*]] = alloc_stack $Loadable
+    // CHECK-NEXT: builtin "prepareInitialization"([[TMP]])
+    // CHECK-NEXT: [[PTR:%.*]] = address_to_pointer {{.*}} [[TMP]]
+    // CHECK-NEXT: try_apply {{.*}}([[PTR]]) {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+    // CHECK: [[ERROR]]([[ERR:%.*]] : $MyError):
+    // CHECK-NEXT: end_lifetime [[TMP]]
+    // CHECK-NEXT: dealloc_stack [[TMP]]
+    // CHECK-NEXT: end_formal_scope
+    // CHECK-NEXT: throw [[ERR]]
+    return try Builtin.emplace(body)
+}

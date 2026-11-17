@@ -704,6 +704,12 @@ public:
                                                            CanType refType,
                                                            SILValue addr,
                                                            SGFContext C);
+
+  /// Whether the initializer that the current `self.init` or `super.init`
+  /// delegates to borrows `self` rather than consuming it. This is the case for
+  /// the C++ constructor of a C++ foreign reference type.
+  bool isInitDelegationBorrowingSelf() const;
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
@@ -983,6 +989,10 @@ public:
 
   /// Return to the previous debug scope.
   void leaveDebugScope();
+
+  /// Enter the debug scope at the closing brace of the block that \p Loc
+  /// ends. Code emitted when falling off the end of a block runs there.
+  void enterBlockEndDebugScope(CleanupLocation Loc);
 
   InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
@@ -1884,6 +1894,9 @@ public:
   /// The location defaults to \c E.
   void emitExprInto(Expr *E, Initialization *I,
                     std::optional<SILLocation> L = std::nullopt);
+
+  /// Borrow the given expression into a borrow binding's Initialization.
+  void emitBorrowInto(Expr *E, Initialization *I, SILLocation loc);
 
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());

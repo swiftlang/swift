@@ -455,6 +455,7 @@ namespace sil_block {
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
+                     BCFixed<1>, // written as '@specialized'
                      BCFixed<1>, // specialization kind
                      GenericSignatureIDField, // specialized signature
                      DeclIDField, // Target SILFunction name or 0.

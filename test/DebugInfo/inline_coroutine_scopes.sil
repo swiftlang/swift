@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt %s -inline -enable-sil-verify-all -sil-print-debuginfo | %FileCheck %s --check-prefixes=CHECK,PERF
+// RUN: %target-sil-opt %s -mandatory-inlining -enable-sil-verify-all -sil-print-debuginfo | %FileCheck %s --check-prefixes=CHECK,MANDATORY
+
+// Test that the borrows created for coroutine inlining have the correct
+// location and scope.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+sil_vtable C {}
+
+sil [ossa] @getC : $@convention(thin) () -> @owned C
+sil [ossa] @useC : $@convention(thin) (@guaranteed C) -> ()
+
+sil_scope 1 { loc "coro.swift":1:6 parent @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed C }
+sil_scope 2 { loc "coro.swift":1:40 parent 1 }
+sil_scope 3 { loc "coro.swift":3:5 parent 2 }
+sil_scope 4 { loc "coro.swift":4:5 parent 2 }
+sil_scope 5 { loc "coro.swift":6:5 parent 2 }
+
+sil [transparent] [ossa] @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed C {
+bb0:
+  %0 = function_ref @getC : $@convention(thin) () -> @owned C, loc "coro.swift":2:13, scope 2
+  %1 = apply %0() : $@convention(thin) () -> @owned C, loc "coro.swift":2:13, scope 2
+  yield %1 : $C, resume bb1, unwind bb2, loc "coro.swift":3:5, scope 3
+
+bb1:
+  destroy_value %1 : $C, loc "coro.swift":4:5, scope 4
+  %4 = tuple (), loc "coro.swift":4:5, scope 4
+  return %4 : $(), loc "coro.swift":4:5, scope 4
+
+bb2:
+  destroy_value %1 : $C, loc "coro.swift":6:5, scope 5
+  unwind, loc "coro.swift":6:5, scope 5
+}
+
+// CHECK-LABEL: sil_scope {{[0-9]+}} { loc "caller.swift":1:6 parent @caller :
+// CHECK-DAG:   sil_scope [[APPLY_SCOPE:[0-9]+]] { loc "caller.swift":2:3 parent
+// CHECK-DAG:   sil_scope [[END_SCOPE:[0-9]+]] { loc "caller.swift":4:5 parent
+// CHECK-DAG:   sil_scope [[ABORT_SCOPE:[0-9]+]] { loc "caller.swift":6:5 parent
+// PERF-DAG:    sil_scope [[YIELD_SCOPE:[0-9]+]] { loc "coro.swift":3:5 parent {{[0-9]+}} inlined_at {{[0-9]+}} }
+
+sil_scope 10 { loc "caller.swift":1:6 parent @caller : $@convention(thin) (Builtin.Int1) -> () }
+sil_scope 11 { loc "caller.swift":2:3 parent 10 }
+sil_scope 12 { loc "caller.swift":4:5 parent 10 }
+sil_scope 13 { loc "caller.swift":6:5 parent 10 }
+
+// CHECK:       sil [ossa] @caller :
+// CHECK:         [[C:%[0-9]+]] = apply
+// PERF-NEXT:     [[BORROW:%[0-9]+]] = begin_borrow [[C]], loc "coro.swift":3:5, scope [[YIELD_SCOPE]]
+// MANDATORY-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[C]], loc "caller.swift":2:3, scope [[APPLY_SCOPE]]
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[BORROW]], loc "caller.swift":4:5, scope [[END_SCOPE]]
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BORROW]], loc "caller.swift":6:5, scope [[ABORT_SCOPE]]
+// CHECK-LABEL: } // end sil function 'caller'
+sil [ossa] @caller : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = function_ref @yield_owned_as_guaranteed : $@yield_once @convention(thin) () -> @yields @guaranteed C, loc "caller.swift":2:3, scope 11
+  (%2, %3) = begin_apply %1() : $@yield_once @convention(thin) () -> @yields @guaranteed C, loc "caller.swift":2:3, scope 11
+  %4 = function_ref @useC : $@convention(thin) (@guaranteed C) -> (), loc "caller.swift":3:3, scope 11
+  %5 = apply %4(%2) : $@convention(thin) (@guaranteed C) -> (), loc "caller.swift":3:3, scope 11
+  cond_br %0, bb1, bb2, loc "caller.swift":3:3, scope 11
+
+bb1:
+  %7 = end_apply %3 as $(), loc "caller.swift":4:5, scope 12
+  br bb3, loc "caller.swift":4:5, scope 12
+
+bb2:
+  abort_apply %3, loc "caller.swift":6:5, scope 13
+  br bb3, loc "caller.swift":6:5, scope 13
+
+bb3:
+  %11 = tuple (), loc "caller.swift":8:1, scope 10
+  return %11 : $(), loc "caller.swift":8:1, scope 10
+}

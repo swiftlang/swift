@@ -461,7 +461,7 @@ private extension AccessBase {
         return .objectIfStackPromoted(rta.instance)
       case .argument(let arg):
         return .decidedInCaller(arg)
-      case .yield, .pointer:
+      case .yield, .pointer, .borrowMutateAccessor:
         return .unknown
       case .index, .unidentified:
         // In the rare case of an unidentified access, just ignore it.

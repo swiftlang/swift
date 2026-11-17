@@ -46,17 +46,19 @@ We describe each in detail below:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
-All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
-macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform<br>Swift Test macOS Platform (arm64)
-macOS platform (Apple Silicon) | @swift-ci Please test macOS arm64           | Swift Test macOS Platform (arm64)
-macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform<br>Swift Test macOS Platform (arm64)
+All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (Ubuntu 22.04) (x86_64)<br>Swift Test macOS Platform (arm64)<br>Swift Test Windows Platform (x86_64)<br>
+All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (Ubuntu 22.04) (x86_64)<br>Swift Test macOS Platform (arm64)<br>Swift Test Windows Platform (x86_64)<br>
+macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (arm64)
+macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (arm64)
+macOS platform (Cross-Compile Intel) | @swift-ci Please test macOS cross-compile x86_64 | Swift Test macOS Platform (cross-compile x86_64)
 macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
 macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - soundness)
-Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
+Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (Ubuntu 22.04) (x86_64)
+Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (Ubuntu 22.04) (x86_64)
 Linux platform               | @swift-ci Please test WebAssembly             | Swift Test WebAssembly (Ubuntu 20.04)
 Swift SDK for Android        | @swift-ci Please test android                 | Swift SDK for Android
+Windows platform               | @swift-ci Please test Windows platform          | Swift Test Windows Platform (x86_64)
+Windows platform               | @swift-ci Please clean test Windows platform    | Swift Test Windows Platform (x86_64)
 
 The core principles of validation testing is that:
 
@@ -145,7 +147,7 @@ macOS platform | @swift-ci Please test stdlib with toolchain| Swift Test stdlib 
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
 macOS platform | preset=<preset> <br> @swift-ci Please test with preset macOS Platform | Swift Test macOS Platform with preset
-Linux platform | preset=<preset> <br> @swift-ci Please test with preset Linux Platform | Swift Test Linux Platform with preset
+Linux platform | preset=<preset> <br> @swift-ci Please test with preset Linux Platform | Swift Test Linux Platform (Ubuntu 22.04) (x86_64) with preset
 
 
 For example:
@@ -253,13 +255,13 @@ Currently, supported pull request testing triggers:
 
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
-Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platform
+Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platform (x86_64)
 
 ## ci.swift.org bots
 
 FIXME: FILL ME IN!
 
-<!-- We are making this numbered list with <ol> and <li> HTML tags intead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
+<!-- We are making this numbered list with <ol> and <li> HTML tags instead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
 [^1]: Even though it should go without saying, the reason why having a green build is important is that:<ol><li>A full build break can prevent other developers from testing their work.</li><li>A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.</li><li>@swift-ci pull request testing becomes less effective since one can not perform a test and one must reason about the source of a given failure.</li></ol>
 
 [^2]: This is due to unrelated issues relating to running lldb tests on macOS.

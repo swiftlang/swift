@@ -1,7 +1,10 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -I %S/Inputs -cxx-interoperability-mode=default \
+// RUN:   -verify-additional-file %S/Inputs%{fs-sep}frt-sequence.h \
 // RUN:   -target %target-swift-5.8-abi-triple -disable-typo-correction
 
+// FIXME: The synthesized conformance of std::vector to CxxVector on android-armv7 is invalid
+// https://github.com/swiftlang/swift/issues/93524
 // XFAIL: OS=linux-androideabi
 
 import FrtSequence
@@ -10,14 +13,12 @@ import CxxStdlib
 // --- std::vector<ImmortalNode*> iteration yields ImmortalNode? ---
 
 let ipv = makeImmortalPtrVector()
-let _ = ipv.begin() // expected-error {{has no member 'begin'}}
-                    // expected-note@-1 {{C++ method 'begin' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to use a for-in loop instead?}}
-let _ = ipv.end()   // expected-error {{has no member 'end'}}
-                    // expected-note@-1 {{C++ method 'end' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to compare against 'nil' instead?}}
-let _ = ipv.__beginUnsafe()
-let _ = ipv.__endUnsafe()
+let _ = ipv.begin() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+let _ = ipv.end() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'end()'}}
+let _ = ipv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = ipv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in ipv {
   let _: ImmortalNode? = i
 }
@@ -31,14 +32,12 @@ mutableIpv[0] = elem
 // --- std::vector<SharedNode*> iteration yields SharedNode? ---
 
 let spv = makeSharedPtrVector()
-let _ = spv.begin() // expected-error {{has no member 'begin'}}
-                    // expected-note@-1 {{C++ method 'begin' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to use a for-in loop instead?}}
-let _ = spv.end()   // expected-error {{has no member 'end'}}
-                    // expected-note@-1 {{C++ method 'end' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to compare against 'nil' instead?}}
-let _ = spv.__beginUnsafe()
-let _ = spv.__endUnsafe()
+let _ = spv.begin() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+let _ = spv.end() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'end()'}}
+let _ = spv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = spv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in spv {
   let _: SharedNode? = i
 }
@@ -46,14 +45,12 @@ for i in spv {
 // --- std::vector<ImmortalNode2> iteration yields ImmortalNode2 ---
 
 let ivv = makeImmortalValVector()
-let _ = ivv.begin() // expected-error {{has no member 'begin'}}
-                    // expected-note@-1 {{C++ method 'begin' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to use a for-in loop instead?}}
-let _ = ivv.end()   // expected-error {{has no member 'end'}}
-                    // expected-note@-1 {{C++ method 'end' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{do you want to compare against 'nil' instead?}}
-let _ = ivv.__beginUnsafe()
-let _ = ivv.__endUnsafe()
+let _ = ivv.begin() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+let _ = ivv.end() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'end()'}}
+let _ = ivv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = ivv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in ivv {
   let _: ImmortalNode2 = i
 }
@@ -68,14 +65,12 @@ for _ in rpc {} // expected-error {{for-in loop requires 'RawPtrIterContainer' t
 
 // begin()/end() are still renamed to __beginUnsafe/__endUnsafe
 
-let _ = rpc.begin() // expected-error {{has no member 'begin'}}
-                    // expected-note@-1 {{C++ method 'begin' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{C++ methods that return iterators are potentially unsafe; try using Swift collection APIs instead}}
-let _ = rpc.end()   // expected-error {{has no member 'end'}}
-                    // expected-note@-1 {{C++ method 'end' that returns an iterator is unavailable}}
-                    // expected-note@-2 {{C++ methods that return iterators are potentially unsafe; try using Swift collection APIs instead}}
-let _: ImmortalNode? = rpc.__beginUnsafe()
-let _: ImmortalNode? = rpc.__endUnsafe()
+let _ = rpc.begin() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'begin()'}}
+let _ = rpc.end() // expected-error {{must be marked with 'unsafe'}}
+// expected-note@-1 {{reference to unsafe instance method 'end()'}}
+let _: ImmortalNode? = rpc.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _: ImmortalNode? = rpc.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 
 // operator[] returns const ImmortalNode* which is a get-only subscript that
 // returns ImmortalNode? (FRT pointer stripping + nullable pointer).

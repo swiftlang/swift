@@ -41,7 +41,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   auto declName = DeclName(Context, Context.getIdentifier("f"), {Identifier()});
 
   // func f<T, U>(_: (T) -> U))
-  auto innerGenericFnParam = AnyFunctionType::Param(genericType1);
+  auto innerGenericFnParam = AnyFunctionType::Param::bodyAccess(genericType1);
   auto genericFnParamTy =
       FunctionType::get({innerGenericFnParam}, {}, genericType2)
           ->withExtInfo(AnyFunctionType::ExtInfo());
@@ -58,7 +58,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
       Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
       SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
       nullptr, genericParamList, genericFnParamList, nullptr, nullptr, DC);
-  auto genericFnParam = AnyFunctionType::Param(genericFnParamTy);
+  auto genericFnParam = AnyFunctionType::Param::bodyAccess(genericFnParamTy);
   llvm::SmallVector<GenericTypeParamType *, 2> genericTypeParams = {
       genericType1, genericType2};
   auto genericSig = GenericSignature::get(genericTypeParams, {});
@@ -69,7 +69,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
   genericFnDecl->setInterfaceType(genericFnTy);
 
   // func f(_: (String) -> Bool?)
-  auto innerConcreteFnParam = AnyFunctionType::Param(stringType);
+  auto innerConcreteFnParam = AnyFunctionType::Param::bodyAccess(stringType);
   auto concreteFnParamTy =
       FunctionType::get({innerConcreteFnParam}, {}, boolOptType)
           ->withExtInfo(AnyFunctionType::ExtInfo());
@@ -82,7 +82,7 @@ TEST_F(SemaTest, TestKeypathFunctionConversionPrefersNarrowConversion) {
       Context, SourceLoc(), StaticSpellingKind::None, SourceLoc(), declName,
       SourceLoc(), /*async=*/false, SourceLoc(), /*throws=*/false, SourceLoc(),
       nullptr, nullptr, concreteFnParamList, nullptr, nullptr, DC);
-  auto concreteFnParam = AnyFunctionType::Param(concreteFnParamTy);
+  auto concreteFnParam = AnyFunctionType::Param::bodyAccess(concreteFnParamTy);
   auto concreteFnTy =
       FunctionType::get({concreteFnParam}, {}, Context.TheEmptyTupleType)
           ->withExtInfo(AnyFunctionType::ExtInfo());

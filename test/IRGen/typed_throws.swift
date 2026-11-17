@@ -38,7 +38,7 @@ func createsP() {
 func buildMetatype() -> Any.Type {
   typealias Fn = (Int) throws(MyBigError) -> Void
 
-  // CHECK-MANGLE: __swift_instantiateConcreteTypeFromMangledName(ptr @"$sySi12typed_throws10MyBigErrorOYKcMD
+  // CHECK-MANGLE: __swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sySi12typed_throws10MyBigErrorOYKcMd
 
   // CHECK-NOMANGLE: call swiftcc %swift.metadata_response @"$sySi12typed_throws10MyBigErrorOYKcMa"
   return Fn.self

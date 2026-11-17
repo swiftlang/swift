@@ -7,7 +7,7 @@
 func genericFn<T>(_ t: T) {}
 
 // CHECK-LABEL: .withInverse1@
-// CHECK: Generic signature: <T where T : Escapable>
+// CHECK: Generic signature: <T where T : Deinitable, T : Escapable>
 func withInverse1<T: ~Copyable>(_ t: borrowing T) {}
 
 // CHECK-LABEL: .withInverse2@
@@ -15,11 +15,11 @@ func withInverse1<T: ~Copyable>(_ t: borrowing T) {}
 func withInverse2<T: ~Escapable>(_ t: borrowing T) {}
 
 // CHECK-LABEL: .withInverse3@
-// CHECK: Generic signature: <T>
+// CHECK: Generic signature: <T where T : Deinitable>
 func withInverse3<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
 // CHECK-LABEL: .where1@
-// CHECK: Generic signature: <T where T : Escapable>
+// CHECK: Generic signature: <T where T : Deinitable, T : Escapable>
 func where1<T>(_ t: borrowing T) where T: ~Copyable {}
 
 // CHECK-LABEL: .where2@
@@ -67,7 +67,7 @@ func withSomeEmpty(_ t: some Empty) {}
 func withSomeProto(_ t: some NoCopyP) {}
 
 // CHECK-LABEL: .withInverseSome@
-// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Escapable>
+// CHECK: Canonical generic signature: <τ_0_0 where τ_0_0 : Deinitable, τ_0_0 : Escapable>
 func withInverseSome(_ t: borrowing some ~Copyable) {}
 
 // CHECK-LABEL: .checkAnyObject@
@@ -84,7 +84,7 @@ func checkSoup<T>(_ t: T) where T: Soup {}
 struct S1<T> {}
 
 // CHECK-LABEL: .S1_I@
-// CHECK: Generic signature: <T where T : Escapable>
+// CHECK: Generic signature: <T where T : Deinitable, T : Escapable>
 struct S1_I<T: ~Copyable> {}
 
 // CHECK-LABEL: .C1@
@@ -92,19 +92,19 @@ struct S1_I<T: ~Copyable> {}
 class C1<T, U> {}
 
 // CHECK-LABEL: .C1_IC@
-// CHECK: Generic signature: <T, U where T : Escapable, U : Copyable, U : Escapable>
+// CHECK: Generic signature: <T, U where T : Deinitable, T : Escapable, U : Copyable, U : Escapable>
 class C1_IC<T: ~Copyable, U> {}
 
 // CHECK-LABEL: .C1_CI@
-// CHECK: Generic signature: <T, U where T : Copyable, T : Escapable, U : Escapable>
+// CHECK: Generic signature: <T, U where T : Copyable, T : Escapable, U : Deinitable, U : Escapable>
 class C1_CI<T, U> where U: ~Copyable {}
 
 // CHECK-LABEL: .C1_II@
-// CHECK: Generic signature: <T, U where T : Escapable, U : Escapable>
+// CHECK: Generic signature: <T, U where T : Deinitable, T : Escapable, U : Deinitable, U : Escapable>
 class C1_II<T: ~Copyable, U: ~Copyable> {}
 
 // CHECK-LABEL: .Empty@
-// CHECK: Requirement signature: <Self>
+// CHECK: Requirement signature: <Self where Self : Deinitable>
 protocol Empty: ~Copyable, ~Escapable {}
 
 // CHECK-LABEL: .NoEscapeP@
@@ -120,7 +120,7 @@ protocol NoEscapeP2 where Self: NoEscapeP & ~Escapable {}
 protocol ForgotTildeEscape where Self: NoEscapeP {}
 
 // CHECK-LABEL: .NoCopyP@
-// CHECK: Requirement signature: <Self where Self : Escapable>
+// CHECK: Requirement signature: <Self where Self : Deinitable, Self : Escapable>
 protocol NoCopyP: ~Copyable {}
 
 // CHECK-LABEL: .NoCopyP2@
@@ -140,8 +140,8 @@ protocol CopyP2: CopyP {}
 protocol CopyInheritsNC: NoCopyP {}
 
 // CHECK-LABEL: .Cond@
-// CHECK: Generic signature: <T where T : Escapable>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : Escapable>
+// CHECK: Generic signature: <T where T : Deinitable, T : Escapable>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : Deinitable, τ_0_0 : Escapable>
 struct Cond<T: ~Copyable>: ~Copyable {}
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Cond
@@ -150,25 +150,30 @@ struct Cond<T: ~Copyable>: ~Copyable {}
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Cond
 // CHECK:       (normal_conformance type="Cond<T>" protocol="Copyable"
+// CHECK-NEXT:       (assoc_conformance type="Self" proto="Deinitable"
+// CHECK-NEXT:         (builtin_conformance type="Cond<T>" protocol="Deinitable"{{.*}}))
 // CHECK-NEXT:       (requirement "T" conforms_to "Copyable"))
 extension Cond: Copyable where T: Copyable {}
 
 
 // CHECK-LABEL: .FullyGenericArg@
-// CHECK: Generic signature: <T>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0>
+// CHECK: Generic signature: <T where T : Deinitable>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : Deinitable>
 struct FullyGenericArg<T: ~Escapable & ~Copyable> {}
 
 // CHECK-LABEL: StructDecl name=FullyGenericArg
 // CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Copyable"{{.*}})
 // CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Escapable"{{.*}})
+// CHECK-NEXT:    (builtin_conformance type="FullyGenericArg<T>" protocol="Deinitable"{{.*}})
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
-// CHECK: Generic signature: <T>
-// CHECK-NEXT: Canonical generic signature: <τ_0_0>
+// CHECK: Generic signature: <T where T : Deinitable>
+// CHECK-NEXT: Canonical generic signature: <τ_0_0 where τ_0_0 : Deinitable>
 
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=FullyGenericArg
-// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty"{{.*}})
+// CHECK-NEXT: (normal_conformance type="FullyGenericArg<T>" protocol="Empty"{{.*}}
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Deinitable"
+// CHECK-NEXT:     (builtin_conformance type="FullyGenericArg<T>" protocol="Deinitable"{{.*}})))
 extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}
 
 // CHECK-LABEL: .P2@
@@ -176,7 +181,7 @@ extension FullyGenericArg: Empty where T: ~Copyable, T: ~Escapable {}
 protocol P2 { associatedtype A }
 
 // CHECK-LABEL: .P2_IC@
-// CHECK: <Self where Self : Escapable, Self.[P2_IC]A : Copyable, Self.[P2_IC]A : Escapable>
+// CHECK: <Self where Self : Deinitable, Self : Escapable, Self.[P2_IC]A : Copyable, Self.[P2_IC]A : Escapable>
 protocol P2_IC: ~Copyable { associatedtype A }
 
 // CHECK-LABEL: .Explicit@

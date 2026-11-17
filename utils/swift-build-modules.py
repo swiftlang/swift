@@ -96,7 +96,7 @@ def main():
             # If using caching, create the map in CAS.
             if args.cas:
                 casid = subprocess.check_output(
-                    [args.llvm_cas_tool, '--cas', args.cas, '--make-blob', '--data', module_map_out], text=True).strip()
+                    [args.llvm_cas_tool, 'make-blob', '--cas', args.cas, '--data', module_map_out], text=True).strip()
                 cmd.extend(['-explicit-swift-module-map-file', casid])
             else:
                 cmd.extend(['-explicit-swift-module-map-file', module_map_out])

@@ -372,6 +372,12 @@ bool arrayrefs_overlap(ArrayRef<T> A, ArrayRef<T> B) {
   return ABegin < BEnd && BBegin < AEnd;
 }
 
+bool InverseRequirement::copyableImpliesDeinitable(ASTContext &ctx) {
+  auto *copyable = ctx.getProtocol(KnownProtocolKind::Copyable);
+  auto *deinitable = ctx.getProtocol(KnownProtocolKind::Deinitable);
+  return copyable && deinitable && copyable->inheritsFrom(deinitable);
+}
+
 void InverseRequirement::expandDefaults(
     ASTContext &ctx,
     ArrayRef<Type> gps,
@@ -389,9 +395,15 @@ void InverseRequirement::expandDefaults(
   ASSERT(!arrayrefs_overlap(gps, {expandedGPs.data(), expandedGPs.size()}) &&
          "types are aliasing!");
 
+  bool skipDeinitable = copyableImpliesDeinitable(ctx);
   auto expandFor = [&](Type gp) {
     expandedGPs.push_back(gp);
     for (auto ip : InvertibleProtocolSet::allKnown()) {
+      // Copyable implies Deinitable, so applyInverses() adds the Deinitable
+      // default only for subjects that suppress Copyable.
+      if (ip == InvertibleProtocolKind::Deinitable && skipDeinitable)
+        continue;
+
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
       result.push_back({{RequirementKind::Conformance, gp,

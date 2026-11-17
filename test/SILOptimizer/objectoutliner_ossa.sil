@@ -241,6 +241,48 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @handle_borrowed_deallocation :
+// CHECK:         [[G:%[0-9]+]] = global_value @handle_borrowed_deallocationTv_ : $Obj
+// CHECK-NOT:     store
+// CHECK-NOT:     dealloc_ref
+// CHECK:         end_borrow
+// CHECK-NEXT:    [[B:%[0-9]+]] = begin_borrow [[G]]
+// CHECK-NEXT:    ref_tail_addr [[B]]
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    metatype
+// CHECK-NEXT:    builtin "destroyArray"
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    end_lifetime
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'handle_borrowed_deallocation'
+sil [ossa] @handle_borrowed_deallocation : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref [stack] [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %b = begin_borrow %5
+  %6 = ref_element_addr %b : $Obj, #Obj.value
+  store %4 to [trivial] %6 : $*Int64
+  %7 = ref_tail_addr %b : $Obj, $Int64
+  store %4 to [trivial] %7 : $*Int64
+  end_borrow %b
+  %10 = end_cow_mutation %5 : $Obj
+  %11 = begin_dealloc_ref %10 : $Obj of %5 : $Obj
+  %12 = begin_borrow %11
+  %13 = ref_tail_addr %12 : $Obj, $Int64
+  %14 = address_to_pointer %13 : $*Int64 to $Builtin.RawPointer
+  %15 = metatype $@thin Int64.Type
+  %16 = builtin "destroyArray"<Int64>(%15 : $@thin Int64.Type, %14 : $Builtin.RawPointer, %0 : $Builtin.Word) : $()
+  fix_lifetime %12 : $Obj
+  end_borrow %12
+  dealloc_ref %11 : $Obj
+  dealloc_stack_ref %5 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_outline_without_end_cow_mutation
 // CHECK: alloc_ref
 // CHECK: store

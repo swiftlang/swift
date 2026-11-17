@@ -1,0 +1,184 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -enable-existential-specializer -existential-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -wmo -enable-sil-verify-all -enable-existential-specializer -existential-specializer %s | %FileCheck %s --check-prefix=CHECK-SELF
+
+// ExistentialSpecializer turns a borrow accessor with an existential parameter
+// into a thunk that calls a generic specialization. A non-trivial @guaranteed
+// result of that call is a borrow scope, so the thunk returns it with a
+// return_borrow. A trivial result has no scope, so the thunk returns it with a
+// plain return.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P {}
+struct S : P {}
+
+class Klass {}
+
+struct Container {
+  var k: Klass
+  var i: Int
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_k : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Klass {
+// CHECK:       bb0(%0 : $*any P, %1 : @guaranteed $Container):
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_kTf4en_n :
+// CHECK:         [[O:%.*]] = open_existential_addr immutable_access %0
+// CHECK:         [[R:%.*]] = apply [[F]]<@opened({{.*}}) Self>([[O]], %1)
+// CHECK-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function 'borrow_k'
+sil [ossa] [noinline] @borrow_k : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $*any P, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.k
+  return %2
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_i : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Int {
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_iTf4en_n :
+// CHECK:         [[O:%.*]] = open_existential_addr immutable_access %0
+// CHECK:         [[R:%.*]] = apply [[F]]<@opened({{.*}}) Self>([[O]], %1)
+// CHECK-NEXT:    return [[R]]
+// CHECK-LABEL: } // end sil function 'borrow_i'
+sil [ossa] [noinline] @borrow_i : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Int {
+bb0(%0 : $*any P, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.i
+  return %2
+}
+
+sil [ossa] @caller : $@convention(thin) (@guaranteed Container) -> (@owned Klass, Int) {
+bb0(%0 : @guaranteed $Container):
+  %1 = alloc_stack $any P
+  %2 = init_existential_addr %1, $S
+  %3 = struct $S ()
+  store %3 to [trivial] %2
+  %5 = function_ref @borrow_k : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Klass
+  %6 = apply %5(%1, %0) : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Klass
+  %7 = copy_value %6
+  end_borrow %6
+  %9 = function_ref @borrow_i : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Int
+  %10 = apply %9(%1, %0) : $@convention(method) (@in_guaranteed any P, @guaranteed Container) -> @guaranteed Int
+  destroy_addr %1
+  dealloc_stack %1
+  %13 = tuple (%7, %10)
+  return %13
+}
+
+sil_witness_table S: P module main {}
+
+// The @in_guaranteed self of a borrow accessor is not specialized, because the
+// @guaranteed result borrows from self's memory location. Other existential
+// parameters are still specialized.
+
+protocol ClassP : AnyObject {}
+class ClassC : ClassP {}
+
+// CHECK-SELF-LABEL: sil [noinline] [ossa] @borrow_self : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed any ClassP {
+// CHECK-SELF:       bb0(%0 : $*any ClassP):
+// CHECK-SELF-NEXT:    [[LB:%.*]] = load_borrow %0
+// CHECK-SELF-NEXT:    return_borrow [[LB]] from_scopes ([[LB]])
+// CHECK-SELF-LABEL: } // end sil function 'borrow_self'
+sil [ossa] [noinline] @borrow_self : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed any ClassP {
+bb0(%0 : $*any ClassP):
+  %1 = load_borrow %0
+  return_borrow %1 from_scopes (%1)
+}
+
+// CHECK-SELF-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_self_with_index : $@convention(method) (@in_guaranteed any P, @in_guaranteed any ClassP) -> @guaranteed any ClassP {
+// CHECK-SELF:       bb0(%0 : $*any P, %1 : $*any ClassP):
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s22borrow_self_with_indexTf4en_n :
+// CHECK-SELF:         [[O:%.*]] = open_existential_addr immutable_access %0
+// CHECK-SELF:         [[R:%.*]] = apply [[F]]<@opened({{.*}}) Self>([[O]], %1)
+// CHECK-SELF-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-SELF-LABEL: } // end sil function 'borrow_self_with_index'
+sil [ossa] [noinline] @borrow_self_with_index : $@convention(method) (@in_guaranteed any P, @in_guaranteed any ClassP) -> @guaranteed any ClassP {
+bb0(%0 : $*any P, %1 : $*any ClassP):
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+// CHECK-SELF-LABEL: sil [ossa] @self_caller :
+// CHECK-SELF:         [[F:%.*]] = function_ref @borrow_self : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed any ClassP
+// CHECK-SELF:         apply [[F]]
+// CHECK-SELF:         [[G:%.*]] = function_ref @borrow_self_with_index : $@convention(method) (@in_guaranteed any P, @in_guaranteed any ClassP) -> @guaranteed any ClassP
+// CHECK-SELF:         apply [[G]]
+// CHECK-SELF-LABEL: } // end sil function 'self_caller'
+sil [ossa] @self_caller : $@convention(thin) (@guaranteed ClassC) -> (@owned any ClassP, @owned any ClassP) {
+bb0(%0 : @guaranteed $ClassC):
+  %1 = copy_value %0
+  %2 = init_existential_ref %1 : $ClassC : $ClassC, $any ClassP
+  %3 = alloc_stack $any ClassP
+  store %2 to [init] %3
+  %5 = function_ref @borrow_self : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed any ClassP
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed any ClassP
+  %7 = copy_value %6
+  end_borrow %6
+  %9 = alloc_stack $any P
+  %10 = init_existential_addr %9, $S
+  %11 = struct $S ()
+  store %11 to [trivial] %10
+  %13 = function_ref @borrow_self_with_index : $@convention(method) (@in_guaranteed any P, @in_guaranteed any ClassP) -> @guaranteed any ClassP
+  %14 = apply %13(%9, %3) : $@convention(method) (@in_guaranteed any P, @in_guaranteed any ClassP) -> @guaranteed any ClassP
+  %15 = copy_value %14
+  end_borrow %14
+  destroy_addr %9
+  dealloc_stack %9
+  destroy_addr %3
+  dealloc_stack %3
+  %21 = tuple (%7, %15)
+  return %21
+}
+
+// The self of an accessor with a @guaranteed_address result is not specialized
+// either. The self of a method with an owned result is still specialized, and
+// its thunk returns the result with a plain return.
+
+// CHECK-SELF-LABEL: sil [noinline] [ossa] @borrow_self_addr : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed_address any ClassP {
+// CHECK-SELF:       bb0(%0 : $*any ClassP):
+// CHECK-SELF-NEXT:    return %0
+// CHECK-SELF-LABEL: } // end sil function 'borrow_self_addr'
+sil [ossa] [noinline] @borrow_self_addr : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed_address any ClassP {
+bb0(%0 : $*any ClassP):
+  return %0
+}
+
+// CHECK-SELF-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @owned_self : $@convention(method) (@in_guaranteed any ClassP) -> @owned any ClassP {
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s10owned_selfTf4e_n :
+// CHECK-SELF:         [[R:%.*]] = apply [[F]]<@opened({{.*}}) Self>(
+// CHECK-SELF-NEXT:    destroy_addr
+// CHECK-SELF-NEXT:    dealloc_stack
+// CHECK-SELF-NEXT:    return [[R]]
+// CHECK-SELF-LABEL: } // end sil function 'owned_self'
+sil [ossa] [noinline] @owned_self : $@convention(method) (@in_guaranteed any ClassP) -> @owned any ClassP {
+bb0(%0 : $*any ClassP):
+  %1 = load [copy] %0
+  return %1
+}
+
+sil [ossa] @self_caller_non_borrow : $@convention(thin) (@guaranteed ClassC) -> (@owned any ClassP, @owned any ClassP) {
+bb0(%0 : @guaranteed $ClassC):
+  %1 = copy_value %0
+  %2 = init_existential_ref %1 : $ClassC : $ClassC, $any ClassP
+  %3 = alloc_stack $any ClassP
+  store %2 to [init] %3
+  %5 = function_ref @borrow_self_addr : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed_address any ClassP
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed any ClassP) -> @guaranteed_address any ClassP
+  %7 = load [copy] %6
+  %8 = function_ref @owned_self : $@convention(method) (@in_guaranteed any ClassP) -> @owned any ClassP
+  %9 = apply %8(%3) : $@convention(method) (@in_guaranteed any ClassP) -> @owned any ClassP
+  destroy_addr %3
+  dealloc_stack %3
+  %12 = tuple (%7, %9)
+  return %12
+}
+
+// The specialization rebuilds the index existential locally, but borrows the
+// result from the caller's self.
+// CHECK-SELF-LABEL: sil shared [noinline] [ossa] @$s22borrow_self_with_indexTf4en_n : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0, @in_guaranteed any ClassP) -> @guaranteed any ClassP {
+// CHECK-SELF:       bb0(%0 : $*τ_0_0, %1 : $*any ClassP):
+// CHECK-SELF:         [[LB:%.*]] = load_borrow %1
+// CHECK-SELF:         return_borrow [[LB]] from_scopes ([[LB]])
+// CHECK-SELF-LABEL: } // end sil function '$s22borrow_self_with_indexTf4en_n'
+
+sil_witness_table ClassC: ClassP module main {}

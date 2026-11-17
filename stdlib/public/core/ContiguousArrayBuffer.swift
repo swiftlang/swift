@@ -1143,6 +1143,10 @@ internal func _copyCollectionToContiguousArray<
     start: result.firstElementAddress,
     count: count)
   var (itr, end) = unsafe source._copyContents(initializing: p)
+  // `p` points into `result`'s storage. Keep `result` alive until all elements
+  // are written. Otherwise, if the returned array is unused, the optimizer may
+  // release the storage before `_copyContents` has initialized the elements.
+  _fixLifetime(result)
 
   _debugPrecondition(itr.next() == nil,
     "invalid Collection: more than 'count' elements in collection")

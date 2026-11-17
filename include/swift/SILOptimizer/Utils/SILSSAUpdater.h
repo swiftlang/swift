@@ -33,6 +33,7 @@ class SILPhiArgument;
 class SILBasicBlock;
 class SILType;
 class SILUndef;
+class UseWrapper;
 
 /// This class updates SSA for a set of SIL instructions defined in multiple
 /// blocks.
@@ -97,13 +98,26 @@ public:
   /// merging val_1 and val_2.
   SILValue getValueInMiddleOfBlock(SILBasicBlock *block);
 
-  void rewriteUse(Operand &operand);
+  /// Rewrite each of \p uses to use the value available at its user,
+  /// inserting phis as needed.
+  void rewriteUses(ArrayRef<UseWrapper> uses);
 
   void *allocate(unsigned size, unsigned align) const;
   static void deallocateSentinel(SILUndef *undef);
 
 private:
   SILValue getValueAtEndOfBlockInternal(SILBasicBlock *block);
+  SILValue tryGetAvailableValueAtEndOfBlock(SILBasicBlock *block) const;
+
+  void rewriteUse(Operand &operand);
+  void rewriteDebugUse(Operand &operand);
+
+  /// Get the SSA value that is live for debug_value user, without inserting
+  /// 'PHI' nodes, if possible. Otherwise return a null value.
+  ///
+  /// A debug_value can use a value outside its lifetime, so the result may be
+  /// consumed or have its borrow scope end before the user.
+  SILValue getValueForDebugUser(DebugValueInst *user);
 };
 
 /// Utility to wrap 'Operand's to deal with invalidation of

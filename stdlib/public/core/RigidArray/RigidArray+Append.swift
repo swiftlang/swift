@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @unsafe
   internal mutating func _appendUnchecked(_ item: consuming Element) {
@@ -28,7 +26,6 @@ extension _RigidArray where Element: ~Copyable {
   /// - Parameter item: The element to append to the collection.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(_ item: consuming Element) {
     _precondition(!isFull, "RigidArray capacity overflow")
@@ -45,7 +42,6 @@ extension _RigidArray where Element: ~Copyable {
   /// - Returns: `item` if the array is full; otherwise nil.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func pushLast(_ item: consuming Element) -> Element? {
     if isFull { return item }
@@ -54,7 +50,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Append a given number of items to the end of this array by populating
   /// an output span.
@@ -75,7 +70,6 @@ extension _RigidArray where Element: ~Copyable {
   ///       the output span before it returns (or before it throws an error).
   ///
   /// - Complexity: O(`newItemCount`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append<E: Error>(
     addingCount newItemCount: Int,
@@ -93,9 +87,7 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @unsafe
   internal mutating func _appendUnchecked(
@@ -118,7 +110,6 @@ extension _RigidArray where Element: ~Copyable {
   ///        the array.
   ///
   /// - Complexity: O(`items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
@@ -137,7 +128,6 @@ extension _RigidArray where Element: ~Copyable {
   ///    - items: An output span whose contents need to be appended to this array.
   ///
   /// - Complexity: O(`items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(
     moving items: inout OutputSpan<Element>
@@ -151,9 +141,7 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @unsafe
   internal mutating func _appendUnchecked(
@@ -177,7 +165,6 @@ extension _RigidArray {
   ///       the array.
   ///
   /// - Complexity: O(`newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
@@ -198,7 +185,6 @@ extension _RigidArray {
   ///        the array.
   ///
   /// - Complexity: O(`newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(
     copying items: UnsafeMutableBufferPointer<Element>
@@ -215,7 +201,6 @@ extension _RigidArray {
   ///    - newElements: A span whose contents to copy into the array.
   ///
   /// - Complexity: O(`newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(copying items: Span<Element>) {
     items.withUnsafeBufferPointer { source in
@@ -242,7 +227,6 @@ extension _RigidArray {
   ///    - newElements: The new elements to copy into the array.
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in

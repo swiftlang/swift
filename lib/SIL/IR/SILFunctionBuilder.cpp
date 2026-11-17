@@ -103,13 +103,30 @@ void SILFunctionBuilder::addFunctionAttributes(
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, targetFunction, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       } else {
         F->addSpecializeAttr(SILSpecializeAttr::create(
             M, specializedSignature, SA->getTypeErasedParams(),
             SA->isExported(), kind, nullptr, spiGroupIdent,
-            attributedFuncDecl->getModuleContext(), availability));
+            attributedFuncDecl->getModuleContext(), availability,
+            SA->isPublic()));
       }
+    }
+
+    // Propagate '@specialized' on the member's type, exported or not, except
+    // to default argument generators, which are emitted into clients.
+    auto *member = constant.getAbstractFunctionDecl();
+    if (member && !constant.isDefaultArgGenerator()) {
+      SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
+      SpecializedAttr::getTypeLevelSpecializations(member, typeLevelSigs);
+      for (auto [sig, exported, module] : typeLevelSigs)
+        F->addSpecializeAttr(SILSpecializeAttr::create(
+            M, sig, /*typeErasedParams=*/{}, exported,
+            SILSpecializeAttr::SpecializationKind::Full,
+            /*target=*/nullptr, Identifier(), module,
+            AvailabilityRange::alwaysAvailable(),
+            /*isSpecializedSpelling=*/true));
     }
   }
 
@@ -172,10 +189,12 @@ void SILFunctionBuilder::addFunctionAttributes(
     F->setOptimizationMode(OA->getMode());
   }
 
-  // @_silgen_name and @_cdecl functions may be called from C code somewhere.
-  if (Attrs.hasAttribute<SILGenNameAttr>() || Attrs.hasAttribute<CDeclAttr>() ||
-      Attrs.hasAttribute<CxxDeclAttr>())
+  // @_silgen_name and C-exported functions may be called from C code.
+  if (Attrs.hasAttribute<SILGenNameAttr>())
     F->setHasCReferences(true);
+  if (auto *AFD = constant.getAbstractFunctionDecl())
+    if (AFD->getCDeclKind())
+      F->setHasCReferences(true);
 
   for (auto *EA : Attrs.getAttributes<ExposeAttr>()) {
     bool shouldExportDecl = true;
@@ -184,6 +203,9 @@ void SILFunctionBuilder::addFunctionAttributes(
       // thunk function.
       shouldExportDecl = constant.isNativeToForeignThunk() || constant.isForeign;
     }
+    // A variable's storage is exported by IRGen, not its accessors.
+    if (constant.isNull() || isa_and_nonnull<VarDecl>(constant.getDecl()))
+      shouldExportDecl = false;
     if (EA->getExposureKind() == ExposureKind::Wasm && shouldExportDecl) {
       // A wasm-level exported function must be retained if it appears in a
       // compilation unit.

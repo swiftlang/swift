@@ -1,0 +1,4 @@
+module ValueTemplate {
+  header "header.h"
+  requires cplusplus
+}

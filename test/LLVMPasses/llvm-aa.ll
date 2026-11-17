@@ -16,3 +16,53 @@ entry:
   %3 = add i8 %1, %2
   ret i8 %3
 }
+
+declare ptr @swift_allocObject(ptr, i64, i64) nounwind
+
+@"$s4test3BoxC1xSivpWvd" = hidden global i64 0, align 8
+@"$s4test3BoxC1ySivpWvd" = hidden constant i64 16, align 8
+@not_a_field_offset = hidden global i64 0, align 8
+
+; The field offset global of a class with a runtime-computed layout is only valid
+; after the class metadata is initialized. Therefore an allocation must be
+; treated as a write of the global.
+
+; CHECK-LABEL: define{{( protected)?}} i64 @test_dont_eliminate_field_offset_load_over_alloc(ptr %0) {
+; CHECK: load i64, ptr @"$s4test3BoxC1xSivpWvd"
+; CHECK: call ptr @swift_allocObject
+; CHECK: load i64, ptr @"$s4test3BoxC1xSivpWvd"
+; CHECK: ret
+define i64 @test_dont_eliminate_field_offset_load_over_alloc(ptr %0) {
+entry:
+  %1 = load i64, ptr @"$s4test3BoxC1xSivpWvd"
+  %2 = call ptr @swift_allocObject(ptr %0, i64 32, i64 7)
+  %3 = load i64, ptr @"$s4test3BoxC1xSivpWvd"
+  %4 = add i64 %1, %3
+  ret i64 %4
+}
+
+; CHECK-LABEL: define{{( protected)?}} i64 @test_eliminate_constant_field_offset_load_over_alloc(ptr %0) {
+; CHECK-NOT: load
+; CHECK: ret i64 32
+define i64 @test_eliminate_constant_field_offset_load_over_alloc(ptr %0) {
+entry:
+  %1 = load i64, ptr @"$s4test3BoxC1ySivpWvd"
+  %2 = call ptr @swift_allocObject(ptr %0, i64 32, i64 7)
+  %3 = load i64, ptr @"$s4test3BoxC1ySivpWvd"
+  %4 = add i64 %1, %3
+  ret i64 %4
+}
+
+; CHECK-LABEL: define{{( protected)?}} i64 @test_eliminate_global_load_over_alloc(ptr %0) {
+; CHECK: load i64, ptr @not_a_field_offset
+; CHECK: call ptr @swift_allocObject
+; CHECK-NOT: load
+; CHECK: ret
+define i64 @test_eliminate_global_load_over_alloc(ptr %0) {
+entry:
+  %1 = load i64, ptr @not_a_field_offset
+  %2 = call ptr @swift_allocObject(ptr %0, i64 32, i64 7)
+  %3 = load i64, ptr @not_a_field_offset
+  %4 = add i64 %1, %3
+  ret i64 %4
+}

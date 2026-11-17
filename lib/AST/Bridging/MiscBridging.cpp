@@ -98,6 +98,16 @@ BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
+swift::SourceLoc
+BridgedParamDecl_getSpecifierLoc(BridgedParamDecl cDecl,
+                                 BridgedParamSpecifier cSpecifier) {
+  auto *ownership =
+      dyn_cast_or_null<OwnershipTypeRepr>(cDecl.unbridged()->getTypeRepr());
+  if (!ownership || ownership->getSpecifier() != unbridge(cSpecifier))
+    return SourceLoc();
+  return ownership->getSpecifierLoc();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedASTType
 //===----------------------------------------------------------------------===//

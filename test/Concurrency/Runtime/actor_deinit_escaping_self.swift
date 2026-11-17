@@ -32,7 +32,7 @@ actor EscapeLocked {
     }
     let r = g.wait(timeout: .now() + .milliseconds(500))
     expectEqual(r, .timedOut)
-    expectCrashLater(withMessage: "Object \(formatAddr(self)) of class EscapeLocked deallocated with non-zero retain count 2. This object's deinit, or something called from it, may have created a strong reference to self which outlived deinit, resulting in a dangling reference.")
+    expectCrashLater(withMessage: "Object \(formatAddr(self)) of class EscapeLocked deallocated with non-zero retain count 2. Possible unsafe concurrent access to stored property containing this object, or escape of self from its deinit.")
   }
 }
 

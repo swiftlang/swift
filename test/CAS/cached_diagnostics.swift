@@ -7,7 +7,7 @@
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd -b %t/header.cmd
 
 // RUN: %target-swift-frontend-plain @%t/header.cmd %S/Inputs/objc.h -disable-implicit-swift-modules -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix CHECK-BRIDGE
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain @%t/header.cmd %S/Inputs/objc.h -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
@@ -20,10 +20,10 @@
 
 // RUN: %target-swift-frontend-plain  -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %s \
 // RUN:   -emit-module -o %t/test.swiftmodule 2>&1 | %FileCheck %s
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:    %target-swift-frontend-plain -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %s \
 // RUN:   -emit-module -o %t/test.swiftmodule > %t/cache_key.json
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json -- \
+// RUN: %cache-tool render-diags -cas-path %t/cas %t/cache_key.json -- \
 // RUN:   %target-swift-frontend-plain -cache-compile-job -module-name Test -O -cas-path %t/cas @%t/MyApp.cmd %s \
 // RUN:   -emit-module -o %t/test.swiftmodule 2>&1 | %FileCheck %s
 

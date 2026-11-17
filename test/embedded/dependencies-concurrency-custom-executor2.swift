@@ -15,7 +15,6 @@ ___stack_chk_fail
 ___stack_chk_guard
 ___stdoutp
 _abort
-_clock_gettime
 _exit
 _flockfile
 _free

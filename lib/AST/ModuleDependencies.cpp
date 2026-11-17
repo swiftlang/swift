@@ -14,9 +14,11 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ArgumentList.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PluginLoader.h"
@@ -26,6 +28,7 @@
 #include "swift/Strings.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 using namespace swift;
 
 ModuleDependencyInfoStorageBase::~ModuleDependencyInfoStorageBase() {}
@@ -215,6 +218,24 @@ void ModuleDependencyInfo::addModuleImport(
                   alreadyAddedModules, sourceManager, sourceLocation);
 }
 
+/// Extract the plugin module name from `#externalMacro(module:type:)` syntax
+/// without evaluating `MacroDecl::getDefinition()`, which would type-check the
+/// definition before imports are resolved.
+static std::optional<Identifier>
+getExternalMacroPluginModuleName(MacroDecl *macro) {
+  auto *expansion = dyn_cast_or_null<MacroExpansionExpr>(macro->definition);
+  if (!expansion ||
+      !expansion->getMacroName().getBaseIdentifier().is("externalMacro"))
+    return std::nullopt;
+  auto *args = expansion->getArgs();
+  if (!args || args->empty() || !args->getLabel(0).is("module"))
+    return std::nullopt;
+  auto *moduleName = dyn_cast<StringLiteralExpr>(args->getExpr(0));
+  if (!moduleName || moduleName->getValue().empty())
+    return std::nullopt;
+  return macro->getASTContext().getIdentifier(moduleName->getValue());
+}
+
 void ModuleDependencyInfo::addModuleImports(
     const SourceFile &sourceFile, llvm::StringSet<> &alreadyAddedModules,
     const SourceManager *sourceManager) {
@@ -251,16 +272,14 @@ void ModuleDependencyInfo::addModuleImports(
           importDecl->isTestable())
         addTestableImport(realPath);
     } else if (auto macroDecl = dyn_cast<MacroDecl>(decl)) {
-      auto macroDef = macroDecl->getDefinition();
-      auto &ctx = macroDecl->getASTContext();
-      if (macroDef.kind != MacroDefinition::Kind::External)
+      auto pluginModule = getExternalMacroPluginModuleName(macroDecl);
+      if (!pluginModule)
         continue;
-      auto external = macroDef.getExternalMacro();
-      PluginLoader &loader = ctx.getPluginLoader();
-      auto &entry = loader.lookupPluginByModuleName(external.moduleName);
+      PluginLoader &loader = macroDecl->getASTContext().getPluginLoader();
+      auto &entry = loader.lookupPluginByModuleName(*pluginModule);
       if (entry.libraryPath.empty() && entry.executablePath.empty())
         continue;
-      addMacroDependency(external.moduleName.str(), entry.libraryPath,
+      addMacroDependency(pluginModule->str(), entry.libraryPath,
                          entry.executablePath);
     }
   }
@@ -649,7 +668,9 @@ swift::dependencies::registerBackDeployLibraries(
 static std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()>
 makeClangScanningVFSFactory(
     const ASTContext &ctx, std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> makeBaseFS,
     llvm::function_ref<StringRef(StringRef)> allocateString) {
+  assert(makeBaseFS);
   // Snapshot the ClangImporter file system into an owning recipe rather than
   // capturing the ASTContext: the callback outlives the per-query
   // CompilerInstance this came from. The overriden files' contents are
@@ -658,17 +679,19 @@ makeClangScanningVFSFactory(
   auto recipe = ClangImporter::computeClangImporterVFSRecipe(
       ctx, importer->getClangFileMapping(), allocateString);
 
-  return [recipe = std::move(recipe), cas = std::move(cas)]()
-             -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
-    // Build a *separate* file system on every call: the Clang scanner calls
-    // setCurrentWorkingDirectory on the file system it is handed, and several
-    // workers do so concurrently (rdar://184810704).
-    auto fs = ClangImporter::computeClangImporterFileSystem(
-        recipe, llvm::vfs::createPhysicalFileSystem());
-    if (cas)
-      return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
-    return fs;
-  };
+  return
+      [recipe = std::move(recipe), cas = std::move(cas),
+       makeBaseFS = std::move(
+           makeBaseFS)]() -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+        // Build a *separate* file system on every call: the Clang scanner calls
+        // setCurrentWorkingDirectory on the file system it is handed, and
+        // several workers do so concurrently (rdar://184810704).
+        auto fs =
+            ClangImporter::computeClangImporterFileSystem(recipe, makeBaseFS());
+        if (cas)
+          return llvm::cas::createCASProvidingFileSystem(cas, std::move(fs));
+        return fs;
+      };
 }
 
 bool SwiftDependencyScanningService::setupDependencyScanningService(
@@ -688,12 +711,17 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
     // The service is reused as-is. Its base file system is not rebuilt, which
     // is usually fine since it should be the same for the same platform, but a
     // conflicting CAS configuration cannot be honored.
-    if (invocation.requiresCAS() &&
-        (!CASConfig || *CASConfig != invocation.getCASOptions().Config)) {
+    auto reportConflictingOptions = [&]() -> bool {
       Instance.getDiags().diagnose(SourceLoc(),
                                   diag::error_cas_conflict_options);
       return true;
+    };
+    if (invocation.requiresCAS() &&
+        (!CASConfig || *CASConfig != invocation.getCASOptions().Config)) {
+      return reportConflictingOptions();
     }
+    if (this->CASFSEscapePaths != invocation.getCASOptions().CASFSEscapePaths)
+      return reportConflictingOptions();
     return false;
   }
 
@@ -709,6 +737,8 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
   // by-name module lookup to resolve Swift overlay and cross-import overlay
   // dependencies, so opt into having Clang report them.
   opts.ReportVisibleModules = true;
+  // Check directory dependencies against the reported paths.
+  opts.ValidateAgainstInvalidatedPaths = true;
 
   std::shared_ptr<llvm::cas::ObjectStore> cas;
   if (invocation.requiresCAS()) {
@@ -724,14 +754,64 @@ bool SwiftDependencyScanningService::setupDependencyScanningService(
         CASOpts, cas, Instance.getSharedCacheInstance()};
   }
 
+  std::function<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>()> makeBaseFS =
+      [] { return llvm::vfs::createPhysicalFileSystem(); };
+  const CASOptions &CASOpts = invocation.getCASOptions();
+  if (!CASOpts.CASFSEscapePaths.empty()) {
+    // Escape paths are expected to be the same across all invocations.
+    this->CASFSEscapePaths = CASOpts.CASFSEscapePaths;
+    SmallVector<StringRef, 4> EscapePaths(CASFSEscapePaths.begin(),
+                                          CASFSEscapePaths.end());
+    auto SandboxFS = llvm::vfs::createSandboxingFileSystem(
+        llvm::vfs::createPhysicalFileSystem(), EscapePaths);
+    if (!SandboxFS) {
+      Instance.getDiags().diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                                   toString(SandboxFS.takeError()));
+      return true;
+    }
+    // Rebuild the sandboxing file system from scratch on every query rather
+    // than sharing the instance validated above: it wraps a physical file
+    // system, and several scanning workers set its working directory
+    // concurrently, which races on that shared state.
+    makeBaseFS = [EscapePaths = this->CASFSEscapePaths]()
+        -> llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> {
+      SmallVector<StringRef, 4> Paths(EscapePaths.begin(), EscapePaths.end());
+      // Using \c cantFail because we verified creation is successful earlier.
+      return llvm::cantFail(llvm::vfs::createSandboxingFileSystem(
+          llvm::vfs::createPhysicalFileSystem(), Paths));
+    };
+  }
+
   // The base VFS is derived from the ClangImporter of this invocation, which is
   // usually fine since it should be the same for the same platform.
   opts.MakeVFS = makeClangScanningVFSFactory(
-      Instance.getASTContext(), std::move(cas),
+      Instance.getASTContext(), std::move(cas), std::move(makeBaseFS),
       [this](StringRef str) { return save(str); });
 
   ClangScanningService.emplace(std::move(opts));
+
+  // Apply any paths reported before the service was created.
+  for (const auto &Path : PendingInvalidatedPaths)
+    ClangScanningService->addInvalidatedPath(Path);
+  PendingInvalidatedPaths.clear();
+
   return false;
+}
+
+void SwiftDependencyScanningService::addInvalidatedPath(StringRef Path) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
+  if (!ClangScanningService)
+    PendingInvalidatedPaths.push_back(Path.str());
+  else
+    ClangScanningService->addInvalidatedPath(Path);
+}
+
+bool SwiftDependencyScanningService::isDirectoryInvalidated(
+    StringRef Directory) {
+  assert(ClangScanningService && "dependency scanning service was not set up");
+  return ClangScanningService->getModuleCacheEntries()
+      .isDirectoryInvalidated(Directory)
+      .value_or(false);
 }
 
 StringRef SwiftDependencyScanningService::save(StringRef str) {

@@ -308,6 +308,9 @@ extension Task {
   /// a cancellation shield is active. Use ``Task/isCancelled-type.property`` (the static property)
   /// if you need cancellation checking that respects active shields.
   ///
+  /// This property doesn't reflect a cancellation that only applies to a part of the task,
+  /// such as an expired deadline of ``withDeadline(in:tolerance:clock:operation:)``.
+  ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
   /// The instance property ``Task/isCancelled-property``
@@ -351,10 +354,13 @@ extension Task where Success == Never, Failure == Never {
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public static var isCancelled: Bool {
     unsafe withUnsafeCurrentTask { task in
-      if #available(SwiftStdlib 6.4, *) {
-        unsafe task?._isCancelled(ignoreTaskCancellationShield: false) ?? false
+      guard let task = unsafe task else { return false }
+      // This getter is part of the stdlib, so `swift_task_isCancelledWithFlags`
+      // is available whenever the stdlib is deployed with it, even on an older OS.
+      if #available(StdlibDeploymentTarget 6.4, *) {
+        return unsafe _taskIsCancelledWithFlags(task._rawTask, flags: 0x0)
       } else {
-        unsafe task?.isCancelled ?? false
+        return unsafe _taskIsCancelled(task._rawTask)
       }
     }
   }
@@ -383,8 +389,16 @@ extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public static var cancellationReason: CancellationError.Reason? {
-    unsafe withUnsafeCurrentTask { task in
-      unsafe task?.cancellationReason
+    unsafe withUnsafeCurrentTask { task -> CancellationError.Reason? in
+      // Unlike `UnsafeCurrentTask.cancellationReason`, take cancellation shields
+      // and cancellation scopes into account.
+      guard let task = unsafe task else { return nil }
+      let packed = unsafe _taskGetIsCancelledWithReasonWithFlags(task._rawTask, flags: 0)
+      guard packed & 1 != 0 else { return nil }
+      let raw = UInt8(truncatingIfNeeded: packed >> 1)
+      // `CancellationError` would refer to `Task.CancellationError()` here.
+      let reason: CancellationError.Reason? = .init(_rawValue: raw)
+      return reason ?? .unspecified
     }
   }
 }
@@ -400,7 +414,6 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `isCancelled()`
   /// - SeeAlso: ``CancellationError/Reason``
-  @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
       if #available(StdlibDeploymentTarget 6.5, *) {
@@ -479,8 +492,11 @@ extension CancellationError {
   /// Create a `CancellationError` with a specific `Reason`.
   ///
   /// The `reason` is then accessible via the error's `reason` property.
+  // Not `@export(implementation)`: an inlined body would call the accessors of
+  // `_reasonRawStorage`, which have the type's 5.1 availability and therefore
+  // get strongly linked even behind `if #available`. Older runtimes don't have
+  // them, so a client would fail to load.
   @available(StdlibDeploymentTarget 6.5, *)
-  @export(implementation)
   public init(reason: Reason) {
     self.init()
     self._reasonRawStorage = reason._rawValue
@@ -492,8 +508,8 @@ extension CancellationError {
   /// by the runtime, e.g. when `Task.checkCancellation()` throws) report
   /// `.unspecified`. Errors constructed via `init(reason:)` report the
   /// specified reason.
+  // Not `@export(implementation)`, see `init(reason:)`.
   @available(StdlibDeploymentTarget 6.5, *)
-  @export(implementation)
   public var reason: Reason {
     Reason(_rawValue: _reasonRawStorage) ?? .unspecified
   }

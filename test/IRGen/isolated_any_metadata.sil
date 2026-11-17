@@ -12,7 +12,7 @@ struct NonSendable {}
 // CHECK:              entry:
 // CHECK-ACCESSOR-NEXT:  [[T0:%.*]] = call swiftcc %swift.metadata_response @"$syyYbYAcMa"([[INT]] 0)
 // CHECK-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbYAcMD")
+// CHECK-DEMANGLE:       [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyYbYAcMd", ptr @"$syyYbYAcMR")
 // CHECK-NEXT:           ret ptr [[METADATA]]
 sil @get_metadata : $() -> @thick Any.Type {
 entry:
@@ -30,7 +30,7 @@ entry:
 // CHECK:              entry:
 // CHECK-COMBO-ACCESSOR-NEXT: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$ss11NonSendableVyYbYAYTcMa"([[INT]] 0)
 // CHECK-COMBO-ACCESSOR-NEXT:  [[METADATA:%.]] = extractvalue %swift.metadata_response [[T0]], 0
-// CHECK-COMBO-DEMANGLE-NEXT: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$ss11NonSendableVyYbYAYTcMD")
+// CHECK-COMBO-DEMANGLE-NEXT: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$ss11NonSendableVyYbYAYTcMd", ptr @"$ss11NonSendableVyYbYAYTcMR")
 // CHECK-NEXT:           ret ptr [[METADATA]]
 sil @get_combo_metadata : $() -> @thick Any.Type {
 entry:

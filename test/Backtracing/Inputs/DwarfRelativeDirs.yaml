@@ -1,0 +1,161 @@
+## A hand-crafted ELF object with two DWARF v5 compile units, each found using
+## .debug_aranges, whose line number tables exercise the way that we build
+## file paths -- see DwarfReaderLookups.swift.
+##
+## Layout:
+##   CU 0, .debug_line offset 0, covers [0x1000, 0x1030):
+##     directories: 0 "/src", 1 "sub", 2 "/abs"
+##     0x1000 line 10 in file 1 ("other.c", directory 1, which is relative)
+##     0x1010 line 20 in file 2 ("abs.c", directory 2, which is absolute)
+##     0x1020 line 30 in file 0 ("file.c", directory 0)
+##   CU 1, .debug_line offset 0x6f, covers [0x2000, 0x2010):
+##     directories: 0 "/other"; the file entries have no directory index
+##     0x2000 line 5 in file 1 ("nodir.c")
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - ID: 0
+      Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_stmt_list
+              Form:      DW_FORM_sec_offset
+    - ID: 1
+      Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_stmt_list
+              Form:      DW_FORM_sec_offset
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      AbbrevTableID: 0
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x00            # DW_AT_stmt_list
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      AbbrevTableID: 1
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x6f           # DW_AT_stmt_list
+  debug_aranges:
+    - Version:     2
+      CuOffset:    0x0
+      AddressSize: 8
+      SegmentSelectorSize: 0
+      Descriptors:
+        - Address: 0x1000
+          Length:  0x30
+    - Version:     2
+      CuOffset:    0x11
+      AddressSize: 8
+      SegmentSelectorSize: 0
+      Descriptors:
+        - Address: 0x2000
+          Length:  0x10
+  debug_line:
+    - Version:           5
+      AddressSize:       8
+      SegmentSelectorSize: 0
+      MinInstLength:     1
+      MaxOpsPerInst:     1
+      DefaultIsStmt:     1
+      LineBase:          251
+      LineRange:         14
+      OpcodeBase:        13
+      StandardOpcodeLengths: [ 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 ]
+      DirectoryEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+      Directories:
+        - - CStr: "/src"
+        - - CStr: "sub"
+        - - CStr: "/abs"
+      FileNameEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+        - ContentType:     DW_LNCT_directory_index
+          Form:            DW_FORM_udata
+      FileNames:
+        - - CStr: "file.c"
+          - Value: 0
+        - - CStr: "other.c"
+          - Value: 1
+        - - CStr: "abs.c"
+          - Value: 2
+      Opcodes:
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    9
+          SubOpcode: DW_LNE_set_address
+          Data:      0x1000
+        - Opcode:    DW_LNS_advance_line
+          SData:     9
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_set_file
+          Data:      2
+        - Opcode:    DW_LNS_advance_line
+          SData:     10
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_set_file
+          Data:      0
+        - Opcode:    DW_LNS_advance_line
+          SData:     10
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    1
+          SubOpcode: DW_LNE_end_sequence
+    - Version:           5
+      AddressSize:       8
+      SegmentSelectorSize: 0
+      MinInstLength:     1
+      MaxOpsPerInst:     1
+      DefaultIsStmt:     1
+      LineBase:          251
+      LineRange:         14
+      OpcodeBase:        13
+      StandardOpcodeLengths: [ 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 ]
+      DirectoryEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+      Directories:
+        - - CStr: "/other"
+      FileNameEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+      FileNames:
+        - - CStr: "nodir0.c"
+        - - CStr: "nodir.c"
+      Opcodes:
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    9
+          SubOpcode: DW_LNE_set_address
+          Data:      0x2000
+        - Opcode:    DW_LNS_advance_line
+          SData:     4
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    1
+          SubOpcode: DW_LNE_end_sequence

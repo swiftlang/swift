@@ -43,6 +43,8 @@ bb0(%0 : $Optional<Builtin.Executor>):
 // CHECK:    {{(must)?}}tail call swift{{(tail)?}}cc void @swift_task_switch(ptr swiftasync [[CTXT]], ptr [[RESUME_FN]], [[INT]] %1, [[INT]] %2)
 // CHECK:    ret void
 
+// CHECK: declare{{( dllimport)?}} swift{{(tail)?}}cc void @swift_task_switch(ptr swiftasync, ptr, [[INT]], [[INT]])
+
 // CHECK: define{{.*}} void @[[TAIL_CALL_FUNC]](ptr %0, ptr %1)
 // CHECK:   {{(must)?}}tail call swift{{(tail)?}}cc void %0(ptr swiftasync %1)
 // CHECK:   ret void

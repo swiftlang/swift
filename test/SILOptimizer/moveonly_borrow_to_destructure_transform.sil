@@ -680,3 +680,147 @@ bb2:
   destroy_value %2 : $KlassPair
   unwind
 }
+
+struct OptionalKlassPairContainer: ~Copyable {
+  var pair: Optional<KlassPair>
+}
+
+// The transform replaces the original borrow of the marked value with a new
+// borrow of a copy (DESTR_COPY_BORROW), and inserts that borrow's end_borrows
+// itself. They must come after the uses of the switch_enum's guaranteed
+// payload, not at the top of each successor block (rdar://190471670).
+//
+// CHECK-LABEL: sil [ossa] @switch_enum_on_extracted_field_payload_use : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value
+// CHECK-NEXT:    [[DESTR_COPY:%.*]] = copy_value [[MARK]]
+// CHECK-NEXT:    [[DESTR_COPY_BORROW:%.*]] = begin_borrow [[DESTR_COPY]]
+// CHECK:         [[EXT:%.*]] = struct_extract [[DESTR_COPY_BORROW]]
+// CHECK:         switch_enum [[EXT]] : $Optional<KlassPair>, case #Optional.some!enumelt: [[BBSOME:bb[0-9]+]], case #Optional.none!enumelt: [[BBNONE:bb[0-9]+]]
+//
+// CHECK:       [[BBNONE]]:
+// CHECK-NEXT:    end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:    destroy_value [[DESTR_COPY]]
+//
+// CHECK:       [[BBSOME]]([[PAYLOAD:%.*]] : @guaranteed $KlassPair):
+// CHECK-NEXT:    [[LHS:%.*]] = struct_extract [[PAYLOAD]] : $KlassPair, #KlassPair.lhs
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    apply {{%.*}}([[LHS]])
+// CHECK-NEXT:    end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:    destroy_value [[DESTR_COPY]]
+// CHECK:       } // end sil function 'switch_enum_on_extracted_field_payload_use'
+sil [ossa] @switch_enum_on_extracted_field_payload_use : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+bb0(%0 : @owned $OptionalKlassPairContainer):
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $OptionalKlassPairContainer
+  %2 = begin_borrow %1 : $OptionalKlassPairContainer
+  %3 = struct_extract %2 : $OptionalKlassPairContainer, #OptionalKlassPairContainer.pair
+  switch_enum %3 : $Optional<KlassPair>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb2(%7 : @guaranteed $KlassPair):
+  %8 = struct_extract %7 : $KlassPair, #KlassPair.lhs
+  %9 = function_ref @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// Same as above, but the payload is used through an interior pointer. The new
+// borrow must also cover the uses of the projected address.
+//
+// CHECK-LABEL: sil [ossa] @switch_enum_on_extracted_field_payload_interior_pointer : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value
+// CHECK-NEXT:    [[DESTR_COPY:%.*]] = copy_value [[MARK]]
+// CHECK-NEXT:    [[DESTR_COPY_BORROW:%.*]] = begin_borrow [[DESTR_COPY]]
+// CHECK:         switch_enum {{%.*}} : $Optional<KlassPair>, case #Optional.some!enumelt: [[BBSOME:bb[0-9]+]], case #Optional.none!enumelt: [[BBNONE:bb[0-9]+]]
+//
+// CHECK:       [[BBSOME]]([[PAYLOAD:%.*]] : @guaranteed $KlassPair):
+// CHECK-NEXT:    [[RHS:%.*]] = struct_extract [[PAYLOAD]] : $KlassPair, #KlassPair.rhs
+// CHECK-NEXT:    [[ADDR:%.*]] = ref_element_addr [[RHS]]
+// CHECK-NEXT:    load [trivial] [[ADDR]]
+// CHECK:         end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:    destroy_value [[DESTR_COPY]]
+// CHECK:       } // end sil function 'switch_enum_on_extracted_field_payload_interior_pointer'
+sil [ossa] @switch_enum_on_extracted_field_payload_interior_pointer : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+bb0(%0 : @owned $OptionalKlassPairContainer):
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $OptionalKlassPairContainer
+  %2 = begin_borrow %1 : $OptionalKlassPairContainer
+  %3 = struct_extract %2 : $OptionalKlassPairContainer, #OptionalKlassPairContainer.pair
+  switch_enum %3 : $Optional<KlassPair>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb2(%7 : @guaranteed $KlassPair):
+  %8 = struct_extract %7 : $KlassPair, #KlassPair.rhs
+  %9 = ref_element_addr %8 : $MoveOnlyKlass, #MoveOnlyKlass.value
+  %10 = load [trivial] %9 : $*Builtin.Int32
+  %11 = function_ref @builtin32_use : $@convention(thin) (Builtin.Int32) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (Builtin.Int32) -> ()
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb3:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// Same as above, but the payload escapes, so its uses can't be found. The new
+// borrow ends where the original borrow of the switched value ended.
+//
+// CHECK-LABEL: sil [ossa] @switch_enum_on_extracted_field_payload_escape : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+// CHECK:         [[MARK:%.*]] = mark_unresolved_non_copyable_value
+// CHECK-NEXT:    [[DESTR_COPY:%.*]] = copy_value [[MARK]]
+// CHECK-NEXT:    [[DESTR_COPY_BORROW:%.*]] = begin_borrow [[DESTR_COPY]]
+// CHECK:         switch_enum {{%.*}} : $Optional<KlassPair>, case #Optional.some!enumelt: [[BBSOME:bb[0-9]+]], case #Optional.none!enumelt: [[BBNONE:bb[0-9]+]]
+//
+// CHECK:       [[BBSOME]]([[PAYLOAD:%.*]] : @guaranteed $KlassPair):
+// CHECK-NEXT:    [[LHS:%.*]] = struct_extract [[PAYLOAD]] : $KlassPair, #KlassPair.lhs
+// CHECK-NEXT:    [[CAST:%.*]] = unchecked_bitwise_cast [[LHS]]
+// CHECK-NEXT:    [[CAST_COPY:%.*]] = copy_value [[CAST]]
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    function_ref
+// CHECK-NEXT:    apply {{%.*}}([[CAST_COPY]])
+// CHECK-NEXT:    destroy_value [[CAST_COPY]]
+// CHECK-NEXT:    end_borrow [[DESTR_COPY_BORROW]]
+// CHECK-NEXT:    destroy_value [[DESTR_COPY]]
+// CHECK:       } // end sil function 'switch_enum_on_extracted_field_payload_escape'
+sil [ossa] @switch_enum_on_extracted_field_payload_escape : $@convention(thin) (@owned OptionalKlassPairContainer) -> () {
+bb0(%0 : @owned $OptionalKlassPairContainer):
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $OptionalKlassPairContainer
+  %2 = begin_borrow %1 : $OptionalKlassPairContainer
+  %3 = struct_extract %2 : $OptionalKlassPairContainer, #OptionalKlassPairContainer.pair
+  switch_enum %3 : $Optional<KlassPair>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb2(%7 : @guaranteed $KlassPair):
+  %8 = struct_extract %7 : $KlassPair, #KlassPair.lhs
+  %9 = unchecked_bitwise_cast %8 : $Klass to $Klass
+  %10 = copy_value %9 : $Klass
+  %11 = function_ref @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %10 : $Klass
+  end_borrow %2 : $OptionalKlassPairContainer
+  destroy_value %1 : $OptionalKlassPairContainer
+  br bb3
+
+bb3:
+  %15 = tuple ()
+  return %15 : $()
+}

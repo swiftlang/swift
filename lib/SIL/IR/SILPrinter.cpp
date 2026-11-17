@@ -1762,7 +1762,7 @@ public:
 
   void printSubstitutions(SubstitutionMap Subs,
                           GenericSignature Sig = GenericSignature()) {
-    if (!Subs.hasAnySubstitutableParams()) return;
+    if (!Subs.isEffectivelyGeneric()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
     // a generic signature that's close-to-but-not-the-same-as expected.
@@ -1875,8 +1875,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->getExecutionSemantics() == ExecutionSemantics::AtMostOnce) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }
@@ -2040,7 +2047,10 @@ public:
     if (LBI->isUnchecked()) {
       *this << "[unchecked] ";
     }
-    *this << getIDAndType(LBI->getOperand());
+    *this << getIDAndType(LBI->getAddress());
+    if (LBI->hasValueHint()) {
+      *this << ", value_hint " << getIDAndType(LBI->getValueHint());
+    }
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *BBI) {
@@ -2378,6 +2388,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
+    if (CI->withoutActuallyDeiniting())
+      *this << "[without_actually_deiniting] ";
     *this << CI->getType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
@@ -2580,6 +2592,7 @@ public:
 
   void visitUncheckedOwnershipInst(UncheckedOwnershipInst *I) {
     *this << getIDAndType(I->getOperand());
+    printForwardingOwnershipKind(I);
   }
 
   void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
@@ -2965,6 +2978,12 @@ public:
       llvm::report_fatal_error("Invalid?!");
     case DiagnoseKind::UnpermittedCopy:
       *this << "[unpermitted_copy] ";
+      break;
+    case DiagnoseKind::LetReinit:
+      *this << "[let_reinit] ";
+      break;
+    case DiagnoseKind::MissingSuperInit:
+      *this << "[missing_super_init] ";
       break;
     }
     *this << getIDAndType(I->getOperand());
@@ -3989,7 +4008,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_semantics \"" << Attr << "\"] ";
 
   for (auto *Attr : getSpecializeAttrs()) {
-    OS << "[_specialize "; Attr->print(OS); OS << "] ";
+    OS << (Attr->isSpecializedSpelling() ? "[specialized " : "[_specialize ");
+    Attr->print(OS);
+    OS << "] ";
   }
 
   if (markedAsUsed())
@@ -4032,6 +4053,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // indicate this with [opaque].
   if (!hasLoweredAddresses())
     OS << "[opaque] ";
+
+  if (hasUnresolvedLifetimes())
+    OS << "[unresolved] ";
 
   if (needsStackProtection())
     OS << "[stack_protection] ";

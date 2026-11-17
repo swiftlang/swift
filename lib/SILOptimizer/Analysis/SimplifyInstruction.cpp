@@ -421,8 +421,8 @@ SILValue InstSimplifier::visitMetatypeInst(MetatypeInst *MI) {
   // downstream CSE/SILCombine optimizations.
   // Note: redundant metatype instructions are already handled by CSE.
   if (isa<TupleType>(instanceType)
-      || instanceType.getStructOrBoundGenericStruct()
-      || instanceType.getEnumOrBoundGenericEnum()) {
+      || instanceType.getStructDecl()
+      || instanceType.getEnumDecl()) {
     for (SILArgument *argument : MI->getFunction()->getArguments()) {
       if (argument->getType().getASTType() == metaType &&
           argument->getType().isObject())
@@ -702,7 +702,7 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
 ///
 /// NOTE: We assume that the insertion point associated with the SILValue must
 /// dominate \p i.
-static SILValue simplifyInstruction(SILInstruction *i) {
+SILValue swift::simplifyInstruction(SILInstruction *i) {
   return InstSimplifier().visit(i);
 }
 

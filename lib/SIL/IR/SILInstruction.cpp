@@ -17,10 +17,12 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/Basic/AssertImplements.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
@@ -360,6 +362,96 @@ bool BorrowedFromInst::isReborrow() const {
     return phi->isReborrow();
   }
   return false;
+}
+
+SubstitutionMap
+OpenPackElementInst::tryGetElementArchetypeSubstitutionMap() const {
+
+  auto env = getOpenedGenericEnvironment();
+
+  // Collect concrete element types for each pack element binding.
+  llvm::SmallDenseMap<CanType, CanType, 4> elementReplacements;
+
+  if (auto *scalarIndex = dyn_cast<ScalarPackIndexInst>(getIndexOperand())) {
+    // If the structural pack index is statically known, we can resolve element
+    // archetypes to concrete types. A structural index always refers to a
+    // scalar pack component; we map each archetype to that component in its
+    // corresponding opened pack.
+    auto index = scalarIndex->getComponentIndex();
+    env->forEachPackElementBinding([&](ElementArchetypeType *elementArchetype,
+                                       PackType *pack) {
+      ASSERT(
+          pack->getNumElements() > index &&
+          !pack->getElementType(index)->is<PackExpansionType>() &&
+          "the opened pack types all have a scalar component at the supplied "
+          "structural index");
+      auto element = pack->getElementType(index);
+      auto interfaceTy =
+          elementArchetype->getInterfaceType()->getCanonicalType();
+      elementReplacements[interfaceTy] = element->getCanonicalType();
+    });
+  } else {
+    // If a structural pack index cannot be determined, we can still eliminate
+    // element archetypes if the opened packs are homogeneous and contain no
+    // expansions, since the same scalar type is stored at every index.
+    bool homogeneousScalar = true;
+    env->forEachPackElementBinding(
+        [&](ElementArchetypeType *elementArchetype, PackType *pack) {
+          if (!homogeneousScalar)
+            return;
+
+          // Treat zero-length packs as non-homogeneous. No code that uses their
+          // elements can run, so there is no reason to substitute them.
+          if (pack->getNumElements() == 0 ||
+              pack->getElementType(0)->is<PackExpansionType>()) {
+            homogeneousScalar = false;
+            return;
+          }
+
+          // Treat single-element packs as non-homogeneous. A loop over one may
+          // initialize memory only because it runs exactly once, which other
+          // passes cannot see once the element type is concrete
+          // (rdar://190731025).
+          if (pack->getNumElements() == 1) {
+            homogeneousScalar = false;
+            return;
+          }
+
+          // Check if the rest of the elements are equal to the first. We know
+          // the first element is scalar, so this catches pack expansions as
+          // well as mismatched scalar types.
+          auto firstElement = pack->getElementType(0)->getCanonicalType();
+          for (unsigned i = 1; i < pack->getNumElements(); i++) {
+            if (firstElement != pack->getElementType(i)->getCanonicalType()) {
+              homogeneousScalar = false;
+              return;
+            }
+          }
+          // The pack is homogeneous and contains only scalar elements.
+          elementReplacements[elementArchetype->getInterfaceType()
+                                  ->getCanonicalType()] = firstElement;
+        });
+    if (!homogeneousScalar)
+      return SubstitutionMap();
+  }
+
+  // Build a SubstitutionMap for the full opened element signature that
+  // maps outer params via the environment's outer substitutions and element
+  // params to concrete types.
+  auto genericSig = env->getGenericSignature();
+  auto outerSubs = env->getOuterSubstitutions();
+  auto subsMap = SubstitutionMap::get(
+      genericSig,
+      [&](SubstitutableType *type) -> swift::Type {
+        auto *gp = cast<GenericTypeParamType>(type);
+        auto canGP = gp->getCanonicalType();
+        auto it = elementReplacements.find(canGP);
+        if (it != elementReplacements.end())
+          return it->second;
+        return swift::Type(type).subst(outerSubs);
+      },
+      LookUpConformanceInModule());
+  return subsMap;
 }
 
 namespace {
@@ -1094,15 +1186,16 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     if (IInfo.ID != llvm::Intrinsic::not_intrinsic) {
       auto &IAttrs = IInfo.getOrCreateFnAttributes(getModule().getASTContext());
       auto MemEffects = IAttrs.getMemoryEffects();
+      if (!IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+        return MemoryBehavior::MayHaveSideEffects;
+      // Read-none? Note that this must be checked first, because
+      // `onlyReadsMemory` is also true for read-none.
+      if (MemEffects.doesNotAccessMemory())
+        return MemoryBehavior::None;
       // Read-only.
-      if (MemEffects.onlyReadsMemory() &&
-          IAttrs.hasAttribute(llvm::Attribute::NoUnwind))
+      if (MemEffects.onlyReadsMemory())
         return MemoryBehavior::MayRead;
-      // Read-none?
-      return MemEffects.doesNotAccessMemory() &&
-                     IAttrs.hasAttribute(llvm::Attribute::NoUnwind)
-                 ? MemoryBehavior::None
-                 : MemoryBehavior::MayHaveSideEffects;
+      return MemoryBehavior::MayHaveSideEffects;
     }
   }
 
@@ -2060,36 +2153,99 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
-static SILValue lookThroughOwnershipAndForwardingInsts(SILValue value) {
-  auto current = value;
-  while (true) {
-    if (auto *inst = current->getDefiningInstruction()) {
-      switch (inst->getKind()) {
-      case SILInstructionKind::MoveValueInst:
-      case SILInstructionKind::CopyValueInst:
-      case SILInstructionKind::BeginBorrowInst:
-        current = inst->getOperand(0);
-        continue;
-      default:
-        break;
-      }
-      auto forward = ForwardingOperation(inst);
-      Operand *op = nullptr;
-      if (forward && (op = forward.getSingleForwardingOperand())) {
-        current = op->get();
-        continue;
-      }
-    } else if (auto *result = SILArgument::isTerminatorResult(current)) {
-      auto *op = result->forwardedTerminatorResultOperand();
-      if (!op) {
-        break;
-      }
-      current = op->get();
-      continue;
+namespace {
+/// Walks the uses of a stack slot that holds an on-stack closure, such as the
+/// slot of an inlined `consuming` parameter. Succeeds only if the slot holds
+/// nothing but the closure: it's initialized once, by \c Initialization, and
+/// otherwise the closure is only taken out of it, moved into another slot, or
+/// destroyed in place.
+class OnStackClosureSlotWalker
+    : public TransitiveAddressWalker<OnStackClosureSlotWalker> {
+  friend TransitiveAddressWalker<OnStackClosureSlotWalker>;
+
+  AllocStackInst *Slot;
+  Operand *Initialization;
+  SmallVectorImpl<SILValue> &Takes;
+  SmallVectorImpl<SILInstruction *> &Destroys;
+  SmallVectorImpl<Operand *> &Moves;
+
+public:
+  OnStackClosureSlotWalker(AllocStackInst *slot, Operand *initialization,
+                           SmallVectorImpl<SILValue> &takes,
+                           SmallVectorImpl<SILInstruction *> &destroys,
+                           SmallVectorImpl<Operand *> &moves)
+      : Slot(slot), Initialization(initialization), Takes(takes),
+        Destroys(destroys), Moves(moves) {}
+
+private:
+  bool visitUse(Operand *use) {
+    if (use == Initialization)
+      return true;
+
+    auto *user = use->getUser();
+    if (isa<DeallocStackInst, EndAccessInst, DebugValueInst>(user))
+      return true;
+
+    // Anything else has to access the closure itself.
+    if (stripAccessMarkers(use->get()) != Slot)
+      return false;
+
+    if (auto *load = dyn_cast<LoadInst>(user)) {
+      if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
+        return false;
+      Takes.push_back(load);
+      return true;
     }
-    break;
+    if (isa<DestroyAddrInst>(user)) {
+      Destroys.push_back(user);
+      return true;
+    }
+    if (auto *copy = dyn_cast<CopyAddrInst>(user)) {
+      if (use->getOperandNumber() != CopyLikeInstruction::Src ||
+          !copy->isTakeOfSrc() || !copy->isInitializationOfDest())
+        return false;
+      Moves.push_back(&copy->getAllOperands()[CopyLikeInstruction::Dest]);
+      return true;
+    }
+    return false;
   }
-  return current;
+};
+} // end anonymous namespace
+
+/// Finds where the on-stack closure that \p initialization stores into a stack
+/// slot is taken out of the slot or destroyed in place, following it into the
+/// slots it's moved into. Adds the closures taken out of the slots to \p takes
+/// and the destroys to \p destroys. Returns false if a slot has a use that this
+/// doesn't model, in which case \p takes and \p destroys are incomplete.
+static bool
+visitStackSlotsOfOnStackClosure(Operand *initialization,
+                                SmallVectorImpl<SILValue> &takes,
+                                SmallVectorImpl<SILInstruction *> &destroys) {
+  SmallVector<Operand *, 2> initializations = {initialization};
+  while (!initializations.empty()) {
+    auto *init = initializations.pop_back_val();
+    auto *slot = dyn_cast<AllocStackInst>(stripAccessMarkers(init->get()));
+    if (!slot)
+      return false;
+    OnStackClosureSlotWalker walker(slot, init, takes, destroys,
+                                    initializations);
+    if (walker.walk(slot) != AddressUseKind::NonEscaping)
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if \p result, which is forwarded from \p use, holds the same
+/// closure as the operand rather than, for example, a closure that captures
+/// it along with other values.
+static bool forwardsSameClosure(Operand *use, SILValue result) {
+  if (auto *inst = result->getDefiningInstruction()) {
+    auto forward = ForwardingOperation(inst);
+    return forward && forward.getSingleForwardingOperand() == use;
+  }
+  if (auto *arg = SILArgument::isTerminatorResult(result))
+    return arg->forwardedTerminatorResultOperand() == use;
+  return false;
 }
 
 bool
@@ -2106,14 +2262,25 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   SSAPrunedLiveness liveness(function, &discoveredBlocks);
   liveness.initializeDef(this);
 
+  // Every value that this closure is forwarded into, including closures that
+  // capture it. Of those, the values that hold this closure itself.
   ValueWorklist values(function);
   values.push(this);
+  ValueSet sameClosureValues(function);
+  sameClosureValues.insert(this);
+
+  auto pushDerivedValue = [&](SILValue from, SILValue derived,
+                              bool isSameClosure) {
+    if (isSameClosure && sameClosureValues.contains(from))
+      sameClosureValues.insert(derived);
+    values.pushIfNotVisited(derived);
+  };
 
   while (auto value = values.pop()) {
     for (auto *use : value->getUses()) {
       if (!use->isConsuming()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
-          values.pushIfNotVisited(cvi);
+          pushDerivedValue(value, cvi, /*isSameClosure=*/true);
         }
         continue;
       }
@@ -2123,18 +2290,47 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         continue;
       }
 
-      // A `@called(atMostOnce)` closure's context is consumed directly by the
-      // `apply`/`try_apply` its passed to.
-      if (hasCalledAtMostOnceSemantics() &&
+      // The context of a closure whose call consumes it is consumed directly
+      // by the `apply`/`try_apply` its passed to. This closure may also be
+      // captured by such a closure, which then ends its lifetime.
+      if ((isCallConsuming() || value->getType().isCallConsuming()) &&
           isa<ApplyInst, TryApplyInst>(use->getUser())) {
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
       }
 
+      if (auto *move = dyn_cast<MoveValueInst>(use->getUser())) {
+        pushDerivedValue(value, move, /*isSameClosure=*/true);
+        continue;
+      }
+
+      // An at-most-once closure passed to an inlined `consuming` parameter
+      // lives in the parameter's stack slot until the slot is promoted, so
+      // follow it into the values taken out of the slot.
+      if (auto *store = dyn_cast<StoreInst>(use->getUser());
+          store &&
+          store->getOwnershipQualifier() == StoreOwnershipQualifier::Init) {
+        // Only use what's found if every slot holds nothing but the closure.
+        SmallVector<SILValue, 2> takes;
+        SmallVector<SILInstruction *, 2> destroys;
+        if (visitStackSlotsOfOnStackClosure(
+                &store->getAllOperands()[CopyLikeInstruction::Dest], takes,
+                destroys)) {
+          for (auto take : takes)
+            pushDerivedValue(value, take, /*isSameClosure=*/true);
+          for (auto *destroy : destroys)
+            liveness.updateForUse(destroy, /*lifetimeEnding=*/true);
+          continue;
+        }
+      }
+
       auto forward = ForwardingOperand(use);
       if (!forward) {
-        // There shouldn't be any non-forwarding consumptions of a nonescaping
-        // partial_apply that don't forward it along, aside from destroy_value.
+        // There shouldn't be any other consumptions of a nonescaping
+        // partial_apply that don't forward it along, aside from the ones
+        // handled above: destroy_value, an apply of a closure whose call
+        // consumes it, move_value, and a store into a stack slot that holds
+        // nothing but the closure.
         //
         // On-stack partial_apply cannot be cloned, so it should never be used
         // by a BranchInst.
@@ -2142,8 +2338,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         // This is a fatal error because it performs SIL verification that is
         // not separately checked in the verifier. It is the only check that
         // verifies the structural requirements of on-stack partial_apply uses.
-        if (lookThroughOwnershipAndForwardingInsts(use->get()) !=
-            SILValue(this)) {
+        if (!sameClosureValues.contains(value)) {
           // Consumes of values which aren't "essentially" the
           //   partial_apply [on_stack]
           // are okay.  For example, a not-on_stack partial_apply that captures
@@ -2156,11 +2351,12 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         if (isa<BranchInst>(user)) {
           llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
         }
-        llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                                 "forwarded to a destroy_value");
+        llvm::report_fatal_error("partial_apply [on_stack] has a consuming use "
+                                 "that can't be followed to the end of its "
+                                 "lifetime");
       }
-      forward.visitForwardedValues([&values](auto value) {
-        values.pushIfNotVisited(value);
+      forward.visitForwardedValues([&](SILValue forwarded) {
+        pushDerivedValue(value, forwarded, forwardsSameClosure(use, forwarded));
         return true;
       });
     }
@@ -2170,16 +2366,21 @@ PartialApplyInst::visitOnStackLifetimeEnds(
 
   for (auto *inst : boundary.lastUsers) {
     Operand *consumingOperand = nullptr;
-    // Non-`@called(atMostOnce)` values end their lifetime only at
-    // `destroy_value`.
+    // A closure ends its lifetime at a `destroy_value`, at a `destroy_addr`
+    // of a stack slot that holds it, or at an apply of a closure whose call
+    // consumes it.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
-    } else if (hasCalledAtMostOnceSemantics()) {
-      // `@called(atMostOnce)` is consumed by an apply, look up the operand
-      // where it appears.
+    } else if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {
+      // The closure was destroyed in a stack slot, such as the slot of an
+      // inlined parameter.
+      consumingOperand = &dai->getOperandRef();
+    } else {
+      // at-most-once is consumed by an apply, look up the operand
+      // where it appears. The apply may consume a value that this closure
+      // was forwarded into, such as a reabstraction thunk that captures it.
       for (auto &operand : inst->getAllOperands()) {
-        if (operand.isConsuming() && lookThroughOwnershipAndForwardingInsts(
-                                         operand.get()) == SILValue(this)) {
+        if (operand.isConsuming() && values.isVisited(operand.get())) {
           consumingOperand = &operand;
           break;
         }

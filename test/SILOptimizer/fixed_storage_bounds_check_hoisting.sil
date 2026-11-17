@@ -359,3 +359,99 @@ bb3:
   %t = tuple ()
   return %t : $()
 }
+
+sil [_semantics "fixed_storage.get_count"] @getCount : $@convention(method) (@guaranteed Span<Int>) -> Int
+
+// The callee function_ref is defined inside the loop. It must be recreated in
+// the preheader when the check is hoisted.
+
+// CHECK-LABEL: sil @test_hoist_check_with_callee_in_loop :
+// CHECK: bb1:
+// CHECK:   [[FIRST:%[0-9]+]] = function_ref @checkIndex
+// CHECK:   apply [[FIRST]]
+// CHECK:   [[LAST:%[0-9]+]] = function_ref @checkIndex
+// CHECK:   apply [[LAST]]
+// CHECK:   br bb2
+// CHECK: bb2({{%[0-9]+}} : $Builtin.Int64):
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'test_hoist_check_with_callee_in_loop'
+sil @test_hoist_check_with_callee_in_loop : $@convention(thin) (@guaranteed Span<Int>) -> () {
+bb0(%0 : $Span<Int>):
+  %zero = integer_literal $Builtin.Int64, 0
+  %one = integer_literal $Builtin.Int64, 1
+  %no_trap = integer_literal $Builtin.Int1, 0
+  %get_count_fn = function_ref @getCount : $@convention(method) (@guaranteed Span<Int>) -> Int
+  %count_struct = apply %get_count_fn(%0) : $@convention(method) (@guaranteed Span<Int>) -> Int
+  %count = struct_extract %count_struct, #Int._value
+  %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %is_zero, bb6, bb1
+
+bb1:
+  br bb2(%zero : $Builtin.Int64)
+
+bb2(%i : $Builtin.Int64):
+  %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
+  %idx = struct $Int (%next : $Builtin.Int64)
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %done, bb5, bb4
+
+bb4:
+  br bb2(%next : $Builtin.Int64)
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_hoist_invariant_check_with_callee_in_loop :
+// CHECK: bb1:
+// CHECK:   [[FN:%[0-9]+]] = function_ref @checkIndex
+// CHECK:   apply [[FN]]
+// CHECK:   br bb2
+// CHECK: bb2({{%[0-9]+}} : $Builtin.Int64):
+// CHECK-NOT: apply
+// CHECK-LABEL: } // end sil function 'test_hoist_invariant_check_with_callee_in_loop'
+sil @test_hoist_invariant_check_with_callee_in_loop : $@convention(thin) (@guaranteed Span<Int>, Int) -> () {
+bb0(%0 : $Span<Int>, %inv : $Int):
+  %zero = integer_literal $Builtin.Int64, 0
+  %get_count_fn = function_ref @getCount : $@convention(method) (@guaranteed Span<Int>) -> Int
+  %count_struct = apply %get_count_fn(%0) : $@convention(method) (@guaranteed Span<Int>) -> Int
+  %count = struct_extract %count_struct, #Int._value
+  %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %is_zero, bb6, bb1
+
+bb1:
+  br bb2(%zero : $Builtin.Int64)
+
+bb2(%i : $Builtin.Int64):
+  %check_fn = function_ref @checkIndex : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%inv, %0) : $@convention(method) (Int, @guaranteed Span<Int>) -> ()
+  %one = integer_literal $Builtin.Int64, 1
+  %no_trap = integer_literal $Builtin.Int1, 0
+  %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
+  %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %done, bb5, bb4
+
+bb4:
+  br bb2(%next : $Builtin.Int64)
+
+bb5:
+  br bb3
+
+bb6:
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}

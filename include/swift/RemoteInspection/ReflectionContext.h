@@ -143,6 +143,7 @@ class ReflectionContext
   typename super::StoredPointer target_future_adapter = 0;
   typename super::StoredPointer target_task_wait_throwing_resume_adapter = 0;
   typename super::StoredPointer target_task_future_wait_resume_adapter = 0;
+  typename super::StoredPointer target_synchronous_operation_adapter = 0;
   bool supportsPriorityEscalation = false;
   typename super::StoredSize asyncTaskSize = 0;
 
@@ -191,6 +192,7 @@ public:
     bool IsGroupChildTask;
     bool IsAsyncLetTask;
     bool IsSynchronousStartTask;
+    bool HasSynchronousOperation;
 
     // Task flags.
     unsigned MaxPriority;
@@ -365,8 +367,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findMachOSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findMachOSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -374,8 +374,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
@@ -385,7 +384,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
 
     auto InfoID = this->addReflectionInfo(info);
@@ -493,8 +491,6 @@ public:
         ObjectFileFormat.getSectionName(ReflectionSectionKind::reflstr));
     auto ConformMdSec = findCOFFSectionByName(
         ObjectFileFormat.getSectionName(ReflectionSectionKind::conform));
-    auto MPEnumMdSec = findCOFFSectionByName(
-        ObjectFileFormat.getSectionName(ReflectionSectionKind::mpenum));
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -502,8 +498,7 @@ public:
         CaptureSec.first == nullptr &&
         TypeRefMdSec.first == nullptr &&
         ReflStrMdSec.first == nullptr &&
-        ConformMdSec.first == nullptr &&
-        MPEnumMdSec.first == nullptr)
+        ConformMdSec.first == nullptr)
       return {};
 
     ReflectionInfo Info = {{FieldMdSec.first, FieldMdSec.second},
@@ -513,7 +508,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return this->addReflectionInfo(Info);
   }
@@ -951,7 +945,6 @@ public:
     auto TypeRefMdSec = lookup("swift5_typeref");
     auto ReflStrMdSec = lookup("swift5_reflstr");
     auto ConformMdSec = lookup("swift5_protocol_conformances");
-    auto MPEnumMdSec = lookup("swift5_mpenum");
 
     ReflectionInfo info = {{FieldMdSec.first, FieldMdSec.second},
                            {AssocTySec.first, AssocTySec.second},
@@ -960,7 +953,6 @@ public:
                            {TypeRefMdSec.first, TypeRefMdSec.second},
                            {ReflStrMdSec.first, ReflStrMdSec.second},
                            {ConformMdSec.first, ConformMdSec.second},
-                           {MPEnumMdSec.first, MPEnumMdSec.second},
                            PotentialModuleNames};
     return addReflectionInfo(info);
   }
@@ -1030,7 +1022,8 @@ public:
         ReflectionSectionKind::fieldmd, ReflectionSectionKind::assocty,
         ReflectionSectionKind::builtin, ReflectionSectionKind::capture,
         ReflectionSectionKind::typeref, ReflectionSectionKind::reflstr,
-        ReflectionSectionKind::conform, ReflectionSectionKind::mpenum};
+        ReflectionSectionKind::conform
+    };
 
     llvm::SmallVector<std::pair<RemoteRef<void>, uint64_t>, 6> Pairs;
     for (auto Section : Sections) {
@@ -1056,7 +1049,6 @@ public:
                            {Pairs[4].first, Pairs[4].second},
                            {Pairs[5].first, Pairs[5].second},
                            {Pairs[6].first, Pairs[6].second},
-                           {Pairs[7].first, Pairs[7].second},
                            PotentialModuleNames};
     return addReflectionInfo(Info);
   }
@@ -1941,8 +1933,12 @@ public:
     if (!JobObj)
       return 0;
 
-    // This is a JobRef which stores flags in the low bits.
-    return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
+    // This is a JobRef which stores flags in the low bits. The pointer is
+    // signed.
+    return stripSignedPointer(
+               RemoteAddress(JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3),
+                             RemoteAddress::DefaultAddressSpace))
+        .getRawAddress();
   }
 
 private:
@@ -2083,6 +2079,7 @@ private:
     Info.IsFuture = JobFlags.task_isFuture();
     Info.IsGroupChildTask = JobFlags.task_isGroupChildTask();
     Info.IsAsyncLetTask = JobFlags.task_isAsyncLetTask();
+    Info.HasSynchronousOperation = JobFlags.task_hasSynchronousOperation();
 
     uint32_t TaskStatusFlags = AsyncTaskObj->PrivateStorage.Status.Flags[0];
     Info.IsCancelled = TaskStatusFlags & ActiveTaskStatusFlags::IsCancelled;
@@ -2162,7 +2159,7 @@ private:
 
         Info.ChildTasks.push_back(ChildTask);
 
-        swift::JobFlags ChildJobFlags(AsyncTaskObj->Flags);
+        swift::JobFlags ChildJobFlags(ChildTaskObj->Flags);
         if (ChildJobFlags.task_isChildTask()) {
           if (asyncTaskSize == 0)
             return {std::string("target async task size unknown, unable to "
@@ -2237,7 +2234,17 @@ private:
     Info.ResumeAsyncContext = TaskResumeContext;
 
     // Walk the async backtrace.
-    if (Info.HasIsRunning && !Info.IsRunning) {
+    if (Info.HasSynchronousOperation) {
+      // The resume context of a synchronous operation task is its
+      // bare initial context, and the operation never suspends, so there is
+      // no async context chain to walk. Its only frame is the operation,
+      // which a task that is not running did not start yet
+      if (Info.HasIsRunning && !Info.IsRunning && AsyncBacktraceLimit > 0) {
+        if (auto Operation =
+                getSynchronousOperation(AsyncTaskObj.get(), TaskResumeContext))
+          Info.AsyncBacktraceFrames.push_back(Operation);
+      }
+    } else if (Info.HasIsRunning && !Info.IsRunning) {
       auto ResumeContext = TaskResumeContext;
       unsigned AsyncBacktraceLoopCount = 0;
       while (ResumeContext && AsyncBacktraceLoopCount++ < AsyncBacktraceLimit) {
@@ -2275,14 +2282,49 @@ private:
 
     // Don't read FirstJob when idle.
     if (Info.State != concurrency::ActorFlagConstants::Idle) {
-      // This is a JobRef which stores flags in the low bits.
-      Info.FirstJob = ActorObj->Status.FirstJob & ~0x3;
+      // This is a JobRef which stores flags in the low bits. The pointer is
+      // signed.
+      Info.FirstJob =
+          stripSignedPointer(
+              RemoteAddress(ActorObj->Status.FirstJob & ~StoredPointer(0x3),
+                            RemoteAddress::DefaultAddressSpace))
+              .getRawAddress();
     }
 
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
         getThreadPort(ActorObj.get());
 
     return {std::nullopt, Info};
+  }
+
+  /// The synchronous operation function of a synchronous operation task,
+  /// read from the `SynchronousDiscardingContextPrefix` before its
+  /// initial context \p ResumeContextPtr, or 0 if it cannot be read
+  template <typename AsyncTaskType>
+  StoredPointer getSynchronousOperation(const AsyncTaskType *AsyncTaskObj,
+                                        StoredPointer ResumeContextPtr) {
+    swift::JobFlags JobFlags(AsyncTaskObj->Flags);
+    if (!JobFlags.task_hasSynchronousOperation() || !ResumeContextPtr)
+      return 0;
+
+    // The task runs 'synchronous_operation_adapter' for its whole lifetime,
+    // since the operation never suspends. Check that when the target tells
+    // us where the adapter is, to not read a stale or bogus prefix
+    loadTargetPointers();
+    auto Fptr = stripSignedPointer(AsyncTaskObj->RunJob).getRawAddress();
+    if (target_synchronous_operation_adapter &&
+        Fptr != target_synchronous_operation_adapter)
+      return 0;
+
+    using Prefix = SynchronousDiscardingContextPrefix<Runtime>;
+    auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
+    auto PrefixBytes = getReader().readBytes(
+        RemoteAddress(PrefixAddr, RemoteAddress::DefaultAddressSpace),
+        sizeof(Prefix));
+    if (!PrefixBytes)
+      return 0;
+    auto PrefixPtr = reinterpret_cast<const Prefix *>(PrefixBytes.get());
+    return stripSignedPointer(PrefixPtr->Function).getRawAddress();
   }
 
   // Get the most human meaningful "run job" function pointer from the task,
@@ -2293,6 +2335,19 @@ private:
 
     loadTargetPointers();
     auto ResumeContextPtr = AsyncTaskObj->ResumeContextAndReserved[0];
+
+    // A synchronous operation task runs its operation from
+    // 'synchronous_operation_adapter', report the operation instead
+    if (swift::JobFlags(AsyncTaskObj->Flags).task_hasSynchronousOperation()) {
+      auto ResumeContext =
+          stripSignedPointer(RemoteAddress(ResumeContextPtr,
+                                           RemoteAddress::DefaultAddressSpace))
+              .getRawAddress();
+      if (auto Operation = getSynchronousOperation(AsyncTaskObj, ResumeContext))
+        return Operation;
+      return Fptr;
+    }
+
     if (target_non_future_adapter && Fptr == target_non_future_adapter) {
       using Prefix = AsyncContextPrefix<Runtime>;
       auto PrefixAddr = ResumeContextPtr - sizeof(Prefix);
@@ -2339,25 +2394,37 @@ private:
     if (setupTargetPointers)
       return;
 
-    auto getPointer = [&](const std::string &name) -> StoredPointer {
+    auto getPointerInProcessAddressSpace =
+        [&](const std::string &name) -> StoredPointer {
       auto Symbol = getReader().getSymbolAddress(name);
       if (!Symbol)
         return 0;
       auto Pointer = getReader().readPointer(Symbol, sizeof(StoredPointer));
       if (!Pointer)
         return 0;
-      return Pointer->getResolvedAddress().getRawAddress();
+      RemoteAddress Address = Pointer->getResolvedAddress();
+      if (Address.getAddressSpace() != RemoteAddress::DefaultAddressSpace) {
+        auto ProcessAddress = getReader().resolveRemoteAddress(Address);
+        if (!ProcessAddress)
+          return 0;
+        Address = *ProcessAddress;
+      }
+      return stripSignedPointer(Address).getRawAddress();
     };
-    target_asyncTaskMetadata =
-        getPointer("_swift_concurrency_debug_asyncTaskMetadata");
-    target_non_future_adapter =
-        getPointer("_swift_concurrency_debug_non_future_adapter");
-    target_future_adapter =
-        getPointer("_swift_concurrency_debug_future_adapter");
-    target_task_wait_throwing_resume_adapter = getPointer(
+    // These are compared against pointers in the address space of the process.
+    target_asyncTaskMetadata = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_asyncTaskMetadata");
+    target_non_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_non_future_adapter");
+    target_future_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_future_adapter");
+    target_task_wait_throwing_resume_adapter = getPointerInProcessAddressSpace(
         "_swift_concurrency_debug_task_wait_throwing_resume_adapter");
-    target_task_future_wait_resume_adapter =
-        getPointer("_swift_concurrency_debug_task_future_wait_resume_adapter");
+    target_task_future_wait_resume_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_task_future_wait_resume_adapter");
+    // Only present in runtimes that can create synchronous operation tasks (Swift 6.5)
+    target_synchronous_operation_adapter = getPointerInProcessAddressSpace(
+        "_swift_concurrency_debug_synchronous_operation_adapter");
     auto supportsPriorityEscalationAddr = getReader().getSymbolAddress(
         "_swift_concurrency_debug_supportsPriorityEscalation");
     if (supportsPriorityEscalationAddr) {

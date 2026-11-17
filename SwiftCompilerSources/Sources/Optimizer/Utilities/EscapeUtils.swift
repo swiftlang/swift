@@ -574,8 +574,22 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
       return .continueWalk
-    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
-      return .continueWalk
+    case let bi as BuiltinInst:
+      switch bi.id {
+      case .TSanInoutAccess, .PrepareInitialization, .ZeroInitializer:
+        return .continueWalk
+      case .AddressOfRawLayout:
+        for user in bi.users {
+          guard let pta = user as? PointerToAddressInst,
+                walkDownUses(ofAddress: pta, path: path.forPointerToAddress(pta)) == .continueWalk
+          else {
+            return isEscaping
+          }
+        }
+        return .continueWalk
+      default:
+        return isEscaping
+      }
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
         // It's dangerous to continue walking over an `unchecked_addr_cast` which casts between two different types.
@@ -604,6 +618,13 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   
   /// Check whether the value escapes through the deinitializer
   private func handleDestroy(of value: Value, path: Path) -> WalkResult {
+
+    if value.type.isMoveOnly {
+      // For simplicity we assume that a deinit of a non-copyable type can escape the destroyed value.
+      // It's not that important to handle destroys of non-copyable types because the DeinitDevirtualizer
+      // lowers such destroys anyway.
+      return isEscaping
+    }
 
     // Even if this is a destroy_value of a struct/tuple/enum, the called destructor(s) only take a
     // single class reference as parameter.
@@ -659,9 +680,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         if !indirectResultEscapes(of: beginApply, path: path) {
           return .continueWalk
         }
-      } else if !apply.isAddressable(operand: argOp) &&
+      } else if !apply.mayEscapeAddress(of: argOp) &&
                 !hasAddressResult(apply) {
-        // The result does not depend on the argument's address.
+        // No result or argument depends on the argument's address.
         return .continueWalk
       }
     }
@@ -815,6 +836,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     case let ap as ApplyInst:
       return walkUpApplyResult(apply: ap, path: path.with(knownType: nil))
+    // TODO: replace with `case let load as LoadInstruction` once we have fast-casts on the host compiler
     case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path) {
         // When walking up we shouldn't end up at a load where followLoads is false,
@@ -824,7 +846,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         //   %a = pointer_to_address %l           // the up-walk starts at %a
         return isEscaping
       }
-      return walkUp(address: (def as! UnaryInstruction).operand.value,
+      return walkUp(address: (def as! LoadInstruction).address,
                     path: path.with(followStores: true).with(knownType: nil))
     case let atp as AddressToPointerInst:
       return walkUp(address: atp.address, path: path.with(knownType: nil))
@@ -988,6 +1010,32 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, addressIsStored: false, knownType: nil)
+  }
+}
+
+private extension ApplySite {
+  /// Returns true if the address of the indirect argument `operand` may escape to the result or to
+  /// another (non-escapable) argument of the apply.
+  ///
+  /// This is the case if there is a scoped lifetime dependence on the argument, e.g.
+  ///
+  ///   @_lifetime(&value)
+  ///   init(single value: inout Element) {
+  ///     self = unsafe MutableSpan(_unsafeStart: UnsafeMutablePointer(Builtin.addressof(&value)), count: 1)
+  ///   }
+  ///
+  /// Even if the dependence is not marked as addressable, the callee can still escape the address
+  /// of the argument, e.g. by using unsafe pointers.
+  func mayEscapeAddress(of operand: Operand) -> Bool {
+    if let dep = resultDependence(on: operand), dep.isScoped {
+      return true
+    }
+    for targetOperand in argumentOperands where !targetOperand.value.isEscapable {
+      if let dep = parameterDependence(target: targetOperand, source: operand), dep.isScoped {
+        return true
+      }
+    }
+    return false
   }
 }
 

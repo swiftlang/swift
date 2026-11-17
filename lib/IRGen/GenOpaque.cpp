@@ -36,6 +36,7 @@
 #include "IRGenModule.h"
 #include "ProtocolInfo.h"
 
+#include "GenBorrow.h"
 #include "GenOpaque.h"
 
 using namespace swift;
@@ -491,8 +492,13 @@ llvm::Value *IRGenFunction::emitValueWitnessValue(SILType type,
     return witness;
   }
   
-  auto vwtable = emitValueWitnessTableRef(type);
-  auto witness = emitLoadOfValueWitnessValue(*this, vwtable, index);
+  llvm::Value *witness;
+  if (shouldComputeBorrowLayoutInline(*this, type)) {
+    witness = emitInlineBorrowValueWitnessValue(*this, type, index);
+  } else {
+    auto vwtable = emitValueWitnessTableRef(type);
+    witness = emitLoadOfValueWitnessValue(*this, vwtable, index);
+  }
   setScopedLocalTypeDataForLayout(type, key, witness);
   return witness;
 }

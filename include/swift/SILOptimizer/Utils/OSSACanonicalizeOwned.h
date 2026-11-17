@@ -486,7 +486,7 @@ private:
     // barriers for non-lexical lifetimes. Optimizations, on the other hand,
     // should always respect deinit barriers.
     //
-    // This reads the module floor, not the function's stage,
+    // This reads the module floor, not the function's stage, because
     // supportsLexicalLifetimes() below is keyed to the module stage floor.
     if (module.getStageFloor() == SILStage::Raw && !currentDef->isLexical())
       return false;

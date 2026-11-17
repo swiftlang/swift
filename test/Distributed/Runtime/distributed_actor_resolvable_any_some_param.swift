@@ -5,6 +5,9 @@
 // RUN: %target-build-swift -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out | %FileCheck %s
 
 // Re-build at -O and run again to ensure the optimized pipeline preserves
 // the synthesized $distributedProxyAdapter$<base> thunks and produces the
@@ -12,6 +15,9 @@
 // RUN: %target-build-swift -O -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-O.out
 // RUN: %target-codesign %t/a-O.out
 // RUN: %target-run %t/a-O.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -O -module-name main -target %target-swift-6.0-abi-triple -plugin-path %swift-plugin-dir -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-O-opaque-values.out
+// RUN: %target-codesign %t/a-O-opaque-values.out
+// RUN: %target-run %t/a-O-opaque-values.out | %FileCheck %s
 //
 // REQUIRES: executable_test
 // REQUIRES: concurrency

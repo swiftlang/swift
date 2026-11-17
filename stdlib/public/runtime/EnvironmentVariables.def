@@ -97,7 +97,8 @@ VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32, 0,
 
 VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, boolean, true,
          "Enable warnings when we fail to look up a type by name in a compiler "
-         "generated type lookup call.")
+         "generated type lookup call, and when a type or protocol involved in "
+         "the failed lookup is defined by more than one image.")
 
 VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, boolean, true,
          "Enable use of metadata in prespecializations library.")

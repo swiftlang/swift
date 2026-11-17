@@ -773,15 +773,18 @@ TypeConverter::convertBuiltinFixedArrayType(BuiltinFixedArrayType *T) {
 
   // A fixed-layout type's storage size is recorded in a 32-bit field, so a
   // fixed-size array whose total byte size does not fit in 32 bits cannot be
-  // represented. Diagnose this instead of silently truncating the size.
+  // represented. In addition, the size in bits must fit for the type's spare
+  // bit mask or a truncated spare bit mask would be created in
+  // getArraySpareBits, called from the LoadableArrayTypeInfo/FixedArrayTypeInfo
+  // ctors below.
   auto &fixedElementTI = cast<FixedTypeInfo>(elementTI);
   uint64_t stride = fixedElementTI.getFixedStride().getValue();
   // SaturatingMultiply clamps to UINT64_MAX on overflow, so an overflowing
-  // product is still caught by the 32-bit bound check below.
+  // product is still caught by the bound check below.
   uint64_t totalSize = llvm::SaturatingMultiply(*fixedSize, stride);
-  if (totalSize > std::numeric_limits<uint32_t>::max()) {
-    IGM.Context.Diags.diagnose(SourceLoc(), diag::fixed_type_too_large,
-                               CanType(T));
+  if (totalSize > std::numeric_limits<uint32_t>::max() / 8) {
+    IGM.Context.Diags.diagnose(SourceLoc(), diag::spare_bits_type_too_large,
+                               true, CanType(T));
     // Fall back to an empty type info so that IRGen can continue far enough to
     // finish diagnosing; the error prevents any object file from being emitted.
     return &getEmptyTypeInfo();

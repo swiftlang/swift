@@ -32,8 +32,7 @@ class Constraint;
 class SolverDisjunction {
   Constraint *disjunction;
   FunctionType *argFuncType = nullptr;
-  TypeVariableType *resultTypeVar = nullptr;
-  unsigned resultGenerationNumber = 0;
+  uint64_t generationNumber = 0;
 
 public:
   SolverDisjunction(Constraint *disjunction)
@@ -48,12 +47,7 @@ public:
 
   void undoArgFuncTypeChange(FunctionType *oldFuncType, unsigned oldGenerationNumber) {
   	argFuncType = oldFuncType;
-    if (argFuncType)
-      resultTypeVar = argFuncType->getResult()->getAs<TypeVariableType>();
-    else
-      resultTypeVar = nullptr;
-    resultGenerationNumber = oldGenerationNumber;
-    ASSERT(resultGenerationNumber == 0 || resultTypeVar != nullptr);
+    generationNumber = oldGenerationNumber;
   }
 };
 

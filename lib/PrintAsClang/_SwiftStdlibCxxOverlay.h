@@ -372,11 +372,8 @@ private:
 template<>
 class Expected<void> {
 public:
-  /// Default
-  Expected() noexcept {
-    new (&buffer) Error();
-    has_val = false;
-  }
+  /// Default: a successful `void` result.
+  Expected() noexcept { has_val = true; }
 
   Expected(const swift::Error &error_val) noexcept {
     new (&buffer) Error(error_val);
@@ -385,9 +382,7 @@ public:
 
   /// Copy
   Expected(Expected const& other) noexcept {
-    if (other.has_value())
-      abort();
-    else
+    if (!other.has_value())
       new (&buffer) Error(other.error());
 
     has_val = other.has_value();
@@ -397,7 +392,10 @@ public:
   // FIXME: Implement move semantics when move swift values is possible
   [[noreturn]] Expected(Expected&&) noexcept { abort(); }
 
-  ~Expected() noexcept { reinterpret_cast<swift::Error *>(buffer)->~Error(); }
+  ~Expected() noexcept {
+    if (!has_value())
+      reinterpret_cast<swift::Error *>(buffer)->~Error();
+  }
 
   /// assignment
   constexpr auto operator=(Expected&& other) noexcept = delete;

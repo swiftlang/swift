@@ -131,6 +131,7 @@ RValue Scope::popPreservingValue(RValue &&rv) {
 void Scope::popImpl() {
   verify();
   cleanups.innermostScope = savedInnermostScope;
+  cleanups.SGF.enterBlockEndDebugScope(loc);
   cleanups.endScope(depth, loc);
   if (cleanups.innermostScope)
     cleanups.stack.checkIterator(cleanups.innermostScope->depth);

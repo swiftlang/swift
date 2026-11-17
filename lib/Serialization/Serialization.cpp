@@ -142,12 +142,12 @@ namespace {
       }
       assert(keyLength == static_cast<uint16_t>(keyLength));
 
-      uint32_t dataLength = (sizeof(uint32_t) + 1) * data.size();
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      uint64_t dataLength = (sizeof(uint32_t) + 1) * data.size();
+      assert(llvm::isUInt<32>(dataLength) && "decl table entry too large");
 
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -312,11 +312,12 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
-      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      uint64_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      assert(llvm::isUInt<32>(dataLength) &&
+             "nested type decls table entry too large");
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -418,13 +419,12 @@ namespace {
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
                                                     key_type_ref key,
                                                     data_type_ref data) {
-      // This will trap if a single ValueDecl has more than 16383 members
-      // with the same DeclBaseName. Seems highly unlikely.
-      assert((data.size() < (1 << 14)) && "Too many members");
-      uint32_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
+      uint64_t dataLength = sizeof(uint32_t) * data.size(); // value DeclIDs
+      assert(llvm::isUInt<32>(dataLength) &&
+             "decl members table entry too large");
       endian::Writer writer(out, llvm::endianness::little);
       // No need to write the key length; it's constant.
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { sizeof(uint32_t), dataLength };
     }
 
@@ -582,8 +582,9 @@ static Accessors getAccessors(const AbstractStorageDecl *storage) {
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
   accessors.ReadWriteImpl = getRawReadWriteImplKind(impl.getReadWriteImpl());
-  auto decls = storage->getAllAccessors();
-  accessors.Decls.append(decls.begin(), decls.end());
+  storage->visitEmittedAccessors([&](auto *accessor) {
+    accessors.Decls.push_back(accessor);
+  });
   return accessors;
 }
 
@@ -1066,12 +1067,17 @@ void Serializer::writeHeader() {
     if (auto build = Options.UserModuleVersion.getBuild()) {
       userModuleBuild = *build;
     }
+    auto userModuleSubbuild = 0;
+    if (auto subbuild = Options.UserModuleVersion.getSubbuild()) {
+      userModuleSubbuild = *subbuild;
+    }
     Metadata.emit(ScratchRecord,
                   SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR,
                   shortVersionStringLength,
                   compatibilityVersionStringLength,
                   userModuleMajor, userModuleMinor,
                   userModuleSubminor, userModuleBuild,
+                  userModuleSubbuild,
                   versionString.str());
 
     if (!Options.SDKName.empty())
@@ -3107,10 +3113,12 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ObjCRuntimeName:
     case DeclAttrKind::RestatedObjCConformance:
     case DeclAttrKind::ClangImporterSynthesizedType:
+    case DeclAttrKind::CArrayProjection:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
     case DeclAttrKind::Diagnose:
-    case DeclAttrKind::Called:
+    case DeclAttrKind::Callable:
+    case DeclAttrKind::ScopeParams:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3438,8 +3446,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<AbstractSpecializeAttr>(DA);
-      auto *afd = cast<AbstractFunctionDecl>(D);
-      auto *targetFunDecl = attr->getTargetFunctionDecl(afd);
+      // On an extension, it has no target.
+      auto *VD = dyn_cast<ValueDecl>(D);
+      auto *targetFunDecl = VD ? attr->getTargetFunctionDecl(VD) : nullptr;
 
       SmallVector<IdentifierID, 4> pieces;
 
@@ -3460,7 +3469,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isPublic(),
           (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
-          S.addGenericSignatureRef(attr->getSpecializedSignature(afd)),
+          S.addGenericSignatureRef(attr->getSpecializedSignature(D)),
           S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
           pieces);
       for (auto availAttr : attr->getAvailableAttrs()) {
@@ -4136,6 +4145,10 @@ private:
         continue;
 
       DeclID memberID = S.addDeclRef(member);
+      // It names another module's member instead of declaring one, so it's
+      // serialized (for its specializations) but isn't a member.
+      if (SpecializedAttr::isSpecializationDeclaration(member))
+        continue;
       memberIDs.push_back(memberID);
 
       if (auto VD = dyn_cast<ValueDecl>(member)) {
@@ -4863,9 +4876,9 @@ public:
     if (theClass->hasSuperclass()) {
       // FIXME: Nested types can still be a problem here: it's possible that (for
       // whatever reason) they won't be able to be deserialized, in which case
-      // we'll be in trouble forming the actual superclass type. However, we
-      // need a more robust handling of deserialization dependencies that can
-      // handle circularities. rdar://problem/50835214
+      // we'll be in trouble forming the actual superclass type. The
+      // deserializer skips re-entrant dependency checks to avoid infinite
+      // recursion, so a cycle can still leave a class only partly checked.
       collectDependenciesFromType(dependencyTypes, theClass->getSuperclass(),
                                   /*excluding*/theClass);
     }
@@ -5952,6 +5965,7 @@ public:
   UNSUPPORTED_TYPE(InOut)
   UNSUPPORTED_TYPE(LValue)
   UNSUPPORTED_TYPE(TypeVariable)
+  UNSUPPORTED_TYPE(Hole)
   UNSUPPORTED_TYPE(ErrorUnion)
   UNSUPPORTED_TYPE(Join)
   UNSUPPORTED_TYPE(Meet)
@@ -6084,6 +6098,9 @@ public:
   }
 
   void visitNominalType(const NominalType *nominalTy) {
+    if (nominalTy->hasGenericArgs())
+      return serializeBoundGenericType(nominalTy);
+
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
     NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
@@ -6470,7 +6487,8 @@ public:
     for (auto proto : composition->getMembers())
       protocols.push_back(S.addTypeRef(proto));
 
-    bool inverseCopyable = false, inverseEscapable = false;
+    bool inverseCopyable = false, inverseEscapable = false,
+         inverseDeinitable = false;
     for (auto ip : composition->getInverses()) {
       switch (ip) {
       case InvertibleProtocolKind::Copyable:
@@ -6479,17 +6497,17 @@ public:
       case InvertibleProtocolKind::Escapable:
         inverseEscapable = true;
         break;
+      case InvertibleProtocolKind::Deinitable:
+        inverseDeinitable = true;
+        break;
       };
     }
 
     unsigned abbrCode =
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode,
-        composition->hasExplicitAnyObject(),
-        inverseCopyable,
-        inverseEscapable,
-        protocols);
+        S.Out, S.ScratchRecord, abbrCode, composition->hasExplicitAnyObject(),
+        inverseCopyable, inverseEscapable, inverseDeinitable, protocols);
   }
 
   void
@@ -6534,7 +6552,7 @@ public:
         S.addTypeRef(generic->getParent()));
   }
 
-  void visitBoundGenericType(const BoundGenericType *generic) {
+  void serializeBoundGenericType(const NominalType *generic) {
     using namespace decls_block;
     SmallVector<TypeID, 8> genericArgIDs;
 
@@ -7442,13 +7460,14 @@ namespace {
                                                     data_type_ref data) {
       uint32_t keyLength = key.str().size();
       assert(keyLength == static_cast<uint16_t>(keyLength));
-      uint32_t dataLength = (sizeof(uint32_t) * 2) * data.size();
+      uint64_t dataLength = (sizeof(uint32_t) * 2) * data.size();
       for (auto entry : data)
         dataLength += entry.first.size();
-      assert(dataLength == static_cast<uint16_t>(dataLength));
+      assert(llvm::isUInt<32>(dataLength) &&
+             "derivative function config table entry too large");
       endian::Writer writer(out, llvm::endianness::little);
       writer.write<uint16_t>(keyLength);
-      writer.write<uint16_t>(dataLength);
+      writer.write<uint32_t>(dataLength);
       return { keyLength, dataLength };
     }
 
@@ -7726,8 +7745,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasName())
           continue;
-        topLevelDecls[VD->getBaseName()]
-          .push_back({ getKindForTable(D), addDeclRef(D) });
+        auto id = addDeclRef(D);
+        // It names another module's declaration instead of declaring one, so
+        // it's serialized (for its specializations) but can't be looked up.
+        if (!SpecializedAttr::isSpecializationDeclaration(VD))
+          topLevelDecls[VD->getBaseName()].push_back({getKindForTable(D), id});
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
         if (extendedNominal) {

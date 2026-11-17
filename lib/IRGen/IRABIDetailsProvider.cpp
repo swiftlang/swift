@@ -111,6 +111,34 @@ public:
         fixedTI->getFixedAlignment().getValue()};
   }
 
+  bool isTypeTrivial(const NominalTypeDecl *TD) {
+    auto type = TD->getDeclaredTypeInContext();
+    // The TypeInfo can use the defining module's layout. Do not expose those
+    // assumptions in a header if the type is nontrivial at minimal expansion.
+    if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
+             .isTrivial())
+      return false;
+
+    auto &TI = IGM.getTypeInfoForUnlowered(type);
+    return TI.isFixedSize(ResilienceExpansion::Minimal) &&
+           TI.isTriviallyDestroyable(ResilienceExpansion::Minimal) &&
+           TI.isCopyable(ResilienceExpansion::Minimal) &&
+           TI.isBitwiseTakable(ResilienceExpansion::Minimal);
+  }
+
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+    auto type = TD->getDeclaredTypeInContext();
+    // The header is also used outside this module's resilience domain. The
+    // locally lowered TypeInfo alone may expose a resilient field's layout.
+    if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
+             .isFixedABI())
+      return false;
+    const auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
+    return typeInfo.isFixedSize(ResilienceExpansion::Minimal) &&
+           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) &&
+           typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+  }
+
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
@@ -329,6 +357,30 @@ public:
 
 } // namespace swift
 
+static bool enumerateNativeSchemaComponents(
+    IRGenModule &IGM, const NativeConventionSchema &schema,
+    const irgen::TypeInfo &typeDetails,
+    llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)>
+        callback) {
+  assert(!schema.requiresIndirect());
+  auto typeSize = clang::CharUnits::fromQuantity(
+      cast<FixedTypeInfo>(typeDetails).getFixedSize().getValue());
+  bool hasError = false;
+  schema.enumerateComponents(
+      [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
+        auto primitiveType = getPrimitiveTypeFromLLVMType(
+            IGM.getSwiftModule()->getASTContext(), type);
+        if (!primitiveType) {
+          hasError = true;
+          return;
+        }
+        assert(offset < typeSize &&
+               "offset can't be higher than the size of the type.");
+        callback(offset, std::min(end, typeSize), *primitiveType);
+      });
+  return hasError;
+}
+
 LoweredFunctionSignature::LoweredFunctionSignature(
     const AbstractFunctionDecl *FD, IRABIDetailsProviderImpl &owner,
     const irgen::SignatureExpansionABIDetails &abiDetails)
@@ -342,19 +394,8 @@ bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
     llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
     const {
   auto &schema = typeDetails.nativeReturnValueSchema(owner.IGM);
-  assert(!schema.requiresIndirect());
-  bool hasError = false;
-  schema.enumerateComponents(
-      [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
-        auto primitiveType = getPrimitiveTypeFromLLVMType(
-            owner.IGM.getSwiftModule()->getASTContext(), type);
-        if (!primitiveType) {
-          hasError = true;
-          return;
-        }
-        callback(offset, end, *primitiveType);
-      });
-  return hasError;
+  return enumerateNativeSchemaComponents(owner.IGM, schema, typeDetails,
+                                         callback);
 }
 
 LoweredFunctionSignature::DirectParameter::DirectParameter(
@@ -371,19 +412,8 @@ bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
     llvm::function_ref<void(clang::CharUnits, clang::CharUnits, Type)> callback)
     const {
   auto &schema = typeDetails.nativeParameterValueSchema(owner.IGM);
-  assert(!schema.requiresIndirect());
-  bool hasError = false;
-  schema.enumerateComponents(
-      [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
-        auto primitiveType = getPrimitiveTypeFromLLVMType(
-            owner.IGM.getSwiftModule()->getASTContext(), type);
-        if (!primitiveType) {
-          hasError = true;
-          return;
-        }
-        callback(offset, end, *primitiveType);
-      });
-  return hasError;
+  return enumerateNativeSchemaComponents(owner.IGM, schema, typeDetails,
+                                         callback);
 }
 
 LoweredFunctionSignature::GenericRequirementParameter::
@@ -505,6 +535,15 @@ std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
                                            ResilienceExpansion expansion) {
   return impl->getTypeSizeAlignment(TD, expansion);
+}
+
+bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
+  return impl->isTypeTrivial(TD);
+}
+
+bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
+    const NominalTypeDecl *TD) {
+  return impl->isSingleSwiftRetainablePointer(TD);
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(

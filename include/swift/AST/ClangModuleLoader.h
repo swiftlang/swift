@@ -21,6 +21,7 @@
 namespace clang {
 class ASTContext;
 class CompilerInstance;
+class CXXConstructorDecl;
 class Decl;
 class FunctionDecl;
 class Module;
@@ -34,11 +35,14 @@ class SourceLocation;
 
 namespace swift {
 
+enum class CArrayProjection : uint8_t;
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
+class ConstructorDecl;
 class Decl;
 class FuncDecl;
+class NominalTypeDecl;
 class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
@@ -142,6 +146,8 @@ public:
   /// (The implementing `ClangImporter` class maintains separate Target info
   /// for use by IRGen/CodeGen clients)
   virtual clang::TargetInfo &getModuleAvailabilityTarget() const = 0;
+
+  virtual CArrayProjection getVisibleCArrayProjection() const = 0;
 
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
@@ -248,6 +254,12 @@ public:
   /// If \param decl is a synthesized thunk for a virtual method of a foreign
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
+
+  /// If \param ctor is an initializer of a C++ foreign reference type that
+  /// was synthesized as a static factory for a C++ constructor, returns that
+  /// constructor.
+  virtual const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) = 0;
 
   /// If \param decl is an imported C++ method that overrides a method of a C++
   /// class imported as one of its Swift superclasses, returns the imported
@@ -377,6 +389,11 @@ public:
                                          SourceLoc useLoc) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  /// Constructor that converts a foreign reference to the SWIFT_REFCOUNTED_PTR
+  /// \p smartPtr, or null if \p smartPtr is not a valid SWIFT_REFCOUNTED_PTR.
+  virtual ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) = 0;
 
   /// Determine whether this is a functional C++ type, e.g. std::function, for
   /// which Swift provides a synthesized constructor that takes a Swift closure

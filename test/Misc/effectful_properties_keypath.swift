@@ -28,6 +28,19 @@ class Vertex {
   }
 }
 
+@dynamicMemberLookup
+struct ThrowingLens<T> {
+  // expected-note@+1 2 {{subscript declared here}}
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get throws { throw E.DoesNotExist }
+  }
+}
+
+@dynamicMemberLookup
+struct ChainedThrowingLens<T> {
+  subscript<U>(dynamicMember member: KeyPath<ThrowingLens<T>, U>) -> U { fatalError() }
+}
+
 func asFunction(_ f : (Vertex) -> Bool) {}
 
 let _ = \Vertex.parent.parent.parent // expected-error 3 {{cannot form key path to property with 'throws' or 'async'}}
@@ -40,3 +53,6 @@ asFunction(\Vertex.parent.marked) // expected-error {{cannot form key path to pr
 // expected-error@+1 {{cannot form key path to property with 'throws' or 'async'}}
 let _ = #keyPath(Vertex.parent)
 
+
+let _ = \ThrowingLens<Vertex>.marked // expected-error {{cannot form key path to subscript with 'throws' or 'async'}}
+let _ = ChainedThrowingLens<Vertex>().marked // expected-error {{cannot form key path to subscript with 'throws' or 'async'}}

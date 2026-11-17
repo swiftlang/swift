@@ -549,9 +549,24 @@ public:
   }
   void setImplicit(bool Implicit = true);
 
+  /// Specifies which expressions \c getReferencedDecl() looks through when an
+  /// expression forwards the reference of a sub-expression, such as an
+  /// implicit conversion, `try`, or `&`.
+  enum class ReferencedDeclLookThrough {
+    /// Look through every expression that forwards a reference.
+    All,
+    /// Look through every expression that forwards a reference, except
+    /// parentheses.
+    AllExceptParens,
+    /// Don't look through any expressions, and return a reference only if this
+    /// expression holds it directly.
+    None,
+  };
+
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
+  ConcreteDeclRef getReferencedDecl(ReferencedDeclLookThrough lookThrough =
+                                        ReferencedDeclLookThrough::All) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -3367,10 +3382,20 @@ public:
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
 class FunctionConversionExpr : public ImplicitConversionExpr {
+  bool WithoutActuallyDeiniting = false;
+
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
     : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+
+  /// Whether this conversion deliberately drops the exactly-once guarantee of
+  /// the operand. Sema only forms such a conversion for a call to
+  /// \c withoutActuallyDeiniting(_:do:).
+  bool isWithoutActuallyDeiniting() const { return WithoutActuallyDeiniting; }
+  void setWithoutActuallyDeiniting(bool value = true) {
+    WithoutActuallyDeiniting = value;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4160,8 +4185,11 @@ public:
   bool isSendable() const;
 
   /// Whether this closure can be called at most once, which is true for both
-  /// `@called(atMostOnce)` and `@called(exactlyOnce)` closures.
+  /// at-most-once and exactly-once closures.
   bool hasCalledAtMostOnceSemantics() const;
+
+  /// Whether calling this closure consumes it.
+  bool isCallConsuming() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
@@ -6107,7 +6135,8 @@ public:
     static Component
     forSubscript(ASTContext &ctx, ConcreteDeclRef subscript,
                  ArgumentList *argList, Type elementType,
-                 ArrayRef<ProtocolConformanceRef> indexHashables);
+                 ArrayRef<ProtocolConformanceRef> indexHashables,
+                 SourceLoc loc);
 
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
@@ -6481,7 +6510,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

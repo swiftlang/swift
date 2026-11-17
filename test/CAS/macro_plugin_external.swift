@@ -21,7 +21,7 @@
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/nomacro.swift -o %t/deps1.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps1.json MyApp casFSRootID > %t/no_macro_fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/no_macro_fs.casid | %FileCheck %s --check-prefix=NO-MACRO
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/no_macro_fs.casid | %FileCheck %s --check-prefix=NO-MACRO
 // NO-MACRO-NOT: MacroDefinition
 
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-name MyApp -module-cache-path %t/clang-module-cache -O \
@@ -29,7 +29,7 @@
 // RUN:   %t/macro.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -external-plugin-path %t/plugins#%swift-plugin-server
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: MacroDefinition
 
@@ -72,7 +72,7 @@
 // RUN:   -scanner-prefix-map-paths %t /^test -scanner-prefix-map-paths %swift-bin-dir /^bin -resolved-plugin-verification
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps2.json MyApp casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS-REMAP -DLIB=%target-library-name(MacroDefinition)
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/fs.casid | %FileCheck %s --check-prefix=FS-REMAP -DLIB=%target-library-name(MacroDefinition)
 
 /// CASFS is remapped.
 // FS-REMAP: /^test{{/|\\}}plugins{{/|\\}}[[LIB]]
@@ -152,7 +152,7 @@
 // RUN:   /^test/macro.swift @%t/MyApp2.cmd -cache-replay-prefix-map /^test %t -cache-replay-prefix-map /^bin %swift-bin-dir
 
 /// Typecheck swift interface with macro plugin.
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain \
 // RUN:   -emit-module -o %t/Macro.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -emit-module-interface-path %t/Macro.swiftinterface \

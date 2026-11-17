@@ -20,7 +20,7 @@ func borrow(_ c: C)
 // CHECK:         [[EI:%.*]] = end_init_let_ref [[INSTANCE]]
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrow
 // CHECK:         apply [[BORROW]]([[EI]])
-// CHECK:         strong_release [[EI]]
+// CHECK:         strong_release [[INSTANCE]]
 // CHECK:         [[NON_BARRIER:%[^,]+]] = function_ref @non_barrier
 // CHECK:         apply [[NON_BARRIER]]()
 // CHECK-LABEL: } // end sil function 'test_hoist_over_non_barrier'

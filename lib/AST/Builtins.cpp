@@ -770,7 +770,8 @@ namespace {
                       bool isSending = false) {
       Type gTyIface = generator.build(*this);
       auto flags = ParameterTypeFlags().withOwnershipSpecifier(ownership);
-      auto p = AnyFunctionType::Param(gTyIface, Identifier(), flags);
+      auto p =
+          AnyFunctionType::Param::bodyAccess(gTyIface, Identifier(), flags);
       if (isSending) {
         p = p.withFlags(p.getParameterFlags().withSending(true));
       }
@@ -1445,9 +1446,10 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-static ValueDecl *getAutoDiffApplyDerivativeFunction(
-    ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
-    unsigned arity, bool throws) {
+static ValueDecl *
+getAutoDiffApplyDerivativeFunction(ASTContext &Context, Identifier Id,
+                                   AutoDiffDerivativeFunctionKind kind,
+                                   unsigned arity, bool throws, bool async) {
   assert(arity >= 1);
   // JVP:
   //   <...T...(arity), R, E: Error> (@differentiable(_forward) (...T) throws(E) -> R, ...T)
@@ -1488,11 +1490,14 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
                 // TODO: Use `kind.getMinimalDifferentiabilityKind()`.
                 .withDifferentiabilityKind(DifferentiabilityKind::Reverse)
                 .withNoEscape()
-                .withThrows(throws, throws? fnThrownTypeGen.build(builder) : Type())
+                .withAsync(async)
+                .withThrows(throws,
+                            throws ? fnThrownTypeGen.build(builder) : Type())
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
-          params.push_back(FunctionType::Param(paramGen.build(builder)));
+          params.push_back(
+              FunctionType::Param::bodyAccess(paramGen.build(builder)));
         return FunctionType::get(params, /* yields */ {},
                                  fnResultGen.build(builder), extInfo);
       }};
@@ -1520,12 +1525,16 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     builder.setThrows();
     builder.setThrownError(fnThrownTypeGen);
   }
+  if (async)
+    builder.setAsync();
   return builder.build(Id);
 }
 
-static ValueDecl *getAutoDiffApplyTransposeFunction(
-    ASTContext &Context, Identifier Id, unsigned arity, bool throws,
-    Type thrownType) {
+static ValueDecl *getAutoDiffApplyTransposeFunction(ASTContext &Context,
+                                                    Identifier Id,
+                                                    unsigned arity, bool throws,
+                                                    Type thrownType,
+                                                    bool async) {
   assert(arity >= 1);
   // <...T...(arity), R>
   //     (@differentiable(_linear) (...T) throws -> R, ...R.TangentVector)
@@ -1557,11 +1566,13 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(
           FunctionType::ExtInfoBuilder()
               .withDifferentiabilityKind(DifferentiabilityKind::Linear)
               .withNoEscape()
+              .withAsync(async)
               .withThrows(throws, thrownType)
               .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
-        params.push_back(FunctionType::Param(paramGen.build(builder)));
+        params.push_back(
+            FunctionType::Param::bodyAccess(paramGen.build(builder)));
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       auto innerFunction = FunctionType::get(
@@ -1676,27 +1687,38 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
       _tuple(_nativeObject, _rawPointer));
 }
 
-static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id) {
+/// Create of "discarding" tasks, i.e. those that discard their successful result.
+static ValueDecl *getCreateDiscardingTask(ASTContext &ctx, Identifier id,
+                                          bool hasSyncOperation) {
   auto taskExecutorIsAvailable =
       ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
 
+  auto parameters = [&](auto operationType) {
+    return _parameters(
+        _label("flags", _swiftInt),
+        _label("initialSerialExecutor",
+               _defaulted(_optional(_executor), _nil)),
+        _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
+        _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
+        _label("initialTaskExecutorConsuming",
+               _defaulted(_consuming(_optional(_bincompatType(
+                              /*if*/ taskExecutorIsAvailable,
+                              _existential(_taskExecutor),
+                              /*else*/ _executor))),
+                          _nil)),
+        _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
+        _label("operation", _sending(operationType)));
+  };
+
+  if (hasSyncOperation) {
+    return getBuiltinFunction(
+        ctx, id, _thin,
+        parameters(_function(_thick, _void, _parameters())),
+        _tuple(_nativeObject, _rawPointer));
+  }
   return getBuiltinFunction(
       ctx, id, _thin,
-      _parameters(
-          _label("flags", _swiftInt),
-          _label("initialSerialExecutor",
-                 _defaulted(_optional(_executor), _nil)),
-          _label("taskGroup", _defaulted(_optional(_rawPointer), _nil)),
-          _label("initialTaskExecutor", _defaulted(_optional(_executor), _nil)),
-          _label("initialTaskExecutorConsuming",
-                 _defaulted(_consuming(_optional(_bincompatType(
-                                /*if*/ taskExecutorIsAvailable,
-                                _existential(_taskExecutor),
-                                /*else*/ _executor))),
-                            _nil)),
-          _label("taskName", _defaulted(_optional(_rawPointer), _nil)),
-          _label("operation", _sending(_function(_async(_throws(_thick)), _void,
-                                                 _parameters())))),
+      parameters(_function(_async(_throws(_thick)), _void, _parameters())),
       _tuple(_nativeObject, _rawPointer));
 }
 
@@ -1962,8 +1984,8 @@ static ValueDecl *getAutoDiffAllocateSubcontext(ASTContext &ctx,
 
 static ValueDecl *getPoundAssert(ASTContext &Context, Identifier Id) {
   auto int1Type = BuiltinIntegerType::get(1, Context);
-  auto optionalRawPointerType = BoundGenericEnumType::get(
-      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType});
+  auto optionalRawPointerType = EnumType::get(
+      Context.getOptionalDecl(), Type(), {Context.TheRawPointerType}, Context);
   return getBuiltinFunction(Id, {int1Type, optionalRawPointerType},
                             Context.TheEmptyTupleType);
 }
@@ -2047,6 +2069,17 @@ static ValueDecl *getFixLifetimeOperation(ASTContext &C, Identifier Id) {
   // <T> T -> ()
   BuiltinFunctionBuilder builder(C);
   builder.addParameter(makeGenericParam());
+  builder.setResult(makeConcrete(TupleType::getEmpty(C)));
+  return builder.build(Id);
+}
+
+static ValueDecl *
+getInitializeForeignReferenceSubclassVTablesOperation(ASTContext &C,
+                                                      Identifier Id) {
+  // <T> T -> ()
+  BuiltinFunctionBuilder builder(C);
+  auto genericParam = makeGenericParam(0);
+  builder.addParameter(genericParam);
   builder.setResult(makeConcrete(TupleType::getEmpty(C)));
   return builder.build(Id);
 }
@@ -2258,7 +2291,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
   swift::CanType ContextTy = Context.TheRawPointerType;
-  auto ContextArg = FunctionType::Param(ContextTy);
+  auto ContextArg = FunctionType::Param::bodyAccess(ContextTy);
   CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
@@ -2296,7 +2329,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
 
   auto contTy = ctx.TheRawUnsafeContinuationType;
   SmallVector<AnyFunctionType::Param, 1> params;
-  params.emplace_back(contTy);
+  params.push_back(AnyFunctionType::Param::bodyAccess(contTy));
 
   auto voidTy = ctx.TheEmptyTupleType;
   auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
@@ -2415,7 +2448,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
       .build();
 
   auto fnParamTy =
-      FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
+      FunctionType::get(FunctionType::Param::bodyAccess(ctx.TheRawPointerType),
                         /* yields */ {}, ctx.TheEmptyTupleType, extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
@@ -2446,9 +2479,8 @@ static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id)
       .withIsolation(FunctionTypeIsolation::forParameter())
       .build();
 
-  auto isolatedParam =
-      FunctionType::Param(A.build(builder), Identifier(),
-                          ParameterTypeFlags().withIsolated(true));
+  auto isolatedParam = FunctionType::Param::bodyAccess(
+      A.build(builder), Identifier(), ParameterTypeFlags().withIsolated(true));
   auto fnParamTy = FunctionType::get({isolatedParam}, /* yields */ {},
                                      T.build(builder), extInfo);
 
@@ -2518,7 +2550,7 @@ static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
                                                            Identifier id) {
   // (UInt8) -> ()
   std::array<AnyFunctionType::Param, 1> params = {
-      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
   auto *functionType = FunctionType::get(params, /* yields */ {},
@@ -2531,8 +2563,8 @@ static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
 static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
                                                       Identifier id) {
   std::array<AnyFunctionType::Param, 2> params = {
-      AnyFunctionType::Param(ctx.getUInt8Type()),
-      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
   // (UInt8, UInt8) -> ()
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
@@ -3037,6 +3069,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Copyable);
   if (Id == Context.Id_Escapable)
     return Context.synthesizeInvertibleProtocolDecl(InvertibleProtocolKind::Escapable);
+  if (Id == Context.Id_Deinitable)
+    return Context.synthesizeInvertibleProtocolDecl(
+        InvertibleProtocolKind::Deinitable);
 
   SmallVector<Type, 4> Types;
   StringRef OperationName = getBuiltinBaseName(Context, Id.str(), Types);
@@ -3215,21 +3250,22 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   if (OperationName.starts_with("applyDerivative_")) {
     AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
-    bool throws;
-    if (!autodiff::getBuiltinApplyDerivativeConfig(
-            OperationName, kind, arity, throws))
+    bool throws, async;
+    if (!autodiff::getBuiltinApplyDerivativeConfig(OperationName, kind, arity,
+                                                   throws, async))
       return nullptr;
-    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws);
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity, throws,
+                                              async);
   }
   if (OperationName.starts_with("applyTranspose_")) {
     unsigned arity;
-    bool throws;
-    if (!autodiff::getBuiltinApplyTransposeConfig(
-            OperationName, arity, throws))
+    bool throws, async;
+    if (!autodiff::getBuiltinApplyTransposeConfig(OperationName, arity, throws,
+                                                  async))
       return nullptr;
     // TODO: Support somehow typed throws
     return getAutoDiffApplyTransposeFunction(Context, Id, arity, throws,
-                                             /*thrownType=*/Type());
+                                             /*thrownType=*/Type(), async);
   }
 
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
@@ -3517,6 +3553,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::FixLifetime:
     return getFixLifetimeOperation(Context, Id);
 
+  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
+    return getInitializeForeignReferenceSubclassVTablesOperation(Context, Id);
+
   case BuiltinValueKind::MarkDependence:
     return getMarkDependenceOperation(Context, Id);
 
@@ -3636,7 +3675,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getCreateTask(Context, Id);
 
   case BuiltinValueKind::CreateDiscardingTask:
-    return getCreateDiscardingTask(Context, Id);
+    return getCreateDiscardingTask(Context, Id, /*hasSyncOperation=*/false);
+
+  case BuiltinValueKind::CreateSynchronousDiscardingTask:
+    return getCreateDiscardingTask(Context, Id, /*hasSyncOperation=*/true);
 
   case BuiltinValueKind::CreateAsyncTask:
     return getCreateAsyncTask(Context, Id, /*inGroup=*/false,
@@ -4103,18 +4145,18 @@ getBuiltinBoundGenericType(ASTContext &C,
     auto types = subs.getReplacementTypes();
   
     auto size = types[0]->getCanonicalType();
-    if (validate
-        && size->getMatchingParamKind() != GenericTypeParamKind::Value
-        && !size->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        size->getMatchingParamKind() != GenericTypeParamKind::Value &&
+        !size->hasTypeVariableOrHole() && !size->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
     auto element = types[1]->getCanonicalType();
-    if (validate
-        && element->getMatchingParamKind() != GenericTypeParamKind::Type
-        && !element->hasTypeVariableOrPlaceholder()) {
+    if (validate &&
+        element->getMatchingParamKind() != GenericTypeParamKind::Type &&
+        !element->hasTypeVariableOrHole() && !element->is<PlaceholderType>()) {
       return ErrorType::get(BuiltinUnboundGenericType::get(kind, C));
     }
-    
+
     return BuiltinFixedArrayType::get(size, element);
   }
   

@@ -69,7 +69,6 @@ namespace swift {
   class AvailabilityDomain;
   class AvailabilityMacroMap;
   class AvailabilityRange;
-  class BoundGenericType;
   class BuiltinTupleDecl;
   class CASOptions;
   class ClangModuleLoader;
@@ -317,6 +316,14 @@ public:
   /// recompile the world every time we add a side table. See
   /// "swift/AST/ASTContextGlobalCache.h"
   GlobalCache &getGlobalCache() const;
+
+  /// Discard the static build configuration derived from LangOpts, so that
+  /// it is formed again from the current LangOpts on next use.
+  ///
+  /// The static build configuration is used for '#if' evaluation and is sent
+  /// to macro plugins. Clients that modify LangOpts after the ASTContext is
+  /// created, e.g. to change the language version, must call this.
+  void invalidateStaticBuildConfiguration();
 
   friend ConstraintCheckerArenaRAII;
 

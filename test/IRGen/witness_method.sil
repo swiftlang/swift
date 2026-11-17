@@ -35,7 +35,8 @@ struct ImplementsDerived : Derived {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testInheritedConformance
 sil @testInheritedConformance : $@convention(thin) (@in ImplementsDerived) -> () {
 entry(%0: $*ImplementsDerived):
-  // CHECK: [[WITNESS:%.*]] = load ptr, ptr getelementptr inbounds (ptr, ptr @"$s14witness_method17ImplementsDerivedVAA4BaseAAWP", i32 1)
+  // CHECK-x86_64: [[WITNESS:%.*]] = load ptr, ptr getelementptr inbounds (i8, ptr @"$s14witness_method17ImplementsDerivedVAA4BaseAAWP", i64 8)
+  // CHECK-i386:   [[WITNESS:%.*]] = load ptr, ptr getelementptr inbounds (i8, ptr @"$s14witness_method17ImplementsDerivedVAA4BaseAAWP", i32 4)
   // CHECK: call swiftcc void [[WITNESS]]
   %m = witness_method $ImplementsDerived, #Base.foo : $@convention(witness_method: Base) <U: Base> (@in_guaranteed U) -> ()
   %z = apply %m<ImplementsDerived>(%0) : $@convention(witness_method: Base) <V: Base> (@in_guaranteed V) -> ()
@@ -120,7 +121,8 @@ entry(%self : $*T):
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testClassArchetypeWitnessMethod(ptr noalias sret({{.*}}) captures(none) %0, ptr noalias align {{4|8}} captures(none) dereferenceable({{4|8}}) %1, ptr %T, ptr %CoverSheet)
 // CHECK: entry:
-// CHECK:  [[WITNESS_FN:%.*]] = load ptr, ptr getelementptr inbounds (ptr, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP", i32 3)
+// CHECK-x86_64: [[WITNESS_FN:%.*]] = load ptr, ptr getelementptr inbounds (i8, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP", i64 24)
+// CHECK-i386:   [[WITNESS_FN:%.*]] = load ptr, ptr getelementptr inbounds (i8, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP", i32 12)
 // CHECK: call swiftcc void [[WITNESS_FN]](ptr noalias sret({{.*}}) %0, ptr noalias swiftself %1, ptr %T, ptr @"$s14witness_method9TPSReportCyxGAA8StrategyAAWP")
 // CHECK: ret void
 

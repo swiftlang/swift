@@ -52,7 +52,7 @@ DiagnosticArgument::DiagnosticArgument(Type T)
   // variables to diagnostics and we can't realistically handle every one of
   // those. We'll just print the type variable as '_' instead.
   if (TypeVal)
-    TypeVal = TypeVal->replaceTypeVariablesAndPlaceholdersWithErrors();
+    TypeVal = TypeVal->replaceTypeVariablesAndHolesWithErrors();
 }
 
 DiagnosticArgument::DiagnosticArgument(TypeRepr *T)

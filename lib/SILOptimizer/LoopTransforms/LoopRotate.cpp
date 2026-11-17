@@ -48,7 +48,8 @@ static llvm::cl::opt<bool>
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, SILPassManager *pm);
+                       SILBasicBlock *upToBB, SILPassManager *pm,
+                       bool ignoreCost);
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -70,11 +71,10 @@ hasLoopInvariantOperands(SILInstruction *inst, SILLoop *loop,
 
 /// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be moved to the preheader.
-static bool
-canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
-                              SILBasicBlock *bb,
-                              SmallVectorImpl<SILInstruction *> &moves,
-                              SinkAddressProjections &sinkProj) {
+static bool canDuplicateOrMoveToPreheader(
+    SILLoop *loop, SILBasicBlock *preheader, SILBasicBlock *bb,
+    SmallVectorImpl<SILInstruction *> &moves, SinkAddressProjections &sinkProj,
+    bool ignoreCost) {
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
@@ -132,7 +132,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
+  return ignoreCost || cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -171,60 +171,20 @@ static void updateSSAForUseOfValue(
   // has to be modified). This would invalidate a plain ValueUseIterator.
   // Instead we collect uses wrapping uses in branches specially so that we
   // can reconstruct the use even after the branch has been modified.
-  //
-  // Debug uses are collected separately and rewritten after all other uses
-  // (see below).
   SmallVector<UseWrapper, 8> storedUses;
-  SmallVector<UseWrapper, 8> debugUses;
   for (auto *use : Res->getUses()) {
-    if (use->getOperandOwnership() == OperandOwnership::DebugUse) {
-      debugUses.push_back(UseWrapper(use));
+    SILInstruction *user = use->getUser();
+    assert(user && "Missing user");
+
+    // Ignore uses in the same basic block.
+    if (user->getParent() == Header)
       continue;
-    }
+
+    assert(user->getParent() != EntryCheckBlock &&
+           "The entry check block should dominate the header");
     storedUses.push_back(UseWrapper(use));
   }
-
-  for (auto useWrapper : storedUses) {
-    Operand *use = useWrapper;
-    SILInstruction *user = use->getUser();
-    assert(user && "Missing user");
-
-    // Ignore uses in the same basic block.
-    if (user->getParent() == Header)
-      continue;
-
-    assert(user->getParent() != EntryCheckBlock &&
-           "The entry check block should dominate the header");
-    updater.rewriteUse(*use);
-  }
-
-  // A debug use may be outside of the value's lifetime, e.g. after the value is
-  // consumed or after its borrow scope ends. Rewriting such a use could create
-  // a phi only for the debug use, which consumes an owned value a second time
-  // or extends a borrow past its scope.
-  //
-  // Rewriting the non-debug uses above recorded an available value for every
-  // block the ssa updater visited. Rewrite a debug use only if its block is one
-  // of them; this reuses existing values and phis. Otherwise, replace the debug
-  // use's operand with undef.
-  for (auto debugWrapper : debugUses) {
-    Operand *use = debugWrapper;
-    SILInstruction *user = use->getUser();
-    assert(user && "Missing user");
-
-    // Ignore uses in the same basic block.
-    if (user->getParent() == Header)
-      continue;
-
-    if (!updater.hasValueForBlock(user->getParent())) {
-      use->set(SILUndef::get(use->get()));
-      continue;
-    }
-
-    assert(user->getParent() != EntryCheckBlock &&
-           "The entry check block should dominate the header");
-    updater.rewriteUse(*use);
-  }
+  updater.rewriteUses(storedUses);
 
   replacePhisWithIncomingValues(pm, insertedPhis);
 }
@@ -267,8 +227,9 @@ static void rewriteNewLoopEntryCheckBlock(
   }
 }
 
-static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
-                                      SILLoopInfo *loopInfo, SILPassManager *pm) {
+bool swift::rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
+                                      SILLoopInfo *loopInfo, SILPassManager *pm,
+                                      bool ignoreCost) {
   auto *latch = loop->getLoopLatch();
   if (!latch) {
     LLVM_DEBUG(llvm::dbgs()
@@ -276,13 +237,14 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  bool didRotate = rotateLoop(
-      loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm);
+  bool didRotate =
+      rotateLoop(loop, domInfo, loopInfo,
+                 RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm,
+                 ignoreCost);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
-    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm)) {
+    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm, ignoreCost)) {
     }
 
   return didRotate;
@@ -331,7 +293,8 @@ static bool isSingleBlockLoop(SILLoop *L) {
 /// loop for termination.
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, SILPassManager *pm) {
+                       SILBasicBlock *upToBB, SILPassManager *pm,
+                       bool ignoreCost) {
   assert(loop != nullptr && domInfo != nullptr && loopInfo != nullptr
          && "Missing loop information");
 
@@ -377,7 +340,7 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   SmallVector<SILInstruction *, 8> moveToPreheader;
   SinkAddressProjections sinkProj;
   if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
-                                     sinkProj)) {
+                                     sinkProj, ignoreCost)) {
     LLVM_DEBUG(llvm::dbgs()
                << *loop << " instructions in header preventing rotating\n");
     return false;
@@ -539,8 +502,8 @@ class LoopRotation : public SILFunctionTransform {
       while (!worklist.empty()) {
         SILLoop *loop = worklist.pop_back_val();
         changed |= canonicalizeLoop(loop, domInfo, loopInfo);
-        changed |=
-            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, getPassManager());
+        changed |= rotateLoopAtMostUpToLatch(
+            loop, domInfo, loopInfo, getPassManager(), /*ignoreCost=*/false);
       }
     }
 

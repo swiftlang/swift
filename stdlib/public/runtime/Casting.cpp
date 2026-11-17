@@ -976,6 +976,19 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
   }
 }
 
+void swift::TARGET_TYPE_IS_NULL() {
+  swift::fatalError(0, "dynamic cast to a NULL type: the target type metadata "
+                       "is null. This usually means a type the compiler "
+                       "referred to by mangled name could not be resolved at "
+                       "run time.\n");
+}
+
+void swift::SOURCE_TYPE_IS_NULL() {
+  swift::fatalError(0, "dynamic cast from a NULL type: the source type "
+                       "metadata is null.\n");
+}
+
+
 /******************************************************************************/
 /********************************* Metatypes **********************************/
 /******************************************************************************/
@@ -983,6 +996,10 @@ swift_dynamicCastUnknownClassUnconditionalImpl(const void *object,
 static const Metadata *
 swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
                               const Metadata *targetType) {
+  if (!targetType)
+    TARGET_TYPE_IS_NULL();
+  if (!sourceType)
+    SOURCE_TYPE_IS_NULL();
   auto origSourceType = sourceType;
 
   // Identical types always succeed
@@ -1074,6 +1091,10 @@ swift_dynamicCastMetatypeUnconditionalImpl(
     const Metadata *sourceType,
     const Metadata *targetType,
     const char *file, unsigned line, unsigned column) {
+  if (!targetType)
+    TARGET_TYPE_IS_NULL();
+  if (!sourceType)
+    SOURCE_TYPE_IS_NULL();
   auto origSourceType = sourceType;
 
   // Identical types always succeed

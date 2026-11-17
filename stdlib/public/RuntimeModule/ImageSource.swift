@@ -237,7 +237,9 @@ struct ImageSource: CustomStringConvertible {
           let oldPart = UnsafeMutableRawBufferPointer(
             rebasing: newBuffer[0..<count]
           )
-          oldPart.copyMemory(from: bytes)
+          oldPart.copyMemory(from:
+            UnsafeRawBufferPointer(rebasing: bytes[0..<count])
+          )
           mutableBytes.deallocate()
           kind = .allocated(count)
         default:
@@ -263,7 +265,7 @@ struct ImageSource: CustomStringConvertible {
       }
 
       if capacity >= byteCount {
-        return mutableBytes
+        return UnsafeMutableRawBufferPointer(mutating: bytes)
       }
 
       let extra = byteCount - capacity
@@ -291,7 +293,7 @@ struct ImageSource: CustomStringConvertible {
       guard case let .allocated(count) = kind else {
         fatalError("Cannot append to immutable image source storage")
       }
-      guard mutableBytes.count - count <= bytes else {
+      guard self.bytes.count - count >= bytes else {
         fatalError("Buffer overrun detected")
       }
       kind = .allocated(count + bytes)

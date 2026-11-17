@@ -40,7 +40,7 @@ extension ThinToThickFunctionInst : Simplifiable, SILCombineSimplifiable {
                                                            resultType: thickType)
     let newConversion = builder.createConvertFunction(originalFunction: newThinToThick,
                                                       resultType: type,
-                                                      withoutActuallyEscaping: conversion.withoutActuallyEscaping)
+                                                      kind: conversion.conversionKind)
     replace(with: newConversion, context)
   }
 }

@@ -1,9 +1,8 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportUnsafeCxxMethodsAsAlwaysUnsafe \
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default \
 // RUN:   -verify-additional-prefix default- \
 // RUN:   -verify-additional-file %S/Inputs%{fs-sep}unsafe-projections.h \
 // RUN:   -verify-additional-file %S/Inputs%{fs-sep}always-unsafe-projections.h
 
-// REQUIRES: swift_feature_ImportUnsafeCxxMethodsAsAlwaysUnsafe
 
 import UnsafeProjections
 import AlwaysUnsafeProjections
@@ -97,8 +96,8 @@ func useTemplateAndSafe(_ o: TemplateAndSafeOwner,
   _ = o.begin() // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
   _ = unsafe o.begin()
-  _ = unsafe o.__beginUnsafe()
-  _ = unsafe o.__endUnsafe()
+  _ = unsafe o.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+  _ = unsafe o.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 }
 
 func useCustomNamed(_ c: inout CustomNamed) {

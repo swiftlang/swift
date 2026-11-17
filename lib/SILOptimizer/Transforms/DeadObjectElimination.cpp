@@ -88,7 +88,7 @@ static SILFunction *getDestructor(AllocRefInstBase *ARI) {
     return nullptr;
 
   // We only support classes.
-  ClassDecl *ClsDecl = ARI->getType().getClassOrBoundGenericClass();
+  ClassDecl *ClsDecl = ARI->getType().getClassDecl();
   if (!ClsDecl)
     return nullptr;
 
@@ -911,8 +911,6 @@ DeadObjectElimination::buildDIExpression(SILInstruction *current) {
     auto var = dvci->getVarInfo();
     if (!var)
       return {};
-    if (!var->Type)
-      var->Type = dvci->getElementType();
     // Strip op_deref: we are salvaging an element being stored.
     // Note: as this is an AllocStackInst, the DIExpr is always
     // a single op_deref.

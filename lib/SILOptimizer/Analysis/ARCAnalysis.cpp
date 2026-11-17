@@ -479,6 +479,15 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
     return true;
   }
 
+  // A non-escapable argument, e.g. a `Span`, can depend on Ptr via a
+  // `mark_dependence` without containing a reference to Ptr. In this case alias
+  // analysis cannot tell that the argument requires Ptr to be alive.
+  // Be conservative, regardless of the argument convention.
+  for (SILValue Op : FAS.getArgumentsWithoutIndirectResults()) {
+    if (!Op->getType().isEscapable(*FAS.getFunction()))
+      return true;
+  }
+
   // Ok, we have a full apply site and our callee is a normal use. Thus if the
   // apply does not have any normal arguments, we don't need to worry about any
   // guaranteed parameters and return early.

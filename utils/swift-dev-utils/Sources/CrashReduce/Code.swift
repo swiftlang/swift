@@ -36,6 +36,7 @@ extension Code {
   private static let leadingWhitespaceRegex = #/^\s+/#
   private static let trailingWhitespaceRegex = #/\s+$/#
   private static let importRegex = #/^\s*import\s+\w+/#
+  private static let autoDiffRegex = #/^\s*import _Differentiation\s*$/#
   private static let objCRegex = #/@objc|#keyPath/#
 
   private static func cleanupLine(
@@ -83,6 +84,9 @@ extension Code {
 
   var hasImport: Bool {
     text.firstMatch(of: Self.importRegex) != nil
+  }
+  var hasAutoDiffImport: Bool {
+    text.firstMatch(of: Self.autoDiffRegex) != nil
   }
   var hasObjC: Bool {
     text.firstMatch(of: Self.objCRegex) != nil

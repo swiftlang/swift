@@ -415,3 +415,32 @@ func conditionalDowncastToObject(b: B?) -> D {
   // expected-swift4-warning@-3:17 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}{{none}}
   // expected-swift5-error@-4:17 {{using '!' is not allowed here}}
 }
+
+enum GenericEnum<T> { case x }
+
+func enumElementPatternParent(_ x: GenericEnum<Int?>) {
+  switch x {
+  case GenericEnum<Int!>.x: ()
+  // expected-swift4-warning@-1 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}
+  // expected-swift5-error@-2 {{using '!' is not allowed here}}
+  // expected-note@-3 {{use '?' instead}} {{23-24=?}}
+  default: ()
+  }
+
+  if case GenericEnum<Int!>.x = x {}
+  // expected-swift4-warning@-1 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}
+  // expected-swift4-note@-2 {{use '?' instead}} {{26-27=?}}
+  // expected-swift5-error@-3 {{using '!' is not allowed here}}
+  // expected-swift5-note@-4 {{use '?' instead}} {{26-27=?}}
+
+  _ = {
+    switch x {
+    case GenericEnum<Int!>.x: ()
+    // expected-swift4-warning@-1 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}
+    // expected-swift4-note@-2 {{use '?' instead}} {{25-26=?}}
+    // expected-swift5-error@-3 {{using '!' is not allowed here}}
+    // expected-swift5-note@-4 {{use '?' instead}} {{25-26=?}}
+    default: ()
+    }
+  }
+}

@@ -1,18 +1,39 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple)
 //
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import ClassTemplateNonTypeParameter
 import StdlibUnittest
 
 var TemplatesTestSuite = TestSuite("TemplatesTestSuite")
 
+#if MODERN_C_ARRAYS
+extension InlineArray: @retroactive Equatable where Element: Equatable {
+  public static func == (lhs: Self, rhs: Self) -> Bool {
+    for i in 0..<count {
+      if lhs[i] != rhs[i] { return false }
+    }
+    return true
+  }
+}
+#endif
+
 TemplatesTestSuite.test("typedeffed-non-type-parameter") {
+  #if MODERN_C_ARRAYS
+  let pair = MagicIntPair(t: [1, 2])
+  expectEqual(pair.t, [1, 2])
+
+  let triple = MagicIntTriple(t: [1, 2, 3])
+  expectEqual(triple.t, [1, 2, 3])
+  #else
   let pair = MagicIntPair(t: (1, 2))
   expectEqual(pair.t, (1, 2))
 
   let triple = MagicIntTriple(t: (1, 2, 3))
   expectEqual(triple.t, (1, 2, 3))
+  #endif
 }
 
 // TODO: This test doesn't work because Swift doesn't support defaulted generic

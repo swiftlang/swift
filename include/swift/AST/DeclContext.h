@@ -608,6 +608,12 @@ public:
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
 
+  /// Determine whether this declaration context is generic and at least one of
+  /// its generic parameters is not fixed to a concrete type. For example, an
+  /// 'extension Array where Element == UInt8' is a generic context but is not
+  /// effectively generic.
+  bool isEffectivelyGenericContext() const;
+
   /// Determine whether the innermost context is generic.
   bool isInnermostContextGeneric() const;
 
@@ -734,6 +740,10 @@ public:
   /// with additional symbols.
   void getSeparatelyImportedOverlays(
       ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const;
+
+  /// Assign local discriminators for the context. Must only be called after
+  /// type-checking.
+  void assignLocalDiscriminators();
 
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.

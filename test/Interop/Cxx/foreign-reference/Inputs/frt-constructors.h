@@ -287,7 +287,6 @@ FRTTemplateCtorWithDefaultArg {
   T value;
 
   __attribute__((swift_attr("returns_retained")))
-  // expected-note@+1 {{'init(_:)' declared here}}
   FRTTemplateCtorWithDefaultArg(T value = T(42)) : value(value) {}
 };
 

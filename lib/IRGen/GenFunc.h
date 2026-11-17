@@ -76,7 +76,7 @@ namespace irgen {
       CanSILFunctionType outType, Explosion &out, bool isOutlined,
       StackAllocationIsNested_t isNested);
   CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                  bool isNoEscape);
+                                  bool capturesIndirectByAddress);
 
   /// Stub function that weakly links againt the swift_coroFrameAlloc
   /// function. This is required for back-deployment.

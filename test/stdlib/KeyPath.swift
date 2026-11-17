@@ -1091,34 +1091,6 @@ class Cat {
   }
 }
 
-if #available(SwiftStdlib 5.9, *) {
-  keyPath.test("_createOffsetBasedKeyPath") {
-    let dogAgeKp = _createOffsetBasedKeyPath(
-      root: Dog.self,
-      value: Int.self,
-      offset: MemoryLayout<String>.size
-    ) as? KeyPath<Dog, Int>
-
-    expectNotNil(dogAgeKp)
-
-    let sparky = Dog(name: "Sparky", age: 7)
-
-    expectEqual(sparky[keyPath: dogAgeKp!], 7)
-
-    let catNameKp = _createOffsetBasedKeyPath(
-      root: Cat.self,
-      value: String.self,
-      offset: 2 * MemoryLayout<UnsafeRawPointer>.size
-    ) as? KeyPath<Cat, String>
-
-    expectNotNil(catNameKp)
-
-    let chloe = Cat(name: "Chloe", age: 4)
-
-    expectEqual(chloe[keyPath: catNameKp!], "Chloe")
-  }
-}
-
 class RerootedSuper {
   var x = "hello world"
 }

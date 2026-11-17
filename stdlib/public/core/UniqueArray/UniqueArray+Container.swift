@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// A Boolean value indicating whether this array contains no elements.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var isEmpty: Bool {
@@ -25,7 +23,6 @@ extension UniqueArray where Element: ~Copyable {
   /// The number of elements in this array.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var count: Int {
@@ -33,20 +30,17 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// A type that represents a position in the array: an integer offset from the
   /// start.
   ///
   /// Valid indices consist of the position of every element and a "past the
   /// end” position that’s not valid for use as a subscript argument.
-  @available(SwiftStdlib 6.4, *)
   public typealias Index = Int
 
   /// The position of the first element in a nonempty array. This is always zero.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var startIndex: Int {
@@ -57,7 +51,6 @@ extension UniqueArray where Element: ~Copyable {
   /// the last valid subscript argument. This is always equal to array's count.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var endIndex: Int {
@@ -67,7 +60,6 @@ extension UniqueArray where Element: ~Copyable {
   /// The range of indices that are valid for subscripting the array.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var indices: Range<Int> {
@@ -81,7 +73,6 @@ extension UniqueArray where Element: ~Copyable {
   ///     to the `endIndex` property.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public subscript(position: Int) -> Element {
     @_transparent
@@ -98,7 +89,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the array.
   ///
@@ -109,14 +99,12 @@ extension UniqueArray where Element: ~Copyable {
   /// - Parameter j: The index of the second valud to swap.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func swapAt(_ i: Int, _ j: Int) {
     _storage.swapAt(i, j)
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Returns the position immediately after the given index.
   ///
@@ -129,7 +117,6 @@ extension UniqueArray where Element: ~Copyable {
   ///     than `endIndex`.
   /// - Returns: The index immediately following `i`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func index(after index: Int) -> Int {
@@ -147,7 +134,6 @@ extension UniqueArray where Element: ~Copyable {
   ///     than `startIndex`.
   /// - Returns: The index immediately preceding `i`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func index(before index: Int) -> Int {
@@ -164,7 +150,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Parameter index: A valid index of the array. `i` must be less
   ///     than `endIndex`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func formIndex(after index: inout Int) {
@@ -181,7 +166,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Parameter index: A valid index of the array. `i` must be greater than
   ///     `startIndex`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func formIndex(before index: inout Int) {
@@ -205,7 +189,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    If `n` is negative, this is the same value as the result of `abs(n)`
   ///    calls to `index(before:)`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func index(_ index: Int, offsetBy n: Int) -> Int {
@@ -224,7 +207,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    to start, the result is zero.
   /// - Returns: The distance between `start` and `end`.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public func distance(from start: Index, to end: Index) -> Int {
@@ -262,7 +244,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    Likewise, if `n < 0`, a limit that is greater than `index` has no
   ///    effect.
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public func formIndex(
     _ index: inout Index,

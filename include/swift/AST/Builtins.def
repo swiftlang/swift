@@ -343,8 +343,9 @@ BUILTIN_SIL_OPERATION(BridgeToRawPointer, "bridgeToRawPointer", Special)
 BUILTIN_SIL_OPERATION(BridgeFromRawPointer, "bridgeFromRawPointer", Special)
 
 /// TakeFromRawPointer has type (Builtin.RawPointer) -> T.
-/// T must be a single reference supported by SILGen. The pointer carries an
-/// existing +1 reference, which the result takes without retaining it.
+/// T must have an object or interface pointer representation supported by
+/// SILGen. The pointer carries an existing +1 reference, which the result
+/// takes without retaining it.
 BUILTIN_SIL_OPERATION(TakeFromRawPointer, "takeFromRawPointer", Special)
 
 /// castReference has type T -> U.
@@ -1046,6 +1047,15 @@ BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
 /// memory that was allocated by startAsyncLetWithLocalBuffer.
 BUILTIN_MISC_OPERATION(FinishAsyncLet, "finishAsyncLet", "", Special)
 
+/// initializeForeignReferenceSubclassVTables<T>(T) -> ()
+///
+/// Points the C++ v-table pointers of `self`, a Swift class that subclasses a
+/// C++ foreign reference type, at the v-tables of that Swift class. Emitted
+/// right after `super.init(...)` returns: the C++ base constructor leaves them
+/// pointing at the v-tables of the base class.
+BUILTIN_MISC_OPERATION(InitializeForeignReferenceSubclassVTables,
+                       "initializeForeignReferenceSubclassVTables", "", Special)
+
 /// endAsyncLetLifetime(): (Builtin.RawPointer) -> Void
 ///
 /// Marks the end of an async-let's lifetime.
@@ -1092,6 +1102,29 @@ BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
 ///
 /// Create a new discarding task.
 BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
+
+/// createSynchronousDiscardingTask(
+///     flags: Int,
+///     initialSerialExecutor: (Builtin.Executor)? = nil,
+///     taskGroup: Builtin.RawPointer? = nil,
+///     initialTaskExecutor: (Builtin.Executor)? = nil,
+///     initialTaskExecutorConsuming: (any TaskExecutor)? = nil,
+///     taskName: Builtin.RawPointer? = nil,
+///     operation: sending @escaping () -> ()
+/// ) -> (Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Creates a discarding task whose operation is synchronous, non-throwing and
+/// returns Void. Oneway calls ('send' expressions) of synchronous functions
+/// use it; a oneway call of an async function uses 'createDiscardingTask'.
+/// The created task does not have an async context or a result future fragment.
+/// The returned initial context is not a usable async context.
+///
+/// The caller must pass the 'Task_HasSynchronousOperation' and
+/// 'Task_IsDiscardingTask' flags.
+///
+/// Introduced in Swift 6.5.
+BUILTIN_SIL_OPERATION(CreateSynchronousDiscardingTask,
+                      "createSynchronousDiscardingTask", Special)
 
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
@@ -1243,11 +1276,18 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActor
 /// only valid during a borrow access of the raw layout type or until the value
 /// is either moved or consumed.
 ///
-/// Note: The purpose of this builtin is to get an opaque pointer to the address
-/// of the raw layout type. We explicitly do not want the optimizer looking into
-/// this pointer or address thereof to start assuming things about mutability or
-/// immutability. This builtin _must_ persist throughout all of SIL and must be
-/// lowered away at IRGen, no sooner.
+/// Note: This builtin forces the address of the raw layout type to be opaque to
+/// the optimizer. This builtin _must_ persist throughout all of SIL. TODO:
+/// IRGen must lower it to an LLVM construct that similarly hides the pointer
+/// provenance from the LLVM optimizer.
+///
+/// If the optimizer sees that the resulting address originates from an address
+/// with exclusive access, then it can introduce undefined behavior. Some
+/// optimizations look through this builtin for escape analysis, but those
+/// results must not reach any optimization that relies on immutability or
+/// aliasing. Doing so could expose undefined behavior. Similarly, LLVM must
+/// not be able to prove that the result of the builtin originates from a
+/// `noalias` address.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n", Special)
 
 /// emplace<T>((Builtin.RawPointer) -> Void) -> T

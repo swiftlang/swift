@@ -53,6 +53,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 
 option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
@@ -75,7 +76,6 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-swift-version 5>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"

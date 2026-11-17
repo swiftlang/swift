@@ -16,6 +16,7 @@ import Swift
 
 /// `MutableSpan<Element>` represents a contiguous region of memory which
 /// contains initialized instances of `Element`.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -92,10 +93,6 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
 
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
@@ -113,6 +110,21 @@ extension MutableSpan where Element: ~Copyable {
     let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: count)
     let ms = unsafe MutableSpan(_unsafeElements: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: start)
+  }
+
+  /// Create a mutable span over a single value.
+  ///
+  /// The span has a `count` of 1. Writes through the span modify `value`,
+  /// which is exclusively accessed while the span exists.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be mutated through the span
+  @export(implementation)
+  @_lifetime(&value)
+  public init(ofOne value: inout Element) {
+    let address = Builtin.unprotectedAddressOf(&value)
+    let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, mutating: &value)
   }
 }
 
@@ -199,19 +211,17 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(&mutableBytes)
   public init(mutating mutableBytes: inout MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      mutating: &mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
+      )
+    }
+    self = unsafe _overrideLifetime(span, mutating: &mutableBytes)
   }
 
   /// Convert a raw span to a typed span.
@@ -225,19 +235,17 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(copy mutableBytes)
   public init(mutableBytes: consuming MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      copying: mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
+      )
+    }
+    self = unsafe _overrideLifetime(span, copying: mutableBytes)
   }
 }
 
@@ -1006,14 +1014,10 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the initial elements of this span,
@@ -1050,14 +1054,10 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of trailing elements.
@@ -1075,15 +1075,11 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of trailing elements.
@@ -1118,15 +1114,11 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the trailing elements of this span,
@@ -1148,16 +1140,12 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the trailing elements of this span,
@@ -1200,16 +1188,12 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of initial elements.
@@ -1230,7 +1214,6 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
@@ -1238,9 +1221,6 @@ extension MutableSpan where Element: ~Copyable {
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of initial elements.
@@ -1281,7 +1261,6 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
@@ -1289,9 +1268,6 @@ extension MutableSpan where Element: ~Copyable {
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 }
 

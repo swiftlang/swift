@@ -138,7 +138,7 @@ public:
 
   bool isZeroSized(const NominalTypeDecl *decl) override;
 
-  bool isOpaqueLayout(const NominalTypeDecl *decl) override;
+  bool isOpaqueLayout(const NominalTypeDecl *decl);
 
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.

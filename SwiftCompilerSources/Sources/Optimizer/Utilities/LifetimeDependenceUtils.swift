@@ -262,9 +262,14 @@ private func loadedAddress(of reference: Value) -> Value? {
   }
 }
 
-/// The guaranteed value that `reference` was forwarded from, if it has one.
+/// The guaranteed value that `reference` was forwarded from, if it has one. Unlike `referenceRoot`, this also looks
+/// through projections of guaranteed values, such as `struct_extract`. A projection is valid for as long as the value
+/// that it is projected from.
 private func guaranteedReferenceRoot(of reference: Value) -> Value? {
-  let root = reference.referenceRoot
+  var root = reference.referenceRoot
+  while root.ownership == .guaranteed, let projected = root.forwardingInstruction?.singleForwardedOperand?.value {
+    root = projected.referenceRoot
+  }
   return root.ownership == .guaranteed ? root : nil
 }
 
@@ -277,18 +282,6 @@ private func guaranteedResultBase(of value: Value) -> Value? {
         // immortal storage. Let the caller handle that.
         apply.functionConvention.hasSelfParameter,
         let selfArgument = apply.arguments.last else {
-    return nil
-  }
-  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
-}
-
-/// If `value` is an address result of a call that returns `@guaranteed_address`,
-/// return the argument that the result is a borrow of.
-private func guaranteedAddressResultBase(of value: Value) -> Value? {
-  guard value.type.isAddress,
-        let apply = value.definingInstruction as? ApplyInst,
-        apply.hasGuaranteedAddressResult,
-        let selfArgument = apply.selfArgument else {
     return nil
   }
   return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
@@ -309,11 +302,6 @@ extension LifetimeDependence.Scope {
   /// multiple guaranteed values.
   init(base: Value, _ context: some Context) {
     if base.type.isAddress {
-      if let accessorBase = guaranteedAddressResultBase(of: base) {
-        // When `base` is @guaranteed_address result of a borrow accessor, root the dependence on the accessor's base.
-        self.init(base: accessorBase, context)
-        return
-      }
       self.init(enclosingAccess: base.enclosingAccessScope, address: base, context)
       return
     }
@@ -377,6 +365,10 @@ extension LifetimeDependence.Scope {
       }
     case .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
+    case let .borrowMutateAccessor(apply):
+      // The address is only valid within the accessor's borrow of 'self'. Root the dependence on 'self'.
+      let selfArgument = apply.selfArgument!
+      self.init(base: guaranteedReferenceRoot(of: selfArgument) ?? selfArgument, context)
     case .unidentified:
       self = .unknown(address)
     case let .stack(allocStack):
@@ -447,6 +439,13 @@ extension LifetimeDependence.Scope {
     switch beginBorrow {
     case .beginBorrow, .loadBorrow, .dereferenceBorrow:
       self = .borrowed(beginBorrow)
+    case let .borrowAccessor(apply):
+      // A value forwarded from a borrow accessor result depends on the base of the accessor.
+      if let accessorBase = guaranteedResultBase(of: apply) {
+        self.init(base: accessorBase, context)
+      } else {
+        self = .borrowed(beginBorrow)
+      }
     case let .beginApply(value):
       self = .yield(value)
     case let .functionArgument(arg):
@@ -525,6 +524,9 @@ extension LifetimeDependence.Scope {
       return LifetimeDependence.Scope(base: bb.borrowedValue, context).ignoreBorrowScope(context)
     case let .loadBorrow(lb):
       return LifetimeDependence.Scope(base: lb.address, context)
+    case .borrowAccessor:
+      // A borrow accessor without self.
+      return nil
     default:
       fatalError("Scope.borrowed must begin begin_borrow or load_borrow")
     }
@@ -955,6 +957,11 @@ extension LifetimeDependenceDefUseWalker {
     if let phi = Phi(using: operand), phi.isReturnValue {
       return returnedDependence(result: operand)
     }
+    // An on-stack closure that consumes a capture, such as an at-most-once closure, carries the capture's dependence. Unlike
+    // a borrowed capture, OSSA does not keep the consumed capture's source alive while the closure is live.
+    if let pa = operand.instruction as? PartialApplyInst, pa.isOnStack {
+      return dependentUse(of: operand, dependentValue: pa)
+    }
     // Delegate ownership forwarding operations to the ForwardingDefUseWalker.
     return walkDownDefault(forwarding: operand)
   }
@@ -1112,6 +1119,8 @@ extension LifetimeDependenceDefUseWalker {
     switch borrowInst {
     case let .beginBorrow(bbi):
       return walkDownUses(of: bbi, using: operand)
+    case let .borrowAccessor(apply):
+      return walkDownUses(of: apply, using: operand)
     case let .borrowedFrom(bfi):
       return walkDownUses(of: bfi, using: operand)
     case let .storeBorrow(sbi):
@@ -1187,6 +1196,11 @@ extension LifetimeDependenceDefUseWalker {
         return escapingDependence(on: operand)
       }
       break
+    case let .borrowMutateAccessor(apply):
+      // Treat a store to the address result of an accessor with an address 'self' like a store to 'self'.
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorAddressResult {
+        return visitStoredUses(of: operand, into: selfAddress)
+      }
     case .global, .class, .tail, .storeBorrow, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
@@ -1431,8 +1445,8 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 /// This utility finds a value or address that is the best-effort "root" of the chain of temporary lifetime-dependent
 /// values.
 ///
-/// This "looks through" projections: a property that is either visible as a stored property or access via
-/// unsafe[Mutable]Address.
+/// This "looks through" projections: a property that is either visible as a stored property, access via
+/// unsafe[Mutable]Address, or returned by a borrow or mutate accessor.
 ///
 ///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
 ///
@@ -1514,6 +1528,16 @@ extension LifetimeDependenceUseDefValueWalker {
       return walkUp(newLifetime: transition.operand.value)
     case let load as LoadInstruction:
       return walkUp(newLifetime: load.address)
+    case let apply as FullApplySite:
+      // Like begin_borrow and load_borrow, a borrow accessor's @guaranteed result borrows its 'self'.
+      if value.isGuaranteedApplyResult, let selfArgument = apply.selfArgument {
+        return walkUp(newLifetime: selfArgument)
+      }
+      // TODO: add an annotation for standard library functions to declare that a pointer result is derived
+      // from an argument.
+      if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
+        return walkUp(newLifetime: apply.parameterOperands[0].value)
+      }
     default:
       break
     }
@@ -1582,6 +1606,11 @@ extension LifetimeDependenceUseDefAddressWalker {
     switch access.base {
     case .box, .global, .class, .tail, .pointer, .index, .unidentified:
       break
+    case let .borrowMutateAccessor(apply):
+      // The address result of an accessor with an address 'self' is within the variable of 'self'.
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorAddressResult {
+        return walkUp(newLifetime: selfAddress)
+      }
     case let .stack(allocStack):
       // Ignore stack locations. Their access scopes do not affect lifetime dependence.
       return walkUp(stackInitializer: allocStack, at: address, access: access)
@@ -1613,6 +1642,10 @@ extension LifetimeDependenceUseDefAddressWalker {
     }
     if case let .store(store, _) = initializer {
       switch store {
+      case let store as StoreInst where store.storeOwnership != .trivial && !store.source.isOwnedCopy:
+        // The store consumes the stored value, ending its lifetime before any use of the temporary. Unless that value
+        // is a copy, its lifetime is not a valid scope, so the temporary itself introduces the scope.
+        return addressIntroducer(address, access: access)
       case let store as StoringInstruction:
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
@@ -1626,6 +1659,20 @@ extension LifetimeDependenceUseDefAddressWalker {
       }
     }
     return addressIntroducer(address, access: access)
+  }
+}
+
+private extension Value {
+  /// True if this owned value is a copy whose lifetime is independent of the value it was copied from.
+  var isOwnedCopy: Bool {
+    switch definingInstruction {
+    case is CopyValueInst, is ExplicitCopyValueInst:
+      return true
+    case let load as LoadInst:
+      return load.loadOwnership == .copy
+    default:
+      return false
+    }
   }
 }
 
@@ -1701,6 +1748,29 @@ private extension PointerToAddressInst {
     }
     return nil
   }
+}
+
+/// Gathers the uses of values depending on `markDep`. Returns false if they can't all be found, in which case `uses`
+/// may hold only some of them.
+func gatherDependentUses(of markDep: MarkDependenceInstruction, into uses: inout Stack<Instruction>,
+                         _ localReachabilityCache: LocalVariableReachabilityCache,
+                         _ context: Context) -> Bool {
+  // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
+  // success having collected nothing.
+  guard let dependence = LifetimeDependence(markDep, context),
+        !dependence.dependentValue.mayEscape else {
+    return false
+  }
+  var dependentUses = Stack<Instruction>(context)
+  defer { dependentUses.deinitialize() }
+  var walker = LifetimeDependentUseWalker(markDep.parentFunction, localReachabilityCache, context) {
+    dependentUses.push($0)
+    return .continueWalk
+  }
+  defer { walker.deinitialize() }
+  let result = walker.walkDown(dependence: dependence)
+  uses.append(contentsOf: dependentUses)
+  return result == .continueWalk
 }
 
 // =============================================================================

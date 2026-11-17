@@ -24,6 +24,7 @@
 #include "ResultPlan.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
@@ -400,6 +401,15 @@ static ManagedValue emitBuiltinCastFromNativeObject(SILGenFunction &SGF,
   return emitCastFromReferenceType(SGF, loc, substitutions, args, C);
 }
 
+// A COM-constrained archetype has an object or interface pointer
+// representation, even when its generic ABI passes it indirectly. The
+// pointer need not refer to a particular COM interface.
+static bool isCOMConstrainedArchetype(SILType type) {
+  if (auto *archetype = type.getASTType()->getAs<ArchetypeType>())
+    return archetype->hasCOMInterfaceConstraint();
+  return false;
+}
+
 /// Specialized emitter for Builtin.bridgeToRawPointer.
 static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
                                         SILLocation loc,
@@ -412,7 +422,25 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   // RawPointers do not have ownership semantics, so the cleanup on the
   // argument remains.
   SILType rawPointerType = SILType::getRawPointerType(SGF.F.getASTContext());
-  if (args[0].getType().getASTType().isCOMExistentialType()) {
+  if (!SGF.getTypeLowering(args[0].getType()).isLoadable()) {
+    if (!isCOMConstrainedArchetype(args[0].getType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeToRawPointer operand must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(rawPointerType);
+    }
+    if (args[0].getType().isAddress()) {
+      auto address = SGF.B.createUncheckedAddrCast(
+          loc, args[0].getValue(), rawPointerType.getAddressType());
+      auto result =
+          SGF.B.createLoad(loc, address, LoadOwnershipQualifier::Trivial);
+      return ManagedValue::forObjectRValueWithoutOwnership(result);
+    }
+  }
+
+  if (args[0].getType().getASTType().isCOMExistentialType() ||
+      isCOMConstrainedArchetype(args[0].getType())) {
     auto value = args[0];
     if (value.getType().isMoveOnlyWrapped()) {
       if (value.getOwnershipKind() != OwnershipKind::Guaranteed)
@@ -429,6 +457,24 @@ static ManagedValue emitBuiltinBridgeToRawPointer(SILGenFunction &SGF,
   return ManagedValue::forObjectRValueWithoutOwnership(result);
 }
 
+static ManagedValue emitAddressOnlyFromRawPointer(
+    SILGenFunction &SGF, SILLocation loc, const TypeLowering &lowering,
+    ManagedValue pointer, SGFContext C, IsTake_t isTake) {
+  auto source = pointer.materialize(SGF, loc);
+  auto address = SGF.B.createUncheckedAddrCast(
+      loc, source.getValue(), lowering.getLoweredType().getAddressType());
+  if (lowering.isLoadableOrOpaque(SGF.F)) {
+    auto ownership =
+        isTake ? LoadOwnershipQualifier::Take : LoadOwnershipQualifier::Copy;
+    auto value = SGF.B.emitLoadValueOperation(loc, address, ownership);
+    return SGF.emitManagedRValueWithCleanup(value, lowering);
+  }
+  return SGF.B.bufferForExpr(
+      loc, lowering.getLoweredType(), lowering, C, [&](SILValue buffer) {
+        SGF.B.createCopyAddr(loc, address, buffer, isTake, IsInitialization);
+      });
+}
+
 /// Specialized emitter for Builtin.bridgeFromRawPointer.
 static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
                                         SILLocation loc,
@@ -440,9 +486,20 @@ static ManagedValue emitBuiltinBridgeFromRawPointer(SILGenFunction &SGF,
   assert(args.size() == 1 && "bridge should have a single argument");
   
   // The substitution determines the destination type.
-  // FIXME: Archetype destination type?
   auto &destLowering =
     SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
+  if (!destLowering.isLoadable()) {
+    if (!isCOMConstrainedArchetype(destLowering.getLoweredType())) {
+      SGF.SGM.diagnose(
+          loc, diag::invalid_sil_builtin,
+          "bridgeFromRawPointer result must have an object or interface "
+          "pointer representation");
+      return SGF.emitUndef(destLowering.getLoweredType());
+    }
+    return emitAddressOnlyFromRawPointer(SGF, loc, destLowering, args[0], C,
+                                         IsNotTake);
+  }
+
   assert(destLowering.isLoadable());
   SILType destType = destLowering.getLoweredType();
 
@@ -474,11 +531,16 @@ static ManagedValue emitBuiltinTakeFromRawPointer(SILGenFunction &SGF,
 
   auto &lowering = SGF.getTypeLowering(substitutions.getReplacementTypes()[0]);
   auto type = lowering.getLoweredType();
+  if (!lowering.isLoadable() && isCOMConstrainedArchetype(type))
+    return emitAddressOnlyFromRawPointer(SGF, loc, lowering, args[0], C,
+                                         IsTake);
+
   if (!lowering.isLoadable() ||
       (!type.getASTType().isCOMExistentialType() &&
        !type.isBridgeableObjectType() && !type.is<BuiltinNativeObjectType>())) {
     SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                     "takeFromRawPointer result must be a single reference");
+                     "takeFromRawPointer result must have an object or interface "
+                     "pointer representation");
     return SGF.emitUndef(type);
   }
 
@@ -1299,8 +1361,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   auto origFnUnsubstType = origFnType->getUnsubstitutedType(SGF.getModule());
   if (origFnType != origFnUnsubstType) {
     origFnVal = SGF.B.createConvertFunction(
-        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        loc, origFnVal, SILType::getPrimitiveObjectType(origFnUnsubstType));
   }
 
   // Get the derivative function.
@@ -1317,8 +1378,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   if (derivativeFnType != derivativeFnUnsubstType) {
     derivativeFn = SGF.B.createConvertFunction(
         loc, derivativeFn,
-        SILType::getPrimitiveObjectType(derivativeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(derivativeFnUnsubstType));
   }
 
   // We don't need to destroy the original function or retain the
@@ -1383,8 +1443,7 @@ static ManagedValue emitBuiltinAutoDiffApplyTransposeFunction(
   if (transposeFnType != transposeFnUnsubstType) {
     transposeFn = SGF.B.createConvertFunction(
         loc, transposeFn,
-        SILType::getPrimitiveObjectType(transposeFnUnsubstType),
-        /*withoutActuallyEscaping*/ false);
+        SILType::getPrimitiveObjectType(transposeFnUnsubstType));
     transposeFnType = transposeFn->getType().castTo<SILFunctionType>();
   }
 
@@ -1423,9 +1482,9 @@ static ManagedValue emitBuiltinApplyDerivative(
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   AutoDiffDerivativeFunctionKind kind;
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyDerivativeConfig(
-      builtinName, kind, arity, throws);
+      builtinName, kind, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyDerivativeFunction(kind, arity, SGF, loc,
                                                     substitutions, args, C);
@@ -1440,9 +1499,9 @@ static ManagedValue emitBuiltinApplyTranspose(
           ->getDecl());
   const auto builtinName = builtinDecl->getBaseIdentifier().str();
   unsigned arity;
-  bool throws;
+  bool throws, async;
   auto successfullyParsed = autodiff::getBuiltinApplyTransposeConfig(
-      builtinName, arity, throws);
+      builtinName, arity, throws, async);
   assert(successfullyParsed);
   return emitBuiltinAutoDiffApplyTransposeFunction(
       arity, throws, SGF, loc, substitutions, args, C);
@@ -1684,15 +1743,21 @@ enum class CreateTaskOptions {
   /// The builtin has optional arguments for everything.
   OptionalEverything = 0x1,
 
-  /// The builtin is for a DiscardingTaskGroup and so expects the function
-  /// to return Void.
-  Discarding = 0x2,
+  /// The builtin is for a discarding task, which has no result.
+  /// Expects the operation to return Void.
+  DiscardingResult = 0x2,
 
   /// The builtin has a non-optional TaskGroup argument.
   TaskGroup = 0x4,
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
+
+  /// The task's operation is a synchronous function,
+  /// i.e. the operation cannot ever suspend.
+  ///
+  /// For now, only a non-throwing '() -> ()' operation is supported.
+  SynchronousOperation = 0x10,
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1701,7 +1766,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         PreparedArguments &&preparedArgs,
                                         OptionSet<CreateTaskOptions> options) {
 #ifndef NDEBUG
-  if (options & CreateTaskOptions::Discarding) {
+  if (options & CreateTaskOptions::DiscardingResult) {
     assert(!subs);
   } else {
     assert(subs && subs.getReplacementTypes().size() == 1);
@@ -1782,7 +1847,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   auto functionValue = [&] {
     // No reabstraction required.
-    if (options & CreateTaskOptions::Discarding) {
+    if (options & CreateTaskOptions::DiscardingResult) {
       return nextArg().getAsSingleValue(SGF);
     }
 
@@ -1828,6 +1893,10 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     return std::move(fnArg).getConverted(SGF, conversion);
   }();
 
+  assert(bool(options & CreateTaskOptions::SynchronousOperation) ==
+             !functionValue.getType().castTo<SILFunctionType>()->isAsync() &&
+         "only a synchronous discarding task has a synchronous operation");
+
   assert(nextArgIdx == args.size() && "didn't exhaust builtin arguments?");
 
   SILValue builtinArgs[] = {
@@ -1860,7 +1929,7 @@ static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
-      { CreateTaskOptions::TaskGroup, CreateTaskOptions::Discarding });
+      { CreateTaskOptions::TaskGroup, CreateTaskOptions::DiscardingResult });
 }
 
 // Emit SIL for the named builtin: createAsyncTaskWithExecutor.
@@ -1885,7 +1954,7 @@ static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
       { CreateTaskOptions::TaskGroup, CreateTaskOptions::TaskExecutor,
-        CreateTaskOptions::Discarding });
+        CreateTaskOptions::DiscardingResult });
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
@@ -1909,7 +1978,37 @@ static ManagedValue emitBuiltinCreateDiscardingTask(
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
       { CreateTaskOptions::OptionalEverything,
-        CreateTaskOptions::Discarding });
+                  CreateTaskOptions::DiscardingResult });
+}
+
+// Emit SIL for the named builtin: createSynchronousDiscardingTask.
+//
+// This emits a 'createAsyncTask' SIL builtin with a synchronous,
+// non-throwing, Void-returning operation.
+static ManagedValue emitBuiltinCreateSynchronousDiscardingTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+
+  // Older runtimes treat the operation as an async function, so the builtin
+  // must be used where the synchronous operation task availability holds
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
+      !ctx.LangOpts.DisableAvailabilityChecking &&
+      loc.getSourceLoc().isValid()) {
+    auto availability =
+        AvailabilityContext::forLocation(loc.getSourceLoc(), SGF.FunctionDC);
+    if (!availability.getPlatformRange().isContainedIn(
+            ctx.getSynchronousOperationTaskAvailability())) {
+      SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                       "Builtin.createSynchronousDiscardingTask requires the "
+                       "synchronous operation task availability (Swift 6.5)");
+    }
+  }
+
+  return emitCreateAsyncTask(SGF, loc, subs, std::move(preparedArgs),
+                             {CreateTaskOptions::OptionalEverything,
+                              CreateTaskOptions::DiscardingResult,
+                              CreateTaskOptions::SynchronousOperation});
 }
 
 // Emit SIL for the named builtin: createTaskGroup.
@@ -1954,7 +2053,8 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
           ->getCanonicalType();
 
   using Param = FunctionType::Param;
-  PreparedArguments args({Param(flagsType), Param(functionType)});
+  PreparedArguments args(
+      {Param::bodyAccess(flagsType), Param::bodyAccess(functionType)});
   args.add(loc, RValue(*this, loc, flagsType, flags));
   args.add(loc, RValue(*this, loc, functionType, mainFunctionRef));
   return emitCreateAsyncTask(*this, loc, subs, std::move(args), {});
@@ -2296,11 +2396,36 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
     auto normalBB = SGF.createBasicBlock();
     auto errorBB = SGF.createBasicBlock();
 
-    SGF.B.createTryApply(loc, args[0].getValue(), {},
-                         {SGF.IndirectErrorResult, bufferPtr}, normalBB, errorBB);
+    // The closure's error is returned indirectly only if it is address-only and
+    // addresses are lowered. Otherwise (under opaque values, or for a loadable
+    // error type) it is returned directly, and the error block receives it as
+    // an argument.
+    auto fnConv = SGF.silConv.getFunctionConventions(fnType);
+    bool hasIndirectError = fnConv.hasIndirectSILErrorResults();
+
+    if (hasIndirectError) {
+      // Have the closure write its error straight into our own indirect error
+      // result.
+      assert(SGF.IndirectErrorResult &&
+             "Builtin.emplace with an indirect error must be emitted into a "
+             "function that throws the same error indirectly");
+      SGF.B.createTryApply(loc, args[0].getValue(), {},
+                           {SGF.IndirectErrorResult, bufferPtr}, normalBB,
+                           errorBB);
+    } else {
+      SGF.B.createTryApply(loc, args[0].getValue(), {}, {bufferPtr}, normalBB,
+                           errorBB);
+    }
 
     // Error branch
     {
+      SILValue directError;
+      if (!hasIndirectError) {
+        directError = errorBB->createPhiArgument(
+            fnConv.getSILErrorType(SGF.getTypeExpansionContext()),
+            OwnershipKind::Owned);
+      }
+
       SGF.B.emitBlock(errorBB);
 
       // When the closure throws an error, it needs to clean up the buffer. This
@@ -2310,9 +2435,16 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
       // here.
       SGF.B.createEndLifetime(loc, buffer);
 
-      SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+      if (hasIndirectError) {
+        SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
 
-      SGF.B.createThrowAddr(loc);
+        SGF.B.createThrowAddr(loc);
+      } else {
+        // Propagate the error to the current throw destination, like any other
+        // `try_apply` does.
+        FullExpr errorScope(SGF.Cleanups, CleanupLocation(loc));
+        SGF.emitThrow(loc, SGF.emitManagedRValueWithCleanup(directError));
+      }
     }
 
     SGF.B.emitBlock(normalBB);

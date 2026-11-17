@@ -52,7 +52,7 @@ struct LoadableIntWrapper {
 import MsvcUseVecIt
 
 public func test(_ result: VecStr) -> CInt {
-    let begin = result.__beginUnsafe()
+    let begin = unsafe result.begin()
     return begin.x
 }
 

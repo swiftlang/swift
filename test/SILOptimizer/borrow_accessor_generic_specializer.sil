@@ -1,0 +1,194 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s --check-prefix=CHECK-SELF
+
+// The generic specializer converts the @in_guaranteed index of a partially
+// applied borrow accessor to a direct parameter, and creates a reabstraction
+// thunk that calls the specialization. A non-trivial @guaranteed result of that
+// call is a borrow scope, so the thunk returns it with a return_borrow. A
+// trivial result has no scope, so the thunk returns it with a plain return.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct Container {
+  var k: Klass
+  var i: Int
+}
+
+sil [ossa] [noinline] @borrow_k : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $*T, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.k
+  return %2
+}
+
+sil [ossa] [noinline] @borrow_i : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Int {
+bb0(%0 : $*T, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.i
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @caller :
+// CHECK:         [[K:%.*]] = function_ref @$s8borrow_kSi_TG5 : $@convention(method) (@in_guaranteed Int, @guaranteed Container) -> @guaranteed Klass
+// CHECK:         partial_apply [callee_guaranteed] [[K]](%0)
+// CHECK:         [[I:%.*]] = function_ref @$s8borrow_iSi_TG5 : $@convention(method) (@in_guaranteed Int, @guaranteed Container) -> @guaranteed Int
+// CHECK:         partial_apply [callee_guaranteed] [[I]](%1)
+// CHECK-LABEL: } // end sil function 'caller'
+
+// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s8borrow_kSi_TG5 : $@convention(method) (@in_guaranteed Int, @guaranteed Container) -> @guaranteed Klass {
+// CHECK:       bb0(%0 : $*Int, %1 : @guaranteed $Container):
+// CHECK:         [[A:%.*]] = load [trivial] %0
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_kSi_Tg5 : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Klass
+// CHECK:         [[R:%.*]] = apply [[F]]([[A]], %1)
+// CHECK-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function '$s8borrow_kSi_TG5'
+
+// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s8borrow_iSi_TG5 : $@convention(method) (@in_guaranteed Int, @guaranteed Container) -> @guaranteed Int {
+// CHECK:       bb0(%0 : $*Int, %1 : @guaranteed $Container):
+// CHECK:         [[A:%.*]] = load [trivial] %0
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_iSi_Tg5 : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Int
+// CHECK:         [[R:%.*]] = apply [[F]]([[A]], %1)
+// CHECK-NEXT:    return [[R]]
+// CHECK-LABEL: } // end sil function '$s8borrow_iSi_TG5'
+sil [ossa] @caller : $@convention(thin) (@owned Container) -> (@owned @callee_guaranteed (@in_guaranteed Int) -> @guaranteed Klass, @owned @callee_guaranteed (@in_guaranteed Int) -> @guaranteed Int) {
+bb0(%0 : @owned $Container):
+  %1 = copy_value %0
+  %2 = function_ref @borrow_k : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Klass
+  %3 = partial_apply [callee_guaranteed] %2<Int>(%0) : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Klass
+  %4 = function_ref @borrow_i : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Int
+  %5 = partial_apply [callee_guaranteed] %4<Int>(%1) : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Int
+  %6 = tuple (%3, %5)
+  return %6
+}
+
+// The @in_guaranteed self of a borrow accessor is not converted to a direct
+// parameter, because the @guaranteed result borrows from self's memory
+// location. The accessor is still specialized, and other @in_guaranteed
+// parameters are still converted.
+
+struct Wrapper<T> {
+  var k: Klass
+  var t: T
+}
+
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-SELF-LABEL: sil shared [noinline] [ossa] @$s13self_borrow_kSi_Tg5 : $@convention(method) (@in_guaranteed Wrapper<Int>) -> @guaranteed Klass {
+// CHECK-SELF:       bb0(%0 : $*Wrapper<Int>):
+// CHECK-SELF-NOT:     store_borrow
+// CHECK-SELF:         [[A:%.*]] = struct_element_addr %0, #Wrapper.k
+// CHECK-SELF:         [[LB:%.*]] = load_borrow [[A]]
+// CHECK-SELF:         return_borrow [[LB]] from_scopes ([[LB]])
+// CHECK-SELF-LABEL: } // end sil function '$s13self_borrow_kSi_Tg5'
+sil [ossa] [noinline] @self_borrow_k : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @guaranteed Klass {
+bb0(%0 : $*Wrapper<T>):
+  %1 = struct_element_addr %0, #Wrapper.k
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+// CHECK-SELF-LABEL: sil shared [noinline] [ossa] @$s19index_self_borrow_kSi_Tg5 : $@convention(method) (Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass {
+// CHECK-SELF:       bb0(%0 : $Int, %1 : $*Wrapper<Int>):
+// CHECK-SELF-NOT:     store_borrow
+// CHECK-SELF:         [[A:%.*]] = struct_element_addr %1, #Wrapper.k
+// CHECK-SELF:         [[LB:%.*]] = load_borrow [[A]]
+// CHECK-SELF:         return_borrow [[LB]] from_scopes ([[LB]])
+// CHECK-SELF-LABEL: } // end sil function '$s19index_self_borrow_kSi_Tg5'
+sil [ossa] [noinline] @index_self_borrow_k : $@convention(method) <T> (@in_guaranteed T, @in_guaranteed Wrapper<T>) -> @guaranteed Klass {
+bb0(%0 : $*T, %1 : $*Wrapper<T>):
+  %2 = struct_element_addr %1, #Wrapper.k
+  %3 = load_borrow %2
+  return_borrow %3 from_scopes (%3)
+}
+
+// No conversion is needed, so no reabstraction thunk is created.
+// CHECK-SELF-LABEL: sil [ossa] @self_caller :
+// CHECK-SELF:       bb0(%0 : $*Wrapper<Int>):
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s13self_borrow_kSi_Tg5 : $@convention(method) (@in_guaranteed Wrapper<Int>) -> @guaranteed Klass
+// CHECK-SELF:         [[R:%.*]] = apply [[F]](%0)
+// CHECK-SELF:         end_borrow [[R]]
+// CHECK-SELF:         [[F2:%.*]] = function_ref @$s13self_borrow_kSi_Tg5 : $@convention(method) (@in_guaranteed Wrapper<Int>) -> @guaranteed Klass
+// CHECK-SELF:         partial_apply [callee_guaranteed] [[F2]]()
+// CHECK-SELF-LABEL: } // end sil function 'self_caller'
+sil [ossa] @self_caller : $@convention(thin) (@in_guaranteed Wrapper<Int>) -> @owned @callee_guaranteed (@in_guaranteed Wrapper<Int>) -> @guaranteed Klass {
+bb0(%0 : $*Wrapper<Int>):
+  %1 = function_ref @self_borrow_k : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  %2 = apply %1<Int>(%0) : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  %3 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2
+  %6 = partial_apply [callee_guaranteed] %1<Int>() : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  return %6
+}
+
+// The index is converted and self is passed through as an address.
+// CHECK-SELF-LABEL: sil [ossa] @index_self_caller :
+// CHECK-SELF:       bb0(%0 : $*Int, %1 : $*Wrapper<Int>):
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s19index_self_borrow_kSi_Tg5 : $@convention(method) (Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass
+// CHECK-SELF:         [[I:%.*]] = load [trivial] %0
+// CHECK-SELF:         [[R:%.*]] = apply [[F]]([[I]], %1)
+// CHECK-SELF:         end_borrow [[R]]
+// CHECK-SELF:         [[T:%.*]] = function_ref @$s19index_self_borrow_kSi_TG5 : $@convention(method) (@in_guaranteed Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass
+// CHECK-SELF:         partial_apply [callee_guaranteed] [[T]]()
+// CHECK-SELF-LABEL: } // end sil function 'index_self_caller'
+
+// CHECK-SELF-LABEL: sil shared [transparent] [thunk] [ossa] @$s19index_self_borrow_kSi_TG5 : $@convention(method) (@in_guaranteed Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass {
+// CHECK-SELF:       bb0(%0 : $*Int, %1 : $*Wrapper<Int>):
+// CHECK-SELF:         [[I:%.*]] = load [trivial] %0
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s19index_self_borrow_kSi_Tg5 : $@convention(method) (Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass
+// CHECK-SELF:         [[R:%.*]] = apply [[F]]([[I]], %1)
+// CHECK-SELF-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-SELF-LABEL: } // end sil function '$s19index_self_borrow_kSi_TG5'
+sil [ossa] @index_self_caller : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Wrapper<Int>) -> @owned @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Wrapper<Int>) -> @guaranteed Klass {
+bb0(%0 : $*Int, %1 : $*Wrapper<Int>):
+  %2 = function_ref @index_self_borrow_k : $@convention(method) <T> (@in_guaranteed T, @in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  %3 = apply %2<Int>(%0, %1) : $@convention(method) <T> (@in_guaranteed T, @in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
+  %7 = partial_apply [callee_guaranteed] %2<Int>() : $@convention(method) <T> (@in_guaranteed T, @in_guaranteed Wrapper<T>) -> @guaranteed Klass
+  return %7
+}
+
+// The self of a method with an owned result is converted to a direct parameter.
+// CHECK-SELF-LABEL: sil shared [transparent] [thunk] [ossa] @$s5get_kSi_TG5 : $@convention(method) (@in_guaranteed Wrapper<Int>) -> @owned Klass {
+// CHECK-SELF:       bb0(%0 : $*Wrapper<Int>):
+// CHECK-SELF-NEXT:    [[S:%.*]] = load_borrow %0
+// CHECK-SELF:         [[F:%.*]] = function_ref @$s5get_kSi_Tg5 : $@convention(method) (@guaranteed Wrapper<Int>) -> @owned Klass
+// CHECK-SELF-NEXT:    [[R:%.*]] = apply [[F]]([[S]])
+// CHECK-SELF-NEXT:    end_borrow [[S]]
+// CHECK-SELF-NEXT:    return [[R]]
+// CHECK-SELF-LABEL: } // end sil function '$s5get_kSi_TG5'
+sil [ossa] [noinline] @get_k : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @owned Klass {
+bb0(%0 : $*Wrapper<T>):
+  %1 = struct_element_addr %0, #Wrapper.k
+  %2 = load [copy] %1
+  return %2
+}
+
+sil [ossa] @owned_self_caller : $@convention(thin) () -> @owned @callee_guaranteed (@in_guaranteed Wrapper<Int>) -> @owned Klass {
+bb0:
+  %0 = function_ref @get_k : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @owned Klass
+  %1 = partial_apply [callee_guaranteed] %0<Int>() : $@convention(method) <T> (@in_guaranteed Wrapper<T>) -> @owned Klass
+  return %1
+}
+
+// A converted non-trivial index is borrowed for the call. Its borrow ends
+// before the return_borrow of the result.
+// CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s8borrow_k4main5KlassC_TG5 : $@convention(method) (@in_guaranteed Klass, @guaranteed Container) -> @guaranteed Klass {
+// CHECK:       bb0(%0 : $*Klass, %1 : @guaranteed $Container):
+// CHECK-NEXT:    [[I:%.*]] = load_borrow %0
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_k4main5KlassC_Tg5 : $@convention(method) (@guaranteed Klass, @guaranteed Container) -> @guaranteed Klass
+// CHECK-NEXT:    [[R:%.*]] = apply [[F]]([[I]], %1)
+// CHECK-NEXT:    end_borrow [[I]]
+// CHECK-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function '$s8borrow_k4main5KlassC_TG5'
+sil [ossa] @klass_index_caller : $@convention(thin) (@owned Container) -> @owned @callee_guaranteed (@in_guaranteed Klass) -> @guaranteed Klass {
+bb0(%0 : @owned $Container):
+  %1 = function_ref @borrow_k : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Klass
+  %2 = partial_apply [callee_guaranteed] %1<Klass>(%0) : $@convention(method) <T> (@in_guaranteed T, @guaranteed Container) -> @guaranteed Klass
+  return %2
+}

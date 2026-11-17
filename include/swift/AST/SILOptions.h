@@ -161,9 +161,6 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
-  /// Verify ownership after every pass.
-  bool VerifyOwnershipAll = false;
-
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
 
@@ -250,9 +247,6 @@ public:
   /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
 
-  /// If set to true, compile with the SIL Ownership Model enabled.
-  bool VerifySILOwnership = true;
-
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 
@@ -321,10 +315,6 @@ public:
   /// Block expanding and register promotion more aggressively throughout the
   /// optimizer.
   bool UseAggressiveReg2MemForCodeSize = true;
-
-  /// Enable enforcement of lifetime dependencies on addressable arguments.
-  /// Temporarily used to bootstrap the AddressableParameters feature.
-  bool EnableAddressDependencies = true;
 
   // Whether to allow merging traps and cond_fails.
   bool MergeableTraps = false;

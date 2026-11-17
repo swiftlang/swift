@@ -30,8 +30,6 @@
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 #include <iostream>
-#include <sstream>
-#include <limits>
 
 #ifdef DEBUG_TYPE_LOWERING
   #define DEBUG_LOG(expr) expr;
@@ -246,6 +244,115 @@ public:
 void TypeInfo::dump(std::ostream &stream, unsigned Indent) const {
   PrintTypeInfo(stream, Indent).print(*this);
   stream << "\n";
+}
+
+bool TypeInfo::Equals(const TypeInfo &Other) const {
+  return getKind() == Other.getKind() && getSize() == Other.getSize() &&
+         getAlignment() == Other.getAlignment() &&
+         getStride() == Other.getStride() &&
+         getNumExtraInhabitants() == Other.getNumExtraInhabitants() &&
+         getBorrowability() == Other.getBorrowability() &&
+         isAddressableForDependencies() == Other.isAddressableForDependencies();
+}
+
+namespace {
+static bool equalFieldInfos(const std::vector<FieldInfo> &A,
+                            const std::vector<FieldInfo> &B) {
+  if (A.size() != B.size())
+    return false;
+  for (size_t i = 0, e = A.size(); i != e; ++i) {
+    const FieldInfo &fa = A[i];
+    const FieldInfo &fb = B[i];
+    if (!fa.TI.Equals(fb.TI))
+      return false;
+    if (fa.Offset != fb.Offset)
+      return false;
+    if (fa.Value != fb.Value)
+      return false;
+    if (fa.Name != fb.Name)
+      return false;
+    if (!TypeRef::deepEquals(fa.TR, fb.TR))
+      return false;
+    if (!TypeRef::deepEquals(fa.IndirectPayloadTR, fb.IndirectPayloadTR))
+      return false;
+  }
+  return true;
+}
+} // end anonymous namespace
+
+bool BuiltinTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<BuiltinTypeInfo>(&Other);
+  if (!O)
+    return false;
+  return getMangledTypeName() == O->getMangledTypeName();
+}
+
+bool RecordTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<RecordTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getRecordKind() != O->getRecordKind())
+    return false;
+  return equalFieldInfos(getFields(), O->getFields());
+}
+
+bool EnumTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<EnumTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getEnumKind() != O->getEnumKind())
+    return false;
+  return equalFieldInfos(getCases(), O->getCases());
+}
+
+bool ReferenceTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<ReferenceTypeInfo>(&Other);
+  if (!O)
+    return false;
+  return getReferenceKind() == O->getReferenceKind() &&
+         getReferenceCounting() == O->getReferenceCounting();
+}
+
+bool ArrayTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<ArrayTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (getElementCount() != O->getElementCount())
+    return false;
+  const TypeInfo *ea = getElementTypeInfo();
+  const TypeInfo *eb = O->getElementTypeInfo();
+  if ((ea == nullptr) != (eb == nullptr))
+    return false;
+  if (ea && eb && !ea->Equals(*eb))
+    return false;
+  return TypeRef::deepEquals(getElementTypeRef(), O->getElementTypeRef());
+}
+
+bool BorrowTypeInfo::Equals(const TypeInfo &Other) const {
+  if (!TypeInfo::Equals(Other))
+    return false;
+  auto *O = llvm::dyn_cast<BorrowTypeInfo>(&Other);
+  if (!O)
+    return false;
+  if (usesValueRepresentation() != O->usesValueRepresentation())
+    return false;
+  const TypeInfo *ra = getReferentTypeInfo();
+  const TypeInfo *rb = O->getReferentTypeInfo();
+  if ((ra == nullptr) != (rb == nullptr))
+    return false;
+  if (ra && rb && !ra->Equals(*rb))
+    return false;
+  return true;
 }
 
 BitMask ReferenceTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
@@ -1494,7 +1601,12 @@ public:
       // value metadata, and finally zero or more witness tables.
       // The buffer is always bitwise takable, since non-bitwise
       // takable payloads are stored out of line.
-      builder.addField(TI->getSize() * 3,
+      uint64_t BufferSize = (uint64_t)TI->getSize() * 3;
+      if (BufferSize > UINT32_MAX) {
+        TC.setError("existential buffer size overflows");
+        return nullptr;
+      }
+      builder.addField(BufferSize,
                        TI->getAlignment(),
                        /*numExtraInhabitants=*/0,
                        /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
@@ -1547,14 +1659,21 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          bool addressableForDependencies) {
   assert(fieldAlignment > 0);
 
-  // Align the current size appropriately
-  Size = ((Size + fieldAlignment - 1) & ~(fieldAlignment - 1));
+  // Align the current size appropriately, and add the field. Size is 32 bits.
+  // Ensure we don't overflow it.
+  uint64_t alignedSize = ((uint64_t)Size + fieldAlignment - 1) &
+                         ~((uint64_t)fieldAlignment - 1);
+  uint64_t newSize = alignedSize + fieldSize;
+  if (newSize > UINT32_MAX) {
+    markInvalid("record size overflows");
+    return 0;
+  }
 
   // Record the offset
-  unsigned offset = Size;
+  unsigned offset = alignedSize;
 
   // Update the aggregate size
-  Size += fieldSize;
+  Size = newSize;
 
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
@@ -1622,7 +1741,13 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
     return nullptr;
 
   // Calculate the stride
-  unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+  uint64_t WideStride =
+      ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+  if (WideStride > UINT32_MAX) {
+    markInvalid("record stride overflows");
+    return nullptr;
+  }
+  unsigned Stride = WideStride;
   if (Stride == 0)
     Stride = 1;
 
@@ -1791,7 +1916,12 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
     return nullptr;
   }
 
-  auto size = descriptor->Size * NumWords_DefaultActor;
+  uint64_t wideSize = (uint64_t)descriptor->Size * NumWords_DefaultActor;
+  if (wideSize > UINT32_MAX) {
+    setError("default actor storage size overflows");
+    return nullptr;
+  }
+  unsigned size = wideSize;
   auto alignment = 2 * descriptor->Alignment;
 
   DefaultActorStorageTI = makeTypeInfo<BuiltinTypeInfo>(
@@ -2302,7 +2432,13 @@ public:
     // This avoids allocating lots of memory for spare bit mask calculations
     // when clients try to interpret random chunks of memory as type descriptions.
     if (Size > (1024ULL * 1024)) {
-      unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+      uint64_t WideStride =
+          ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+      if (WideStride > UINT32_MAX) {
+        markInvalid("enum stride overflows", TR);
+        return nullptr;
+      }
+      unsigned Stride = WideStride;
       return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
       	Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
       	AddressableForDependencies, Kind, Cases);
@@ -2455,7 +2591,13 @@ public:
     // Builtin descriptors don't record addressable-for-dependencies, but we
     // can derive it reliably from the payloads, so AddressableForDependencies
     // is left as is.
-    unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
+    uint64_t WideStride =
+        ((uint64_t)Size + Alignment - 1) & ~((uint64_t)Alignment - 1);
+    if (WideStride > UINT32_MAX) {
+      markInvalid("enum stride overflows", TR);
+      return nullptr;
+    }
+    unsigned Stride = WideStride;
     if (Stride == 0)
       Stride = 1;
 

@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1036; // remove legacy hidden type layout block
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1045; // load_borrow value hint
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -950,6 +950,7 @@ namespace control_block {
     BCVBR<17>, // User module format minor version
     BCVBR<17>, // User module format sub-minor version
     BCVBR<17>, // User module format build version
+    BCVBR<17>, // User module format sub-build version
     BCBlob // misc. version information
   >;
 
@@ -1497,6 +1498,7 @@ namespace decls_block {
     BCFixed<1>,          // has AnyObject constraint
     BCFixed<1>,          // has ~Copyable constraint
     BCFixed<1>,          // has ~Escapable constraint
+    BCFixed<1>,          // has ~Deinitable constraint
     BCArray<TypeIDField> // protocols
   );
 
@@ -2485,6 +2487,8 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using CArrayProjectionDeclAttrLayout
+    = BCRecordLayout<CArrayProjection_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
   using AllowFeatureSuppressionDeclAttrLayout =
       BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;
@@ -2737,10 +2741,12 @@ namespace decls_block {
                                            BCFixed<3>,  // threading model
                                            BCBlob>;     // IID/CLSID
 
-  using CalledDeclAttrLayout = BCRecordLayout<
-    Called_DECL_ATTR,
-    BCFixed<2> // execution semantics
+  using CallableDeclAttrLayout = BCRecordLayout<
+    Callable_DECL_ATTR,
+    BCFixed<1> // implicit flag
   >;
+
+  using ScopeParamsDeclAttrLayout = BCRecordLayout<ScopeParams_DECL_ATTR>;
 
   constexpr uint8_t NoReferenceCounting =
       static_cast<uint8_t>(ReferenceCounting::Error) + 1;

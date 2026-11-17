@@ -16,7 +16,7 @@ Currently, the `swift-frontend` and `sil-opt` tools include the Swift modules. T
 There are four build modes, which can be selected with the `--bootstrapping=<mode>` build-script option:
 
 * `off`: the Swift code is not included in the tools.
-* `hosttools`: the Swift code is built with a pre-installed Swift toolchain, using a `swiftc` which is expected to be in the command search path. This mode is the preferred way to build for local development, because it is the fastest way to build. It requires a 5.5 (or newer) swift toolchain to be installed on the host system.
+* `hosttools`: the Swift code is built with a pre-installed Swift toolchain, using a `swiftc` which is expected to be in the command search path. This mode is the preferred way to build for local development, because it is the fastest way to build. It requires a 6.2 (or newer) swift toolchain to be installed on the host system.
 * `bootstrapping`: The compiler is built with a two-stage bootstrapping process. This is the preferred mode if no swift toolchain is available on the system or if the build should not depend on any pre-installed toolchain.
 * `bootstrapping-with-hostlibs`: This mode is only available on macOS. It's similar to `bootstrapping`, but links the compiler against the host system swift libraries instead of the built libraries. The build is faster than `bootstrapping` because only the swiftmodule files of the bootstrapping libraries have to be built.
 

@@ -331,7 +331,9 @@ namespace {
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
                           bool useStructLayouts) const override {
-      if (!useStructLayouts) {
+      // A scalar entry would release the context instead of destroying it.
+      if (!useStructLayouts ||
+          isClosureContextDestroyedDirectly(IGM, FormalType)) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       } else if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -378,6 +380,8 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        assert(!isClosureContextDestroyedDirectly(IGF.IGM, FormalType) &&
+               "retaining a context that is destroyed without a release");
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
@@ -386,16 +390,27 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        // In Embedded Swift, a noncopyable closure owns its context, so drop
+        // it without the runtime, which isn't available with -no-allocations.
+        if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+          emitDestroyEmbeddedNoncopyableClosureContext(IGF, data);
+          return;
+        }
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
-      if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
+      if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         IGF.Builder.CreateStore(context, dataAddr);
-      else
+      } else if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+        llvm::Value *oldContext = IGF.Builder.CreateLoad(dataAddr);
+        IGF.Builder.CreateStore(context, dataAddr);
+        emitDestroyEmbeddedNoncopyableClosureContext(IGF, oldContext);
+      } else {
         IGF.emitNativeStrongAssign(context, dataAddr);
+      }
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -890,8 +905,30 @@ static void emitApplyArgument(IRGenFunction &IGF,
                         out);
 }
 
+/// Whether the context of the closure that \c outType describes captures an
+/// indirect argument with the given convention and type by address, instead of
+/// owning the value.
+static bool capturesIndirectArgumentByAddress(CanSILFunctionType outType,
+                                              ParameterConvention convention,
+                                              SILType argType) {
+  // The context of an escaping closure owns its indirect arguments.
+  if (!outType->isNoEscape())
+    return false;
+
+  // A noncopyable closure is the exception for a noncopyable argument that it
+  // consumes. Like the other consumed captures of such a closure, its context
+  // owns the value.
+  if (convention == ParameterConvention::Indirect_In &&
+      outType->isNoncopyable() && argType.isMoveOnly())
+    return false;
+
+  // A stack-promoted closure doesn't own most of its indirect arguments, so it
+  // captures their addresses.
+  return true;
+}
+
 CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                       bool isNoEscape) {
+                                       bool capturesIndirectByAddress) {
   switch (paramInfo.getConvention()) {
   // Capture value parameters by value, consuming them.
   case ParameterConvention::Direct_Owned:
@@ -906,12 +943,12 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
     return type;
 
   // Capture indirect parameters if the closure is not [onstack]. [onstack]
-  // closures don't take ownership of their arguments so we just capture the
-  // address.
+  // closures don't take ownership of most of their arguments so we just capture
+  // the address.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
-    if (isNoEscape)
+    if (capturesIndirectByAddress)
       return CanInOutType::get(type);
     else
       return type;
@@ -931,6 +968,12 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
   if (coroAllocFn->getLinkage() != llvm::GlobalValue::ExternalWeakLinkage)
     return coroAllocFn;
 
+  auto availability = IGM.Context.getTypedCoroAllocAvailability();
+  auto &sdkVersion = IGM.Context.LangOpts.SDKVersion;
+  bool sdkHasCoroFrameAlloc =
+      !sdkVersion || !availability.hasMinimumVersion() ||
+      *sdkVersion >= availability.getRawMinimumVersion();
+
   // Otherwise, create a stub function to call it when available, or malloc
   // when it isn't.
   return IGM.getOrCreateHelperFunction(
@@ -938,6 +981,15 @@ llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
       [&](IRGenFunction &IGF) {
         auto parameters = IGF.collectParameters();
         auto *size = parameters.claimNext();
+        // The weak reference still has to be resolved by the static linker
+        // for Darwin, so if the SDK's Swift runtime predates
+        // swift_coroFrameAlloc, always use malloc.
+        if (!sdkHasCoroFrameAlloc) {
+          (void)parameters.claimNext(); // The type id is unused.
+          IGF.Builder.CreateRet(IGF.Builder.CreateCall(
+              IGF.IGM.getMallocFunctionPointer(), {size}));
+          return;
+        }
         auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
         auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
             llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
@@ -1841,6 +1893,23 @@ getPartialApplicationForwarderEmission(
   }
 }
 
+/// Returns the fields of a stack-promoted closure context that the context
+/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
+/// that the enclosing function still owns, so nothing in the context may
+/// destroy it.
+llvm::BitVector
+getUnownedContextFields(HeapLayout const &layout,
+                        ArrayRef<ParameterConvention> conventions) {
+  llvm::BitVector unownedFields(conventions.size());
+  for (unsigned i : indices(conventions)) {
+    auto fieldTy = layout.getElementTypes()[i];
+    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
+        fieldTy.isMoveOnly())
+      unownedFields.set(i);
+  }
+  return unownedFields;
+}
+
 /// This is a parameter convention-aware version of \c createDtorFn.
 ///
 /// It's used by the partial application forwarder emitter to avoid
@@ -1850,18 +1919,45 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
                            Address contextPtr,
                            const llvm::BitVector &consumedFields,
-                           bool contextIsOnStack) {
+                           const llvm::BitVector &unownedFields,
+                           bool contextIsOnStack, bool trapsOnDestroy) {
   if (!layout) {
+    assert(!trapsOnDestroy && "trapping contexts always have a layout");
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
   }
 
-  // If none of the parameters are owned, let's use release that would
-  // destroy all of the captures (fields of the closure context).
-  if (consumedFields.empty() || consumedFields.none()) {
-    forwarder.emitNativeStrongRelease(rawContextPtr,
-                                      forwarder.getDefaultAtomicity());
+  // For a closure that doesn't have any owned fields to destroy, just
+  // release the context object. We can't do that for a context whose
+  // destructor traps, though, because reaching the destructor indicates that
+  // the closure was dropped. Proceed to deallocating the context as
+  // uninitialized instead of releasing it in that case.
+  if (!trapsOnDestroy && (consumedFields.empty() || consumedFields.none())) {
+    if (!contextIsOnStack) {
+      forwarder.emitNativeStrongRelease(rawContextPtr,
+                                        forwarder.getDefaultAtomicity());
+      return;
+    }
+
+    // The caller deallocates a stack-allocated context, so releasing it would
+    // only call its destructor through the runtime. Call the destructor
+    // directly instead, unless it has nothing to destroy. The caller built the
+    // context's metadata, and with it the destructor, before emitting this
+    // forwarder.
+    auto *dtorFn = layout->getPrivateDestructor();
+    assert(dtorFn && "stack-allocated context without a destructor");
+    bool hasFieldsToDestroy = false;
+    for (unsigned i : indices(layout->getElements())) {
+      if (!layout->getElement(i).isTriviallyDestroyable() &&
+          (unownedFields.empty() || !unownedFields.test(i)))
+        hasFieldsToDestroy = true;
+    }
+    if (hasFieldsToDestroy) {
+      auto *call = forwarder.Builder.CreateCall(dtorFn->getFunctionType(),
+                                                dtorFn, {rawContextPtr});
+      call->addParamAttr(0, llvm::Attribute::SwiftSelf);
+    }
     return;
   }
 
@@ -1872,6 +1968,10 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // context object and let us deallocate it as-if it was uninitialized.
   llvm::BitVector fieldsToDestroy(consumedFields);
   fieldsToDestroy.flip();
+
+  // A field that the context doesn't own is destroyed by its real owner.
+  if (!unownedFields.empty())
+    fieldsToDestroy.reset(unownedFields);
   for (unsigned elementIdx : fieldsToDestroy.set_bits()) {
     auto &field = layout->getElement(elementIdx);
     if (field.isTriviallyDestroyable())
@@ -2030,9 +2130,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.hasAnySubstitutableParams()
+  assert((subs.isEffectivelyGeneric()
             == hasPolymorphicParameters(origType) ||
-         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
+         (!subs.isEffectivelyGeneric() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;
@@ -2086,6 +2186,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion witnessMethodSelfValue;
   llvm::Value *lastCapturedFieldPtr = nullptr;
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
+  llvm::BitVector unownedFields;
+  if (layout && outType->isNoEscape())
+    unownedFields = getUnownedContextFields(*layout, conventions);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2197,14 +2300,19 @@ static llvm::Value *emitPartialApplicationForwarder(
 
         auto initStackCopy = [&addressesToDeallocate, &needsAllocas, &param,
                               &subIGF](const TypeInfo &fieldTI, SILType fieldTy,
-                                       Address fieldAddr) {
-          // The +1 argument is passed indirectly, so we need to copy into a
-          // temporary.
+                                       Address fieldAddr, bool isTake) {
+          // The +1 argument is passed indirectly, so we need to copy or move
+          // into a temporary.
           needsAllocas = true;
           auto stackAddr = fieldTI.allocateStack(subIGF, fieldTy, "arg.temp");
           auto addressPointer = stackAddr.getAddress().getAddress();
-          fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(), fieldAddr,
-                                     fieldTy, false);
+          if (isTake)
+            fieldTI.initializeWithTake(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false,
+                                       /*zeroizeIfSensitive=*/false);
+          else
+            fieldTI.initializeWithCopy(subIGF, stackAddr.getAddress(),
+                                       fieldAddr, fieldTy, false);
           param.add(addressPointer);
 
           // Remember to deallocate later.
@@ -2212,7 +2320,8 @@ static llvm::Value *emitPartialApplicationForwarder(
               AddressToDeallocate{fieldTy, fieldTI, stackAddr});
         };
 
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, fieldConvention,
+                                              fieldTy)) {
           // If the closure is [onstack] it only captured the address of the
           // value. Load that address from the context.
           Explosion addressExplosion;
@@ -2224,9 +2333,16 @@ static llvm::Value *emitPartialApplicationForwarder(
               subIGF.getTypeInfoForLowered(newFieldTy.getASTType());
           fieldAddr =
               newFieldTI.getAddressForPointer(addressExplosion.claimNext());
-          initStackCopy(newFieldTI, newFieldTy, fieldAddr);
+          initStackCopy(newFieldTI, newFieldTy, fieldAddr, /*isTake=*/false);
+        } else if (outType->isCallConsuming() &&
+                   fieldConvention == ParameterConvention::Indirect_In &&
+                   fieldTy.isMoveOnly()) {
+          // The call consumes the closure, so move the value out of the
+          // context, which then must not destroy it.
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/true);
+          consumedFields.set(fieldIndex);
         } else {
-          initStackCopy(fieldTI, fieldTy, fieldAddr);
+          initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/false);
         }
         break;
       }
@@ -2262,7 +2378,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        if (outType->hasCalledAtMostOnceSemantics()) {
+        if (outType->isCallConsuming()) {
           // Move value into the apply.
           cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
           consumedFields.set(fieldIndex);
@@ -2325,7 +2441,8 @@ static llvm::Value *emitPartialApplicationForwarder(
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                            outType->isNoEscape());
+                            unownedFields, outType->isNoEscape(),
+                            outType->isNondeinitable());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2448,7 +2565,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                          outType->isNoEscape());
+                          unownedFields, outType->isNoEscape(),
+                          outType->isNondeinitable());
   }
 
   emission->createReturn(call);
@@ -2491,8 +2609,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   for (auto param : params) {
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     if (!isa<FixedTypeInfo>(ti)) {
@@ -2505,14 +2625,16 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     SILType argType = IGF.IGM.silConv.getSILType(
         param, substType, IGF.IGM.getMaximalTypeExpansionContext());
 
-    auto argLoweringTy = getArgumentLoweringType(argType.getASTType(), param,
-                                                 outType->isNoEscape());
+    auto argLoweringTy =
+        getArgumentLoweringType(argType.getASTType(), param,
+                                capturesIndirectArgumentByAddress(
+                                    outType, param.getConvention(), argType));
 
     auto &ti = IGF.getTypeInfoForLowered(argLoweringTy);
 
     // Empty values don't matter, unless they still require a nontrivial
     // destroy (e.g. a zero-sized `~Copyable` type with a user-defined
-    // deinit captured by a `@called(atMostOnce)` closure).
+    // deinit captured by an at-most-once closure).
     auto schema = ti.getSchema();
     if (schema.empty() && !param.isFormalIndirect() &&
         ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
@@ -2632,6 +2754,15 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
 
+  // A nondeinitable closure always gets a context of its own so that its
+  // destructor can trap when the closure is dropped. That means it can't take
+  // advantage of the single ref-counted object optimization. Neither can a
+  // noncopyable closure in Embedded Swift, which is dropped by calling the
+  // destructor of its context directly.
+  if (outType->isNondeinitable() ||
+      isClosureContextDestroyedDirectly(IGF.IGM, outType))
+    hasSingleSwiftRefcountedContext = No;
+
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
   
   // If we have a single refcounted pointer context (and no polymorphic args
@@ -2733,7 +2864,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   if (args.empty() && layout.isKnownEmpty() &&
       layout.isTriviallyDestroyable()) {
-    if (outType->isNoEscape())
+    if (outType->isNondeinitable())
+      data = IGF.IGM.getAddrOfExactlyOnceSharedContext();
+    else if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
     else
       data = IGF.IGM.RefCountedNull;
@@ -2749,21 +2882,15 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();
 
-      // @called(atMostOnce) closures always get a context even if they are
+      // Noncopyable closures always get a context even if they are
       // stack promoted because they can have consuming captures.
-      if (outType->hasCalledAtMostOnceSemantics()) {
+      if (outType->isNoncopyable()) {
         assert(!outType->isTrivialNoEscape());
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
-        llvm::BitVector unownedFields(argConventions.size());
-        for (unsigned i : indices(argConventions)) {
-          auto fieldTy = layout.getElementTypes()[i];
-          if (fieldTy &&
-              argConventions[i] == ParameterConvention::Direct_Guaranteed &&
-              fieldTy.isMoveOnly())
-            unownedFields.set(i);
-        }
+        llvm::BitVector unownedFields =
+            getUnownedContextFields(layout, argConventions);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
@@ -2771,7 +2898,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
         auto metadata = layout.getPrivateMetadata(
             IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
-            /*isStackAllocated=*/true);
+            /*isStackAllocated=*/true, outType->isNondeinitable());
         auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
         object = IGF.emitInitStackObjectCall(metadata, object, "closure");
         data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);
@@ -2781,7 +2908,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                        substType, subs,
                                                        layout);
 
-        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets);
+        data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets,
+                                      outType->isNondeinitable());
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
     
@@ -2825,7 +2953,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In_Guaranteed: {
-        if (outType->isNoEscape()) {
+        if (capturesIndirectArgumentByAddress(outType, argConventions[i],
+                                              argValTypes[i])) {
           cast<LoadableTypeInfo>(fieldLayout.getType())
               .initialize(IGF, args, fieldAddr, isOutlined);
         } else {
@@ -3341,10 +3470,6 @@ llvm::Function *IRGenFunction::createAsyncSuspendFn() {
   suspendCall->setCallingConv(IGM.SwiftAsyncCC);
   suspendCall->setDoesNotThrow();
   suspendCall->setTailCallKind(IGM.AsyncTailCallKind);
-
-  llvm::AttributeList attrs = suspendCall->getAttributes();
-  IGM.addSwiftAsyncContextAttributes(attrs, /*context arg index*/ 0);
-  suspendCall->setAttributes(attrs);
 
   Builder.CreateRetVoid();
   return suspendFn;

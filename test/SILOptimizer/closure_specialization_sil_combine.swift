@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -O -module-name src %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -Xllvm -sil-print-transform-blocks=false -module-name src %s | %FileCheck %s
 
 @inline(never)
 public func invoke(_ x: Double, _ body: (Double) -> Double) -> Double {

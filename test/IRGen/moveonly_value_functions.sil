@@ -23,7 +23,7 @@ sil @deinit_count : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (move
 
 // CHECK-LABEL: define{{.*}} @"$s15Synchronization5_CellVAARi_zrlEfD"(
 // CHECK-SAME:      ptr %"_Cell<Value>", 
-// CHECK-SAME:      ptr noalias swiftself [[SOURCE:%[0-9]+]]
+// CHECK-SAME:      ptr swiftself [[SOURCE:%[0-9]+]]
 // CHECK-SAME:  ) 
 // CHECK-SAME:  {
 // CHECK:       entry:

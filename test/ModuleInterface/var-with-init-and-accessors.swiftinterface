@@ -10,6 +10,14 @@
     }
 
     public internal(set) var dict: [String: Int] = [:]
+
+    var internalObserved: Int? = nil {
+        didSet {}
+    }
+
+    private var privateObserved: Int? = nil {
+        willSet {}
+    }
 }
 // INTERFACE: @frozen public struct Struct {
 // INTERFACE-LABEL: @_hasStorage public var values: [Swift::Int] = .init() { @_accessorBlock
@@ -19,4 +27,9 @@
 // INTERFACE-LABEL: @_hasStorage public var dict: [Swift::String : Swift::Int] = [:] { @_accessorBlock
 // INTERFACE-NEXT:     get
 // INTERFACE-NEXT: }
-// INTERFACE: }
+
+// Accessors of non-public properties aren't printed, so neither is the
+// accessor block.
+// INTERFACE-NEXT: @_hasStorage internal var internalObserved: Swift::Int? = nil{{$}}
+// INTERFACE-NEXT: @_hasStorage private var privateObserved: Swift::Int? = nil{{$}}
+// INTERFACE-NEXT: }

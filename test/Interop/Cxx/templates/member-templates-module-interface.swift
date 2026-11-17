@@ -13,9 +13,9 @@
 // CHECK: }
 
 // CHECK: struct TemplateClassWithMemberTemplates<CInt> {
-// CHECK:   init(_ val: CInt)
 // CHECK:   var value: CInt
 // CHECK:   mutating func setValue<U>(_ val: U)
+// CHECK:   init(_ val: CInt)
 // CHECK: }
 
 // CHECK: typealias IntWrapper = TemplateClassWithMemberTemplates<CInt>

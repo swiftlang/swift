@@ -55,6 +55,12 @@ public enum _SwiftifyInfo {
     /// Can express lifetime dependencies between inputs and outputs of a function.
     /// 'dependsOn' is the input on which the output 'pointer' depends.
     case lifetimeDependence(dependsOn: _SwiftifyExpr, pointer: _SwiftifyExpr, type: _DependenceType)
+    /// Corresponds to a C++ lvalue reference type, imported as `Unsafe[Mutable]Pointer<T>`.
+    /// The pointer is known to be non-null and to point to a single element. Combined with a
+    /// `lifetimeDependence` on the same value, the wrapper exposes it as `Ref<Cell<T>>` (or
+    /// `Ref<ConstCell<T>>` for `const` references). Currently only supported for `.return`.
+    /// Parameter pointer: the value with reference type.
+    case reference(pointer: _SwiftifyExpr)
 }
 
 /// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.
@@ -75,12 +81,18 @@ public enum _SwiftifyInfo {
 /// wrapper, with a runtime assertion that a returned null pointer only occurs when the count is
 /// 0. When `false`, the wrapper instead exposes `Span?`/`UnsafeBufferPointer?`, preserving source
 /// stability for projects that adopted the original `SafeInteropWrappers` experimental feature.
+/// Parameter refAvailability: availability of `Ref` and `Cell`/`ConstCell`, applied to wrappers
+/// returning a `Ref`. When passed, a lifetime-dependent `std::span` or `countedBy`/
+/// `countedByOrNull` return value is exposed as `Span<Cell<T>>` (or `Span<ConstCell<T>>` for
+/// `const` elements), and this availability is applied to the wrapper. An empty string adds no
+/// availability attribute.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
                              spanAvailability: String? = nil,
                              typeMappings: [String: String] = [:],
-                             nullableAsEmptySpan: Bool = false) =
+                             nullableAsEmptySpan: Bool = false,
+                             refAvailability: String? = nil) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 

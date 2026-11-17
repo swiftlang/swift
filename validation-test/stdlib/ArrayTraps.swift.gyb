@@ -168,6 +168,33 @@ ${ArrayTy}Traps.test("${'remove(at:)/%s' % index}")
   a.remove(at: ${index})
 }
 %   end
+
+%   for i, j in (0, -1), (-1, 0), (0, 2), (2, 0):
+${ArrayTy}Traps.test("${'swapAt(_:_:)/%s,%s' % (i, j)}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var a: ${ArrayTy}<Int> = [42, 43]
+  expectCrashLater(withDebugMessage: ${ArrayTy}BoundsErrorMsg)
+  a.swapAt(${i}, ${j})
+}
+%   end
+
+% if ArrayTy == 'ArraySlice':
+// These indices are inside the underlying buffer, but not inside the slice.
+%   for i, j in (0, 1), (1, 0):
+${ArrayTy}Traps.test("${'swapAt(_:_:)/%s,%s/belowStartIndex' % (i, j)}")
+  .skip(.custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
+  var a: ${ArrayTy}<Int> = [41, 42, 43][1...]
+  expectCrashLater(withDebugMessage: ${ArrayTy}BoundsErrorMsg)
+  a.swapAt(${i}, ${j})
+}
+%   end
+% end
 % end
 
 ArrayTraps.test("unsafeLength")

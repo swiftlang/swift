@@ -1,0 +1,152 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -dead-object-elimination %s | %FileCheck %s
+
+// An alloc_stack of empty type is not necessarily stored to. When it is
+// removed, its variables are described by constant debug values.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Empty {}
+
+struct Pair {
+  var x: Int64
+  var e: Empty
+}
+
+struct NoElements {
+  var storage: Builtin.FixedArray<0, Int64>
+}
+
+struct Wrapper {
+  var e: Empty
+}
+
+// An empty struct.
+// CHECK-LABEL: sil [ossa] @empty_struct_init :
+// CHECK:       bb0(%0 : $@thin Empty.Type):
+// CHECK-NEXT:    debug_value (), var, name "self", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = struct $Empty ()
+// CHECK-NEXT:      return %0
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[SELF:%[0-9]+]] = struct $Empty ()
+// CHECK-NEXT:    return [[SELF]]
+// CHECK-LABEL: } // end sil function 'empty_struct_init'
+sil [ossa] @empty_struct_init : $@convention(method) (@thin Empty.Type) -> Empty {
+bb0(%0 : $@thin Empty.Type):
+  %1 = alloc_stack $Empty, var, name "self"
+  %2 = struct $Empty ()
+  dealloc_stack %1
+  return %2
+}
+
+// An empty tuple.
+// CHECK-LABEL: sil [ossa] @void_result :
+// CHECK:       bb0([[X:%[0-9]+]] : $Int64):
+// CHECK-NEXT:    debug_value (), let, name "result", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = tuple ()
+// CHECK-NEXT:      return %0
+// CHECK-NEXT:    }
+// CHECK-NEXT:    return [[X]]
+// CHECK-LABEL: } // end sil function 'void_result'
+sil [ossa] @void_result : $@convention(thin) (Int64) -> Int64 {
+bb0(%0 : $Int64):
+  %1 = alloc_stack $()
+  debug_value %1, let, name "result", expr op_deref
+  dealloc_stack %1
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @nested_empty :
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (), var, name "t", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = struct $Empty ()
+// CHECK-NEXT:      %1 = tuple ()
+// CHECK-NEXT:      %2 = tuple (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[NESTED_RET:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[NESTED_RET]]
+// CHECK-LABEL: } // end sil function 'nested_empty'
+sil [ossa] @nested_empty : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $(Empty, ()), var, name "t"
+  dealloc_stack %0
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @empty_fragment :
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (), var, name "p", type $Pair, expr op_fragment:#Pair.e, transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = struct $Empty ()
+// CHECK-NEXT:      return %0
+// CHECK-NEXT:    }
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'empty_fragment'
+sil [ossa] @empty_fragment : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Empty
+  debug_value %0, var, name "p", type $Pair, expr op_deref:op_fragment:#Pair.e
+  dealloc_stack %0
+  %3 = tuple ()
+  return %3
+}
+
+
+// A zero-length Builtin.FixedArray, as stored by InlineArray<0, Int64>.
+// CHECK-LABEL: sil [ossa] @empty_fixed_array :
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (), var, name "a", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = builtin "zeroInitializer"() : $Builtin.FixedArray<0, Int64>
+// CHECK-NEXT:      %1 = struct $NoElements (%0)
+// CHECK-NEXT:      return %1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'empty_fixed_array'
+sil [ossa] @empty_fixed_array : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $NoElements, var, name "a"
+  dealloc_stack %0
+  %2 = tuple ()
+  return %2
+}
+
+// Loads of the address are replaced, its other uses are killed.
+// CHECK-LABEL: sil [ossa] @empty_non_load_use :
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (), var, name "w", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = struct $Empty ()
+// CHECK-NEXT:      %1 = struct $Wrapper (%0)
+// CHECK-NEXT:      %2 = struct_element_addr undef : $*Wrapper, #Wrapper.e
+// CHECK-NEXT:      %3 = load %2
+// CHECK-NEXT:      %4 = tuple (%1, %3)
+// CHECK-NEXT:      return %4
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[NON_LOAD_RET:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[NON_LOAD_RET]]
+// CHECK-LABEL: } // end sil function 'empty_non_load_use'
+sil [ossa] @empty_non_load_use : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Wrapper
+  debug_value %0, var, name "w", transform {
+  bb0(%1 : $*Wrapper):
+    %2 = load %1
+    %3 = struct_element_addr %1, #Wrapper.e
+    %4 = load %3
+    %5 = tuple (%2, %4)
+    return %5
+  }
+  dealloc_stack %0
+  %3 = tuple ()
+  return %3
+}

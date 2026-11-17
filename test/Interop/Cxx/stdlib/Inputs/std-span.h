@@ -74,7 +74,7 @@ struct DependsOnSelf {
 // CHECK:     struct DependsOnSelf {
 // CHECK:       @safe borrowing func get() -> ConstSpanOfInt
 // CHECK-LEGACY:       @_lifetime(borrow self)
-// CHECK-LEGACY-NEXT:  @safe @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public borrowing func get() -> Span<CInt>
+// CHECK-LEGACY-NEXT:  @safe @_alwaysEmitIntoClient @inline(always) @_addressableSelf @_disfavoredOverload public borrowing func get() -> Span<CInt>
 // CHECK:     }
 
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
@@ -117,7 +117,7 @@ inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
 // CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-LEGACY-NEXT: @_lifetime(borrow v)
-// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing @_addressable VecOfInt) -> Span<CInt>
 
 struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
@@ -159,7 +159,7 @@ inline const int * __counted_by(len) mixedFuncWithSafeWrapper2(const VecOfInt &v
 // CHECK-LEGACY-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-LEGACY-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-LEGACY-NEXT: @_lifetime(borrow v)
-// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing VecOfInt, _ len: CInt) -> Span<CInt>
+// CHECK-LEGACY-NEXT: @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func mixedFuncWithSafeWrapper2(_ v: borrowing @_addressable VecOfInt, _ len: CInt) -> Span<CInt>
 
 inline void mixedFuncWithSafeWrapper3(ConstSpanOfInt s [[clang::noescape]],
                                       int * __counted_by(len) p, int len) {}
@@ -383,7 +383,11 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
       [[clang::lifetimebound]] {
     return ConstSpanOfInt(v.data(), v.size());
   }
-  SpanOfInt getMutable() [[clang::lifetimebound]] {
+  // Vouch for safety explicitly: whether std::span is considered a
+  // self-contained type (and hence whether this is an unsafe projection)
+  // depends on the C++ standard library implementation.
+  __attribute__((swift_attr("safe"))) SpanOfInt getMutable()
+      [[clang::lifetimebound]] {
     return SpanOfInt(v.data(), v.size());
   }
 };
@@ -392,7 +396,7 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
 // CHECK-NEXT:   convenience init()
 // CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
 // CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
-// CHECK-NEXT:   borrowing func {{(__)?}}getMutable{{(Unsafe)?}}() -> SpanOfInt
+// CHECK-NEXT:   borrowing func getMutable() -> SpanOfInt
 // CHECK-NEXT: }
 
 struct NonCopyable {

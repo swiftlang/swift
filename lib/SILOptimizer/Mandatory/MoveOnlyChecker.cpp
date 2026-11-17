@@ -249,6 +249,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
                                                    checker.diagnosticEmitter);
     }
 
+    // Later move-only diagnostics, like the ones from the implicit destroy
+    // checker, would only add noise.
+    if (checker.diagnosticEmitter.emittedDiagnostic())
+      fn->addSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS);
+
     // Remaining borrows
     // should be correctly immutable. We can canonicalize any remaining
     // `load_borrow [unchecked]` instructions.

@@ -569,6 +569,41 @@ Do NOT add `REQUIRES: asserts` for experimental features anymore. The correct
 usage of `REQUIRES: swift_feature_...` will take care of testing the feature as
 it evolves from experimental, to upcoming, to language feature.
 
+#### Testing the future language mode
+
+Source-breaking changes that are planned for the next language mode are
+usually staged as warnings until that mode (for example, with
+`warnUntilLanguageMode(LanguageMode::future)`) or as upcoming features that are
+enabled in `LanguageMode::future`. To test the behavior of the future language
+mode, pass `-language-mode future` (or `-swift-version future`).
+
+The `future` language mode identifier is only accepted by compilers built with assertions.
+Gate each RUN line that uses it with the `swift_future` feature using `%if`,
+rather than adding `REQUIRES: swift_future` to the whole file, so that the rest
+of the test still runs with compilers built without assertions.
+
+Test the current and the future language modes in the same file, using
+`-verify-additional-prefix` to distinguish the diagnostics that differ between
+them. Don't split the future language mode test cases into a separate file
+(such as `my_feature_swift7.swift`):
+
+```swift
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- %}
+
+func test() {
+  someStagedDiagnostic()
+  // expected-swift6-warning@-1 {{some diagnostic; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{some diagnostic}}
+
+  someDiagnostic() // expected-error {{some other diagnostic}}
+}
+```
+
+For tests that use `FileCheck`, use `--check-prefixes` with a common prefix and
+a prefix for each language mode, for example
+`--check-prefixes=CHECK,CHECK-SWIFT6` and `--check-prefixes=CHECK,CHECK-FUTURE`.
+
 #### Feature ``REQUIRES: executable_test``
 
 This feature marks an executable test. The test harness makes this feature

@@ -203,7 +203,7 @@ tests.test("HexFloats") {
   expectParse("0xab", 171.0)
   expectParse("0x1p+10", 1024.0)
   expectParse("0x1p+0000000000000000000000000010", 1024.0)
-  expectParse("0x1.921fb4p+1", Float32.pi)
+  expectParse("0x1.921fb6p+1", Float32.pi)
 
   // Rationale for the four assertions below:
   // * Float32.greatestFiniteMagnitude has an odd significand
@@ -323,6 +323,24 @@ func viaLegacy(_ text: String) -> Float32? {
       return Float32?.none
     }
   }
+}
+
+// Digits beyond the maximum needed to resolve a midpoint are summarized by a
+// single digit, which must only be non-zero if one of those digits is non-zero.
+tests.test("Summarized digits") {
+  func zeros(_ count: Int) -> String { String(repeating: "0", count: count) }
+  let midpoint = "16777217"
+  let below: Float32 = 16777216.0
+  let above: Float32 = 16777218.0
+
+  expectParse(midpoint + "." + zeros(105), below)
+  expectParse(midpoint + "." + zeros(106), below)
+  expectParse(midpoint + "." + zeros(200), below)
+  expectParse(midpoint + "." + zeros(200) + "1", above)
+
+  // The decimal point can fall within the summarized digits.
+  expectParse(midpoint + zeros(110) + ".0000e-110", below)
+  expectParse(midpoint + zeros(110) + ".0001e-110", above)
 }
 
 tests.test("Legacy ABI") {

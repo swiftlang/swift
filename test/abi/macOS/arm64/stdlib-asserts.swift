@@ -5,6 +5,8 @@
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
+// REQUIRES: backtracing
+// REQUIRES: runtime_function_counters
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 

@@ -1,0 +1,245 @@
+// RUN: %target-sil-opt %s -test-runner -verify -o /dev/null
+
+// Unit tests for the DiagnoseResolvedLifetimes pass. Each function is hand-written
+// with the markers that LifetimeResolution's `legalize` would leave behind, so the
+// diagnose pass is exercised in isolation via its FunctionTest hook:
+//   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
+//   - `assign undef to [init]`                          -> use-before-init
+//   - `diagnose [let_reinit]`                           -> repeated `let` initialization
+//   - `diagnose [unpermitted_copy]` on a `copy_value` of a borrowed value -> missed-copy backstop
+//   - a copy of a noncopyable value without a marker                       -> missed-copy backstop
+//   - `diagnose [unpermitted_copy]` on a `load [copy]` from a borrowed box -> missing reinitialization
+//
+// (The variable name renders empty here because hand-written SIL has no backing
+// VarDecl; from real Swift source the name resolves normally.)
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+
+struct NC : ~Copyable {
+  var k: K
+}
+
+sil @getK : $@convention(thin) () -> @owned K
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @consumeK : $@convention(thin) (@owned K) -> ()
+
+sil_global hidden @globalK : $K
+
+// A `load [copy]` tagged with `diagnose [unpermitted_copy]` is a consume that was
+// demoted to a copy because `%l2` still demanded the value below it. The error is
+// reported at that downstream use, with a note at the consume.
+sil [ossa] @diagnose_use_after_consume : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_box ${ var K }, var, name "a"
+  %1 = mark_uninitialized [var] %0 : ${ var K }
+  %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
+  %root = project_box %2 : ${ var K }, 0
+  specify_test "diagnose_resolved_lifetimes"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root : $*K
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %c = load [copy] %d1 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %c : $K
+  end_access %d1 : $*K
+  destroy_value %c : $K
+
+  %r1 = begin_access [deinit] [unknown] %root : $*K
+  %l2 = load [take] %r1 : $*K // expected-error {{used after consume}}
+  destroy_value %l2 : $K
+  end_access %r1 : $*K
+
+  end_borrow %2
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+// A `diagnose [unpermitted_copy]` on a `copy_value`.
+sil [ossa] @diagnose_use_after_consume_value : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  specify_test "diagnose_resolved_lifetimes"
+
+  %0 = apply %getFn() : $@convention(thin) () -> @owned K
+  %root = move_value [lexical] [var_decl] %0 : $K
+  debug_value %root, let, name "p"
+
+  %copy = copy_value %root : $K
+  diagnose [unpermitted_copy] %copy : $K
+  %m = move_value [allows_diagnostics] %copy : $K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  ignored_use %m
+  destroy_value %m : $K
+
+  ignored_use %root // expected-error {{used after consume}}
+  destroy_value %root : $K
+  %t = tuple ()
+  return %t
+}
+
+// An `assign undef to [init]` marks a root that was used while possibly
+// uninitialized. The error is reported at the first read that observes the undef
+// value, with a note at the declaration.
+sil [ossa] @diagnose_use_before_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var K }, var, name "b"
+  %1 = mark_uninitialized [var] %0 : ${ var K } // expected-note {{variable defined here}}
+  %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
+  %root = project_box %2 : ${ var K }, 0
+  assign undef to [init] %root : $*K
+  specify_test "diagnose_resolved_lifetimes"
+
+  %d1 = begin_access [deinit] [unknown] %root : $*K
+  %l1 = load [take] %d1 : $*K // expected-error {{used before being initialized}}
+  end_access %d1 : $*K
+  destroy_value %l1 : $K
+
+  end_borrow %2
+  destroy_value %1
+  %t = tuple ()
+  return %t
+}
+
+// Consumes on either branch that reach the same use are reported as one error,
+// with a note at each consume.
+sil [ossa] @diagnose_grouped_consumes : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
+  specify_test "diagnose_resolved_lifetimes"
+  %v = apply %getFn() : $@convention(thin) () -> @owned K
+  store %v to [init] %0 : $*K
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = load [copy] %0 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %c1 : $K
+  destroy_value %c1 : $K
+  br bb3
+
+bb2:
+  %c2 = load [copy] %0 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %c2 : $K
+  destroy_value %c2 : $K
+  br bb3
+
+bb3:
+  %l = load [take] %0 : $*K // expected-error {{used after consume}}
+  destroy_value %l : $K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A `diagnose [let_reinit]` marks a store to immutable storage that may already be initialized.
+sil [ossa] @diagnose_let_reinit : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
+  %1 = mark_uninitialized [var] %0 : $*K
+  specify_test "diagnose_resolved_lifetimes"
+  %a = apply %getFn() : $@convention(thin) () -> @owned K
+  store %a to [init] %1 : $*K
+  %b = apply %getFn() : $@convention(thin) () -> @owned K
+  diagnose [let_reinit] %1 : $*K // expected-error {{may only be initialized once}}
+  store %b to [assign] %1 : $*K
+  destroy_addr %1 : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// Markers on storage that is not resolvable still produce an error.
+sil [ossa] @diagnose_unknown_storage : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = global_addr @globalK : $*K
+  specify_test "diagnose_resolved_lifetimes"
+  assign undef to [init] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
+  %a = apply %getFn() : $@convention(thin) () -> @owned K
+  diagnose [let_reinit] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
+  store %a to [assign] %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A consume of a borrowed value is reported at the copy.
+sil [ossa] @diagnose_consume_of_borrow : $@convention(thin) (@guaranteed K) -> () {
+bb0(%0 : @guaranteed $K):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = copy_value %0 // expected-error {{'' is borrowed and cannot be consumed without an explicit 'copy'}} // expected-note {{write 'copy ' to consume a copy instead}}
+  diagnose [unpermitted_copy] %1
+  apply %consFn(%1) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t
+}
+
+// A captured box's contents must be initialized when the closure returns.
+sil [ossa] @diagnose_consume_of_borrowed_box : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var K }):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [copy] %2 // expected-error {{missing reinitialization of closure capture '' after consume}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %3
+  end_access %2
+  apply %consFn(%3) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t
+}
+
+// The backstop: every copy of a noncopyable value must be accompanied by a
+// `diagnose [unpermitted_copy]`, or else LifetimeResolution missed it.
+
+sil [ossa] @missed_copy_load : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %0 = alloc_stack $NC
+  specify_test "diagnose_resolved_lifetimes"
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0
+  %c = load [copy] %0 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_value %c
+  destroy_addr %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+sil [ossa] @missed_copy_addr : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %0 = alloc_stack $NC
+  %1 = alloc_stack $NC
+  specify_test "diagnose_resolved_lifetimes"
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0
+  copy_addr %0 to [init] %1 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_addr %1
+  destroy_addr %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+sil [ossa] @missed_copy_value : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  specify_test "diagnose_resolved_lifetimes"
+  %0 = apply %getFn() : $@convention(thin) () -> @owned NC
+  %c = copy_value %0 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_value %c
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}

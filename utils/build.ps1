@@ -126,6 +126,8 @@ Build the MSI installers and packaging.
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+Use 'swift-prepare' to configure and build everything the Swift test suite needs, without running it
+(for example, so that utils\run-test.cmd can be used afterwards). It is not included in '*'.
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -136,6 +138,11 @@ Build and include the no-assert toolchain variant in the output.
 
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
+
+.PARAMETER Trace
+Write the build timings to build-timings.json in the Stage directory (or BinaryCache
+if Stage is empty) in the Chrome Trace Event format, which can be viewed in
+https://ui.perfetto.dev or chrome://tracing.
 
 .EXAMPLE
 PS> .\Build.ps1
@@ -172,6 +179,9 @@ param
   # CMake
   [string] $CMakeVersion = "4.4.1",
 
+  # Ninja
+  [string] $NinjaVersion = "1.13.2",
+
   # Dependency Download Retries
   [ValidateRange(1, [int]::MaxValue)]
   [int] $DownloadRetryCount = 3,
@@ -183,6 +193,7 @@ param
   # Dependencies
   [ValidatePattern('^\d+(\.\d+)*$')]
   [string] $PythonVersion = "3.10.1",
+  [switch] $DependenciesOnly = $False,
 
   # Toolchain Version Info
   [string] $ProductVersion = "0.0.0",
@@ -231,7 +242,8 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $Trace
 )
 
 ## Prepare the build environment.
@@ -484,7 +496,7 @@ $PythonModules = @{
   "psutil" = @{
     Version = "6.1.0";
     SHA256 = @{
-      AMD64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+      AMD64 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
       ARM64 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
     };
     Dependencies = @();
@@ -626,6 +638,25 @@ $KnownCMakes = @{
   }
 }
 
+$KnownNinjas = @{
+  "1.13.2" = @{
+    AMD64 = @{
+      Artifact = "ninja-1.13.2-windows-amd64"
+      URL = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-win.zip"
+      SHA256 = "07FC8261B42B20E71D1720B39068C2E14FFCEE6396B76FB7A795FB460B78DC65"
+      FileName = "ninja-win.zip"
+      Path = [IO.Path]::Combine("$ArtifactCache", "ninja-1.13.2-windows-amd64", "ninja.exe")
+    };
+    ARM64 = @{
+      Artifact = "ninja-1.13.2-windows-arm64"
+      URL = "https://github.com/ninja-build/ninja/releases/download/v1.13.2/ninja-winarm64.zip"
+      SHA256 = "E52F0BDEF9DFB1003229DBD6508A508C4073FD017247002ADC66E5E806CB0391"
+      FileName = "ninja-winarm64.zip"
+      Path = [IO.Path]::Combine("$ArtifactCache", "ninja-1.13.2-windows-arm64", "ninja.exe")
+    };
+  }
+}
+
 $BuildArchName = if ($env:PROCESSOR_ARCHITEW6432) { $env:PROCESSOR_ARCHITEW6432 } else { $env:PROCESSOR_ARCHITECTURE }
 # TODO: Support other cross-compilation scenarios.
 $BuildOS = [OS]::Windows
@@ -634,19 +665,6 @@ $HostOS = [OS]::Windows
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -property installationPath
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
-
-function Get-Ninja {
-  try {
-    return (Get-Command "Ninja.exe" -ErrorAction Stop).Source
-  } catch {
-      if (Test-Path -Path "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja" -PathType Container) {
-        return "${VSInstallRoot}\Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja\ninja.exe"
-      }
-  }
-  throw "Ninja not found on Path nor in the Visual Studio Installation. Please Install Ninja to continue."
-}
-
-$ninja = Get-Ninja
 
 $NugetRoot = "$ArtifactCache\nuget"
 
@@ -711,6 +729,25 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+$BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
+$RecordTimings = $Summary -or $Trace
+
+if ($RecordTimings) {
+  Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
+[DllImport("kernel32.dll")]
+public static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
+"@
+}
+
+# Returns the time all processors have spent busy and idle since boot.
+function Get-ProcessorTimes {
+  $IdleTime = $KernelTime = $UserTime = [long] 0
+  $null = [Win32.Kernel32]::GetSystemTimes([ref] $IdleTime, [ref] $KernelTime, [ref] $UserTime)
+  # The kernel time includes the idle time.
+  return @{ Busy = $KernelTime + $UserTime - $IdleTime; Idle = $IdleTime }
+}
+
+$BuildStartProcessorTimes = if ($RecordTimings) { Get-ProcessorTimes } else { $null }
 
 function Add-TimingData {
   param
@@ -719,6 +756,7 @@ function Add-TimingData {
     [Hashtable] $Platform,
     [Parameter(Mandatory)]
     [string] $BuildStep,
+    [string] $Variant = "",
     [PSCustomObject] $Parent = $null
   )
 
@@ -726,7 +764,10 @@ function Add-TimingData {
     Arch = $Platform.Architecture.LLVMName
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
+    Variant = $Variant
+    Start = $BuildStopwatch.Elapsed
     "Elapsed Time" = [TimeSpan]::Zero
+    CPU = 0
     Parent = $Parent
     Children = @()
   }
@@ -747,22 +788,28 @@ function Record-OperationTime {
     [Parameter(Mandatory)]
     [string] $BuildStep,
     [Parameter(Mandatory)]
-    [ScriptBlock] $ScriptBlock
+    [ScriptBlock] $ScriptBlock,
+    [string] $SummaryVariant = ""
   )
-  if (!$Summary) {
+  if (!$RecordTimings) {
     & $ScriptBlock
     return
   }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-  $TimingEntry = Add-TimingData $Platform $BuildStep $script:CurrentOperation
+  $StartTimes = Get-ProcessorTimes
+  $TimingEntry = Add-TimingData $Platform $BuildStep -Variant $SummaryVariant -Parent $script:CurrentOperation
   $script:CurrentOperation = $TimingEntry
 
   try {
     & $ScriptBlock
   } finally {
     $Stopwatch.Stop()
+    $EndTimes = Get-ProcessorTimes
+    $BusyTime = $EndTimes.Busy - $StartTimes.Busy
+    $TotalTime = $BusyTime + $EndTimes.Idle - $StartTimes.Idle
     $TimingEntry."Elapsed Time" = $Stopwatch.Elapsed
+    $TimingEntry.CPU = if ($TotalTime -gt 0) { $BusyTime / $TotalTime } else { 0 }
     $script:CurrentOperation = $TimingEntry.Parent
   }
 }
@@ -779,13 +826,23 @@ function Flatten-TimingEntry {
   $Indent = "  " * $Depth
   $Percentage = [math]::Round(($Entry."Elapsed Time".TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
   $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $Entry."Elapsed Time"
+  # Time spent in the step itself rather than in its children (configuring,
+  # installing, copying files, ...). Only meaningful for steps with children.
+  $FormattedSelfTime = ""
+  if ($Entry.Children) {
+    $ChildrenTicks = ($Entry.Children | ForEach-Object { $_."Elapsed Time".Ticks } | Measure-Object -Sum).Sum
+    $FormattedSelfTime = "{0:hh\:mm\:ss\.ff}" -f ($Entry."Elapsed Time" - [TimeSpan]::FromTicks($ChildrenTicks))
+  }
 
   [PSCustomObject]@{
     "Build Step" = "$Indent$($Entry.'Build Step')"
+    Variant = $Entry.Variant
     Platform = $Entry.Platform
     Arch = $Entry.Arch
     "Elapsed Time" = $FormattedTime
+    Self = $FormattedSelfTime
     "%" = "$Percentage%"
+    CPU = "$([math]::Round($Entry.CPU * 100))%"
   }
 
   $SortedChildren = $Entry.Children | Sort-Object -Descending -Property "Elapsed Time"
@@ -797,14 +854,37 @@ function Flatten-TimingEntry {
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  $TotalTime = [TimeSpan]::Zero
-  foreach ($Entry in $TimingData) {
-    if (-not $Entry.Parent) {
-      $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
+  $TotalTime = $BuildStopwatch.Elapsed
+  $EndTimes = Get-ProcessorTimes
+  $BusyTime = $EndTimes.Busy - $BuildStartProcessorTimes.Busy
+  $AllTime = $BusyTime + $EndTimes.Idle - $BuildStartProcessorTimes.Idle
+  $TotalCPU = if ($AllTime -gt 0) { $BusyTime / $AllTime } else { 0 }
+
+  $TrackedTime = [TimeSpan]::Zero
+  $TrackedBusySeconds = 0
+  $RootEntries = @($TimingData | Where-Object { -not $_.Parent })
+  foreach ($Entry in $RootEntries) {
+    $TrackedTime = $TrackedTime.Add($Entry."Elapsed Time")
+    $TrackedBusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
+  }
+
+  # Account for the time spent outside of any recorded build step.
+  $UntrackedTime = $TotalTime - $TrackedTime
+  if ($UntrackedTime -gt [TimeSpan]::Zero) {
+    $UntrackedBusySeconds = $TotalCPU * $TotalTime.TotalSeconds - $TrackedBusySeconds
+    $RootEntries += [PSCustomObject]@{
+      Arch = ""
+      Platform = ""
+      "Build Step" = "(untracked)"
+      Variant = ""
+      "Elapsed Time" = $UntrackedTime
+      CPU = [math]::Max(0, [math]::Min(1, $UntrackedBusySeconds / $UntrackedTime.TotalSeconds))
+      Parent = $null
+      Children = @()
     }
   }
 
-  $RootEntries = $TimingData | Where-Object { -not $_.Parent } | Sort-Object -Descending -Property "Elapsed Time"
+  $RootEntries = $RootEntries | Sort-Object -Descending -Property "Elapsed Time"
   $Result = foreach ($RootEntry in $RootEntries) {
     Flatten-TimingEntry $RootEntry $TotalTime
   }
@@ -812,13 +892,43 @@ function Write-Summary {
   $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
     "Build Step" = "TOTAL"
+    Variant = ""
     Platform = ""
     Arch = ""
     "Elapsed Time" = $FormattedTotalTime
+    Self = ""
     "%" = "100.0%"
+    CPU = "$([math]::Round($TotalCPU * 100))%"
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
+}
+
+# Writes the timing data in the Chrome Trace Event format, which can be loaded
+# in https://ui.perfetto.dev or chrome://tracing to view the build timeline.
+function Write-TimingTrace([string] $Path) {
+  $Events = foreach ($Entry in $TimingData) {
+    [ordered]@{
+      name = $Entry."Build Step"
+      cat = "$($Entry.Platform) $($Entry.Arch)"
+      ph = "X"
+      # Timestamps are in microseconds, TimeSpan ticks are 100ns.
+      ts = [long]($Entry.Start.Ticks / 10)
+      dur = [long]($Entry."Elapsed Time".Ticks / 10)
+      pid = 0
+      tid = 0
+      args = [ordered]@{
+        Platform = $Entry.Platform
+        Arch = $Entry.Arch
+        CPU = [math]::Round($Entry.CPU, 2)
+      }
+    }
+  }
+
+  New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
+  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
+  [IO.File]::WriteAllText($Path, $Json)
+  Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
 
 function Get-AndroidNDK {
@@ -861,6 +971,10 @@ function Get-Syft {
 
 function Get-CMake {
   return $KnownCMakes[$CMakeVersion][$BuildArchName]
+}
+
+function Get-Ninja {
+  return $KnownNinjas[$NinjaVersion][$BuildArchName]
 }
 
 function Get-InstallDir([Hashtable] $Platform) {
@@ -936,7 +1050,10 @@ function Invoke-BuildStep {
     }
   }
 
-  Record-OperationTime $Platform $Name {
+  $SummaryVariant = $SplatArgs["SummaryVariant"]
+  $SplatArgs.Remove("SummaryVariant")
+
+  Record-OperationTime $Platform $Name -SummaryVariant $SummaryVariant {
     & $Name $Platform @SplatArgs
   }
 }
@@ -1568,6 +1685,7 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $env:WindowsSdkBinPath = "$CustomWinSDKRoot\bin"
     $env:WindowsSDKLibVersion = "$WinSDKVersion\"
     $env:WindowsSdkVerBinPath = "$CustomWinSDKRoot\bin\$WinSDKVersion"
+    $env:WindowsSdkDir = $CustomWinSDKRoot
     $env:WindowsSDKVersion = "$WinSDKVersion\"
 
     $env:EXTERNAL_INCLUDE += ";$WinSDKIncludePath"
@@ -1583,12 +1701,12 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
     function Write-Success([string] $Description) {
-      $HeavyCheckMark = @{
-        Object = [Char]0x2714
+      $SuccessTag = @{
+        Object = "[OK]"
         ForegroundColor = 'DarkGreen'
         NoNewLine = $true
       }
-      Write-Host @HeavyCheckMark
+      Write-Host @SuccessTag
       Write-Host " $Description"
     }
 
@@ -1806,8 +1924,10 @@ function Get-Dependencies {
       Install-PIPIfNeeded
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
+      if ($Test -contains "swift" -or $Test -contains "swift-prepare" -or $Test -contains "lldb" -or $Test -contains "lldb-swift") {
+        Install-PythonModule "psutil"       # Required for lit per-test timeouts, and for testing LLDB
+      }
       if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
-        Install-PythonModule "psutil"       # Required for testing LLDB
         Install-PythonModule "cryptography" # Required for testing LLDB
       }
     }
@@ -1861,6 +1981,12 @@ function Get-Dependencies {
     DownloadAndVerify $CMake.URL "$ArtifactCache\$($CMake.FileName)" $CMake.SHA256
     Expand-ArtifactZip $CMake.FileName $CMake.Artifact
     Write-Success "CMake $CMakeVersion"
+
+    # Install Ninja.
+    $Ninja = Get-Ninja
+    DownloadAndVerify $Ninja.URL "$ArtifactCache\$($Ninja.FileName)" $Ninja.SHA256
+    Expand-ArtifactZip $Ninja.FileName $Ninja.Artifact
+    Write-Success "Ninja $NinjaVersion"
 
     if ($Android) {
       $NDK = Get-AndroidNDK
@@ -2367,6 +2493,9 @@ function Build-CMakeProject {
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_ARCH_ABI $Platform.Architecture.ABI
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_NDK "$AndroidNDKPath"
+        # Use the shared C++ runtime so that libraries like libswiftCore and
+        # _FoundationICU don't carry their own copy.
+        Add-KeyValueIfNew $Defines CMAKE_ANDROID_STL_TYPE c++_shared
         Add-KeyValueIfNew $Defines CMAKE_SYSROOT "$AndroidSysroot"
 
         if ($UseASM) {
@@ -2555,7 +2684,7 @@ function Build-CMakeProject {
       Add-KeyValueIfNew $Defines CMAKE_INSTALL_PREFIX $InstallTo
     }
 
-    Add-KeyValueIfNew $Defines CMAKE_MAKE_PROGRAM "$ninja"
+    Add-KeyValueIfNew $Defines CMAKE_MAKE_PROGRAM "$((Get-Ninja).Path)"
 
     # Generate the project
     $cmakeGenerateArgs = @("-B", $Bin, "-S", $Src, "-G", $Generator)
@@ -2596,13 +2725,14 @@ function Build-CMakeProject {
     Write-Host "$CMakeBin $cmakeGenerateArgs"
     Invoke-Program $CMakeBin @cmakeGenerateArgs
 
-    # Build all requested targets
-    foreach ($Target in $BuildTargets) {
-      if ($Target -eq "default") {
-        Invoke-Program $CMakeBin --build $Bin
-      } else {
-        Invoke-Program $CMakeBin --build $Bin --target $Target
-      }
+    # Build all requested targets in one invocation. Test targets such as
+    # ExperimentalTest do not depend on the default target, so build it first.
+    if ($BuildTargets -contains "default") {
+      Invoke-Program $CMakeBin --build $Bin
+    }
+    $Targets = @($BuildTargets | Where-Object { $_ -ne "default" })
+    if ($Targets.Length -gt 0) {
+      Invoke-Program $CMakeBin --build $Bin --target @Targets
     }
 
     if ($BuildTargets.Length -eq 0 -and $InstallTo) {
@@ -2915,11 +3045,17 @@ function Build-CDispatch([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
-    -Defines @{
+    -Defines (@{
       BUILD_SHARED_LIBS = $(if ($Static) { "NO" } else { "YES" });
       BUILD_TESTING = "NO";
       ENABLE_SWIFT = "NO";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # libdispatch doesn't use libc++, but with the shared C++ runtime it would
+      # take `__emutls_get_address` from it and depend on libc++_shared.so.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Get-CompilersDefines([Hashtable] $Platform,
@@ -3387,7 +3523,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [switch] $PrepareSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3407,8 +3543,10 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift) {
-      $Targets += @("SwiftCompilerPlugin", "check-swift")
+    if ($TestSwift -or $PrepareSwift) {
+      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
+      # need it, so it is built before check-swift starts.
+      $Targets += @("SwiftCompilerPlugin")
     }
     $LLDBTargets = @()
     if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
@@ -3424,6 +3562,11 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
       New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
       foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
+        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+      }
+      $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
+      $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+      foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
 
@@ -3543,8 +3686,22 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    $Targets = @("swift-test-stdlib") + $Targets
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    # Some tests run Stage2 tools with a scrubbed PATH, so cmark's DLLs can't
+    # be found via the PATH set above; put them beside the executables.
+    foreach ($DLL in @("src\cmark-gfm.dll", "extensions\cmark-gfm-extensions.dll")) {
+      $CMarkDLL = Join-Path (Get-CMarkBinaryCache $Platform) $DLL
+      if (Test-Path $CMarkDLL) {
+        Copy-Item -Force -Path $CMarkDLL -Destination $Stage2BinDir
+      }
+    }
+
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
+    if ($Targets) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    }
+    if ($TestSwift) {
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+    }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {
@@ -3747,8 +3904,11 @@ function Build-ZLib([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -Defines @{
-      BUILD_SHARED_LIBS = "NO";
       CMAKE_POSITION_INDEPENDENT_CODE = "YES";
+      ZLIB_BUILD_MINIZIP = "NO";
+      ZLIB_BUILD_SHARED = "NO";
+      ZLIB_BUILD_STATIC = "YES";
+      ZLIB_BUILD_TESTING = "NO";
     }
 }
 
@@ -3827,12 +3987,17 @@ function Build-DS2([Hashtable] $Platform) {
     -Platform $Platform `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
-    -Defines @{
+    -Defines (@{
       DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # ds2 is a standalone executable, so keep the static C++ runtime.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Build-BoringSSL([Hashtable] $Platform,
@@ -4002,8 +4167,12 @@ function Build-CURL([Hashtable] $Platform,
       USE_WIN32_LARGE_FILES = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       USE_WIN32_LDAP = "NO";
       USE_WINDOWS_SSPI = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
-      ZLIB_ROOT = "$BinaryCache\$($Platform.Triple)\usr";
-      ZLIB_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib";
+      ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+      ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+        "$BinaryCache\$($Platform.Triple)\usr\lib\libzs.lib"
+      } else {
+        "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
+      };
     })
 }
 
@@ -4678,6 +4847,12 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         dispatch_INSTALL_ARCH_SUBDIR      = "YES";
       }
       $DispatchDefines = $SDKInstallDefines + $DispatchDefines
+      if ($Platform.OS -eq [OS]::Android) {
+        # libdispatch doesn't use libc++, but with the shared C++ runtime it
+        # would take `__emutls_get_address` from it and depend on
+        # libc++_shared.so.
+        $DispatchDefines.CMAKE_ANDROID_STL_TYPE = "c++_static"
+      }
 
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
@@ -4748,7 +4923,7 @@ roots:
           CURL_DIR                          = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR                       = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY                      = if ($Platform.OS -eq [OS]::Windows) {
-                                                "$BinaryCache\$($Platform.Triple)\usr\lib\zlibstatic.lib"
+                                                "$BinaryCache\$($Platform.Triple)\usr\lib\libzs.lib"
                                               } else {
                                                 "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
                                               };
@@ -4979,7 +5154,7 @@ function Test-LLBuild([Hashtable] $Platform) {
   # Build additional llvm executables needed by tests
   Invoke-IsolatingEnvVars {
     Invoke-VsDevShell $BuildPlatform
-    Invoke-Program $ninja -C (Get-ProjectBinaryCache $BuildPlatform BuildTools) FileCheck not
+    Invoke-Program (Get-Ninja).Path -C (Get-ProjectBinaryCache $BuildPlatform BuildTools) FileCheck not
   }
 
   Invoke-IsolatingEnvVars {
@@ -5897,6 +6072,10 @@ try {
 
 Get-Dependencies
 
+if ($DependenciesOnly) {
+  exit 0;
+}
+
 if ($Clean) {
   # Fail instead of leaving a partially-cleaned tree behind.
   function Clean-Path([string] $Path) {
@@ -5939,12 +6118,12 @@ if ($Toolchain) {
   Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Early Swift Driver ────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
+  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver -SummaryVariant "EarlySwiftDriver"
   Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
 
   # ── Stage1 Compiler ───────────────────────────────────────────────────────
-  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
-  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
+  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap" -SummaryVariant "Bootstrap"
+  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers -SummaryVariant "Stage1/Asserts" @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
     Assembler       = $Assemblers.Host;
     CCompiler       = $Compilers.Host.C;
@@ -5967,7 +6146,7 @@ if ($Toolchain) {
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
 
-  Invoke-BuildStep Build-SDK $HostPlatform -Context @{
+  Invoke-BuildStep Build-SDK $HostPlatform -SummaryVariant "Dynamic" -Context @{
     SDKIdentifier        = $HostPlatform.OS.ToString();
     Variant              = "Dynamic";
     Compilers            = $Compilers.Stage1;
@@ -5978,8 +6157,8 @@ if ($Toolchain) {
 
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
-  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
-  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
+  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
     CXXCompiler     = $Compilers.Stage1.CXX;
@@ -5987,7 +6166,7 @@ if ($Toolchain) {
     SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
     DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
   }
-  Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
+  Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
   # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
@@ -6103,7 +6282,7 @@ if ($Toolchain) {
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers -SummaryVariant "Stage2/NoAsserts" @{
       Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
@@ -6127,18 +6306,18 @@ if ($Toolchain) {
     #   /NS: Do not write file sizes
     #   /NP: Do not show progress indicator
     & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
-    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts"
+    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts" -SummaryVariant "NoAsserts"
   }
 
   if ($HostPlatform.OS -eq [OS]::Windows) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
     if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
         ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
         RuntimeLocation = $HostRuntimeBin;
       }
@@ -6156,7 +6335,7 @@ if ($Windows) {
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
     if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Dynamic";
         Compilers            = $Compilers.Stage1;
@@ -6167,7 +6346,7 @@ if ($Windows) {
     }
 
     if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Static";
         Compilers            = $Compilers.Stage1;
@@ -6201,7 +6380,7 @@ if ($Windows) {
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build CURL)\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build XML2)\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
-    Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\zlibstatic.lib" -Destination "${SwiftResourceDir}\zlibstatic.lib" | Out-Null
+    Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\libzs.lib" -Destination "${SwiftResourceDir}\libzs.lib" | Out-Null
   }
 
   $RebuiltHostDynamicRuntime = @(
@@ -6214,12 +6393,12 @@ if ($Windows) {
   if ($Toolchain -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
     if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
         ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
         RuntimeLocation = $HostRuntimeBin;
       }
@@ -6233,7 +6412,7 @@ if ($Android) {
   $SDKROOT = Get-SwiftSDK -OS Android
   foreach ($Build in $AndroidSDKBuilds) {
     if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
         SDKIdentifier        = "Android";
         Variant              = "Dynamic";
         Compilers            = $Compilers.Stage1;
@@ -6244,7 +6423,7 @@ if ($Android) {
     }
 
     if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
         SDKIdentifier        = "Android";
         Variant              = "Static";
         Compilers            = $Compilers.Stage1;
@@ -6306,13 +6485,13 @@ if (-not $IsCrossCompiling) {
   if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
   }
 
-  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift")
+  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift", "swift-prepare")
   if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
@@ -6321,6 +6500,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLDBSwift" = $Test -contains "lldb-swift";
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
+      "-PrepareSwift" = $Test -contains "swift-prepare";
     }
     Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
   }
@@ -6402,5 +6582,10 @@ if ($IncludeSBoM) {
 } finally {
   if ($Summary) {
     Write-Summary
+  }
+  if ($Trace) {
+    # Stage the trace with the other CI artifacts so that it can be downloaded.
+    $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
+    Write-TimingTrace "$TimingTraceDir\build-timings.json"
   }
 }

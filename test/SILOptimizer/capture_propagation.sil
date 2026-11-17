@@ -443,7 +443,7 @@ bb0(%0 : $*T, %1 : $*T, %2 : $@thin T.Type):
 }
 
 // CHECK-LABEL: sil [ossa] @return_generic_nonthrowing_closure
-// CHECK: [[F:%[0-9]+]] = function_ref @$s39specialized_generic_nonthrowing_closures5Int32V_Tg5
+// CHECK: [[F:%[0-9]+]] = function_ref @$s39specialized_generic_nonthrowing_closures5Int32V_TG5
 // CHECK: [[R:%[0-9]+]] = thin_to_thick_function [[F]]
 // CHECK: return [[R]]
 sil [ossa] @return_generic_nonthrowing_closure : $@convention(thin) () -> @owned @callee_owned (@in Int32, @in Int32) -> Bool {
@@ -1120,7 +1120,7 @@ bb0(%0 : $*Int32, %1 : $Int32, %2 : $Builtin.Int32):
 // partial_apply - must be used for the callee.
 //
 // CHECK-LABEL: sil [ossa] @return_concrete_forwarding_thunk_closure
-// CHECK:         [[F:%[0-9]+]] = function_ref @$s28generic_dead_captures_callees5Int32V_Tg5
+// CHECK:         [[F:%[0-9]+]] = function_ref @$s28generic_dead_captures_callees5Int32V_TG5
 // CHECK:         [[R:%[0-9]+]] = thin_to_thick_function [[F]]
 // CHECK:         return [[R]]
 // CHECK:       } // end sil function 'return_concrete_forwarding_thunk_closure'
@@ -1150,7 +1150,7 @@ bb0(%0 : $*T, %1 : $*Int32, %2 : $Builtin.Int32):
 // The thunk's substitutions must be mapped through the substitutions of the partial_apply.
 //
 // CHECK-LABEL: sil [ossa] @return_generic_forwarding_thunk_closure
-// CHECK:         [[F:%[0-9]+]] = function_ref @$s29generic_dead_captures_callee2Sf_s5Int32VTg5
+// CHECK:         [[F:%[0-9]+]] = function_ref @$s29generic_dead_captures_callee2Sf_s5Int32VTG5
 // CHECK:         [[R:%[0-9]+]] = thin_to_thick_function [[F]]
 // CHECK:         return [[R]]
 // CHECK:       } // end sil function 'return_generic_forwarding_thunk_closure'

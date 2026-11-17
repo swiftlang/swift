@@ -27,13 +27,13 @@ module APINotes {
 //--- Inputs/direct.h
 #include "swift/bridging"
 
-// expected-error@+1 {{'ImmortalNonEscapable' cannot be both a foreign reference type and non-escapable}}
+// expected-error@+1 {{'ImmortalNonEscapable' cannot be both a foreign reference type and non-'Escapable'}}
 struct SWIFT_IMMORTAL_REFERENCE SWIFT_NONESCAPABLE ImmortalNonEscapable {
   int value;
 };
 
 // A foreign reference type without accessible constructors is diagnosed too.
-// expected-error@+1 {{'ImmortalNonEscapableNoCtor' cannot be both a foreign reference type and non-escapable}}
+// expected-error@+1 {{'ImmortalNonEscapableNoCtor' cannot be both a foreign reference type and non-'Escapable'}}
 struct SWIFT_IMMORTAL_REFERENCE SWIFT_NONESCAPABLE ImmortalNonEscapableNoCtor {
   int value;
 
@@ -46,14 +46,14 @@ struct SharedNonEscapable;
 void retainShared(SharedNonEscapable *);
 void releaseShared(SharedNonEscapable *);
 
-// expected-error@+2 {{'SharedNonEscapable' cannot be both a foreign reference type and non-escapable}}
+// expected-error@+2 {{'SharedNonEscapable' cannot be both a foreign reference type and non-'Escapable'}}
 struct SWIFT_SHARED_REFERENCE(retainShared, releaseShared) SWIFT_NONESCAPABLE
     SharedNonEscapable {
   int value;
 };
 
 // Non-escapability inherited from a non-escapable foreign reference base.
-// expected-note@+2 {{escapable record 'DerivedFromNonEscapable' cannot have non-escapable base 'ImmortalNonEscapable'}}
+// expected-note@+2 {{'Escapable' record 'DerivedFromNonEscapable' cannot have non-'Escapable' base 'ImmortalNonEscapable'}}
 struct SWIFT_IMMORTAL_REFERENCE DerivedFromNonEscapable
     : ImmortalNonEscapable {};
 
@@ -65,13 +65,13 @@ struct SWIFT_NONESCAPABLE View {
 void retainWithField(class FRTWithNonEscapableField *);
 void releaseWithField(class FRTWithNonEscapableField *);
 
-// expected-note@+1 {{escapable record 'FRTWithNonEscapableField' cannot have non-escapable field 'view'}}
+// expected-note@+1 {{'Escapable' record 'FRTWithNonEscapableField' cannot have non-'Escapable' field 'view'}}
 class FRTWithNonEscapableField {
 public:
   View view;
 } SWIFT_SHARED_REFERENCE(retainWithField, releaseWithField);
 
-// expected-note@+1 {{escapable record 'ComplexFRTWithNonEscapableField' cannot have non-escapable field 'view'}}
+// expected-note@+1 {{'Escapable' record 'ComplexFRTWithNonEscapableField' cannot have non-'Escapable' field 'view'}}
 struct SWIFT_IMMORTAL_REFERENCE ComplexFRTWithNonEscapableField {
   View view;
   ~ComplexFRTWithNonEscapableField();
@@ -82,8 +82,8 @@ struct SWIFT_IMMORTAL_REFERENCE ComplexFRTWithNonEscapableField {
 // argument is rejected, whether or not it spells SWIFT_ESCAPABLE_IF. A
 // non-escapable argument that is not stored is fine, since nothing that cannot
 // escape ends up inside the class.
-// expected-warning@+3 2 {{SWIFT_ESCAPABLE_IF has no effect on}}
-// expected-note@+2 {{escapable record 'StoresArgument<View>' cannot have non-escapable field 'value'}}
+// expected-warning@+3 2 {{SWIFT_SELF_CONTAINED_IF has no effect on}}
+// expected-note@+2 {{'Escapable' record 'StoresArgument<View>' cannot have non-'Escapable' field 'value'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
     StoresArgument {
   T value;
@@ -91,7 +91,7 @@ template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
 using StoresNonEscapable = StoresArgument<View>;
 using StoresEscapable = StoresArgument<int>;
 
-// expected-note@+1 {{escapable record 'UnannotatedTemplate<View>' cannot have non-escapable field 'value'}}
+// expected-note@+1 {{'Escapable' record 'UnannotatedTemplate<View>' cannot have non-'Escapable' field 'value'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE UnannotatedTemplate {
   T value;
 };
@@ -109,15 +109,15 @@ struct SWIFT_IMMORTAL_REFERENCE Immortal {
 
 // Escapability annotations are redundant on a foreign reference type, whether
 // it is annotated directly or inherits its reference-ness from a base.
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'ImmortalEscapable'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'ImmortalEscapable'}}
 struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE ImmortalEscapable {
   int value;
 };
 
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'DerivedEscapable'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'DerivedEscapable'}}
 struct SWIFT_ESCAPABLE DerivedEscapable : Immortal {};
 
-// expected-warning@+2 {{SWIFT_ESCAPABLE_IF has no effect on 'ConditionallyEscapable<int>'}}
+// expected-warning@+2 {{SWIFT_SELF_CONTAINED_IF has no effect on 'ConditionallyEscapable<int>'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
     ConditionallyEscapable {
   T value;
@@ -126,26 +126,26 @@ using ConditionallyEscapableInt = ConditionallyEscapable<int>;
 
 struct HoldsNonEscapableFRT {
   // expected-note@+2 {{field 'field' unavailable (cannot import)}}
-  // expected-note@+1 {{pointer to non-escapable type 'ImmortalNonEscapable' cannot be imported}}
+  // expected-note@+1 {{pointer to non-'Escapable' type 'ImmortalNonEscapable' cannot be imported}}
   ImmortalNonEscapable *field;
 };
 
 struct SWIFT_IMMORTAL_REFERENCE ImmortalHoldsNonEscapableFRT {
   // expected-note@+2 {{field 'field' unavailable (cannot import)}}
-  // expected-note@+1 {{pointer to non-escapable type 'ImmortalNonEscapable' cannot be imported}}
+  // expected-note@+1 {{pointer to non-'Escapable' type 'ImmortalNonEscapable' cannot be imported}}
   ImmortalNonEscapable *field;
 };
 
 //--- Inputs/apinotes.h
 #include "swift/bridging"
 
-// expected-error@+1 {{'AnnotatedViaAPINotes' cannot be both a foreign reference type and non-escapable}}
+// expected-error@+1 {{'AnnotatedViaAPINotes' cannot be both a foreign reference type and non-'Escapable'}}
 struct SWIFT_IMMORTAL_REFERENCE AnnotatedViaAPINotes {
   int value;
 };
 
 // An escapability annotation applied via API notes is redundant too.
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'EscapableViaAPINotes'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'EscapableViaAPINotes'}}
 struct SWIFT_IMMORTAL_REFERENCE EscapableViaAPINotes {
   int value;
 };

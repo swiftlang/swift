@@ -75,6 +75,10 @@ enum class DeclTypeCheckingSemantics {
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
 
+  /// The withoutActuallyDeiniting(_:do:) declaration, which temporarily
+  /// converts an exactly-once function to an at-most-once function.
+  WithoutActuallyDeiniting,
+
   /// The _openExistential(_:do:) declaration, which extracts the value inside
   /// an existential and passes it as a value of its own dynamic type.
   OpenExistential,
@@ -738,6 +742,26 @@ void checkSwitchExhaustiveness(const SwitchStmt *stmt, const DeclContext *DC,
 /// \returns true if an error occurred, false otherwise.
 bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 
+/// True if a dynamic cast between \p fromType and \p toType can never succeed
+/// because one side is a fully concrete non-`Copyable` type and the other can
+/// only hold `Copyable` values. Casts whose answer depends on a dynamic type --
+/// an existential, a generic parameter, or an Optional the runtime unwraps --
+/// are not decided here.
+bool isStaticallyImpossibleNoncopyableCast(Type fromType, Type toType);
+
+/// If a cast from \p fromType to \p toType should be applied to an Optional
+/// source as it stands rather than to its unwrapped payload, the kind of the
+/// cast of the payload; otherwise None.
+///
+/// This is the case when \p fromType is one level of Optional around a
+/// non-`Copyable` payload and \p toType is not optional. Unwrapping it would
+/// consume it, even when the cast then fails; a cast of the Optional itself
+/// fails on `nil` and otherwise casts the payload, so the runtime unwraps it
+/// only on success.
+std::optional<CheckedCastKind>
+noncopyableOptionalPayloadCastKind(Type fromType, Type toType,
+                                   DeclContext *dc);
+
 /// Determine the semantics of a checked cast operation.
 ///
 /// \param fromType       The source type of the cast.
@@ -915,9 +939,18 @@ TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 /// \param name The name of the entity to look for.
 /// \param loc The source location at which name lookup occurs.
 /// \param options Options that control name lookup.
-LookupResult lookupUnqualified(
-    DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NLOptions options = defaultUnqualifiedLookupOptions);
+/// \param filter If provided, only the declarations found by lookup for which
+/// the filter returns true are considered for the result. The filter runs
+/// before overridden and shadowed declarations are removed, which avoids the
+/// cost of computing overrides and shadowing for declarations that the caller
+/// would discard anyway. As a result, the filter must make the same decision
+/// for any declarations that could override or shadow one another, such as
+/// functions with the same signature. Otherwise, a rejected declaration could
+/// fail to hide an accepted one.
+LookupResult
+lookupUnqualified(DeclContext *dc, DeclNameRef name, SourceLoc loc,
+                  NLOptions options = defaultUnqualifiedLookupOptions,
+                  llvm::function_ref<bool(ValueDecl *)> filter = nullptr);
 
 /// Perform unqualified type lookup at the given source location
 /// within a particular declaration context.
@@ -1455,25 +1488,6 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
 
-/// Look for closure discriminators within an AST.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
-  unsigned NextDiscriminator = 0;
-
-public:
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
-
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator();
-
-  unsigned getFirstDiscriminator() const {
-    return FirstDiscriminator;
-  }
-};
 
 using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;
@@ -1513,6 +1527,13 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+/// Emit a note with a fix-it that adds an import of \p mod to \p sf, at least
+/// as permissive as \p requiredAccessLevel and consistent with how other files
+/// in the module import \p mod. Emits nothing if \p mod is imported as
+/// implementation-only elsewhere.
+void noteAddImportOfModule(SourceFile &sf, ModuleDecl *mod,
+                           AccessLevel requiredAccessLevel);
 
 // Guide ForEachStmt type-checking by indicating whether the Iterable
 // protocol should be used, thus enabling Borrowing iteration for a given

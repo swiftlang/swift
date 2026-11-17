@@ -266,7 +266,7 @@ public func test10() {
 
 // CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup37testPointeeDependenceOnMutablePointer1pySPys5Int64VG_tF : $@convention(thin) (UnsafePointer<Int64>) -> () {
 // CHECK: bb0(%0 : $UnsafePointer<Int64>):
-// CHECK:   [[ALLOC:%.*]] = alloc_stack [var_decl] $UnsafePointer<Int64>, var, name "ptr", type $UnsafePointer<Int64>
+// CHECK:   [[ALLOC:%.*]] = alloc_stack [var_decl] $UnsafePointer<Int64>, var, name "ptr"
 // CHECK:   mark_dependence [nonescaping] %{{.*}} on %0
 // CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup37testPointeeDependenceOnMutablePointer1pySPys5Int64VG_tF'
 func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
@@ -277,7 +277,7 @@ func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
 
 // CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup16testReassignment1bySw_tF : $@convention(thin) (UnsafeMutableRawBufferPointer) -> () {
 // CHECK: bb0(%0 : $UnsafeMutableRawBufferPointer):
-// CHECK:   [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $MutableView, var, name "span", type $MutableView
+// CHECK:   [[VAR:%.*]] = alloc_stack [lexical] [var_decl] $MutableView, var, name "span"
 // CHECK:   apply %{{.*}}(%0, %{{.*}}) : $@convention(method) (UnsafeMutableRawBufferPointer, @thin MutableView.Type) -> @lifetime(borrow 0) @owned MutableView
 // CHECK:   [[ACCESS1:%.*]] = begin_access [modify] [static] [[VAR]] : $*MutableView
 // CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(method) (@lifetime(copy 0) @inout MutableView) -> @lifetime(borrow 0) @owned MutableView

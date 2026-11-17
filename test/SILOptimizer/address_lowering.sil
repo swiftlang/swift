@@ -113,6 +113,7 @@ sil [ossa] @getT : $@convention(thin) <T> () -> @out T
 sil [ossa] @getKlass : $@convention(thin) () -> (@owned Klass)
 sil [ossa] @borrowKlass : $(@in_guaranteed Klass) -> ()
 sil [ossa] @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil [ossa] @borrowTU : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
 sil [ossa] @borrowMoveOnlyT : $@convention(thin) <T> (@in_guaranteed @moveOnly T) -> ()
 sil [ossa] @getPair : $@convention(thin) <T> () -> @out Pair<T>
 sil [ossa] @getOwned : $@convention(thin) <T : AnyObject> () -> (@owned T)
@@ -493,6 +494,7 @@ bb0(%0 : $*Box<T>):
   %3 = load_borrow %1 : $*Box<T>
   %4 = apply %2<T>(%3) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %5 = copy_value %4 : $T
+  end_borrow %4 : $T
   end_access %1 : $*Box<T>
   %6 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -517,6 +519,7 @@ bb0(%0 : @guaranteed $Box<T>):
   %1 = function_ref @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %2 = apply %1<T>(%0) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %3 = copy_value %2 : $T
+  end_borrow %2 : $T
   %4 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %5 = apply %4<T>(%3) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   destroy_value %3 : $T
@@ -717,6 +720,30 @@ bb0(%0 : @owned $Optional<T>):
   %call = apply %f<T>(%d) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %4 = tuple ()
   return %4 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f082_unwrapMixedTrivial : $@convention(thin) <T> (@in Mixed<T>) -> Builtin.Int64 {
+// CHECK: bb0(%0 : $*Mixed<T>):
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
+// CHECK:   [[I:%.*]] = load [trivial] [[A]] : $*Builtin.Int64
+// CHECK:   return [[I]] : $Builtin.Int64
+// CHECK-LABEL: } // end sil function 'f082_unwrapMixedTrivial'
+sil [ossa] @f082_unwrapMixedTrivial : $@convention(thin) <T> (@in Mixed<T>) -> Int {
+bb0(%0 : @owned $Mixed<T>):
+  %1 = unchecked_enum_data %0 : $Mixed<T>, #Mixed.i!enumelt
+  return %1 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @f083_unwrapMixedObject : $@convention(thin) <T> (@in Mixed<T>) -> @owned AnyObject {
+// CHECK: bb0(%0 : $*Mixed<T>):
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
+// CHECK:   [[O:%.*]] = load [take] [[A]] : $*AnyObject
+// CHECK:   return [[O]] : $AnyObject
+// CHECK-LABEL: } // end sil function 'f083_unwrapMixedObject'
+sil [ossa] @f083_unwrapMixedObject : $@convention(thin) <T> (@in Mixed<T>) -> @owned AnyObject {
+bb0(%0 : @owned $Mixed<T>):
+  %1 = unchecked_enum_data %0 : $Mixed<T>, #Mixed.o!enumelt
+  return %1 : $AnyObject
 }
 
 // CHECK-LABEL: sil [ossa] @f090_tupletuple : $@convention(thin) ((Builtin.Int64, Builtin.Int64), Builtin.Int64) -> (@out (Builtin.Int64, Builtin.Int64), @out (Builtin.Int64, Builtin.Int64), Builtin.Int64, Builtin.Int64) {
@@ -1698,6 +1725,28 @@ exitBB:
   return %t
 }
 
+
+sil [ossa] @takeInT : $@convention(thin) <T> (@in T) -> ()
+
+// ConsumeOperatorCopyableValuesChecker describes a consumed address-only
+// variable with `debug_value undef : $T`. AddressLowering must give it the
+// address form that the address-based checker emits.
+//
+// CHECK-LABEL: sil [ossa] @f274_debug_value_undef_address_only : {{.*}} {
+// CHECK:       bb0([[ARG:%[^,]+]] : $*T):
+// CHECK:         debug_value [moveable_value_debuginfo] [[ARG]] : $*T, let, name "x", argno 1, expr op_deref
+// CHECK:         debug_value [moveable_value_debuginfo] undef : $*T, let, name "x", argno 1, expr op_deref
+// CHECK-LABEL: } // end sil function 'f274_debug_value_undef_address_only'
+sil [ossa] @f274_debug_value_undef_address_only : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  debug_value [moveable_value_debuginfo] %0 : $T, let, name "x", argno 1
+  %1 = move_value %0 : $T
+  debug_value [moveable_value_debuginfo] undef : $T, let, name "x", argno 1
+  %2 = function_ref @takeInT : $@convention(thin) <T> (@in T) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <T> (@in T) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
 
 // CHECK-LABEL: sil [ossa] @fixeeLifetime : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*T):
@@ -2831,6 +2880,33 @@ bb0(%0 : @guaranteed $NCG<T>):
   return %4 : $()
 }
 
+// A copy of the mark that is captured rather than stored does not prevent the
+// elision.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_elide_borrow_copy_with_captured_copy :
+// CHECK:       bb0(%0 : $*NCG<T>):
+// CHECK-NOT:     copy_addr %0
+// CHECK:         [[MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NCG<T>
+// CHECK:         copy_addr [[MARK]] to [init] [[CAPTURE:%[^,]+]] : $*NCG<T>
+// CHECK:         partial_apply [callee_guaranteed] {{%[^,]+}}<T>([[CAPTURE]])
+// CHECK-NOT:     destroy_addr [[MARK]]
+// CHECK-LABEL: } // end sil function 'test_elide_borrow_copy_with_captured_copy'
+sil hidden [ossa] @test_elide_borrow_copy_with_captured_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %f = function_ref @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %3 = copy_value %2 : $NCG<T>
+  %4 = partial_apply [callee_guaranteed] %f<T>(%3) : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %5 = convert_escape_to_noescape [not_guaranteed] %4 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %6 = apply %5() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %4 : $@callee_guaranteed () -> ()
+  destroy_value %2 : $NCG<T>
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // Verify that the init_enum_data_addr instruction is created before its first
 // use.  Although the opaque values are visited in forward order, their
 // uses are visited at the same time.  At that point, addresses are
@@ -3071,8 +3147,9 @@ sil [ossa] @test_partial_apply_1_addronly_heap : $<T> () -> () {
 // CHECK:         apply [[GET]]<T>([[STACK]])
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @borrowT
 // CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW]]<T>([[STACK]])
-// CHECK:         apply [[CLOSURE]]()
-// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[STACK]]
+// CHECK:         apply [[DEPENDENCY]]()
+// CHECK:         destroy_value [[DEPENDENCY]]
 // CHECK:         destroy_addr [[STACK]]
 // CHECK:         dealloc_stack [[STACK]]
 // CHECK-LABEL: } // end sil function 'test_partial_apply_2_addronly_stack'
@@ -3151,6 +3228,54 @@ bb0(%c : @owned $Klass):
   %callee = function_ref @test_partial_apply_5_indexing_callee : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
   %closure = partial_apply [callee_guaranteed] %callee(%c) : $@convention(thin) (@inout Int, @guaranteed Klass) -> (@out Int)
   destroy_value %closure : $@callee_guaranteed (@inout Int) -> (@out Int)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// An on-stack closure that captures borrowed address-only arguments is
+// dependent on each argument's storage, in a chain.
+// CHECK-LABEL: sil [ossa] @test_partial_apply_6_addronly_stack_borrowed_arguments : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[T:%[^,]+]] : $*T, [[U:%[^,]+]] : $*U):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @borrowTU
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[CALLEE]]<T, U>([[T]], [[U]])
+// CHECK:         [[DEPENDENCY_U:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[U]]
+// CHECK:         [[DEPENDENCY_T:%[^,]+]] = mark_dependence [nonescaping] [[DEPENDENCY_U]] : {{.*}} on [[T]]
+// CHECK:         apply [[DEPENDENCY_T]]()
+// CHECK:         destroy_value [[DEPENDENCY_T]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_6_addronly_stack_borrowed_arguments'
+sil [ossa] @test_partial_apply_6_addronly_stack_borrowed_arguments : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
+bb0(%t : @guaranteed $T, %u : @guaranteed $U):
+  %callee = function_ref @borrowTU : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  %borrow_t = begin_borrow %t : $T
+  %borrow_u = begin_borrow %u : $U
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee<T, U>(%borrow_t, %borrow_u) : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> ()
+  apply %closure() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  end_borrow %borrow_u : $U
+  end_borrow %borrow_t : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Uses of the closure, such as a conversion, go through the dependence.
+// CHECK-LABEL: sil [ossa] @test_partial_apply_7_addronly_stack_converted : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[T:%[^,]+]] : $*T):
+// CHECK:         [[CALLEE:%[^,]+]] = function_ref @borrowT
+// CHECK:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[CALLEE]]<T>([[T]])
+// CHECK:         [[DEPENDENCY:%[^,]+]] = mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on [[T]]
+// CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
+// CHECK:         apply [[CONVERTED]]()
+// CHECK:         destroy_value [[CONVERTED]]
+// CHECK-LABEL: } // end sil function 'test_partial_apply_7_addronly_stack_converted'
+sil [ossa] @test_partial_apply_7_addronly_stack_converted : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%t : @guaranteed $T):
+  %callee = function_ref @borrowT : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %borrow_t = begin_borrow %t : $T
+  %closure = partial_apply [on_stack] [callee_guaranteed] %callee<T>(%borrow_t) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %converted = convert_function %closure : $@noescape @callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  apply %converted() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %converted : $@noescape @callee_guaranteed () -> ()
+  end_borrow %borrow_t : $T
   %retval = tuple ()
   return %retval : $()
 }

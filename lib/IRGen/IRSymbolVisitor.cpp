@@ -16,6 +16,7 @@
 
 #include "swift/IRGen/IRSymbolVisitor.h"
 
+#include "GenProto.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/SIL/SILSymbolVisitor.h"
 
@@ -326,6 +327,19 @@ public:
   }
 
   void addProtocolWitnessTable(RootProtocolConformance *C) override {
+    // IRGen emits a private witness table pattern in place of the witness
+    // table of a dependent conformance in a generic context. Ask the question
+    // as IRGen did when it emitted the conformance's own module, which lazily
+    // initializes conformances from other modules on COFF targets.
+    auto &opts = Ctx.getSILCtx().getOpts();
+    auto *DC = C->getDeclContext();
+    auto *module = DC->getParentModule();
+    if (!opts.RelativeProtocolWitnessTables && DC->isGenericContext() &&
+        isDependentConformance(
+            C, module, opts.FragileResilientProtocols,
+            module->getASTContext().LangOpts.Target.isOSBinFormatCOFF()))
+      return;
+
     addLinkEntity(LinkEntity::forProtocolWitnessTable(C));
   }
 

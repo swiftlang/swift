@@ -65,8 +65,10 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
                           /*isMandatory*/ true);
 
   // Check linear OSSA lifetimes.
-  if (opts.VerifyAll || VerifySILGen)
-    Module.verifyOwnership();
+  if (opts.VerifyAll || VerifySILGen) {
+    SILPassManager pm(&Module, /*isMandatory=*/true, /*IRMod=*/nullptr);
+    pm.runMandatoryModuleVerification();
+  }
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
@@ -95,9 +97,9 @@ bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
     return Ctx.hadError();
 
   // Generate diagnostics. Committing the floor also advances every function
-  // that cleared the mandatory pipeline. This is the only per-function commit
-  // point: the pipeline interleaves module passes, so no earlier point observes
-  // a function having cleared every mandatory pass.
+  // that cleared the mandatory pipeline. This is the only commit point in the
+  // mandatory pipeline: the pipeline interleaves module passes, so no earlier
+  // point observes a function having cleared every mandatory pass.
   Module.commitStage(SILStage::Canonical);
 
   // Verify the module, if required.

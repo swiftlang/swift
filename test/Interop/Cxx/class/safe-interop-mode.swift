@@ -80,25 +80,25 @@ using UnsafeTuple = std::tuple<int, int*, int>;
 
 View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
 // Second non-escapable type is not annotated in any way.
-void unsafeFunc(View v1 [[clang::noescape]], View v2); // expected-note {{non-escapable parameter 'v2' has no lifetime annotation}}
+void unsafeFunc(View v1 [[clang::noescape]], View v2); // expected-note {{non-'Escapable' parameter 'v2' has no lifetime annotation}}
 
-// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-View returnsViewNoAnnotation(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+// expected-warning@+1{{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+View returnsViewNoAnnotation(const Owner &o); // expected-note {{this returns a non-'Escapable' value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct InferredNonEscapable {
   View v;
 };
-InferredNonEscapable returnsInferredNonEscapable(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+InferredNonEscapable returnsInferredNonEscapable(const Owner &o); // expected-note {{this returns a non-'Escapable' value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 
 struct HasUnannotatedViewGetter {
-  // expected-warning@+2{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+  // expected-warning@+2{{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
   // expected-error@+1{{cannot infer lifetime dependence on a method because 'self' is BitwiseCopyable, specify '@_lifetime(borrow self)'}}
-  View getView() const; // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+  View getView() const; // expected-note {{this returns a non-'Escapable' value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 };
 
-// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2{{the returned type 'ViewWithUnannotatedCtor' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 struct SWIFT_NONESCAPABLE ViewWithUnannotatedCtor {
-    ViewWithUnannotatedCtor(const Owner &o); // expected-note {{this returns a non-escapable value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
+    ViewWithUnannotatedCtor(const Owner &o); // expected-note {{this returns a non-'Escapable' value whose lifetime Swift had to infer; annotate the C++ declaration with SWIFT_LIFETIMEBOUND to say what the result depends on}}
 private:
     const int *member;
 };
@@ -108,7 +108,7 @@ View returnsViewLifetimebound(const Owner &o [[clang::lifetimebound]]);
 // A lifetime dependency whose target is Escapable is dropped, so the annotation
 // is not enforced: import the function as unsafe.
 // expected-warning@+1{{the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies}}
-Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]); // expected-note {{this lifetime annotation is not enforced: the result is Escapable, so Swift drops the dependency}}
+Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]); // expected-note {{this lifetime annotation is ignored: the result is Escapable, so Swift drops the dependency}}
 
 // A hand-written lifetime annotation says what the result depends on, so the
 // importer neither asks for an annotation nor infers one.
@@ -122,7 +122,7 @@ __attribute__((swift_attr("@lifetime(borrow byValue)")))
 View returnsViewByValueLifetime(Owner byValue);
 
 __attribute__((swift_attr("safe")))
-// expected-warning@+1{{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+1{{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 View returnsViewAuditedSafe(const Owner &o);
 
 class SharedObject {
@@ -270,6 +270,8 @@ func useSafeEscapableIf(x: SafeEscapableIf) {
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     let _ = c.__beginUnsafe() // expected-note{{reference to unsafe instance method '__beginUnsafe()'}}
+    // expected-warning@-1{{'__beginUnsafe()' is deprecated: renamed to 'begin()'}}
+    // expected-note@-2{{use 'begin()' instead}}
 }
 
 #if canImport(CoreFoundation)

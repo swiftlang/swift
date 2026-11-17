@@ -114,7 +114,7 @@ func local() {
     }
   }
 
-  value = 15 // expected-error {{variable 'anotherVar' used by function definition before being initialized}}
+  value = 15 // expected-error {{variable 'anotherVar' passed by reference before being initialized}}
 
   anotherVar = "hello!"
   _ = anotherVar

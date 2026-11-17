@@ -1,17 +1,32 @@
-# Install the EmbeddedPlatform header into "swift".
+# Install the EmbeddedPlatform headers into "swift".
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_command(
-      OUTPUT "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
-      COMMAND "${CMAKE_COMMAND}" "-E" "copy" "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h" "${SWIFT_INCLUDE_DIR}/swift")
+      OUTPUT
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
+        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
+      DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+      COMMAND "${CMAKE_COMMAND}" "-E" "copy"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+        "${SWIFT_INCLUDE_DIR}/swift")
 
   add_custom_target("copy_embedded_swift_platform_header"
-      DEPENDS "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-      COMMENT "Copying Embedded Swift platform header to ${SWIFT_INCLUDE_DIR}/swift")
+      DEPENDS
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
+        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
+        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
+      COMMENT "Copying Embedded Swift platform headers to ${SWIFT_INCLUDE_DIR}/swift")
 
   swift_install_in_component(FILES
       "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
+      "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
+      "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
       DESTINATION "include/swift"
       COMPONENT stdlib)
 
@@ -45,6 +60,34 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     "-enable-builtin-module"
     "-disable-bridging-pch")
 
+  # The clock functions need POSIX clocks, which bare-metal and Windows
+  # triples lack, and Apple triples need an Apple SDK. Keep this list separate
+  # from `_mt_posix_skip_triple`: plain WASI has clocks but no threads.
+  set(_clock_posix_skip_triple "-none-" "-windows-")
+  if(NOT SWIFT_HOST_VARIANT STREQUAL "macosx")
+    list(APPEND _clock_posix_skip_triple "-apple-")
+  endif()
+
+  add_embedded_swift_target_library(
+    embedded-posix-shim
+    swiftEmbeddedPlatformPOSIX
+    PARTIAL_SOURCES_INTENDED
+    NON_EMPTY_OBJECT_FILE
+    DETECT_MALLOC_TYPE
+    DETECT_ARC4RANDOM
+
+    EmbeddedPlatformPOSIX.swift
+    EmbeddedPlatformClockPOSIX.c
+
+    SWIFT_COMPILE_FLAGS ${_embedded_platform_swift_flags}
+    C_COMPILE_FLAGS -nostdinc++ -I${CMAKE_CURRENT_SOURCE_DIR}/swift
+    SKIP_MOD_REGEX "-windows-msvc$"
+    SKIP_ARCH_REGEX "avr"
+    SKIP_TRIPLE_REGEX ${_clock_posix_skip_triple}
+    ARCHITECTURE_KEY mod
+    INSTALL_IN_COMPONENT stdlib
+  )
+
   add_embedded_swift_target_library(
     embedded-posix-shim
     swiftEmbeddedPlatformPOSIX
@@ -58,6 +101,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     SWIFT_COMPILE_FLAGS ${_embedded_platform_swift_flags}
     SKIP_MOD_REGEX "-windows-msvc$"
     SKIP_ARCH_REGEX "avr"
+    ONLY_TRIPLE_REGEX ${_clock_posix_skip_triple}
     ARCHITECTURE_KEY mod
     INSTALL_IN_COMPONENT stdlib
   )

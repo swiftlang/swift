@@ -147,11 +147,18 @@ namespace swift {
     bool readBlockArgs(SILBasicBlock *BB, SILFunction *Fn,
                        ArrayRef<uint64_t> Args);
     /// Read a SIL instruction.
-    bool readSILInstruction(SILFunction *Fn,
-                            SILBuilder &Builder,
-                            unsigned RecordKind,
-                            SmallVectorImpl<uint64_t> &scratch,
-                            SmallVectorImpl<DebugValueInst *> &DebugBBWorklist);
+    llvm::Error
+    readSILInstruction(SILFunction *Fn, SILBuilder &Builder,
+                       unsigned RecordKind, SmallVectorImpl<uint64_t> &scratch,
+                       SmallVectorImpl<DebugValueInst *> &DebugBBWorklist);
+
+    /// Diagnose a SIL function body that references a module that isn't
+    /// loaded.
+    void diagnoseModuleNotLoaded(SILFunction *fn, llvm::Error error);
+
+    /// Discard the partially deserialized body of \p fn after a failure,
+    /// leaving it as a declaration.
+    void dropPartialBody(SILFunction *fn);
 
     /// Read the SIL function table.
     std::unique_ptr<SerializedFuncTable>

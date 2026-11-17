@@ -51,7 +51,7 @@ public func testContainerInside() {
 // CHECK: [[I:%.*]] = alloc_ref $Inner
 // CHECK: [[D:%.*]] = alloc_ref $IsolatedDeinit
 // CHECK: [[DI:%.*]] = end_init_let_ref [[D]] : $IsolatedDeinit
-// CHECK: strong_release [[DI]] : $IsolatedDeinit
+// CHECK: strong_release [[D]] : $IsolatedDeinit
 // CHECK: return
 @inline(never)
 public func testInnerOutside() {
@@ -65,7 +65,7 @@ public func testInnerOutside() {
 // CHECK: [[D:%.*]] = alloc_ref $IsolatedDeinit
 // CHECK: [[DI:%.*]] = end_init_let_ref [[D]] : $IsolatedDeinit
 // CHECK: [[I:%.*]] = alloc_ref $Inner
-// CHECK: strong_release [[DI]] : $IsolatedDeinit
+// CHECK: strong_release [[D]] : $IsolatedDeinit
 // CHECK: return
 @inline(never)
 public func testInnerInside() {

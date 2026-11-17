@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift 2>&1 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // Pseudo code of the synthesized func:

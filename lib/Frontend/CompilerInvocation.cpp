@@ -881,6 +881,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
 
   Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
 
+  if (auto *A = Args.getLastArg(OPT_scanner_cas_fs))
+    Opts.DepscanCASFileSystemRootID = A->getValue();
+  Opts.CASFSEscapePaths = Args.getAllArgValues(OPT_cas_fs_escape);
+
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_filelist))
@@ -1137,11 +1141,6 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
   if (Args.hasArg(OPT_enable_builtin_module))
     Opts.enableFeature(Feature::BuiltinModule);
 
-  if (Args.hasArg(OPT_strict_memory_safety))
-    Opts.enableFeature(Feature::StrictMemorySafety);
-  else if (Args.hasArg(OPT_strict_memory_safety_migrate))
-    Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
-
   if (Args.hasArg(OPT_enable_library_evolution, OPT_enable_resilience))
     Opts.enableFeature(Feature::LibraryEvolution);
 
@@ -1150,6 +1149,7 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
+                          const DiagnosticOptions &DiagnosticOpts,
                           ModuleInterfaceOptions &ModuleInterfaceOpts,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
@@ -1159,8 +1159,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_language_mode)) {
-    auto vers =
-        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
+    auto vers = VersionParser::parseLanguageMode(A->getValue(), &Diags);
     bool isValid = false;
     if (vers.has_value()) {
       if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
@@ -1255,6 +1254,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableWorkaroundBrokenModules
     &= !Args.hasArg(OPT_disable_workaround_broken_modules);
+
+  Opts.DebugDuplicateClosureDiscriminators |=
+      Args.hasArg(OPT_debug_duplicate_closure_discriminators);
 
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
@@ -1426,6 +1428,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
+
+  // The C++ overlay uses '@unsafe(always)', including in .swiftinterface files
+  // built without the flag, so the feature is always on for it. This also makes
+  // '$AlwaysUnsafeAttribute' true when its interface is rebuilt.
+  if (FrontendOpts.ModuleName == CXX_MODULE_NAME)
+    Opts.enableFeature(Feature::AlwaysUnsafeAttribute);
+
+  // '-strict-memory-safety' only enables the diagnostic group, but
+  // `#if hasFeature` and the module's strict memory safety flag key on the
+  // feature. Turn the feature on whenever the group is enabled.
+  DiagnosticState commandLineDiagState;
+  commandLineDiagState.setWarningGroupControlRules(
+      DiagnosticOpts.WarningGroupControlRules);
+  if (!commandLineDiagState.isIgnoredDiagnosticGroupTree(
+          DiagGroupID::StrictMemorySafety))
+    Opts.enableFeature(Feature::StrictMemorySafety);
+
+  // Clients detect strict memory safety from the interface's flags.
+  if (Opts.hasFeature(Feature::StrictMemorySafety) &&
+      !Args.hasArg(OPT_strict_memory_safety))
+    ModuleInterfaceOpts.PublicFlags.IgnorableFlags += " -strict-memory-safety";
 
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
   // If the old prototype version of the feature has been requested, honor it.
@@ -2255,6 +2278,16 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_promote_supertypes,
                    Opts.SolverEnablePromoteSupertypes);
 
+  Opts.SolverEnableShortConversions =
+      Args.hasFlag(OPT_solver_enable_short_conversions,
+                   OPT_solver_disable_short_conversions,
+                   Opts.SolverEnableShortConversions);
+
+  Opts.SolverEnableExtremeEdgeContraction =
+      Args.hasFlag(OPT_solver_enable_extreme_edge_contraction,
+                   OPT_solver_disable_extreme_edge_contraction,
+                   Opts.SolverEnableExtremeEdgeContraction);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
@@ -2613,6 +2646,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
     Opts.InProcessPluginServerPath = A->getValue();
+  if (const Arg *A =
+          Args.getLastArg(OPT_resolved_in_process_plugin_server_path))
+    Opts.ResolvedInProcessPluginServerPath = A->getValue();
 
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
@@ -2721,7 +2757,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMapPath = A->getValue();
-  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file_EQ)) {
     if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
                                               Opts.ExplicitSwiftModuleInputs))
       return true;
@@ -2976,6 +3012,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError,
                                                DiagGroupID::HeapAllocation);
   }
+
+  // Enabled before processing warning flags so `-warnings-as-errors` applies.
+  if (Args.hasArg(OPT_strict_memory_safety, OPT_strict_memory_safety_migrate))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::StrictMemorySafety);
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
@@ -3482,7 +3523,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
-  Opts.VerifyOwnershipAll |= Args.hasArg(OPT_sil_ownership_verify_all);
   Opts.AbortOnUnknownRegionIsolationPatternError |=
       Args.hasArg(OPT_sil_region_isolation_assert_on_unknown_pattern);
   Opts.EmitIsolationHistory |=
@@ -3505,7 +3545,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
-  Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
@@ -3622,10 +3661,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  Opts.EnableAddressDependencies = Args.hasFlag(
-      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
-      Opts.EnableAddressDependencies);
-
   if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
     // On Darwin and Linux, use yield_once_2 by default.
     Opts.CoroutineAccessorsUseYieldOnce2 = true;
@@ -3736,6 +3771,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
   Opts.FragileResilientProtocols =
     Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
+  Opts.RelativeProtocolWitnessTables =
+      Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
+                   OPT_disable_relative_protocol_witness_tables, false);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -4624,8 +4662,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
-                    FrontendOpts)) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, DiagnosticOpts,
+                    ModuleInterfaceOpts, FrontendOpts)) {
     return true;
   }
 
@@ -4691,20 +4729,16 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::StrictMemorySafety)) {
-    if (SILOpts.RemoveRuntimeAsserts ||
-        SILOpts.AssertConfig == SILOptions::Unchecked) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-Ounchecked");
-    }
+  if (SILOpts.RemoveRuntimeAsserts ||
+      SILOpts.AssertConfig == SILOptions::Unchecked) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-Ounchecked");
+  }
 
-    if (!LangOpts.EnableAccessControl &&
-        FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-disable-access-control");
-    }
+  if (!LangOpts.EnableAccessControl &&
+      FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-disable-access-control");
   }
 
   SILOpts.UseAggressiveReg2MemForCodeSize =

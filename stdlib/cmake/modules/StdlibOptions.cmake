@@ -273,15 +273,9 @@ option(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES
        "Use fragile protocol witness tables for resilient protocols"
        FALSE)
 
-if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
-  set(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default TRUE)
-else()
-  set(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default FALSE)
-endif()
-
 option(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS
        "Install a parent module map for Swift shims."
-       ${SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default})
+       TRUE)
 
 option(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
        "Allow retain/release functions to be overridden by indirecting through function pointers."

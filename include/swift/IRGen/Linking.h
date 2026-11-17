@@ -485,6 +485,10 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadataDemanglingCacheVariable,
 
+    /// Pair of a relative pointer to and size of the mangled name of a
+    /// type metadata.
+    TypeMetadataMangledNameRef,
+
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -970,6 +974,12 @@ public:
   static LinkEntity forTypeMetadataDemanglingCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataDemanglingCacheVariable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataMangledNameRef(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataMangledNameRef, type);
     return entity;
   }
 
@@ -1861,6 +1871,18 @@ public:
   /// definitions (e.g., with @used).
   bool hasNonUniqueDefinition() const;
 
+  /// Whether this is an exported specialized body of another module's
+  /// function, or the metadata, value witness table or a witness table of an
+  /// exported specialization of another module's type, e.g. 'Box<Int>', that
+  /// \p swiftModule owns. Other modules may export the same one, so its
+  /// definition is weak.
+  bool isWeakExportedSpecialization(const ModuleDecl *swiftModule) const;
+
+  /// Whether this entity belongs to a back-deployed type from another module,
+  /// or to a conformance declared alongside it, which the module being
+  /// compiled emits on demand.
+  bool isBackDeployedIntoClient() const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 
@@ -1871,7 +1893,7 @@ private:
     return false;
   }
   static bool isObjCImplementation(CanType ty) {
-    return isObjCImplementation(ty->getClassOrBoundGenericClass());
+    return isObjCImplementation(ty->getClassDecl());
   }
 };
 

@@ -32,7 +32,7 @@ extension AST.`Type` {
     if !self.isOptional {
       return self
     }
-    return self.genericArgumentsOfBoundGenericType[0].fullyUnwrappedType
+    return self.genericArgumentsOfNominalType[0].fullyUnwrappedType
   }
 }
 
@@ -409,7 +409,8 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, ignoreTrivialCopies: false) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, needsAccessScope: false,
+                                                       isInoutAccess: false) {
       introducer = $0
       return .abortWalk
     }
@@ -466,6 +467,8 @@ private struct LifetimeVariable {
       self = .init(dependent: sb.source, context)
     case .pointer(let ptrToAddr):
       self = .init(introducer: ptrToAddr, context)
+    case .borrowMutateAccessor(let apply):
+      self = .init(dependent: apply.selfArgument!, context)
     case .index, .unidentified:
       break
     }

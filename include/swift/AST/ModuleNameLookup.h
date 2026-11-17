@@ -44,6 +44,13 @@ enum class ResolutionKind {
 
 void simple_display(llvm::raw_ostream &out, ResolutionKind kind);
 
+/// Returns whether \p decl is the kind of declaration that a lookup with
+/// \p resolutionKind and \p options can find, without considering access
+/// control or scoped imports.
+bool isAcceptableLookupResult(const ValueDecl *decl,
+                              ResolutionKind resolutionKind,
+                              NLOptions options);
+
 /// Performs a lookup into the given module and its imports.
 ///
 /// If 'moduleOrFile' is a ModuleDecl, we search the module and its

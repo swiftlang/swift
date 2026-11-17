@@ -185,3 +185,83 @@ func test() async {
   // @MainActor callee — same caller isolation, this is allowed
   await callDoSomethingFromMainActor(MyClass())
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: Conformances that cannot be isolated
+// https://github.com/swiftlang/swift/issues/93084
+
+protocol AsyncRequirement {
+  func requirement() async
+}
+
+protocol SendableWithAssoc: Sendable {
+  associatedtype A: AsyncRequirement
+}
+
+protocol OtherRequirement {}
+
+final class MainActorIsolatedAssoc: @MainActor AsyncRequirement, @MainActor OtherRequirement {
+  func requirement() async {}
+}
+
+// We correctly reject witnessing `A` with an actor isolatec conformance like 'MainActorIsolatedAssoc':
+// expected-error@+1{{type 'RejectsIsolatedAssoc' does not conform to protocol 'SendableWithAssoc'}}
+struct RejectsIsolatedAssoc: SendableWithAssoc {
+  // expected-error@-1{{main actor-isolated conformance of 'MainActorIsolatedAssoc' to 'AsyncRequirement' cannot satisfy conformance requirement for a 'Sendable' type parameter 'Self.A'}}
+  // expected-note@-2{{requirement specified as 'Self.A' : 'AsyncRequirement' [with Self = RejectsIsolatedAssoc]}}
+  typealias A = MainActorIsolatedAssoc
+}
+
+final class NonisolatedAssoc: AsyncRequirement, @MainActor OtherRequirement {
+  func requirement() async {}
+}
+
+struct AcceptsNonisolatedAssoc: SendableWithAssoc {
+  typealias A = NonisolatedAssoc
+}
+
+// expected-note@+1{{'needsOtherRequirement' declared here}}
+func needsOtherRequirement<T: SendableWithAssoc>(_: T) where T.A: OtherRequirement {}
+
+@MainActor func rejectsIsolatedAssocWhereClause() {
+  // expected-error@+1{{main actor-isolated conformance of 'NonisolatedAssoc' to 'OtherRequirement' cannot satisfy conformance requirement for a 'Sendable' type parameter}}
+  needsOtherRequirement(AcceptsNonisolatedAssoc())
+}
+
+@concurrent func takesAsyncRequirement<T: AsyncRequirement>(_: T.Type) async {}
+@concurrent func takesOtherRequirement<T: OtherRequirement>(_: T.Type) async {}
+
+// The parent type parameter is Sendable, so conformances of its nested types cannot be isolated
+nonisolated(nonsending) func associatedOfSendable<T: SendableWithAssoc>(_: T, a: T.A) async {
+  await takesAsyncRequirement(T.A.self)
+  await a.requirement()
+}
+
+// Also applies to conformances that don't come from the Sendable protocol
+nonisolated(nonsending) func associatedOfSendableWhereClause<T: SendableWithAssoc>(_: T) async
+    where T.A: OtherRequirement {
+  await takesOtherRequirement(T.A.self)
+}
+
+// The Self conformance of a protocol member call is skipped regardless of
+// which generic parameter of the caller it is
+nonisolated(nonsending) func selfConformanceNotFirstParam<U, T: AsyncRequirement>(_: U, _ t: T) async {
+  await t.requirement()
+}
+
+// A non-Sendable generic parameter's conformance passed to @concurrent is still diagnosed
+nonisolated(nonsending) func stillDiagnosed<U, T: AsyncRequirement>(_: U, _: T) async {
+  // expected-warning@+1{{conformance of 'T' to protocol 'AsyncRequirement' may be isolated and cannot be passed to @concurrent context}}
+  await takesAsyncRequirement(T.self)
+}
+
+protocol HasConcurrentGeneric {
+  @concurrent func g<V: OtherRequirement>(_ v: V) async
+}
+
+// Only the Self conformance is skipped;
+// other conformances of the same type passed into the @concurrent callee are still diagnosed
+nonisolated(nonsending) func selfTypeOtherConformance<U, T: HasConcurrentGeneric & OtherRequirement>(_: U, _ t: T) async {
+  // expected-warning@+1{{conformance of 'T' to protocol 'OtherRequirement' may be isolated and cannot be passed to @concurrent context}}
+  await t.g(t)
+}

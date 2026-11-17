@@ -14,6 +14,7 @@ add_swift_unittest(SwiftASTTests
   SILFunctionTypeTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
+  TypeTests.cpp
   VersionRangeTests.cpp
   ImportTests.cpp
 )

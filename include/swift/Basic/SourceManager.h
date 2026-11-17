@@ -488,11 +488,14 @@ public:
   /// Returns the line and column represented by the given source location.
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
+  /// Otherwise, the buffer containing \p Loc is looked up.
   ///
   /// This respects \c #sourceLocation directives.
   std::pair<unsigned, unsigned>
   getPresumedLineAndColumnForLoc(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
+    if (BufferID == 0)
+      BufferID = findBufferContainingLoc(Loc);
     int LineOffset = getLineOffset(Loc);
     int l, c;
     std::tie(l, c) = LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
@@ -503,11 +506,14 @@ public:
   /// Returns the real line and column for a source location.
   ///
   /// If \p BufferID is provided, \p Loc must come from that source buffer.
+  /// Otherwise, the buffer containing \p Loc is looked up.
   ///
   /// This does not respect \c #sourceLocation directives.
   std::pair<unsigned, unsigned>
   getLineAndColumnInBuffer(SourceLoc Loc, unsigned BufferID = 0) const {
     assert(Loc.isValid());
+    if (BufferID == 0)
+      BufferID = findBufferContainingLoc(Loc);
     return LLVMSourceMgr.getLineAndColumn(Loc, BufferID);
   }
 

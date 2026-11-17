@@ -317,6 +317,12 @@ private:
   llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
   llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
 
+  /// Classes whose dependency types are currently being checked. A class
+  /// re-entered while in this set skips the checks, which avoids infinite
+  /// recursion when superclasses name each other, as in `class A: Base<B>`
+  /// and `class B: Base<A>`.
+  llvm::SmallDenseSet<serialization::DeclID, 4> ClassesResolvingDependencies;
+
   TinyPtrVector<Decl *> ImportDecls;
 
   /// Maps USRs to their deserialized comment object.

@@ -32,3 +32,26 @@
 // CHECK:   typealias Distance = CInt
 // CHECK:   var pointee: CInt
 // CHECK: }
+
+// CHECK: struct InheritedFromBaseWithIteratorConcept : UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct ReturnsInheritedFromBaseWithIteratorConcept {
+// CHECK:   @available(*, deprecated, renamed: "get()")
+// CHECK:   func __getUnsafe() -> InheritedFromBaseWithIteratorConcept
+// CHECK:   func get() -> InheritedFromBaseWithIteratorConcept
+// CHECK: }
+
+// CHECK: struct HasOnlyIteratorConcept : UnsafeCxxInputIterator {
+// CHECK:   func __operatorStar() -> UnsafePointer<CInt>
+// CHECK:   func successor() -> HasOnlyIteratorConcept
+// CHECK:   typealias Pointee = CInt
+// CHECK:   static func == (lhs: HasOnlyIteratorConcept, other: HasOnlyIteratorConcept) -> CBool
+// CHECK:   var pointee: CInt { get }
+// CHECK: }
+
+// CHECK: struct ReturnsOnlyIteratorConcept {
+// CHECK:   @available(*, deprecated, renamed: "get()")
+// CHECK:   func __getUnsafe() -> HasOnlyIteratorConcept
+// CHECK:   func get() -> HasOnlyIteratorConcept
+// CHECK: }

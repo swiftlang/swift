@@ -1,0 +1,6 @@
+// {"frontendArgs":["-emit-silgen"],"kind":"custom","signature":"swift::constraints::ConstraintSystem::setType(swift::ASTNode, swift::Type, swift::constraints::PreparedOverloadBuilder*)","signatureAssert":"Assertion failed: (!node.isNull() && \"Cannot set type information on null node\"), function setType","signatureNext":"ConstraintSystem::resolveClosure"}
+// RUN: not --crash %target-swift-frontend -emit-silgen %s
+@propertyWrapper struct a {
+  let b = { (@a ) in
+  }
+}

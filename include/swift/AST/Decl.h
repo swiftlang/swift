@@ -70,6 +70,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
+  class AvailabilityQuery;
   class AvailabilityRange;
   class AvailabilityDomain;
   class GenericEnvironment;
@@ -897,6 +898,11 @@ protected:
     NumberOfVTableEntries : 2
   );
 
+  SWIFT_INLINE_BITFIELD(TopLevelCodeDecl, Decl, 1,
+    /// Whether we've assigned discriminators for the body.
+    HasBodyDiscriminators : 1
+  );
+
   } Bits;
   // Turn back on clang-format now that we have defined our inline bitfields.
   // clang-format on
@@ -1051,6 +1057,13 @@ public:
   /// when the decl was imported via Cxx interop.
   LLVM_READONLY
   ModuleDecl *getModuleContextForNameLookup() const;
+
+  /// Retrieve every module in which this declaration would be found by name
+  /// lookup queries. A Cxx `namespace` can be declared in more than one Clang
+  /// module and is found through each of them. For any other declaration, the
+  /// only result is `getModuleContextForNameLookup()`.
+  void
+  getModuleContextsForNameLookup(SmallVectorImpl<ModuleDecl *> &modules) const;
 
   /// getASTContext - Return the ASTContext that this decl lives in.
   LLVM_READONLY
@@ -1226,6 +1239,19 @@ public:
   /// Returns true if the decl has a valid and active `@backDeployed` attribute.
   bool isBackDeployed() const;
 
+  /// Whether this declaration, nested in a back-deployed type, is annotated
+  /// as only available within \p backDeployedRange, where the type's defining
+  /// module provides the type, on the primary target or on the target variant.
+  /// Such a declaration isn't back-deployed along with the type.
+  bool isOnlyAvailableWithinBackDeployedRange(
+      AvailabilityRange backDeployedRange, bool forTargetVariant = false) const;
+
+  /// The query that determines at runtime whether the original of this
+  /// back-deployed declaration is available, accounting for both the primary
+  /// target and the target variant, or \c std::nullopt if this declaration
+  /// isn't back-deployed.
+  std::optional<AvailabilityQuery> getBackDeploymentAvailabilityQuery() const;
+
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
 
@@ -1336,7 +1362,16 @@ public:
   void setHoisted(bool hoisted = true) { Bits.Decl.Hoisted = hoisted; }
 
   /// Whether this declaration predates the introduction of concurrency.
+  ///
+  /// An inferred `@preconcurrency` is only seen if the actor isolation has
+  /// already been computed; use \c preconcurrencyIncludingInferred() when the
+  /// answer must not depend on that.
   bool preconcurrency() const;
+
+  /// Like \c preconcurrency(), but computes the actor isolation first, so an
+  /// inferred `@preconcurrency` is always seen. This can be cyclic if called
+  /// while computing the isolation or interface type of this declaration.
+  bool preconcurrencyIncludingInferred() const;
 
   /// Query whether this declaration was explicitly declared to be safe or
   /// unsafe.
@@ -1782,6 +1817,9 @@ public:
   /// getGenericParams() this will not synthesize generic parameters for
   /// extensions, protocols and certain type aliases.
   GenericParamList *getParsedGenericParams() const;
+
+  /// Whether this context has generic parameters written in source.
+  bool hasParsedGenericParamList() const { return getParsedGenericParams(); }
 
   /// Determine whether this context has generic parameters
   /// of its own.
@@ -2808,6 +2846,11 @@ public:
     return getPatternList()[i].getOriginalInitRange();
   }
 
+  /// Retrieve the SourceRange for the pattern binding entry at a given index.
+  SourceRange getEntrySourceRange(unsigned i) const {
+    return getPatternList()[i].getSourceRange();
+  }
+
   void setInit(unsigned i, Expr *E) {
     getMutablePatternList()[i].setInit(E);
   }
@@ -2972,14 +3015,29 @@ class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return Bits.TopLevelCodeDecl.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = value;
+  }
+
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
-      Decl(DeclKind::TopLevelCode, Parent),
-      Body(Body) {}
+      : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+        Decl(DeclKind::TopLevelCode, Parent), Body(Body) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = false;
+  }
 
   BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
+  void setBody(BraceStmt *b, bool resetDiscriminators = false) {
+    Body = b;
+    if (resetDiscriminators)
+      setBodyHasDiscriminators(false);
+  }
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -4724,6 +4782,19 @@ public:
   /// is built resiliently.
   bool isResilient() const;
 
+  /// Whether this is a back-deployed struct or enum from a module other than
+  /// the one being compiled, and the deployment target doesn't guarantee that
+  /// its module provides it, so that the module being compiled emits its own
+  /// copy of the type's metadata and conformances.
+  bool isBackDeployedIntoClient() const;
+
+  /// Whether the module being compiled emits its own copy of a conformance of
+  /// this type that is declared in \p conformanceDC: that is, this type is
+  /// back-deployed into the client (\c isBackDeployedIntoClient), and the
+  /// conformance is declared alongside it, in the same module, and isn't only
+  /// available where that module provides the type.
+  bool emitsConformanceIntoClient(const DeclContext *conformanceDC) const;
+
   /// True if the decl is resilient AND also its defining module does
   /// _not_ allow non-resilient access; the module can allow such access
   /// if package optimization is enabled so its client modules within the
@@ -5307,7 +5378,7 @@ class StructDecl final : public NominalTypeDecl {
   //
   // What we need is to serialize enough information to be
   // able to instantiate C++ class template on deserialization. It turns out
-  // that all that information is conveniently covered by the BoundGenericType,
+  // that all that information is conveniently covered by the NominalType,
   // which we store in this field. The field is set during the typechecking at
   // the time when we instantiate the C++ class template.
   //
@@ -5521,6 +5592,10 @@ public:
   /// otherwise.
   bool walkSuperclasses(
       llvm::function_ref<TypeWalker::Action(ClassDecl *)> fn) const;
+
+  /// Whether an inverse of the given invertible protocol in this class's
+  /// inheritance clause suppresses the implicit conformance.
+  bool canSuppressInvertible(InvertibleProtocolKind ip) const;
 
   //// Whether this class requires all of its stored properties to
   //// have initializers in the class definition.
@@ -6423,6 +6498,11 @@ public:
   /// it.
   bool hasStorage() const;
 
+  void setHasStorage(bool hasStorage) {
+    LazySemanticInfo.HasStorage = hasStorage;
+    LazySemanticInfo.HasStorageComputed = true;
+  }
+
   /// Return true if this is a VarDecl that has init accessor associated
   /// with it.
   bool hasInitAccessor() const;
@@ -7059,6 +7139,12 @@ public:
     return getIntroducerStringRef(getIntroducer());
   }
 
+  /// Returns the ownership that binding this variable requires of the value
+  /// that its pattern matches, or \c std::nullopt if the binding works with
+  /// whatever ownership the match as a whole has, as a `let` binding does.
+  /// See \c Pattern::getOwnership().
+  std::optional<LoweredOwnership> getBindingOwnership() const;
+
   CaptureListExpr *getParentCaptureList() const {
     if (!Parent)
       return nullptr;
@@ -7577,6 +7663,10 @@ public:
   /// such as the magic literal \c #function.
   bool hasCallerSideDefaultExpr() const;
 
+  /// Whether this parameter's default argument is evaluated by a generator
+  /// function, rather than at the call site or by an overridden declaration.
+  bool hasDefaultArgumentGenerator() const;
+
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.
   ///
@@ -7809,6 +7899,12 @@ public:
     return getValueOwnershipForSpecifier(getSpecifier());
   }
 
+  /// Returns the ownership that this parameter has after lowering. An
+  /// unannotated parameter of a closure has the ownership of the corresponding
+  /// parameter of the closure's type, which may be inferred. See
+  /// swift::getLoweredOwnership().
+  LoweredOwnership getLoweredOwnership() const;
+
   static ValueOwnership getValueOwnershipForSpecifier(Specifier specifier) {
     switch (specifier) {
     case ParamSpecifier::InOut:
@@ -7943,10 +8039,10 @@ private:
     setIndices(Indices);
   }
 
-  /// Returns the given type as a `BoundGenericType` if it is a
+  /// Returns the given type as a `NominalType` if it is a
   /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
   /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
-  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
+  static NominalType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -8021,7 +8117,7 @@ public:
   /// If `useDC` is provided (where the decl is being used), validates that
   /// access control is being used consistently and that `decl` is appropriately
   /// accessible, returning `nullptr` if inaccessible.
-  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
+  NominalType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -8249,7 +8345,21 @@ protected:
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
     unsigned NoLifetimeDependenceInfo : 1;
+
+    /// Whether we've assigned discriminators for a function body.
+    /// NOTE: This should really be a bit on AbstractFunctionDecl, but that
+    /// bitfield is full.
+    unsigned HasBodyDiscriminators : 1;
   } LazySemanticInfo = { };
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return LazySemanticInfo.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    LazySemanticInfo.HasBodyDiscriminators = value;
+  }
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,
@@ -8714,10 +8824,20 @@ public:
   /// instance method.
   bool isObjCInstanceMethod() const;
 
+  /// Whether this is a top-level (module-scope) function with @objc (SE-0495).
+  bool isObjCGlobalFunction() const;
+
   /// Get the foreign language targeted by a @c-style attribute, if any.
   /// Used to abstract away the change in meaning of @c vs @_cdecl while
   /// formalizing the attribute.
   std::optional<ForeignLanguage> getCDeclKind() const;
+
+  /// Whether this function's signature includes types that require Objective-C
+  /// bridging (e.g. String <-> NSString). Used by @objc global functions to
+  /// decide between the @c single-symbol model and the @_cdecl thunk model.
+  /// This always examines the declaration's interface types; substitutions at
+  /// a use site must not change the declaration's entry-point model.
+  bool signatureRequiresObjCBridging() const;
 
   /// Determine whether the name of an argument is an API name by default
   /// depending on the function context.
@@ -9413,7 +9533,6 @@ public:
 
   /// Returns the string for the base name, or "_" if this is unnamed.
   StringRef getNameStr() const {
-    assert(!getName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseIdentifier().str() : "_";
   }
 

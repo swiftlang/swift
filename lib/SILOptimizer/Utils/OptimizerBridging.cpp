@@ -11,8 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
-#include "../../IRGen/IRGenModule.h"
 #include "../../IRGen/GenClass.h"
+#include "../../IRGen/IRGenModule.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -21,6 +22,7 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
@@ -28,10 +30,12 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 
 using namespace swift;
 
@@ -41,7 +45,8 @@ llvm::cl::list<std::string>
 
 llvm::cl::opt<bool> DisableSwiftVerification(
     "disable-swift-verification", llvm::cl::init(false),
-    llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+    llvm::cl::desc("Disable the mandatory verification which is implemented in "
+                   "the SwiftCompilerSources, including ownership verification"));
 
 
 #ifdef PURE_BRIDGING_MODE
@@ -53,25 +58,24 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
-  if (f->getModule().getOptions().VerifyNone)
-    return;
+bool SILPassManager::isMandatoryVerificationEnabled(SILFunction *f) {
+  return !f->getModule().getOptions().VerifyNone &&
+         !DisableSwiftVerification &&
+         !f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION);
+}
 
-  if (DisableSwiftVerification)
+void SILPassManager::runMandatoryVerification(SILFunction *f) {
+  if (!isMandatoryVerificationEnabled(f))
     return;
-
-  if (f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
-    return;
-  }
 
   SILFunction *prevFunction = getSwiftPassInvocation()->beginVerifyFunction(f);
   BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
   getSwiftPassInvocation()->endVerifyFunction(prevFunction);
 }
 
-void SILPassManager::runSwiftModuleVerification() {
+void SILPassManager::runMandatoryModuleVerification() {
   for (SILFunction &f : *Mod) {
-    runSwiftFunctionVerification(&f);
+    runMandatoryVerification(&f);
   }
 }
 
@@ -141,6 +145,10 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
   auto bi = builtin.getAs<BuiltinInst>();
   std::optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+OptionalBridgedValue BridgedPassContext::simplifyInstruction(BridgedInstruction inst) const {
+  return {::simplifyInstruction(inst.unbridged())};
 }
 
 void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
@@ -233,6 +241,11 @@ void BridgedPassContext::visitTypesWithEmittedMetadata(
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   for (SILType type : mod->getNonCopyableTypesWithEmittedMetadata())
     callback(context, {type});
+  // IRGen also emits the metadata of exported type specializations eagerly,
+  // so add them to 'typesWithEmittedMetadata' (e.g. for the vtable loop in
+  // MandatoryPerformanceOptimizations).
+  for (CanType type : mod->getExportedTypeSpecializations())
+    callback(context, {SILType::getPrimitiveObjectType(type)});
 }
 
 void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
@@ -248,7 +261,7 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
         normal->getEffectiveCodeGenerationModel() !=
             CodeGenerationModel::Interface ||
         normal->getDeclContext()->getParentModule() != mod->getSwiftModule() ||
-        normal->getDeclContext()->isGenericContext())
+        normal->isEffectivelyGeneric())
       continue;
     conformances.push_back(normal);
   }
@@ -260,6 +273,27 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
     mod->linkWitnessTable(normal, SILModule::LinkingMode::LinkNormal,
                           /*referencedFromInitExistential=*/true);
     callback(context, {ProtocolConformanceRef(normal)});
+  }
+
+  // Exported conformance specializations: for each exported type
+  // specialization, e.g. 'Box<Int>', the conformances of its type.
+  for (CanType type : mod->getExportedTypeSpecializations()) {
+    for (auto *conformance : type->getAnyNominal()->getAllConformances()) {
+      // The conformance of the specialization, e.g. 'Box<Int>: P'.
+      auto specialized =
+          lookupConformance(type, conformance->getProtocol());
+      // Only if it exists and its type's specialization's owner, i.e. this
+      // module, owns its witness table (isExportedConformanceSpecialization).
+      if (specialized.isConcrete() &&
+          SpecializedAttr::isExportedConformanceSpecialization(
+              specialized.getConcrete())) {
+        // Load the witness table it's specialized from, as above.
+        mod->linkWitnessTable(specialized.getConcrete(),
+                              SILModule::LinkingMode::LinkNormal,
+                              /*referencedFromInitExistential=*/true);
+        callback(context, {specialized});
+      }
+    }
   }
 }
 
@@ -281,6 +315,16 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
   }
 
   SILOptFunctionBuilder FunctionBuilder(*invocation->getTransform());
+
+  // In Embedded Swift, use the specialization that the module declaring
+  // `origFunc` exports, instead of creating a local copy. Callers of
+  // `context.specialize(function:for:...)` (e.g. the vtable and deinit
+  // specializers) keep its linkage, see `isExportedSpecialization`.
+  if (mod->getOptions().EmbeddedSwift) {
+    if (auto *exported = lookupExportedSpecialization(
+            FunctionBuilder, origFunc, subs, ReInfo.getSpecializedType()))
+      return {exported};
+  }
 
   GenericFuncSpecializer FuncSpecializer(FunctionBuilder, origFunc, ReInfo.getClonerParamSubstitutionMap(),
                                          ReInfo, isMandatory);
@@ -313,6 +357,12 @@ bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
+}
+
+bool BridgedPassContext::unrollPackLoopsInFunction(
+    BridgedFunction function) const {
+  return swift::unrollPackLoopsInFunction(function.getFunction(),
+                                          invocation->getPassManager());
 }
 
 namespace  {
@@ -448,6 +498,24 @@ BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithDifferentiableFunctionArgs(
+    BridgedArrayRef bridgedDifferentiableFunctionArgs,
+    BridgedFunction applySiteCallee) const {
+  auto *callee = applySiteCallee.getFunction();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      callee->getASTContext(), Demangle::SpecializationPass::ClosureSpecializer,
+      callee->getSerializedKind(), callee);
+
+  for (auto arg : bridgedDifferentiableFunctionArgs
+                      .unbridged<DifferentiableFunctionArgMangling>()) {
+    mangler.setArgumentDifferentiableFunctionProp(
+        unsigned(arg.argIdx), arg.inst.unbridged(),
+        arg.originalRoot.unbridged(), arg.jvpRoot.unbridged(),
+        arg.vjpRoot.unbridged());
+  }
+  return BridgedOwnedString(mangler.mangle());
+}
+
 BridgedOwnedString BridgedPassContext::mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const {
   auto pass = Demangle::SpecializationPass::EmbeddedWitnessCallSpecialization;
 
@@ -472,6 +540,10 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
       break;
   }
   invocation->setNeedFixStackNesting(false);
+}
+
+bool BridgedPassContext::enableMandatoryVerification(BridgedFunction function) const {
+  return SILPassManager::isMandatoryVerificationEnabled(function.getFunction());
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {
@@ -589,6 +661,15 @@ bool BeginApply_canInline(BridgedInstruction beginApply) {
   return swift::SILInliner::canInlineBeginApply(beginApply.getAs<BeginApplyInst>());
 }
 
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value) {
+  auto nameAndRoot =
+      VariableNameInferrer::inferNameAndRoot(value.getSILValue());
+  if (!nameAndRoot)
+    return {BridgedStringRef(), {nullptr}};
+  return {nameAndRoot->first.str(), {nameAndRoot->second}};
+}
+
 BridgedDynamicCastResult classifyDynamicCastBridged(BridgedCanType sourceTy, BridgedCanType destTy,
                                                     BridgedFunction function,
                                                     bool sourceTypeIsExact) {
@@ -671,7 +752,7 @@ bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
 // See also ASTMangler::mangleAutoDiffGeneratedDeclaration.
 bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
   assert(vjp.isAutodiffVJP());
-  EnumDecl *ed = unbridged().getEnumOrBoundGenericEnum();
+  EnumDecl *ed = unbridged().getEnumDecl();
   if (ed == nullptr)
     return false;
 

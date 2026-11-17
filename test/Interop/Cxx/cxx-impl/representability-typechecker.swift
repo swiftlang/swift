@@ -99,11 +99,11 @@ func returnsSwiftString() -> String { return "" }
 
 // Swift specials: async, throwing, generic
 
-// expected-error@+1{{@cxx global function cannot be asynchronous}}
+// expected-error@+1{{'@cxx' global function cannot be asynchronous}}
 @cxx @implementation
 func asyncFunc() async {}
 
-// expected-error@+1{{raising errors from @cxx functions is not supported}}
+// expected-error@+1{{raising errors from '@cxx' functions is not supported}}
 @cxx @implementation
 func throwingFunc() throws {}
 

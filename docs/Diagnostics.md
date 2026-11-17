@@ -59,6 +59,20 @@ Clang also has a kind of diagnostic called a "remark", which represents informat
 - When referring to attributes by name, use *either* `attribute 'foo'` or 
   `'@foo'`, rather than `attribute '@foo'`.
 
+- Describe a type or value that doesn't conform to an invertible protocol by
+  prefixing the quoted protocol name with "non-": "non-'Copyable'" for
+  `Copyable`, "non-'Escapable'" for `Escapable`, and "non-'Deinitable'" for
+  `Deinitable`. Don't use variations such as "noncopyable", "non-copyable",
+  or "~Escapable". Use the inverse syntax only when the diagnostic tells the
+  developer what to write, or when it refers to a generic signature that
+  contains an inverse.
+  For example:
+  - `key path cannot refer to non-'Copyable' type 'File'`.
+  - `a function cannot return a non-'Escapable' result`.
+  - `tuple cannot contain non-'Deinitable' element type 'ND'`, but
+    `'@_moveOnly' attribute is deprecated and will be removed; use '~Copyable' instead`
+    and `'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance`.
+
 - Match the tone and phrasing of other diagnostics. Some common phrases:
 
   - "\<noun> '\<name>'" (e.g. "type 'Set<Int>'")
@@ -174,6 +188,11 @@ diagnostic arguments of a given type.
 
 - `%kind0` - Replaced with `attribute 'foo'`, whereas `%0` is replaced with
   `'@foo'`.
+
+#### `DeclAttribute`
+
+- `%kind0` - Replaced with `attribute 'foo'` or `modifier 'foo'`, whereas `%0`
+  is replaced with `'@foo'` or `'foo'` based on if it's an attribute or modifier.
 
 Note: If your diagnostic could apply to accessors, be careful how you format the declaration's name; accessors have an empty name, so you need to display their accessor kind and the name of their storage decl instead. Inserting the name with a `Decl *` parameter will handle these complications automatically; if you want to use `DeclName` or `Identifier` instead, you'll probably need a separate version of the diagnostic for accessors. 
 

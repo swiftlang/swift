@@ -1,0 +1,58 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// A value defined in a loop header and consumed within the loop is consumed at
+// entry to the header along the back edge. Extending liveness to the boundary of
+// the consumed region must not reach the loop's preheader, where the value isn't
+// live at all: doing so put a destroy of the value there, before its definition.
+// (The preheader must contain an instruction other than its terminator for the
+// extension to have anywhere to go.)
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @next : $@convention(thin) <T where T : ~Copyable> () -> @out Optional<T>
+sil @consume : $@convention(thin) <T where T : ~Copyable> (@in T) -> ()
+sil @prepare : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @defined_in_loop_header : {{.*}} {
+// CHECK:       bb0:
+// CHECK:         function_ref @prepare
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    [[STACK:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         switch_enum_addr [[STACK]]
+// CHECK-LABEL: } // end sil function 'defined_in_loop_header'
+sil [ossa] @defined_in_loop_header : $@convention(thin) <T where T : ~Copyable> () -> () {
+bb0:
+  %p = function_ref @prepare : $@convention(thin) () -> ()
+  %pa = apply %p() : $@convention(thin) () -> ()
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Optional<T>
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*Optional<T>
+  %3 = function_ref @next : $@convention(thin) <T where T : ~Copyable> () -> @out Optional<T>
+  %4 = apply %3<T>(%2) : $@convention(thin) <T where T : ~Copyable> () -> @out Optional<T>
+  switch_enum_addr %2 : $*Optional<T>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb3
+
+bb2:
+  %6 = begin_access [deinit] [static] [no_nested_conflict] %2 : $*Optional<T>
+  %7 = unchecked_inplace_enum_data_addr %6 : $*Optional<T>, #Optional.some!enumelt
+  %8 = alloc_stack $T
+  copy_addr [take] %7 to [init] %8 : $*T
+  end_access %6 : $*Optional<T>
+  %11 = function_ref @consume : $@convention(thin) <T where T : ~Copyable> (@in T) -> ()
+  %12 = apply %11<T>(%8) : $@convention(thin) <T where T : ~Copyable> (@in T) -> ()
+  dealloc_stack %8 : $*T
+  dealloc_stack %1 : $*Optional<T>
+  br bb1
+
+bb3:
+  destroy_addr %2 : $*Optional<T>
+  dealloc_stack %1 : $*Optional<T>
+  %17 = tuple ()
+  return %17 : $()
+}

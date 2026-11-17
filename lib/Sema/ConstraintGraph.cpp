@@ -922,6 +922,20 @@ bool ConstraintGraph::contractEdges() {
       bool isNotContractable = true;
       const auto &bindings = CS.getConstraintGraph()[rep1].getPotentialBindings();
 
+      if (CS.getASTContext().TypeCheckerOpts.SolverEnableExtremeEdgeContraction) {
+        // If we're the supertype of at least one non-inout type variable, we
+        // cannot be inout either.
+        if (!bindings.SupertypeOf.empty()) {
+          for (auto pair : bindings.SupertypeOf) {
+            auto *typeVar = pair.first;
+            if (!typeVar->getImpl().canBindToInOut()) {
+              isNotContractable = false;
+              break;
+            }
+          }
+        }
+      }
+
       // Check if there are any bindings. If there are no bindings, we
       // do not contract the edge. If there is at least one binding, and
       // all potential bindings are to non-'inout' types, we can contract.

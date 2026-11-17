@@ -84,6 +84,13 @@ extension SubstitutionMap {
     return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged,
                                                                           selfType?.bridged ?? BridgedCanType()))
   }
+
+  /// Returns true if at least one replacement type of this substitution map (partially)
+  /// contains the corresponding replacement type of `other`.
+  /// Both substitution maps must have the same generic signature.
+  public func isGrowing(comparedTo other: SubstitutionMap) -> Bool {
+    return SubstitutionMap_isGrowing(bridged, other.bridged)
+  }
 }
 
 extension Conformance {

@@ -287,6 +287,12 @@ struct InverseRequirement {
                              SmallVectorImpl<StructuralRequirement> &result,
                              SmallVectorImpl<Type> &expandedGPs);
 
+  /// Returns true if the Copyable protocol inherits from Deinitable, so that
+  /// a Copyable subject doesn't need its own Deinitable default. This is false
+  /// for a standard library built by an older compiler that did not have the
+  /// Deinitable protocol.
+  static bool copyableImpliesDeinitable(ASTContext &ctx);
+
   void print(raw_ostream &os, const PrintOptions &opts, bool forInherited=false) const;
 };
 

@@ -94,3 +94,18 @@ func testEscapedLater2<T>(_ e: consuming E<T>) {
     }
 }
 
+struct NoncopyableWithString<T>: ~Copyable {
+    var t: T
+    var s: String
+    borrowing func check() -> Bool { true }
+}
+
+func takeAutoclosure(_ f: @autoclosure () -> Bool, _ s: String) {}
+
+// Reading the value while the closure is alive doesn't keep the copy.
+// CHECK-LABEL: sil {{.*}}29testReadDuringClosureLifetime
+func testReadDuringClosureLifetime<T>(_ t: T) {
+    // CHECK: partial_apply {{.*}}[on_stack]
+    let x = NoncopyableWithString(t: t, s: "a")
+    takeAutoclosure(x.check(), x.s)
+}

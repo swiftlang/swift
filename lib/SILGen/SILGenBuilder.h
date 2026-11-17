@@ -408,9 +408,9 @@ public:
   ManagedValue createManagedFunctionRef(SILLocation loc, SILFunction *f);
 
   using SILBuilder::createConvertFunction;
-  ManagedValue createConvertFunction(SILLocation loc, ManagedValue fn,
-                                     SILType resultTy,
-                                     bool WithoutActuallyEscaping = false);
+  ManagedValue createConvertFunction(
+      SILLocation loc, ManagedValue fn, SILType resultTy,
+      ConvertFunctionInst::Kind kind = ConvertFunctionInst::Kind::Ordinary);
 
   using SILBuilder::createConvertEscapeToNoEscape;
   ManagedValue

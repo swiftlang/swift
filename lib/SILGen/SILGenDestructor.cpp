@@ -158,10 +158,17 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
   SILValue resultSelfValue;
   SILType objectPtrTy = SILType::getNativeObjectType(F.getASTContext());
   SILType classTy = selfValue->getType();
-  if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass()) {
+  // A Swift class that subclasses a C++ foreign reference type does not call
+  // the base's destructor: the imported FRT has no Swift deinit body, and it is
+  // released through the release operation of the FRT.
+  bool superclassIsForeignReference =
+      cd->getSuperclassDecl() &&
+      cd->getSuperclassDecl()->isForeignReferenceType();
+  if (cd->hasSuperclass() && !cd->isNativeNSObjectSubclass() &&
+      !superclassIsForeignReference) {
     Type superclassTy =
       dd->mapTypeIntoEnvironment(cd->getSuperclass());
-    ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+    ClassDecl *superclass = superclassTy->getClassDecl();
     auto superclassDtorDecl = superclass->getDestructor();
     SILDeclRef dtorConstant =
       SILDeclRef(superclassDtorDecl, SILDeclRef::Kind::Destroyer);
@@ -175,7 +182,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
 
     // We completely drop the generic signature if all generic parameters were
     // concrete.
-    if (subMap && subMap.getGenericSignature()->areAllParamsConcrete())
+    if (subMap && !subMap.isEffectivelyGeneric())
       subMap = SubstitutionMap();
 
     std::tie(dtorValue, dtorTy)
@@ -422,8 +429,7 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
         /* invocationSubs */ {}, getASTContext());
     SILType workFuncType = SILType::getPrimitiveObjectType(workFuncType1);
     SILValue dtx = dtorValue.getValue();
-    auto castedDeallocator =
-        B.createConvertFunction(loc, dtx, workFuncType, false);
+    auto castedDeallocator = B.createConvertFunction(loc, dtx, workFuncType);
 
     auto wordTy = SILType::getBuiltinWordType(getASTContext());
     auto *flagsInst =
@@ -791,7 +797,7 @@ void SILGenFunction::emitObjCDestructor(SILDeclRef dtor) {
   // Form a reference to the superclass -dealloc.
   Type superclassTy = dd->mapTypeIntoEnvironment(cd->getSuperclass());
   assert(superclassTy && "Emitting Objective-C -dealloc without superclass?");
-  ClassDecl *superclass = superclassTy->getClassOrBoundGenericClass();
+  ClassDecl *superclass = superclassTy->getClassDecl();
   auto superclassDtorDecl = superclass->getDestructor();
   auto superclassDtor = SILDeclRef(superclassDtorDecl,
                                    SILDeclRef::Kind::Deallocator)

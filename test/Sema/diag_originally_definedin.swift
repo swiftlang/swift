@@ -30,7 +30,7 @@ public func macroVersioned() {}
 
 // Fallback to the default diagnostic when the macro is unknown.
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for attribute '@_originallyDefinedIn'}}
+@_originallyDefinedIn(module: "original", _unknownMacro) // expected-warning {{unknown platform '_unknownMacro' for '@_originallyDefinedIn' attribute}}
 // expected-error@-1 {{expected version number in '@_originallyDefinedIn' attribute}}
 public func macroUnknown() {}
 
@@ -38,27 +38,27 @@ public func macroUnknown() {}
 public func macroEmpty() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", macos 10.13) // expected-warning {{unknown platform 'macos' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-48=macOS}}
+@_originallyDefinedIn(module: "original", macos 10.13) // expected-warning {{unknown platform 'macos' for '@_originallyDefinedIn' attribute; did you mean 'macOS'?}} {{43-48=macOS}}
 public func incorrectPlatformCase() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", mscos 10.13) // expected-warning {{unknown platform 'mscos' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-48=macOS}}
+@_originallyDefinedIn(module: "original", mscos 10.13) // expected-warning {{unknown platform 'mscos' for '@_originallyDefinedIn' attribute; did you mean 'macOS'?}} {{43-48=macOS}}
 public func incorrectPlatformSimilar1() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", macoss 10.13) // expected-warning {{unknown platform 'macoss' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-49=macOS}}
+@_originallyDefinedIn(module: "original", macoss 10.13) // expected-warning {{unknown platform 'macoss' for '@_originallyDefinedIn' attribute; did you mean 'macOS'?}} {{43-49=macOS}}
 public func incorrectPlatformSimilar2() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", mac 10.13) // expected-warning {{unknown platform 'mac' for attribute '@_originallyDefinedIn'; did you mean 'macOS'?}} {{43-46=macOS}}
+@_originallyDefinedIn(module: "original", mac 10.13) // expected-warning {{unknown platform 'mac' for '@_originallyDefinedIn' attribute; did you mean 'macOS'?}} {{43-46=macOS}}
 public func incorrectPlatformSimilar3() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", notValid 10.13) // expected-warning {{unknown platform 'notValid' for attribute '@_originallyDefinedIn'}} {{none}}
+@_originallyDefinedIn(module: "original", notValid 10.13) // expected-warning {{unknown platform 'notValid' for '@_originallyDefinedIn' attribute}} {{none}}
 public func incorrectPlatformNotSimilar() {}
 
 @available(macOS 10.9, *)
-@_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
+@_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for '@_originallyDefinedIn' attribute}}
 public func swiftVersionMacro() {}
 
 @available(macOS, unavailable)

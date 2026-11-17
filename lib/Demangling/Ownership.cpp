@@ -26,7 +26,7 @@ llvm::StringRef swift::keywordOf(ReferenceOwnership ownership) {
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
   assert(false && "impossible");
-  LLVM_BUILTIN_UNREACHABLE;
+  LLVM_BUILTIN_TRAP;
 }
 
 llvm::StringRef swift::manglingOf(ReferenceOwnership ownership) {
@@ -39,5 +39,5 @@ llvm::StringRef swift::manglingOf(ReferenceOwnership ownership) {
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
   assert(false && "impossible");
-  LLVM_BUILTIN_UNREACHABLE;
+  LLVM_BUILTIN_TRAP;
 }

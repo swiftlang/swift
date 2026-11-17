@@ -12,8 +12,17 @@
 
 import SIL
 
-extension TupleInst : OnoneSimplifiable {
+extension TupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if !context.preserveDebugInfo {
+      // Eliminate `tuple_extract`s of an owned `tuple` where the `tuple_extract`s are inside a
+      // a borrow scope. See `StructInst.simplify` for details.
+      // Don't do this in -Onone, because it would change the debug info.
+      splitOwnedAggregate(context)
+      if isDeleted {
+        return
+      }
+    }
 
     // Eliminate the redundant instruction pair
     // ```
@@ -54,6 +63,15 @@ extension TupleInst : OnoneSimplifiable {
   }
 }
 
+extension TupleInst : DebugReconstructionBlockSimplifiable {
+  /// Just folds an all-undef tuple to undef.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
+      replaceWithUndef(context)
+    }
+  }
+}
+
 private func tryReplaceDestructConstructPair(destruct: MultipleValueInstruction & UnaryInstruction,
                                              construct: SingleValueInstruction,
                                              _ context: SimplifyContext) {
@@ -71,5 +89,6 @@ private func tryReplaceDestructConstructPair(destruct: MultipleValueInstruction 
 
   if everyResultUsedOnce {
     context.erase(instruction: construct)
+    context.erase(instruction: destruct)
   }
 }

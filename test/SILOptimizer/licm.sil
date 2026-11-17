@@ -2678,6 +2678,57 @@ bb2:
   return %52 : $()
 }
 
+// A store which is hoisted speculatively must not be erased when its memory location is promoted afterwards.
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_promoted_location :
+// CHECK:         {{^}}bb0([[A:%[0-9]+]] : $*Builtin.Int32, [[V:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:      store [[V]] to [trivial] [[A]]
+// CHECK-NEXT:      br bb1
+// CHECK-NOT:       store
+// CHECK:         } // end sil function 'hoist_dominating_store_promoted_location'
+sil [ossa] @hoist_dominating_store_promoted_location : $@convention(thin) (@inout Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  br bb1
+
+bb1:
+  store %1 to [trivial] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL:   sil [ossa] @hoist_dominating_store_promoted_stack_location :
+// CHECK:         {{^}}bb0([[I:%[0-9]+]] : $Builtin.Int32, [[V:%[0-9]+]] : $Builtin.Int32):
+// CHECK-NEXT:      [[A:%[0-9]+]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT:      store [[I]] to [trivial] [[A]]
+// CHECK-NEXT:      store [[V]] to [trivial] [[A]]
+// CHECK-NEXT:      br bb1
+// CHECK-NOT:       store
+// CHECK:         } // end sil function 'hoist_dominating_store_promoted_stack_location'
+sil [ossa] @hoist_dominating_store_promoted_stack_location : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
+  %2 = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %2
+  br bb1
+
+bb1:
+  store %1 to [trivial] %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %3 = load [trivial] %2
+  dealloc_stack %2
+  return %3
+}
+
 
 // CHECK-LABEL:   sil [ossa] @dont_hoist_multi_store
 // CHECK:         {{^}}bb0

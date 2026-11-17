@@ -1,15 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.sil
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.sil
 // RUN: %FileCheck %s --check-prefix=SIL < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=DISPATCH < %t/main.sil
 // RUN: %FileCheck %s --check-prefix=SHARED-ON-THROW < %t/main.sil
-// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.ll
+// RUN: %target-swift-frontend -emit-ir -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 -plugin-path %swift-plugin-dir -module-name main %s -o %t/main.ll
 // RUN: %FileCheck %s --check-prefix=IR < %t/main.ll
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // REQUIRES: rdar189403868

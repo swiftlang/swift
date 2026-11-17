@@ -2,11 +2,13 @@
 // REQUIRES: objc_interop
 
 // Use the runtime name for runtime instantiation
-// CHECK-LABEL: @"$sSo16ObjCRuntimeNamedCSgMD" = {{.*}}@"symbolic So26ObjCRuntimeNameIsDifferentCSg"
+// CHECK-LABEL: @"$sSo16ObjCRuntimeNamedCSgMd" = linkonce_odr hidden global { ptr } zeroinitializer, align 8
+// CHECK-LABEL: @"$sSo16ObjCRuntimeNamedCSgMR" = {{.*}}@"symbolic So26ObjCRuntimeNameIsDifferentCSg"
 public func getMetadata() -> Any.Type {
   return ObjCRuntimeNamed?.self
 }
-// CHECK-LABEL: @"$sSo21ObjCProtoRuntimeNamed_pSgMD" = {{.*}}@"symbolic So31ObjCProtoRuntimeNameIsDifferent_pSg"
+// CHECK-LABEL: @"$sSo21ObjCProtoRuntimeNamed_pSgMd" = linkonce_odr hidden global { ptr } zeroinitializer, align 8
+// CHECK-LABEL: @"$sSo21ObjCProtoRuntimeNamed_pSgMR" = {{.*}}@"symbolic So31ObjCProtoRuntimeNameIsDifferent_pSg"
 public func getMetadata2() -> Any.Type {
   return ObjCProtoRuntimeNamed?.self
 }

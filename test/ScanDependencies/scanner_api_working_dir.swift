@@ -13,7 +13,7 @@
 // CHECK: "mainModuleName": "Test"
 
 // RUN: cd %t
-// RUN: %swift-scan-test -action scan_dependency -threads 2  -- %target-swift-frontend -emit-module -module-name Test \
+// RUN: %swift-scan-test -action scan_dependency -scan-threads 2  -- %target-swift-frontend -emit-module -module-name Test \
 // RUN:   -swift-version 5 -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -I include %t/test.swift | %FileCheck %s
 

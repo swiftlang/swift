@@ -817,6 +817,16 @@ bool _swift_arrayDownCastConditionalIndirect(OpaqueValue *destination,
                                              const Metadata *sourceValueType,
                                              const Metadata *targetValueType);
 
+// internal func _arrayDownCastTestIndirect<SourceValue, TargetValue>(
+//   _ source: UnsafePointer<Array<SourceValue>>,
+//   _ targetType: TargetValue.Type
+// ) -> Bool
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+bool _swift_arrayDownCastTestIndirect(OpaqueValue *source,
+                                      const Metadata *targetType,
+                                      const Metadata *sourceValueType,
+                                      const Metadata *targetValueType);
+
 // internal func _setDownCastIndirect<SourceValue, TargetValue>(
 //   _ source: UnsafePointer<Set<SourceValue>>,
 //   _ target: UnsafeMutablePointer<Set<TargetValue>>)
@@ -1060,13 +1070,11 @@ tryCastToArray(
       auto sourceArgs = srcType->getGenericArgs();
       auto destArgs = destType->getGenericArgs();
       if (isTestOnlyCast(destLocation)) {
-        // Try building a new array in a temporary, then discard.
-        // TODO: Make array tests more efficient by avoiding the copy
-        return testByProducingIntoTemporary(
-            destType, [&](OpaqueValue *temporary) {
-              return _swift_arrayDownCastConditionalIndirect(
-                  srcValue, temporary, sourceArgs[0], destArgs[0]);
-            });
+        // Check the elements in place; no result array is built.
+        return _swift_arrayDownCastTestIndirect(
+                   srcValue, destArgs[0], sourceArgs[0], destArgs[0])
+                   ? DynamicCastResult::TestSuccess
+                   : DynamicCastResult::Failure;
       }
       if (mayDeferChecks) {
         _swift_arrayDownCastIndirect(
@@ -2362,7 +2370,8 @@ static DynamicCastResult tryCastToExtendedExistential(
     SubstGenericParametersFromMetadata substitutions(destExistentialShape,
                                                      allGenericArgsVec.data());
     // Verify the requirements in the requirement signature against the
-    // arguments from the source value.
+    // arguments from the source value. The leading generalization parameters
+    // never record inverses, so don't check them for Copyable and Escapable.
     ConformanceExecutionContext context;
     auto requirementSig = destExistentialShape->getRequirementSignature();
     auto error = swift::_checkGenericRequirements(
@@ -2378,7 +2387,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
         },
-        &context);
+        &context, /*numParamsExemptFromInvertibleChecks=*/
+        destExistentialShape->getNumGenSigParams());
     if (error)
       return DynamicCastResult::Failure;
 
@@ -2850,6 +2860,13 @@ tryCast(
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
   bool takeOnSuccess, bool mayDeferChecks, bool prohibitIsolatedConformances)
 {
+  // Every strategy dereferences both types, and the shortcut below treats two
+  // null types as equal, so this has to come first.
+  if (!destType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // Sanity: test-only is incompatible with deferred checks
   // Failure indicates a structural problem with the cast logic in this file.
   assert(!(isTestOnlyCast(destLocation) && mayDeferChecks) &&
@@ -3202,6 +3219,12 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
                       const Metadata *destType,
                       DynamicCastFlags flags)
 {
+  // Check before anything below looks at either type.
+  if (!destType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // If the compiler has asked for a "take", we can
   // move pointers without ref-counting overhead.
   bool takeOnSuccess = flags & DynamicCastFlags::TakeOnSuccess;
@@ -3269,6 +3292,11 @@ swift_dynamicCastTestImpl(OpaqueValue *srcValue,
                           const Metadata *srcType,
                           const Metadata *targetType,
                           DynamicCastFlags flags) {
+  if (!targetType)
+    TARGET_TYPE_IS_NULL();
+  if (!srcType)
+    SOURCE_TYPE_IS_NULL();
+
   // A test never takes the source and never destroys it on failure, so the
   // corresponding flags are meaningless here. Unconditional is meaningless too:
   // there is no value to produce, so there is nothing to defer checking on.

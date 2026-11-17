@@ -1,0 +1,209 @@
+// RUN: %target-sil-opt %s \
+// RUN:   --lifetime-dependence-diagnostics \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -o /dev/null
+
+// REQUIRES: swift_feature_Lifetimes
+
+// rdar://190361126 (GH #93414) Lifetime dependence is lost when an address-only ~Escapable value is stored into an
+// enum.
+//
+// Verify LifetimeDependenceDiagnostics on address-only enums initialized in place:
+//   init_enum_data_addr + payload initialization + inject_enum_addr
+// The inject_enum_addr must not be treated as a reassignment of the enum that kills the payload's dependence.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {}
+
+struct Owner {
+  var c: C
+}
+
+struct AONE : ~Escapable {
+  var tag: Any
+
+  @_lifetime(immortal)
+  init()
+}
+
+enum AOWrapper : ~Escapable {
+  case some(AONE)
+  case none
+}
+
+sil @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+sil @makeOwner : $@convention(thin) () -> @out Owner
+sil @useOptional : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+
+// Closure body: copy a borrowed parameter into a temporary Optional (init_enum_data_addr + inject_enum_addr), then
+// move it into the captured variable.
+sil [ossa] @testInjectCopyToCapture : $@convention(thin) (@in_guaranteed AONE, @inout_aliasable Optional<AONE>) -> () {
+bb0(%0 : $*AONE, %1 : @closureCapture $*Optional<AONE>):
+  debug_value %0, let, name "v", argno 1, expr op_deref
+  %4 = alloc_stack $Optional<AONE>
+  %5 = init_enum_data_addr %4, #Optional.some!enumelt
+  copy_addr %0 to [init] %5
+  inject_enum_addr %4, #Optional.some!enumelt
+  %10 = begin_access [modify] [static] %1
+  copy_addr [take] %4 to %10
+  end_access %10
+  dealloc_stack %4
+  %15 = tuple ()
+  return %15 // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-13{{it depends on the lifetime of an argument of 'testInjectCopyToCapture'}}
+  // expected-note @-2{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Same, through a custom address-only enum.
+sil [ossa] @testInjectCustomEnumToCapture : $@convention(thin) (@in_guaranteed AONE, @inout_aliasable AOWrapper) -> () {
+bb0(%0 : $*AONE, %1 : @closureCapture $*AOWrapper):
+  debug_value %0, let, name "v", argno 1, expr op_deref
+  %4 = alloc_stack $AOWrapper
+  %5 = init_enum_data_addr %4, #AOWrapper.some!enumelt
+  copy_addr %0 to [init] %5
+  inject_enum_addr %4, #AOWrapper.some!enumelt
+  %10 = begin_access [modify] [static] %1
+  copy_addr [take] %4 to %10
+  end_access %10
+  dealloc_stack %4
+  %15 = tuple ()
+  return %15 // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-13{{it depends on the lifetime of an argument of 'testInjectCustomEnumToCapture'}}
+  // expected-note @-2{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Initialize a temporary Optional's payload with an @out apply + mark_dependence_addr, then assign it to an outer
+// variable that is used after the owner is destroyed.
+sil [ossa] @testInjectAssignOutOfScope : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Optional<AONE>, var, name "kept"
+  inject_enum_addr %0, #Optional.none!enumelt
+  %owner = alloc_stack [lexical] [var_decl] $Owner, let, name "local" // expected-note {{it depends on the lifetime of this parent value}}
+  %mk = function_ref @makeOwner : $@convention(thin) () -> @out Owner
+  %o = apply %mk(%owner) : $@convention(thin) () -> @out Owner
+  %7 = alloc_stack $Optional<AONE>
+  %8 = init_enum_data_addr %7, #Optional.some!enumelt
+  %9 = function_ref @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  %10 = apply %9(%8, %owner) : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  mark_dependence_addr [unresolved] %7 on %owner
+  inject_enum_addr %7, #Optional.some!enumelt
+  %13 = begin_access [modify] [static] %0
+  copy_addr [take] %7 to %13
+  end_access %13
+  dealloc_stack %7
+  destroy_addr %owner
+  dealloc_stack %owner
+  %18 = begin_access [read] [static] %0 // expected-error {{lifetime-dependent value escapes its scope}}
+  %use = function_ref @useOptional : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  %u = apply %use(%18) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  end_access %18 // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  destroy_addr %0
+  dealloc_stack %0
+  %28 = tuple ()
+  return %28
+}
+
+// Same, but initialize a deferred 'let' with copy_addr [take] ... to [init].
+sil [ossa] @testInjectInitOutOfScope : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Optional<AONE>, let, name "kept"
+  %owner = alloc_stack [lexical] [var_decl] $Owner, let, name "local" // expected-note {{it depends on the lifetime of this parent value}}
+  %mk = function_ref @makeOwner : $@convention(thin) () -> @out Owner
+  %o = apply %mk(%owner) : $@convention(thin) () -> @out Owner
+  %6 = alloc_stack $Optional<AONE> // expected-error {{lifetime-dependent value escapes its scope}}
+  %7 = init_enum_data_addr %6, #Optional.some!enumelt
+  %8 = function_ref @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  %9 = apply %8(%7, %owner) : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  mark_dependence_addr [unresolved] %6 on %owner
+  inject_enum_addr %6, #Optional.some!enumelt
+  copy_addr [take] %6 to [init] %0
+  dealloc_stack %6
+  destroy_addr %owner
+  dealloc_stack %owner
+  %use = function_ref @useOptional : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  %u = apply %use(%0) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> () // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  destroy_addr %0
+  dealloc_stack %0
+  %23 = tuple ()
+  return %23
+}
+
+// Initialize a named local Optional in place, then copy (not take) it to an outer variable.
+sil [ossa] @testInjectLocalCopiedOut : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Optional<AONE>, var, name "outer"
+  inject_enum_addr %0, #Optional.none!enumelt
+  %owner = alloc_stack [lexical] [var_decl] $Owner, let, name "local" // expected-note {{it depends on the lifetime of this parent value}}
+  %mk = function_ref @makeOwner : $@convention(thin) () -> @out Owner
+  %o = apply %mk(%owner) : $@convention(thin) () -> @out Owner
+  %7 = alloc_stack [lexical] [var_decl] $Optional<AONE>, let, name "inner"
+  %8 = init_enum_data_addr %7, #Optional.some!enumelt
+  %9 = function_ref @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  %10 = apply %9(%8, %owner) : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  mark_dependence_addr [unresolved] %7 on %owner
+  inject_enum_addr %7, #Optional.some!enumelt
+  %15 = begin_access [modify] [static] %0
+  copy_addr %7 to %15
+  end_access %15
+  destroy_addr %7
+  dealloc_stack %7
+  destroy_addr %owner
+  dealloc_stack %owner
+  %22 = begin_access [read] [static] %0 // expected-error {{lifetime-dependent value escapes its scope}}
+  %use = function_ref @useOptional : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  %u = apply %use(%22) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  end_access %22 // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  destroy_addr %0
+  dealloc_stack %0
+  %32 = tuple ()
+  return %32
+}
+
+// Store into an inout Optional whose lifetime only copies its own incoming dependence.
+sil [ossa] @testInjectToInout : $@convention(thin) (@lifetime(copy 0) @inout Optional<AONE>, @in_guaranteed Owner) -> () {
+bb0(%0 : $*Optional<AONE>, %1 : $*Owner):
+  debug_value %1, let, name "owner", argno 2, expr op_deref
+  %5 = alloc_stack $Optional<AONE>
+  %6 = init_enum_data_addr %5, #Optional.some!enumelt
+  %7 = function_ref @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  %9 = apply %7(%6, %1) : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  mark_dependence_addr [unresolved] %5 on %1
+  inject_enum_addr %5, #Optional.some!enumelt
+  %12 = begin_access [modify] [static] %0
+  copy_addr [take] %5 to %12
+  end_access %12
+  dealloc_stack %5
+  %16 = tuple ()
+  return %16 // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-15{{it depends on the lifetime of an argument of 'testInjectToInout'}}
+  // expected-note @-2{{this use causes the lifetime-dependent value to escape}}
+}
+
+// Valid: the Optional is used only while the owner is alive.
+sil [ossa] @testInjectInScope : $@convention(thin) () -> () {
+bb0:
+  %owner = alloc_stack [lexical] [var_decl] $Owner, let, name "local"
+  %mk = function_ref @makeOwner : $@convention(thin) () -> @out Owner
+  %o = apply %mk(%owner) : $@convention(thin) () -> @out Owner
+  %7 = alloc_stack $Optional<AONE>
+  %8 = init_enum_data_addr %7, #Optional.some!enumelt
+  %9 = function_ref @getAONE : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  %10 = apply %9(%8, %owner) : $@convention(method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @out AONE
+  mark_dependence_addr [unresolved] %7 on %owner
+  inject_enum_addr %7, #Optional.some!enumelt
+  %use = function_ref @useOptional : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  %u = apply %use(%7) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  destroy_addr %7
+  dealloc_stack %7
+  destroy_addr %owner
+  dealloc_stack %owner
+  %28 = tuple ()
+  return %28
+}

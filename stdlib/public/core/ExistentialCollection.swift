@@ -576,6 +576,25 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
     return (AnyIterator(it),idx)
   }
 
+#if $Embedded
+  // In embedded Swift, the vtable of every allocated box must be specialized.
+  // Wrapping `S` itself would create infinitely many box types, like
+  // `_SequenceBox<PrefixSequence<PrefixSequence<...<S>>>>`. Instead, wrap this
+  // type-erased box, so that the boxes created from it have a bounded number
+  // of types.
+  @inlinable
+  internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<DropFirstSequence<AnySequence<Element>>>(
+      _base: DropFirstSequence(AnySequence(_box: self), dropping: n))
+  }
+  @inlinable
+  internal override func _drop(
+    while predicate: (Element) throws -> Bool
+  ) rethrows -> _AnySequenceBox<Element> {
+    return try _SequenceBox<DropWhileSequence<AnySequence<Element>>>(
+      _base: DropWhileSequence(AnySequence(_box: self), predicate: predicate))
+  }
+#else
   @inlinable
   internal override func _dropFirst(_ n: Int) -> _AnySequenceBox<Element> {
     return _SequenceBox<DropFirstSequence<S>>(_base: _base.dropFirst(n))
@@ -586,14 +605,23 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   ) rethrows -> _AnySequenceBox<Element> {
     return try _SequenceBox<DropWhileSequence<S>>(_base: _base.drop(while: predicate))
   }
+#endif
   @inlinable
   internal override func _dropLast(_ n: Int) -> [Element] {
     return _base.dropLast(n)
   }
+#if $Embedded
+  @inlinable
+  internal override func _prefix(_ n: Int) -> _AnySequenceBox<Element> {
+    return _SequenceBox<PrefixSequence<AnySequence<Element>>>(
+      _base: PrefixSequence(AnySequence(_box: self), maxLength: n))
+  }
+#else
   @inlinable
   internal override func _prefix(_ n: Int) -> _AnySequenceBox<Element> {
     return _SequenceBox<PrefixSequence<S>>(_base: _base.prefix(n))
   }
+#endif
   @inlinable
   internal override func _prefix(
     while predicate: (Element) throws -> Bool

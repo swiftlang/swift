@@ -430,7 +430,7 @@ void swift::performLLVMOptimizations(
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
-  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
+  PassBuilder PB(Module->getContext(), TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
@@ -1052,6 +1052,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
   opts.HeapDestructors =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.EmbeddedHeapObjectMetadata =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ObjCISA);
 
   // Partial-apply captures are not ABI and can use a more aggressive key.
   opts.PartialApplyCapture =

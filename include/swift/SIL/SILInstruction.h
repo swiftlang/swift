@@ -2071,7 +2071,7 @@ class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
       private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
+      private llvm::TrailingObjects<AllocStackInst, SILLocation,
                                     const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
@@ -2194,7 +2194,7 @@ public:
   /// \param complete If true, always retrieve the complete variable with
   /// location, scope, and element type. If false, only return the
   /// values if they are stored (if they are different from the instruction's
-  /// location, scope, and type). This should only be set to false in
+  /// location and scope). This should only be set to false in
   /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
   /// have location and scope and sometimes not.
   std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
@@ -2207,9 +2207,7 @@ public:
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
-    if (HasAuxDebugVariableType)
-      AuxVarType = *getTrailingObjects<SILType>();
-    else if (complete)
+    if (complete)
       AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
@@ -2720,6 +2718,13 @@ public:
   SubstitutionMap getSubstitutions() const { return Subs; }
 };
 
+/// Checks if \p Subs2 is an expanded version of \p Subs1, i.e. if at least one
+/// replacement type in \p Subs2 (partially) contains the corresponding
+/// replacement type of \p Subs1. Both substitution maps must have the same
+/// generic signature.
+/// This is used to detect infinitely growing specialization loops.
+bool growingSubstitutions(SubstitutionMap Subs1, SubstitutionMap Subs2);
+
 class PartialApplyInst;
 
 // There's no good reason for the OverloadToken type to be internal
@@ -3014,7 +3019,7 @@ public:
 
   /// True if this application has generic substitutions.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// The substitutions used to bind the generic arguments of this function.
@@ -3387,8 +3392,51 @@ public:
     return getSubstCalleeConv().hasGuaranteedAddressResult();
   }
 
+  /// If the non-trivial @guaranteed result borrows a @guaranteed self value,
+  /// like a begin_borrow, return the self operand. Otherwise return nullptr.
+  Operand *getSelfObjectOfGuaranteedBorrowAccessorResult() {
+    if (!hasGuaranteedResult() || !hasSelfArgument() ||
+        getType().isTrivial(*getFunction())) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If the result borrows an @in_guaranteed self memory location, return the
+  /// self operand, whose address must not be modified over the scope of the
+  /// result. Returns nullptr if self is @guaranteed, there is no self, or the
+  /// result is trivial.
+  Operand *getSelfAddressOfGuaranteedBorrowAccessorResult() {
+    if (!hasGuaranteedResult() || !hasSelfArgument() ||
+        getType().isTrivial(*getFunction())) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
+  }
+
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// address-typed self, return the self operand. Otherwise return nullptr.
+  Operand *getAddressSelfOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
   }
 
   bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
@@ -3452,6 +3500,14 @@ public:
   bool hasCalledAtMostOnceSemantics() const {
     return getFunctionType()->hasCalledAtMostOnceSemantics();
   }
+
+  /// Returns true if the resulting closure can't be copied. See
+  /// `SILFunctionType::isNoncopyable()`.
+  bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
+
+  /// Returns true if calling the resulting closure consumes it. See
+  /// `SILFunctionType::isCallConsuming()`.
+  bool isCallConsuming() const { return getFunctionType()->isCallConsuming(); }
 
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
@@ -4438,7 +4494,7 @@ class KeyPathInst final
   }
 
 public:
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   KeyPathPattern *getPattern() const;
   bool hasPattern() const { return (bool)Pattern; }
@@ -4568,7 +4624,7 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// Return the type parameters to the builtin.
@@ -5003,17 +5059,39 @@ public:
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
-    public UnaryInstructionBase<SILInstructionKind::LoadBorrowInst,
-                                SingleValueInstruction>
+    public InstructionBase<SILInstructionKind::LoadBorrowInst,
+                           SingleValueInstruction>
 {
   friend class SILBuilder;
+
+  FixedOperandList<2> Operands;
 
   bool Unchecked = false;
 
 public:
-  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
-      : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue address, SILValue valueHint)
+      : InstructionBase(DebugLoc, address->getType().getObjectType()),
+        Operands{this, address, valueHint} {}
+
+  SILValue getAddress() const { return getOperand(0); }
+
+  /// Returns the optional value hint.
+  ///
+  /// If present, the loaded value is exactly the value of the value hint.
+  /// This is used if the load_borrow cannot be replaced by the value hint in
+  /// OSSA because it would violate ownership rules, e.g. if the value hint is
+  /// consumed before the load_borrow. The value hint is not an ownership use.
+  ///
+  /// Must only be called if `hasValueHint()` is true.
+  SILValue getValueHint() const { return getOperand(1); }
+
+  /// Returns true if the load_borrow has a value hint.
+  bool hasValueHint() const { return (bool)Operands[1].get(); }
+
+  /// Sets the value hint, which must have the same type as the load_borrow.
+  ///
+  /// `v` must not be null, i.e. this cannot be used to remove a value hint.
+  void setValueHint(SILValue v) { Operands[1].set(v); }
 
   // True if the invariants on `load_borrow` have not been checked and
   // should not be strictly enforced.
@@ -5032,6 +5110,13 @@ public:
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
+
+  ArrayRef<Operand> getAllOperands() const {
+    return Operands.asArray().drop_back(hasValueHint() ? 0 : 1);
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return Operands.asArray().drop_back(hasValueHint() ? 0 : 1);
+  }
 };
 
 inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -5856,6 +5941,13 @@ public:
   /// SSA operand type.
   SILType getVarType() const;
 
+  /// Returns true if the variable type is the type of the SSA operand, and
+  /// therefore follows a change of the operand's type. Otherwise it's a stored
+  /// type or the return type of a debug reconstruction block.
+  bool varTypeFollowsOperand() const {
+    return !HasAuxDebugVariableType && !getDebugReconstructionBlock();
+  }
+
   /// Return the debug variable information attached to this instruction.
   ///
   /// \param includeLoc If true (by default), always return a variable with
@@ -6294,15 +6386,30 @@ class ConvertFunctionInst final
   friend SILBuilder;
   USE_SHARED_UINT8;
 
+public:
+  /// The kind of a conversion. The values are part of the serialized format.
+  enum class Kind : uint8_t {
+    /// An ordinary conversion between ABI-compatible function types.
+    Ordinary = 0,
+
+    /// The conversion turns a non-escaping closure into an escaping function
+    /// type. See withoutActuallyEscaping().
+    WithoutActuallyEscaping = 1,
+
+    /// The conversion turns an exactly-once function into an at-most-once
+    /// function. See withoutActuallyDeiniting().
+    WithoutActuallyDeiniting = 2,
+  };
+
+private:
   ConvertFunctionInst(SILDebugLocation DebugLoc, SILValue Operand,
                       ArrayRef<SILValue> TypeDependentOperands, SILType Ty,
-                      bool WithoutActuallyEscaping,
+                      Kind ConversionKind,
                       ValueOwnershipKind forwardingOwnershipKind)
       : UnaryInstructionWithTypeDependentOperandsBase(DebugLoc, Operand,
                                                       TypeDependentOperands, Ty,
                                                       forwardingOwnershipKind) {
-    sharedUInt8().ConvertFunctionInst.withoutActuallyEscaping =
-        WithoutActuallyEscaping;
+    sharedUInt8().ConvertFunctionInst.conversionKind = uint8_t(ConversionKind);
     assert((Operand->getType().castTo<SILFunctionType>()->isNoEscape() ==
                 Ty.castTo<SILFunctionType>()->isNoEscape() ||
             Ty.castTo<SILFunctionType>()->getRepresentation() !=
@@ -6310,12 +6417,17 @@ class ConvertFunctionInst final
            "Change of escapeness is not ABI compatible");
   }
 
-  static ConvertFunctionInst *create(
-      SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-      SILFunction *F,
-      bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind);
+  static ConvertFunctionInst *
+  create(SILDebugLocation DebugLoc, SILValue Operand, SILType Ty,
+         SILModule &Mod, SILFunction *F, Kind ConversionKind,
+         ValueOwnershipKind forwardingOwnershipKind);
 
 public:
+  /// Returns the kind of this conversion.
+  Kind getConversionKind() const {
+    return Kind(sharedUInt8().ConvertFunctionInst.conversionKind);
+  }
+
   /// Returns `true` if this converts a non-escaping closure into an escaping
   /// function type. `True` must be returned whenever the closure operand has an
   /// unboxed capture (via @inout_aliasable) *and* the resulting function type
@@ -6325,7 +6437,13 @@ public:
   /// not be @noescape. Note that a non-escaping closure may have unboxed
   /// captured even though its SIL function type is "escaping".
   bool withoutActuallyEscaping() const {
-    return sharedUInt8().ConvertFunctionInst.withoutActuallyEscaping;
+    return getConversionKind() == Kind::WithoutActuallyEscaping;
+  }
+
+  /// Returns `true` if this converts an exactly-once function into an
+  /// at-most-once function.
+  bool withoutActuallyDeiniting() const {
+    return getConversionKind() == Kind::WithoutActuallyDeiniting;
   }
 
   /// Returns `true` if the function conversion is between types with the same
@@ -6972,7 +7090,7 @@ public:
   }
 
   StructDecl *getStructDecl() const {
-    auto s = getType().getStructOrBoundGenericStruct();
+    auto s = getType().getStructDecl();
     assert(s && "A struct should always have a StructDecl associated with it");
     return s;
   }
@@ -7479,7 +7597,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getOperand()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getOperand()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_enum_data must be of enum type");
     return E;
   }
@@ -7601,7 +7719,7 @@ public:
   }
 
   EnumDecl *getEnumDecl() const {
-    auto *E = getEnum()->getType().getEnumOrBoundGenericEnum();
+    auto *E = getEnum()->getType().getEnumDecl();
     assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
                 " type");
     return E;
@@ -7795,7 +7913,7 @@ public:
     auto enumValue = getEnumOperand();
     SILType enumType = enumValue->getType();
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     if (!enumType.isEffectivelyExhaustiveEnumType(this->getFunction())) {
@@ -8074,7 +8192,7 @@ public:
 
   NominalTypeDecl *getParentDecl() const {
     auto s =
-        ParentTy::getOperand(0)->getType().getNominalOrBoundGenericNominal();
+        ParentTy::getOperand(0)->getType().getNominalDecl();
     assert(s);
     return s;
   }
@@ -8177,7 +8295,7 @@ class RefTailAddrInst
 
 public:
   ClassDecl *getClassDecl() const {
-    auto s = getOperand()->getType().getClassOrBoundGenericClass();
+    auto s = getOperand()->getType().getClassDecl();
     assert(s);
     return s;
   }
@@ -8342,8 +8460,8 @@ public:
 };
 
 /// Access allowed to the opened value by the open_existential_addr instruction.
-/// Allowing mutable access to the opened existential requires a boxed
-/// existential value's box to be unique.
+/// Allowing mutable access to a boxed existential requires its box to be
+/// unique.
 enum class OpenedExistentialAccess { Immutable, Mutable };
 
 OpenedExistentialAccess getOpenedExistentialAccessFor(AccessKind access);
@@ -8909,6 +9027,13 @@ public:
   AnyPackIndexInst *getIndexOperand() const {
     return cast<AnyPackIndexInst>(getOperand());
   }
+
+  /// Build a SubstitutionMap that maps each element archetype in the opened
+  /// generic environment to the concrete type at the index in its corresponding
+  /// pack indicated by this instruction's index operand.
+  ///
+  /// If this is not possible, returns an empty SubstitutionMap.
+  SubstitutionMap tryGetElementArchetypeSubstitutionMap() const;
 };
 
 /// Get the value previously stored in a pack by pack_element_set.
@@ -9312,6 +9437,14 @@ public:
 
     /// The marked value is a copy that is not permitted by the language model.
     UnpermittedCopy,
+
+    /// The marked address is the destination of a second initialization of
+    /// immutable storage.
+    LetReinit,
+
+    /// The marked address holds `self` in a derived class initializer, which
+    /// may be used before `super.init` initializes its superclass part.
+    MissingSuperInit,
   };
 
 private:
@@ -11338,7 +11471,7 @@ public:
     if (!enumType.isEffectivelyExhaustiveEnumType(f))
       return nullptr;
 
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
 
     SmallPtrSet<EnumElementDecl *, 4> unswitchedElts;
@@ -11362,7 +11495,7 @@ public:
   getUniqueCaseForDestination(SILBasicBlock *block) {
     SILValue value = getOperand();
     SILType enumType = value->getType();
-    EnumDecl *decl = enumType.getEnumOrBoundGenericEnum();
+    EnumDecl *decl = enumType.getEnumDecl();
     assert(decl && "switch_enum operand is not an enum");
     (void)decl;
 
@@ -12366,7 +12499,7 @@ public:
          ValueOwnershipKind forwardingOwnershipKind);
 
   StructDecl *getStructDecl() const {
-    return getOperand()->getType().getStructOrBoundGenericStruct();
+    return getOperand()->getType().getStructDecl();
   }
 
   static bool classof(SILNodePointer node) {

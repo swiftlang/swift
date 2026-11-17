@@ -8,7 +8,7 @@
 // RUN:   -o %t/virtual-execution-main.o
 // RUN: %target-interop-build-swift \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -Xfrontend -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -module-name VirtualExecutionMain \
 // RUN:   -parse-as-library \
 // RUN:   -I %S/Inputs \
@@ -19,6 +19,7 @@
 // RUN: %target-run %t/virtual-execution | %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi
 
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_CxxImplementation
 
 #include <stdio.h>

@@ -113,6 +113,16 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
+  func unrollPackLoops(in function: Function) -> Bool {
+    if bridgedPassContext.unrollPackLoopsInFunction(function.bridged) {
+      notifyInstructionsChanged()
+      notifyBranchesChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
   func specialize(function: Function,
                   for substitutions: SubstitutionMap,
                   convertIndirectToDirect: Bool,
@@ -155,6 +165,28 @@ struct FunctionPassContext : MutatingContext {
 
     return bridgedArgManglings.withBridgedArrayRef{ bridgedClosureArgs in
       String(taking: bridgedPassContext.mangleWithClosureArgs(bridgedClosureArgs, applySiteCallee.bridged))
+    }
+  }
+
+  typealias DifferentiableFunctionArgumentMangling = (
+    argumentIndex: Int,
+    function: DifferentiableFunctionInst,
+    originalRoot: ThinToThickFunctionInst,
+    jvpRoot: ThinToThickFunctionInst,
+    vjpRoot: ThinToThickFunctionInst
+  )
+
+  func mangle(withDifferentiableFunctionArguments args: [DifferentiableFunctionArgumentMangling],
+              from applySiteCallee: Function) -> String {
+    let bridgedArgManglings = args.map {
+      BridgedPassContext.DifferentiableFunctionArgMangling(
+        argIdx: $0.argumentIndex, inst: $0.function.bridged,
+        originalRoot: $0.originalRoot.bridged, jvpRoot: $0.jvpRoot.bridged,
+        vjpRoot: $0.vjpRoot.bridged)
+    }
+    return bridgedArgManglings.withBridgedArrayRef { bridgedDifferentiableFunctionArgs in
+      String(taking: bridgedPassContext.mangleWithDifferentiableFunctionArgs(
+        bridgedDifferentiableFunctionArgs, applySiteCallee.bridged))
     }
   }
 
@@ -262,5 +294,11 @@ struct FunctionPassContext : MutatingContext {
 
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)
+  }
+}
+
+extension VerificationContext {
+  init(_ context: FunctionPassContext) {
+    self.init(_bridged: context._bridged)
   }
 }

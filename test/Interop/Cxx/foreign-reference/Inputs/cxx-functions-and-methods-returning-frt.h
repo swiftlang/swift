@@ -160,6 +160,12 @@ struct
       __attribute__((swift_attr("returns_unretained")));
 };
 
+// CF_RETURNS_(NOT_)RETAINED are treated like SWIFT_RETURNS_(UN)RETAINED for FRTs
+FRTStruct
+    *_Nonnull global_function_returning_FRT_with_returns_retained_cf_returns_not_retained() // expected-error {{'global_function_returning_FRT_with_returns_retained_cf_returns_not_retained' cannot be annotated with both SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED}}
+        __attribute__((swift_attr("returns_retained")))
+        __attribute__((cf_returns_not_retained));
+
 // A c++ struct not annotated with SWIFT_SHARED_REFERENCE,
 // SWIFT_IMMORTAL_REFERENCE or SWIFT_UNSAFE_REFERENCE
 struct NonFRTStruct {};
@@ -196,6 +202,9 @@ struct StructWithAPIsReturningNonCxxFrt {
 };
 
 NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt();
+// CF_RETURNS_(NOT_)RETAINED are valid on non-FRT pointers, so no warning here
+NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt_with_cf_annotation()
+    __attribute__((cf_returns_retained));
 NonFRTStruct *_Nonnull global_function_returning_non_cxx_frt_with_annotations() // expected-warning {{'global_function_returning_non_cxx_frt_with_annotations' should not be annotated with SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type}}
     __attribute__((swift_attr("returns_retained")));
 

@@ -184,8 +184,10 @@ function(_add_target_variant_c_compile_link_flags)
                        "-fcoverage-mapping")
   endif()
 
-  # Use frame pointers on Linux
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR
+     "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC" OR
+     "${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result "-fno-omit-frame-pointer")
   endif()
 
@@ -366,8 +368,10 @@ function(_add_target_variant_c_compile_flags)
                        "-fcoverage-mapping")
   endif()
 
-  # Use frame pointers on Linux
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR
+     "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC" OR
+     "${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result "-fno-omit-frame-pointer")
   endif()
 
@@ -1090,7 +1094,9 @@ function(add_swift_target_library_single target name)
         -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";
+      -Xcc;"-fmodule-map-file=${SWIFT_WINDOWS_MODULE_MAP}";
+      -Xfrontend;-strict-implicit-module-context)
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
       swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
       foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1270,8 +1276,10 @@ function(add_swift_target_library_single target name)
     set(install_in_component "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   endif()
 
-  # Use frame pointers on Linux
-  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" OR
+      "${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX_STATIC" OR
+      "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 
@@ -1875,7 +1883,18 @@ function(add_swift_target_library_single target name)
   endif()
 
   if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    embedded_amend_archive_commands_on_darwin_host(${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+    # The object produced by the Swift compiler is an EXTERNAL_OBJECT, which
+    # $<TARGET_OBJECTS:...> does not include, so pass it on explicitly.
+    set(_swift_external_objects)
+    foreach(_src ${SWIFTLIB_SINGLE_SOURCES})
+      get_source_file_property(_is_external_object "${_src}" EXTERNAL_OBJECT)
+      if(_is_external_object)
+        list(APPEND _swift_external_objects "${_src}")
+      endif()
+    endforeach()
+    embedded_amend_archive_commands_on_darwin_host(
+      ${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}"
+      ${_swift_external_objects})
   endif()
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
@@ -3194,10 +3213,14 @@ function(_add_swift_target_executable_single name)
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";
+      -Xcc;"-fmodule-map-file=${SWIFT_WINDOWS_MODULE_MAP}";
+      -Xfrontend;-strict-implicit-module-context)
   endif()
 
-  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")
+  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" OR
+      "${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX_STATIC" OR
+      "${SWIFTEXE_SINGLE_SDK}" STREQUAL "ANDROID")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 
@@ -3992,7 +4015,7 @@ function(add_embedded_swift_target_library prefix library_name)
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS ${per_target_swift_compile_flags}
-      C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
+      C_COMPILE_FLAGS -ffunction-sections -fdata-sections ${EMBLIB_C_COMPILE_FLAGS}
       SDK "embedded"
       ARCHITECTURE "${arch_key}"
       FILE_DEPENDS ${EMBLIB_FILE_DEPENDS}
@@ -4045,16 +4068,14 @@ function(add_embedded_swift_target_library prefix library_name)
       endif()
     endif()
 
-    # Static archives whose target triple is ELF/EABI/wasm need a different
-    # archiver when cross-built from a macOS host. embedded_amend_archive_
-    # commands_on_darwin_host is a no-op for other targets/hosts, so it's
-    # safe to call unconditionally — every embedded library is static.
-    embedded_amend_archive_commands_on_darwin_host(${prefix}-${mod} ${triple})
-
     add_dependencies(${prefix} ${prefix}-${mod})
   endforeach()
 endfunction()
 
+# Any additional arguments are object files that are not visible to
+# $<TARGET_OBJECTS:...> (in particular the object produced by the Swift
+# compiler, which is an EXTERNAL_OBJECT) and which must be added to the
+# rebuilt archive.
 function(embedded_amend_archive_commands_on_darwin_host target triple)
   # This is a temporary solution while we work on porting the build
   # on the Embedded stdlib to the Runtime build system, where each platform
@@ -4071,6 +4092,7 @@ function(embedded_amend_archive_commands_on_darwin_host target triple)
           $<TARGET_FILE:${target}>
           "$<JOIN:$<TARGET_PROPERTY:${target},STATIC_LIBRARY_OPTIONS>,;>"
           "$<JOIN:$<TARGET_OBJECTS:${target}>,;>"
+          ${ARGN}
         COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_FILE:${target}>
         VERBATIM
         COMMAND_EXPAND_LISTS)

@@ -15,6 +15,7 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -196,8 +197,10 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
       if (auto *store = dyn_cast<StoreInst>(initI))
         openedVal = store->getSrc();
     }
-  } else if (auto *sb = dyn_cast<StoreBorrowInst>(openedVal)) {
-    openedVal = sb->getSrc();
+  }
+  // Handle a store_borrow, either used directly or copied to the alloc_stack.
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(openedVal)) {
+    openedVal = sbi->getSrc();
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
@@ -208,7 +211,36 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
-    ExistentialValue = Open->getOperand();
+    // In OSSA the existential reference may be wrapped in ownership
+    // instructions (e.g. begin_borrow or copy_value) before it is opened. Look
+    // through them so that the underlying init_existential_ref can be found by
+    // ConcreteExistentialInfo.
+    ExistentialValue = lookThroughOwnershipInsts(Open->getOperand());
+
+    // A `load_borrow` which RLE could not eliminate records the loaded value in
+    // its value hint, e.g.
+    //   %e = init_existential_ref %c : $C : $C, $P
+    //   %h = unchecked_ownership %e, forwarding: @none
+    //   store %e to [init] %a
+    //   %l = load_borrow %a, value_hint %h
+    //   %o = open_existential_ref %l
+    // Follow the value hint to find the init_existential_ref.
+    SILValue hinted = ExistentialValue;
+    while (true) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(hinted)) {
+        if (!lbi->hasValueHint())
+          break;
+        hinted = lookThroughOwnershipInsts(lbi->getValueHint());
+      } else if (auto *uoi = dyn_cast<UncheckedOwnershipInst>(hinted)) {
+        hinted = lookThroughOwnershipInsts(uoi->getOperand());
+      } else {
+        break;
+      }
+    }
+    if (hinted != ExistentialValue && isa<InitExistentialRefInst>(hinted)) {
+      ExistentialValue = hinted;
+      isExistentialValueFromValueHint = true;
+    }
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(openedVal)) {
@@ -245,8 +277,16 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
-      [&](InFlightSubstitution &, Type, ProtocolDecl *proto)
+      [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
+        // Requirements on associated types of the opened existential, e.g.
+        // the default `Self.A: Copyable` for a suppressed primary associated
+        // type `A`, are not part of the existential's conformances. Look them
+        // up on the concrete type. This can fail, e.g. if the concrete type's
+        // associated type is not Copyable.
+        if (!origType->is<GenericTypeParamType>())
+          return lookupConformance(origType.subst(IFS), proto);
+
         // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
@@ -261,6 +301,13 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;
       });
+
+  for (ProtocolConformanceRef conformance : ExistentialSubs.getConformances()) {
+    if (conformance.isInvalid()) {
+      ExistentialSubs = SubstitutionMap();
+      return;
+    }
+  }
   assert(isValid());
 }
 
@@ -268,10 +315,8 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!isa<ExistentialArchetypeType>(ConcreteType))
+  if (!isValid() || !isa<ExistentialArchetypeType>(ConcreteType))
     return;
-
-  assert(isValid());
 
   // If the concrete type is another existential, we're "forwarding" an
   // opened existential type, so we must keep track of the original
@@ -387,8 +432,6 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   /// Determine the ExistentialConformances and SubstitutionMap.
   ExistentialType = Protocol->getDeclaredInterfaceType()->getCanonicalType();
   initializeSubstitutionMap(ProtocolConformanceRef(ConcreteConformance), M);
-
-  assert(isValid());
 }
 
 ConcreteOpenedExistentialInfo::ConcreteOpenedExistentialInfo(Operand &use)

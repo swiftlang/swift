@@ -91,11 +91,14 @@ func setBox(_ size: Int) {
   setBox = Set(Set(0 ..< size).map(Box.init))
 }
 
-// Inputs for measuring `Set.init` from an array.
+// Inputs for measuring `Set.init` and `formUnion` from an array.
 // Large to expose the per-element cost of building the set.
 let initSize = 10_000
 let initArrayInt = Array(0 ..< initSize)
 let initArrayBox = initArrayInt.map(Box.init)
+// Sets with 50% overlap with the arrays above.
+let initSetInt50 = Set(initSize / 2 ..< initSize + initSize / 2)
+let initSetBox50 = Set(initSetInt50.map(Box.init))
 
 public let benchmarks = [
   // Mnemonic: number after name is percentage of common elements in input sets.
@@ -743,6 +746,46 @@ public let benchmarks = [
     runFunction: { n in run_SetInitUnspecializedBox(initArrayBox, initSize, n) },
     tags: [.validation, .api, .Set],
     setUpFunction: { blackHole(initArrayBox) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Int",
+    runFunction: { n in run_SetFormUnionInt(setE, initArrayInt, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, initArrayInt] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Int.Unspecialized",
+    runFunction: { n in run_SetFormUnionUnspecializedInt(setE, initArrayInt, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setE, initArrayInt] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Box",
+    runFunction: { n in run_SetFormUnionBox(setOE, initArrayBox, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, initArrayBox] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Box.Unspecialized",
+    runFunction: { n in run_SetFormUnionUnspecializedBox(setOE, initArrayBox, initSize, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([setOE, initArrayBox] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Int50",
+    runFunction: { n in run_SetFormUnionInt(initSetInt50, initArrayInt, initSize + initSize / 2, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([initSetInt50, initArrayInt] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Int50.Unspecialized",
+    runFunction: { n in run_SetFormUnionUnspecializedInt(initSetInt50, initArrayInt, initSize + initSize / 2, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([initSetInt50, initArrayInt] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Box50",
+    runFunction: { n in run_SetFormUnionBox(initSetBox50, initArrayBox, initSize + initSize / 2, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([initSetBox50, initArrayBox] as [Any]) }),
+  BenchmarkInfo(
+    name: "Set.formUnion.Box50.Unspecialized",
+    runFunction: { n in run_SetFormUnionUnspecializedBox(initSetBox50, initArrayBox, initSize + initSize / 2, n) },
+    tags: [.validation, .api, .Set],
+    setUpFunction: { blackHole([initSetBox50, initArrayBox] as [Any]) }),
 
   // Legacy benchmarks, kept for continuity with previous releases.
   BenchmarkInfo(
@@ -1222,6 +1265,66 @@ func run_SetInitUnspecializedBox(
   _ n: Int) {
   for _ in 0 ..< n {
     let set = makeSetUnspecialized(identity(a))
+    check(set.count == r)
+  }
+}
+
+// Like `makeSetUnspecialized`, but through `formUnion`.
+@inline(never)
+@_semantics("optimize.sil.specialize.generic.never")
+func formUnionUnspecialized<Element: Hashable>(
+  _ set: Set<Element>, _ elements: Array<Element>) -> Set<Element> {
+  var set = set
+  set.formUnion(elements)
+  return set
+}
+
+@inline(never)
+func run_SetFormUnionInt(
+  _ s: Set<Int>,
+  _ a: Array<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    var set = s
+    set.formUnion(identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetFormUnionUnspecializedInt(
+  _ s: Set<Int>,
+  _ a: Array<Int>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = formUnionUnspecialized(s, identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetFormUnionBox(
+  _ s: Set<Box<Int>>,
+  _ a: Array<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    var set = s
+    set.formUnion(identity(a))
+    check(set.count == r)
+  }
+}
+
+@inline(never)
+func run_SetFormUnionUnspecializedBox(
+  _ s: Set<Box<Int>>,
+  _ a: Array<Box<Int>>,
+  _ r: Int,
+  _ n: Int) {
+  for _ in 0 ..< n {
+    let set = formUnionUnspecialized(s, identity(a))
     check(set.count == r)
   }
 }

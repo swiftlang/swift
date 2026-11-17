@@ -6,12 +6,6 @@ The Embedded Swift compilation model can produce extremely small binaries withou
 
 Diagnostics in the `EmbeddedRestrictions` group describe those language features that cannot be used in Embedded Swift. These include:
 
-* `weak` and `unowned` references, because Embedded Swift uses a simplified reference-counting model that cannot support them. For example:
-
-      class Node {
-        weak var parent: Node?    // error: attribute 'weak' cannot be used in Embedded Swift
-      }
-
 * Dynamic casts to a type involving a protocol are not supported, because Embedded Swift does not include runtime metadata about protocol conformances. For example:
 
       protocol P: AnyObject { }
@@ -59,6 +53,37 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
       func testPassingValueOfProtocolType(value: any P) {
         acceptAny(value)              // warning: cannot open existential type 'any P' when passing it as an argument to global function 'acceptAny' in Embedded Swift
         acceptAny(value as any P)     // okay, passes the existential itself
+      }
+
+* `dynamic` declarations and `@_dynamicReplacement`, because Embedded Swift does not include the runtime support for replacing the implementation of a declaration. Both are ignored, so calls always use the original implementation, and a replacement is an ordinary declaration. For example:
+
+      dynamic func greet() { }        // warning: global function 'greet()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored
+
+      @_dynamicReplacement(for: greet())
+      func greetDifferently() { }     // warning: global function 'greetDifferently()' cannot be a dynamic replacement in Embedded Swift; '@_dynamicReplacement' will be ignored
+
+* Variadic generic functions have limited support. Pack expansion expressions and `for-in repeat` loops must be unrolled, so the body can be specialized for each element of the pack individually. If this unrolling fails, the variadic generic cannot be specialized. Currently, this can happen due to an early exit (e.g. `break`, `throw`) or branch (e.g. `if`) inside the loop. For example:
+
+      func mayThrow<T: BinaryInteger>(_ n: T) -> T throws {}
+
+      func testPackExpansion<each T: BinaryInteger>(_ ts: repeat each T) {
+        _ = (repeat 1 + each ts) // okay
+        _ = try (repeat mayThrow(each ts)) // error: cannot specialize pack expression or statement in Embedded Swift.
+      }
+
+      func sink<T: BinaryInteger>(_ n: T) { }
+
+      func testPackLoop<each T: BinaryInteger>(_ ts: repeat each T) {
+        for t in repeat each ts { // okay
+          sink(0)
+        }
+        for t in repeat each ts { // error: cannot specialize pack expression or statement in Embedded Swift.
+          if t.bitWidth == 16 {
+            sink(0)
+          } else {
+            sink(t)
+          }
+        }
       }
 
 ## See Also

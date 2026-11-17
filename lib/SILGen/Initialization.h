@@ -313,6 +313,26 @@ public:
   TemporaryInitialization(SILValue addr, CleanupHandle cleanup)
     : Addr(addr), Cleanup(cleanup) {}
 
+  bool canPerformInPlaceInitialization() const override {
+    return SingleBufferInitialization::canPerformInPlaceInitialization();
+  }
+
+  bool canSplitIntoTupleElements() const override {
+    return SingleBufferInitialization::canSplitIntoTupleElements();
+  }
+
+  MutableArrayRef<InitializationPtr>
+  splitIntoTupleElements(SILGenFunction &SGF, SILLocation loc, CanType type,
+                         SmallVectorImpl<InitializationPtr> &buf) override {
+    return SingleBufferInitialization::splitIntoTupleElements(SGF, loc, type,
+                                                              buf);
+  }
+
+  void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
+                           ManagedValue value, bool isInit) override {
+    SingleBufferInitialization::copyOrInitValueInto(SGF, loc, value, isInit);
+  }
+
   void finishInitialization(SILGenFunction &SGF) override;
 
   void finishUninitialized(SILGenFunction &SGF) override {

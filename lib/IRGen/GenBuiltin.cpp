@@ -278,7 +278,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SILType loweredTy = IGF.IGM.getLoweredType(boundTy);
     std::optional<uint64_t> descriptor;
-    if (boundTy->getClassOrBoundGenericClass()) {
+    if (boundTy->getClassDecl()) {
       // For a class, describe the heap object.
       auto &classTI = IGF.IGM.getTypeInfo(loweredTy).as<ClassTypeInfo>();
       auto &classLayout = classTI.getClassLayout(
@@ -1334,24 +1334,26 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
 
+    auto tyPair = getLoweredTypeAndTypeInfo(
+        IGF.IGM, substitutions.getReplacementTypes()[0]);
+    SILType elemTy = tyPair.first;
+    const TypeInfo &elemTI = tyPair.second;
+
+    // Do nothing for zero-sized POD array elements. The addresses of empty
+    // values are meaningless and may be undef, so even copying one stride
+    // through them would be undefined behavior.
+    if (llvm::Constant *SizeConst = elemTI.getStaticSize(IGF.IGM)) {
+      auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
+      if (SizeInt->getSExtValue() == 0 &&
+          elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+              IsTriviallyDestroyable)
+        return;
+    }
+
     // In Embedded Swift we don't have metadata and witness tables, so we can't
     // just use TypeInfo's initialize... and assign... APIs, which need
     // metadata to emit calls. Emit a loop to process elements directly instead.
     if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      auto tyPair = getLoweredTypeAndTypeInfo(
-          IGF.IGM, substitutions.getReplacementTypes()[0]);
-      SILType elemTy = tyPair.first;
-      const TypeInfo &elemTI = tyPair.second;
-
-      // Do nothing for zero-sized POD array elements.
-      if (llvm::Constant *SizeConst = elemTI.getStaticSize(IGF.IGM)) {
-        auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
-        if (SizeInt->getSExtValue() == 0 &&
-            elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
-                IsTriviallyDestroyable)
-          return;
-      }
-
       llvm::Value *firstSrcElem = IGF.Builder.CreatePtrToInt(
           IGF.Builder.CreateBitCast(src, IGM.PtrTy), IGF.IGM.IntPtrTy);
       llvm::Value *firstDestElem = IGF.Builder.CreatePtrToInt(
@@ -1425,46 +1427,41 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       return;
     }
 
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
-
     dest = IGF.Builder.CreateBitCast(dest, IGM.PtrTy);
     src = IGF.Builder.CreateBitCast(src, IGM.PtrTy);
-    Address destArray = valueTy.second.getAddressForPointer(dest);
-    Address srcArray = valueTy.second.getAddressForPointer(src);
+    Address destArray = elemTI.getAddressForPointer(dest);
+    Address srcArray = elemTI.getAddressForPointer(src);
     
     switch (Builtin.ID) {
     case BuiltinValueKind::CopyArray:
-      valueTy.second.initializeArrayWithCopy(IGF, destArray, srcArray, count,
-                                             valueTy.first);
+      elemTI.initializeArrayWithCopy(IGF, destArray, srcArray, count, elemTy);
       break;
     case BuiltinValueKind::TakeArrayNoAlias:
-      valueTy.second.initializeArrayWithTakeNoAlias(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.initializeArrayWithTakeNoAlias(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::TakeArrayFrontToBack:
-      valueTy.second.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray,
-                                                        count, valueTy.first);
+      elemTI.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray, count,
+                                                elemTy);
       break;
     case BuiltinValueKind::TakeArrayBackToFront:
-      valueTy.second.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray,
-                                                        count, valueTy.first);
+      elemTI.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray, count,
+                                                elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayNoAlias:
-      valueTy.second.assignArrayWithCopyNoAlias(IGF, destArray, srcArray, count,
-                                                valueTy.first);
+      elemTI.assignArrayWithCopyNoAlias(IGF, destArray, srcArray, count,
+                                        elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
-      valueTy.second.assignArrayWithCopyFrontToBack(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.assignArrayWithCopyFrontToBack(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayBackToFront:
-      valueTy.second.assignArrayWithCopyBackToFront(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.assignArrayWithCopyBackToFront(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::AssignTakeArray:
-      valueTy.second.assignArrayWithTake(IGF, destArray, srcArray, count,
-                                         valueTy.first);
+      elemTI.assignArrayWithTake(IGF, destArray, srcArray, count, elemTy);
       break;
     default:
       llvm_unreachable("out of sync with if condition");
@@ -1661,7 +1658,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // strategy for it. Just call the vwt function. Otherwise, we know that this
     // is at least an enum and can optimize away some of the cost of getEnumTag.
     if (!ty.is<ArchetypeType>()) {
-      assert(ty.getEnumOrBoundGenericEnum() && "expected enum type in "
+      assert(ty.getEnumDecl() && "expected enum type in "
              "getEnumTag builtin!");
 
       auto &strategy = getEnumImplStrategy(IGF.IGM, ty);
@@ -1788,6 +1785,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
+  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }
 }

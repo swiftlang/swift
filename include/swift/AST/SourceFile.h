@@ -79,7 +79,7 @@ class SourceFile final : public FileUnit {
 
 public:
   /// Flags that direct how the source file is parsed.
-  enum class ParsingFlags : uint8_t {
+  enum class ParsingFlags : uint16_t {
     /// Whether to disable delayed parsing for nominal type, extension, and
     /// function bodies.
     ///
@@ -120,6 +120,11 @@ public:
 
     /// Consider every #if ... #endif region active.
     PoundIfAllActive = 1 << 7,
+
+    /// Whether to suppress diagnostics during parsing. This is set when
+    /// scanning a source file for imports, since the subsequent compile job
+    /// will parse and diagnose the file.
+    SuppressParserDiagnostics = 1 << 8,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -844,6 +849,11 @@ public:
   /// Whether the bodies of types and functions within this file can be lazily
   /// parsed.
   bool hasDelayedBodyParsing() const;
+
+  /// Whether diagnostics should be suppressed during parsing of this file.
+  bool shouldSuppressParserDiagnostics() const {
+    return ParsingOpts.contains(ParsingFlags::SuppressParserDiagnostics);
+  }
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 

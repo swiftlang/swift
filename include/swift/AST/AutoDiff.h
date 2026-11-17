@@ -658,29 +658,32 @@ GenericSignature getConstrainedDerivativeGenericSignature(
 /// Retrieve config from the function name of a variant of
 /// `Builtin.applyDerivative`, e.g. `Builtin.applyDerivative_jvp_arity2`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyDerivativeConfig(
-    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
-    unsigned &arity, bool &rethrows);
+bool getBuiltinApplyDerivativeConfig(StringRef operationName,
+                                     AutoDiffDerivativeFunctionKind &kind,
+                                     unsigned &arity, bool &throws,
+                                     bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.applyTranspose`, e.g. `Builtin.applyTranspose_arity2`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinApplyTransposeConfig(
-  StringRef operationName, unsigned &arity, bool &rethrows);
+bool getBuiltinApplyTransposeConfig(StringRef operationName, unsigned &arity,
+                                    bool &throws, bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
 /// `Builtin.differentiableFunction_arity1_throws`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
+bool getBuiltinDifferentiableOrLinearFunctionConfig(StringRef operationName,
+                                                    unsigned &arity,
+                                                    bool &throws, bool &async);
 
 /// Retrieve config from the function name of a variant of
 /// `Builtin.differentiableFunction` or `Builtin.linearFunction`, e.g.
 /// `Builtin.differentiableFunction_arity1_throws`.
 /// Returns true if the function name is parsed successfully.
-bool getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws);
+bool getBuiltinDifferentiableOrLinearFunctionConfig(StringRef operationName,
+                                                    unsigned &arity,
+                                                    bool &throws, bool &async);
 
 /// Returns the SIL differentiability witness generic signature given the
 /// original declaration's generic signature and the derivative generic

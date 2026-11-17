@@ -390,19 +390,34 @@ computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
                                  "requested input not found from invocation");
 }
 
-static llvm::Expected<std::string>
-computeCacheKeyFromIndex(llvm::cas::ObjectStore &CAS,
-                         llvm::ArrayRef<const char *> Args,
-                         unsigned InputIndex) {
+static llvm::Expected<std::vector<std::string>>
+computeCacheKeysFromIndices(llvm::cas::ObjectStore &CAS,
+                            llvm::ArrayRef<const char *> Args,
+                            llvm::ArrayRef<unsigned> InputIndices) {
   auto BaseKey = swift::createCompileJobBaseCacheKey(CAS, Args);
   if (!BaseKey)
     return BaseKey.takeError();
 
-  auto Key =
-      swift::createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputIndex);
-  if (!Key)
-    return Key.takeError();
-  return CAS.getID(*Key).toString();
+  std::vector<std::string> Keys;
+  Keys.reserve(InputIndices.size());
+  for (unsigned InputIndex : InputIndices) {
+    auto Key =
+        swift::createCompileJobCacheKeyForOutput(CAS, *BaseKey, InputIndex);
+    if (!Key)
+      return Key.takeError();
+    Keys.push_back(CAS.getID(*Key).toString());
+  }
+  return Keys;
+}
+
+static llvm::Expected<std::string>
+computeCacheKeyFromIndex(llvm::cas::ObjectStore &CAS,
+                         llvm::ArrayRef<const char *> Args,
+                         unsigned InputIndex) {
+  auto Keys = computeCacheKeysFromIndices(CAS, Args, InputIndex);
+  if (!Keys)
+    return Keys.takeError();
+  return std::move(Keys->front());
 }
 
 swiftscan_string_ref_t
@@ -442,6 +457,27 @@ swiftscan_cache_compute_key_from_input_index(swiftscan_cas_t cas, int argc,
   }
   *error = swift::c_string_utils::create_null();
   return swift::c_string_utils::create_clone(ID->c_str());
+}
+
+swiftscan_string_set_t *swiftscan_cache_compute_keys_from_input_indices(
+    swiftscan_cas_t cas, int argc, const char **argv,
+    const unsigned *input_indices, size_t num_inputs,
+    swiftscan_string_ref_t *error) {
+  llvm::SmallVector<const char *> ArgsStorage;
+  llvm::BumpPtrAllocator Alloc;
+  llvm::StringSaver Saver(Alloc);
+  auto Args = expandSwiftInvocation(argc, argv, Saver, ArgsStorage);
+
+  auto Keys = computeCacheKeysFromIndices(
+      unwrap(cas)->getCAS(), Args,
+      llvm::ArrayRef<unsigned>(input_indices, num_inputs));
+  if (!Keys) {
+    *error =
+        swift::c_string_utils::create_clone(toString(Keys.takeError()).c_str());
+    return nullptr;
+  }
+  *error = swift::c_string_utils::create_null();
+  return swift::c_string_utils::create_set(*Keys);
 }
 
 // Create a non-owning string ref that is used in call backs.

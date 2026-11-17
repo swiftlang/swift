@@ -212,6 +212,16 @@ public:
     if (F->getExtFlags().isNonisolatedNonsending()) {
       printField("execution", "caller");
     }
+    switch (F->getExtFlags().getExecutionSemantics()) {
+    case FunctionMetadataExecutionSemantics::None:
+      break;
+    case FunctionMetadataExecutionSemantics::AtMostOnce:
+      printField("execution-semantics", "at-most-once");
+      break;
+    case FunctionMetadataExecutionSemantics::Once:
+      printField("execution-semantics", "exactly-once");
+      break;
+    }
 
     stream << "\n";
     Indent += 2;
@@ -1115,8 +1125,10 @@ public:
     Node::Kind kind;
     switch (F->getFlags().getConvention()) {
     case FunctionMetadataConvention::Swift:
-      kind = !F->getFlags().isEscaping() ? Node::Kind::NoEscapeFunctionType
-                                         : Node::Kind::FunctionType;
+      kind = !F->getFlags().isEscaping()
+                 ? Node::Kind::NoEscapeFunctionType
+                 : getEscapingSwiftFunctionNodeKind(
+                       F->getExtFlags().getExecutionSemantics());
       break;
     case FunctionMetadataConvention::Block:
       kind = Node::Kind::ObjCBlock;

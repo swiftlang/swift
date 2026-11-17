@@ -35,13 +35,13 @@ entry(%arg : $*A<Builtin.Int32>):
 // CHECK: }
 
 // CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOc"(
-// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledName
+// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledNameV2
 // CHECK:  load
 // CHECK:  call ptr %{{.*}}(ptr noalias {{.*}}, ptr {{.*}})
 // CHECK: }
 
 // CHECK-LABEL: define{{.*}} ptr @"$s32typelayout_based_value_operation1AVyAA1CCGWOh"(
-// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledName
+// CHECK:  call ptr @__swift_instantiateConcreteTypeFromMangledNameV2
 // CHECK:  load
 // CHECK:  call void %{{.*}}(ptr noalias {{.*}}, ptr {{.*}})
 // CHECK: }

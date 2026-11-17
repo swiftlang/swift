@@ -384,7 +384,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         }
 
         auto boundRCAType =
-            BoundGenericType::get(RCA, Type(), {paramTy});
+            NominalType::get(RCA, Type(), {paramTy}, C);
         auto remoteCallArgumentInitDeclRef =
             TypeExpr::createImplicit(boundRCAType, C);
 
@@ -647,6 +647,57 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   return {body, /*isTypeChecked=*/false};
 }
 
+bool swift::distributedThunkShouldBeNonisolatedNonsending(FuncDecl *func) {
+  auto *DC = func->getDeclContext();
+  auto *actorNominal = DC->getSelfNominalTypeDecl();
+  if (!actorNominal)
+    return false;
+
+  auto systemTy = getConcreteReplacementForProtocolActorSystemType(actorNominal);
+  if (!systemTy)
+    return false;
+
+  auto *systemNominal = systemTy->getNominalDecl();
+  if (!systemNominal)
+    return false;
+
+  bool isVoidReturn = false;
+  if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
+    isVoidReturn = accessor->getStorage()
+                       ->getValueInterfaceType()
+                       ->isVoid();
+  } else {
+    isVoidReturn = func->getResultInterfaceType()->isVoid();
+  }
+
+  return isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
+      systemNominal, isVoidReturn);
+}
+
+/// Attach the correct isolation attributes for a synthesized distributed thunk.
+///
+/// If the concrete system's `remoteCall` witness is `nonisolated(nonsending)`,
+/// emit the thunk as `nonisolated(nonsending)` so isolation is threaded
+/// through to `system.remoteCall` without a hop.
+///
+/// Otherwise fall back to `nonisolated @concurrent`.
+static void addDistributedThunkIsolationAttributes(FuncDecl *thunk,
+                                                   FuncDecl *originalFunc) {
+  if (isa<AccessorDecl>(thunk))
+    return;
+
+  auto &C = thunk->getASTContext();
+
+  if (distributedThunkShouldBeNonisolatedNonsending(originalFunc)) {
+    thunk->addAttribute(
+        NonisolatedAttr::createImplicit(C, NonIsolatedModifier::NonSending));
+  } else {
+    thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+    if (DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, thunk))
+      thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  }
+}
+
 /// Create a new FuncDecl that has the same signature as the passed in func.
 /// This is used both to create stub witnesses as well as distributed thunks.
 ///
@@ -727,11 +778,7 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
 
-  // TODO(distributed): It would be nicer to make distributed thunks nonisolated(nonsending) instead;
-  //                    this way we would not hop off the caller when calling system.remoteCall;
-  //                    it'd need new ABI and the remoteCall also to become nonisolated(nonsending)
-  if (DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent, thunk))
-    thunk->addAttribute(new (C) ConcurrentAttr(/*IsImplicit=*/true));
+  addDistributedThunkIsolationAttributes(thunk, func);
 
   return thunk;
 }
@@ -1100,9 +1147,10 @@ struct EmbeddedDispatchContext {
 
 } // end anonymous namespace
 
-/// Build the body of a single dispatch branch for `distFunc`:
+/// Build the body of a single dispatch branch for `distFunc`, matching any of
+/// the given mangled thunk names:
 ///
-///   if target.identifier.utf8.elementsEqual("$e_..._TE".utf8) {
+///   if target.identifierEquals("$e_..._TE") || ... {
 ///     let p1: T1 = try invocationDecoder.decodeNextArgument()
 ///     let p2: T2 = try invocationDecoder.decodeNextArgument()
 ///     let __result = try await self.distFunc(p1, p2)
@@ -1117,25 +1165,38 @@ static IfStmt *buildEmbeddedDispatchBranch(
     ASTContext &C, AbstractFunctionDecl *thunk,
     VarDecl *targetVar, VarDecl *invocationDecoderVar,
     VarDecl *resultHandlerVar, AbstractFunctionDecl *distFunc,
-    StringRef mangledThunkName) {
+    ArrayRef<std::string> mangledThunkNames) {
   const auto implicit = true;
   const SourceLoc sloc = SourceLoc();
   const DeclNameLoc dloc = DeclNameLoc();
 
   // === Build the target condition
   //
-  // target.identifierEquals("<mangled>")
-  Expr *mangledLiteral =
-      new (C) StringLiteralExpr(C.AllocateCopy(mangledThunkName),
-                                SourceRange(), implicit);
+  // target.identifierEquals("<mangled>") || target.identifierEquals(...)
+  Expr *eqCheck = nullptr;
+  for (auto &mangledThunkName : mangledThunkNames) {
+    Expr *mangledLiteral =
+        new (C) StringLiteralExpr(C.AllocateCopy(mangledThunkName),
+                                  SourceRange(), implicit);
 
-  Expr *eqCheck = CallExpr::createImplicit(
-      C,
-      UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit),
-          C.getIdentifier("identifierEquals")),
-      ArgumentList::createImplicit(
-          C, { Argument(sloc, Identifier(), mangledLiteral) }));
+    Expr *nameCheck = CallExpr::createImplicit(
+        C,
+        UnresolvedDotExpr::createImplicit(
+            C, new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit),
+            C.getIdentifier("identifierEquals")),
+        ArgumentList::createImplicit(
+            C, { Argument(sloc, Identifier(), mangledLiteral) }));
+
+    if (!eqCheck) {
+      eqCheck = nameCheck;
+      continue;
+    }
+    auto *orOperator = new (C) UnresolvedDeclRefExpr(
+        DeclNameRef(C.getIdentifier("||")), DeclRefKind::BinaryOperator,
+        DeclNameLoc());
+    eqCheck = BinaryExpr::create(C, eqCheck, orOperator, nameCheck,
+                                 /*implicit=*/true);
+  }
 
   // === Build the decode args, then invoke the target statements
   SmallVector<ASTNode, 8> thenStmts;
@@ -1366,13 +1427,20 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
   auto *invocationDecoderParam = params->get(1);
   auto *resultHandlerParam = params->get(2);
 
-  // Mangle each distributed thunk's name exactly once
+  // Mangle each distributed thunk's name exactly once.
+  //
+  // A '@Resolvable' protocol requirement and the actor's own distributed func
+  // that witnesses it are one implementation reached by two target names: the
+  // '$P' stub's thunk and the actor's thunk. Give that implementation a single
+  // branch matching both names, instead of two branches with identical bodies.
   struct DispatchTarget {
     AbstractFunctionDecl *distFunc;
-    std::string mangledThunkName;
+    SmallVector<std::string, 2> mangledThunkNames;
   };
-  llvm::MapVector<unsigned, SmallVector<DispatchTarget, 4>> byLength;
+  SmallVector<DispatchTarget, 8> targets;
   {
+    llvm::DenseMap<AbstractFunctionDecl *, unsigned> targetIndex;
+    auto *actor = thunk->getDeclContext()->getSelfClassDecl();
     Mangle::ASTMangler mangler(C);
     for (auto *distFunc : ctx->distributedFuncs) {
       auto *funcDecl = cast<FuncDecl>(distFunc);
@@ -1380,9 +1448,40 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
       if (!thunkFunc)
         continue;
       auto mangled = mangler.mangleDistributedThunk(thunkFunc);
-      unsigned length = (unsigned)mangled.size();
-      byLength[length].push_back({distFunc, std::move(mangled)});
+
+      AbstractFunctionDecl *impl = distFunc;
+      if (auto *proto = dyn_cast<ProtocolDecl>(distFunc->getDeclContext())) {
+        auto conformance =
+            lookupConformance(actor->getDeclaredInterfaceType(), proto);
+        if (conformance.isConcrete()) {
+          if (auto *witness = dyn_cast_or_null<AbstractFunctionDecl>(
+                  conformance.getConcrete()->getWitnessDecl(distFunc))) {
+            if (targetIndex.count(witness))
+              impl = witness;
+          }
+        }
+      }
+
+      auto found = targetIndex.find(impl);
+      if (found != targetIndex.end()) {
+        targets[found->second].mangledThunkNames.push_back(std::move(mangled));
+        continue;
+      }
+      targetIndex[impl] = targets.size();
+      targets.push_back({impl, {std::move(mangled)}});
     }
+  }
+
+  // Targets with a single name are bucketed by its length. A target with
+  // several names gets its own branch ahead of the switch, since its names can
+  // differ in length.
+  llvm::MapVector<unsigned, SmallVector<DispatchTarget *, 4>> byLength;
+  SmallVector<DispatchTarget *, 4> multiNameTargets;
+  for (auto &target : targets) {
+    if (target.mangledThunkNames.size() == 1)
+      byLength[target.mangledThunkNames.front().size()].push_back(&target);
+    else
+      multiNameTargets.push_back(&target);
   }
 
   SmallVector<ASTNode, 4> bodyStmts;
@@ -1404,10 +1503,11 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
     auto &funcs = kv.second;
 
     SmallVector<ASTNode, 4> caseStmts;
-    for (auto &target : funcs) {
+    for (auto *target : funcs) {
       if (auto *ifStmt = buildEmbeddedDispatchBranch(
               C, thunk, targetParam, invocationDecoderParam,
-              resultHandlerParam, target.distFunc, target.mangledThunkName)) {
+              resultHandlerParam, target->distFunc,
+              target->mangledThunkNames)) {
         caseStmts.push_back(ifStmt);
       }
     }
@@ -1434,12 +1534,23 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
 
   auto *switchStmt = SwitchStmt::createImplicit(
       LabeledStmtInfo(), targetIdentifierCount, cases, C);
+
+  SmallVector<ASTNode, 4> dispatchStmts;
+  for (auto *target : multiNameTargets) {
+    if (auto *ifStmt = buildEmbeddedDispatchBranch(
+            C, thunk, targetParam, invocationDecoderParam, resultHandlerParam,
+            target->distFunc, target->mangledThunkNames)) {
+      dispatchStmts.push_back(ifStmt);
+    }
+  }
+  dispatchStmts.push_back(switchStmt);
+
   // A dispatcher without targets has nothing that could throw into the catch
-  if (byLength.empty())
-    bodyStmts.push_back(switchStmt);
+  if (targets.empty())
+    bodyStmts.append(dispatchStmts.begin(), dispatchStmts.end());
   else
     bodyStmts.push_back(buildEmbeddedDispatchOnThrowCatch(
-        C, thunk, resultHandlerParam, { ASTNode(switchStmt) }));
+        C, thunk, resultHandlerParam, dispatchStmts));
 
   // Fallthrough (no match in any case, or a case's if-chain fell
   // through with no match): throw EmbeddedDistributedTargetNotFound

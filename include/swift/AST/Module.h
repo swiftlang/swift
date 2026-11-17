@@ -35,6 +35,7 @@
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -320,6 +321,9 @@ private:
 
   std::unique_ptr<SourceLookupCache> Cache;
   SourceLookupCache &getSourceLookupCache() const;
+
+  /// The macro expansion files of this module, in the order they were created.
+  SmallVector<SourceFile *, 0> MacroExpansionFiles;
 
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
@@ -924,6 +928,25 @@ public:
     lookupValue(Name, LookupKind, {}, Result);
   }
 
+  /// Look up the module-scope declarations named \p name, a unique macro name,
+  /// that are visible from \p loc. Unique names are only visible inside the
+  /// macro expansion that introduced them, so this only looks into the macro
+  /// expansion buffers enclosing \p loc, and appends the results to
+  /// \p results.
+  void lookupUniqueMacroNameInEnclosingExpansions(
+      DeclName name, SourceLoc loc, SmallVectorImpl<ValueDecl *> &results);
+
+  /// Record \p sourceFile, a macro expansion file of this module.
+  void addMacroExpansionFile(SourceFile *sourceFile) {
+    MacroExpansionFiles.push_back(sourceFile);
+  }
+
+  /// Returns the macro expansion files of this module, in the order they were
+  /// created.
+  ArrayRef<SourceFile *> getMacroExpansionFiles() const {
+    return MacroExpansionFiles;
+  }
+
   /// Look up a local type declaration by its mangled name.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -1157,9 +1180,13 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results, bool recursive = false) const;
 
   struct ImportCollector {
-    SmallPtrSet<const ModuleDecl *, 4> imports;
-    llvm::SmallDenseMap<const ModuleDecl *, SmallPtrSet<Decl *, 4>, 4>
-        qualifiedImports;
+    using ImportSet = llvm::SmallSetVector<const ModuleDecl *, 4>;
+    using QualifiedImportMap =
+        llvm::SmallMapVector<const ModuleDecl *,
+                             llvm::SmallSetVector<Decl *, 4>, 4>;
+
+    ImportSet imports;
+    QualifiedImportMap qualifiedImports;
     AccessLevel minimumDocVisibility = AccessLevel::Private;
     llvm::function_ref<bool(const ModuleDecl *)> importFilter = nullptr;
 

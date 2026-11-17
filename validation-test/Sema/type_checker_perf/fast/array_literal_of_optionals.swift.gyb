@@ -1,9 +1,7 @@
-// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumConstraintScopes -Xfrontend=-solver-disable-type-var-joins %s
-// RUN: %scale-test --invert --begin 1 --end 5 --step 1 --select NumConstraintScopes -Xfrontend=-solver-enable-type-var-joins %s
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumConstraintScopes -Xfrontend=-solver-disable-type-var-joins -Xfrontend=-solver-disable-short-conversions %s
+// RUN: %scale-test --begin 1 --end 5 --step 1 --select NumConstraintScopes -Xfrontend=-solver-enable-type-var-joins -Xfrontend=-solver-enable-short-conversions %s
 // REQUIRES: asserts,no_asan
 
-// FIXME: This becomes slow even with type variable joins, because of issues
-// around Optional conversions and bindings.
 func test() {
   let _ = [
     Optional(0),

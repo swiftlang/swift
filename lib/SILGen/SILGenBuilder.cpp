@@ -74,7 +74,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
 
   // We completely drop the generic signature if all generic parameters were
   // concrete. Similar to emitRawApply.
-  if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
+  if (Subs && !Subs.isEffectivelyGeneric())
     Subs = SubstitutionMap();
 
   return SILBuilder::createPartialApply(
@@ -107,10 +107,10 @@ ManagedValue SILGenBuilder::createPartialApply(
 ManagedValue
 SILGenBuilder::createConvertFunction(SILLocation loc, ManagedValue fn,
                                      SILType resultTy,
-                                     bool withoutActuallyEscaping) {
+                                     ConvertFunctionInst::Kind kind) {
   CleanupCloner cloner(*this, fn);
   SILValue result = createConvertFunction(loc, fn.forward(getSILGenFunction()),
-                                          resultTy, withoutActuallyEscaping);
+                                          resultTy, kind);
   return cloner.clone(result);
 }
 
@@ -129,7 +129,7 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
          "Expect a escaping to noescape conversion");
   (void)fnType;
 
-  // For a `@called(atMostOnce)` function value, the conversion is a
+  // For a noncopyable function value, the conversion is a
   // ownership-consuming forwarding operation, so forward `fn`'s cleanup onto
   // the result, exactly like the sibling `createConvertFunction` above does for
   // other function conversions. Mark the conversion's lifetime as already
@@ -137,8 +137,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   // lifetime is already exactly as long as it needs to be, by construction.
   //
   // `OperandOwnershipClassifier` treats `ConvertEscapeToNoEscapeInst` as
-  // `ForwardingConsume` as well when the result type is `@called(atMostOnce)`.
-  if (resultFnType->hasCalledAtMostOnceSemantics()) {
+  // `ForwardingConsume` as well when the result type is noncopyable.
+  if (resultFnType->isNoncopyable()) {
     CleanupCloner cloner(*this, fn);
     SILValue result =
         createConvertEscapeToNoEscape(loc, fn.forward(getSILGenFunction()),

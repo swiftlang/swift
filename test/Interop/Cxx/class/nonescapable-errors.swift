@@ -1,14 +1,9 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
-// RUN:   -I %t%{fs-sep}Inputs \
-// RUN:   -cxx-interoperability-mode=default \
-// RUN:   -verify-ignore-unrelated \
-// RUN:   -Xcc -Wno-nullability-completeness \
-// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
-// RUN:   -verify-additional-prefix LIFETIMES- \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// Typo correction depends on the declarations of the platform's C++ standard
+// library, and replaces the notes explaining why a declaration was not
+// imported, so turn it off.
 
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
@@ -16,7 +11,18 @@
 // RUN:   -verify-ignore-unrelated \
 // RUN:   -Xcc -Wno-nullability-completeness \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
-// RUN:   -verify-additional-prefix NO-LIFETIMES-
+// RUN:   -verify-additional-prefix LIFETIMES- \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -typo-correction-limit 0
+
+// RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
+// RUN:   -I %t%{fs-sep}Inputs \
+// RUN:   -cxx-interoperability-mode=default \
+// RUN:   -verify-ignore-unrelated \
+// RUN:   -Xcc -Wno-nullability-completeness \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
+// RUN:   -verify-additional-prefix NO-LIFETIMES- \
+// RUN:   -typo-correction-limit 0
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -78,40 +84,40 @@ TemplatedFloatOwner f4(int* x [[clang::lifetimebound]]) {
     return TemplatedOwner<float>{0};
 }
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 View g(int* x) {
     return View(x);
 }
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 // expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on a function}}
 View gByValue(Owner o);
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 // expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on a function}}
 View gByRvalueRef(Owner &&o);
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 // expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'parameter #1', which is passed by value on a function}}
 View gByValueUnnamed(Owner);
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 View gByPointer(Owner *o);
 
-// expected-warning@+2 {{the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 View gByFRTPointer(SharedFRT *_Nonnull p);
 
 struct SWIFT_NONESCAPABLE ViewByValueCtor {
-    // expected-warning@+2 {{the returned type 'ViewByValueCtor' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+    // expected-warning@+2 {{the returned type 'ViewByValueCtor' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
     // expected-LIFETIMES-error@+1 {{cannot borrow the lifetime of 'o', which is passed by value on an initializer}}
     ViewByValueCtor(Owner o);
-    // expected-NO-LIFETIMES-error@-1 {{an initializer cannot return a ~Escapable result}}
+    // expected-NO-LIFETIMES-error@-1 {{an initializer cannot return a non-'Escapable' result}}
 };
 
 template<typename F, typename S>
@@ -120,10 +126,10 @@ struct SWIFT_ESCAPABLE_IF(F, S) MyPair {
     S second;
 };
 
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 MyPair<View, Owner> h1(int* x);
 
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 MyPair<Owner, View> h2(int* x);
 
 // OK; MyPair<Owner, Owner> is not ~Escapable
@@ -135,7 +141,7 @@ struct SWIFT_UNCHECKED_SENDABLE SWIFT_ESCAPABLE_IF(F) MySendablePair {
     F first;
 };
 
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 MySendablePair<View> h4(int* x);
 
 // OK; MySendablePair<Owner> is not ~Escapable
@@ -169,58 +175,128 @@ struct Outer {
     };
 };
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 Outer<View>::NonTemplated::Inner<Owner> j1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 Outer<Owner>::NonTemplated::Inner<View> j2();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 Outer<Owner>::NonTemplated::Inner<Owner> j3();
 
 template<typename... Ts>
 struct SWIFT_ESCAPABLE_IF(Ts) MyTuple {};
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 MyTuple<View> k1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 MyTuple<Owner, View> k2();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 MyTuple<Owner, Owner> k3();
 
 using ViewVector = std::vector<View>;
 using OwnerVector = std::vector<Owner>;
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 ViewVector l1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 OwnerVector l2();
 
 // expected-note@+3 {{function 'usedToCrash' unavailable (cannot import)}}
 // expected-note@+2 {{return type unavailable (cannot import)}}
-// expected-note@+1 {{pointer to non-escapable type 'View' cannot be imported}}
+// expected-note@+1 {{pointer to non-'Escapable' type 'View' cannot be imported}}
 const View* usedToCrash(const View* p) {
     return p;
 }
 
 View* usedToCrashAsInit(const int* p) SWIFT_NAME(View.init(p:));
 
-// expected-note@+1 {{escapable record 'Invalid' cannot have non-escapable field 'v'}}
+// A reference to a non-escapable type would be imported as an
+// 'Unsafe(Mutable)Pointer', which cannot have a non-escapable pointee.
+// expected-note@+3 {{function 'returnsReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+const View &returnsReference(const View &v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsMutableReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+View &returnsMutableReference(View &v [[clang::lifetimebound]]);
+
+// Reference parameters are imported as their pointee type.
+void takesReference(const View &v);
+void takesMutableReference(View &v);
+void takesRvalueReference(View &&v);
+
+typedef const View &ViewRef;
+void takesTypedefReference(ViewRef v);
+
+// expected-note@+3 {{function 'returnsRvalueReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+View &&returnsRvalueReference(View &&v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsTypedefReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+ViewRef returnsTypedefReference(ViewRef v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsReferenceToPointer' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{pointer to non-'Escapable' type 'View' cannot be imported}}
+View *&returnsReferenceToPointer();
+
+// expected-note@+3 {{function 'returnsVectorReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'ViewVector' cannot be imported}}
+const ViewVector &returnsVectorReference();
+
+// A mutable reference parameter of a function pointer is imported as a
+// reference, so the function pointer falls back to 'OpaquePointer'. The note is
+// emitted when the function is used, although the function is imported.
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+void takesFunctionPointer(void (*fp)(View &));
+
+struct SWIFT_NONESCAPABLE ViewHolder {
+    View v;
+    // expected-note@+3 {{function 'get' unavailable (cannot import)}}
+    // expected-note@+2 {{return type unavailable (cannot import)}}
+    // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+    const View &get() const [[clang::lifetimebound]] { return v; }
+    // 'pointee' only needs the address, so the result depending on 'self' is
+    // enough to keep it.
+    const View &operator*() const [[clang::lifetimebound]] { return v; }
+    // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+    static const View &staticReference;
+};
+
+struct SWIFT_NONESCAPABLE UnannotatedViewHolder {
+    View v;
+    const View &operator*() const { return v; }
+};
+
+// The result of a prefix increment is dropped, so 'successor()' still works.
+struct SWIFT_NONESCAPABLE ViewIterator {
+    const int *p;
+    ViewIterator &operator++() { ++p; return *this; }
+};
+
+// expected-note@+1 {{'Escapable' record 'Invalid' cannot have non-'Escapable' field 'v'}}
 struct SWIFT_ESCAPABLE Invalid {
     View v;
 };
 
-// expected-note@+1 {{escapable record 'Invalid2' cannot have non-escapable base 'View'}}
+// expected-note@+1 {{'Escapable' record 'Invalid2' cannot have non-'Escapable' base 'View'}}
 struct SWIFT_ESCAPABLE Invalid2 : View {
 };
 
@@ -325,15 +401,15 @@ struct UnsafeThenView {
   View v;
 };
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 Aggregate m1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 ComplexRecord m2();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 ComplexRecord2 m3(); // expected-note {{'m3()' has been explicitly marked unavailable here}}
 ComplexRecord3 m4(); // expected-note {{'m4()' has been explicitly marked unavailable here}}
@@ -344,77 +420,77 @@ DtorWithView m5(); // expected-note {{'m5()' has been explicitly marked unavaila
 MoveOpsWithView m6(); // expected-note {{'m6()' has been explicitly marked unavailable here}}
 DtorWrapsHoldsView m7(); // expected-note {{'m7()' has been explicitly marked unavailable here}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 OwningPair<View> m8();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 OwningPair<Owner> m9();
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 ViewThenUnsafe m10();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 UnsafeThenView m11();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-error@+1 {{multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'}}
+// expected-error@+1 {{multiple SWIFT_VIEW annotations found on 'DoubleNonEscapableAnnotation'}}
 struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
-// expected-note@-1 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_VIEW annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
-// expected-error@+1 {{multiple SWIFT_ESCAPABLE annotations found on 'DoubleEscapableAnnotation'}}
+// expected-error@+1 {{multiple SWIFT_SELF_CONTAINED annotations found on 'DoubleEscapableAnnotation'}}
 struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE DoubleEscapableAnnotation {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED annotation found here}}
 
-// expected-error@+3 {{multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'}}
-// expected-error@+2 {{multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'}}
+// expected-error@+3 {{multiple SWIFT_SELF_CONTAINED_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'}}
+// expected-error@+2 {{multiple SWIFT_SELF_CONTAINED_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'}}
 template<typename F, typename S>
 struct SWIFT_ESCAPABLE_IF(F) SWIFT_ESCAPABLE_IF(S) DoubleEscapableIfAnnotation {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-3 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-4 {{SWIFT_ESCAPABLE_IF annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-3 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-4 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
 
 // expected-error@+1 {{multiple conflicting annotations found on 'EscapableNonEscapable'}}
 struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE EscapableNonEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
 // expected-error@+1 {{multiple conflicting annotations found on 'DoubleEscapableNonEscapable'}}
 struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE SWIFT_ESCAPABLE DoubleEscapableNonEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-3 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-4 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
+// expected-note@-3 {{SWIFT_VIEW annotation found here}}
+// expected-note@-4 {{SWIFT_SELF_CONTAINED annotation found here}}
 
 // expected-error@+2 {{multiple conflicting annotations found on 'EscapableIfEscapable<NonEscapable>'}}
 template<typename T>
 struct SWIFT_ESCAPABLE_IF(T) SWIFT_ESCAPABLE EscapableIfEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED annotation found here}}
 
 // expected-error@+2 {{multiple conflicting annotations found on 'NonEscapableIfEscapable<Owner>'}}
 template<typename T>
 struct SWIFT_ESCAPABLE_IF(T) SWIFT_NONESCAPABLE NonEscapableIfEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
-// expected-error@+2 {{SWIFT_ESCAPABLE_IF is invalid because it is only supported in class templates}}
+// expected-error@+2 {{SWIFT_SELF_CONTAINED_IF is invalid because it is only supported in class templates}}
 // expected-error@+1 {{multiple conflicting annotations found on 'NonTemplateEscapableIf'}}
 struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE_IF(T) NonTemplateEscapableIf {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE_IF annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
 
-// expected-warning@+3 {{the returned type 'DoubleNonEscapableAnnotation' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-warning@+3 {{the returned type 'DoubleNonEscapableAnnotation' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 DoubleNonEscapableAnnotation n1();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 DoubleEscapableAnnotation n2();
 
@@ -422,33 +498,33 @@ DoubleEscapableIfAnnotation<Owner, NonEscapable> n3();
 
 DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation> n4();
 
-// expected-warning@+3 {{the returned type 'EscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-warning@+3 {{the returned type 'EscapableNonEscapable' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 EscapableNonEscapable n5();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-warning@+3 {{the returned type 'DoubleEscapableNonEscapable' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-warning@+3 {{the returned type 'DoubleEscapableNonEscapable' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 DoubleEscapableNonEscapable n6();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 EscapableIfEscapable<NonEscapable> n7();
 
-// expected-warning@+3 {{the returned type 'NonEscapableIfEscapable<Owner>' is annotated as non-escapable; its lifetime dependencies must be annotated}}
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-warning@+3 {{the returned type 'NonEscapableIfEscapable<Owner>' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 NonEscapableIfEscapable<Owner> n8();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 NonTemplateEscapableIf n9();
 
 // We infer that MyPair is ~Escapable from `NonEscapable`, but still emit diagnostics for `Missing`
-// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 MyPair<NonEscapable, MyPair<Owner, MyPair2<NonEscapable, DoubleEscapableAnnotation>>> n10();
-// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
 // Don't emit the same diagnostic twice
 MyPair<DoubleEscapableAnnotation, DoubleEscapableAnnotation> n11();
@@ -470,9 +546,9 @@ public func droppedInitializer() {
     _ = View(p: nil) // expected-error {{extraneous argument label 'p:' in call}}
 }
 
-// expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-error@+3 {{a function with a non-'Escapable' result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
-// expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
+// expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 public func noAnnotations() -> View {
     f(nil)
     f2(nil, nil)
@@ -526,6 +602,34 @@ public func diagnoseInvalidSwiftAttributes() {
 
 public func test3(_ x: inout View) {
     usedToCrash(&x) // expected-error {{cannot find 'usedToCrash' in scope}}
+}
+
+public func references(_ x: inout View, _ h: borrowing ViewHolder,
+                       _ u: borrowing UnannotatedViewHolder,
+                       _ it: borrowing ViewIterator) {
+    _ = returnsReference(x) // expected-error {{cannot find 'returnsReference' in scope}}
+    _ = returnsMutableReference(&x) // expected-error {{cannot find 'returnsMutableReference' in scope}}
+    _ = returnsRvalueReference(x) // expected-error {{cannot find 'returnsRvalueReference' in scope}}
+    _ = returnsTypedefReference(x) // expected-error {{cannot find 'returnsTypedefReference' in scope}}
+    _ = returnsReferenceToPointer() // expected-error {{cannot find 'returnsReferenceToPointer' in scope}}
+    _ = returnsVectorReference() // expected-error {{cannot find 'returnsVectorReference' in scope}}
+    takesReference(x)
+    takesMutableReference(&x)
+    takesTypedefReference(x)
+    takesFunctionPointer(nil)
+    _ = h.get() // expected-error {{value of type 'ViewHolder' has no member 'get'}}
+    _ = h.pointee
+    _ = ViewHolder.staticReference // expected-error {{type 'ViewHolder' has no member 'staticReference'}}
+    // Without a dependence on 'self', 'pointee' would need a getter, which
+    // cannot load through the pointer.
+    _ = u.pointee // expected-error {{value of type 'UnannotatedViewHolder' has no member 'pointee'}}
+#if hasFeature(LifetimeDependence)
+    _ = it.successor()
+#endif
+}
+
+public func consumingReference(_ x: consuming View) {
+    takesRvalueReference(consuming: x)
 }
 
 public func optional() {

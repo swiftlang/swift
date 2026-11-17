@@ -852,15 +852,12 @@ bool SILGenFunction::emitBorrowOrMutateAccessorResult(
   }
 
   SILValue result = resultMV->getValue();
-  SILType selfType = F.getSelfArgument()->getType();
 
   if (F.getConventions().hasGuaranteedResult()) {
     // If we are returning the result of borrow accessor, strip the
     // unnecessary copy_value + mark_unresolved_non_copyable_value
     // instructions.
-    if (selfType.isMoveOnly()) {
-      result = lookThroughMoveOnlyCheckerPattern(result);
-    }
+    result = lookThroughMoveOnlyCheckerPattern(result);
     // If the SIL convention is @guaranteed and the generated result is an
     // address, emit a load_borrow.
     if (result->getType().isAddress()) {
@@ -1657,10 +1654,6 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
   // If we're suppressing error paths, just wrap it up as unreachable
   // and return.
   if (suppressErrorPath) {
-    // A boxed error arrives as an owned phi argument, and OSSA rejects an owned
-    // value that reaches `unreachable` without a lifetime-ending use.
-    if (errorValue->getOwnershipKind() == OwnershipKind::Owned)
-      B.createDestroyValue(loc, errorValue, IsDeadEnd);
     B.createUnreachable(loc);
     return destBB;
   }
@@ -1808,7 +1801,7 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
 
             return ManagedValue::forForwardedRValue(*this, exn);
           }).forward(*this);
-    } else if (destASTType->getClassOrBoundGenericClass()) {
+    } else if (destASTType->getClassDecl()) {
       // Class upcast: the in-flight error is a reference to a subclass of
       // the destination. SIL's `upcast` instruction additionally verifies
       // the subclass relationship in asserts builds; release builds rely

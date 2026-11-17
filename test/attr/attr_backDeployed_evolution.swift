@@ -118,6 +118,30 @@
 
 import BackDeployHelper
 
+protocol Printable {
+  func print()
+}
+
+protocol DefaultInitializable {
+  init()
+}
+
+extension IntArray: Printable {}
+extension IntArray: Summable {}
+extension IntArray: DefaultInitializable {}
+
+func genericPrint<T: Printable>(_ t: T) {
+  t.print()
+}
+
+func genericSum<T: Summable>(_ t: T) -> Int {
+  t.sum()
+}
+
+func genericInit<T: DefaultInitializable>() -> T {
+  T()
+}
+
 // CHECK: client: check
 testPrint(handle: #dsohandle, "check")
 // CHECK: library: check
@@ -179,6 +203,19 @@ do {
   array.rawValues.print()
 
   precondition(array.removeLast() == 3)
+
+  // Verify that protocol witnesses use the back deployed APIs correctly.
+
+  // CHECK-ABI: library: [5, 43]
+  // CHECK-BD: client: [5, 43]
+  genericPrint(array)
+
+  // CHECK-ABI: library: sum: 48
+  // CHECK-BD: client: sum: 48
+  precondition(genericSum(array) == 48)
+
+  let defaultInitialized: IntArray = genericInit()
+  precondition(defaultInitialized.values == [])
 }
 
 do {

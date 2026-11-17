@@ -667,14 +667,13 @@ function(_compile_swift_files
 
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "Lifetimes")
+  list(APPEND swift_flags "-enable-experimental-feature" "AddressableParameters")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
   if (SWIFT_STDLIB_ENABLE_STRICT_CONCURRENCY_COMPLETE)
     list(APPEND swift_flags "-strict-concurrency=complete")
   endif()
-
-  list(APPEND swift_flags "-Werror" "StrictMemorySafety")
 
   if (SWIFT_STDLIB_ENABLE_SIL_OPAQUE_VALUES)
     list(APPEND swift_flags "-Xfrontend" "-enable-sil-opaque-values")
@@ -709,6 +708,11 @@ function(_compile_swift_files
   endif()
 
   list(APPEND swift_flags ${SWIFTFILE_FLAGS})
+
+  # `-Werror StrictMemorySafety` would also enable the diagnostics.
+  if("-strict-memory-safety" IN_LIST swift_flags)
+    list(APPEND swift_flags "-Werror" "StrictMemorySafety")
+  endif()
 
   if(SWIFT_CACHING_BUILD AND SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
     swift_append_caching_compile_flags(swift_flags)

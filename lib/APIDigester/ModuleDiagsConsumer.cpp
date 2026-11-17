@@ -39,6 +39,7 @@ static StringRef getCategoryName(DiagID ID) {
   case DiagID::default_arg_removed:
   case DiagID::decl_type_change:
   case DiagID::func_type_escaping_changed:
+  case DiagID::func_thrown_type_change:
   case DiagID::param_ownership_change:
   case DiagID::type_witness_change:
     return "/* Type Changes */";

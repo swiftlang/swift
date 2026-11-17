@@ -406,6 +406,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (isa<ClangModuleUnit>(NTD->getDeclContext()->getModuleScopeContext()))
       return false;
 
+    // Don't skip a back-deployed type from another module that this module
+    // emits its own copy of, which has PublicNonUnique linkage. The members
+    // that this module adds to it in extensions still have symbols.
+    if (NTD->isBackDeployedIntoClient())
+      return false;
+
     return !(getDeclLinkage(NTD) == FormalLinkage::PublicUnique ||
              getDeclLinkage(NTD) == FormalLinkage::PackageUnique);
   }
@@ -464,13 +470,19 @@ public:
     // call site.
     auto index = 0;
     for (auto *param : *PL) {
-      if (param->isDefaultArgument())
+      if (param->hasDefaultArgumentGenerator())
         addFunction(SILDeclRef::getDefaultArgGenerator(VD, index));
       ++index;
     }
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+    // A '@specialized' declaration without a body has no symbol of its own,
+    // and the specialized bodies it exports are weak: other modules can export
+    // them too, so they aren't part of this module's interface.
+    if (SpecializedAttr::isSpecializationDeclaration(AFD))
+      return;
+
     // Add exported prespecialized symbols.
     for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
@@ -488,6 +500,26 @@ public:
         addFunction(SILDeclRef(AFD, erasedSignature), /*ignoreLinkage=*/true);
       }
     }
+    // And those that '@specialized' on its type gives it.
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
+    SpecializedAttr::getTypeLevelSpecializations(AFD, typeLevelSigs);
+    for (auto [sig, exported, module] : typeLevelSigs) {
+      if (!exported || module != AFD->getModuleContext())
+        continue;
+      SILDeclRef constant(AFD, sig);
+      addFunction(constant, /*ignoreLinkage=*/true);
+      // A class's designated initializer and deinit have a second entry point.
+      if (AFD->getDeclContext()->getSelfClassDecl()) {
+        auto *ctor = dyn_cast<ConstructorDecl>(AFD);
+        if (ctor && ctor->isDesignatedInit())
+          constant.kind = SILDeclRef::Kind::Initializer;
+        else if (isa<DestructorDecl>(AFD))
+          constant.kind = SILDeclRef::Kind::Destroyer;
+        else
+          continue;
+        addFunction(constant, /*ignoreLinkage=*/true);
+      }
+    }
 
     addFunction(SILDeclRef(AFD).asForeign(AFD->hasOnlyCEntryPoint()));
 
@@ -499,13 +531,12 @@ public:
       Visitor.addDynamicFunction(AFD, *dynKind);
     }
 
-    if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
-      if (cdeclAttr->Underscored) {
-        // A @_cdecl("...") function has an extra symbol, with the name from the
-        // attribute.
-        addFunction(SILDeclRef(AFD).asForeign());
-      }
-    }
+    // @_cdecl and @objc-on-a-top-level-function with bridged types emit a
+    // foreign thunk with an extra C symbol. Export it. C-compatible @objc
+    // globals use the single-symbol model and are already handled above.
+    if (AFD->getCDeclKind() == ForeignLanguage::ObjectiveC &&
+        !AFD->hasOnlyCEntryPoint())
+      addFunction(SILDeclRef(AFD).asForeign());
 
     {
       // Distributed functions emit a number of thunks that we need to replicate here.
@@ -859,6 +890,7 @@ public:
         ProtocolDecl *PD;
         bool Resilient;
         bool WitnessMethodElimination;
+        bool HasWitnesses = false;
 
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
@@ -869,6 +901,7 @@ public:
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
         void addMethod(SILDeclRef declRef) {
+          HasWitnesses = true;
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
@@ -889,25 +922,34 @@ public:
         }
 
         void addAssociatedType(AssociatedTypeDecl *assocType) {
+          HasWitnesses = true;
           Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
-        void addProtocolConformanceDescriptor() {
-          Visitor.addProtocolRequirementsBaseDescriptor(PD);
-        }
+        void addProtocolConformanceDescriptor() {}
 
         void addOutOfLineBaseProtocol(ProtocolDecl *proto) {
+          HasWitnesses = true;
           Visitor.addBaseConformanceDescriptor(BaseConformance(PD, proto));
         }
 
         void addAssociatedConformance(AssociatedConformance associatedConf) {
+          HasWitnesses = true;
           Visitor.addAssociatedConformanceDescriptor(associatedConf);
         }
 
-        void addPlaceholder(MissingMemberDecl *decl) {}
+        void addPlaceholder(MissingMemberDecl *decl) {
+          if (decl->getNumberOfVTableEntries() > 0)
+            HasWitnesses = true;
+        }
 
         void doIt() {
           visitProtocolDecl(PD);
+
+          // IRGen only defines the requirements base descriptor for a protocol
+          // that has witnesses.
+          if (HasWitnesses)
+            Visitor.addProtocolRequirementsBaseDescriptor(PD);
         }
       };
 

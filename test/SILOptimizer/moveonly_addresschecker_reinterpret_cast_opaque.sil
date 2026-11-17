@@ -1,0 +1,132 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// With opaque values, a noncopyable value of generic type is an object, so
+// SILGen's Builtin.reinterpretCast of it is a load of the marked memory whose
+// value is bit cast by an unchecked_bitwise_cast. This is the shape that
+// moveonly_addresschecker_reinterpret_cast.swift gets from a loadable type
+// without opaque values. This test runs the checker directly on that shape, so
+// it does not depend on where address lowering sits in the pipeline.
+//
+// The checker classifies such a load as a consume of the marked memory because
+// of the cast. Other uses of the loaded value that the checker cannot see
+// through, like the base of a mark_dependence, must not make it a consume.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// The load is a consume of the marked memory, so the checker accepts the cast
+// and removes the mark.
+// CHECK-LABEL: sil [ossa] {{.*}}@cast_generic :
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK:         [[LOAD:%[^,]+]] = load [take] {{%[^,]+}} : $*T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_bitwise_cast [[LOAD]] : $T to $U
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAST]] : $U
+// CHECK:         destroy_value [[LOAD]] : $T
+// CHECK:         return [[COPY]] : $U
+// CHECK:       } // end sil function 'cast_generic'
+sil [ossa] @cast_generic : $@convention(thin) <T, U where T : ~Copyable> (@in T) -> @out U {
+bb0(%0 : @owned $T):
+  %1 = alloc_box $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, var, name "x"
+  %2 = begin_borrow [lexical] [var_decl] %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  %3 = project_box %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, 0
+  store %0 to [init] %3 : $*T
+  %5 = begin_access [deinit] [unknown] %3 : $*T
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5 : $*T
+  %7 = load [take] %6 : $*T
+  %8 = unchecked_bitwise_cast %7 : $T to $U
+  %9 = copy_value %8 : $U
+  destroy_value %7 : $T
+  end_access %5 : $*T
+  end_borrow %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  destroy_value %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  return %9 : $U
+}
+
+// A load [copy] is a copy of the marked memory, which the checker converts to a
+// take because the cast is its last use.
+// CHECK-LABEL: sil [ossa] {{.*}}@cast_generic_copy :
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK:         [[LOAD:%[^,]+]] = load [take] {{%[^,]+}} : $*T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_bitwise_cast [[LOAD]] : $T to $U
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAST]] : $U
+// CHECK:         destroy_value [[LOAD]] : $T
+// CHECK:         return [[COPY]] : $U
+// CHECK:       } // end sil function 'cast_generic_copy'
+sil [ossa] @cast_generic_copy : $@convention(thin) <T, U where T : ~Copyable> (@in T) -> @out U {
+bb0(%0 : @owned $T):
+  %1 = alloc_box $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, var, name "x"
+  %2 = begin_borrow [lexical] [var_decl] %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  %3 = project_box %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, 0
+  store %0 to [init] %3 : $*T
+  %5 = begin_access [deinit] [unknown] %3 : $*T
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5 : $*T
+  %7 = load [copy] %6 : $*T
+  %8 = unchecked_bitwise_cast %7 : $T to $U
+  %9 = copy_value %8 : $U
+  destroy_value %7 : $T
+  end_access %5 : $*T
+  end_borrow %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  destroy_value %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  return %9 : $U
+}
+
+sil [ossa] @use : $@convention(thin) <T where T : ~Copyable> (@guaranteed T) -> ()
+
+// The loaded value has another use besides the cast and its destroy. The cast
+// still makes the load a consume of the marked memory.
+// CHECK-LABEL: sil [ossa] {{.*}}@cast_and_borrow :
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK:         [[LOAD:%[^,]+]] = load [take] {{%[^,]+}} : $*T
+// CHECK:         unchecked_bitwise_cast [[LOAD]] : $T to $U
+// CHECK:         apply {{%[^<]+}}<T>([[LOAD]])
+// CHECK:         destroy_value [[LOAD]] : $T
+// CHECK:       } // end sil function 'cast_and_borrow'
+sil [ossa] @cast_and_borrow : $@convention(thin) <T, U where T : ~Copyable> (@in T) -> @out U {
+bb0(%0 : @owned $T):
+  %1 = alloc_box $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, var, name "x"
+  %2 = begin_borrow [lexical] [var_decl] %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  %3 = project_box %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>, 0
+  store %0 to [init] %3 : $*T
+  %5 = begin_access [deinit] [unknown] %3 : $*T
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5 : $*T
+  %7 = load [copy] %6 : $*T
+  %8 = unchecked_bitwise_cast %7 : $T to $U
+  %9 = copy_value %8 : $U
+  %10 = function_ref @use : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed τ_0_0) -> ()
+  %11 = apply %10<T>(%7) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed τ_0_0) -> ()
+  destroy_value %7 : $T
+  end_access %5 : $*T
+  end_borrow %2 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  destroy_value %1 : $<τ_0_0, τ_0_1 where τ_0_0 : ~Copyable> { var τ_0_0 } <T, U>
+  return %9 : $U
+}
+
+// The base of a mark_dependence is a PointerEscape of the loaded value, like the
+// operand of the cast, but it does not use the value. The load stays a borrow of
+// the marked memory, so it is not a consume.
+// CHECK-LABEL: sil [ossa] {{.*}}@dependence_base :
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK-NOT:     load [take]
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow {{%[^,]+}} : $*T
+// CHECK:         mark_dependence {{%[^,]+}} : $Builtin.Word on [[LOAD]] : $T
+// CHECK:         end_borrow [[LOAD]] : $T
+// CHECK:       } // end sil function 'dependence_base'
+sil [ossa] @dependence_base : $@convention(thin) <T where T : ~Copyable> (@in T) -> Builtin.Word {
+bb0(%0 : @owned $T):
+  %1 = alloc_box $<τ_0_0 where τ_0_0 : ~Copyable> { var τ_0_0 } <T>, var, name "x"
+  %2 = begin_borrow [lexical] [var_decl] %1 : $<τ_0_0 where τ_0_0 : ~Copyable> { var τ_0_0 } <T>
+  %3 = project_box %2 : $<τ_0_0 where τ_0_0 : ~Copyable> { var τ_0_0 } <T>, 0
+  store %0 to [init] %3 : $*T
+  %5 = begin_access [deinit] [unknown] %3 : $*T
+  %6 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %5 : $*T
+  %7 = load [copy] %6 : $*T
+  %8 = integer_literal $Builtin.Word, 0
+  %9 = mark_dependence %8 : $Builtin.Word on %7 : $T
+  destroy_value %7 : $T
+  end_access %5 : $*T
+  end_borrow %2 : $<τ_0_0 where τ_0_0 : ~Copyable> { var τ_0_0 } <T>
+  destroy_value %1 : $<τ_0_0 where τ_0_0 : ~Copyable> { var τ_0_0 } <T>
+  return %9 : $Builtin.Word
+}

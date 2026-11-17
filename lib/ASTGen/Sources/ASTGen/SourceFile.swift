@@ -92,11 +92,11 @@ extension Parser.LanguageFeatures {
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
     mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
-    mapFeature(.DefaultIsolationPerFile, to: .defaultIsolationPerFile)
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
-    mapFeature(.CalledAttribute, to: .calledAttribute)
+    mapFeature(.OnceFunctions, to: .onceFunctions)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
+    mapFeature(.ExtendedSpecializedAttribute, to: .extendedSpecializedAttribute)
   }
 }
 

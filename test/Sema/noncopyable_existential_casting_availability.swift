@@ -23,14 +23,14 @@ struct NC: ~Copyable, P { var t: Int }
 func exprIs(_ box: borrowing any P & ~Copyable) -> Bool {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   return box is NC
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
 }
 
 func exprAsOptional(_ box: consuming any P & ~Copyable) -> Int {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   if let n = box as? NC { return n.t }
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
   return -1
 }
@@ -38,7 +38,7 @@ func exprAsOptional(_ box: consuming any P & ~Copyable) -> Int {
 func exprAsForced(_ box: consuming any P & ~Copyable) -> Int {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   return (box as! NC).t
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
 }
 
@@ -46,7 +46,7 @@ func patternIs(_ box: borrowing any P & ~Copyable) -> Int {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   switch box {
   case is NC: return 1
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
   default: return -1
   }
@@ -55,7 +55,7 @@ func patternIs(_ box: borrowing any P & ~Copyable) -> Int {
 func patternBinding(_ box: consuming any P & ~Copyable) -> Int {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   if case let n as NC = box { return n.t }
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
   return -1
 }
@@ -109,9 +109,6 @@ func copyableTargetBinding(_ box: consuming any P & ~Copyable) -> Int {
 // Even a 'Copyable' existential target is gated, because a non-'Copyable'
 // payload can inhabit one: `any Q & ~Copyable` accepts it outright, and
 // 'AnyObject' accepts anything by boxing it in '__SwiftValue', which copies.
-// Only pattern position is checked here; an existential target in expression
-// position is rejected outright, so the gate never gets a look at it (see
-// test/Sema/noncopyable_existential_is_targets.swift).
 
 protocol R: ~Copyable {}
 
@@ -119,13 +116,18 @@ func existentialTargetPatternIs(_ box: borrowing any P & ~Copyable) -> Int {
   // expected-note @-1 {{add '@available' attribute to enclosing global function}}
   switch box {
   case is any R & ~Copyable: return 1
-  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' existential is only available in}}
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
   // expected-note @-2 {{add 'if #available' version check}}
-  // Unrelated to availability: no type here is known to conform to both. The
-  // cast is still emitted, so the gate still has to fire.
-  // expected-warning @-5 {{cast from 'any P & ~Copyable' to unrelated type 'any R & ~Copyable' always fails}}
   default: return -1
   }
+}
+
+// Runtime support for noncopyable type tests is only available with newer runtimes
+func existentialTargetExprIs(_ box: borrowing any P & ~Copyable) -> Bool {
+  // expected-note @-1 {{add '@available' attribute to enclosing global function}}
+  return box is any R & ~Copyable
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
+  // expected-note @-2 {{add 'if #available' version check}}
 }
 
 // MARK: - A copyable existential is unaffected
@@ -144,4 +146,23 @@ struct CopyableConformer: P { var t: Int }
 
 func copyableConformer(_ box: any P) -> Bool {
   return box is CopyableConformer // no error
+}
+
+// MARK: - A non-existential non-'Copyable' source is gated too
+
+// A non-'Copyable' generic parameter reaches the same runtime entry point, and
+// the older runtime's copying fallback traps on its value just the same.
+func genericSource<T: ~Copyable>(_ value: consuming T) -> Int {
+  // expected-note @-1 {{add '@available' attribute to enclosing global function}}
+  if let n = value as? NC { return n.t }
+  // expected-error @-1 {{runtime support for casting out of a non-'Copyable' value is only available in}}
+  // expected-note @-2 {{add 'if #available' version check}}
+  return -1
+}
+
+// A cast the static types already satisfy makes no runtime call.
+func staticallySatisfied(_ value: consuming NC) -> Int {
+  if let n = value as? NC { return n.t }
+  // expected-warning @-1 {{conditional cast from 'NC' to 'NC' always succeeds}}
+  return -1
 }

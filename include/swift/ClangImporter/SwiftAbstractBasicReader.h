@@ -69,6 +69,10 @@ public:
         unsigned(asImpl().readUInt64()));
   }
 
+  clang::DynAllocKind readDynAllocKind() {
+    return clang::DynAllocKind(asImpl().readUInt64());
+  }
+
   clang::Selector readSelector() {
     uint64_t numArgsPlusOne = asImpl().readUInt64();
 

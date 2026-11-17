@@ -76,6 +76,40 @@ extension P {
   }
 }
 
+struct VariadicReplaceables {
+  dynamic func foo(_ x: Int) {}
+  dynamic func bar(_ fn: (Int) -> Void) {}
+  dynamic func baz(_ fn: (Int...) -> Void) {}
+  dynamic init(fn: (Int) -> Void) {}
+  dynamic var prop: (Int) -> Void { { _ in } }
+  dynamic subscript(fn: (Int) -> Void) -> Int { 0 }
+}
+
+extension VariadicReplaceables {
+  @_dynamicReplacement(for: foo(_:)) // expected-error {{could not be found}}
+  func replacement_foo(_ x: Int...) {}
+
+  @_dynamicReplacement(for: bar(_:)) // expected-error {{could not be found}}
+  func replacement_bar(_ fn: (Int...) -> Void) {}
+
+  @_dynamicReplacement(for: baz(_:))
+  func replacement_baz(_ fn: (Int...) -> Void) {}
+
+  @_dynamicReplacement(for: init(fn:)) // expected-error {{could not be found}}
+  init(replacement_fn: (Int...) -> Void) {}
+
+}
+
+// FIXME: These should be diagnosed.
+// https://github.com/swiftlang/swift/issues/93937
+extension VariadicReplaceables {
+  @_dynamicReplacement(for: prop)
+  var replacement_prop: (Int...) -> Void { { _ in } }
+
+  @_dynamicReplacement(for: subscript(_:))
+  subscript(replacement fn: (Int...) -> Void) -> Int { 0 }
+}
+
 struct ImplicitModifier {
   var i: Int {
     get { 1 }

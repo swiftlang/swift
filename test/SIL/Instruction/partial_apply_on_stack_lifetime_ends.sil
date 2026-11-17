@@ -68,3 +68,124 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @closure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+
+// An at-most-once closure passed to an inlined `consuming` parameter lives in
+// the parameter's stack slot, where it's either taken out and called or
+// destroyed.
+// CHECK-LABEL: begin running test {{.*}} on at_most_once_in_stack_slot
+// CHECK-DAG:   Owner:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK-DAG:   Owner:   destroy_addr %{{.*}} : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on at_most_once_in_stack_slot
+sil [ossa] @at_most_once_in_stack_slot : $@convention(thin) (Builtin.Int64, Builtin.Int1) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int1):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+  %f = function_ref @closure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %pa = partial_apply [on_stack] [called_at_most_once] %f(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %m = move_value [lexical] %pa : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %slot = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  store %m to [init] %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  cond_br %1, bb1, bb2
+
+bb1:
+  %l = load [take] %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %r = apply %l() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%r : $Builtin.Int64)
+
+bb2:
+  destroy_addr %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%0 : $Builtin.Int64)
+
+bb3(%a : $Builtin.Int64):
+  dealloc_stack %slot : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %a : $Builtin.Int64
+}
+
+// The closure is stored through an access to the slot, and then moved into
+// another slot, as `let g = fn` does.
+// CHECK-LABEL: begin running test {{.*}} on at_most_once_moved_between_stack_slots
+// CHECK:       Owner:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on at_most_once_moved_between_stack_slots
+sil [ossa] @at_most_once_moved_between_stack_slots : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+  %f = function_ref @closure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %pa = partial_apply [on_stack] [called_at_most_once] %f(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %slot1 = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %access1 = begin_access [modify] [static] %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  store %pa to [init] %access1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  end_access %access1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %slot2 = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %access2 = begin_access [modify] [static] %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  copy_addr [take] %access2 to [init] %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  end_access %access2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %l = load [take] %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %r = apply %l() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  dealloc_stack %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  dealloc_stack %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %r : $Builtin.Int64
+}
+
+// The closure is taken out of the slot of one inlined parameter and stored
+// into the slot of another.
+// CHECK-LABEL: begin running test {{.*}} on at_most_once_forwarded_between_stack_slots
+// CHECK:       Owner:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on at_most_once_forwarded_between_stack_slots
+sil [ossa] @at_most_once_forwarded_between_stack_slots : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+  %f = function_ref @closure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %pa = partial_apply [on_stack] [called_at_most_once] %f(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %slot1 = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  store %pa to [init] %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %l1 = load [take] %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %slot2 = alloc_stack [lexical] $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  store %l1 to [init] %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %l2 = load [take] %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  %r = apply %l2() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  dealloc_stack %slot2 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  dealloc_stack %slot1 : $*@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %r : $Builtin.Int64
+}
+
+sil @thunk : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+
+// A thunk that captures the closure ends its lifetime when it's called.
+// CHECK-LABEL: begin running test {{.*}} on at_most_once_captured_by_thunk
+// CHECK:       Owner:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on at_most_once_captured_by_thunk
+sil [ossa] @at_most_once_captured_by_thunk : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+  %f = function_ref @closure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %pa = partial_apply [on_stack] [called_at_most_once] %f(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %t = function_ref @thunk : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %outer = partial_apply [on_stack] [called_at_most_once] %t(%pa) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %r = apply %outer() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %r : $Builtin.Int64
+}
+
+sil @plainClosure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+sil @atMostOnceThunk : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Builtin.Int64) -> Builtin.Int64
+
+// A closure without execution semantics that's captured by an at-most-once
+// thunk ends its lifetime when the thunk is called.
+// CHECK-LABEL: begin running test {{.*}} on plain_closure_captured_by_at_most_once_thunk
+// CHECK:       Owner:   %{{.*}} = apply %{{.*}}() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       returned: true
+// CHECK-LABEL: end running test {{.*}} on plain_closure_captured_by_at_most_once_thunk
+sil [ossa] @plain_closure_captured_by_at_most_once_thunk : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+  %f = function_ref @plainClosure : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
+  %t = function_ref @atMostOnceThunk : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Builtin.Int64) -> Builtin.Int64
+  %outer = partial_apply [on_stack] [called_at_most_once] %t(%pa) : $@convention(thin) (@owned @noescape @callee_guaranteed () -> Builtin.Int64) -> Builtin.Int64
+  %r = apply %outer() : $@noescape @callable(once) @callee_owned () -> Builtin.Int64
+  return %r : $Builtin.Int64
+}

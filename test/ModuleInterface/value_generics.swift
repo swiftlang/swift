@@ -27,6 +27,51 @@ public func usesConcreteSlab(_: Slab<Int, 2>) {}
 // CHECK: public func usesNegativeSlab(_: ValueGeneric::Slab<Swift::String, -10>)
 public func usesNegativeSlab(_: Slab<String, -10>) {}
 
+public protocol P {}
+public struct ConformsToP: P {
+  public init() {}
+}
+
+public protocol Q {
+  associatedtype A: P
+  func make() -> A
+}
+
+// CHECK-LABEL: extension ValueGeneric::Slab : ValueGeneric::Q {
+extension Slab: Q {
+  // CHECK: public func make() -> some ValueGeneric::P
+  public func make() -> some P { ConformsToP() }
+
+  // CHECK: public typealias A = @_opaqueReturnTypeOf("$s12ValueGeneric4SlabV4makeQryF", 0) __<Element, N>
+}
+
+public protocol SlabProvider {
+  associatedtype ProvidedSlab: Q
+  associatedtype A where A == ProvidedSlab.A
+  func provide() -> ProvidedSlab
+}
+
+// CHECK-LABEL: public struct GenericSlabProvider<let N : Swift::Int> : ValueGeneric::SlabProvider {
+public struct GenericSlabProvider<let N: Int>: SlabProvider {
+  public func provide() -> Slab<Int, N> { .init() }
+
+  // CHECK: public typealias A = @_opaqueReturnTypeOf("$s12ValueGeneric4SlabV4makeQryF", 0) __<Swift::Int, N>
+}
+
+// CHECK-LABEL: public struct ConcreteSlabProvider : ValueGeneric::SlabProvider {
+public struct ConcreteSlabProvider: SlabProvider {
+  public func provide() -> Slab<Int, 2> { .init() }
+
+  // CHECK: public typealias A = @_opaqueReturnTypeOf("$s12ValueGeneric4SlabV4makeQryF", 0) __<Swift::Int, 2>
+}
+
+// CHECK-LABEL: public struct NegativeSlabProvider : ValueGeneric::SlabProvider {
+public struct NegativeSlabProvider: SlabProvider {
+  public func provide() -> Slab<String, -10> { .init() }
+
+  // CHECK: public typealias A = @_opaqueReturnTypeOf("$s12ValueGeneric4SlabV4makeQryF", 0) __<Swift::String, -10>
+}
+
 @inlinable
 public func test() -> Int {
   // CHECK: Slab<Int, 123>.N

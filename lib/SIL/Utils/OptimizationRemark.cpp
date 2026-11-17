@@ -137,7 +137,7 @@ static bool isMethodWithForceEmitSemanticAttrNominalType(SILFunction &fn) {
     return false;
 
   auto selfType = fn.getSelfArgument()->getType();
-  auto *nomType = selfType.getNominalOrBoundGenericNominal();
+  auto *nomType = selfType.getNominalDecl();
   if (!nomType)
     return false;
   return nomType->shouldEmitAssemblyVisionRemarksOnMethods();

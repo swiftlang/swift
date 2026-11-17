@@ -21,6 +21,10 @@ struct NCD : ~Copyable {
   var c: C
   deinit
 }
+struct NCPair : ~Copyable {
+  var nc: NC
+  var c: C
+}
 
 // CHECK-LABEL: begin running test {{.*}} on consume_move_only
 // CHECK-LABEL: sil [ossa] @consume_move_only : {{.*}} {
@@ -44,9 +48,11 @@ bb0(%c : @guaranteed $C):
 // CHECK-LABEL: begin running test {{.*}} on borrow_move_only
 // CHECK-LABEL: sil [ossa] @borrow_move_only : {{.*}} {
 // CHECK:       bb0([[C:%[^,]+]] :
-//                No copy!
-// CHECK:         [[NC:%[^,]+]] = struct $NC ([[C]]
+//                Forwards of non-copyable values are not rewritten.
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[NC:%[^,]+]] = struct $NC ([[COPY]]
 // CHECK:         apply undef([[NC]])
+// CHECK:         destroy_value [[NC]]
 // CHECK-LABEL: } // end sil function 'borrow_move_only'
 // CHECK-LABEL: end running test {{.*}} on borrow_move_only
 sil [ossa] @borrow_move_only : $@convention(thin) (@guaranteed C) -> () {
@@ -63,9 +69,11 @@ bb0(%c : @guaranteed $C):
 // CHECK-LABEL: begin running test {{.*}} on consume_and_borrow_move_only
 // CHECK-LABEL: sil [ossa] @consume_and_borrow_move_only : {{.*}} {
 // CHECK:       bb0([[C:%[^,]+]] :
-//                No copy!
-// CHECK:         [[NC1:%[^,]+]] = struct $NC ([[C]]
+//                Forwards of non-copyable values are not rewritten.
+// CHECK:         [[COPY1:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[NC1:%[^,]+]] = struct $NC ([[COPY1]]
 // CHECK:         apply undef([[NC1]])
+// CHECK:         destroy_value [[NC1]]
 //                Necessary copy.
 // CHECK:         [[COPY2:%[^,]+]] = copy_value [[C]]
 // CHECK:         [[NC2:%[^,]+]] = struct $NC ([[COPY2]]
@@ -82,6 +90,39 @@ bb0(%c : @guaranteed $C):
   %copy2 = copy_value %c
   %nc2 = struct $NC (%copy2)
   apply undef(%nc2) : $@convention(thin) (@owned NC) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// The non-copyable struct $NC is consumed by another non-copyable aggregate.
+// Its forwarded value cannot be copied on demand, so the struct must not be
+// converted to a guaranteed forward. Previously, the canonicalization bailed out
+// in the middle of rewriting the uses of the lexical move, leaving the move
+// without a consuming use (a leaked copy). See
+// https://github.com/swiftlang/swift/issues/93409
+//
+// CHECK-LABEL: begin running test {{.*}} on consume_move_only_in_aggregate
+// CHECK-LABEL: sil [ossa] @consume_move_only_in_aggregate : {{.*}} {
+// CHECK:       bb0([[C:%[^,]+]] :
+// CHECK-NOT:     move_value
+// CHECK-DAG:     [[COPY1:%[^,]+]] = copy_value [[C]]
+// CHECK-DAG:     [[NC:%[^,]+]] = struct $NC ([[COPY1]]
+// CHECK-DAG:     [[COPY2:%[^,]+]] = copy_value [[C]]
+// CHECK:         [[PAIR:%[^,]+]] = struct $NCPair ([[NC]], [[COPY2]])
+// CHECK:         apply undef([[PAIR]])
+// CHECK-NOT:     move_value
+// CHECK-LABEL: } // end sil function 'consume_move_only_in_aggregate'
+// CHECK-LABEL: end running test {{.*}} on consume_move_only_in_aggregate
+sil [ossa] @consume_move_only_in_aggregate : $@convention(thin) (@guaranteed C) -> () {
+bb0(%c : @guaranteed $C):
+  specify_test "canonicalize_function_argument @argument"
+  %copy = copy_value %c
+  %move = move_value [lexical] %copy
+  debug_value %move, let, name "c"
+  %copy2 = copy_value %move
+  %nc = struct $NC (%copy2)
+  %pair = struct $NCPair (%nc, %move)
+  apply undef(%pair) : $@convention(thin) (@owned NCPair) -> ()
   %retval = tuple ()
   return %retval
 }

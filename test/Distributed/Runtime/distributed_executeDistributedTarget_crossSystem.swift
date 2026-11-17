@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -module-name main -target %target-future-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main -target %target-future-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -45,10 +48,19 @@ struct Main {
         handler: handler)
       print("UNEXPECTED: cross-system returned")
     } catch let e as ExecuteDistributedTargetError {
-      print("crossSystem threw errorCode=\(e.errorCode)")
+      // The runtime picks the error code with an availability check on
+      // SwiftStdlib 6.5, so the expected code depends on the host OS version
+      // once that release has a real OS version assigned.
+      let expected: ExecuteDistributedTargetError.ErrorCode
+      if #available(SwiftStdlib 6.5, *) {
+        expected = .incompatibleInvocationDecoder
+      } else {
+        expected = .typeDeserializationFailure
+      }
+      print("crossSystem threw expected errorCode=\(e.errorCode == expected)")
     } catch {
       print("crossSystem threw: \(error)")
     }
-    // CHECK: crossSystem threw errorCode=incompatibleInvocationDecoder
+    // CHECK: crossSystem threw expected errorCode=true
   }
 }

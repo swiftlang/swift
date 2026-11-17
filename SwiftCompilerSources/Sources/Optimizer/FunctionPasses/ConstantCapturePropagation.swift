@@ -155,7 +155,7 @@ private func getSpecializedCalleeWithDeadParams(of partialApply: PartialApplyIns
   }
 
   // Specialize the callee if it is still generic
-  if substitutions.hasAnySubstitutableParams {
+  if substitutions.isEffectivelyGeneric {
     guard callee.isDefinition,
           partialApply.referencedFunction!.shouldOptimize, callee.shouldOptimize,
           let genericSpecialized = context.specialize(function: callee, for: substitutions,
@@ -435,7 +435,7 @@ private extension Value {
     case let keyPath as KeyPathInst:
       guard keyPath.operands.isEmpty,
             keyPath.hasPattern,
-            !keyPath.substitutionMap.hasAnySubstitutableParams
+            !keyPath.substitutionMap.isEffectivelyGeneric
       else {
         return .notConstant
       }

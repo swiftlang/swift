@@ -154,3 +154,55 @@ bb0(%0 : $*C):
   dealloc_stack %2
   return %c
 }
+
+sil [ossa] @use_throwing : $@convention(thin) (@in_guaranteed C) -> @error any Error
+
+// The alloc_stack is used by two store_borrows. Removing the alloc_stack must not delete
+// the other store_borrow and its users (including the try_apply terminator).
+//
+// CHECK-LABEL: sil [ossa] @two_store_borrows_to_same_alloc_stack :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store_borrow
+// CHECK:         try_apply %{{[0-9]+}}(%0) : {{.*}}, normal bb2, error bb1
+// CHECK:       bb2(%{{[0-9]+}} : $()):
+// CHECK-NEXT:    try_apply %{{[0-9]+}}(%1) : {{.*}}, normal bb4, error bb3
+// CHECK:       } // end sil function 'two_store_borrows_to_same_alloc_stack'
+sil [ossa] @two_store_borrows_to_same_alloc_stack : $@convention(thin) (@in_guaranteed C, @in_guaranteed C) -> () {
+bb0(%0 : $*C, %1 : $*C):
+  %2 = load_borrow %0
+  %3 = load_borrow %1
+  %f = function_ref @use_throwing : $@convention(thin) (@in_guaranteed C) -> @error any Error
+  %4 = alloc_stack $C
+  %5 = store_borrow %2 to %4
+  try_apply %f(%5) : $@convention(thin) (@in_guaranteed C) -> @error any Error, normal bb2, error bb1
+
+bb1(%e1 : @owned $any Error):
+  end_borrow %5
+  end_borrow %3
+  end_borrow %2
+  br bb5(%e1)
+
+bb2(%r1 : $()):
+  end_borrow %5
+  %6 = store_borrow %3 to %4
+  try_apply %f(%6) : $@convention(thin) (@in_guaranteed C) -> @error any Error, normal bb4, error bb3
+
+bb3(%e2 : @owned $any Error):
+  end_borrow %6
+  end_borrow %3
+  end_borrow %2
+  br bb5(%e2)
+
+bb4(%r2 : $()):
+  end_borrow %6
+  end_borrow %3
+  end_borrow %2
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+
+bb5(%e : @owned $any Error):
+  dealloc_stack %4
+  destroy_value [dead_end] %e
+  unreachable
+}

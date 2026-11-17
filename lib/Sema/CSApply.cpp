@@ -109,7 +109,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   for (const auto &opened : openedTypes->second) {
     auto type = getFixedType(opened.second);
     if (opened.first->isParameterPack()) {
-      if (type->is<PlaceholderType>()) {
+      if (type->is<HoleType>()) {
         type = PackType::get(
             ctx,
             {PackExpansionType::get(ErrorType::get(ctx), ErrorType::get(ctx))});
@@ -1116,7 +1116,8 @@ namespace {
                                              DeclContext *declOrClosure,
                                              ParameterList *thunkParamList,
                                              ConstraintLocatorBuilder locator) {
-      auto *const fnTy = cs.getType(fnExpr)->castTo<FunctionType>();
+      auto *const fnTy =
+          solution.getResolvedType(fnExpr)->castTo<FunctionType>();
       auto *calleeFnTy = fnTy;
 
       if (baseExpr) {
@@ -1181,7 +1182,7 @@ namespace {
 
           paramRef = AppliedPropertyWrapperExpr::create(
               ctx, calleeDeclRef, calleeParamDecl, SourceLoc(),
-              appliedWrapper.wrapperType, paramRef, valueKind);
+              simplifyType(appliedWrapper.wrapperType), paramRef, valueKind);
           cs.cacheExprTypes(paramRef);
 
           newCalleeParams.push_back(calleeParam.withType(paramRef->getType()));
@@ -2356,7 +2357,8 @@ namespace {
         Type baseTy;
         bool resultIsLValue;
         
-        if (auto nom = keyPathTy->getAs<NominalType>()) {
+        if (auto nom = keyPathTy->getAs<NominalType>();
+            nom && !nom->hasGenericArgs()) {
           // AnyKeyPath is <T> rvalue T -> rvalue Any?
           if (nom->isAnyKeyPath()) {
             valueTy = ctx.getAnyExistentialType();
@@ -2388,7 +2390,7 @@ namespace {
             ASSERT(keyPathTy);
           }
 
-          auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
+          auto keyPathBGT = keyPathTy->castTo<NominalType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
 
           // Coerce the index to the key path's type
@@ -2584,7 +2586,8 @@ namespace {
         if (!selfTy->hasReferenceSemantics())
           flags = flags.withInOut(true);
 
-        auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+        auto selfParam =
+            AnyFunctionType::Param::bodyAccess(selfTy, Identifier(), flags);
         return FunctionType::get({selfParam}, /* yields */ {},
                                  resultTy->getResult(), resultTy->getExtInfo());
       };
@@ -2622,6 +2625,15 @@ namespace {
       using Component = KeyPathExpr::Component;
       auto *anchor = getAsExpr(memberLoc->getAnchor());
 
+      // The implicit key path spans the member reference that it resolves. If
+      // the anchor is a key path, that is only one of its components.
+      SourceLoc endLoc = anchor->getEndLoc();
+      if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+        if (auto kpElt =
+                memberLoc->findFirst<LocatorPathElt::KeyPathComponent>())
+          endLoc = KPE->getComponents()[kpElt->getIndex()].getSourceRange().End;
+      }
+
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
         Type keyPathTy = paramType;
 
@@ -2644,7 +2656,7 @@ namespace {
         }
 
         auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
-                                               components, anchor->getEndLoc());
+                                               components, endLoc);
         kp->setType(keyPathTy);
         cs.cacheExprTypes(kp);
 
@@ -3905,7 +3917,7 @@ namespace {
 
       if (arrayTy->isInlineArray() || arrayTy->is_InlineArray()) {
         // <let count: Int, Element>
-        elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
+        elementType = arrayTy->castTo<StructType>()->getGenericArgs()[1];
       } else {
         ProtocolDecl *arrayProto = TypeChecker::getProtocol(
             ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -4276,6 +4288,14 @@ namespace {
         // Continue anyway.
       }
 
+      if (castKind == CheckedCastKind::Unresolved ||
+          castKind == CheckedCastKind::ValueCast) {
+        if (TypeChecker::noncopyableOptionalPayloadCastKind(fromType, toType, dc)) {
+          // Unwrapping an optional noncopyable would consume it, so don't
+          return expr;
+        }
+      }
+
       // Dig through the optionals in the from/to types.
       SmallVector<Type, 2> fromOptionals;
       fromType->lookThroughAllOptionalTypes(fromOptionals);
@@ -4345,7 +4365,7 @@ namespace {
           auto destObjectType = destValueType;
           if (auto metaTy = destObjectType->getAs<MetatypeType>())
             destObjectType = metaTy->getInstanceType();
-          if (auto destClass = destObjectType->getClassOrBoundGenericClass()) {
+          if (auto destClass = destObjectType->getClassDecl()) {
             if (destClass->getForeignClassKind() ==
                   ClassDecl::ForeignKind::CFType) {
               if (SuppressDiagnostics)
@@ -4803,6 +4823,13 @@ namespace {
         break;
       }
 
+      if (expr->getCastKind() == CheckedCastKind::ValueCast &&
+          TypeChecker::noncopyableOptionalPayloadCastKind(fromType, toType, dc)) {
+        // Unwrapping an optional noncopyable would consume it, so don't
+        cs.setType(expr, OptionalType::get(toType));
+        return expr;
+      }
+
       return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
                                          OptionalBindingsCastKind::Conditional);
     }
@@ -5191,10 +5218,10 @@ namespace {
         isFunctionType = true;
       } else if (auto *existential = exprType->getAs<ExistentialType>()) {
         auto layout = existential->getExistentialLayout();
-        auto keyPathTy = layout.explicitSuperclass->castTo<BoundGenericType>();
+        auto keyPathTy = layout.explicitSuperclass->castTo<NominalType>();
         leafTy = keyPathTy->getGenericArgs()[1];
       } else {
-        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        auto keyPathTy = exprType->castTo<NominalType>();
         leafTy = keyPathTy->getGenericArgs()[1];
       }
 
@@ -5277,7 +5304,8 @@ namespace {
             resolvedComponents.push_back(
                 KeyPathExpr::Component::forOptionalForce(objectTy, loc));
           } else {
-            buildKeyPathOptionalForceComponent(resolvedComponents);
+            buildKeyPathOptionalForceComponent(resolvedComponents,
+                                               origComponent.getLoc());
           }
           break;
         }
@@ -5345,7 +5373,8 @@ namespace {
       // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
       auto kpDecl = ctx.getKeyPathDecl();
       auto keyPathTy =
-          BoundGenericType::get(kpDecl, nullptr, { baseTy, kpResultTy });
+          NominalType::get(kpDecl, nullptr, { baseTy, kpResultTy },
+                           cs.getASTContext());
       E->setType(keyPathTy);
       cs.cacheType(E);
 
@@ -5358,7 +5387,7 @@ namespace {
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
-          FunctionType::get({FunctionType::Param(baseTy)},
+          FunctionType::get({FunctionType::Param::bodyAccess(baseTy)},
                             /* yields */ {}, kpResultTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);
@@ -5428,8 +5457,14 @@ namespace {
       return coerceToType(captureExpr, exprType, cs.getConstraintLocator(E));
     }
 
+    /// Add an optional-force component that unwraps the last component.
+    ///
+    /// \param bangLoc The location of an explicit '!'. Implicit forces of
+    /// implicitly unwrapped optionals take the location of the component they
+    /// unwrap.
     void buildKeyPathOptionalForceComponent(
-        SmallVectorImpl<KeyPathExpr::Component> &components) {
+        SmallVectorImpl<KeyPathExpr::Component> &components,
+        SourceLoc bangLoc = SourceLoc()) {
       assert(!components.empty());
 
       // Unwrap the last component type, preserving @lvalue-ness.
@@ -5443,7 +5478,7 @@ namespace {
       }
       assert(objectTy);
 
-      auto loc = components.back().getLoc();
+      auto loc = bangLoc.isValid() ? bangLoc : components.back().getLoc();
       components.push_back(
           KeyPathExpr::Component::forOptionalForce(objectTy, loc));
     }
@@ -5528,7 +5563,8 @@ namespace {
       }
 
       auto comp = KeyPathExpr::Component::forSubscript(
-          ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances));
+          ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances),
+          componentLoc);
       components.push_back(comp);
 
       auto unwrapCount =
@@ -7015,8 +7051,8 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
     return expr;
 
   // Build the first value conversion.
-  auto fromArgs = cs.getType(expr)->castTo<BoundGenericType>()->getGenericArgs();
-  auto toArgs = toType->castTo<BoundGenericType>()->getGenericArgs();
+  auto fromArgs = cs.getType(expr)->castTo<NominalType>()->getGenericArgs();
+  auto toArgs = toType->castTo<NominalType>()->getGenericArgs();
   auto conv =
     buildOpaqueElementConversion(*this, expr->getLoc(),
                                  fromArgs[0], toArgs[0],
@@ -7071,7 +7107,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
     // FIXME: Ideally we would instead have already recorded a restriction
     // when solving the constraint, and we wouldn't need to duplicate this
     // part of coerceToType() here.
-    if (auto foreignClass = toType->getClassOrBoundGenericClass()) {
+    if (auto foreignClass = toType->getClassDecl()) {
       if (foreignClass->getForeignClassKind() ==
             ClassDecl::ForeignKind::CFType) {
         return cs.cacheType(new (ctx)
@@ -7209,8 +7245,8 @@ Expr *ConstraintSystem::addImplicitLoadExpr(Expr *expr) {
 
 Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                  ConstraintLocatorBuilder locator) {
-  ASSERT(toType && !toType->hasError() &&
-         !toType->hasTypeVariableOrPlaceholder());
+  ASSERT(toType && !toType->hasError() && !toType->hasTypeVariableOrHole() &&
+         !toType->hasPlaceholder());
 
   // Diagnose conversions to invalid function types that couldn't be performed
   // beforehand because of placeholders.
@@ -7285,6 +7321,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           return cs.cacheType(new (ctx) UnsafeCastExpr(expr, toType));
       }
 
+      // TODO: Record the relationship between scopes instead.
+      // FIXME: Lvalues and function conversions equal up to scopes
+      // aren't coersed so they crash in the AST verifier / SILGen.
+      if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+          eraseScopes(fromType)->isEqual(eraseScopes(toType)))
+        return cs.cacheType(new (ctx) UnsafeCastExpr(expr, toType));
+
       auto &err = llvm::errs();
       err << "fromType->getCanonicalType() = ";
       fromType->getCanonicalType()->dump(err);
@@ -7320,7 +7363,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
         
     case ConversionRestrictionKind::ValueToOptional: {
-      auto toGenericType = toType->castTo<BoundGenericType>();
+      auto toGenericType = toType->castTo<EnumType>();
       assert(toGenericType->getDecl()->isOptionalDecl());
       TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
 
@@ -7453,7 +7496,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::CFTollFreeBridgeToObjC: {
-      auto foreignClass = fromType->getClassOrBoundGenericClass();
+      auto foreignClass = fromType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       auto asObjCClass =
@@ -7462,7 +7505,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     case ConversionRestrictionKind::ObjCTollFreeBridgeToCF: {
-      auto foreignClass = toType->getClassOrBoundGenericClass();
+      auto foreignClass = toType->getClassDecl();
       auto objcType = foreignClass->getAttrs().getAttribute<ObjCBridgedAttr>()
                         ->getObjCClass()->getDeclaredInterfaceType();
       Expr *result = coerceToType(expr, objcType, locator);
@@ -7682,9 +7725,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // FIXME: Can we rig things up so that we always have a Superclass
   // conversion restriction in this case?
   case TypeKind::DynamicSelf:
-  case TypeKind::BoundGenericClass:
   case TypeKind::Class: {
-    if (!toType->getClassOrBoundGenericClass())
+    if (!toType->getClassDecl())
       break;
     for (auto fromSuperClass = fromType->getSuperclass();
          fromSuperClass;
@@ -7892,7 +7934,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate the
-    // '@called(atMostOnce)' bit to the closure without invalidating prior
+    // at-most-once bit to the closure without invalidating prior
     // analysis.
     fromEI = fromFunc->getExtInfo();
     if (toEI.hasCalledAtMostOnceSemantics() &&
@@ -7902,7 +7944,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
-        // Propagating '@called(atMostOnce)' might have satisfied the entire
+        // Propagating at-most-once might have satisfied the entire
         // conversion. If so, we're done, otherwise keep converting.
         if (fromFunc->isEqual(toType))
           return expr;
@@ -7998,7 +8040,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       llvm_unreachable("unhandled metatype kind");
     }
     
-    if (auto toClass = toType->getClassOrBoundGenericClass()) {
+    if (auto toClass = toType->getClassDecl()) {
       if (toClass->getName() == ctx.Id_Protocol
           && toClass->getModuleContext()->getName()
               == ctx.Id_ObjectiveC) {
@@ -8030,8 +8072,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::ProtocolComposition:
   case TypeKind::ParameterizedProtocol:
   case TypeKind::Existential:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
   case TypeKind::GenericFunction:
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
@@ -8055,8 +8095,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return coerceExistential(expr, toType, locator);
 
   // Coercion to Optional<T>.
-  case TypeKind::BoundGenericEnum: {
-    auto toGenericType = cast<BoundGenericEnumType>(desugaredToType);
+  case TypeKind::Enum: {
+    auto toGenericType = cast<EnumType>(desugaredToType);
     if (!toGenericType->getDecl()->isOptionalDecl())
       break;
     TypeChecker::requireOptionalIntrinsics(ctx, expr->getLoc());
@@ -8073,8 +8113,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     return result;
   }
 
-  case TypeKind::BoundGenericStruct: {
-    auto toStruct = cast<BoundGenericStructType>(desugaredToType);
+  case TypeKind::Struct: {
+    auto toStruct = cast<StructType>(desugaredToType);
     if (!toStruct->isArray() && !toStruct->isDictionary())
       break;
 
@@ -8094,10 +8134,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Error:
   case TypeKind::Module:
   case TypeKind::Tuple:
-  case TypeKind::Enum:
-  case TypeKind::Struct:
   case TypeKind::Class:
-  case TypeKind::BoundGenericClass:
   case TypeKind::Metatype:
   case TypeKind::DynamicSelf:
   case TypeKind::PrimaryArchetype:
@@ -8509,7 +8546,36 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         cs.setType(replacement, resultType);
         return replacement;
       }
-      
+
+      case DeclTypeCheckingSemantics::WithoutActuallyDeiniting: {
+        // Resolve into body(convert(closure)), where the conversion is marked
+        // as a deliberate drop of the exactly-once guarantee.
+        auto *args = apply->getArgs();
+        assert(args->size() == 2 && "should have two arguments");
+        auto *exactlyOnce = cs.coerceToRValue(args->getExpr(0));
+        auto *body = cs.coerceToRValue(args->getExpr(1));
+        auto bodyFnTy = cs.getType(body)->castTo<FunctionType>();
+        auto resultType = bodyFnTy->getResult();
+        auto atMostOnceTy = bodyFnTy->getParams()[0].getPlainType();
+
+        // The body is immediately called, so is obviously noescape.
+        bodyFnTy = cast<FunctionType>(
+            bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
+        body = coerceToType(body, bodyFnTy, locator);
+        assert(body && "can't make nonescaping?!");
+
+        auto *conversion =
+            new (ctx) FunctionConversionExpr(exactlyOnce, atMostOnceTy);
+        conversion->setWithoutActuallyDeiniting();
+        cs.setType(conversion, atMostOnceTy);
+
+        auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {conversion});
+        auto *replacement = CallExpr::createImplicit(ctx, body, argList);
+        cs.cacheSubExprTypes(replacement);
+        cs.setType(replacement, resultType);
+        return replacement;
+      }
+
       case DeclTypeCheckingSemantics::OpenExistential: {
         // Resolve into an OpenExistentialExpr.
         auto *args = apply->getArgs();
@@ -8726,7 +8792,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We're constructing a value of nominal type.
-  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+  assert(ty->getNominalDecl() || ty->is<DynamicSelfType>() ||
          ty->isExistentialType() || ty->is<ArchetypeType>());
 
   // Consider the constructor decl reference expr 'implicit', but the
@@ -9010,23 +9076,21 @@ namespace {
       exprType = solution.simplifyType(exprType);
       // assert((!expr->getType() || expr->getType()->isEqual(exprType)) &&
       //       "Mismatched types!");
-      assert(!exprType->getRecursiveProperties().isSolverAllocated() &&
-             "Should not write solver allocated type into expression!");
-      assert(!exprType->hasPlaceholder() &&
-             "Should not write type placeholders into expression!");
+      auto assertValidType = [](Type ty) {
+        ASSERT(!ty->getRecursiveProperties().isSolverAllocated() &&
+               "Should not write solver allocated type into expression!");
+        ASSERT(!ty->hasHole() && "Should not write holes into expression!");
+        ASSERT(!ty->hasPlaceholder() &&
+               "Should not write placeholders into expression!");
+      };
+      assertValidType(exprType);
       expr->setType(exprType);
 
       if (auto kp = dyn_cast<KeyPathExpr>(expr)) {
         for (auto i : indices(kp->getComponents())) {
-          Type componentType;
           if (cs.hasType(kp, i)) {
-            componentType = solution.simplifyType(cs.getType(kp, i));
-            assert(
-                !componentType->getRecursiveProperties().isSolverAllocated() &&
-                "Should not write solver allocated type into key-path "
-                "component!");
-            assert(!componentType->hasPlaceholder() &&
-                   "Should not write type placeholder into key-path component");
+            auto componentType = solution.simplifyType(cs.getType(kp, i));
+            assertValidType(componentType);
             kp->getMutableComponents()[i].setComponentType(componentType);
           }
         }
@@ -9875,9 +9939,8 @@ ConstraintSystem::applySolution(Solution &solution,
       if (diagnosedErrorsViaFixes)
         return std::nullopt;
 
-      // If we didn't manage to diagnose anything well, so fall back to
-      // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureFor(target);
+      // If we didn't manage to diagnose anything well, emit the fallback.
+      produceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
     }
   }
@@ -9897,7 +9960,8 @@ ConstraintSystem::applySolution(Solution &solution,
   // unresolved types.
   {
     auto isValidType = [&](Type ty) {
-      return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
+      return !ty->hasError() && !ty->hasPlaceholder() &&
+             !ty->hasTypeVariableOrHole();
     };
     for (auto pair : solution.typeBindings) {
       if (!isValidType(pair.second)) {

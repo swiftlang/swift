@@ -64,7 +64,7 @@ class G<T> : A {
 
 // CHECK: define hidden swiftcc ptr @"$s8subclass9a_to_gint1aAA1GCySiGAA1AC_tF"(ptr %0) {{.*}} {
 func a_to_gint(a: A) -> G<Int> {
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s8subclass1GCySiGMD")
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s8subclass1GCySiGMd", ptr @"$s8subclass1GCySiGMR")
   // CHECK: call ptr @swift_dynamicCastClassUnconditional
   return a as! G<Int>
 }

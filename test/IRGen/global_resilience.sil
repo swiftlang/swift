@@ -94,7 +94,7 @@ bb0:
 
   %addr = global_addr @fixedGlobal : $*LargeResilientStruct
 
-  // CHECK: [[VALUE:%.*]] = load i64, ptr getelementptr inbounds{{.*}} (%T17global_resilience20LargeResilientStructV, ptr @fixedGlobal, i32 0, i32 1)
+  // CHECK: [[VALUE:%.*]] = load i64, ptr getelementptr inbounds{{.*}} (i8, ptr @fixedGlobal, [[INT]] 8)
   %x_addr = struct_element_addr %addr : $*LargeResilientStruct, #LargeResilientStruct.x
   %x = load %x_addr : $*Int64
 

@@ -36,8 +36,9 @@ public struct S1 : P {
 // CHECK: bb0([[REG0:%.*]] : $*S1):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -47,7 +48,7 @@ public struct S1 : P {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S1V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S1) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-EVO: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S1VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S1) -> @guaranteed_address NonTrivial {
@@ -81,8 +82,9 @@ extension S3 {
 // CHECK: bb0([[REG0:%.*]] : $*S2):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S2V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -92,7 +94,7 @@ extension S3 {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S2V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S2) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-EVO: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2S2VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S2) -> @guaranteed_address NonTrivial {
@@ -120,8 +122,9 @@ public struct S4 : P {
 // CHECK: bb0([[REG0:%.*]] : $*S4):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S4V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -131,7 +134,7 @@ public struct S4 : P {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S4V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S4) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-EVO: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S4VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S4) -> @guaranteed_address NonTrivial {
@@ -220,8 +223,9 @@ public class K4 : S {
 // CHECK: bb0([[REG0:%.*]] : $*S5):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -231,7 +235,7 @@ public class K4 : S {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2S5V2idAA10NonTrivialVvb : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed S5) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-EVO: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2S5VAA1PA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S5) -> @guaranteed_address NonTrivial {
@@ -245,15 +249,18 @@ public class K4 : S {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*S6):
 // CHECK-EVO:   [[REG1:%.*]] = function_ref @$s24borrow_accessor_protocol2S6V2idAA16FrozenNonTrivialVvb : $@convention(method) (@in_guaranteed S6) -> @guaranteed FrozenNonTrivial
 // CHECK-EVO:   [[REG2:%.*]] = apply [[REG1]]([[REG0]]) : $@convention(method) (@in_guaranteed S6) -> @guaranteed FrozenNonTrivial
-// CHECK-EVO:   return [[REG2]]
+// CHECK-EVO:   [[REG3:%.*]] = unchecked_ownership [[REG2]]
+// CHECK-EVO:   end_borrow [[REG2]]
+// CHECK-EVO:   return [[REG3]]
 // CHECK-EVO: }
 
 // CHECK: sil shared [transparent] [serialized] [thunk] [ossa] @$s24borrow_accessor_protocol2K1CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K1) -> @guaranteed NonTrivial {
 // CHECK: bb0([[REG0:%.*]] : $*K1):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -282,8 +289,9 @@ public class K4 : S {
 // CHECK: bb0([[REG0:%.*]] : $*K2):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = class_method [[REG1]], #K2.id!borrow : (K2) -> () -> NonTrivial, $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -292,8 +300,9 @@ public class K4 : S {
 // CHECK: bb0([[REG0:%.*]] : $*K3):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -322,8 +331,9 @@ public class K4 : S {
 // CHECK: bb0([[REG0:%.*]] : $*K4):
 // CHECK:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK:   [[REG2:%.*]] = class_method [[REG1]], #K4.id!borrow : (K4) -> () -> FrozenNonTrivial, $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
-// CHECK:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
+// CHECK:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
+// CHECK:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK:   end_borrow [[REG3]]
 // CHECK:   end_borrow [[REG1]]
 // CHECK:   return [[REG4]]
 // CHECK: }
@@ -341,7 +351,7 @@ public class K4 : S {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K2C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial {
@@ -357,7 +367,7 @@ public class K4 : S {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = class_method [[REG1]], #K2.id!borrow : (K2) -> () -> NonTrivial, $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K2) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial {
@@ -373,7 +383,7 @@ public class K4 : S {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K3) -> @guaranteed NonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-SIL: sil [ossa] @$s24borrow_accessor_protocol2K4C2idAA16FrozenNonTrivialVvb : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial {
@@ -389,7 +399,7 @@ public class K4 : S {
 // CHECK-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-SIL:   [[REG2:%.*]] = class_method [[REG1]], #K4.id!borrow : (K4) -> () -> FrozenNonTrivial, $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
 // CHECK-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
-// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-SIL:   return_borrow [[REG3]] from_scopes ([[REG1]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK-EVO: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2K1CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K1) -> @guaranteed_address NonTrivial {
@@ -456,8 +466,9 @@ public class K4 : S {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*K4):
 // CHECK-EVO:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-EVO:   [[REG2:%.*]] = class_method [[REG1]], #K4.id!borrow : (K4) -> () -> FrozenNonTrivial, $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
-// CHECK-EVO:   [[REG3:%.*]] = unchecked_ownership [[REG1]]
-// CHECK-EVO:   [[REG4:%.*]] = apply [[REG2]]([[REG3]]) : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
+// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K4) -> @guaranteed FrozenNonTrivial
+// CHECK-EVO:   [[REG4:%.*]] = unchecked_ownership [[REG3]]
+// CHECK-EVO:   end_borrow [[REG3]]
 // CHECK-EVO:   end_borrow [[REG1]]
 // CHECK-EVO:   return [[REG4]]
 // CHECK-EVO: }

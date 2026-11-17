@@ -6,7 +6,7 @@
 int addOne(int &x);
 void swapRefs(int &a, int &b);
 
-// Const references, implemented by plain by-value parameters.
+// Const references, implemented by `borrowing` parameters.
 
 int readConstRef(const int &x);
 extern int referencesGlobal;
@@ -51,6 +51,12 @@ int missingUnsafeConstParam(const int &x);
 void missingUnsafeMixed(int a, int &b, const int &c);
 // expected-note@+1{{parameter declared as a C++ reference here}}
 int missingUnsafeUnnamed(int &);
+
+// Rejected: a const reference implemented by a plain or a `consuming`
+// parameter.
+
+int plainConstRef(const int &x);
+int consumeConstRef(const int &x);
 
 // Rejected: rvalue references.
 

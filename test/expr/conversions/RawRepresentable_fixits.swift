@@ -218,12 +218,8 @@ do {
     let _: ClassWrapper = classWrapper.rawValue
     // expected-error@-1:40 {{cannot convert value of type 'Class' to specified type 'ClassWrapper'}}{{27-27=ClassWrapper(rawValue: }} {{48-48=) ?? <#default value#>}}
 
-    // FIXME: This note replaces 'as' with 'as!', which is incorrect.
-    // expected-note@+3:36 {{did you mean to use 'as!' to force downcast?}}{{36-38=as!}}
-    // FIXME: Bad fix-it, will not compile
-    // expected-error@+1:36 {{cannot convert value of type 'AnyObject' to specified type 'ClassWrapper'}}{{27-27=ClassWrapper(rawValue: }} {{48-48=) ?? <#default value#>}}
+    // expected-error@+1:36 {{cannot convert value of type 'AnyObject' to specified type 'ClassWrapper'}}{{48-48= as! ClassWrapper}}
     let _: ClassWrapper = subClass as AnyObject
-    // expected-error@-1:36 {{'AnyObject' is not convertible to 'Class'}}{{none}}
   }
 }
 

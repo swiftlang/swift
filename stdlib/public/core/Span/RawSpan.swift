@@ -22,6 +22,7 @@ import Swift
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
 /// ensuring spatial safety and avoiding buffer overflow errors.
+@backDeployed(before: SwiftStdlib 6.2)
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 @frozen
@@ -356,6 +357,26 @@ extension RawSpan {
   public init<Element: ConvertibleToBytes>(elements span: Span<Element>) {
     unsafe self = Self.init(unsafeElements: span)
   }
+
+  /// Create a span over the bytes of a single value.
+  ///
+  /// The span has a `byteCount` of `MemoryLayout<Element>.size`,
+  /// and borrows `value`.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be borrowed by the span
+  @export(implementation)
+  @_lifetime(borrow value)
+  public init<Element: ConvertibleToBytes>(
+    bytesOf value: borrowing @_addressable Element
+  ) {
+    let buffer = unsafe UnsafeRawBufferPointer(
+      start: .init(Builtin.unprotectedAddressOfBorrow(value)),
+      count: MemoryLayout<Element>.size
+    )
+    let span = unsafe RawSpan(_unsafeBytes: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: value)
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -639,11 +660,7 @@ extension RawSpan {
   consuming public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(start: _pointer, count: _count)
-    let newSpan = unsafe Span<T>(_unsafeBytes: rawBuffer)
-    // As a trivial value, 'rawBuffer' does not formally depend on the
-    // lifetime of 'self'. Make the dependence explicit.
-    return unsafe _overrideLifetime(newSpan, copying: self)
+    unsafe Span<T>(_unsafeBytes: self)
   }
 }
 
@@ -788,7 +805,6 @@ extension RawSpan {
   ///   - byteOrder: The order in which the bytes will be decoded.
   /// - Returns: A new value of type `T`, read from `offset`.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
     fromByteOffset offset: Int,
     as type: T.Type,
@@ -1037,6 +1053,7 @@ extension RawSpan {
 
 extension RawSpan {
   @available(*, deprecated)
+  @available(swift, obsoleted: 1)
   @usableFromInline
   var _span: Span<UInt8> {
     @_lifetime(copy self)

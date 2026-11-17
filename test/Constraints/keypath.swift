@@ -332,15 +332,15 @@ func test_new_key_path_type_requirements() {
     var v: V
   }
 
-  _ = \S.x // expected-error {{key path cannot refer to noncopyable type 'S'}}
+  _ = \S.x // expected-error {{key path cannot refer to non-'Copyable' type 'S'}}
   _ = \S.v
-  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
-  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+  // expected-error@-1 {{key path cannot refer to non-'Copyable' type 'S'}}
+  // expected-error@-2 {{key path cannot refer to non-'Copyable' type 'V'}}
 
   func test<R>(_: KeyPath<R, Int>) {} // expected-note {{'where R: Copyable' is implicit here}}
 
   test(\S.x)
-  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-1 {{key path cannot refer to non-'Copyable' type 'S'}}
   // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }
 
@@ -393,5 +393,21 @@ func rdar174707424() {
 
   let _: (S) -> Void = {
     f($0, \.i)
+  }
+}
+
+// Regression test for rdar://190454958
+func key_path_application_vs_pattern_binding() {
+  enum CacheState {
+    case loaded(Int)
+    case unloaded
+  }
+
+  struct State {}
+
+  func test(state: State, keyPath: WritableKeyPath<State, CacheState>) {
+    if case .loaded(let value) = state[keyPath: keyPath] {
+      _ = value
+    }
   }
 }

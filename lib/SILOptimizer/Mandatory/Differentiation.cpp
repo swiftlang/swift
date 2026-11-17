@@ -986,7 +986,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
       getIRName(original), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
-  if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
+  if (vjpCanGenSig.isEffectivelyGeneric())
     vjpGenericEnv = vjpCanGenSig.getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
@@ -1004,8 +1004,8 @@ static SILFunction *createEmptyVJP(ADContext &context,
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
-  // The VJP (and the pullback nested in it) is generated after AddressLowering
-  // in lowered-address form, so it shares the original's lowered state.
+  // The VJP (and the pullback nested in it) is generated in the form of the
+  // original: lowered-address if AddressLowering has run, opaque-value if not.
   vjp->inheritDerivedFrom(original);
 
   if (original->getInlineStrategy() == AlwaysInline ||
@@ -1037,7 +1037,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
       getIRName(original), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
-  if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
+  if (jvpCanGenSig.isEffectivelyGeneric())
     jvpGenericEnv = jvpCanGenSig.getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
@@ -1055,9 +1055,8 @@ static SILFunction *createEmptyJVP(ADContext &context,
       original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  // The JVP (and the differential nested in it) is generated after
-  // AddressLowering in lowered-address form, so it shares the original's
-  // lowered state.
+  // The JVP (and the differential nested in it) is generated in the form of the
+  // original: lowered-address if AddressLowering has run, opaque-value if not.
   jvp->inheritDerivedFrom(original);
 
   if (original->getInlineStrategy() == AlwaysInline ||
@@ -1212,8 +1211,7 @@ bool DifferentiationTransformer::emitDefaultDerivative(
                                               unsubstFromType, unsubstToType);
   if (fromType != unsubstFromType)
     defaultDeriv = builder.createConvertFunction(
-        loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType),
-        /*withoutActuallyEscaping*/ false);
+        loc, defaultDeriv, SILType::getPrimitiveObjectType(unsubstFromType));
 
   auto *thunkRef = builder.createFunctionRef(loc, thunk);
   SmallVector<SILValue, 4> args(fn->getArguments());

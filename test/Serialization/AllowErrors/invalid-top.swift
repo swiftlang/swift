@@ -13,6 +13,11 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t/mods/invalidUses.swiftmodule -experimental-allow-module-with-compiler-errors -I%t/mods %t/invalid-uses.swift 2>&1 | %FileCheck -check-prefix=CHECK-INVALID %s
 
+// A client that does not allow errors gets a fatal error rather than a crash
+// RUN: not %target-swift-frontend -typecheck -I%t/mods %t/no-allow-uses.swift 2>&1 | %FileCheck -check-prefix=CHECK-NOALLOW %s
+// RUN: %target-swift-ide-test -print-module -source-filename dummy -module-to-print errors -I %t/mods 2>%t/print.err | %FileCheck -check-prefix=CHECK-NOALLOW-PRINT %s
+// RUN: %FileCheck -check-prefix=CHECK-NOALLOW %s < %t/print.err
+
 // BEGIN errors.swift
 public struct ValidType {}
 
@@ -23,6 +28,8 @@ public func invalidFuncBody() -> ValidType {
 }
 
 public func invalidFuncRet() -> undefined {} // expected-error {{cannot find type 'undefined'}}
+
+public func invalidFuncParam(_ p: undefined) {} // expected-error {{cannot find type 'undefined'}}
 
 
 // BEGIN valid-uses.swift
@@ -55,3 +62,16 @@ func test() {
 // CHECK-INVALID: error: allowing deserialization of error type '<null>' in module 'errors'
 // CHECK-INVALID: error: allowing deserialization of invalid declaration 'invalidFuncRet()' (global function) in module 'errors'
 // CHECK-INVALID-NOT: invalid-uses.swift:{{.*}} error:
+
+
+// BEGIN no-allow-uses.swift
+import errors
+
+func test() {
+  invalidFuncParam(1)
+}
+
+// CHECK-NOALLOW: error: deserialized error type '<null>' in module 'errors'
+// CHECK-NOALLOW-NOT: allowing deserialization
+
+// CHECK-NOALLOW-PRINT: func invalidFuncParam(_ p: <<error type>>)

@@ -31,6 +31,7 @@ config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
+config.embedded_stdlib_target_triples = "@EMBEDDED_STDLIB_TARGET_TRIPLES@".split(";")
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"
@@ -49,6 +50,7 @@ config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
+config.wasi_test_linker_flags = "@SWIFT_WASI_TEST_LINKER_FLAGS@"
 
 config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
 config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
@@ -65,6 +67,8 @@ config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows ---
+config.windows_sdk_module_map = r'''@SWIFT_WINDOWS_MODULE_MAP@'''
+
 msvc_runtime_flags = {
   'MultiThreaded': 'MT',
   'MultiThreadedDebug': 'MTd',
@@ -104,8 +108,9 @@ if '@SWIFT_STDLIB_ENABLE_LTO@'.lower() in ['full', 'thin']:
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
-    # Tests that require -swift-version 7 can only run with asserts compilers
-    config.available_features.add('swift7')
+    # Tests that require -swift-version future can only run with asserts
+    # compilers
+    config.available_features.add('swift_future')
 else:
     config.available_features.add('no_asserts')
 

@@ -182,8 +182,12 @@ public actor ProcessReproducers {
     for outputPath in outputDirs.allPaths {
       for file in try outputPath.getDirContents() where file.hasExtension(.swift) {
         let absPath = outputPath.appending(file)
-        guard let reproFile = try ReproducerFile(from: absPath) else { continue }
-        reproFiles.append(reproFile)
+        do {
+          guard let reproFile = try ReproducerFile(from: absPath) else { continue }
+          reproFiles.append(reproFile)
+        } catch {
+          log.warning("skipping \(absPath), unable to decode header: \(error)")
+        }
       }
     }
     if reprocess {

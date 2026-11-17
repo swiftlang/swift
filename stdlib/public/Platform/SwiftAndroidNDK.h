@@ -136,6 +136,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 #include <sys/socket.h>
+#include <sys/system_properties.h>
 #include <sys/time.h>
 #include <sys/times.h>
 #include <sys/types.h>

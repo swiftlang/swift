@@ -54,7 +54,7 @@ to ask for help!
   Thoroughly discusses different ways of measuring compiler performance
   and common pitfalls.
 - [Generics/](/docs/Generics/): "Compiling Swift Generics", a book about
-  the implementation of parameteric polymorphism in the Swift compiler.
+  the implementation of parametric polymorphism in the Swift compiler.
   Also covers the compilation pipeline, request evaluator, and type system in
   general.
 - [LibraryEvolution.rst](/docs/LibraryEvolution.rst):

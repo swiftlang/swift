@@ -18,17 +18,36 @@
 #ifndef SWIFT_COMPILEJOBCACHEKEY_H
 #define SWIFT_COMPILEJOBCACHEKEY_H
 
+#include "swift/Basic/LLVM.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
 
+/// The indices of the references at the fixed positions in CompileJobBaseKey.
+enum class CompileJobBaseKeyRef : unsigned {
+  /// The compiler version.
+  Version,
+  /// The command-line arguments that are stable across the jobs in a module.
+  CommandLine,
+  /// The clang arguments (-Xcc).
+  ClangArguments,
+  /// The clang include tree root, or an empty blob if not used.
+  IncludeTreeRoot,
+  /// The clang include tree file list, or an empty blob if not used.
+  IncludeTreeFileList,
+  /// The number of the references at the fixed positions.
+  NumFixedRefs,
+};
+
 /// Compute CompileJobBaseKey from swift-frontend command-line arguments.
 /// CompileJobBaseKey represents the core inputs and arguments, and is used as a
-/// base to compute keys for each compiler outputs.
+/// base to compute keys for each compiler outputs. The CAS IDs passed by the
+/// options labeled as ArgumentIsCASID are added to the key as references, and
+/// it is an error if the referenced object is not in the CAS.
 // TODO: switch to create key from CompilerInvocation after we can canonicalize
 // arguments.
 llvm::Expected<llvm::cas::ObjectRef>
@@ -48,11 +67,6 @@ createCompileJobCacheKeyForOutput(llvm::cas::ObjectStore &CAS,
 llvm::Error printCompileJobCacheKey(llvm::cas::ObjectStore &CAS,
                                     llvm::cas::ObjectRef Key,
                                     llvm::raw_ostream &os);
-
-/// Iterating through command-line options in cache key.
-llvm::Error iterateCommandLine(llvm::cas::ObjectStore &CAS,
-                               llvm::cas::ObjectRef Key,
-                               std::function<llvm::Error(StringRef)> Callback);
 
 } // namespace swift
 

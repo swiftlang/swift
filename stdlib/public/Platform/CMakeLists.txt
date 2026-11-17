@@ -8,6 +8,7 @@ set(swift_platform_compile_flags)
 if(SWIFT_ENABLE_REFLECTION)
   list(APPEND swift_platform_compile_flags "-DSWIFT_ENABLE_REFLECTION")
 endif()
+list(APPEND swift_platform_compile_flags -Xfrontend -enable-sil-opaque-values)
 
 set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")
@@ -96,6 +97,7 @@ add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVE
       ${swift_platform_compile_flags}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS WINDOWS
+    SWIFT_MODULE_DEPENDS_WINDOWS _Builtin_float
     INSTALL_IN_COMPONENT sdk-overlay)
 
 foreach(sdk ${SWIFT_SDKS})
@@ -570,11 +572,15 @@ add_dependencies(sdk-overlay emscriptenlibc_modulemap)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
+      SwiftUCRT.h
+      SwiftWinRT.h
       WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
-      winsdk_um.modulemap
-      winsdk_shared.modulemap
+      winrt.modulemap
+      winsdk.modulemap
+      um.modulemap
+      shared.modulemap
     DESTINATION "share"
     COMPONENT sdk-overlay)
 endif()
@@ -585,7 +591,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
   if(SWIFT_WASI_SYSROOT_PATH)
     set(arch "wasm32")
-    set(triple "wasm32-unknown-wasip1")
+    set(triple "${SWIFT_EMBEDDED_WASI_TRIPLE}")
 
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")

@@ -1703,12 +1703,22 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // propagates the same flags into its Clang cc1 args. This is important because
   // -sanitize options can add target-features (e.g. MTE). These are checked when
   // loading a PCM (and mismatches are fatal).
+  //
+  // All sanitizers must be passed as a single comma-joined '-sanitize' flag.
+  // Swift has no '-fno-sanitize' equivalent, so if inheriting
+  // '-sanitize=undefined,address' it would not be possible to disable one of
+  // sanitizers without this 'last occurrence wins' behavior.
   genericSubInvocation.getSILOptions().Sanitizers = silOpts.Sanitizers;
+  std::string SanitizerList;
 #define SANITIZER(_, kind, name, __)                                           \
   if (silOpts.Sanitizers & SanitizerKind::kind) {                              \
-    GenericArgs.push_back("-sanitize=" #name);                                 \
+    if (!SanitizerList.empty())                                                \
+      SanitizerList += ',';                                                    \
+    SanitizerList += #name;                                                    \
   }
 #include "swift/Basic/Sanitizers.def"
+  if (!SanitizerList.empty())
+    GenericArgs.push_back(ArgSaver.save("-sanitize=" + SanitizerList).data());
 
   genericSubInvocation.setImportSearchPaths(
       SearchPathOpts.getImportSearchPaths());
@@ -3003,7 +3013,11 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
       // COM model conditions can select different declarations from the same
       // textual interface.
-      getCOMInteropCacheState(CI.getLangOptions()));
+      getCOMInteropCacheState(CI.getLangOptions()),
+
+      // Sanitizers are forwarded to interface builds and change both the
+      // serialized SIL (e.g. TSan instrumentation) and the Clang dependencies.
+      CI.getSILOptions().Sanitizers.toRaw());
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }

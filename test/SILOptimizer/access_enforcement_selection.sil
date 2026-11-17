@@ -346,3 +346,38 @@ bb0(%0 : @guaranteed $@callee_guaranteed () -> (), %1 : $*Builtin.Int64):
   %8 = tuple ()
   return %8 : $()
 }
+
+// The box and a non-escaping closure that captures its address are passed to
+// the same call. The callee can access the box through both during the call, so
+// the closure's access is dynamic.
+//
+sil hidden [ossa] @boxAndAddressCaptureSameCall : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int64 }, var, name "x"
+  %proj = project_box %box : ${ var Builtin.Int64 }, 0
+  %zero = integer_literal $Builtin.Int64, 0
+  store %zero to [trivial] %proj : $*Builtin.Int64
+  %cf = function_ref @boxAndAddressCaptureSameCallClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply [callee_guaranteed] [on_stack] %cf(%proj) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %f = function_ref @takesClosureAndBox : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int64 }) -> ()
+  %call = apply %f(%closure, %box) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int64 }) -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int64 }
+  %v = tuple ()
+  return %v : $()
+}
+
+sil @takesClosureAndBox : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int64 }) -> ()
+
+// CHECK-LABEL: sil private [ossa] @boxAndAddressCaptureSameCallClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+// CHECK: begin_access [modify] [dynamic] %0 : $*Builtin.Int64
+// CHECK-LABEL: } // end sil function 'boxAndAddressCaptureSameCallClosure'
+sil private [ossa] @boxAndAddressCaptureSameCallClosure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %one = integer_literal $Builtin.Int64, 1
+  %w = begin_access [modify] [unknown] %0 : $*Builtin.Int64
+  assign %one to %w : $*Builtin.Int64
+  end_access %w : $*Builtin.Int64
+  %v = tuple ()
+  return %v : $()
+}

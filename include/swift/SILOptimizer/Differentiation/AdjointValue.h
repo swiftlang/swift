@@ -247,7 +247,7 @@ struct AddElementValue final {
       : baseAdjoint(baseAdjoint), eltToAdd(eltToAdd),
         fieldLocator(fieldLocator) {
     assert(baseAdjoint.getType().is<TupleType>() ||
-           baseAdjoint.getType().getStructOrBoundGenericStruct() != nullptr);
+           baseAdjoint.getType().getStructDecl() != nullptr);
   }
 
   bool isTupleAdjoint() const { return fieldLocator.isTupleFieldLocator(); }

@@ -30,6 +30,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
@@ -3117,7 +3118,7 @@ public:
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
-                                bool, bool),
+                                bool, bool, bool),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3128,7 +3129,7 @@ private:
   // Evaluation.
   bool evaluate(Evaluator &evaluator, DeclContext *DC, ValueDecl *VD1,
                 ValueDecl *VD2, bool dynamic, bool allowMissingConformances,
-                bool debugMode) const;
+                bool ignoreExecutionSemantics, bool debugMode) const;
 
 public:
   // Caching.
@@ -4129,9 +4130,6 @@ public:
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
 
-  static Type evaluate(const TypeResolution &resolution,
-                       TypeRepr *repr);
-
 private:
   friend SimpleRequest;
 
@@ -5075,11 +5073,14 @@ public:
 
 /// Compute the local discriminators for the given declaration context.
 ///
-/// This is a state-changing operation for closures within the context, which
-/// produces the discriminator value that any subsequent requests should use.
+/// This is a state-changing operation for closures within the context.
+///
+/// NOTE: Do not call into this request directly: Use
+/// `DeclContext::assignLocalDiscriminators` instead since that handles function
+/// bodies.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
-                           unsigned(DeclContext *),
+                           evaluator::SideEffect(DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5087,10 +5088,33 @@ public:
 private:
   friend SimpleRequest;
 
-  unsigned evaluate(Evaluator &evaluator, DeclContext *dc) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }
+};
+
+/// The function/top-level body equivalent to LocalDiscriminatorsRequest.
+///
+/// This is necessary since we support replacing function/top-level bodies for
+/// code completion, so need to be able to re-assign discriminators without also
+/// re-assigning for function parameters.
+class BodyDiscriminatorsRequest
+    : public SimpleRequest<BodyDiscriminatorsRequest,
+                           evaluator::SideEffect(DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &eval, DeclContext *) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 /// Retrieve the raw documentation comment of a declaration.
@@ -5173,7 +5197,9 @@ public:
 };
 
 /// Check a function that is exported to a foreign language for compatibility
-/// with that language. This covers @c, @_cdecl, and @cxx.
+/// with that language. This covers @c, @_cdecl, and @cxx, as well as @objc
+/// on a top-level function (SE-0495); \p attr is the attribute that
+/// requested the export.
 class TypeCheckForeignFunctionRequest
     : public SimpleRequest<TypeCheckForeignFunctionRequest,
                            evaluator::SideEffect(FuncDecl *FD,
@@ -5330,7 +5356,7 @@ public:
 
 class SerializeAttrGenericSignatureRequest
     : public SimpleRequest<SerializeAttrGenericSignatureRequest,
-                           GenericSignature(const AbstractFunctionDecl *,
+                           GenericSignature(const Decl *,
                                             AbstractSpecializeAttr *),
                            RequestFlags::SeparatelyCached> {
 public:
@@ -5339,8 +5365,7 @@ public:
 private:
   friend SimpleRequest;
 
-  GenericSignature evaluate(Evaluator &evaluator,
-                            const AbstractFunctionDecl *decl,
+  GenericSignature evaluate(Evaluator &evaluator, const Decl *decl,
                             AbstractSpecializeAttr *attr) const;
 
 public:
@@ -5533,6 +5558,45 @@ public:
   getCachedResult() const;
   void cacheResult(
       std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> value) const;
+};
+
+/// Intermediate representation of the scopes of the accesses of a function's
+/// parameters and `self`, before being written into `Param`s.
+struct ParamAccessScopes {
+  /// For each parameter index, what access scope should it have relative to
+  /// the declaration's type. These can be error scopes if there was a
+  /// problem resolving the parameter.
+  ArrayRef<ScopeRef> Params;
+  /// Whether something refers to the access of `self`, requiring the outer
+  /// function type to have a scope parameter.
+  bool IsSelfReferenced = false;
+  /// The declared `@_scopeParams`, plus the accesses that are referenced
+  /// without being bound by `@_accessScope`.
+  ScopeSignature Signature;
+};
+
+/// Resolves the scopes of the accesses of the parameters and `self` of a
+/// function that supports scopes.
+///
+/// DISCUSSION: Each parameter's access scope depends on the whole signature,
+/// like which other accesses something refers to, so they're computed together
+/// syntactically. Since each type depends on access scope numbering, depending
+/// on the type of parameters would be cyclic.
+class ParamAccessScopesRequest
+    : public SimpleRequest<ParamAccessScopesRequest,
+                           ParamAccessScopes(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ParamAccessScopes evaluate(Evaluator &evaluator,
+                             AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 class CaptureInfoRequest :

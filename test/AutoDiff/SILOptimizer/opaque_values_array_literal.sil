@@ -1,0 +1,67 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -differentiation -sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+
+// With Objective-C interop, `Array` stores its elements in an `_ArrayBuffer`.
+// Without it, the buffer is a `_ContiguousArrayBuffer`, and the SIL that takes
+// the address of the elements of an array literal spells out that type.
+// REQUIRES: objc_interop
+
+// Differentiation of opaque-values SIL that builds an array literal, run
+// directly with `sil-opt`, so the results do not depend on where AddressLowering
+// sits in the pipeline.
+//
+// The pullback is generated in opaque-value form, and Differentiation lowers it
+// as soon as it has generated it: the checks are for the lowered pullback. The
+// input is the SIL that Differentiation receives when AddressLowering runs after
+// it.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+// An array literal: the pullback gets the adjoint of each element from the
+// adjoint of the array, with the subscript getter of its differentiable view.
+// CHECK-LABEL: sil private [ossa] @arrayLiteral{{.*}}TJpSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@guaranteed Array<τ_0_0.TangentVector>.DifferentiableView) -> (@out τ_0_0.TangentVector, @out τ_0_0.TangentVector) {
+// CHECK:       bb0([[RESULT0:%.*]] : $*τ_0_0.TangentVector, [[RESULT1:%.*]] : $*τ_0_0.TangentVector, [[VIEW:%.*]] : @guaranteed $Array<τ_0_0.TangentVector>.DifferentiableView):
+// CHECK:         [[GETTER:%.*]] = function_ref @$sSa16_DifferentiationAA14DifferentiableRzlE0B4ViewVAAs18AdditiveArithmeticRzrlEyxSicig
+// CHECK:         apply [[GETTER]]<τ_0_0.TangentVector>({{%.*}}, {{%.*}}, [[VIEW]])
+// CHECK:         apply {{%.*}}<τ_0_0.TangentVector>({{%.*}}, {{%.*}}, [[VIEW]])
+// CHECK:         copy_addr {{%.*}} to [init] [[RESULT0]] : $*τ_0_0.TangentVector
+// CHECK:         copy_addr {{%.*}} to [init] [[RESULT1]] : $*τ_0_0.TangentVector
+sil [ossa] @arrayLiteral : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @owned Array<T> {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  debug_value %1 : $T, let, name "y", argno 2
+  %4 = integer_literal $Builtin.Word, 2
+  %5 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%7, %8) = destructure_tuple %6 : $(Array<T>, Builtin.RawPointer)
+  %9 = begin_borrow %7 : $Array<T>
+  %10 = struct_extract %9 : $Array<T>, #Array._buffer
+  %11 = struct_extract %10 : $_ArrayBuffer<T>, #_ArrayBuffer._storage
+  %12 = struct_extract %11 : $_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  %13 = unchecked_ref_cast %12 : $Builtin.BridgeObject to $__ContiguousArrayStorageBase
+  %14 = ref_tail_addr %13 : $__ContiguousArrayStorageBase, $T
+  %15 = integer_literal $Builtin.Word, 0
+  %16 = index_addr [projection] %14 : $*T, %15 : $Builtin.Word
+  %17 = copy_value %0 : $T
+  store %17 to [init] %16 : $*T
+  %19 = integer_literal $Builtin.Word, 1
+  %20 = index_addr [projection] %14 : $*T, %19 : $Builtin.Word
+  %21 = copy_value %1 : $T
+  store %21 to [init] %20 : $*T
+  end_borrow %9 : $Array<T>
+  %24 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  %25 = apply %24<T>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
+  return %25 : $Array<T>
+}
+
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] <T where T : Differentiable> @arrayLiteral : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @owned Array<T> {
+}
+
+sil [serialized] [heuristic_always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+
+sil hidden_external [serialized] [export_implementation] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>

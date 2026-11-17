@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-Xfrontend -enable-lifetime-resolution)
 
 // REQUIRES: executable_test
 
@@ -171,6 +172,114 @@ FailableInitTestSuite.test("SecondClassTrivial") {
 
   mustSucceed { SecondClassTrivial(n: 3) }
   expectEqual(2, deinitCalled)
+}
+
+class ConditionalClass {
+  var x: LifetimeTracked
+  var y: Int
+
+  init?(initX: Bool, fail: Bool) {
+    y = 0
+
+    if initX {
+      x = LifetimeTracked(0)
+    }
+
+    if fail {
+      return nil
+    }
+
+    x = LifetimeTracked(1)
+  }
+
+  deinit {
+    deinitCalled += 1
+  }
+}
+
+FailableInitTestSuite.test("ConditionalClass") {
+  deinitCalled = 0
+
+  mustFail { ConditionalClass(initX: false, fail: true) }
+  expectEqual(0, deinitCalled)
+
+  mustFail { ConditionalClass(initX: true, fail: true) }
+  expectEqual(1, deinitCalled)
+
+  mustSucceed { ConditionalClass(initX: true, fail: false) }
+  expectEqual(2, deinitCalled)
+
+  mustSucceed { ConditionalClass(initX: false, fail: false) }
+  expectEqual(3, deinitCalled)
+}
+
+class TwoConditionalClass {
+  var x: LifetimeTracked
+  var y: LifetimeTracked
+
+  init?(initX: Bool, initY: Bool) {
+    if initX {
+      x = LifetimeTracked(0)
+    }
+
+    if initY {
+      y = LifetimeTracked(1)
+    }
+
+    if !initX || !initY {
+      return nil
+    }
+
+    x = LifetimeTracked(2)
+    y = LifetimeTracked(3)
+  }
+
+  deinit {
+    deinitCalled += 1
+  }
+}
+
+FailableInitTestSuite.test("TwoConditionalClass") {
+  deinitCalled = 0
+
+  mustFail { TwoConditionalClass(initX: false, initY: false) }
+  mustFail { TwoConditionalClass(initX: true, initY: false) }
+  mustFail { TwoConditionalClass(initX: false, initY: true) }
+  expectEqual(0, deinitCalled)
+
+  mustSucceed { TwoConditionalClass(initX: true, initY: true) }
+  expectEqual(1, deinitCalled)
+}
+
+struct InitError: Error {}
+
+class ThrowingClass {
+  var x: LifetimeTracked
+  var y: LifetimeTracked
+
+  init(fail: Bool) throws {
+    x = LifetimeTracked(0)
+
+    if fail {
+      throw InitError()
+    }
+
+    y = LifetimeTracked(1)
+  }
+
+  deinit {
+    deinitCalled += 1
+  }
+}
+
+FailableInitTestSuite.test("ThrowingClass") {
+  deinitCalled = 0
+
+  mustFail { try? ThrowingClass(fail: true) }
+  expectEqual(0, deinitCalled)
+
+  mustSucceed { try? ThrowingClass(fail: false) }
+  expectEqual(1, deinitCalled)
 }
 
 runAllTests()

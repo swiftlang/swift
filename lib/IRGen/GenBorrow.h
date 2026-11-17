@@ -17,6 +17,12 @@
 #ifndef SWIFT_IRGEN_GENBORROW_H
 #define SWIFT_IRGEN_GENBORROW_H
 
+#include "swift/IRGen/ValueWitness.h"
+
+namespace llvm {
+class Value;
+}
+
 namespace swift {
 
 class SILType;
@@ -53,6 +59,23 @@ Address emitDereferenceBorrowToAddress(IRGenFunction &IGF,
 Address emitDereferenceBorrowAtAddress(IRGenFunction &IGF,
                                        SILType borrowTy,
                                        Address borrow);
+
+/// Whether the layout of the `Builtin.Borrow` type `T` must be computed inline
+/// from its referent's layout, because the runtime support for doing so
+/// (swift_getBorrowTypeMetadata and friends) might not exist at the deployment
+/// target and `T`'s layout isn't known statically.
+bool shouldComputeBorrowLayoutInline(IRGenFunction &IGF, SILType T);
+
+/// For a type for which shouldComputeBorrowLayoutInline returns true, emit the
+/// value witness `index` (other than a function witness) from the referent's
+/// value witnesses.
+llvm::Value *emitInlineBorrowValueWitnessValue(IRGenFunction &IGF, SILType T,
+                                               ValueWitness index);
+
+/// Given a pointer to the type layout of a borrow's referent, emit a pointer
+/// to a type layout record for the corresponding `Builtin.Borrow`.
+llvm::Value *emitInlineBorrowTypeLayout(IRGenFunction &IGF,
+                                        llvm::Value *referentLayout);
 
 } // namespace irgen
 } // namespace swift

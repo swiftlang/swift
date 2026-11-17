@@ -52,7 +52,7 @@ GenericSignature::LocalRequirements
 RequirementMachine::getLocalRequirements(Type depType) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   GenericSignature::LocalRequirements result;
@@ -78,7 +78,7 @@ RequirementMachine::getLocalRequirements(Type depType) const {
 bool RequirementMachine::requiresClass(Type depType) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -95,7 +95,7 @@ bool RequirementMachine::requiresClass(Type depType) const {
 LayoutConstraint RequirementMachine::getLayoutConstraint(Type depType) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -109,7 +109,7 @@ bool RequirementMachine::requiresProtocol(Type depType,
                                           const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -131,7 +131,7 @@ GenericSignature::RequiredProtocols
 RequirementMachine::getRequiredProtocols(Type depType) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -156,7 +156,7 @@ getSuperclassBound(Type depType,
                    ArrayRef<GenericTypeParamType *> genericParams) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -177,7 +177,7 @@ bool RequirementMachine::isConcreteType(Type depType,
                                         const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             proto);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -197,7 +197,7 @@ getConcreteType(Type depType,
                 const ProtocolDecl *proto) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             proto);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -214,12 +214,12 @@ bool RequirementMachine::areReducedTypeParametersEqual(Type depType1,
                                                        Type depType2) const {
   auto term1 = Context.getMutableTermForType(depType1->getCanonicalType(),
                                              /*proto=*/nullptr);
-  System.simplify(term1);
+  System.reduce(term1);
   verify(term1);
 
   auto term2 = Context.getMutableTermForType(depType2->getCanonicalType(),
                                              /*proto=*/nullptr);
-  System.simplify(term2);
+  System.reduce(term2);
   verify(term2);
 
   return (term1 == term2);
@@ -311,7 +311,7 @@ bool RequirementMachine::isReducedType(Type type) const {
           component->getCanonicalType(),
           /*proto=*/nullptr);
 
-      Self.System.simplify(term);
+      Self.System.reduce(term);
       Self.verify(term);
 
       auto anchor = Self.Map.getTypeForTerm(term, {});
@@ -358,7 +358,7 @@ Type RequirementMachine::getReducedTypeParameter(
 
   // Get a simplified term T.
   auto term = Context.getMutableTermForType(t, /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
 
   // We need to handle "purely concrete" member types, eg if I have a
   // signature <T where T == Foo>, and we're asked to reduce the
@@ -508,7 +508,7 @@ Type RequirementMachine::getReducedType(
 bool RequirementMachine::isValidTypeParameter(Type type) const {
   auto term = Context.getMutableTermForType(type->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
 
   auto prefix = getLongestValidPrefix(term);
   return (prefix == term);
@@ -531,7 +531,7 @@ RequirementMachine::getConformancePath(Type type,
                                        ProtocolDecl *protocol) {
   auto mutTerm = Context.getMutableTermForType(type->getCanonicalType(),
                                                /*proto=*/nullptr);
-  System.simplify(mutTerm);
+  System.reduce(mutTerm);
   verify(mutTerm);
 
   if (CONDITIONAL_ASSERT_enabled()) {
@@ -590,7 +590,7 @@ RequirementMachine::getConformancePath(Type type,
       ConformancePath result(ctx.AllocateCopy(path));
 
       auto mutTerm = Context.getMutableTermForType(rootType, nullptr);
-      System.simplify(mutTerm);
+      System.reduce(mutTerm);
 
       auto rootTerm = Term::get(mutTerm, Context);
       recordPath(rootTerm, rootProto, result);
@@ -642,7 +642,7 @@ RequirementMachine::getConformancePath(Type type,
         MutableTerm mutTerm(pair.first);
         mutTerm.append(Context.getMutableTermForType(nextSubjectType,
                                                      /*proto=*/lastProto));
-        System.simplify(mutTerm);
+        System.reduce(mutTerm);
 
         auto nextTerm = Term::get(mutTerm, Context);
 
@@ -676,7 +676,7 @@ TypeDecl *
 RequirementMachine::lookupNestedType(Type depType, Identifier name) const {
   auto term = Context.getMutableTermForType(depType->getCanonicalType(),
                                             /*proto=*/nullptr);
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   auto *props = Map.lookUpProperties(term);
@@ -749,7 +749,7 @@ RequirementMachine::getReducedShapeTerm(Type type) const {
   term.add(Symbol::forShape(Context));
 
   // Compute the reduced shape term `T'.[shape]`.
-  System.simplify(term);
+  System.reduce(term);
   verify(term);
 
   // Get the term T', which is the reduced shape of T.
@@ -865,16 +865,16 @@ void RequirementMachine::verify(const MutableTerm &term) const {
     }
   }
 
-  MutableTerm simplified = erased;
-  System.simplify(simplified);
+  MutableTerm reduced = erased;
+  System.reduce(reduced);
 
   // We should end up with the same term.
-  if (simplified != term) {
+  if (reduced != term) {
     ABORT([&](auto &out) {
       out << "Term verification failed\n";
-      out << "Initial term:    " << term << "\n";
-      out << "Erased term:     " << erased << "\n";
-      out << "Simplified term: " << simplified << "\n";
+      out << "Initial term: " << term << "\n";
+      out << "Erased term:  " << erased << "\n";
+      out << "Reduced term: " << reduced << "\n";
       out << "\n";
       dump(out);
     });

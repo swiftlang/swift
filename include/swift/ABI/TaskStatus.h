@@ -342,18 +342,30 @@ private:
     HasRetainedExecutor = 1 << 0
   };
   OptionSet<Flags> flags;
-  const TaskExecutorRef Preferred;
+
+  /// The two words of the preferred TaskExecutorRef, stored separately so
+  /// each can be signed.
+  HeapObject *__ptrauth_swift_task_executor_preference_identity const
+      PreferredIdentity;
+  const void *__ptrauth_swift_task_executor_preference_implementation const
+      PreferredImplementation;
 
 public:
   TaskExecutorPreferenceStatusRecord(TaskExecutorRef executor, bool retainedExecutor)
       : TaskStatusRecord(TaskStatusRecordKind::TaskExecutorPreference),
-        Preferred(executor) {
+        PreferredIdentity(executor.Identity),
+        PreferredImplementation(
+            reinterpret_cast<const void *>(executor.Implementation)) {
     if (retainedExecutor) {
       flags = Flags::HasRetainedExecutor;
     }
   }
 
-  TaskExecutorRef getPreferredExecutor() { return Preferred; }
+  TaskExecutorRef getPreferredExecutor() {
+    return TaskExecutorRef(
+        PreferredIdentity,
+        reinterpret_cast<uintptr_t>(PreferredImplementation));
+  }
 
   bool hasRetainedExecutor() const {
     return flags.contains(Flags::HasRetainedExecutor);
@@ -586,15 +598,18 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// to remain alive while the scope is active.
   AsyncTask *OwningTask;
 
-  /// Packed cancellation state
+  /// Packed state
   ///
   /// bit 0:          the cancelled flag;
   /// bits 1-3:       hold the cancellation reason (same shape as swift_task_cancelWithFlags).
+  /// bit 4:          whether this is the outermost scope of the task. When it
+  ///                 is popped, the task has no scope anymore.
   /// remaining bits: reserved for future use.
   std::atomic<uintptr_t> State{0};
 
   static constexpr uintptr_t CancelledBit = 1;
   static constexpr uintptr_t ReasonMask = 0b111;
+  static constexpr uintptr_t OutermostScopeBit = 1 << 4;
 
 public:
   explicit TaskCancellationScopeRecord(AsyncTask *owningTask)
@@ -602,6 +617,17 @@ public:
         OwningTask(owningTask) {}
 
   AsyncTask *getOwningTask() const { return OwningTask; }
+
+  bool isOutermostScope() const {
+    return (State.load(std::memory_order_relaxed) & OutermostScopeBit) != 0;
+  }
+  /// Only called before the record is added to the task.
+  void setIsOutermostScope(bool isOutermost) {
+    auto state = State.load(std::memory_order_relaxed);
+    state = isOutermost ? (state | OutermostScopeBit)
+                        : (state & ~OutermostScopeBit);
+    State.store(state, std::memory_order_relaxed);
+  }
 
   bool isCancelled() const {
     return (State.load(std::memory_order_relaxed) & CancelledBit) != 0;
@@ -613,18 +639,21 @@ public:
   /// Only 3 bits of the reason are used, remaining bits are reserved for future evolution.
   ///
   /// First-cancel-wins: if the scope is already cancelled, this is a no-op.
-  void cancel(size_t reason) {
+  ///
+  /// Returns whether this call cancelled the scope.
+  bool cancel(size_t reason) {
     auto oldState = State.load(std::memory_order_relaxed);
     // bail if the scope was already cancelled - first-cancel-wins.
     while (!(oldState & CancelledBit)) {
-      auto newState = ((reason & ReasonMask) << 1) | CancelledBit;
+      auto newState = oldState | ((reason & ReasonMask) << 1) | CancelledBit;
       if (State.compare_exchange_weak(oldState, newState,
                                        std::memory_order_relaxed,
                                        std::memory_order_relaxed)) {
-        return;
+        return true;
       }
       // CAS failed, retry
     }
+    return false;
   }
 
   static bool classof(const TaskStatusRecord *record) {
@@ -637,9 +666,18 @@ public:
 /// Its position in the records list relative to any `TaskCancellationScopeRecord`
 /// determines whether a scope's cancellation is masked at a given call site.
 class TaskCancellationShieldRecord : public TaskStatusRecord {
+  /// Whether this is the outermost shield of the task. When it is popped, the
+  /// task has no shield anymore.
+  bool IsOutermostShield = false;
+
 public:
   TaskCancellationShieldRecord()
       : TaskStatusRecord(TaskStatusRecordKind::CancellationShield) {}
+
+  bool isOutermostShield() const { return IsOutermostShield; }
+  void setIsOutermostShield(bool isOutermost) {
+    IsOutermostShield = isOutermost;
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::CancellationShield;

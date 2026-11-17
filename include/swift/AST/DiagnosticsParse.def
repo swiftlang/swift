@@ -448,9 +448,9 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
 
 // Destructor
 ERROR(destructor_decl_outside_class_or_noncopyable,none,
-      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+      "deinitializers may only be declared within a class, actor, or non-'Copyable' type", ())
 ERROR(destructor_decl_on_noncopyable_enum,none,
-      "deinitializers are not yet supported on noncopyable enums", ())
+      "deinitializers are not yet supported on non-'Copyable' enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -485,7 +485,7 @@ ERROR(operator_decl_no_fixity,none,
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
 ERROR(operator_decl_should_not_contain_other_attributes, none, 
-      "unexpected attribute %0 in operator declaration", (DeclAttribute))
+      "unexpected %kind0 in operator declaration", (DeclAttribute))
 
 // PrecedenceGroup
 ERROR(precedencegroup_not_infix,none,
@@ -1520,10 +1520,10 @@ ERROR(multiple_access_level_modifiers,none,
 NOTE(previous_access_level_modifier,none,
      "previous modifier specified here", ())
 ERROR(mutually_exclusive_decl_attrs,none,
-      "%0 contradicts previous %select{attribute|modifier}2 %1",
-      (DeclAttribute, DeclAttribute, bool))
+      "%kind0 contradicts previous %kind1",
+      (DeclAttribute, DeclAttribute))
 ERROR(mutually_exclusive_type_attrs,none,
-      "%0 contradicts previous %1",
+      "%kind0 contradicts previous %kind1",
       (const TypeAttribute *, const TypeAttribute *))
 ERROR(mutually_exclusive_attr_names,none,
       "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
@@ -1622,7 +1622,7 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
-      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+      "%0 is unsupported on target '%1'", (DeclAttribute, StringRef))
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
@@ -1640,9 +1640,9 @@ ERROR(attr_availability_multiple_kinds ,none,
 WARNING(attr_availability_invalid_duplicate,none,
         "'%0' argument has already been specified", (StringRef))
 WARNING(attr_availability_unknown_platform,none,
-       "unknown platform '%0' for attribute '%1'", (StringRef, StringRef))
+       "unknown platform '%0' for '%1' attribute", (StringRef, StringRef))
 WARNING(attr_availability_suggest_platform,none,
-       "unknown platform '%0' for attribute '%1'; did you mean '%2'?",
+       "unknown platform '%0' for '%1' attribute; did you mean '%2'?",
        (StringRef, StringRef, StringRef))
 ERROR(attr_availability_expected_platform,none,
       "expected platform in '%0' attribute", (StringRef))
@@ -1868,13 +1868,11 @@ ERROR(diff_params_clause_expected_parameter_unnamed,PointsToFirstBadToken,
 ERROR(autodiff_attr_expected_original_decl_name,PointsToFirstBadToken,
       "expected an original function name", ())
 
-// called
-ERROR(attr_called_expected_rparen,none,
-      "expected ')' after execution semantics", ())
-ERROR(attr_called_expected_semantics,none,
-      "expected 'exactlyOnce' or 'atMostOnce' as the '@called' execution "
-      "semantics",
-      ())
+// callable
+ERROR(attr_callable_expected_rparen,none,
+      "expected ')' after 'once'", ())
+ERROR(attr_callable_expected_once,none,
+      "expected 'once' in '@callable' attribute", ())
 
 // SIL autodiff
 ERROR(sil_autodiff_expected_lsquare,PointsToFirstBadToken,
@@ -2249,10 +2247,14 @@ ERROR(sil_failed_to_parse_sil_optional,none,
 // MARK: Scope restrictions
 //------------------------------------------------------------------------------
 
-ERROR(expected_scope_specifier, PointsToFirstBadToken,
-      "expected identifier or 'self' in '_scoped' attribute", ())
+ERROR(expected_scope, PointsToFirstBadToken,
+      "expected identifier or 'self' in '%0' attribute", (StringRef))
 ERROR(immortal_scope_cannot_be_access, none,
       "cannot depend on the access scope of 'immortal'", ())
+ERROR(expected_scope_param, PointsToFirstBadToken,
+      "expected scope parameter name in '_scopeParams' attribute", ())
+ERROR(immortal_scope_param, none,
+      "'immortal' cannot be used as a scope parameter name", ())
 
 //------------------------------------------------------------------------------
 // MARK: nonisolated(nonsending)
@@ -2273,9 +2275,6 @@ ERROR(nonisolated_nonsending_repeated,none,
 ERROR(file_default_invalid_specifier,PointsToFirstBadToken,
       "expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'",
       ())
-ERROR(experimental_file_default_disabled,PointsToFirstBadToken,
-      "file-level defaults are an experimental feature that is currently "
-      "disabled", ())
 ERROR(file_default_rejects_attributes,PointsToFirstBadToken,
       "attribute cannot be attached to a file-level default", ())
 

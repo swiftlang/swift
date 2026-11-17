@@ -1,23 +1,22 @@
 // RUN: %target-typecheck-verify-swift -language-mode 6 -verify-additional-prefix swift6-
-// RUN: %target-typecheck-verify-swift -language-mode 7 -verify-additional-prefix swift7-
-// REQUIRES: swift7
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -language-mode future -verify-additional-prefix future- %}
 
 func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> Void,
                                           fn2: @escaping () -> (x: Int, Int)) {
-  // Warn on mismatches in Swift 6, upgrading to an error for Swift 7
+  // Warn on mismatches in Swift 6 and error in a future language mode
   let _: ((a: Int, b: Int)) -> Void = fn1
   // expected-swift6-warning@-1 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-  // expected-swift7-error@-2 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+  // expected-future-error@-2 {{tuple conversion from '(a: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
   let _: ((x: Int, b: Int)) -> Void = fn1
   // expected-swift6-warning@-1 {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
-  // expected-swift7-error@-2 {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
+  // expected-future-error@-2 {{tuple conversion from '(x: Int, b: Int)' to '(x: Int, y: Int)' mismatches labels}}
 
   let _: () -> (y: Int, Int) = fn2
   // expected-swift6-warning@-1 {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
-  // expected-swift7-error@-2 {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
+  // expected-future-error@-2 {{tuple conversion from '(x: Int, Int)' to '(y: Int, Int)' mismatches labels}}
   let _: () -> (y: Int, k: Int) = fn2
   // expected-swift6-warning@-1 {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
-  // expected-swift7-error@-2 {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
+  // expected-future-error@-2 {{tuple conversion from '(x: Int, Int)' to '(y: Int, k: Int)' mismatches labels}}
 
   // Attempting to shuffle has always been illegal here
   let _: () -> (y: Int, x: Int) = fn2

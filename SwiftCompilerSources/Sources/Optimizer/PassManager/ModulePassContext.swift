@@ -184,6 +184,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   /// The types of all non-copyable nominal types declared in this module for
   /// which IRGen may emit type metadata.
+  /// Also all exported type specializations.
   var typesWithEmittedMetadata: [Type] {
     var types: [Type] = []
     withUnsafeMutablePointer(to: &types) { typesPtr in
@@ -196,6 +197,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   /// The conformances of all non-generic witness tables in this module which
   /// IRGen emits eagerly, i.e. the ones of `@export(interface)` conformances.
+  /// Also the conformances of exported type specializations.
   var conformancesWithEagerlyEmittedWitnessTables: [Conformance] {
     var conformances: [Conformance] = []
     withUnsafeMutablePointer(to: &conformances) { conformancesPtr in

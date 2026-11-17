@@ -65,7 +65,7 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
 
   public var optionalObjectType: Type {
     assert(self.isOptional)
-    return genericArgumentsOfBoundGenericType[0]
+    return genericArgumentsOfNominalType[0]
   }
 
   public var optionalType: Type {
@@ -102,8 +102,12 @@ public struct Type: TypeProperties, CustomStringConvertible, NoReflectionChildre
     bridged.GenericTypeParam_getParamKind()
   }
 
-  public var genericArgumentsOfBoundGenericType: TypeArray {
-    TypeArray(bridged: bridged.BoundGenericType_getGenericArgs())
+  public var genericArgumentsOfNominalType: TypeArray {
+    TypeArray(bridged: bridged.NominalType_getGenericArgs())
+  }
+
+  public var elementTypesOfPackType: TypeArray {
+    TypeArray(bridged: bridged.PackType_getElementTypes())
   }
 }
 
@@ -199,6 +203,7 @@ extension TypeProperties {
   public var isDynamicSelf: Bool { rawType.bridged.isDynamicSelf()}
   public var isBox: Bool { rawType.bridged.isBox() }
   public var isPack: Bool { rawType.bridged.isPack() }
+  public var isPackExpansion: Bool { rawType.bridged.isPackExpansion() }
   public var isSILPack: Bool { rawType.bridged.isSILPack() }
 
   public var canBeClass: Type.TraitResult { rawType.bridged.canBeClass().result }
@@ -286,6 +291,7 @@ extension TypeProperties {
   public var hasArchetype: Bool { rawType.bridged.hasArchetype() }
   public var hasTypeParameter: Bool { rawType.bridged.hasTypeParameter() }
   public var hasLocalArchetype: Bool { rawType.bridged.hasLocalArchetype() }
+  public var hasOpaqueArchetype: Bool { rawType.bridged.hasOpaqueArchetype() }
   /// True if this type mentions an existential (opened existential) archetype.
   public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
@@ -328,7 +334,7 @@ extension TypeProperties {
   public var isGenericAtAnyLevel: Bool { rawType.bridged.isGenericAtAnyLevel() }
 
   public var nominal: NominalTypeDecl? {
-    rawType.bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
+    rawType.bridged.getNominalDecl().getAs(NominalTypeDecl.self)
   }
 
   /// Performs a global conformance lookup for this type for `protocol`.
@@ -485,5 +491,5 @@ extension CanonicalType: Hashable {
 
 public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
 
-/// The execution semantics of a function type, such as `@called(atMostOnce)`.
+/// The execution semantics of a function type, such as at-most-once.
 public typealias ExecutionSemantics = swift.ExecutionSemantics

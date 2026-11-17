@@ -11,7 +11,7 @@ extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'e
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int

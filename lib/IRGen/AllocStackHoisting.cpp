@@ -64,7 +64,7 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   // Don't hoist weakly imported (weakly linked) types.
   bool foundWeaklyImported =
       SILTy.getASTType().findIf([&Mod](CanType type) -> bool {
-        if (auto nominal = type->getNominalOrBoundGenericNominal())
+        if (auto nominal = type->getNominalDecl())
           if (nominal->isWeakImported(Mod.getSwiftModule())) {
             return true;
           }
@@ -442,7 +442,11 @@ private:
 
 bool inhibitsAllocStackHoisting(SILInstruction *I) {
   if (auto *Apply = dyn_cast<ApplyInst>(I)) {
-    return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
+    // The semantics attribute may carry the kind of the query function.
+    if (auto *callee = Apply->getReferencedFunctionOrNull())
+      return callee->hasSemanticsAttrThatStartsWith(
+          semantics::AVAILABILITY_OSVERSION);
+    return false;
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
     return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast

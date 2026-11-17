@@ -1,10 +1,4 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=UnsafeProjections -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
-// RUN: %target-swift-ide-test -print-module -module-to-print=AlwaysUnsafeProjections -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s --check-prefix=ALWAYS-INPUTS
-
-// Without ImportUnsafeCxxMethodsAsAlwaysUnsafe, 'safe' doesn't stop the rename.
-// ALWAYS-INPUTS: struct TemplateAndSafeOwner : CxxConvertibleToCollection, CxxIterable {
-// ALWAYS-INPUTS:   func __vouchedProjectionUnsafe() -> UnsafeMutablePointer<CInt>!
-// ALWAYS-INPUTS: }
 
 // CHECK: struct View {
 // CHECK:   func data() -> UnsafeMutableRawPointer!

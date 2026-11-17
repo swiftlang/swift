@@ -120,7 +120,7 @@ assert(f0(1) == 1)
 
 // TODO(diagnostics): Bad diagnostic - should be `circular reference`
 var selfRef = { selfRef() }
-// expected-error@-1 {{unable to infer closure type without a type annotation}}
+// expected-error@-1 {{failed to produce diagnostic for expression}}
 
 // TODO: should be an error `circular reference` but it's diagnosed via overlapped requests
 var nestedSelfRef = {

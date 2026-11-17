@@ -21,6 +21,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
+#include "swift/SIL/GenericSpecializationMangler.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
@@ -652,7 +653,7 @@ SILModule::lookUpMoveOnlyDeinitForType(SILType nominalType,
   if (auto *specialized = lookUpSpecializedMoveOnlyDeinit(nominalType))
     return specialized;
 
-  return lookUpMoveOnlyDeinit(nominalType.getNominalOrBoundGenericNominal(),
+  return lookUpMoveOnlyDeinit(nominalType.getNominalDecl(),
                               deserializeLazily);
 }
 
@@ -850,9 +851,11 @@ void SILModule::registerDeserializationNotificationHandler(
 
 SILValue SILModule::getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
                                                   SILFunction *inFunction) {
-  SILValue &def = RootLocalArchetypeDefs[{genericEnv, inFunction}];
+  LocalArchetypeKey key = {genericEnv, inFunction};
+  SILValue &def = RootLocalArchetypeDefs[key];
   if (!def) {
     numUnresolvedLocalArchetypes++;
+    UnresolvedLocalArchetypeKeys.insert(key);
     def = ::new PlaceholderValue(inFunction,
                                  SILType::getPrimitiveAddressType(
                                     inFunction->getASTContext().TheEmptyTupleType));
@@ -868,25 +871,31 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
 }
 
 void SILModule::reclaimUnresolvedLocalArchetypeDefinitions() {
-  llvm::DenseMap<LocalArchetypeKey, SILValue> newLocalArchetypeDefs;
-
-  for (auto pair : RootLocalArchetypeDefs) {
-    if (auto *placeholder = dyn_cast<PlaceholderValue>(pair.second)) {
-      // If a placeholder has no uses, the instruction that introduced it
-      // was deleted before the local archetype was resolved. Reclaim the
-      // placeholder so that we don't complain.
-      if (placeholder->use_empty()) {
-        assert(numUnresolvedLocalArchetypes > 0);
-        --numUnresolvedLocalArchetypes;
-        ::delete placeholder;
-        continue;
-      }
+  // Only visit the placeholders, not all of RootLocalArchetypeDefs. This is
+  // called once per function by some clients, so its cost must not depend on
+  // the number of local archetypes in the whole module.
+  llvm::SmallVector<LocalArchetypeKey, 4> reclaimed;
+  for (LocalArchetypeKey key : UnresolvedLocalArchetypeKeys) {
+    auto *placeholder = dyn_cast_or_null<PlaceholderValue>(
+        RootLocalArchetypeDefs.lookup(key));
+    if (!placeholder) {
+      // The entry no longer holds a placeholder; drop the stale key.
+      reclaimed.push_back(key);
+      continue;
     }
-
-    newLocalArchetypeDefs.insert(pair);
+    // If a placeholder has no uses, the instruction that introduced it
+    // was deleted before the local archetype was resolved. Reclaim the
+    // placeholder so that we don't complain.
+    if (placeholder->use_empty()) {
+      assert(numUnresolvedLocalArchetypes > 0);
+      --numUnresolvedLocalArchetypes;
+      ::delete placeholder;
+      RootLocalArchetypeDefs.erase(key);
+      reclaimed.push_back(key);
+    }
   }
-
-  std::swap(newLocalArchetypeDefs, RootLocalArchetypeDefs);
+  for (LocalArchetypeKey key : reclaimed)
+    UnresolvedLocalArchetypeKeys.erase(key);
 }
 
 bool SILModule::hasUnresolvedLocalArchetypeDefinitions() {
@@ -963,6 +972,7 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
       assert(numUnresolvedLocalArchetypes > 0);
       numUnresolvedLocalArchetypes--;
+      UnresolvedLocalArchetypeKeys.erase({genericEnv, inst->getFunction()});
     }
     val = dependency;
   });
@@ -1086,6 +1096,15 @@ void SILModule::promoteLinkages() {
   // TODO: Promote linkage of other SIL entities
 }
 
+void SILModule::addExportedSpecializationOfImportedFunction(
+    SILDeclRef target, GenericSignature specializedSig, bool createdHere) {
+  // The same name the specializer gives the body.
+  auto name = Mangle::GenericSpecializationMangler::manglePrespecialization(
+      getASTContext(), target.mangle(),
+      target.getAbstractFunctionDecl()->getGenericSignature(), specializedSig);
+  exportedSpecializationsOfImportedFunctions[name] |= createdHere;
+}
+
 bool SILModule::isStdlibModule() const {
   return TheSwiftModule->isStdlibModule();
 }
@@ -1094,8 +1113,11 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   if (prespecializedFunctionDeclsImported)
     return;
 
-  // No prespecitalizations in embedded Swift
-  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // No prespecitalizations in embedded Swift, except those spelled
+  // '@specialized' (the action filters them).
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      !getASTContext().LangOpts.hasFeature(
+          Feature::ExtendedSpecializedAttribute))
     return;
 
   SmallVector<ModuleDecl *, 8> importedModules;
@@ -1118,11 +1140,25 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
     }
   }
 
-  for (auto *module : importedModules) {
+  // Also the '@specialized' declarations of modules linked only through other
+  // modules' imports, but not their '@_specialize' ones.
+  SmallVector<ModuleDecl *, 32> linkedModules;
+  SpecializedAttr::getModulesWithUsedSpecializations(getSwiftModule(),
+                                                     linkedModules);
+  size_t numDirect = importedModules.size();
+  for (auto *module : linkedModules)
+    if (!module->isNonSwiftModule() &&
+        !llvm::is_contained(importedModules, module))
+      importedModules.push_back(module);
+
+  for (auto [index, module] : llvm::enumerate(importedModules)) {
     SmallVector<Decl *, 16> prespecializations;
     module->getExportedPrespecializations(prespecializations);
     for (auto *p : prespecializations) {
       if (auto *vd = dyn_cast<AbstractFunctionDecl>(p)) {
+        if (index >= numDirect &&
+            !vd->getAttrs().hasAttribute<SpecializedAttr>())
+          continue;
         action(vd);
       }
     }

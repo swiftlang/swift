@@ -86,6 +86,10 @@ class AddCodableContext {
     Options.PrintSpaceBeforeInheritance = false;
     Options.ExcludeAttrList.push_back(DeclAttrKind::HasInitialValue);
     Options.PrintInternalAccessKeyword = false;
+    // FIXME: Always-unsafe uses need 'unsafe' even where the group is ignored.
+    Options.PrintImplicitUnsafe = ctx.Diags.isDiagnosticGroupEnabled(
+        IDC->getDecl()->getDeclContext()->getParentSourceFile(),
+        DiagGroupID::StrictMemorySafety);
 
     std::string baseIndent = getBaseIndent();
     ExtraIndentStreamPrinter Printer(OS, baseIndent);

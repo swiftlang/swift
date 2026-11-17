@@ -308,7 +308,8 @@ enum class ImplFunctionRepresentation {
   Method,
   ObjCMethod,
   WitnessMethod,
-  Closure
+  Closure,
+  COMMethod,
 };
 
 enum class ImplFunctionDifferentiabilityKind {
@@ -332,7 +333,7 @@ enum class ImplFunctionIsolation {
 };
 
 class ImplFunctionTypeFlags {
-  unsigned Rep : 3;
+  unsigned Rep : 4;
   unsigned Pseudogeneric : 1;
   unsigned Escaping : 1;
   unsigned Concurrent : 1;
@@ -530,7 +531,7 @@ void decodeRequirement(
     if (!subjectType)
       return;
 
-    BuiltType constraintType;
+    BuiltType constraintType = BuiltType();
     if (child->getKind() ==
         Demangle::Node::Kind::DependentGenericConformanceRequirement) {
       constraintType = Builder.decodeMangledType(child->getChild(1));
@@ -663,6 +664,21 @@ decodeShape(NodePointer Node) {
     return {nullptr, nullptr};
 
   return {Protocol, Requirements};
+}
+
+/// Returns the node kind for an escaping Swift function type with the given
+/// execution semantics.
+inline Node::Kind
+getEscapingSwiftFunctionNodeKind(FunctionMetadataExecutionSemantics semantics) {
+  switch (semantics) {
+  case FunctionMetadataExecutionSemantics::None:
+    return Node::Kind::FunctionType;
+  case FunctionMetadataExecutionSemantics::AtMostOnce:
+    return Node::Kind::CalledAtMostOnceFunctionType;
+  case FunctionMetadataExecutionSemantics::Once:
+    return Node::Kind::CalledOnceFunctionType;
+  }
+  return Node::Kind::FunctionType;
 }
 
 #define MAKE_NODE_TYPE_ERROR(Node, Fmt, ...)                                   \
@@ -1184,16 +1200,28 @@ protected:
           flags.withNumParameters(parameters.size())
               .withParameterFlags(hasParamFlags)
               .withEscaping(
-                          Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
-                          Node->getKind() == NodeKind::EscapingObjCBlock);
+                  Node->getKind() == NodeKind::FunctionType ||
+                  Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                  Node->getKind() == NodeKind::EscapingObjCBlock ||
+                  // Only escaping function types with execution semantics
+                  // have their own manglings.
+                  Node->getKind() == NodeKind::CalledOnceFunctionType ||
+                  Node->getKind() == NodeKind::CalledAtMostOnceFunctionType);
 
-      if (Node->getKind() == NodeKind::CalledOnceFunctionType)
+      // Function types record their execution semantics, along with the
+      // invertible protocols that they suppress.
+      if (Node->getKind() == NodeKind::CalledOnceFunctionType ||
+          Node->getKind() == NodeKind::CalledAtMostOnceFunctionType) {
+        bool isOnce = Node->getKind() == NodeKind::CalledOnceFunctionType;
         extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::Once);
-      else if (Node->getKind() == NodeKind::CalledAtMostOnceFunctionType)
-        extFlags = extFlags.withExecutionSemantics(
-            FunctionMetadataExecutionSemantics::AtMostOnce);
+            isOnce ? FunctionMetadataExecutionSemantics::Once
+                   : FunctionMetadataExecutionSemantics::AtMostOnce);
+        auto inverted = extFlags.getInvertedProtocols();
+        inverted.insert(InvertibleProtocolKind::Copyable);
+        if (isOnce)
+          inverted.insert(InvertibleProtocolKind::Deinitable);
+        extFlags = extFlags.withInvertedProtocols(inverted);
+      }
 
       auto result =
           decodeMangledType(Node->getChild(firstChildIdx + 1), depth + 1,
@@ -1227,8 +1255,20 @@ protected:
           if (child->getText() == "@convention(thin)") {
             flags =
               flags.withRepresentation(ImplFunctionRepresentation::Thin);
-          } else if (child->getText() == "@callee_guaranteed") {
-            calleeConvention = ImplParameterConvention::Direct_Guaranteed;
+          } else {
+            auto convention =
+                llvm::StringSwitch<std::optional<ImplParameterConvention>>(
+                    child->getText())
+                    .Case("@callee_unowned",
+                          ImplParameterConvention::Direct_Unowned)
+                    .Case("@callee_guaranteed",
+                          ImplParameterConvention::Direct_Guaranteed)
+                    .Case("@callee_owned",
+                          ImplParameterConvention::Direct_Owned)
+                    .Default(std::nullopt);
+            if (!convention)
+              return MAKE_NODE_TYPE_ERROR0(child, "unknown callee convention");
+            calleeConvention = *convention;
           }
         } else if (child->getKind() == NodeKind::ImplFunctionConvention) {
           if (child->getNumChildren() == 0)
@@ -1240,14 +1280,21 @@ protected:
 
           // [TODO: synthesize-Clang-type-from-mangled-name] If there are two
           // grand-children, the second is going to be the mangled Clang type.
-          StringRef text = child->getFirstChild()->getText();
-          if (text == "c") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
-          } else if (text == "block") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::Block);
-          }
+          auto representation =
+              llvm::StringSwitch<std::optional<ImplFunctionRepresentation>>(
+                  child->getFirstChild()->getText())
+                  .Case("c", ImplFunctionRepresentation::CFunctionPointer)
+                  .Case("block", ImplFunctionRepresentation::Block)
+                  .Case("method", ImplFunctionRepresentation::Method)
+                  .Case("objc_method", ImplFunctionRepresentation::ObjCMethod)
+                  .Case("witness_method",
+                        ImplFunctionRepresentation::WitnessMethod)
+                  .Case("closure", ImplFunctionRepresentation::Closure)
+                  .Case("com_method", ImplFunctionRepresentation::COMMethod)
+                  .Default(std::nullopt);
+          if (!representation)
+            return MAKE_NODE_TYPE_ERROR0(child, "unknown function convention");
+          flags = flags.withRepresentation(*representation);
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");

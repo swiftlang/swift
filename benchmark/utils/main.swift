@@ -19,6 +19,7 @@ import AngryPhonebook
 import AnyHashableWithAClass
 import Array2D
 import ArrayAppend
+import ArrayCastTest
 import ArrayInClass
 import ArrayLiteral
 import ArrayOfGenericPOD
@@ -31,6 +32,7 @@ import ArraySliceTests
 import ArraySubscript
 import ArrayTests
 import AssumeIsolated
+import AsyncStreamYield
 import AsyncTree
 import BinaryFloatingPointConversionFromBinaryInteger
 import BinaryFloatingPointProperties
@@ -55,20 +57,23 @@ import CharacterRecognizer
 import Chars
 import ChildTaskCreation
 import ClassArrayGetter
+import ClockMeasure
 import CodableTest
 import Combos
 import ContiguousArrayTests
+import ContinuationResume
 import CountAlgo
 import CreateObjects
 // rdar://128520766
-// import CxxSetToCollection
+import CxxSetToCollection
 import CxxSpanTests
 import CxxStringConversion
 // rdar://128520766
-// import CxxVectorSum
+import CxxVectorSum
 import DataBenchmarks
 import DeadArray
 import DevirtualizeProtocolComposition
+import DistributedThunkHop
 import DictOfArraysToArrayOfDicts
 import DictTest
 import DictTest2
@@ -197,6 +202,7 @@ import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
 import SpanTests
+import SpecializedWitnessTable
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -214,12 +220,14 @@ import StringReplaceSubrange
 import StringSplitting
 import StringSwitch
 import StringTests
+import StringValidating
 import StringWalk
 import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
 import TaskIsCancelledCancellationScopes
+import TaskIDBenchmark
 import TaskLocalGet
 import TaskRegistryStress
 import ToddCoxeter
@@ -238,6 +246,7 @@ register(AngryPhonebook.benchmarks)
 register(AnyHashableWithAClass.benchmarks)
 register(Array2D.benchmarks)
 register(ArrayAppend.benchmarks)
+register(ArrayCastTest.benchmarks)
 register(ArrayInClass.benchmarks)
 register(ArrayLiteral.benchmarks)
 register(ArrayOfGenericPOD.benchmarks)
@@ -250,6 +259,7 @@ register(ArraySliceTests.benchmarks)
 register(ArraySubscript.benchmarks)
 register(ArrayTests.benchmarks)
 register(AssumeIsolated.benchmarks)
+register(AsyncStreamYield.benchmarks)
 register(AsyncTree.benchmarks)
 register(BinaryFloatingPointConversionFromBinaryInteger.benchmarks)
 register(BinaryFloatingPointProperties.benchmarks)
@@ -276,18 +286,21 @@ register(ChildTaskCreation.benchmarks)
 register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ContiguousArrayTests.benchmarks)
+register(ContinuationResume.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
+register(ClockMeasure.benchmarks)
 register(CreateObjects.benchmarks)
 // rdar://128520766
-// register(CxxSetToCollection.benchmarks)
+register(CxxSetToCollection.benchmarks)
 register(CxxSpanTests.benchmarks)
 register(CxxStringConversion.benchmarks)
 // rdar://128520766
-// register(CxxVectorSum.benchmarks)
+register(CxxVectorSum.benchmarks)
 register(DataBenchmarks.benchmarks)
 register(DeadArray.benchmarks)
 register(DevirtualizeProtocolComposition.benchmarks)
+register(DistributedThunkHop.benchmarks)
 register(DictOfArraysToArrayOfDicts.benchmarks)
 register(DictTest.benchmarks)
 register(DictTest2.benchmarks)
@@ -417,6 +430,7 @@ register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
 register(SpanTests.benchmarks)
+register(SpecializedWitnessTable.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
@@ -438,12 +452,14 @@ if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 
 register(StringSwitch.benchmarks)
 register(StringTests.benchmarks)
+register(StringValidating.benchmarks)
 register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
 register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskIDBenchmark.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)
 register(ToddCoxeter.benchmarks)

@@ -2,6 +2,15 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(SwiftTestUtils)
 
+if(SWIFT_ENABLE_WASI_THREADS AND "WASI" IN_LIST SWIFT_SDKS
+   AND NOT SWIFT_WASI_TEST_LINKER_FLAGS)
+  message(FATAL_ERROR
+    "SWIFT_WASI_TEST_LINKER_FLAGS must carry the WASI threads test link flags: "
+    "--import-memory and --export-memory, without which every guest aborts "
+    "with no diagnostic, and --max-memory, without which wasm-ld pins the "
+    "shared memory maximum to its initial size.")
+endif()
+
 function(swift_configure_lit_site_cfg source_path destination_path installed_name)
   if (CMAKE_CFG_INTDIR STREQUAL ".")
     set(SWIFT_BUILD_MODE ".")
@@ -11,6 +20,13 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
 
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_TOOLS_DIR ${LLVM_TOOLS_BINARY_DIR})
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_LIBS_DIR  ${LLVM_LIBRARY_DIR})
+  # Where the LLVM shared libraries live: DLL platforms put them in bin, like
+  # LLVM_SHLIB_OUTPUT_INTDIR does.
+  if(WIN32 OR CYGWIN)
+    set(SHLIBDIR ${LLVM_TOOLS_DIR})
+  else()
+    set(SHLIBDIR ${LLVM_LIBS_DIR})
+  endif()
 
   set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
 
@@ -341,12 +357,19 @@ normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
 normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+normalize_boolean_spelling(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
 # Allow callers to pin the host SDK used by lit.site.cfg.in.
 if(NOT SWIFT_HOST_SDKROOT)
   set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+endif()
+
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  file(TO_CMAKE_PATH
+       "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap"
+       SWIFT_WINDOWS_MODULE_MAP)
 endif()
 
 set(profdata_merge_worker
@@ -612,8 +635,7 @@ foreach(SDK ${SWIFT_SDKS})
       if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING AND _is_wasm_sdk)
         string(TOLOWER "${SDK}" _sdk_lower)
         set(VARIANT_SUFFIX "-embedded-${_sdk_lower}")
-        string(REGEX REPLACE "-threads$" "" VARIANT_TRIPLE
-               "${SWIFT_SDK_${SDK}_ARCH_wasm32_TRIPLE}")
+        set(VARIANT_TRIPLE "${SWIFT_SDK_${SDK}_ARCH_wasm32_TRIPLE}")
         set(test_mode "optimize_none")
         set(test_subset "primary")
         set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/embedded")

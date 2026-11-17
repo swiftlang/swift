@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework -module-link-name Framework %S/Inputs/public_struct_with_generic_arg_swift_class_constrained.swift -o %t/%target-library-name(Framework) -emit-module-path %t/Framework.swiftmodule
+// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework -module-link-name Framework %S/Inputs/public_struct_with_generic_arg_swift_class_constrained.swift -o %t/%target-library-name(Framework) -Xlinker -install_name -Xlinker @executable_path/%target-library-name(Framework) -emit-module-path %t/Framework.swiftmodule
 // RUN: %target-codesign %t/libFramework.dylib
-// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework2 -module-link-name Framework2 %S/Inputs/open_subclass_of_Framework.Superclass.swift -o %t/%target-library-name(Framework2) -emit-module-path %t/Framework2.swiftmodule -I %t -L %t
+// RUN: %target-build-swift -emit-library -enable-library-evolution -module-name Framework2 -module-link-name Framework2 %S/Inputs/open_subclass_of_Framework.Superclass.swift -o %t/%target-library-name(Framework2) -Xlinker -install_name -Xlinker @executable_path/%target-library-name(Framework2) -emit-module-path %t/Framework2.swiftmodule -I %t -L %t
 // RUN: %target-codesign %t/libFramework2.dylib
 
 // RUN: %target-build-swift %s %S/Inputs/print_subclass/main.swift -module-name main -o %t/main -I %t -L %t
 // RUN: %target-codesign %t/main
-// RUN: %target-run %t/main | %FileCheck %S/Inputs/print_subclass/main.swift
+// RUN: %target-run %t/main %t/%target-library-name(Framework) %t/%target-library-name(Framework2) | %FileCheck %S/Inputs/print_subclass/main.swift
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx

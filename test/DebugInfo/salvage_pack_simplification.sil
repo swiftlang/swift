@@ -31,3 +31,35 @@ bb0(%0 : $*Value):
   dealloc_pack %pack
   return %result : $Int
 }
+
+// An address-only multi-element pack is salvaged as tuple fragments of an
+// object tuple type.
+
+// CHECK-LABEL: sil @test_pack_debug_value_salvage_tuple
+// CHECK: [[STACK_A:%[0-9]+]] = alloc_stack $A
+// CHECK: [[STACK_B:%[0-9]+]] = alloc_stack $B
+// CHECK: debug_value [[STACK_A]], let, name "items", argno 1, type $(A, B), expr op_deref:op_tuple_fragment:$(A, B):0
+// CHECK: debug_value [[STACK_B]], let, name "items", argno 1, type $(A, B), expr op_deref:op_tuple_fragment:$(A, B):1
+// CHECK: return
+sil @test_pack_debug_value_salvage_tuple : $@convention(thin) <A, B> (@in_guaranteed A, @in_guaranteed B) -> Int {
+bb0(%0 : $*A, %1 : $*B):
+  %pack = alloc_pack $Pack{A, B}
+  %stackA = alloc_stack $A
+  copy_addr %0 to [init] %stackA
+  %stackB = alloc_stack $B
+  copy_addr %1 to [init] %stackB
+  %idxA = scalar_pack_index 0 of $Pack{A, B}
+  pack_element_set %stackA into %idxA of %pack
+  %idxB = scalar_pack_index 1 of $Pack{A, B}
+  pack_element_set %stackB into %idxB of %pack
+  debug_value %pack, let, name "items", argno 1, expr op_deref
+  %get = pack_element_get %idxA of %pack as $*A
+  %fn = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> Int
+  %result = apply %fn<A>(%get) : $@convention(thin) <T> (@in_guaranteed T) -> Int
+  destroy_addr %stackB
+  dealloc_stack %stackB
+  destroy_addr %stackA
+  dealloc_stack %stackA
+  dealloc_pack %pack
+  return %result : $Int
+}

@@ -53,9 +53,9 @@ init {} // expected-error {{initializers may only be declared within a type}} ex
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 
-deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 deinit // expected-error {{expected '{' for deinitializer}}
-deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 
 struct BarStruct {
   init() {}
@@ -66,7 +66,7 @@ extension BarStruct {
   init(x : Int) {}
 
   // When/if we allow 'var' in extensions, then we should also allow dtors
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 enum BarUnion {
@@ -76,7 +76,7 @@ enum BarUnion {
 
 extension BarUnion {
   init(x : Int) {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 class BarClass {
@@ -86,22 +86,22 @@ class BarClass {
 
 extension BarClass {
   convenience init(x : Int) { self.init() }
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 protocol BarProtocol {
   init() {} // expected-error {{protocol initializers must not have bodies}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 extension BarProtocol {
   init(x : Int) {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 func fooFunc() {
   init() {} // expected-error {{initializers may only be declared within a type}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 }
 
 func barFunc() {
@@ -113,7 +113,7 @@ func barFunc() {
 
   var y : () = { () -> () in
     // expected-warning@-1 {{variable 'y' was never used; consider replacing with '_' or removing it}}
-    deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+    deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
     return
   } ()
 }

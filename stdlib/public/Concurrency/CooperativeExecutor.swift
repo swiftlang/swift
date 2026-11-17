@@ -177,9 +177,7 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
     }
 
     init(from duration: Swift.Duration) {
-      let (seconds, attoseconds) = duration.components
-      self.seconds = seconds
-      self.nanoseconds = attoseconds / 1_000_000_000
+      (self.seconds, self.nanoseconds) = duration._saturatedSecondsAndNanoseconds
     }
 
     static func == (lhs: Duration, rhs: Duration) -> Bool {
@@ -221,12 +219,17 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
                       nanoseconds: lhs.nanoseconds - rhs.nanoseconds)
     }
     static func + (lhs: Timestamp, rhs: Duration) -> Timestamp {
-      var seconds = lhs.seconds + rhs.seconds
       var nanoseconds = lhs.nanoseconds + rhs.nanoseconds
-      // Normally will run only once
-      while nanoseconds > 1_000_000_000 {
-        seconds += 1
+      var carry: Int64 = 0
+      if nanoseconds >= 1_000_000_000 {
+        carry = 1
         nanoseconds -= 1_000_000_000
+      }
+      // Saturate rather than trap if the deadline is beyond Int64 seconds.
+      let (partial, overflow1) = lhs.seconds.addingReportingOverflow(rhs.seconds)
+      let (seconds, overflow2) = partial.addingReportingOverflow(carry)
+      if overflow1 || overflow2 {
+        return Timestamp(seconds: Int64.max, nanoseconds: 999_999_999)
       }
       return Timestamp(seconds: seconds, nanoseconds: nanoseconds)
     }
@@ -313,10 +316,12 @@ extension CooperativeExecutor: RunLoopExecutor {
         }
       }
 
-      if let toWait {
+      if !runQueue.isEmpty {
+        // There is more to run, so don't wait for a timer
+      } else if let toWait {
         _sleep(seconds: toWait.seconds,
                nanoseconds: toWait.nanoseconds)
-      } else if runQueue.isEmpty {
+      } else {
         // Stop if no more jobs are available
         break
       }

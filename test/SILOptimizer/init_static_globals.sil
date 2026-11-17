@@ -376,6 +376,8 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array :
 // CHECK-NOT:     alloc_global
 // CHECK-NOT:     global_addr
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store
 // CHECK:       } // end sil function 'globalinit_inline_array'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -407,6 +409,8 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples :
 // CHECK-NOT:     alloc_global
 // CHECK-NOT:     global_addr
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     store
 // CHECK:       } // end sil function 'globalinit_inline_array_of_tuples'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):

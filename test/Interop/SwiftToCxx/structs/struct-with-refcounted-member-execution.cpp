@@ -11,10 +11,14 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <type_traits>
 #include "structs.h"
 
 int main() {
   using namespace Structs;
+
+  static_assert(!std::is_trivially_copyable<StructWithRefcountedMember>::value, "");
+  static_assert(!std::is_trivially_destructible<StructWithRefcountedMember>::value, "");
 
   // Ensure that the value destructor is called.
   {
@@ -58,5 +62,31 @@ int main() {
 // CHECK-NEXT: breakpoint 4
 // CHECK-NEXT: destroy RefCountedClass
 // CHECK-NEXT: breakpoint 5
+  {
+    auto value = returnNewStructWithRefcountedMember();
+    auto &alias = value;
+    value = alias;
+    printBreak(6);
+    auto copy = identity(value);
+    value = copy;
+    printBreak(7);
+  }
+  printBreak(8);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: breakpoint 6
+// CHECK-NEXT: breakpoint 7
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 8
+  {
+    auto value = returnNewReferenceEnum();
+    auto copy = identity(value);
+    value = copy;
+    printBreak(9);
+  }
+  printBreak(10);
+// CHECK-NEXT: create RefCountedClass
+// CHECK-NEXT: breakpoint 9
+// CHECK-NEXT: destroy RefCountedClass
+// CHECK-NEXT: breakpoint 10
   return 0;
 }

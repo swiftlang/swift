@@ -654,15 +654,22 @@ private:
   std::string FunctionName;
 
   bool IsDistributed: 1;
+  bool HasLeadingImplicitActorIsolationParameter : 1;
 
   CanSILFunctionType Type;
   llvm::Constant *Address;
 
   explicit AccessibleFunction(std::string recordName, std::string funcName,
-                              bool isDistributed, CanSILFunctionType type,
-                              llvm::Constant *addr)
+                              bool isDistributed,
+                              bool hasLeadingImplicitActorIsolationParameter,
+                              CanSILFunctionType type, llvm::Constant *addr)
       : RecordName(recordName), FunctionName(funcName),
-        IsDistributed(isDistributed), Type(type), Address(addr) {}
+        IsDistributed(isDistributed),
+        HasLeadingImplicitActorIsolationParameter(hasLeadingImplicitActorIsolationParameter),
+        Type(type), Address(addr) {
+    assert((!hasLeadingImplicitActorIsolationParameter || isDistributed) &&
+           "currently only distributed accessors can take an isolated actor parameter");
+  }
 
 public:
   StringRef getRecordName() const { return RecordName; }
@@ -670,15 +677,19 @@ public:
 
   bool isDistributed() const { return IsDistributed; }
 
+  bool hasLeadingImplicitActorIsolationParameter() const {
+    return HasLeadingImplicitActorIsolationParameter;
+  }
+
   CanSILFunctionType getType() const { return Type; }
 
   llvm::Constant *getAddress() const { return Address; }
 
   static AccessibleFunction forSILFunction(IRGenModule &IGM, SILFunction *func);
-  static AccessibleFunction forDistributed(std::string recordName,
-                                           std::string accessorName,
-                                           CanSILFunctionType type,
-                                           llvm::Constant *address);
+  static AccessibleFunction
+  forDistributed(std::string recordName, std::string accessorName,
+                 bool hasLeadingImplicitActorIsolationParameter,
+                 CanSILFunctionType type, llvm::Constant *address);
 };
 
 enum class CStringSectionType {
@@ -911,6 +922,14 @@ public:
 
   llvm::Constant *swiftImmortalRefCount = nullptr;
   llvm::Constant *swiftStaticArrayMetadata = nullptr;
+
+  /// The address of the context that every captureless exactly-once closure in
+  /// this module shares. See getAddrOfExactlyOnceSharedContext().
+  llvm::Constant *ExactlyOnceSharedContext = nullptr;
+
+  /// The destructor of every exactly-once closure context in this module. See
+  /// getExactlyOnceClosureDestructor().
+  llvm::Function *ExactlyOnceClosureDestructor = nullptr;
 
   llvm::StructType *
   createTransientStructType(StringRef name,
@@ -1204,6 +1223,10 @@ public:
                               bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
+  /// Whether the specialized witness table \p wt can be emitted as a static
+  /// witness table, which is directly referenced.
+  bool canEmitStaticSpecializedWitnessTable(SILWitnessTable *wt);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
@@ -1230,6 +1253,9 @@ private:
 
   llvm::DenseMap<const ProtocolConformance *,
                  std::unique_ptr<const ConformanceInfo>> Conformances;
+
+  /// Caches the results of canEmitStaticSpecializedWitnessTable.
+  llvm::DenseMap<SILWitnessTable *, bool> StaticSpecializedWitnessTables;
 
   friend class GenericContextScope;
   friend class LoweringModeScope;
@@ -1366,6 +1392,13 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Override the linkage computed by Clang for \p global with \p linkage if
+  /// \p declModule, the module that the corresponding declaration belongs to,
+  /// is imported @_weakLinked.
+  void overrideLinkageForWeakLinkedClangDecl(
+      llvm::GlobalValue *global, const ModuleDecl *declModule,
+      llvm::GlobalValue::LinkageTypes linkage);
+
   /// Global blocks, keyed by their invoke function and constant capture.
   llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
                  llvm::Constant *> GlobalBlocks;
@@ -1448,6 +1481,10 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
+
+  /// Additional conformance descriptors, for the conformances of
+  /// back-deployed types, that refer to the defining module's type descriptor.
+  std::vector<llvm::Constant *> BackDeploymentCanonicalConformances;
   /// List of types to generate runtime-resolvable metadata records for that
   /// are consumable for any Swift runtime.
   SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
@@ -1478,8 +1515,14 @@ private:
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
   /// Cache of statically-instantiated key path objects (embedded Swift).
   /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
-  /// referring to the same pattern share one immortal global.
-  llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
+  /// referring to the same pattern share one immortal global.  Also records
+  /// the argument data offsets of capturing components.
+  struct StaticKeyPathInstance {
+    llvm::Constant *Instance;
+    SmallVector<uint32_t, 2> ArgDataOffsets;
+  };
+  llvm::DenseMap<KeyPathPattern*, StaticKeyPathInstance>
+      StaticKeyPathInstances;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
@@ -1515,6 +1558,11 @@ private:
   SmallVector<llvm::MDNode *> UsedConditionals;
   void emitUsedConditionals();
 
+  /// The static initializers to add to the global constructors in
+  /// emitGlobalLists(). See addStaticInitializer().
+  SmallVector<llvm::Function *, 2> StaticInitializers;
+  bool EmittedStaticInitializers = false;
+
   void emitGlobalLists();
   void emitAutolinkInfo();
   void cleanupClangCodeGenMetadata();
@@ -1528,7 +1576,6 @@ public:
   std::string CaptureDescriptorSection;
   std::string ReflectionStringsSection;
   std::string ReflectionTypeRefSection;
-  std::string MultiPayloadEnumDescriptorSection;
 
   /// Builtin types referenced by types in this module when emitting
   /// reflection metadata.
@@ -1576,6 +1623,14 @@ public:
       llvm::function_ref<ConstantInitFuture(ConstantInitBuilder &)> body);
 
   llvm::Constant *getAddrOfFieldName(StringRef Name);
+
+  /// Returns the context that every captureless exactly-once closure shares.
+  llvm::Constant *getAddrOfExactlyOnceSharedContext();
+
+  /// Returns the destructor that terminates the program, which every
+  /// exactly-once closure context in this module has.
+  llvm::Function *getExactlyOnceClosureDestructor();
+
   llvm::Constant *getAddrOfCaptureDescriptor(SILFunction &caller,
                                              CanSILFunctionType origCalleeType,
                                              CanSILFunctionType substCalleeType,
@@ -1608,7 +1663,6 @@ public:
   const char *getCaptureDescriptorMetadataSectionName();
   const char *getReflectionStringsSectionName();
   const char *getReflectionTypeRefSectionName();
-  const char *getMultiPayloadEnumDescriptorSectionName();
 
   static constexpr const char ObjCClassNameSectionName[] =
       "__TEXT,__objc_classname,cstring_literals";
@@ -1739,6 +1793,14 @@ public:
   /// invalid.
   bool finalize();
 
+  /// Adds \p fn to the module's static initializers. They run before the C++
+  /// global constructors that Clang emits into the same module.
+  void addStaticInitializer(llvm::Function *fn) {
+    assert(!EmittedStaticInitializers &&
+           "static initializer added after emitting global constructors");
+    StaticInitializers.push_back(fn);
+  }
+
   void constructInitialFnAttributes(
       llvm::AttrBuilder &Attrs,
       OptimizationMode FuncOptMode = OptimizationMode::NotSet,
@@ -1772,6 +1834,14 @@ public:
   void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
+  /// Get a slot holding a weak reference to the type context descriptor of a
+  /// back-deployed type in its defining module, as opposed to this module's
+  /// copy of it. The slot is null when that module doesn't provide the type at
+  /// runtime.
+  llvm::Constant *getAddrOfDefiningModuleTypeDescriptorSlot(
+      NominalTypeDecl *decl);
+  llvm::Constant *
+  emitCanonicalTypeProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
 
@@ -1915,6 +1985,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfTypeMetadataMangledNameRef(CanType type,
+                                                      ConstantInit definition);
   llvm::Constant *getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
       NominalTypeDecl *decl);
   llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
@@ -2047,7 +2119,8 @@ public:
 
   llvm::Function *
   getAddrOfDistributedTargetAccessor(LinkEntity accessor,
-                                     ForDefinition_t forDefinition);
+                                     ForDefinition_t forDefinition,
+                                     bool hasIsolatedActorParameter);
 
   /// Emit a distributed accessor function for the given distributed thunk or
   /// protocol requirement.
@@ -2163,6 +2236,11 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+
+  /// Whether the runtime support for `Builtin.Borrow` of a non-fixed referent
+  /// (swift_getBorrowTypeMetadata and friends) is guaranteed to exist at the
+  /// deployment target. If not, IRGen computes that layout inline.
+  bool isBorrowRuntimeAvailable();
   bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;

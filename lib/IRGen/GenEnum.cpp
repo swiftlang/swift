@@ -106,6 +106,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/IRGen/Linking.h"
@@ -7053,7 +7054,7 @@ namespace {
 
 const EnumImplStrategy &
 irgen::getEnumImplStrategy(IRGenModule &IGM, SILType ty) {
-  assert(ty.getEnumOrBoundGenericEnum() && "not an enum");
+  assert(ty.getEnumDecl() && "not an enum");
   auto *ti = &IGM.getTypeInfo(ty);
   if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(ti))
     return loadableTI->as<LoadableEnumTypeInfo>().Strategy;
@@ -7202,7 +7203,7 @@ CCompatibleEnumImplStrategy::completeEnumTypeLayout(TypeConverter &TC,
          && "c-compatible enum didn't come from clang!");
   assert(theEnum->hasRawType()
          && "c-compatible enum doesn't have raw type!");
-  assert(!theEnum->getDeclaredTypeInContext()->is<BoundGenericType>()
+  assert(!theEnum->isGenericContext()
          && "c-compatible enum is generic!");
 
   // The raw type should be a C integer type, which should have a single
@@ -7276,6 +7277,19 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
     ExtraTagBitCount = llvm::Log2_32(NumExtraTagValues-1) + 1;
   }
 
+  // A spare bit mask is an APInt, whose width in bits must fit in 32 bits.
+  // Reject an enum whose mask would not fit, and lay it out dynamically so
+  // that IRGen can continue far enough to finish diagnosing.
+  if (!llvm::isUInt<32>(Size(payloadTI.getFixedSize().getValue() +
+                             (ExtraTagBitCount + 7) / 8)
+                            .getValueInBits())) {
+    TC.IGM.Context.Diags.diagnose(theEnum->getLoc(),
+                                  diag::spare_bits_type_too_large, true,
+                                  Type.getASTType());
+    TIK = Opaque;
+    return completeDynamicLayout(TC, Type, theEnum, enumTy);
+  }
+
   // Create the body type.
   setTaggedEnumBody(TC.IGM, enumTy,
                     payloadTI.getFixedSize().getValueInBits(),
@@ -7304,8 +7318,6 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
 
   auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
 
   auto isABIAccessible = isTypeABIAccessibleIfFixedSize(TC.IGM,
                                                         Type.getASTType());
@@ -7313,7 +7325,9 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeFixedLayout(
       enumTy, Size(sizeWithTag), spareBits.build(), alignment,
       deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
       payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
-      copyable, isABIAccessible);
+      // Computed from the declaration and the payload, not the declaration
+      // alone: Optional<NC> is not Copyable.
+      Copyable, isABIAccessible);
 
   if (TIK >= Loadable && CopyDestroyKind == Normal) {
     computePayloadTypesAndTagType(TC.IGM, *TI, PayloadTypesAndTagType);
@@ -7343,13 +7357,11 @@ TypeInfo *SinglePayloadEnumImplStrategy::completeDynamicLayout(
 
   auto deinit = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
-  auto copyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   return registerEnumTypeInfo(new NonFixedEnumTypeInfo(*this, enumTy,
          alignment,
          deinit & payloadTI.isTriviallyDestroyable(ResilienceExpansion::Maximal),
          payloadTI.getBitwiseTakable(ResilienceExpansion::Maximal),
-         copyable,
+         Copyable,
          enumAccessible));
 }
 
@@ -7379,8 +7391,6 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
   // of the largest payload.
   CommonSpareBits = {};
   Alignment worstAlignment(1);
-  auto isCopyable = !theEnum->canBeCopyable()
-    ? IsNotCopyable : IsCopyable;
   auto isTriviallyDestroyable = theEnum->hasValueTypeDestructor()
     ? IsNotTriviallyDestroyable : IsTriviallyDestroyable;
   IsBitwiseTakable_t isBT = IsBitwiseTakableAndBorrowable;
@@ -7448,6 +7458,20 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     ? 0 : numTagBits - commonSpareBitCount;
   NumExtraTagValues =
       (commonSpareBitCount < 32) ? numTags >> commonSpareBitCount : 0;
+
+  // A spare bit mask is an APInt, whose width in bits must fit in 32 bits.
+  // Reject an enum whose mask would not fit, and lay it out dynamically so
+  // that IRGen can continue far enough to finish diagnosing.
+  if (!llvm::isUInt<32>(
+          Size(PayloadSize + (ExtraTagBitCount + 7) / 8).getValueInBits())) {
+    TC.IGM.Context.Diags.diagnose(theEnum->getLoc(),
+                                  diag::spare_bits_type_too_large, true,
+                                  Type.getASTType());
+    TIK = Opaque;
+    AllowFixedLayoutOptimizations = false;
+    CommonSpareBits = {};
+    return completeDynamicLayout(TC, Type, theEnum, enumTy);
+  }
 
   // Create the type. We need enough bits to store the largest payload plus
   // extra tag bits we need.
@@ -7524,7 +7548,8 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
                                                         Type.getASTType());
   getFixedEnumTypeInfo(enumTy, Size(sizeWithTag), std::move(spareBits),
                        worstAlignment, isTriviallyDestroyable, isBT,
-                       isCopyable, isABIAccessible);
+                       // Computed from the declaration and every payload.
+                       Copyable, isABIAccessible);
 
   if (TIK >= Loadable &&
       (CopyDestroyKind == Normal || CopyDestroyKind == BitwiseTakable)) {

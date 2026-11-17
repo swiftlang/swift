@@ -387,7 +387,7 @@ private:
 
   bool isClassElementTypeArray(SILValue Arr) {
     auto Ty = Arr->getType();
-    if (auto BGT = Ty.getAs<BoundGenericStructType>()) {
+    if (auto BGT = Ty.getAs<StructType>()) {
       // Check the array element type parameter.
       bool isClass = false;
       for (auto EltTy : BGT->getGenericArgs()) {
@@ -536,10 +536,7 @@ protected:
     SSAUp.addAvailableValue(OrigBB, V);
     SILValue NewVal = getMappedValue(V);
     SSAUp.addAvailableValue(getOpBasicBlock(OrigBB), NewVal);
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SSAUp.rewriteUse(*Use);
-    }
+    SSAUp.rewriteUses(UseList);
   }
 
   void updateSSAForm() {
@@ -617,7 +614,7 @@ protected:
 static SILValue createStructExtract(SILBuilder &B, SILLocation Loc,
                                     SILValue Opd, unsigned FieldNo) {
   SILType Ty = Opd->getType();
-  auto SD = Ty.getStructOrBoundGenericStruct();
+  auto SD = Ty.getStructDecl();
   auto Properties = SD->getStoredProperties();
   unsigned Counter = 0;
   for (auto *D : Properties)
@@ -821,8 +818,10 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
     // possible loop-nest.
     SmallVector<SILBasicBlock *, 16> HoistableLoopNests;
     std::function<void(SILLoop *)> processChildren = [&](SILLoop *L) {
-      ArrayPropertiesAnalysis Analysis(L, DA, deb);
-      if (Analysis.run()) {
+      // Note that the analysis must not be alive while recursing into
+      // sub-loops. Otherwise its BasicBlockSet would limit the maximum loop
+      // nesting depth to the number of available block bits.
+      if (ArrayPropertiesAnalysis(L, DA, deb).run()) {
         // Hoist in the current loop nest.
         HasChanged = true;
         HoistableLoopNests.push_back(L->getLoopPreheader());

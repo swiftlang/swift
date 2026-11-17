@@ -20,8 +20,10 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
@@ -38,7 +40,6 @@
 #include "GenMeta.h"
 #include "GenProto.h"
 #include "GenType.h"
-#include "GenValueWitness.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
@@ -183,6 +184,11 @@ static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
   if (!nom->getModuleContext()->isStdlibModule())
     return false;
 
+  // A back-deployed type that this module emits its own copy of isn't known to
+  // the runtimes it is back-deployed to, so their demangler can't find it.
+  if (nom->isBackDeployedIntoClient())
+    return false;
+
   // If there's an @_originallyDefined(in:) attribute, then the nominal is
   // not always available for demangling.
   for (auto attr: nom->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
@@ -195,7 +201,8 @@ static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
 }
 
 std::optional<llvm::VersionTuple>
-getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+getRuntimeVersionThatSupportsDemanglingType(CanType type,
+                                            CanGenericSignature genericSig) {
   enum VersionRequirement {
     None,
     Swift_5_2,
@@ -203,9 +210,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_6_0,
     Swift_6_1,
     Swift_6_2,
+    Swift_6_5,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_2
+    Latest = Swift_6_5
   };
 
   VersionRequirement latestRequirement = None;
@@ -221,6 +229,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
       auto isolation = fn->getIsolation();
       auto sendingResult = fn->hasSendingResult();
+
+      // The Swift 6.5 runtime is the first version able to demangle function
+      // types with execution semantics.
+      if (fn->getExecutionSemantics())
+        return addRequirement(Swift_6_5);
 
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
@@ -265,6 +278,37 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       // involving them.
     }
 
+    // Retroactive conformances are mangled after the generic arguments.
+    // Pack conformances need the Swift 6.0 runtime and conformances of
+    // opaque archetypes need the Swift 6.2 runtime to demangle them.
+    if (latestRequirement < Swift_6_2 &&
+        (t->hasPack() || t->hasOpaqueArchetype())) {
+      // Only opaque types and bound generic types have a list of
+      // conformances mangled after their generic arguments, where "HO" and
+      // "HX" can appear.
+      SubstitutionMap subs;
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t))
+        subs = opaque->getSubstitutions();
+      else if (t->isSpecialized())
+        subs = t->getContextSubstitutionMap();
+      if (llvm::any_of(subs.getConformances(),
+                       Mangle::ASTMangler::containsRetroactiveConformance)) {
+        // Check which of these the mangled name actually contains.
+        auto name = IRGenMangler(t->getASTContext())
+                        .mangleTypeWithoutPrefix(t, genericSig);
+        Demangle::Context ctx;
+        auto *root = ctx.demangleTypeAsNode(name);
+        ASSERT(root && "IRGen mangling should be demangleable");
+        auto contains = [&](Demangle::Node::Kind kind) {
+          return root->findByKind(kind, INT_MAX);
+        };
+        if (contains(Demangle::Node::Kind::DependentProtocolConformanceOpaque))
+          return addRequirement(Swift_6_2);
+        if (contains(Demangle::Node::Kind::PackProtocolConformance))
+          return addRequirement(Swift_6_0);
+      }
+    }
+
     /// Any nominal type that has an inverse requirement in its generic
     /// signature uses NoncopyableGenerics. Since inverses are mangled into
     /// symbols, a Swift 6.0+ runtime is generally needed to demangle them.
@@ -272,7 +316,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     /// We make an exception for some types in the stdlib, like Optional, since
     /// the runtime should still be able to demangle them, based on the
     /// availability of the type.
-    if (auto nominalTy = dyn_cast<NominalOrBoundGenericNominalType>(t)) {
+    if (auto nominalTy = dyn_cast<NominalType>(t)) {
       auto *nom = nominalTy->getDecl();
       if (auto sig = nom->getGenericSignature()) {
         SmallVector<InverseRequirement, 2> inverses;
@@ -294,6 +338,7 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
   });
 
   switch (latestRequirement) {
+  case Swift_6_5: return llvm::VersionTuple(6, 5);
   case Swift_6_2: return llvm::VersionTuple(6, 2);
   case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
@@ -473,11 +518,12 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
 }
 
 bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
-                                                      CanType type) {
+                                                      CanType type,
+                                                      CanGenericSignature sig) {
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           IGM.Context.LangOpts.Target)) {
     if (auto minimumSupportedRuntimeVersion =
-            getRuntimeVersionThatSupportsDemanglingType(type)) {
+            getRuntimeVersionThatSupportsDemanglingType(type, sig)) {
       if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
         return true;
       }
@@ -560,10 +606,30 @@ getTypeRefImpl(IRGenModule &IGM,
     // in-process.
     IGM.IRGen.noteUseOfTypeMetadata(type);
 
+    // ObjC lightweight-generic classes (e.g. NSArray<T>) have their type
+    // parameters erased at runtime. The mangled type metadata string
+    // embeds the class name textually and the runtime resolves it via
+    // objc_getClass(). Without a linker-visible reference, the linker may
+    // not extract the archive member defining the class when linking
+    // static archives without -ObjC. Emit a classref to force extraction.
+    if (IGM.ObjCInterop) {
+      type.visit([&](Type t) {
+        auto *nominal = t->getAnyNominal();
+        if (!nominal)
+          return;
+        auto *classDecl = dyn_cast<ClassDecl>(nominal);
+        if (!classDecl)
+          return;
+        if (!classDecl->isTypeErasedGenericClass())
+          return;
+        (void)IGM.getAddrOfObjCClassRef(classDecl);
+      });
+    }
+
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
-    if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
+    if (mangledNameIsUnknownToDeployTarget(IGM, type, sig)) {
       return getTypeRefByFunction(IGM, sig, type, role);
     }
 
@@ -739,10 +805,14 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
   // Drill down to the i8* at the beginning of the constant.
   auto addr = llvm::ConstantExpr::getBitCast(var, Int8PtrTy);
 
-  // Set the low bit.
+  // Set the low bit. The GEP is inbounds (the string is at least two bytes
+  // long) so LLVM can see through it and recognize the relative references to
+  // this string as link-time constants; otherwise, on ELF, the referencing
+  // descriptors would be placed in a writable .rodata section.
   unsigned bit = ProtocolRequirementFlags::AssociatedTypeMangledNameBit;
   auto bitConstant = llvm::ConstantInt::get(IntPtrTy, bit);
-  addr = llvm::ConstantExpr::getGetElementPtr(Int8Ty, addr, bitConstant);
+  addr = llvm::ConstantExpr::getInBoundsGetElementPtr(Int8Ty, addr,
+                                                      bitConstant);
 
   // Update the entry.
   entry = {var, addr};
@@ -1279,74 +1349,6 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
   builder.emit();
 }
 
-class MultiPayloadEnumDescriptorBuilder : public ReflectionMetadataBuilder {
-  CanType type;
-  CanType typeInContext;
-  const FixedTypeInfo *ti;
-
-public:
-  MultiPayloadEnumDescriptorBuilder(IRGenModule &IGM,
-                                    const NominalTypeDecl *nominalDecl)
-    : ReflectionMetadataBuilder(IGM) {
-    type = nominalDecl->getDeclaredType()->getCanonicalType();
-    typeInContext = nominalDecl->getDeclaredTypeInContext()->getCanonicalType();
-    ti = &cast<FixedTypeInfo>(IGM.getTypeInfoForUnlowered(typeInContext));
-  }
-
-  void layout() override {
-    auto &strategy = getEnumImplStrategy(IGM, typeInContext);
-    bool isMPE = strategy.getElementsWithPayload().size() > 1;
-    assert(isMPE && "Cannot emit Multi-Payload Enum data for an enum that "
-                    "doesn't have multiple payloads");
-
-    const TypeInfo &TI = strategy.getTypeInfo();
-    auto fixedTI = dyn_cast<FixedTypeInfo>(&TI);
-    assert(fixedTI != nullptr &&
-           "MPE reflection records can only be emitted for fixed-layout enums");
-
-    auto spareBitsMaskInfo = strategy.calculateSpareBitsMask();
-
-    // Never write an MPE descriptor bigger than 16k
-    // The runtime will fall back on its own internal
-    // spare bits calculation for this (very rare) case.
-    if (!spareBitsMaskInfo)
-      return;
-
-    auto bits = spareBitsMaskInfo->bits;
-
-    addTypeRef(type, CanGenericSignature());
-
-    bool usesPayloadSpareBits = spareBitsMaskInfo->bytesInMask > 0;
-
-    // MPE record contents are a multiple of 32-bits
-    uint32_t contentsSizeInWords = 1; /* Size + flags is mandatory */
-    if (usesPayloadSpareBits) {
-      contentsSizeInWords += 1 /* SpareBits byte count */
-                             + spareBitsMaskInfo->wordsInMask();
-    }
-
-    uint32_t flags = usesPayloadSpareBits ? 1 : 0;
-
-    B.addInt32((contentsSizeInWords << 16) | flags);
-
-    if (usesPayloadSpareBits) {
-      B.addInt32((spareBitsMaskInfo->byteOffset << 16) |
-                 spareBitsMaskInfo->bytesInMask);
-      // TODO: Endianness??
-      for (unsigned i = 0; i < spareBitsMaskInfo->wordsInMask(); ++i) {
-        uint32_t nextWord = bits.extractBitsAsZExtValue(32, 0);
-        B.addInt32(nextWord);
-        bits.lshrInPlace(32);
-      }
-    }
-  }
-
-  llvm::GlobalVariable *emit() {
-    auto section = IGM.getMultiPayloadEnumDescriptorSectionName();
-    return ReflectionMetadataBuilder::emit(std::nullopt, section);
-  }
-};
-
 /// Builds a constant LLVM struct describing the layout of a fixed-size
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
@@ -1539,7 +1541,7 @@ public:
             const irgen::MetadataSource &Source,
             const MetadataPath &Path) {
 
-      const reflection::MetadataSource *Root;
+      const reflection::MetadataSource *Root = nullptr;
       switch (Source.getKind()) {
       case irgen::MetadataSource::Kind::SelfMetadata:
       case irgen::MetadataSource::Kind::SelfWitnessTable:
@@ -1727,12 +1729,6 @@ const char *IRGenModule::getReflectionTypeRefSectionName() {
   return ReflectionTypeRefSection.c_str();
 }
 
-const char *IRGenModule::getMultiPayloadEnumDescriptorSectionName() {
-  if (MultiPayloadEnumDescriptorSection.empty())
-    MultiPayloadEnumDescriptorSection = getReflectionSectionName(*this, "mpenum", "mpen");
-  return MultiPayloadEnumDescriptorSection.c_str();
-}
-
 llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
   auto &entry = FieldNames[Name];
   if (entry.second)
@@ -1867,7 +1863,6 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   auto T = D->getDeclaredTypeInContext()->getCanonicalType();
 
   bool needsOpaqueDescriptor = false;
-  bool needsMPEDescriptor = false;
   bool needsFieldDescriptor = true;
 
   if (isa<EnumDecl>(D)) {
@@ -1881,13 +1876,11 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
 
     // If this is a fixed-size multi-payload enum, we have to emit a descriptor
-    // with the size and alignment of the type and another with the spare bit
-    // mask data, because the reflection library cannot consistently derive this
-    // information at runtime.
+    // with the size and alignment of the type, because the reflection library
+    // cannot derive this information at runtime.
     if (strategy.getElementsWithPayload().size() > 1 &&
         !strategy.needsPayloadSizeInMetadata()) {
       needsOpaqueDescriptor = true;
-      needsMPEDescriptor = true;
     }
   }
 
@@ -1931,11 +1924,6 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
     }
     
     FixedTypeMetadataBuilder builder(*this, D);
-    builder.emit();
-  }
-
-  if (needsMPEDescriptor) {
-    MultiPayloadEnumDescriptorBuilder builder(*this, D);
     builder.emit();
   }
 

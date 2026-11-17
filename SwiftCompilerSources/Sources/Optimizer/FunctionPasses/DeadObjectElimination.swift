@@ -312,11 +312,13 @@ private struct UseCollector : AddressDefUseWalker {
 
       case is FixLifetimeInst,
            is EndBorrowInst,
+           is EndLifetimeInst,
            is DebugValueInst:
         break
 
       case is BeginBorrowInst,
            is MoveValueInst,
+           is UncheckedOwnershipConversionInst,
            is EndInitLetRefInst,
            is BeginDeallocRefInst,
            is UpcastInst,

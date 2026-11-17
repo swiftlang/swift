@@ -551,6 +551,101 @@ public enum EnumWithTwoSameAddressOnlyPayloads<T> {
   }
 }
 
+// A switch over a noncopyable address-only enum matches on a borrow of the
+// subject, not on a copy of it.
+struct NoncopyableIdle<T>: ~Copyable { var value: T? }
+enum NoncopyableState<T>: ~Copyable { case idle(NoncopyableIdle<T>), other }
+
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen26noncopyableBorrowingSwitchyxSgAA16NoncopyableStateOyxGlF :
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [fixed] {{%[^,]+}} : $NoncopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $NoncopyableState<T>, case #NoncopyableState.idle!enumelt: [[IDLE:bb[0-9]+]],
+// CHECK:       [[IDLE]]({{%[^,]+}} : @guaranteed $NoncopyableIdle<T>):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen26noncopyableBorrowingSwitchyxSgAA16NoncopyableStateOyxGlF'
+func noncopyableBorrowingSwitch<T>(_ s: borrowing NoncopyableState<T>) -> T? {
+  switch s {
+  case .idle(let idle): return idle.value
+  case .other: return nil
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen35noncopyableBorrowingSwitchNoBindingySbAA16NoncopyableStateOyxGlF :
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [fixed] {{%[^,]+}} : $NoncopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $NoncopyableState<T>,
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen35noncopyableBorrowingSwitchNoBindingySbAA16NoncopyableStateOyxGlF'
+func noncopyableBorrowingSwitchNoBinding<T>(_ s: borrowing NoncopyableState<T>) -> Bool {
+  switch s {
+  case .idle: return true
+  case .other: return false
+  }
+}
+
+// The cases are matched on a borrow, and the chosen payload is then taken from
+// the owned subject.
+//
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen26noncopyableConsumingSwitchyxSgAA16NoncopyableStateOyxGnlF :
+// CHECK:         [[SUBJECT:%[^,]+]] = load [take] {{%[^,]+}} : $*NoncopyableState<T>
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [fixed] [[SUBJECT]] : $NoncopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $NoncopyableState<T>, case #NoncopyableState.idle!enumelt: [[IDLE:bb[0-9]+]],
+// CHECK:       [[IDLE]]({{%[^,]+}} : @guaranteed $NoncopyableIdle<T>):
+// CHECK:         end_borrow [[BORROW]] : $NoncopyableState<T>
+// CHECK:         unchecked_enum_data [[SUBJECT]] : $NoncopyableState<T>, #NoncopyableState.idle!enumelt
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen26noncopyableConsumingSwitchyxSgAA16NoncopyableStateOyxGnlF'
+func noncopyableConsumingSwitch<T>(_ s: consuming NoncopyableState<T>) -> T? {
+  switch consume s {
+  case .idle(let idle): return idle.value
+  case .other: return nil
+  }
+}
+
+// When a later case can still match, a switch over a copyable address-only
+// enum matches on a borrow of the subject's copy.
+struct CopyableIdle<T> { var value: T? }
+enum CopyableState<T> { case idle(CopyableIdle<T>), count(Int), other }
+
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen30copyableBorrowingSwitchDefaultyxSgAA13CopyableStateOyxGlF :
+// CHECK:         [[COPY:%[^,]+]] = copy_value %0 : $CopyableState<T>
+// CHECK-NEXT:    [[BORROW:%[^,]+]] = begin_borrow [[COPY]] : $CopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $CopyableState<T>, case #CopyableState.idle!enumelt: [[IDLE:bb[0-9]+]], default [[DEFAULT:bb[0-9]+]]
+// CHECK:       [[IDLE]]({{%[^,]+}} : @guaranteed $CopyableIdle<T>):
+// CHECK:       [[DEFAULT]]({{%[^,]+}} : @guaranteed $CopyableState<T>):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen30copyableBorrowingSwitchDefaultyxSgAA13CopyableStateOyxGlF'
+func copyableBorrowingSwitchDefault<T>(_ s: CopyableState<T>) -> T? {
+  switch s {
+  case .idle(let idle): return idle.value
+  default: return nil
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen28copyableBorrowingSwitchGuardySiAA13CopyableStateOyxGlF :
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow {{%[^,]+}} : $CopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $CopyableState<T>, case #CopyableState.count!enumelt: {{bb[0-9]+}}, case #CopyableState.idle!enumelt: [[IDLE:bb[0-9]+]],
+// CHECK:       [[IDLE]]({{%[^,]+}} : @guaranteed $CopyableIdle<T>):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen28copyableBorrowingSwitchGuardySiAA13CopyableStateOyxGlF'
+func copyableBorrowingSwitchGuard<T>(_ s: CopyableState<T>) -> Int {
+  switch s {
+  case .count(let n) where n > 0: return n
+  case .idle: return -1
+  default: return 0
+  }
+}
+
+enum CopyableOuter<T> { case state(CopyableState<T>), none }
+
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s20opaque_values_silgen29copyableBorrowingSwitchNestedyxSgAA13CopyableOuterOyxGlF :
+// CHECK:         switch_enum {{%[^,]+}} : $CopyableOuter<T>, case #CopyableOuter.state!enumelt: [[STATE:bb[0-9]+]],
+// CHECK:       [[STATE]]([[PAYLOAD:%[^,]+]] : @owned $CopyableState<T>):
+// CHECK-NEXT:    [[BORROW:%[^,]+]] = begin_borrow [[PAYLOAD]] : $CopyableState<T>
+// CHECK-NEXT:    switch_enum [[BORROW]] : $CopyableState<T>, case #CopyableState.idle!enumelt: [[IDLE:bb[0-9]+]],
+// CHECK:       [[IDLE]]({{%[^,]+}} : @guaranteed $CopyableIdle<T>):
+// CHECK-LABEL: } // end sil function '$s20opaque_values_silgen29copyableBorrowingSwitchNestedyxSgAA13CopyableOuterOyxGlF'
+func copyableBorrowingSwitchNested<T>(_ o: CopyableOuter<T>) -> T? {
+  switch o {
+  case .state(.idle(let idle)): return idle.value
+  case .state: return nil
+  case .none: return nil
+  }
+}
+
 
 // Verify exit block arguments are ordered correctly.
 // 

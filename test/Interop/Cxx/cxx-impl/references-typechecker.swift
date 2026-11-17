@@ -10,9 +10,9 @@ import References
 
 
 // A mutable reference is implemented by an `inout` parameter, a const
-// reference by a plain by-value parameter, and a reference return by a
-// non-optional pointer. An implementation with a reference parameter must be
-// marked `@unsafe`.
+// reference by a `borrowing` parameter, and a reference return by a
+// non-optional pointer. An implementation with a reference
+// parameter must be marked `@unsafe`.
 
 @unsafe @cxx @implementation
 func addOne(_ x: inout CInt) -> CInt {
@@ -28,7 +28,7 @@ func swapRefs(_ a: inout CInt, _ b: inout CInt) {
 }
 
 @unsafe @cxx @implementation
-func readConstRef(_ x: CInt) -> CInt { return x * 10 }
+func readConstRef(_ x: borrowing CInt) -> CInt { return x * 10 }
 
 
 // Reference returns
@@ -60,7 +60,7 @@ func reseatPtr(_ p: inout UnsafeMutablePointer<CInt>?) { p = refStorage }
 func refOverload(_ x: inout CInt) { x += 100 }
 
 @unsafe @cxx @implementation
-func refOverload(_ x: CInt) { referencesGlobal = x }
+func refOverload(_ x: borrowing CInt) { referencesGlobal = copy x }
 
 @cxx @implementation
 func refOverload(_ p: UnsafeMutablePointer<CInt>) { p.pointee += 1000 }
@@ -83,7 +83,7 @@ extension Accumulator {
 func bumpTotal(_ acc: inout Accumulator) { acc.total += 1 }
 
 @unsafe @cxx @implementation
-func readTotal(_ acc: Accumulator) -> CInt { return acc.total }
+func readTotal(_ acc: borrowing Accumulator) -> CInt { return acc.total }
 
 
 // An implementation with reference parameters that is not marked `@unsafe`
@@ -98,7 +98,7 @@ func missingUnsafeParam(
 // expected-error@+2{{global function 'missingUnsafeConstParam' must be marked '@unsafe' to implement C++ function 'missingUnsafeConstParam'}}{{-1:1-1=@unsafe }}
 @cxx @implementation
 func missingUnsafeConstParam(
-  _ x: CInt // expected-note{{C++ callers may modify parameter 'x' through another reference during the call}}
+  _ x: borrowing CInt // expected-note{{C++ callers may modify parameter 'x' through another reference during the call}}
 ) -> CInt { return x }
 
 // expected-error@+2{{global function 'missingUnsafeMixed' must be marked '@unsafe' to implement C++ function 'missingUnsafeMixed'}}{{-1:1-1=@unsafe }}
@@ -106,7 +106,7 @@ func missingUnsafeConstParam(
 func missingUnsafeMixed(
   _ a: CInt,
   _ b: inout CInt, // expected-note{{C++ callers may violate exclusive access to 'inout' parameter 'b'}}
-  _ c: CInt // expected-note{{C++ callers may modify parameter 'c' through another reference during the call}}
+  _ c: borrowing CInt // expected-note{{C++ callers may modify parameter 'c' through another reference during the call}}
 ) { b += a + c }
 
 // expected-error@+2{{global function 'missingUnsafeUnnamed' must be marked '@unsafe' to implement C++ function 'missingUnsafeUnnamed'}}{{-1:1-1=@unsafe }}
@@ -114,6 +114,17 @@ func missingUnsafeMixed(
 func missingUnsafeUnnamed(
   _ x: inout CInt // expected-note{{C++ callers may violate exclusive access to 'inout' parameter 'x'}}
 ) -> CInt { return x }
+
+
+// A const reference is borrowed for the call, so it must be `borrowing`.
+
+// expected-error@+2{{global function 'plainConstRef' cannot implement C++ function 'plainConstRef' because parameter 'x' must be 'borrowing' to match a C++ 'const' reference}}{{25-25=borrowing }}
+@unsafe @cxx @implementation
+func plainConstRef(_ x: CInt) -> CInt { return x }
+
+// expected-error@+2{{global function 'consumeConstRef' cannot implement C++ function 'consumeConstRef' because parameter 'x' must be 'borrowing' to match a C++ 'const' reference}}{{27-36=borrowing}}
+@unsafe @cxx @implementation
+func consumeConstRef(_ x: consuming CInt) -> CInt { return x }
 
 
 // RValue references are rejected.

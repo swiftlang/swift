@@ -125,21 +125,26 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
                                       clock: CInt,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
-  let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
+  // The deadline is an absolute time on `clock`, so schedule it as one.
+  let deadline = Duration(_seconds: seconds, nanoseconds: nanoseconds)
+
+  // A negative tolerance means that none was specified.
+  let leeway: Duration? = leewayNanoseconds < 0 ? nil
+    : Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
+
   if #available(StdlibDeploymentTarget 6.3, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
         Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
+          at: SuspendingClock.Instant(_value: deadline),
           tolerance: leeway,
           clock: .suspending
         )
       case _ClockID.continuous.rawValue:
         Task.defaultExecutor.asSchedulingExecutor!.enqueue(
           ExecutorJob(unownedJob),
-          after: delay,
+          at: ContinuousClock.Instant(_value: deadline),
           tolerance: leeway,
           clock: .continuous
         )

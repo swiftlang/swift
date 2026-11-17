@@ -1096,7 +1096,7 @@ getContextDescriptor(const Metadata *conformingType) {
   auto *existentialType = dyn_cast<ExistentialTypeMetadata>(conformingType);
   if (existentialType == nullptr ||
       existentialType->getProtocols().size() != 1 ||
-      existentialType->getSuperclassConstraint() != nullptr)
+      existentialType->isClassBounded())
     return {nullptr, {}};
 
   auto proto = existentialType->getProtocols()[0];
@@ -2473,7 +2473,8 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     SubstGenericParameterRefFn substGenericParam,
     SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
     SubstDependentWitnessTableRefFn substWitnessTable,
-    ConformanceExecutionContext *context) {
+    ConformanceExecutionContext *context,
+    unsigned numParamsExemptFromInvertibleChecks) {
   // The suppressed conformances for each generic parameter.
   llvm::SmallVector<InvertibleProtocolSet, 4> allSuppressed;
 
@@ -2512,6 +2513,11 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     // aliased to another type.
     if (!genericParams[index].hasKeyArgument())
       continue;
+
+    if (index < numParamsExemptFromInvertibleChecks) {
+      keyIndex++;
+      continue;
+    }
 
     InvertibleProtocolSet suppressed;
     if (index < allSuppressed.size())

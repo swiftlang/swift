@@ -5898,6 +5898,14 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
 
+  // Only the plain `any Error` uses the boxed Error representation. Adding
+  // AnyObject or a superclass makes it a standard class existential, matching
+  // ExistentialLayout::isErrorExistential in the compiler.
+  if (special == SpecialProtocol::Error &&
+      (key.ClassConstraint != ProtocolClassConstraint::Any ||
+       key.SuperclassConstraint != nullptr))
+    special = SpecialProtocol::None;
+
   // Calculate the class constraint and number of witness tables for the
   // protocol set.
   unsigned numWitnessTables = 0;

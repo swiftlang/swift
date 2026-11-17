@@ -167,7 +167,7 @@ namespace {
       }
 
       // Next, add the fields for the given class.
-      auto theClass = classType.getClassOrBoundGenericClass();
+      auto theClass = classType.getClassDecl();
       assert(theClass);
 
       if (theClass->getObjCImplementationDecl())
@@ -209,12 +209,21 @@ namespace {
     /// Adds a layout of a tail-allocated element.
     void addTailElement(const ElementLayout &Elt) {
       Elements.push_back(Elt);
+      auto &eltTI = cast<FixedTypeInfo>(Elt.getType());
       if (!addField(Elements.back(), LayoutStrategy::Universal)) {
         // For empty tail allocated elements we still add 1 padding byte.
-        assert(cast<FixedTypeInfo>(Elt.getType()).getFixedStride() == Size(1) &&
+        assert(eltTI.getFixedStride() == Size(1) &&
                "empty elements should have stride 1");
         StructFields.push_back(llvm::ArrayType::get(IGM.Int8Ty, 1));
         CurSize += Size(1);
+        return;
+      }
+      // Add trailing padding for the last element.
+      Size padding = eltTI.getFixedStride() - eltTI.getFixedSize();
+      if (!padding.isZero()) {
+        StructFields.push_back(
+            llvm::ArrayType::get(IGM.Int8Ty, padding.getValue()));
+        CurSize += padding;
       }
     }
 
@@ -243,7 +252,7 @@ namespace {
       } else if (theClass->hasSuperclass() &&
                  !theClass->isForeignReferenceType()) {
         SILType superclassType = classType.getSuperclass();
-        auto superclassDecl = superclassType.getClassOrBoundGenericClass();
+        auto superclassDecl = superclassType.getClassDecl();
         assert(superclassType && superclassDecl);
 
         if (IGM.hasResilientMetadata(superclassDecl,
@@ -553,7 +562,7 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
 
   // Create the StructLayout, which is transferred to the caller (the caller is
   // responsible for deleting it).
-  return new StructLayout(builder, classType.getClassOrBoundGenericClass(),
+  return new StructLayout(builder, classType.getClassDecl(),
                           ResultTy, builder.getElements());
 }
 
@@ -716,7 +725,7 @@ MemberAccessStrategy
 irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
                                             SILType baseType, VarDecl *field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
-  ClassDecl *baseClass = baseType.getClassOrBoundGenericClass();
+  ClassDecl *baseClass = baseType.getClassDecl();
 
   auto &classLayout = baseClassTI.getClassLayout(IGM, baseType,
                                                /*forBackwardDeployment=*/false);
@@ -764,7 +773,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
                                                              ClassType);
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                        ClassType.getClassOrBoundGenericClass(),
+                                        ClassType.getClassDecl(),
                                         metadata).first;
   }
   // Align up to the TailType.
@@ -921,7 +930,7 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     } else {
       std::tie(size, alignMask)
         = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                       selfType.getClassOrBoundGenericClass(),
+                                       selfType.getClassDecl(),
                                        metadata);
     }
 
@@ -973,7 +982,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   llvm::Value *size, *alignMask;
   std::tie(size, alignMask)
     = emitClassResilientInstanceSizeAndAlignMask(IGF,
-                                   selfType.getClassOrBoundGenericClass(),
+                                   selfType.getClassDecl(),
                                    metadata);
   std::tie(size, alignMask)
     = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
@@ -1019,7 +1028,7 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
 void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                   SILType selfType,
                                   llvm::Value *selfValue) {
-  auto *theClass = selfType.getClassOrBoundGenericClass();
+  auto *theClass = selfType.getClassDecl();
 
   // We want to deallocate default actors or potential default
   // actors differently.  We assume that being a default actor
@@ -1066,7 +1075,7 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          SILType selfType,
                                          llvm::Value *selfValue,
                                          llvm::Value *metadataValue) {
-  auto *theClass = selfType.getClassOrBoundGenericClass();
+  auto *theClass = selfType.getClassDecl();
   assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
@@ -1265,6 +1274,16 @@ namespace {
           return InstanceMethods;
         }
       }
+    }
+
+    /// Adds \p method to the appropriate method list for \p decl, unless the
+    /// method is skipped during lowering.
+    void addMethod(SmallVectorImpl<MethodDescriptor> &methodList,
+                   AbstractFunctionDecl *method) {
+      if (!method->isAvailableDuringLowering())
+        return;
+
+      methodList.push_back(method);
     }
 
   public:
@@ -1805,14 +1824,14 @@ namespace {
       // Don't emit getters/setters for @NSManaged methods.
       if (method->getAttrs().hasAttribute<NSManagedAttr>()) return;
 
-      getMethodList(method).push_back(method);
+      addMethod(getMethodList(method), method);
     }
 
     /// Constructors need to be collected into the appropriate methods list.
     void visitConstructorDecl(ConstructorDecl *constructor) {
       if (!isBuildingProtocol() &&
           !requiresObjCMethodDescriptor(constructor)) return;
-      getMethodList(constructor).push_back(constructor);
+      addMethod(getMethodList(constructor), constructor);
     }
 
     /// Determine whether the given destructor has an Objective-C
@@ -1840,7 +1859,7 @@ namespace {
       auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
-        InstanceMethods.push_back(destructor);
+        addMethod(getMethodList(destructor), destructor);
       }
     }
 
@@ -1891,8 +1910,7 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
-      if (!method->isAvailableDuringLowering())
-        return;
+      ASSERT(method->isAvailableDuringLowering());
 
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
@@ -2196,6 +2214,9 @@ namespace {
 
     /// Properties need to be collected in the properties list.
     void visitProperty(VarDecl *var) {
+      if (!var->isAvailableDuringLowering())
+        return;
+
       if (requiresObjCPropertyDescriptor(IGM, var)) {
         if (var->isStatic()) {
           ClassProperties.push_back(var);
@@ -2212,11 +2233,10 @@ namespace {
         if (var->getAttrs().hasAttribute<NSManagedAttr>())
           return;
 
-        auto &methods = getMethodList(var);
-        methods.push_back(getter);
+        addMethod(getMethodList(var), getter);
 
         if (auto setter = var->getOpaqueAccessor(AccessorKind::Set))
-          methods.push_back(setter);
+          addMethod(getMethodList(var), setter);
       }
     }
     
@@ -2248,8 +2268,11 @@ namespace {
       auto hasObjectEncoding = typeEnc[0] == '@';
       
       // Determine the assignment semantics.
-      // Get-only properties are (readonly).
-      if (!prop->isSettable(propDC))
+      // Get-only properties are (readonly). So are properties with a setter
+      // that is unavailable during lowering.
+      auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+      if (!prop->isSettable(propDC) ||
+          (setter && !setter->isAvailableDuringLowering()))
         outs << ",R";
       // Weak and Unowned properties are (weak).
       else if (prop->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
@@ -2471,11 +2494,10 @@ namespace {
       auto getter = subscript->getOpaqueAccessor(AccessorKind::Get);
       if (!getter) return;
 
-      auto &methods = getMethodList(subscript);
-      methods.push_back(getter);
+      addMethod(getMethodList(subscript), getter);
 
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
-        methods.push_back(setter);
+        addMethod(getMethodList(subscript), setter);
     }
     
     SWIFT_DEBUG_DUMP {
@@ -2754,7 +2776,7 @@ static llvm::Constant *doEmitClassPrivateData(
 
 llvm::Constant *irgen::emitSpecializedGenericClassPrivateData(
     IRGenModule &IGM, ClassDecl *theClass, CanType theType) {
-  assert(theType->getClassOrBoundGenericClass() == theClass);
+  assert(theType->getClassDecl() == theClass);
   assert(theClass->getGenericEnvironment());
   Type ty = theType;
   PrettyStackTraceType stackTraceRAII(theClass->getASTContext(),
@@ -2974,7 +2996,7 @@ CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, ClassDecl *C) {
 
 CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
                                         bool useArchetypes) {
-  auto cls = type->getClassOrBoundGenericClass();
+  auto cls = type->getClassDecl();
   if (cls->isNativeNSObjectSubclass()) {
     return getSuperclassDeclForMetadata(IGM, cls)->getDeclaredInterfaceType()
                                                  ->getCanonicalType();
@@ -3050,7 +3072,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
 bool irgen::hasKnownSwiftMetadata(IRGenModule &IGM, CanType type) {
   // This needs to be kept up-to-date with getIsaEncodingForType.
 
-  if (ClassDecl *theClass = type.getClassOrBoundGenericClass()) {
+  if (ClassDecl *theClass = type.getClassDecl()) {
     return hasKnownSwiftMetadata(IGM, theClass);
   }
 
@@ -3109,7 +3131,13 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
-  assert(!method.getOverridden() && "must always be base method");
+  // The type ID is that of the method that introduces the vtable slot. Usually
+  // that is a method that doesn't override anything, but an override can also
+  // introduce a slot of its own. For example, a public override of an internal
+  // method needs a new slot because clients outside the module can't see the
+  // overridden method's slot (an ABI-incompatible override is another case).
+  assert((!method.getOverridden() || method.requiresNewVTableEntry()) &&
+         "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
   auto mangled = entity.mangleAsString(IGM.Context);

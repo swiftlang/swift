@@ -644,6 +644,23 @@ func copyGenArray<T>(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count:
   Builtin.assignTakeArray(T.self, dest, src, count)
 }
 
+// Zero-sized trivial elements have no bytes to move, and their addresses may be
+// undef, so nothing is emitted for them.
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins14copyEmptyArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2) {{.*}} {
+// CHECK-NOT:     call {{.*}}@llvm.memcpy
+// CHECK-NOT:     call {{.*}}@llvm.memmove
+// CHECK-NOT:     call {{.*}}@swift_array
+// CHECK:         ret void
+func copyEmptyArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
+  Builtin.copyArray(Empty.self, dest, src, count)
+  Builtin.takeArrayFrontToBack(Empty.self, dest, src, count)
+  Builtin.takeArrayBackToFront(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(Empty.self, dest, src, count)
+  Builtin.assignTakeArray(Empty.self, dest, src, count)
+}
+
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins24conditionallyUnreachableyyF"
 // CHECK-NEXT:  entry
 // CHECK-NEXT:    unreachable

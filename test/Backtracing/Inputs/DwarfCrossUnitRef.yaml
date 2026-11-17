@@ -1,0 +1,91 @@
+## A hand-crafted ELF object holding two DWARF v5 units that use different
+## abbreviation tables, in the style produced by `dwz`: a partial unit
+## containing a subprogram, and a compile unit with an inlined subroutine
+## whose DW_AT_abstract_origin refers (via DW_FORM_ref_addr) into the partial
+## unit. The DIE must be decoded with the partial unit's abbreviations, not
+## those of the referring unit -- see DwarfReaderCrossUnitRef.swift.
+##
+## Layout:
+##   Unit @ 0x00: DW_UT_partial (abbrev table 0)
+##     DIE @ 0x0c: DW_TAG_partial_unit
+##     DIE @ 0x0d: DW_TAG_subprogram, linkage_name "callee"
+##   Unit @ 0x16: DW_UT_compile (abbrev table 1)
+##     DIE: DW_TAG_compile_unit
+##     DIE: DW_TAG_inlined_subroutine, abstract_origin -> 0x0d, call_line 7,
+##          range [0x1000, 0x1010)
+##
+## The abbreviation codes are deliberately chosen so that the subprogram's
+## code (2) means DW_TAG_inlined_subroutine in the compile unit's table.
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - ID: 0
+      Table:
+        - Code:     0x01
+          Tag:      DW_TAG_partial_unit
+          Children: DW_CHILDREN_yes
+          Attributes: []
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+    - ID: 1
+      Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+        - Code:     0x02
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref_addr
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+  debug_info:
+    - Version:        5
+      UnitType:       DW_UT_partial
+      AddrSize:       8
+      AbbrevTableID:  0
+      Entries:
+        - AbbrCode: 0x01
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "callee"
+        - AbbrCode: 0x00
+    - Version:        5
+      UnitType:       DW_UT_compile
+      AddrSize:       8
+      AbbrevTableID:  1
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x1000
+        - AbbrCode: 0x02
+          Values:
+            - Value: 0x0d            # DW_AT_abstract_origin -> "callee"
+            - Value: 0x1000          # DW_AT_low_pc
+            - Value: 0x10            # DW_AT_high_pc (length)
+            - Value: 0x01            # DW_AT_call_file
+            - Value: 0x07            # DW_AT_call_line
+            - Value: 0x01            # DW_AT_call_column
+        - AbbrCode: 0x00

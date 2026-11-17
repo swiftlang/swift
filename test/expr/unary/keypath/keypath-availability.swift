@@ -126,3 +126,31 @@ public func universallyUnavailable() {
   _ = lens.setter_universally_unavailable // expected-error {{setter for 'setter_universally_unavailable' is unavailable}}
   lens.setter_universally_unavailable = Lens(1) // expected-error {{setter for 'setter_universally_unavailable' is unavailable}}
 }
+
+@dynamicMemberLookup
+struct DeprecatedLens<T> {
+  var obj: T
+
+  @available(*, deprecated, message: "use obj")
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U { obj[keyPath: member] }
+}
+
+@dynamicMemberLookup
+struct UnavailableLens<T> {
+  var obj: T
+
+  @available(*, unavailable) // expected-note {{'subscript(dynamicMember:)' has been explicitly marked unavailable here}}
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U { obj[keyPath: member] }
+}
+
+@dynamicMemberLookup
+struct ChainedLens<T> {
+  subscript<U>(dynamicMember member: KeyPath<DeprecatedLens<T>, U>) -> U { fatalError() }
+}
+
+public func dynamicMemberLookupInKeyPaths() {
+  _ = \DeprecatedLens<Butt>.setter_conditionally_available // expected-warning {{'subscript(dynamicMember:)' is deprecated: use obj}}
+  _ = \UnavailableLens<Butt>.setter_conditionally_available // expected-error {{'subscript(dynamicMember:)' is unavailable}}
+  _ = \ChainedLens<Butt>.setter_conditionally_available // expected-warning {{'subscript(dynamicMember:)' is deprecated: use obj}}
+  _ = ChainedLens<Butt>().setter_conditionally_available // expected-warning {{'subscript(dynamicMember:)' is deprecated: use obj}}
+}

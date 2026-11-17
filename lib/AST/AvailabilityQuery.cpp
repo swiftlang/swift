@@ -13,7 +13,9 @@
 #include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PlatformKindUtils.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Platform.h"
 
 using namespace swift;
@@ -233,6 +235,58 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
   case AvailabilityDomain::Kind::Custom:
     return domain.getCustomDomain()->getPredicateFunc();
   }
+}
+
+llvm::StringRef swift::getOSVersionQueryKindName(OSVersionQueryKind kind) {
+  switch (kind) {
+  case OSVersionQueryKind::IsOSVersionAtLeast:
+    return "isOSVersionAtLeast";
+  case OSVersionQueryKind::IsVariantOSVersionAtLeast:
+    return "isVariantOSVersionAtLeast";
+  case OSVersionQueryKind::IsOSVersionAtLeastOrVariantVersionAtLeast:
+    return "isOSVersionAtLeastOrVariantVersionAtLeast";
+  }
+  llvm_unreachable("unhandled OSVersionQueryKind");
+}
+
+std::string swift::getOSVersionQuerySemanticsAttr(OSVersionQueryKind kind) {
+  return (llvm::Twine(semantics::AVAILABILITY_OSVERSION) + "(" +
+          getOSVersionQueryKindName(kind) + ")")
+      .str();
+}
+
+std::optional<OSVersionQueryKind>
+swift::parseOSVersionQuerySemanticsAttr(llvm::StringRef attr) {
+  if (!attr.consume_front(semantics::AVAILABILITY_OSVERSION) ||
+      !attr.consume_front("(") || !attr.consume_back(")"))
+    return std::nullopt;
+
+  for (auto kind : {OSVersionQueryKind::IsOSVersionAtLeast,
+                    OSVersionQueryKind::IsVariantOSVersionAtLeast,
+                    OSVersionQueryKind::IsOSVersionAtLeastOrVariantVersionAtLeast}) {
+    if (attr == getOSVersionQueryKindName(kind))
+      return kind;
+  }
+  return std::nullopt;
+}
+
+std::optional<OSVersionQueryKind>
+swift::inferOSVersionQueryKind(const FuncDecl *decl) {
+  if (!decl->getDeclContext()->getParentModule()->isStdlibModule())
+    return std::nullopt;
+
+  // On iOS `_stdlib_isOSVersionAtLeast()` is `@_transparent` and does not carry
+  // the semantics attribute, so a query there reaches the optimizer as a call
+  // to `_stdlib_isOSVersionAtLeast_AEIC()` instead.
+  auto name = decl->getBaseIdentifier().str();
+  if (name == "_stdlib_isOSVersionAtLeast" ||
+      name == "_stdlib_isOSVersionAtLeast_AEIC")
+    return OSVersionQueryKind::IsOSVersionAtLeast;
+  if (name == "_stdlib_isVariantOSVersionAtLeast")
+    return OSVersionQueryKind::IsVariantOSVersionAtLeast;
+  if (name == "_stdlib_isOSVersionAtLeastOrVariantVersionAtLeast")
+    return OSVersionQueryKind::IsOSVersionAtLeastOrVariantVersionAtLeast;
+  return std::nullopt;
 }
 
 /// Returns the version tuple that `arguments`, the three integer components of

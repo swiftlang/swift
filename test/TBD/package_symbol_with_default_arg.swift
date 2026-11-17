@@ -18,6 +18,10 @@
 // CHECK-TBD: $s5Utils6pubBar3argS2i_tF
 // CHECK-TBD: $s5Utils6pubFoo3argS2i_tF
 
+// RUN: %llvm-nm %t/libUtils.tbd | %FileCheck %s --check-prefix CHECK-CALLER-SIDE
+// CHECK-CALLER-SIDE: $s5Utils6pkgNil3arg4lineS2iSg_SitF
+// CHECK-CALLER-SIDE-NOT: $s5Utils6pkgNil3arg4lineS2iSg_SitFfA
+
 // RUN: %target-build-swift-dylib(%t/%target-library-name(UtilsForTesting)) %t/Utils.swift \
 // RUN:  -module-name UtilsForTesting -package-name testpkg \
 // RUN:  -emit-module -emit-module-path %t/UtilsForTesting.swiftmodule \
@@ -36,6 +40,12 @@
 // CHECK-TEST: $s15UtilsForTesting6pubBar3argS2i_tF
 // CHECK-TEST: $s15UtilsForTesting6pubFoo3argS2i_tF
 
+// RUN: %llvm-nm %t/libUtilsForTesting.tbd | %FileCheck %s --check-prefix CHECK-TEST-CALLER-SIDE
+// CHECK-TEST-CALLER-SIDE: $s15UtilsForTesting11internalNil3arg4fileySiSg_SStF
+// CHECK-TEST-CALLER-SIDE-NOT: $s15UtilsForTesting11internalNil3arg4fileySiSg_SStFfA
+// CHECK-TEST-CALLER-SIDE: $s15UtilsForTesting6pkgNil3arg4lineS2iSg_SitF
+// CHECK-TEST-CALLER-SIDE-NOT: $s15UtilsForTesting6pkgNil3arg4lineS2iSg_SitFfA
+
 // RUN: %target-swift-frontend -typecheck %t/main.swift -I %t -L %t -lUtils -package-name mypkg -verify
 
 
@@ -48,6 +58,10 @@ public func pubFoo(arg: Int) -> Int { return arg + 1 }
 package func pkgFoo(arg: Int) -> Int { return arg + 2 }
 func internalFoo(arg: Int) -> Int { return arg + 3 }
 
+// Caller-side default arguments don't have a generator.
+package func pkgNil(arg: Int? = nil, line: Int = #line) -> Int { return line }
+func internalNil(arg: Int? = nil, file: String = #file) {}
+
 //--- main.swift
 import Utils
 
@@ -56,5 +70,6 @@ let b = pkgBar()
 
 let c = pubFoo(arg: 3)
 let d = pkgFoo(arg: 5)
+let e = pkgNil()
 
-print(a, b, c, d)
+print(a, b, c, d, e)

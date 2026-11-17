@@ -24,6 +24,23 @@
 
 namespace swift {
 
+class SILPassManager;
+
+/// Simplifies the content of the debug reconstruction blocks of \p f, so that
+/// a block which reconstructs nothing but `undef` returns `undef` literally.
+/// This is what tells a variable which was optimized away from one which is
+/// only partially described.
+///
+/// Dead operands are dropped and trivial blocks are removed, which replaces
+/// debug values with new instructions.
+void simplifyDebugReconstructionBlocks(SILPassManager *pm, SILFunction *f);
+
+/// Simplifies the debug reconstruction block of \p dvi, see
+/// simplifyDebugReconstructionBlocks. Returns the debug value, which is a new
+/// instruction if \p dvi was replaced.
+DebugValueInst *simplifyDebugReconstructionBlock(SILPassManager *pm,
+                                                 DebugValueInst *dvi);
+
 
 /// Salvages the debug uses of any result of \p inst, then deletes whatever
 /// could not be salvaged.
@@ -37,6 +54,11 @@ void deleteAllDebugUses(SILInstruction *inst, InstModCallbacks &callbacks,
 ///
 /// Pass \p salvage as false when the instruction already has been salvaged.
 void deleteAllDebugUses(SILInstruction *inst, bool salvage = true);
+
+/// Turns \p debugValue into a variable of empty tuple type. Used when the type
+/// of the variable can no longer be described, because it uses an archetype
+/// that is being removed. \p debugValue is erased as a new one is created.
+void replaceWithVoidVariable(DebugValueInst *debugValue);
 
 /// Transfer debug info associated with (the result of) \p I to a
 /// new `debug_value` instruction before \p I is deleted.

@@ -1,6 +1,14 @@
 // RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name UserModule -strict-memory-safety
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name UserModule
 // RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %FileCheck -check-prefix FLAGS %s < %t.swiftinterface
+
+// Interfaces record strict memory safety when enabled via module diagnostic group controls.
+// RUN: %target-swift-emit-module-interface(%t.wwarning.swiftinterface) %s -module-name UserModule -Wwarning StrictMemorySafety
+// RUN: %target-swift-typecheck-module-from-interface(%t.wwarning.swiftinterface) -module-name UserModule
+// RUN: %FileCheck -check-prefix FLAGS %s < %t.wwarning.swiftinterface
+
+// FLAGS: swift-module-flags-ignorable:{{.*}} -strict-memory-safety
 
 // CHECK: @unsafe public func getIntUnsafely() -> Swift::Int
 @unsafe public func getIntUnsafely() -> Int { 0 }

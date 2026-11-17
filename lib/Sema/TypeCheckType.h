@@ -16,6 +16,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_TYPE_H
 #define SWIFT_SEMA_TYPE_CHECK_TYPE_H
 
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/AST/Types.h"
@@ -25,6 +26,10 @@ namespace swift {
 class ASTContext;
 class AvailabilityContext;
 class QualifiedIdentTypeRepr;
+class FunctionTypeRepr;
+struct ParamAccessScopes;
+class ScopedTypeAttr;
+class ScopeBinder;
 class TypeRepr;
 class PackElementTypeRepr;
 class GenericEnvironment;
@@ -93,6 +98,11 @@ enum class TypeResolutionFlags : uint32_t {
 
   /// We are in @yield_once coroutine declaration
   Coroutine = 1 << 16,
+
+  /// Whether an 'is'/'as' pattern is being matched against a value whose
+  /// extra optionals are implicitly unwrapped, which makes the test
+  /// conditional even if the cast itself is a coercion.
+  ImplicitlyUnwrappedIsPattern = 1 << 17,
 };
 
 /// Type resolution contexts that require special handling.
@@ -102,20 +112,19 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether we are checking generic arguments of a non-variadic bound generic
   /// type. This includes parameterized protocol types. We don't allow pack
-  /// expansions here.
+  /// expansions here. Integer types and value parameters are allowed, and we
+  /// use the ValueMatchVisitor to ensure that they line up with value
+  /// parameters.
   ScalarGenericArgument,
 
   /// Whether we are checking generic arguments of a variadic generic type.
   /// We allow pack expansions in all argument positions, and then use the
   /// PackMatcher to ensure that scalar parameters line up with scalar
   /// arguments, and pack expansion parameters line up with pack expansion
-  /// arguments.
+  /// arguments. As with ScalarGenericArgument, integer types and value
+  /// parameters are allowed, and we use the ValueMatchVisitor to ensure that
+  /// they line up with value parameters.
   VariadicGenericArgument,
-
-  /// Whether we are checking generic arguments of a bound generic type with
-  /// value parameters. We use the ValueMatchVisitor to ensure that all value
-  /// parameters line up with integer types or other value parameters.
-  ValueGenericArgument,
 
   /// Whether we are checking a tuple element type.
   TupleElement,
@@ -234,6 +243,8 @@ class TypeResolutionOptions {
   static_assert(sizeof(TypeResolutionOptions::flags) ==
                     sizeof(TypeResolutionFlags),
                 "Flags size error");
+  // The function types enclosing the type which `ScopeRef`s can refer to.
+  const ScopeBinder *scopeBinder = nullptr;
 
 public:
   ~TypeResolutionOptions() = default;
@@ -278,6 +289,18 @@ public:
   /// Get the current flags.
   TypeResolutionFlags getFlags() const { return TypeResolutionFlags(flags); }
 
+  const ScopeBinder *getScopeBinder() const { return scopeBinder; }
+  void setScopeBinder(const ScopeBinder *binder) { scopeBinder = binder; }
+
+  /// Whether this is a position in a function's signature where the scopes
+  /// written are applied. We don't know how to apply scopes in other positions
+  /// yet, and should diagnose uses of scopes.
+  bool isScopePosition() const {
+    return scopeBinder && (is(Context::FunctionInput) ||
+                          is(Context::InoutFunctionInput) ||
+                          is(Context::FunctionResult));
+  }
+
   /// Is this type resolution context an expression.
   bool isAnyExpr() const {
     switch (base) {
@@ -315,7 +338,6 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::PatternBindingDecl:
     case Context::RawLayoutAttr:
       return false;
@@ -362,7 +384,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return true;
     }
@@ -406,7 +427,6 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
@@ -417,7 +437,6 @@ public:
     switch (context) {
     case Context::ScalarGenericArgument:
     case Context::VariadicGenericArgument:
-    case Context::ValueGenericArgument:
       return true;
 
     case Context::None:
@@ -497,7 +516,6 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
-    case Context::ValueGenericArgument:
     case Context::RawLayoutAttr:
       return false;
     }
@@ -510,7 +528,7 @@ public:
 
   friend bool operator==(TypeResolutionOptions lhs, TypeResolutionOptions rhs) {
     return lhs.base == rhs.base && lhs.context == rhs.context &&
-           lhs.flags == rhs.flags;
+           lhs.flags == rhs.flags && lhs.scopeBinder == rhs.scopeBinder;
   }
 
   friend bool operator!=(TypeResolutionOptions lhs, TypeResolutionOptions rhs) {
@@ -572,7 +590,7 @@ public:
 };
 
 /// A function reference used to "open" the given unbound generic type
-/// by introducing generic arguments and constructing a \c BoundGenericType
+/// by introducing generic arguments and constructing a \c NominalType
 /// out of them.
 ///
 /// \returns the \c null type on failure.
@@ -753,7 +771,7 @@ public:
   /// \param loc The source location for diagnostic reporting.
   /// \param genericArgs The list of generic arguments to apply.
   ///
-  /// \returns A BoundGenericType bound to the given arguments, or null on
+  /// \returns A NominalType bound to the given arguments, or null on
   /// error.
   ///
   /// \see applyGenericArguments
@@ -775,6 +793,128 @@ void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
 bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
                               const TypeResolution &resolution);
+
+/// Whether the scopes written in \p fn's signature are resolved into its types
+/// rather than unconditionally diagnosed.
+bool resolvesScopesInSignature(AbstractFunctionDecl *fn);
+
+/// Stack allocated linked list of functions to track what scope identifiers are
+/// bound and quickly identify relative depth for scope references.
+///
+/// The "root" binder (with null `Parent`) describes the function declaration.
+/// Nested binders describe function types in parameters and results. A
+/// method's type is nested in an outer one that binds `self`, which tracked in
+/// the root with `IsSelfReferenced` instead of via an explicit binder.
+class ScopeBinder {
+  AbstractFunctionDecl *Fn;
+  /// The function type written in the signature, or null for the declaration.
+  FunctionTypeRepr *Repr;
+  /// The scope parameters it declares.
+  ArrayRef<Located<ScopeName>> Declared;
+  /// The binder of the function type it's written in, or null for the
+  /// declaration.
+  const ScopeBinder *Parent;
+  /// The scopes of the accesses of `Fn`'s parameters, relative to this
+  /// binder's function type. Only set for the declaration.
+  ArrayRef<ScopeRef> ParamAccesses;
+  /// Whether something refers to the access of `self`. Only set for the
+  /// declaration.
+  bool IsSelfReferenced = false;
+
+public:
+  /// The binder of the declaration \p fn.
+  explicit ScopeBinder(AbstractFunctionDecl *fn);
+  /// The binder of the declaration \p fn, whose parameters' and `self`'s
+  /// accesses have the scopes \p accesses.
+  ScopeBinder(AbstractFunctionDecl *fn, const ParamAccessScopes &accesses);
+  /// The binder of the function type \p repr, written on a parameter or result
+  /// of \p parent's function type, which declares the scope parameters
+  /// \p declared.
+  ScopeBinder(const ScopeBinder &parent, FunctionTypeRepr *repr,
+              ArrayRef<Located<ScopeName>> declared)
+      : Fn(parent.Fn), Repr(repr), Declared(declared), Parent(&parent) {}
+
+  // A nested binder refers to its parent by address.
+  ScopeBinder(const ScopeBinder &) = delete;
+  ScopeBinder &operator=(const ScopeBinder &) = delete;
+
+  AbstractFunctionDecl *getFunction() const { return Fn; }
+  /// The function type written in the signature, or null for the declaration.
+  FunctionTypeRepr *getRepr() const { return Repr; }
+  /// The scope parameters it declares.
+  ArrayRef<Located<ScopeName>> getDeclared() const { return Declared; }
+  /// The binder of the function type it's written in, or null for the
+  /// declaration.
+  const ScopeBinder *getParent() const { return Parent; }
+
+  /// Whether \p name names a parameter that would be "in scope" here.
+  ///
+  /// TODO: Support scopes named by the parameters of function types preferring
+  /// explicitly named scopes within a function type.
+  bool namesFunctionTypeParam(Identifier name) const;
+
+  /// The scope parameter named \p name relative to this binder, or `nullopt` if
+  /// the scope can't be found.
+  std::optional<ScopeRef> lookUpScopeParam(ScopeName name) const;
+
+  /// The scope of the access of the declaration's parameter \p index relative
+  /// to this binder, or an error scope if its binding was diagnosed.
+  ScopeRef lookUpParamAccess(unsigned index) const;
+
+  /// The scope of the access of `self` relative to this binder, which the
+  /// method's outer type binds.
+  ScopeRef lookUpSelfAccess() const;
+};
+
+/// Restrict \p ty, resolved from the type \p attr is written on, to the scope
+/// \p attr names, relative to \p binder. Returns an error type if it was
+/// diagnosed.
+Type applyScopedAttr(const ScopeBinder &binder, ScopedTypeAttr *attr, Type ty);
+
+/// Resolve the scope the `@_accessScope` on \p repr binds a parameter's access
+/// to, relative to \p binder. Checks that \p flags isn't consuming. Returns the
+/// call's body if there's none, and `nullopt` if it was diagnosed
+ScopeRef resolveAccessBinding(const ScopeBinder &binder,
+                              TypeRepr *repr, ParameterTypeFlags flags);
+
+/// Check that \p ty, the type of a parameter or result in \p fn's signature
+/// resolved from \p repr, is saturated with scopes, diagnosing and returning an
+/// error type if it isn't.
+Type checkScopeSaturated(AbstractFunctionDecl *fn, TypeRepr *repr, Type ty);
+
+/// Check that \p ty, the opaque result type of \p fn resolved from \p repr,
+/// has no non-escapable type, whose scope can't be written there, diagnosing
+/// and returning an error type if it does.
+Type checkOpaqueResultScopes(FuncDecl *fn, TypeRepr *repr, Type ty);
+
+/// Diagnose the scope parameters \p binder's function type, resolved as
+/// \p fnTy, declares more than once or doesn't use.
+void checkDeclaredScopeParams(const ScopeBinder &binder, AnyFunctionType *fnTy);
+
+/// Add the scopes of the accesses of \p fn's parameters to \p params, and the
+/// number of scope parameters its type binds to \p info, if its signature
+/// resolves scopes. \p params and \p result are the types of its parameters and
+/// result.
+///
+/// Exists to avoid exposing implementation details about scope representation
+/// outside of TypeCheckScopeRestrictions.
+void addScopes(AbstractFunctionDecl *fn, AnyFunctionType::ExtInfoBuilder &info,
+               MutableArrayRef<AnyFunctionType::Param> params, Type result);
+
+/// Add the scope of the access of the method \p fn's `self` to \p self, and the
+/// number of scope parameters the outer function type of its curried type binds
+/// to \p info, if its signature resolves scopes.
+///
+/// Exists to avoid exposing implementation details about scope representation
+/// outside of TypeCheckScopeRestrictions.
+void addSelfScopes(AbstractFunctionDecl *fn,
+                   AnyFunctionType::ExtInfoBuilder &info,
+                   AnyFunctionType::Param &self);
+
+/// Diagnose the scope parameters \p fn declares that are declared more than
+/// once or unused, and the scopes in its signature that refer to or bind the
+/// accesses of consumed parameters, if its signature resolves scopes.
+void checkScopedSignature(AbstractFunctionDecl *fn);
 
 } // end namespace swift
 

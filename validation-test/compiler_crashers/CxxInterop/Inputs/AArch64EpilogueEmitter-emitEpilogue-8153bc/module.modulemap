@@ -1,0 +1,4 @@
+module CxxMod {
+  header "header.h"
+  requires cplusplus
+}

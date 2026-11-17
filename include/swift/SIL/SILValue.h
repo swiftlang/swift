@@ -620,6 +620,11 @@ public:
 
   bool isBorrowAccessorResult() const;
 
+  /// Returns true if this is a value yielded with a guaranteed convention by a
+  /// begin_apply, i.e. a value that the coroutine has lent to us and which we
+  /// therefore only borrow.
+  bool isGuaranteedCoroutineYield() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -728,9 +733,7 @@ public:
   }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  ///
-  /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership() const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1109,7 +1112,8 @@ public:
   Operand(SILInstruction *owner, SILValue theValue)
       : TheValue(theValue), Owner(owner),
         customBits(0), lastInitializedBitfieldID(0) {
-    insertIntoCurrent();
+    if (theValue)
+      insertIntoCurrent();
   }
 
   /// Operands are not copyable.

@@ -3535,7 +3535,10 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
   decl->setImplInfo(implInfo);
 
-  decl->getASTContext().evaluator.cacheOutput(HasStorageRequest{decl}, implInfo.hasStorage());
+  // Don't go through `HasStorageRequest`, which consults the ABI role of the
+  // decl. Its attributes, including any `@abi` attribute, have not been
+  // attached yet, so that would cache the wrong ABI role.
+  decl->setHasStorage(implInfo.hasStorage());
 
   SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {
@@ -4424,9 +4427,10 @@ public:
     Type paramTy;
     SET_OR_RETURN_ERROR(paramTy, MF.getTypeChecked(interfaceTypeID));
 
-    if (paramTy->hasError() && !MF.allowCompilerErrors()) {
-      // FIXME: This should never happen, because we don't serialize
-      // error types.
+    if (paramTy->hasError() && !MF.allowCompilerErrors() &&
+        !MF.compiledAllowingCompilerErrors()) {
+      // This should never happen, because error types are only serialized
+      // when allowing errors.
       DC->printContext(llvm::errs());
       paramTy->dump(llvm::errs());
       return MF.diagnoseFatal();
@@ -4498,19 +4502,20 @@ public:
     bool isImplicit;
     bool isStatic;
     uint8_t rawStaticSpelling, rawAccessLevel, rawMutModifier;
-    uint8_t rawAccessorKind;
+    std::optional<uint8_t> rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, async, throws;
     TypeID thrownTypeID;
-    unsigned numNameComponentsBiased;
+    unsigned numNameComponentsBiased = 0;
     GenericSignatureID genericSigID;
     TypeID resultInterfaceTypeID;
     bool isIUO;
     DeclID associatedDeclID;
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
-    bool overriddenAffectsABI, needsNewTableEntry, isTransparent;
+    bool overriddenAffectsABI, needsNewTableEntry;
+    bool isTransparent = false;
     DeclID opaqueReturnTypeID;
-    bool isUserAccessible;
+    bool isUserAccessible = false;
     bool isDistributedThunk;
     bool hasSendingResult = false;
     ArrayRef<uint64_t> nameAndDependencyIDs;
@@ -4559,7 +4564,7 @@ public:
 
     // Parse the accessor-specific fields.
     AbstractStorageDecl *storage = nullptr;
-    AccessorKind accessorKind;
+    std::optional<AccessorKind> accessorKind;
     if (isAccessor) {
       auto storageResult = MF.getDeclChecked(accessorStorageDeclID);
       if (!storageResult ||
@@ -4571,7 +4576,8 @@ public:
             errorFlags, numTableEntries);
       }
 
-      if (auto accessorKindResult = getActualAccessorKind(rawAccessorKind))
+      if (auto accessorKindResult =
+              getActualAccessorKind(rawAccessorKind.value()))
         accessorKind = *accessorKindResult;
       else
         return MF.diagnoseFatal();
@@ -4580,7 +4586,7 @@ public:
       // into this code.  When we come out, don't create the accessor twice.
       // TODO: find some better way of breaking this cycle, like lazily
       // deserializing the accessors.
-      if (auto accessor = storage->getAccessor(accessorKind))
+      if (auto accessor = storage->getAccessor(accessorKind.value()))
         return accessor;
     }
 
@@ -4670,9 +4676,9 @@ public:
                                         async, throws, thrownType,
                                         genericParams, resultType, DC);
     } else {
-      auto *accessor =
-          AccessorDecl::createDeserialized(ctx, accessorKind, storage, async,
-                                           throws, thrownType, resultType, DC);
+      auto *accessor = AccessorDecl::createDeserialized(
+          ctx, accessorKind.value(), storage, async, throws, thrownType,
+          resultType, DC);
       accessor->setIsTransparent(isTransparent);
 
       fn = accessor;
@@ -5174,11 +5180,20 @@ public:
     auto inheritedIDs = rawIDs.slice(0, numInheritedTypes);
     auto dependencyIDs = rawIDs.slice(numInheritedTypes);
 
-    for (TypeID dependencyID : dependencyIDs) {
-      auto dependency = MF.getTypeChecked(dependencyID);
-      if (!dependency) {
-        return llvm::make_error<TypeError>(
-            name, takeErrorInfo(dependency.takeError()));
+    // A dependency can lead back to this class (`class A: Base<B>` and
+    // `class B: Base<A>`). If we're re-entered while checking this class's
+    // dependencies, skip the checks to avoid infinite recursion. The class is
+    // then created before all of its dependencies are known to be readable;
+    // if one is missing, the class stays cached but incomplete, and later
+    // lookups can find it.
+    if (MF.ClassesResolvingDependencies.insert(thisDeclID).second) {
+      SWIFT_DEFER { MF.ClassesResolvingDependencies.erase(thisDeclID); };
+      for (TypeID dependencyID : dependencyIDs) {
+        auto dependency = MF.getTypeChecked(dependencyID);
+        if (!dependency) {
+          return llvm::make_error<TypeError>(
+              name, takeErrorInfo(dependency.takeError()));
+        }
       }
     }
 
@@ -5198,7 +5213,13 @@ public:
         genericParams, DC, isExplicitActorDecl);
     declOrOffset = theClass;
 
-    theClass->setGenericSignature(MF.getGenericSignature(genericSigID));
+    // The dependency checks above may have been skipped to break a cycle, so
+    // the signature isn't guaranteed to be readable. Report an error instead
+    // of aborting.
+    GenericSignature genericSig;
+    SET_OR_RETURN_ERROR(genericSig,
+                        MF.getGenericSignatureChecked(genericSigID));
+    theClass->setGenericSignature(genericSig);
 
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       theClass->setAccess(*accessLevel);
@@ -8189,13 +8210,16 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
-                        ParameterTypeFlags(isVariadic, isAutoClosure,
-                                           isNonEphemeral, *ownership,
-                                           isIsolated, isNoDerivative,
-                                           isCompileTimeLiteral, isSending,
-                                           isAddressable, isConstValue),
-                        MF.getIdentifier(internalLabelID));
+    // FIXME: Scopes aren't serialized, neither access bindings nor the scope
+    // arguments of nominal types, so clients see a module's types without
+    // them.
+    params.push_back(AnyFunctionType::Param::bodyAccess(
+        paramTy.get(), MF.getIdentifier(labelID),
+        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
+                           *ownership, isIsolated, isNoDerivative,
+                           isCompileTimeLiteral, isSending, isAddressable,
+                           isConstValue),
+        MF.getIdentifier(internalLabelID)));
   }
 
   SmallVector<AnyFunctionType::Yield, 1> yields;
@@ -8474,15 +8498,13 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
-  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable;
+  bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
+      hasInverseDeinitable;
   ArrayRef<uint64_t> rawProtocolIDs;
 
   decls_block::ProtocolCompositionTypeLayout::readRecord(
-      scratch,
-      hasExplicitAnyObject,
-      hasInverseCopyable,
-      hasInverseEscapable,
-      rawProtocolIDs);
+      scratch, hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
+      hasInverseDeinitable, rawProtocolIDs);
 
   SmallVector<Type, 4> protocols;
   for (TypeID protoID : rawProtocolIDs) {
@@ -8497,6 +8519,8 @@ Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     inverses.insert(InvertibleProtocolKind::Copyable);
   if (hasInverseEscapable)
     inverses.insert(InvertibleProtocolKind::Escapable);
+  if (hasInverseDeinitable)
+    inverses.insert(InvertibleProtocolKind::Deinitable);
 
   return ProtocolCompositionType::get(MF.getContext(), protocols, inverses,
                                       hasExplicitAnyObject);
@@ -8580,10 +8604,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
     genericArgs.push_back(argTy.get());
   }
 
+  auto &ctx = MF.getContext();
+
   if (auto clangDecl = nominal->getClangDecl()) {
     if (auto ctd = dyn_cast<clang::ClassTemplateDecl>(clangDecl)) {
       auto clangImporter = static_cast<ClangImporter *>(
-          nominal->getASTContext().getClangModuleLoader());
+          ctx.getClangModuleLoader());
 
       SmallVector<Type, 2> typesOfGenericArgs;
       for (auto arg : genericArgs) {
@@ -8592,7 +8618,7 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
 
       SmallVector<clang::TemplateArgument, 2> templateArguments;
       std::unique_ptr<TemplateInstantiationError> error =
-          MF.getContext().getClangTemplateArguments(
+          ctx.getClangTemplateArguments(
               ctd->getTemplateParameters(), typesOfGenericArgs,
               templateArguments);
 
@@ -8600,12 +8626,12 @@ Expected<Type> DESERIALIZE_TYPE(BOUND_GENERIC_TYPE)(
           const_cast<clang::ClassTemplateDecl *>(ctd), templateArguments);
 
       instantiation->setTemplateInstantiationType(
-          BoundGenericType::get(nominal, parentTy, genericArgs));
+          NominalType::get(nominal, parentTy, genericArgs, ctx));
       return instantiation->getDeclaredInterfaceType();
     }
   }
 
-  return BoundGenericType::get(nominal, parentTy, genericArgs);
+  return NominalType::get(nominal, parentTy, genericArgs, ctx);
 }
 
 Expected<Type> DESERIALIZE_TYPE(SIL_BLOCK_STORAGE_TYPE)(
@@ -9145,7 +9171,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError() && !allowCompilerErrors()) {
+  // A module built with errors may legitimately contain error types. Reading
+  // one has already been diagnosed, here or by an earlier error.
+  if (typeOrOffset.get()->hasError() && !allowCompilerErrors() &&
+      !compiledAllowingCompilerErrors()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");

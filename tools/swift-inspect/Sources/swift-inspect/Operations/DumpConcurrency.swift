@@ -55,6 +55,7 @@ fileprivate class ConcurrencyDumper {
     var isFuture: Bool
     var isGroupChildTask: Bool
     var isAsyncLetTask: Bool
+    var hasSynchronousOperation: Bool
     var maxPriority: UInt32
     var isCancelled: Bool
     var isStatusRecordLocked: Bool
@@ -199,14 +200,15 @@ fileprivate class ConcurrencyDumper {
       return nil
     }
 
-    // These arrays are temporary pointers which we must copy out before we call
-    // into Remote Mirror again.
+    // These arrays and the name are temporary pointers which we must copy out
+    // before we call into Remote Mirror again.
     let children = Array(UnsafeBufferPointer(
         start: reflectionInfo.ChildTasks,
         count: Int(reflectionInfo.ChildTaskCount)))
     let asyncBacktraceFrames = Array(UnsafeBufferPointer(
         start: reflectionInfo.AsyncBacktraceFrames,
         count: Int(reflectionInfo.AsyncBacktraceFramesCount)))
+    let name = reflectionInfo.Name.map { String(cString: $0) }
 
     var allocatorSlab = reflectionInfo.AllocatorSlabPtr
     var allocatorTotalSize = 0
@@ -229,6 +231,7 @@ fileprivate class ConcurrencyDumper {
       isFuture: reflectionInfo.IsFuture,
       isGroupChildTask: reflectionInfo.IsGroupChildTask,
       isAsyncLetTask: reflectionInfo.IsAsyncLetTask,
+      hasSynchronousOperation: reflectionInfo.HasSynchronousOperation,
       maxPriority: reflectionInfo.MaxPriority,
       isCancelled: reflectionInfo.IsCancelled,
       isStatusRecordLocked: reflectionInfo.IsStatusRecordLocked,
@@ -246,7 +249,7 @@ fileprivate class ConcurrencyDumper {
       allocatorTotalChunks: allocatorTotalChunks,
       childTasks: children,
       asyncBacktrace: asyncBacktraceFrames,
-      name: reflectionInfo.Name.map { String(cString: $0) }
+      name: name
     )
   }
 
@@ -295,6 +298,7 @@ fileprivate class ConcurrencyDumper {
     if info.isFuture { flags.append("future") }
     if info.isGroupChildTask { flags.append("groupChildTask") }
     if info.isAsyncLetTask { flags.append("asyncLetTask") }
+    if info.hasSynchronousOperation { flags.append("synchronousOperation") }
     if info.isCancelled { flags.append("cancelled") }
     if info.isStatusRecordLocked { flags.append("statusRecordLocked") }
     if info.isEscalated { flags.append("escalated") }

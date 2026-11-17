@@ -141,7 +141,7 @@ struct NCBuffer: ~Copyable {
   public var bytes: Span<UInt8> {
     @_lifetime(borrow self)
     borrowing get {
-      let span: Span<UInt8> = Span(_bytes: self.buffer.bytes)
+      let span: Span<UInt8> = Span(_unsafeBytes: self.buffer.bytes)
       return span
     }
   }

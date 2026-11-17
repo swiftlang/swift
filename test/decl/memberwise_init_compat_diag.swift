@@ -1,15 +1,17 @@
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -verify-additional-prefix deprecated- -enable-experimental-feature DeprecateCompatMemberwiseInit
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6- -verify-additional-prefix deprecated- -enable-experimental-feature DeprecateCompatMemberwiseInit
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- -enable-experimental-feature DeprecateCompatMemberwiseInit %}
 // REQUIRES: swift_feature_DeprecateCompatMemberwiseInit
 
 struct A {
   // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'b'; uses of it will be an error in a future Swift language mode}}
-  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{11:3-3=private init(a: Int, b: Int = 0) {\nself.a = a\nself.b = b\n\}\n}}
+  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+6:3-3=private init(a: Int, b: Int = 0) {\nself.a = a\nself.b = b\n\}\n}}
   var a: Int
   private var b = 0
 
   func foo() {
     _ = Self(a: 0, b: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'b' in call}}
   }
 }
 
@@ -29,19 +31,20 @@ struct B {
 
 struct C {
   // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'b' and 'c'; uses of it will be an error in a future Swift language mode}}
-  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{37:3-3=fileprivate init(a: Int, b: Int = 0, c: Int = 0) {\nself.a = a\nself.b = b\nself.c = c\n\}\n}}
+  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+7:3-3=fileprivate init(a: Int, b: Int = 0, c: Int = 0) {\nself.a = a\nself.b = b\nself.c = c\n\}\n}}
   var a: Int
   fileprivate var b = 0
   fileprivate var c = 0
 
   func foo() {
     _ = Self(a: 0, b: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'b' in call}}
   }
 }
 
 struct D {
   // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'b', 'c', and 'd'; uses of it will be an error in a future Swift language mode}}
-  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{50:3-3=private init(a: Int, b: Int = 0, c: Int = 0, d: Int = 0) {\nself.a = a\nself.b = b\nself.c = c\nself.d = d\n\}\n}}
+  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+8:3-3=private init(a: Int, b: Int = 0, c: Int = 0, d: Int = 0) {\nself.a = a\nself.b = b\nself.c = c\nself.d = d\n\}\n}}
   var a: Int
   private var b = 0
   private var c = 0
@@ -49,7 +52,9 @@ struct D {
 
   func foo() {
     _ = Self(a: 0, b: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'b' in call}}
     _ = D(a: 0, b: 0) // We only diagnose for the first reference
+    // expected-future-error@-1 {{extra argument 'b' in call}}
   }
 }
 
@@ -63,12 +68,13 @@ struct E {
 
   func foo() {
     _ = Self(a: 0, b: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'b' in call}}
   }
 }
 
 struct F {
   // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'c'; uses of it will be an error in a future Swift language mode}}
-  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{82:3-3=fileprivate init(a: Int, c: Int = 0) {\nself.a = a\nself.c = c\n\}\n}}
+  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+13:3-3=fileprivate init(a: Int, c: Int = 0) {\nself.a = a\nself.c = c\n\}\n}}
 
   var a: Int
   var b: Int
@@ -81,6 +87,7 @@ struct F {
   }
   func foo() {
     _ = Self(a: 0, c: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'c' in call}}
   }
 }
 
@@ -108,7 +115,7 @@ struct G {
 
 struct H {
   // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'b'; uses of it will be an error in a future Swift language mode}}
-  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{114:1-1=private init(a: Int, b: Int = 0) {\nself.a = a\nself.b = b\n\}\n}}
+  // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+5:1-1=private init(a: Int, b: Int = 0) {\nself.a = a\nself.b = b\n\}\n}}
   var a: Int
   private var b = 0
 }
@@ -116,19 +123,20 @@ struct H {
 extension H {
   func foo() {
     _ = Self(a: 0, b: 0) // expected-deprecated-note {{memberwise initializer used here}}
+    // expected-future-error@-1 {{extra argument 'b' in call}}
   }
 }
 
 // We don't currently support accessing a property declared later.
 // NOTE: If this restriction is lifted, `emitImplicitValueConstructor` needs
 // updating to ensure we initialize `d` before `b`.
-struct I { // expected-error {{cannot automatically synthesize memberwise initializer}}
+struct I { // expected-swift6-error {{cannot automatically synthesize memberwise initializer}}
   var a: Int
   var b: Int
   private var c: Int = 0 {
     @storageRestrictions(initializes: b, accesses: d)
     init { b = newValue + d }
-    // expected-note@-1 {{init accessor for 'c' cannot access stored property 'd' because it is called before 'd' is initialized}}
+    // expected-swift6-note@-1 {{init accessor for 'c' cannot access stored property 'd' because it is called before 'd' is initialized}}
     get { b }
   }
   var d: Int
@@ -152,12 +160,13 @@ func testLocal() {
   }
   struct B {
     // expected-deprecated-warning@-1 {{synthesized memberwise initializer no longer includes 'x'; uses of it will be an error in a future Swift language mode}}
-    // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{159:5-5=private init(x: Int? = nil, y: Int) {\nself.x = x\nself.y = y\n\}\n}}
+    // expected-deprecated-note@-2 {{insert an explicit implementation of the memberwise initializer}} {{+6:5-5=private init(x: Int? = nil, y: Int) {\nself.x = x\nself.y = y\n\}\n}}
     private var x: Int?
     var y: Int
 
     func foo() {
       _ = B(x: 0, y: 0) // expected-deprecated-note {{memberwise initializer used here}}
+      // expected-future-error@-1 {{extra argument 'x' in call}}
     }
   }
 }

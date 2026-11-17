@@ -27,31 +27,31 @@ struct ES: ~Copyable {
 }
 
 enum AE: ~Copyable {
-  // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
+  // expected-error@+1 {{deinitializers are not yet supported on non-'Copyable' enums}}
   @FirstActor deinit {} // expected-error {{only classes and actors can have isolated deinit}}
 }
 
 @FirstActor
 enum BE: ~Copyable {
   case dummy
-  // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
+  // expected-error@+1 {{deinitializers are not yet supported on non-'Copyable' enums}}
   isolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
 }
 
 enum CE: ~Copyable {
   case dummy
-  // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
+  // expected-error@+1 {{deinitializers are not yet supported on non-'Copyable' enums}}
   isolated deinit {} // expected-error {{only classes and actors can have isolated deinit}}
 }
 
 enum DE: ~Copyable {
   case dummy
-  // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
+  // expected-error@+1 {{deinitializers are not yet supported on non-'Copyable' enums}}
   nonisolated deinit {}
 }
 
 enum EE: ~Copyable {
   case dummy
-  // expected-error@+1 {{deinitializers are not yet supported on noncopyable enums}}
+  // expected-error@+1 {{deinitializers are not yet supported on non-'Copyable' enums}}
   @FirstActor isolated deinit {} // expected-error 2 {{only classes and actors can have isolated deinit}}
 }

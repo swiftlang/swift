@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables 2>&1 | %FileCheck %s --check-prefixes=PASS,CHECK
+// RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-degraded-variables 2>&1 | %FileCheck %s --check-prefixes=PASS,CHECK
 // RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass 2>&1 | %FileCheck %s --check-prefixes=FIRST,SECOND,CHECK
 // RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-lost-variables -sil-stats-subpass -sil-opt-pass-count 2.1 2>&1 | %FileCheck %s --check-prefixes=FIRST,CHECK
 // RUN: %target-sil-opt --dce --sil-combine -o /dev/null %s -sil-stats-subpass 2>&1 | %FileCheck %s --allow-empty

@@ -44,8 +44,12 @@ ConformanceCache::lookupConformance(Type type, ProtocolDecl *protocol) {
   return conformance;
 }
 
+/// If we have:
+///
 /// T conv $T0
 /// $T0 conforms P
+///
+/// Can we conclude that T itself conforms to P?
 bool ConformanceCache::isConformanceTransitiveForSupertype(
     ConversionBehavior behavior, ProtocolDecl *proto) {
   // Sendable conformance is too loose to conclude anything.
@@ -95,6 +99,7 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
   case ConversionBehavior::Optional:
   case ConversionBehavior::AnyHashable:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Function:
     break;
 
   case ConversionBehavior::String:
@@ -122,10 +127,9 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
       declsToCheck.push_back(cgFloatDecl);
     break;
 
-  case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
   case ConversionBehavior::ExistentialMetatype:
-    // FIXME: Metatypes and functions.
+    // FIXME: COM interp introduces "metatype conformances", revisit this
     result = false;
     break;
 
@@ -186,8 +190,12 @@ bool ConformanceCache::checkTransitiveSupertypeConformance(
   return true;
 }
 
+/// If we have:
+///
 /// $T0 conv T
 /// $T0 conforms P
+///
+/// Can we conclude that T itself conforms to P?
 bool ConformanceCache::isConformanceTransitiveForSubtype(
     ConversionBehavior behavior, ProtocolDecl *proto) {
   // Sendable conformance is too loose to conclude anything.

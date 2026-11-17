@@ -1,4 +1,5 @@
-// RUN: %swift -typecheck -verify -target %target-cpu-apple-macosx12 %s
+// RUN: %swift -typecheck -verify -target %target-cpu-apple-macosx12 %s -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %swift -typecheck -verify -target %target-cpu-apple-macosx12 %s -swift-version future -verify-additional-prefix future- %}
 // REQUIRES: OS=macosx
 
 protocol ProtoWithAssocType {
@@ -16,8 +17,10 @@ struct ConformsToProtoWithAssocType_WitnessSame: ProtoWithAssocType {
 }
 
 struct ConformsToProtoWithAssocType_WitnessTooNew: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_WitnessTooNew' does not conform to protocol 'ProtoWithAssocType'}}
   @available(macOS 13, *)
-  struct A {} // expected-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer}}
 }
 
 struct ConformsToProtoWithAssocTypeInExtension_WitnessOld {}
@@ -37,8 +40,10 @@ extension ConformsToProtoWithAssocTypeInExtension_WitnessSame: ProtoWithAssocTyp
 struct ConformsToProtoWithAssocTypeInExtension_WitnessTooNew {}
 
 extension ConformsToProtoWithAssocTypeInExtension_WitnessTooNew: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocTypeInExtension_WitnessTooNew' does not conform to protocol 'ProtoWithAssocType'}}
   @available(macOS 13, *)
-  struct A {} // expected-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 12 and newer}}
 }
 
 @available(macOS 13, *)
@@ -55,17 +60,23 @@ extension ConformsToProtoWithAssocTypeInExtension_NewerConformance: ProtoWithAss
 
 @available(macOS 13, *)
 struct ConformsToProtoWithAssocType_NewerAndWitnessTooNew: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_NewerAndWitnessTooNew' does not conform to protocol 'ProtoWithAssocType'}}
   @available(macOS 14, *)
-  struct A {} // expected-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 13 and newer; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 13 and newer; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{protocol 'ProtoWithAssocType' requires 'A' to be available in macOS 13 and newer}}
 }
 
 struct ConformsToProtoWithAssocType_WitnessUnavailable: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_WitnessUnavailable' does not conform to protocol 'ProtoWithAssocType'}}
   @available(macOS, unavailable)
-  struct A {} // expected-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
 }
 
 struct ConformsToProtoWithAssocType_WitnessUnavailableInExtension: ProtoWithAssocType {
-  // expected-warning@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
+  // expected-future-error@-3 {{type 'ConformsToProtoWithAssocType_WitnessUnavailableInExtension' does not conform to protocol 'ProtoWithAssocType'}}
 }
 
 extension ConformsToProtoWithAssocType_WitnessUnavailableInExtension {
@@ -74,7 +85,9 @@ extension ConformsToProtoWithAssocType_WitnessUnavailableInExtension {
 }
 
 struct ConformsToProtoWithAssocType_WitnessInUnavailableExtension: ProtoWithAssocType {
-  // expected-warning@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
+  // expected-future-error@-3 {{type 'ConformsToProtoWithAssocType_WitnessInUnavailableExtension' does not conform to protocol 'ProtoWithAssocType'}}
 }
 
 @available(macOS, unavailable)
@@ -83,18 +96,24 @@ extension ConformsToProtoWithAssocType_WitnessInUnavailableExtension {
 }
 
 struct ConformsToProtoWithAssocType_WitnessUnavailableMessage: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_WitnessUnavailableMessage' does not conform to protocol 'ProtoWithAssocType'}}
   @available(*, unavailable, message: "Just don't")
-  struct A {} // expected-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType': Just don't; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType': Just don't; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType': Just don't}}
 }
 
 struct ConformsToProtoWithAssocType_WitnessObsoleted: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_WitnessObsoleted' does not conform to protocol 'ProtoWithAssocType'}}
   @available(macOS, obsoleted: 11)
-  struct A {} // expected-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
 }
 
 struct ConformsToProtoWithAssocType_WitnessIntroInSwift99: ProtoWithAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithAssocType_WitnessIntroInSwift99' does not conform to protocol 'ProtoWithAssocType'}}
   @available(swift, introduced: 99)
-  struct A {} // expected-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{unavailable struct 'A' was used to satisfy a requirement of protocol 'ProtoWithAssocType'}}
 }
 
 @available(macOS, unavailable)
@@ -123,8 +142,10 @@ struct ConformsToProtoWithNewAssocType_WitnessSame: ProtoWithNewAssocType {
 }
 
 struct ConformsToProtoWithNewAssocType_WitnessTooNew: ProtoWithNewAssocType {
+  // expected-future-error@-1 {{type 'ConformsToProtoWithNewAssocType_WitnessTooNew' does not conform to protocol 'ProtoWithNewAssocType'}}
   @available(macOS 14, *)
-  struct A {} // expected-warning {{protocol 'ProtoWithNewAssocType' requires 'A' to be available in macOS 13 and newer; this will be an error in a future Swift language mode}}
+  struct A {} // expected-swift6-warning {{protocol 'ProtoWithNewAssocType' requires 'A' to be available in macOS 13 and newer; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{protocol 'ProtoWithNewAssocType' requires 'A' to be available in macOS 13 and newer}}
 }
 
 protocol ProtoWithAssocTypeAndReq {
@@ -153,7 +174,9 @@ struct ConformsToProtoWithAssocTypeAndReq_InferredWitnessSame: ProtoWithAssocTyp
 struct InferredTooNew {} // expected-note {{'InferredTooNew' declared here}}
 
 struct ConformsToProtoWithAssocTypeAndReq_InferredWitnessTooNew: ProtoWithAssocTypeAndReq {
-  // expected-warning@-1 {{protocol 'ProtoWithAssocTypeAndReq' requires 'InferredTooNew' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-1 {{protocol 'ProtoWithAssocTypeAndReq' requires 'InferredTooNew' to be available in macOS 12 and newer; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{protocol 'ProtoWithAssocTypeAndReq' requires 'InferredTooNew' to be available in macOS 12 and newer}}
+  // expected-future-error@-3 {{type 'ConformsToProtoWithAssocTypeAndReq_InferredWitnessTooNew' does not conform to protocol 'ProtoWithAssocTypeAndReq'}}
 
   @available(macOS 13, *)
   func req(_ a: InferredTooNew) {}

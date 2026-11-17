@@ -36,7 +36,8 @@ import Swift
 /// - SeeAlso: ``CheckedContinuation``
 @safe
 @frozen
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 5.1, *)
+@backDeployed(before: SwiftStdlib 6.4)
 public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unchecked Sendable {
 
   // Implementation note: we're using raw continuation here since UnsafeContinuation

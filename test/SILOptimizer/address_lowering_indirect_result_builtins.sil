@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @consumeT : $@convention(thin) <T> (@in T) -> ()
+
+// CHECK-LABEL: sil [ossa] @taskRunInlineReturn : $@convention(thin) <T> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T {
+// CHECK:       bb0(%0 : $*T, %1 : @guaranteed $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
+// CHECK-NEXT:    builtin "taskRunInline"<T>(%0 : $*T, %1 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'taskRunInlineReturn'
+sil [ossa] @taskRunInlineReturn : $@convention(thin) <T> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> @out T {
+bb0(%0 : @guaranteed $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
+  %1 = builtin "taskRunInline"<T>(%0 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $T
+  return %1 : $T
+}
+
+// CHECK-LABEL: sil [ossa] @taskRunInlineLocal : $@convention(thin) <T> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> () {
+// CHECK:       bb0(%0 : @guaranteed $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
+// CHECK-NEXT:    [[S:%.*]] = alloc_stack $T
+// CHECK-NEXT:    builtin "taskRunInline"<T>([[S]] : $*T, %0 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $()
+// CHECK:         function_ref @consumeT
+// CHECK-NEXT:    apply %{{.*}}<T>([[S]])
+// CHECK:         dealloc_stack [[S]] : $*T
+// CHECK-LABEL: } // end sil function 'taskRunInlineLocal'
+sil [ossa] @taskRunInlineLocal : $@convention(thin) <T> (@guaranteed @noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) -> () {
+bb0(%0 : @guaranteed $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>):
+  %1 = builtin "taskRunInline"<T>(%0 : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <T>) : $T
+  %f = function_ref @consumeT : $@convention(thin) <T> (@in T) -> ()
+  %2 = apply %f<T>(%1) : $@convention(thin) <T> (@in T) -> ()
+  %r = tuple ()
+  return %r : $()
+}

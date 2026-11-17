@@ -1316,12 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    // Values for the enumerated execution semantics. Reserved; the compiler
-    // doesn't emit them yet.
-    ExecutionSemanticsMask = 0x00000060U, // two bits
+    // Values for the enumerated execution semantics.
+    ExecutionSemanticsMask = 0x000000E0U, // three bits
     ExecutionSemanticsShift = 5,
 
-    /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1389,13 +1387,13 @@ public:
     return bool(Data & HasSendingResult);
   }
 
+  int_type getIntValue() const {
+    return Data;
+  }
+
   FunctionMetadataExecutionSemantics getExecutionSemantics() const {
     return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
                                               ExecutionSemanticsShift);
-  }
-
-  int_type getIntValue() const {
-    return Data;
   }
 
   InvertibleProtocolSet getInvertedProtocols() const {
@@ -1840,6 +1838,23 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
 
+  /// The task to resume in a NullaryContinuationJob.
+  const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
+
+  /// The executor identity and witness table stored in a task executor
+  /// preference status record.
+  const uint16_t TaskExecutorPreferenceIdentity = 0xc69e; // = 50846
+  const uint16_t TaskExecutorPreferenceImplementation = 0x3dac; // = 15788
+
+  /// The task waiting on a task group. It's address-diversified.
+  const uint16_t TaskGroupWaitQueue = 0x69ea; // = 27114
+
+  /// Job pointers in a default actor's job queues: the first job in the
+  /// actor's status word, and the links between jobs and the priority queue's
+  /// head and tails. Address-diversified.
+  const uint16_t ActorStatusFirstJob = 0x0d12; // = 3346
+  const uint16_t ActorJobQueueLink = 0xcc5c;   // = 52316
+
   /// Result type metadata stored in a future task or task group.
   const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
@@ -1871,6 +1886,12 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// The object passed to an isolated deinit body.
+  const uint16_t IsolatedDeinitJobObject = 0xe281; // = 57985
+
+  /// The synchronous & discarding task's operation `() -> ()`
+  const uint16_t SynchronousTaskOperation = 0x0f08; // = 3848
 
   /// IsCurrentGlobalActor function used between the Swift runtime and
   /// concurrency runtime.
@@ -2874,6 +2895,14 @@ public:
     /// Supported starting in Swift 6.1.
     Task_IsTaskFunctionConsumed                   = 15,
     Task_IsImmediateTask                          = 16,
+    /// The task's operation is synchronous and does not throw.
+    /// The task function is a plain Swift function pointer
+    /// instead of an async function pointer.
+    ///
+    /// A synchronous operation which throws would need its own flag.
+    ///
+    /// Supported starting in Swift 6.5.
+    Task_HasSynchronousOperation                  = 17,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2909,6 +2938,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsImmediateTask,
                                 isImmediateTask,
                                 setIsImmediateTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasSynchronousOperation,
+                                hasSynchronousOperation,
+                                setHasSynchronousOperation)
 };
 
 /// Flags for schedulable jobs.
@@ -2929,10 +2961,12 @@ public:
     Task_IsChildTask                      = 24,
     Task_IsFuture                         = 25,
     Task_IsGroupChildTask                 = 26,
-    // 27 is currently unused
+    Task_HasSynchronousOperation          = 27,
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
     Task_HasInitialTaskName               = 30,
+    // 31 is currently unused. It is the last free task flag,
+    // if we need add any more flags, overflow to a flags fragment.
   };
   // clang-format on
 
@@ -2972,6 +3006,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
                                 task_hasInitialTaskName,
                                 task_setHasInitialTaskName)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasSynchronousOperation,
+                                task_hasSynchronousOperation,
+                                task_setHasSynchronousOperation)
 };
 
 /// Kinds of task status record.
@@ -3182,13 +3219,21 @@ public:
   enum {
     /// Whether this is a "distributed" actor function.
     Distributed = 0,
+    /// Whether the accessor this record points at has a leading `isolated (any Actor)?`.
+    HasLeadingImplicitActorIsolationParameter = 1,
   };
 
   explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
   constexpr AccessibleFunctionFlags() {}
 
   /// Whether the this is a "distributed" actor function.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed,
+    isDistributed, setDistributed)
+
+  /// Whether the target function has a leading implicit actor isolation parameter.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLeadingImplicitActorIsolationParameter,
+    hasLeadingImplicitActorIsolationParameter,
+    setHasLeadingImplicitActorIsolationParameter)
 };
 
 } // end namespace swift

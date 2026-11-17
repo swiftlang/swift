@@ -452,6 +452,8 @@ const char *AccessRepresentation::getKindName(AccessStorage::Kind k) {
     return "Argument";
   case Yield:
     return "Yield";
+  case BorrowMutateAccessor:
+    return "BorrowMutateAccessor";
   case Global:
     return "Global";
   case Class:
@@ -483,6 +485,9 @@ AccessRepresentation::AccessRepresentation(SILValue base, Kind kind) : value() {
   case Yield:
     assert(isa<BeginApplyInst>(
              cast<MultipleValueInstructionResult>(base)->getParent()));
+    break;
+  case BorrowMutateAccessor:
+    assert(isa<ApplyInst>(base));
     break;
   case Unidentified:
     break;
@@ -560,6 +565,7 @@ void AccessRepresentation::print(raw_ostream &os) const {
   case Stack:
   case Nested:
   case Yield:
+  case BorrowMutateAccessor:
   case Unidentified:
   case Tail:
     os << value;
@@ -597,6 +603,7 @@ getReferenceFromBase(SILValue base, AccessRepresentation::Kind kind) {
   case AccessBase::Stack:
   case AccessBase::Nested:
   case AccessBase::Yield:
+  case AccessBase::BorrowMutateAccessor:
   case AccessBase::Unidentified:
   case AccessBase::Argument:
   case AccessBase::Global:
@@ -652,6 +659,9 @@ getNonRefNonGlobalDecl(SILValue base, AccessRepresentation::Kind kind) {
   case AccessBase::Yield:
     return nullptr;
 
+  case AccessBase::BorrowMutateAccessor:
+    return nullptr;
+
   case AccessBase::Nested:
     return nullptr;
 
@@ -696,6 +706,8 @@ bool AccessBase::hasLocalOwnershipLifetime() const {
     // Yielded values have a local apply scope, but they never have the same
     // storage as yielded values from a different scope, so there is no need to
     // consider their local scope during substitution.
+    return false;
+  case AccessBase::BorrowMutateAccessor:
     return false;
   case AccessBase::Box:
   case AccessBase::Class:
@@ -786,6 +798,17 @@ protected:
   // Return an invalid value for a phi with no resolved inputs.
   SILValue recursiveFindRoot(SILValue ref) {
     while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
+      // A `load_borrow` with a value hint is guaranteed to load the hinted value.
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(svi)) {
+        if (!lbi->hasValueHint())
+          break;
+        ref = lbi->getValueHint();
+        continue;
+      }
+      if (isa<UncheckedOwnershipInst>(svi)) {
+        ref = svi->getOperand(0);
+        continue;
+      }
       // If preserveOwnership is true, stop at the first owned root
       if (!isIdentityPreservingRefCast(svi)) {
         break;
@@ -865,16 +888,6 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
       continue;
     }
 
-    // Special handling until borrowing apply is represented as a
-    // ForwardingOperation.
-    if (auto *apply =
-            dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction())) {
-      if (apply->hasGuaranteedResult()) {
-        worklist.pushIfNotVisited(apply->getSelfArgument());
-        continue;
-      }
-    }
-
     // Found a potential root.
     if (lookThroughNestedBorrows) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
@@ -886,6 +899,17 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
         }
         // The borrowee isn't guaranteed or we aren't looking through nested
         // borrows. Fall through to add the begin_borrow to roots.
+      }
+      // The result of a borrow accessor is a nested borrow of a @guaranteed
+      // self.
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        auto *selfOperand =
+            apply->getSelfObjectOfGuaranteedBorrowAccessorResult();
+        if (selfOperand && selfOperand->get()->getOwnershipKind() ==
+                               OwnershipKind::Guaranteed) {
+          worklist.pushIfNotVisited(selfOperand->get());
+          continue;
+        }
       }
     }
     roots.push_back(value);
@@ -989,7 +1013,7 @@ const ValueDecl *AccessStorage::getDecl() const {
     // base, we can only make a best effort to extract it from the object type,
     // which might not even be a class in the case of bridge objects.
     if (ClassDecl *classDecl =
-        getObject()->getType().getClassOrBoundGenericClass()) {
+        getObject()->getType().getClassDecl()) {
       return getIndexedField(classDecl, getPropertyIndex());
     }
     return nullptr;
@@ -1367,8 +1391,7 @@ public:
              // copyable_to_moveonlywrapper_addr, we just look through it when
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
-             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
-             isAddressReturn(projectedAddr));
+             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -1407,7 +1430,7 @@ bool swift::visitProductLeafAccessPathNodes(
         auto *elementNode = node->getChild(index);
         worklist.push_back({silType.getTupleElementType(index), elementNode});
       }
-    } else if (auto *decl = silType.getStructOrBoundGenericStruct()) {
+    } else if (auto *decl = silType.getStructDecl()) {
       if (decl->isResilient(tec.getContext()->getParentModule(),
                             tec.getResilienceExpansion())) {
         visitor(AccessPath::PathNode(node), silType);
@@ -1983,9 +2006,6 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
-    if (isAddressReturn(svi)) {
-      pushUsers(svi, dfs);
-    }
   }
   if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
     if (use->get() == sbi->getDest()) {
@@ -2140,18 +2160,19 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
     }
     return true;
   }
-  if (!(visitor.*visit)(use))
-    return false;
 
+  // Like a load_borrow, a borrow accessor borrows the memory location of an
+  // @in_guaranteed self over the scope of its result, including the scopes of
+  // its reborrows.
   if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
-    if (applyInst->hasGuaranteedResult()) {
-      for (auto *resultUse : applyInst->getUses()) {
-        if (!(visitor.*visit)(resultUse)) {
-          return false;
-        }
-      }
+    if (use == applyInst->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+      return BorrowedValue(applyInst).visitTransitiveLifetimeEndingUses(
+          [&](Operand *endUse) { return (visitor.*visit)(endUse); });
     }
   }
+
+  if (!(visitor.*visit)(use))
+    return false;
   return true;
 }
 
@@ -2163,6 +2184,12 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
   // TODO: handle non-escaping partial-applies just like a full apply. The
   // address uses are the points where the partial apply is invoked.
   if (FullApplySite apply = FullApplySite::isa(user)) {
+    // The uses of the address result of an accessor with an address self may
+    // access the storage, but they are not visited.
+    if (apply.getSubstCalleeConv().hasAddressResult() &&
+        apply.hasSelfArgument() && use == &apply.getSelfArgumentOperand()) {
+      return visitor.visitUnknownUse(use);
+    }
     switch (apply.getArgumentConvention(*use)) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
@@ -2470,6 +2497,9 @@ bool swift::isPossibleFormalAccessStorage(const AccessStorage &storage,
   case AccessStorage::Yield:
     // Yields are accessed by the caller.
     return false;
+  case AccessStorage::BorrowMutateAccessor:
+    // Accessor results are accessed within the access of the accessor's self.
+    return false;
   case AccessStorage::Argument:
     // Function arguments are accessed by the caller.
     return false;
@@ -2538,15 +2568,11 @@ static void visitApplyAccesses(ApplySite apply,
       visitor(&oper);
       continue;
     }
-    auto fnType = oper.get()->getType().getAs<SILFunctionType>();
-    if (!fnType || !fnType->isNoEscape())
-      continue;
-
-    // When @noescape function closures are passed as arguments, their
+    // When non-escaping function closures are passed as arguments, their
     // arguments are considered accessed at the call site.
     TinyPtrVector<PartialApplyInst *> partialApplies;
-    findClosuresForFunctionValue(oper.get(), partialApplies);
-    // Recursively visit @noescape function closure arguments.
+    findNonEscapingClosuresForFunctionValue(oper.get(), partialApplies);
+    // Recursively visit non-escaping function closure arguments.
     for (auto *PAI : partialApplies)
       visitApplyAccesses(PAI, visitor);
   }
@@ -2618,6 +2644,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
     case BuiltinValueKind::InitializeNonDefaultDistributedActor:
+    case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::GetCurrentExecutor:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
@@ -2797,12 +2824,21 @@ void swift::visitAccessedAddress(SILInstruction *I,
                                  /*lookThroughNestedBorrows=*/true, roots);
     for (auto root : roots) {
       if (auto *lbi = dyn_cast<LoadBorrowInst>(root)) {
-        visitor(&lbi->getOperandRef());
+        visitor(&lbi->getOperandRef(0));
         return;
       }
       if (auto *sbi = dyn_cast<StoreBorrowInst>(root)) {
         visitor(&sbi->getOperandRef(StoreInst::Dest));
         return;
+      }
+      // Like a load_borrow, a borrow accessor result borrows the memory
+      // location of an @in_guaranteed self.
+      if (auto *apply = dyn_cast<ApplyInst>(root)) {
+        if (auto *selfOperand =
+                apply->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+          visitor(selfOperand);
+          return;
+        }
       }
     }
     break;

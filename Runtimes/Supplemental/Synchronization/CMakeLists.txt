@@ -55,6 +55,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 
 option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
@@ -84,6 +85,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature StaticExclusiveOnly>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BackDeployFrozenValueTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-runtime-compatibility-version none>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
@@ -92,6 +94,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")

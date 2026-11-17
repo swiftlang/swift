@@ -1,0 +1,139 @@
+## A hand-crafted ELF object holding a DWARF v5 compile unit that exercises
+## the ways in which a subprogram DIE can get its name from another DIE --
+## see DwarfReaderLookups.swift.
+##
+## Layout:
+##   DIE @ 0x0d: DW_TAG_subprogram (declaration), linkage name "_ZN1AC4Ev"
+##   DIE @ 0x18: DW_TAG_subprogram, DW_AT_specification -> 0x0d, with its own
+##               linkage name "_ZN1AC2Ev", [0x1000, 0x1020)
+##   DIE @ 0x33: DW_TAG_subprogram (abstract, DW_AT_inline), "abstract_fn"
+##   DIE @ 0x41: DW_TAG_subprogram, DW_AT_abstract_origin -> 0x33 and no name
+##               of its own, [0x2000, 0x2020)
+##   DIE @ 0x52: DW_TAG_subprogram "caller", [0x3000, 0x3100)
+##     DIE: inlined, abstract_origin -> 0x18, [0x3010, 0x3020), line 3 col 4
+##     DIE: inlined, abstract_origin -> 0x33, [0x3030, 0x3040), line 5 col 6
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes: []
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_declaration
+              Form:      DW_FORM_flag_present
+        - Code:     0x03
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_specification
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x04
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_inline
+              Form:      DW_FORM_data1
+        - Code:     0x05
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x06
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x07
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_data1
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "_ZN1AC4Ev"
+        - AbbrCode: 0x03
+          Values:
+            - Value: 0x0d            # DW_AT_specification
+            - CStr: "_ZN1AC2Ev"
+            - Value: 0x1000
+            - Value: 0x20
+        - AbbrCode: 0x04
+          Values:
+            - CStr: "abstract_fn"
+            - Value: 0x01            # DW_AT_inline = DW_INL_inlined
+        - AbbrCode: 0x05
+          Values:
+            - Value: 0x33            # DW_AT_abstract_origin
+            - Value: 0x2000
+            - Value: 0x20
+        - AbbrCode: 0x06
+          Values:
+            - CStr: "caller"
+            - Value: 0x3000
+            - Value: 0x100
+        - AbbrCode: 0x07
+          Values:
+            - Value: 0x18
+            - Value: 0x3010
+            - Value: 0x10
+            - Value: 0x01
+            - Value: 0x03
+            - Value: 0x04
+        - AbbrCode: 0x07
+          Values:
+            - Value: 0x33
+            - Value: 0x3030
+            - Value: 0x10
+            - Value: 0x01
+            - Value: 0x05
+            - Value: 0x06
+        - AbbrCode: 0x00              # end of "caller"'s children
+        - AbbrCode: 0x00              # end of compile unit's children

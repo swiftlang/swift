@@ -1,0 +1,4 @@
+module ConstRefCallback {
+  header "header.h"
+  requires cplusplus
+}

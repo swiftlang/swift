@@ -434,6 +434,10 @@ public:
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 
+  /// Returns the operator that was synthesized from \p decl , or \c nullptr if
+  /// there is none. \p decl is not an operator itself; it is the regular
+  /// function that a C++ operator was imported as, whose name starts with
+  /// `__operator`.
   FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
@@ -614,6 +618,7 @@ public:
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
+  CArrayProjection getVisibleCArrayProjection() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
@@ -783,6 +788,9 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) override;
+
   bool needsClosureConstructor(
       const clang::CXXRecordDecl *recordDecl) const override;
 
@@ -823,6 +831,8 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) override;
   ValueDecl *getOverriddenSuperclassMember(const ValueDecl *decl) override;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
@@ -917,9 +927,10 @@ struct CxxReferenceParameter {
   CxxReferenceParameterKind kind;
 };
 
-/// Classifies a C++ reference parameter type, or `None` if \p type is not a
-/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
-/// those must be imported as the pointee rather than as a pointer.
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a C++
+/// reference type or is a reference to a function. Every kind but `Mutating` is
+/// lowered indirectly, so those must be imported as the pointee rather than as
+/// a pointer.
 std::optional<CxxReferenceParameter>
 classifyCxxReferenceParameter(clang::QualType type);
 
@@ -981,7 +992,7 @@ inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
 /// Whether \p type is an imported C++ class that C++ cannot pass in registers
 /// (a non-trivial copy or move constructor, or a non-trivial destructor).
 inline bool isNonTrivialCxxRecord(Type type) {
-  const auto *structDecl = type->getStructOrBoundGenericStruct();
+  const auto *structDecl = type->getStructDecl();
   if (!structDecl)
     return false;
   const auto *record =
@@ -1014,6 +1025,12 @@ bool isClangNamespace(const DeclContext *dc);
 
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
+
+/// The C++ name of an overloaded operator, e.g. "operator==".
+StringRef getCxxOperatorName(clang::OverloadedOperatorKind op);
+
+/// The overloaded operator named \p name, e.g. "operator==", if any.
+std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
 
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
@@ -1094,31 +1111,6 @@ getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
-
-enum class RefCountedPtrError {
-  NotAnnotated,
-  MissingToRawPointer,
-  ToRawPointerLookupFailure,
-  ToRawPointerLookupAmbiguity,
-  ToRawPointerNotFunction,
-  ToRawPointerWrongSignature,
-  CtorLookupAmbiguity,
-  CtorLookupFailure,
-  CtorWrongParamType
-};
-
-struct RefCountedPtrInfo {
-  ConstructorDecl *toSmartPtr;
-};
-
-struct RefCountedPtrRequestResult {
-  std::variant<RefCountedPtrInfo, RefCountedPtrError> result;
-  ValueDecl *toRawPtrFunc = nullptr;
-  StringRef toRawPtrName = "";
-};
-
-RefCountedPtrRequestResult
-getClangRefCountedSmartPointer(NominalTypeDecl *decl);
 
 /// Iterator categories, based on the std iterator tags
 enum class CxxIteratorCategory {

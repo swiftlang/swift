@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -sil-ownership-verify-all -O %s
+// RUN: %target-swift-frontend -emit-sil -sil-verify-all -O %s
 
 // Ensure that we do correct ownership of VJP normal result
 

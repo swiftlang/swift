@@ -7,3 +7,8 @@ module CustomStringBuiltins {
   header "custom-string-builtins.h"
   export *
 }
+
+module Functions {
+  header "functions.h"
+  export *
+}

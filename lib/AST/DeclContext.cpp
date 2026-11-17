@@ -163,7 +163,7 @@ GenericSignature DeclContext::getGenericSignatureOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericSignature();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
@@ -174,7 +174,7 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
     if (auto decl = dc->getAsDecl())
       if (auto GC = decl->getAsGenericContext())
         return GC->getGenericEnvironment();
-  } while ((dc = dc->getParent()));
+  } while ((dc = dc->getParentForLookup()));
 
   return nullptr;
 }
@@ -326,7 +326,7 @@ DeclContext *DeclContext::getParentForLookup() const {
   if (isa<NominalTypeDecl>(this)) {
     // If we are inside a nominal type that is inside a protocol,
     // skip the protocol.
-    if (isa<ProtocolDecl>(getParent()))
+    if (getParent()->getSelfProtocolDecl())
       return getModuleScopeContext();
   }
   return getParent();
@@ -472,6 +472,15 @@ void DeclContext::getSeparatelyImportedOverlays(
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
 
+void DeclContext::assignLocalDiscriminators() {
+  auto &eval = getASTContext().evaluator;
+  evaluateOrDefault(eval, LocalDiscriminatorsRequest{this}, {});
+
+  // Also handle function/top-level bodies specially since they can be replaced.
+  if (isa<TopLevelCodeDecl, AbstractFunctionDecl>(this))
+    evaluateOrDefault(eval, BodyDiscriminatorsRequest{this}, {});
+}
+
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
   auto dc = this;
@@ -485,6 +494,11 @@ bool DeclContext::isGenericContext() const {
   } while ((dc = dc->getParentForLookup()));
 
   return false;
+}
+
+bool DeclContext::isEffectivelyGenericContext() const {
+  return isGenericContext() &&
+         getGenericSignatureOfContext()->isEffectivelyGeneric();
 }
 
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
@@ -1380,43 +1394,45 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
             if (VD->isStatic() ||
                !VD->hasStorageOrWrapsStorage())
               return;
+
+            // FIXME: this should definitely be using a type walker
+
             // Unwrap in case this var is optional.
             auto varType = VD->getInterfaceType()->getCanonicalType();
             if (auto unwrapped = varType->getCanonicalType()->getOptionalObjectType()) {
               varType = unwrapped->getCanonicalType();
             }
-            // Handle BoundGenericType, e.g. [Foo: Bar], Dictionary<Foo, Bar>.
-            // Check for its arguments types, i.e. Foo, Bar.
-            if (auto boundGeneric = varType->getAs<BoundGenericType>()) {
-                for (auto arg : boundGeneric->getGenericArgs()) {
-                  if (auto argNominal = arg->getNominalOrBoundGenericNominal()) {
-                    if (auto argIDC = dyn_cast<IterableDeclContext>(argNominal)) {
-                      argIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
-                      if (argIDC->hasDeserializeMemberError()) {
-                         setHasDeserializeMemberError(true);
-                        break;
-                      }
-                    }
-                  }
-                }
-            } else if (auto tupleType = varType->getAs<TupleType>()) {
-              // Handle TupleType, e.g. (Foo, Var).
-              for (auto element : tupleType->getElements()) {
-                if (auto elementNominal = element.getType()->getNominalOrBoundGenericNominal()) {
-                    if (auto elementIDC = dyn_cast<IterableDeclContext>(elementNominal)) {
-                      elementIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
-                      if (elementIDC->hasDeserializeMemberError()) {
-                         setHasDeserializeMemberError(true);
-                        break;
-                      }
-                    }
-                  }
-                }
-            } else if (auto varNominal = varType->getNominalOrBoundGenericNominal()) {
-              if (auto varIDC = dyn_cast<IterableDeclContext>(varNominal)) {
+            // Handle generic type arguments, e.g. [Foo: Bar],
+            // Dictionary<Foo, Bar>.
+            if (auto nominalType = varType->getAs<NominalType>()) {
+              if (auto varIDC = dyn_cast<IterableDeclContext>(nominalType->getDecl())) {
                 varIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
                 if (varIDC->hasDeserializeMemberError()) {
                    setHasDeserializeMemberError(true);
+                }
+              }
+              for (auto arg : nominalType->getGenericArgs()) {
+                if (auto argNominal = arg->getNominalDecl()) {
+                  if (auto argIDC = dyn_cast<IterableDeclContext>(argNominal)) {
+                    argIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
+                    if (argIDC->hasDeserializeMemberError()) {
+                       setHasDeserializeMemberError(true);
+                      break;
+                    }
+                  }
+                }
+              }
+            } else if (auto tupleType = varType->getAs<TupleType>()) {
+              // Handle TupleType, e.g. (Foo, Var).
+              for (auto element : tupleType->getElements()) {
+                if (auto elementNominal = element.getType()->getNominalDecl()) {
+                  if (auto elementIDC = dyn_cast<IterableDeclContext>(elementNominal)) {
+                    elementIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
+                    if (elementIDC->hasDeserializeMemberError()) {
+                       setHasDeserializeMemberError(true);
+                      break;
+                    }
+                  }
                 }
               }
             }

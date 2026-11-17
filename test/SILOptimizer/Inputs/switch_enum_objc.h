@@ -27,3 +27,15 @@ enum UnfairCoin {
   UnfairCoinHeads,
   UnfairCoinTails __attribute__((unavailable)),
 } __attribute__((enum_extensibility(closed)));
+
+#define UNAVAILABLE_ON_APPLE_PLATFORMS                                         \
+  __attribute__((availability(macos, unavailable)))                            \
+  __attribute__((availability(ios, unavailable)))                              \
+  __attribute__((availability(tvos, unavailable)))                             \
+  __attribute__((availability(watchos, unavailable)))                          \
+  __attribute__((availability(visionos, unavailable)))
+
+enum PlatformUnfairCoin {
+  PlatformUnfairCoinHeads,
+  PlatformUnfairCoinTails UNAVAILABLE_ON_APPLE_PLATFORMS,
+} __attribute__((enum_extensibility(closed)));

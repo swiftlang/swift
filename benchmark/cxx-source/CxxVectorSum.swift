@@ -83,8 +83,8 @@ public func run_CxxVectorOfU32_Sum_Swift_RawIteratorLoop(_ n: Int) {
   let vectorOfU32 = makeVector32(vectorSize)
   var sum: UInt32 = 0
   for _ in 0..<(n * iterRepeatFactor) {
-    var b = vectorOfU32.__beginUnsafe()
-    let e = vectorOfU32.__endUnsafe()
+    var b = unsafe vectorOfU32.begin()
+    let e = unsafe vectorOfU32.end()
     while b != e {
         sum = sum &+ b.pointee
         b = b.successor()

@@ -529,8 +529,8 @@ enum class CaptureKind {
   /// A let constant captured as a pointer to storage
   Immutable,
   /// A local value captured directly, moved (not boxed or copied) into the
-  /// closure's context. This is only used for `@called(atMostOnce)` closures
-  /// that capture `@called(atMostOnce)` values at the moment because such
+  /// closure's context. This is only used for at-most-once closures
+  /// that capture at-most-once values at the moment because such
   /// closures cannot be copied or called multiple times.
   Consuming,
 };

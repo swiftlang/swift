@@ -7,5 +7,5 @@
 @_objcImplementation @_cdecl("CImplFunc1") func CImplFunc1(_: Double) {}
 
 // YES-DAG: cdecl_implementation_features.swift:[[@LINE+2]]:{{[0-9]+}}: error: global function 'CImplFunc2' of type '(Double) -> ()' does not match type '(CInt) -> Void' (aka '(Int32) -> ()') declared by the header{{$}}
-// YES-NOT: cdecl_implementation_features.swift:[[@LINE+1]]:{{[0-9]+}}: error: 'implementation' attribute is only valid when experimental feature CImplementation is enabled
+// YES-NOT: cdecl_implementation_features.swift:[[@LINE+1]]:{{[0-9]+}}: error: '@implementation' attribute is only valid when experimental feature CImplementation is enabled
 @implementation @_cdecl("CImplFunc2") func CImplFunc2(_: Double) {}

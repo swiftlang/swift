@@ -348,7 +348,7 @@ getSelfFunctionArgumentForRefElementAddr(SILValue value) {
   if (!lbi)
     return {};
 
-  auto *asi = dyn_cast<AllocStackInst>(lbi->getOperand());
+  auto *asi = dyn_cast<AllocStackInst>(lbi->getAddress());
   if (!asi || !asi->getDecl()->isActorSelf())
     return {};
   return self;
@@ -417,7 +417,7 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   }
 
   // Then check if our classValue is an any Actor.
-  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal();
+  if (auto *nomDecl = classValue->getType().getNominalDecl();
       nomDecl && nomDecl->isAnyActor()) {
     return SILIsolationInfo::getActorInstanceIsolated(queriedValue, classValue,
                                                       nomDecl);
@@ -429,7 +429,7 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
     if (auto *nomDecl =
             classValue->getType()
                 .getLoweredInstanceTypeOfMetatype(classValue->getFunction())
-                .getNominalOrBoundGenericNominal()) {
+                .getNominalDecl()) {
 
       // See if the nominal decl is global actor isolated. In such a case, we
       // know that the metatype is also actor isolated.
@@ -711,7 +711,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       if (funcType->hasSelfParam()) {
         auto selfParam = funcType->getSelfInstanceType(
             fri->getModule(), func->getTypeExpansionContext());
-        if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
+        if (auto *nomDecl = selfParam->getNominalDecl()) {
           auto nomDeclIsolation = swift::getActorIsolation(nomDecl);
           if (nomDeclIsolation.isGlobalActor()) {
             return SILIsolationInfo::getGlobalActorIsolated(
@@ -960,7 +960,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
       // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
-            swi->getOperand()->getType().getEnumOrBoundGenericEnum();
+            swi->getOperand()->getType().getEnumDecl();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
 
@@ -1016,15 +1016,11 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
             isClosureCapturedNonisolatedUnsafe);
       }
 
-      // All of the non-Sendable captures of non-escaping @called(atMostOnce)
-      // closures that aren't explicitly `sending` are disconnected.
-      if (auto *closure = declRef.getClosureExpr();
-          closure && closure->hasCalledAtMostOnceSemantics()) {
-        auto *closureTy = closure->getType()->castTo<FunctionType>();
-        if (closureTy->getExtInfo().isNoEscape())
-          return SILIsolationInfo::getDisconnected(
-              isClosureCapturedNonisolatedUnsafe);
-      }
+      // The captures of non-escaping at-most-once closures that are inferred
+      // to be `sending` are disconnected.
+      if (isInferredSendingClosureCapture(fArg))
+        return SILIsolationInfo::getDisconnected(
+            isClosureCapturedNonisolatedUnsafe);
     }
   }
 
@@ -1798,6 +1794,30 @@ SILIsolationInfo SILIsolationInfo::getFunctionIsolation(SILFunction *fn) {
   }
 
   return {};
+}
+
+bool SILIsolationInfo::isInferredSendingClosureCapture(
+    SILFunctionArgument *arg) {
+  if (!arg->isClosureCapture() || arg->isSending())
+    return false;
+
+  auto declRef = arg->getFunction()->getDeclRef();
+  if (!declRef)
+    return false;
+
+  auto *closure = declRef.getClosureExpr();
+  if (!closure || !closure->hasCalledAtMostOnceSemantics())
+    return false;
+
+  auto *closureTy = closure->getType()->castTo<FunctionType>();
+  if (!closureTy->getExtInfo().isNoEscape())
+    return false;
+
+  // Listing a value in a capture list without `sending` opts it out of the
+  // inference, like in a regular closure. This includes the capture list of an
+  // enclosing closure, where the value isn't disconnected and so can't be sent.
+  auto *var = dyn_cast_or_null<VarDecl>(arg->getDecl());
+  return !var || !var->isCaptureList();
 }
 
 //===----------------------------------------------------------------------===//

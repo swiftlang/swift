@@ -38,6 +38,7 @@ EXCEPTIONAL_FILES = [
     # Needs Embedded but without any command lines that enable it for the compiler.
     pathlib.Path("test/embedded/concurrency-non-symbols.swift"),
     pathlib.Path("test/embedded/concurrency-non-symbols-nonassert.swift"),
+    pathlib.Path("test/embedded/concurrency-clock-dependencies.swift"),
 ]
 
 ENABLE_FEATURE_RE = re.compile(

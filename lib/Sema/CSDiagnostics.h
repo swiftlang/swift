@@ -35,8 +35,6 @@
 namespace swift {
 namespace constraints {
 
-class FunctionArgpplyInfo;
-
 /// Base class for all of the possible diagnostics,
 /// provides most basic information such as location of
 /// the problem, parent expression and some utility methods.
@@ -815,6 +813,30 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose errors related to using an array literal where a
+/// tuple is expected.
+class ArrayLiteralToTupleConversionFailure final : public ContextualFailure {
+public:
+  ArrayLiteralToTupleConversionFailure(const Solution &solution,
+                                       Type arrayTy, Type tupleTy,
+                                       ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, tupleTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose errors related to using a tuple where an array literal
+/// is expected.
+class TupleToArrayConversionFailure final : public ContextualFailure {
+public:
+  TupleToArrayConversionFailure(const Solution &solution,
+                                Type arrayTy, Type tupleTy,
+                                ConstraintLocator *locator)
+      : ContextualFailure(solution, arrayTy, tupleTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose errors related to converting function type which
 /// isn't explicitly '@escaping' or '@Sendable' to some other type.
 class AttributedFuncToTypeConversionFailure final : public ContextualFailure {
@@ -913,8 +935,10 @@ public:
                                   ConstraintLocator *locator)
       : ContextualFailure(solution, actualType, requiredType, locator),
         Mismatches(mismatches) {
-    assert(actualType->is<BoundGenericType>());
-    assert(requiredType->is<BoundGenericType>());
+    assert(actualType->is<NominalType>() &&
+           actualType->castTo<NominalType>()->hasGenericArgs());
+    assert(requiredType->is<NominalType>() &&
+           requiredType->castTo<NominalType>()->hasGenericArgs());
   }
 
   bool diagnoseAsError() override;
@@ -932,13 +956,13 @@ private:
   getDiagnosticFor(ContextualTypePurpose context);
 
   /// The actual type being used.
-  BoundGenericType *getActual() const {
-    return getFromType()->castTo<BoundGenericType>();
+  NominalType *getActual() const {
+    return getFromType()->castTo<NominalType>();
   }
 
   /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const {
-    return getToType()->castTo<BoundGenericType>();
+  NominalType *getRequired() const {
+    return getToType()->castTo<NominalType>();
   }
 };
 
@@ -1011,11 +1035,11 @@ public:
 };
 
 /// Diagnose failures related to conversion between two types with different
-/// execution semantics i.e. '@called(atMostOnce)' function and regular one:
+/// execution semantics, such as an at-most-once function and a regular one:
 ///
 /// ```swift
 /// func test(_: () -> Void) {}
-/// let fn: @called(atMostOnce) () -> Void = {}
+/// let fn: @callable(once) () -> Void = {}
 /// test(fn) // error due to widening
 /// ```
 class ConversionBetweenFunctionsWithDifferentExecutionSemantics final
@@ -1334,6 +1358,15 @@ private:
   ///   _ = tuple[0] // -> tuple.0.
   ///  ```
   bool diagnoseForSubscriptMemberWithTupleBase() const;
+
+  /// Tailored diagnostics for tuple element on a base type with an appropriate
+  /// subscript.
+  /// e.g
+  /// ```swift
+  ///   let ary: [2 of Int] = [0, 0]
+  ///   _ = ary.0 // -> ary[0]
+  ///  ```
+  bool diagnoseForTupleElementWithSubscriptMemberBase() const;
 
   static DeclName findCorrectEnumCaseName(Type Ty,
                                           TypoCorrectionResults &corrections,
@@ -3398,6 +3431,19 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose an argument to \c withoutActuallyDeiniting(_:do:) that isn't an
+/// exactly-once function.
+class NonExactlyOnceDeinitArgumentFailure final : public FailureDiagnostic {
+  Type ArgType;
+
+public:
+  NonExactlyOnceDeinitArgumentFailure(const Solution &solution, Type argType,
+                                      ConstraintLocator *locator)
+      : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose attempts to specialize with invalid number of generic arguments:
 ///
 /// \code
@@ -3447,11 +3493,12 @@ public:
 /// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
 class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
-  unsigned lhsCount, rhsCount;
+  IntegerType *lhsCount;
+  unsigned rhsCount;
 
 public:
-  IncorrectInlineArrayLiteralCount(const Solution &solution, unsigned lhsCount,
-                                   unsigned rhsCount,
+  IncorrectInlineArrayLiteralCount(const Solution &solution,
+                                   IntegerType *lhsCount, unsigned rhsCount,
                                    ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(lhsCount),
         rhsCount(rhsCount) {}

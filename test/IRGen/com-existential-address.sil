@@ -1,0 +1,38 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %S/../SIL/com-existential-address.sil | %FileCheck %s --check-prefix=ADDRESS
+// RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -module-name M -emit-ir -sil-verify-all %s | %FileCheck %s
+
+// ADDRESS-LABEL: define{{.*}} @mutable_address(
+// ADDRESS-SAME: ptr {{.*}}[[VALUE:%[^,) ]+]])
+// ADDRESS-NOT: load
+// ADDRESS-NOT: getelementptr
+// ADDRESS: ret ptr [[VALUE]]
+// ADDRESS-LABEL: define{{.*}} @immutable_address(
+// ADDRESS-SAME: ptr {{.*}}[[VALUE:%[^,) ]+]])
+// ADDRESS-NOT: load
+// ADDRESS-NOT: getelementptr
+// ADDRESS: ret ptr [[VALUE]]
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol IItem {}
+
+sil @modify : $@convention(thin) <T: IItem> (@inout T) -> ()
+
+// The generic callee receives the original address and a zero adjustment.
+// CHECK-LABEL: define{{.*}} @generic_address(
+// CHECK-SAME: ptr {{.*}}[[VALUE:%[^,) ]+]])
+// CHECK-NOT: getelementptr
+// CHECK-NOT: load ptr, ptr [[VALUE]]
+// CHECK: call swiftcc void @modify(ptr {{.*}}[[VALUE]], ptr {{.*}}, i{{32|64}} 0)
+// CHECK: ret void
+sil @generic_address : $@convention(thin) (@inout IItem) -> () {
+bb0(%value : $*IItem):
+  %open = open_existential_addr mutable_access %value : $*IItem to $*@opened(1, IItem) Self
+  %callee = function_ref @modify : $@convention(thin) <T: IItem> (@inout T) -> ()
+  %result = apply %callee<@opened(1, IItem) Self>(%open) : $@convention(thin) <T: IItem> (@inout T) -> ()
+  return %result : $()
+}

@@ -237,7 +237,7 @@ protocol ProtocolRequirements: Differentiable {
 }
 
 protocol ProtocolRequirementsRefined: ProtocolRequirements {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse)'}}
+  // expected-error @+1 {{overriding declaration is missing '@differentiable(reverse)'}}
   func f1(_ x: Float) -> Float
 }
 
@@ -290,38 +290,38 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var x: Float
   var y: Float
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
     self.x = x
     self.y = y
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
     self.x = x
     self.y = Float(y)
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Float) -> Float'}}
   public func amb(x: Float, y: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse, wrt: x)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse, wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse, wrt: x)' to satisfy requirement}} {{10-10=@differentiable(reverse, wrt: x) }}
   // expected-note @+1 {{candidate has non-matching type '(Float, Int) -> Float'}}
   public func amb(x: Float, y: Int) -> Float {
     return x
   }
 
-  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement}}
   public func f1(_ x: Float) -> Float {
     return x
   }
 
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement}}
   @differentiable(reverse, wrt: (self, x))
   public func f2(_ x: Float, _ y: Float) -> Float {
     return x + y
@@ -549,7 +549,7 @@ public protocol DifferentiableDistribution: Differentiable, Distribution {
 // Adding a more general `@differentiable` attribute.
 public protocol DoubleDifferentiableDistribution: DifferentiableDistribution
   where Value: Differentiable {
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse, wrt: self)'}} {{3-3=@differentiable(reverse, wrt: self) }}
+  // expected-error @+1 {{overriding declaration is missing '@differentiable(reverse, wrt: self)'}} {{3-3=@differentiable(reverse, wrt: self) }}
   func logProbability(of value: Value) -> Float
 }
 
@@ -567,7 +567,7 @@ public struct AttemptsToSatisfyRequirement: HasRequirement {
   // This `@differentiable` attribute does not satisfy the requirement because
   // it is more constrained than the requirement's `@differentiable` attribute.
   @differentiable(reverse where T: CustomStringConvertible)
-  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse, wrt: (x, y))' attribute to satisfy requirement}}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse, wrt: (x, y))' to satisfy requirement}}
   public func requirement<T: Differentiable>(_ x: T, _ y: T) -> T { x }
 }
 
@@ -648,8 +648,8 @@ class Super: Differentiable {
 }
 
 class Sub: Super {
-  // expected-error @+2 {{overriding declaration is missing attribute '@differentiable(reverse, wrt: x)'}}
-  // expected-error @+1 {{overriding declaration is missing attribute '@differentiable(reverse)'}}
+  // expected-error @+2 {{overriding declaration is missing '@differentiable(reverse, wrt: x)'}}
+  // expected-error @+1 {{overriding declaration is missing '@differentiable(reverse)'}}
   override func testMissingAttributes(_ x: Float) -> Float { x }
 }
 

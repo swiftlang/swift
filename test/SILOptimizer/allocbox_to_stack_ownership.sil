@@ -404,7 +404,9 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
   %2 = function_ref @_TFsoP2ppUs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0 // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
+  %1a = begin_access [modify] [unknown] %1 : $*Int
+  %4 = apply %2<Int>(%3, %1a) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@inout τ_0_0) -> @out τ_0_0
+  end_access %1a : $*Int
   %5 = load [trivial] %3 : $*Int                          // user: %8
   dealloc_stack %3 : $*Int       // id: %6
   destroy_value %0 : $<τ_0_0> { var τ_0_0 } <Int>      // id: %7

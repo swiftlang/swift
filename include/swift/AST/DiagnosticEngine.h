@@ -1377,6 +1377,11 @@ namespace swift {
     }
   };
 
+  /// DO NOT ADD NEW USES OF THIS. A diagnostic transaction covers all
+  /// diagnostics emitted in its scope, including those from cached requests,
+  /// which will never be replayed. Instead, either use DiagnosticQueue, or
+  /// redesign your logic to not require transactions.
+  ///
   /// Represents a diagnostic transaction. While a transaction is
   /// open, all recorded diagnostics are saved until the transaction commits,
   /// at which point they are emitted. If the transaction is instead aborted,

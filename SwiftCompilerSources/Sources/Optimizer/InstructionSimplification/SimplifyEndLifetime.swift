@@ -20,6 +20,17 @@ extension EndLifetimeInst : Simplifiable, SILCombineSimplifiable {
       return
     }
 
+    // There is no lifetime to end if the value doesn't have ownership. This can happen if an owned
+    // value is replaced by a value without ownership, e.g. an `alloc_ref` by a `global_value`.
+    if operand.value.ownership == .none,
+       // An address operand also has "none" ownership, but `end_lifetime` of an address
+       // ends the lifetime of the memory (it de-initializes it) and must not be removed.
+       !operand.value.type.isAddress
+    {
+      context.erase(instruction: self)
+      return
+    }
+
     tryRemoveForwardingInstruction(context)
   }
 

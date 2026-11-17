@@ -1,18 +1,22 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
+// RUN:   -enable-experimental-feature AlwaysUnsafeAttribute \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
+// RUN:   -enable-experimental-feature AlwaysUnsafeAttribute \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -25,15 +29,19 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
+// RUN:   -enable-experimental-feature ExtendedSpecializedAttribute \
+// RUN:   -enable-experimental-feature AlwaysUnsafeAttribute \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ExtendedSpecializedAttribute
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -83,6 +91,9 @@ struct S4 {}
 
 @abi(func fn_abi()) // expected-error {{cannot give global function 'fn' the ABI of a global function with a different number of parameters}}
 func fn(_: Int) {}
+
+@abi(var globalVar_abi: Int)
+var globalVar: Int = 0
 
 @_alignment(8) struct AnyAlignment {}
 
@@ -159,7 +170,7 @@ struct ImplementsStruct: ImplementsProto {
 
 @_optimize(speed) func OspeedFunc() {}
 
-@_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-31=}}
+@_private(sourceFile: "none") func foo() {} // expected-error {{'@_private' may only be used on 'import' declarations}} {{1-31=}}
 
 struct ProjectedValueStruct {
   @_projectedValueProperty($dummy)
@@ -175,6 +186,9 @@ func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
 
 @specialized(where X == Int, Y == Float, Z == Double)
 func testSpecializePublic<X, Y, Z>(x: X, y: Y, z: Z) {}
+
+@specialized(exported: true, where X == Int)
+public func testSpecializeExported<X>(x: X) {}
 
 @_spi(SPIName) public func spiFn() {}
 

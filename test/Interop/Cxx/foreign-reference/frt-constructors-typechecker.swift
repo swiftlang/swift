@@ -51,6 +51,6 @@ func ctorWithDefaultArgs() {
   let _ = FRTCtorWithDefaultViewArg(FRTCtorArgView(ptr: nil))
   let _ = FRTCtorWithUnsafeDefaultViewArg()
 
-  let _ = FRTTemplateCtorWithDefaultArgInt() // expected-error {{missing argument for parameter #1 in call}}
+  let _ = FRTTemplateCtorWithDefaultArgInt()
   let _ = FRTTemplateCtorWithDefaultArgInt(7)
 }

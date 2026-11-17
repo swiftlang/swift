@@ -7,7 +7,8 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
 // RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
 // RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
-// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution-
+// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution- \
+// RUN:   -verify-additional-prefix no-import-
 
 // Test with a precompiled bridging header.
 // RUN: %target-swift-frontend -emit-pch -o %t/objc-bridging-header.pch \
@@ -15,7 +16,16 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)-typecheck %t/main.swift \
 // RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
 // RUN:   -internal-import-bridging-header %t/objc-bridging-header.pch \
-// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution-
+// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution- \
+// RUN:   -verify-additional-prefix no-import-
+
+// Test that any import of a module reached through the bridging header, even
+// a less permissive one, makes it a dependency for layouts exposed to clients.
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
+// RUN:   -verify -verify-ignore-unrelated -verify-ignore-unknown \
+// RUN:   -internal-import-bridging-header %t/objc-bridging-header.h \
+// RUN:   -swift-version 6 -verify-additional-prefix non-library-evolution- \
+// RUN:   -D FILEPRIVATE_IMPORT
 
 // Test library-evolution differences.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/main.swift \
@@ -45,8 +55,14 @@ typedef struct {
 
 //--- main.swift
 
+#if FILEPRIVATE_IMPORT
+fileprivate import Foundation
+#endif
+
 /// Referenced types
 
+// expected-no-import-note @+2 2 {{add import of module 'ObjectiveC'}}{{1-1=internal import ObjectiveC\n}}
+// expected-no-import-note @+1 {{add import of module 'Foundation'}}{{1-1=internal import Foundation\n}}
 public struct ExposedLayoutPublic {
   public init() { fatalError() }
 }
@@ -816,4 +832,22 @@ private protocol PrivateProtocol : RestrictedProtocol {
 
 @_implementationOnly
 internal protocol PrivateProtocolHidden : RestrictedProtocol {
+}
+
+/// Declarations from a module that the bridging header imports
+
+internal struct InternalStructWithTypeFromModule {
+  var o: NSObject
+  // expected-no-import-error @-1 {{cannot use class 'NSObject' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
+}
+
+internal protocol InternalProtocolFromModule : NSObjectProtocol {
+// expected-no-import-error @-1 {{cannot use protocol 'NSObjectProtocol' here; it was imported via the internal bridging header}}
+}
+
+internal struct BridgeableBox<T: _ObjectiveCBridgeable> {}
+
+internal struct InternalStructWithConformanceFromModule {
+  var b: BridgeableBox<Int>
+  // expected-no-import-error @-1 {{cannot use conformance of 'Int' to '_ObjectiveCBridgeable' in a property declaration member of a type not marked '@_implementationOnly'; it was imported via the internal bridging header}}
 }

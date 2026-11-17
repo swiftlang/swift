@@ -359,18 +359,12 @@ public:
 
   /// Get the contextual type for an expression target.
   Type getExprContextualType() const {
-    return getExprContextualTypeLoc().getType();
-  }
-
-  /// Get the contextual type for an expression target.
-  TypeLoc getExprContextualTypeLoc() const {
     // For an @autoclosure parameter, the conversion type is
     // the result of the function type.
-    auto typeLoc = getExprContextualTypeInfo().typeLoc;
     if (FunctionType *autoclosureParamType = getAsAutoclosureParamType())
-      return TypeLoc(typeLoc.getTypeRepr(), autoclosureParamType->getResult());
+      return autoclosureParamType->getResult();
 
-    return typeLoc;
+    return getExprContextualTypeInfo().getType();
   }
 
   /// Retrieve the type to which an expression should be converted, or

@@ -2691,8 +2691,8 @@ public:
       if (auto dynB = origInstance->getAs<DynamicSelfType>()) {
         origInstance = dynB->getSelfType();
       }
-      if (auto aClass = substInstance->getClassOrBoundGenericClass()) {
-        if (auto bClass = origInstance->getClassOrBoundGenericClass()) {
+      if (auto aClass = substInstance->getClassDecl()) {
+        if (auto bClass = origInstance->getClassDecl()) {
           if (aClass != bClass) {
             return bClass;
           }
@@ -2800,11 +2800,6 @@ public:
                                         newReplacements,
                                         ArrayRef<ProtocolConformanceRef>{});
     return bga->getWithSubstitutions(newSubs);
-  }
-
-  CanType visitBoundGenericType(CanBoundGenericType bgt,
-                                AbstractionPattern pattern) {
-    return handleGenericNominalType(pattern, bgt);
   }
 
   CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
@@ -2993,7 +2988,7 @@ public:
                                          AbstractionPattern yieldPattern) {
     SmallVector<FunctionType::Param, 4> newParams;
     auto addParam = [&](ParameterTypeFlags oldFlags, CanType newType) {
-      newParams.push_back(FunctionType::Param(
+      newParams.push_back(FunctionType::Param::bodyAccess(
           newType, /*label*/ Identifier(), oldFlags.withVariadic(false),
           /*internal label*/ Identifier()));
     };

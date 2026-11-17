@@ -114,4 +114,44 @@ tests.test("Existential box should maintain identity") {
   expectTrue(e! === c)
 }
 
+class Base<T> {}
+final class Derived<T>: Base<T> {}
+
+@inline(never)
+func castToDerived<T>(_ b: Base<T>) -> Derived<T>? {
+  return b as? Derived<T>
+}
+
+@inline(never)
+func forceCastToDerived<T>(_ b: Base<T>) -> Derived<T> {
+  return b as! Derived<T>
+}
+
+tests.test("Class casts with parameterized existential generic arguments") {
+  let d: Base<any Holder<Int>> = Derived<any Holder<Int>>()
+  expectNotNil(d as? Derived<any Holder<Int>>)
+  expectNil(d as? Derived<any Holder<String>>)
+  expectNotNil(castToDerived(d))
+  expectTrue(forceCastToDerived(d) === d)
+
+  let b = Base<any Holder<Int>>()
+  expectNil(b as? Derived<any Holder<Int>>)
+  expectNil(castToDerived(b))
+}
+
+protocol ClassProto: AnyObject {}
+final class ConformingDerived<T>: Base<T>, ClassProto {}
+
+@inline(never)
+func castToComposition<T>(_ b: Base<T>) -> (any Base<T> & ClassProto)? {
+  return b as? any Base<T> & ClassProto
+}
+
+tests.test("Class existential casts with parameterized existential generic arguments") {
+  let c: Base<any Holder<Int>> = ConformingDerived<any Holder<Int>>()
+  expectTrue(castToComposition(c)! === c)
+  expectNil(castToComposition(Derived<any Holder<Int>>()))
+  expectNil(castToComposition(Base<any Holder<Int>>()))
+}
+
 runAllTests()

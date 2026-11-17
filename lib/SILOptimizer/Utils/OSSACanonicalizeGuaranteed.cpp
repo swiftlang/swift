@@ -148,14 +148,16 @@ bool OSSACanonicalizeGuaranteed::isRewritableOSSAForward(SILInstruction *inst) {
   if (!canOpcodeForwardOwnedValues(forwardedOper))
     return false;
 
-  // Don't rewrite the forwarding of a non-copyable value with a deinit.
-  // Converting such a value to a guaranteed value would drop the call to its
-  // deinitializer (memberwise destruction is not equivalent to aggregate
-  // destruction for a type with a user-defined deinit).
-  if (forwardedOper->get()->getType().isValueTypeWithDeinit())
+  // Don't rewrite the forwarding of a non-copyable value.
+  // A consuming use of a non-copyable value cannot be rewritten to consume a
+  // copy on demand. Bailing out in the middle of the in-place rewriting would
+  // leave the SIL in an inconsistent state, e.g. with a leaking copy.
+  // Also, converting a value with a deinit to a guaranteed value would drop the
+  // call to its deinitializer.
+  if (forwardedOper->get()->getType().isMoveOnly())
     return false;
   for (auto result : inst->getResults()) {
-    if (result->getType().isValueTypeWithDeinit())
+    if (result->getType().isMoveOnly())
       return false;
   }
 
@@ -184,6 +186,10 @@ SILValue OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(SILValue def) {
       case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::Phi:
       case BorrowedValueKind::BeginApplyToken:
+      // FIXME: A borrow accessor result with a @guaranteed self could be
+      // handled like begin_borrow, but downstream utilities like
+      // filterOuterBorrowUseInsts do not support it yet.
+      case BorrowedValueKind::BorrowAccessor:
         break;
       }
     }
@@ -211,6 +217,7 @@ bool OSSACanonicalizeGuaranteed::computeBorrowLiveness() {
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
+  case BorrowedValueKind::BorrowAccessor:
     // TODO: Canonicalize load_borrow scope and phi once consolidateBorrowScope
     // can handle persistentCopies.
     return false;

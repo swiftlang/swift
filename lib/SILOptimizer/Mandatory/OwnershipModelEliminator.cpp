@@ -213,6 +213,11 @@ struct OwnershipModelEliminatorVisitor
     return true;
   }
 
+  bool visitUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    eraseInstructionAndRAUW(uoi, uoi->getOperand());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);
@@ -328,16 +333,20 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
 }
 
 bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // Break down the load borrow into an unqualified load.
-  auto newLoad =
-      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
-        return b.createLoad(loc, lbi->getOperand(),
-                            LoadOwnershipQualifier::Unqualified);
-      });
+  SILValue newValue;
+  if (lbi->hasValueHint()) {
+    newValue = lbi->getValueHint();
+  } else {
+    // Break down the load borrow into an unqualified load.
+    newValue = withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+          return b.createLoad(loc, lbi->getAddress(),
+                              LoadOwnershipQualifier::Unqualified);
+        });
+  }
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  eraseInstructionAndRAUW(lbi, newLoad);
+  eraseInstructionAndRAUW(lbi, newValue);
   return true;
 }
 
@@ -481,8 +490,8 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   if (!inst->isOnStack())
     return false;
 
-  // A nonescaping closure borrows its captures (note that
-  // `@called(atMostOnce)`, is allowed to also consume its captures), but now
+  // A nonescaping closure borrows its captures (note that a noncopyable
+  // closure is allowed to also consume its captures), but now
   // that we've lowered those borrows away, we need to make those dependence
   // relationships explicit so that the optimizer continues respecting them.
   ApplySite applySite(inst);
@@ -502,10 +511,10 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
         break;
       }
 
-      // In `@called(atMostOnce)` case, consumed captures don't need the
+      // In the noncopyable case, consumed captures don't need the
       // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
       // value.
-      if (inst->hasCalledAtMostOnceSemantics()) {
+      if (inst->isNoncopyable()) {
         auto argConv = applySite.getArgumentConvention(argOp);
         if (!(op->getType().isMoveOnly() &&
               !argConv.isOwnedConventionInCaller()))
@@ -554,7 +563,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto loc = destroy->getLoc();
   auto operand = destroy->getOperand();
   auto operandTy = operand->getType();
-  NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = operandTy.getNominalDecl();
 
   if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {
@@ -813,7 +822,7 @@ static bool stripOwnership(SILFunction &func) {
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
-      // A `@called(atMostOnce)` closure's context can be consumed directly by a
+      // An at-most-once closure's context can be consumed directly by a
       // `try_apply`, which is a terminator, so the `dealloc_stack` has to
       // go at the start of every successor block instead.
       if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {
@@ -927,8 +936,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
             "Found verification error when verifying before lowering "
             "ownership. Please re-run with -sil-verify-all to identify the "
             "actual pass that introduced the verification error.");
-        f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
-        getPassManager()->runSwiftFunctionVerification(&f);
+        // The mandatory verification checks linear lifetimes and additional
+        // OSSA invariants, such as borrowed-from and reborrow flags. In
+        // contrast to the SIL verifier, it also runs in compilers built without
+        // assertions.
+        getPassManager()->runVerification(&f);
       }
 
       if (stripOwnership(f)) {

@@ -51,7 +51,7 @@ enum class CxxUnsafetyReason {
 /// place ClangTypeEscapability gives up; that computation records the reason, so
 /// an explanation cannot contradict the verdict it explains.
 enum class CxxUnknownEscapabilityReason {
-  /// A conditionally-escapable type (std::shared_ptr, SWIFT_ESCAPABLE_IF) whose
+  /// A conditionally-escapable type (std::shared_ptr, SWIFT_SELF_CONTAINED_IF) whose
   /// argument has unknown escapability.
   ConditionalArgument,
   /// A record too complex to infer from, so only an annotation would settle it.

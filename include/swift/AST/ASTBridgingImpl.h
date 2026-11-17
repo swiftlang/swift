@@ -228,6 +228,18 @@ bool BridgedDeclObj::AbstractStorage_isConst() const {
   return getAs<swift::AbstractStorageDecl>()->isConstValue();
 }
 
+bool BridgedDeclObj::Var_isLet() const {
+  return getAs<swift::VarDecl>()->isLet();
+}
+
+bool BridgedDeclObj::Var_hasInitialValue() const {
+  return getAs<swift::VarDecl>()->getParentExecutableInitializer() != nullptr;
+}
+
+void BridgedDeclObj::Var_emitLetToVarNoteIfSimple() const {
+  getAs<swift::VarDecl>()->emitLetToVarNoteIfSimple(nullptr);
+}
+
 bool BridgedDeclObj::GenericType_isGenericAtAnyLevel() const {
   return getAs<swift::GenericTypeDecl>()->isGenericContext();
 }
@@ -271,6 +283,10 @@ BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
 }
 
+BridgedDeclObj BridgedDeclObj::Accessor_getStorage() const {
+  return {getAs<swift::AccessorDecl>()->getStorage()};
+}
+
 bool BridgedDeclObj::Class_isForeign() const {
   return getAs<swift::ClassDecl>()->isForeign();
 }
@@ -310,8 +326,16 @@ bool BridgedDeclObj::AbstractFunction_isDistributedWitnessWithAdHocSerialization
       ->isDistributedWitnessWithAdHocSerializationRequirement();
 }
 
+BridgedParameterList BridgedDeclObj::AbstractFunction_getParameterList() const {
+  return getAs<swift::AbstractFunctionDecl>()->getParameters();
+}
+
 bool BridgedDeclObj::Constructor_isInheritable() const {
   return getAs<swift::ConstructorDecl>()->isInheritable();
+}
+
+bool BridgedDeclObj::Constructor_isFailable() const {
+  return getAs<swift::ConstructorDecl>()->isFailable();
 }
 
 bool BridgedDeclObj::Destructor_isIsolated() const {
@@ -413,6 +437,10 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(const swift::DiagnosticArgu
 
 const swift::DiagnosticArgument &BridgedDiagnosticArgument::unbridged() const {
   return *reinterpret_cast<const swift::DiagnosticArgument *>(&storage);
+}
+
+BridgedDiagnosticArgument BridgedDeclObj::Value_asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(getAs<swift::ValueDecl>()->getName());
 }
 
 //===----------------------------------------------------------------------===//
@@ -568,6 +596,10 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasOpaqueArchetype() const {
+  return unbridged()->hasOpaqueArchetype();
+}
+
 bool BridgedASTType::hasExistentialArchetype() const {
   return unbridged()->hasOpenedExistential();
 }
@@ -694,6 +726,10 @@ bool BridgedASTType::isPack() const {
   return unbridged()->is<swift::PackType>();
 }
 
+bool BridgedASTType::isPackExpansion() const {
+  return unbridged()->is<swift::PackExpansionType>();
+}
+
 bool BridgedASTType::isSILPack() const {
   return unbridged()->is<swift::SILPackType>();
 }
@@ -760,8 +796,8 @@ bool BridgedASTType::isUnsafeMutableRawBufferPointerType() const {
   return unbridged()->isUnsafeMutableRawBufferPointer();
 }
 
-OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
-  return {unbridged()->getNominalOrBoundGenericNominal()};
+OptionalBridgedDeclObj BridgedASTType::getNominalDecl() const {
+  return {unbridged()->getNominalDecl()};
 }
 
 BridgedASTType::TraitResult BridgedASTType::canBeClass() const {
@@ -873,8 +909,12 @@ bool BridgedASTType::Tuple_containsPackExpansionType() const {
   return llvm::cast<swift::TupleType>(type)->containsPackExpansionType();
 }
 
-BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
-  return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
+BridgedASTTypeArray BridgedASTType::NominalType_getGenericArgs() const {
+  return {llvm::cast<swift::NominalType>(type)->getGenericArgs()};
+}
+
+BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
+  return {llvm::cast<swift::PackType>(type)->getElementTypes()};
 }
 
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
@@ -1084,8 +1124,8 @@ bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
   return unbridged() == rhs.unbridged();
 }
 
-bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
-  return unbridged().hasAnySubstitutableParams();
+bool BridgedSubstitutionMap::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 BridgedSubstitutionMap
@@ -1126,8 +1166,8 @@ BridgedGenericSignature::getCanonicalSignature() const {
   return BridgedCanGenericSignature{impl};
 }
 
-bool BridgedGenericSignature::areAllParamsConcrete() const {
-  return unbridged()->areAllParamsConcrete();
+bool BridgedGenericSignature::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 bool BridgedGenericSignature::canBeEmittedInEmbeddedSwift() const {

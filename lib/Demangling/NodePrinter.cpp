@@ -103,6 +103,17 @@ static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
   return printer;
 }
 
+/// Print the payload of a symbolic reference node, which is either an index
+/// into the mangled name or, when produced by a remote reader, an address in
+/// the inspected process.
+static void printSymbolicReferencePayload(DemanglerPrinter &Printer,
+                                          NodePointer Node) {
+  if (Node->hasRemoteAddress())
+    Printer.writeHex(Node->getRemoteAddress().first);
+  else if (Node->hasIndex())
+    Printer.writeHex(Node->getIndex());
+}
+
 static StringRef toString(Directness d) {
   switch (d) {
   case Directness::Direct:
@@ -517,6 +528,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::TypeMetadataInstantiationFunction:
   case Node::Kind::TypeMetadataSingletonInitializationCache:
   case Node::Kind::TypeMetadataDemanglingCache:
+  case Node::Kind::TypeMetadataMangledNameRef:
   case Node::Kind::TypeMetadataLazyCache:
   case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
@@ -619,6 +631,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::BackDeploymentCopy:
     case Node::Kind::ExtendedExistentialTypeShape:
     case Node::Kind::Uniquable:
     case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
@@ -848,10 +861,10 @@ void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
   case Node::Kind::NoEscapeFunctionType:
     break;
   case Node::Kind::CalledOnceFunctionType:
-    Printer << "@called(exactlyOnce) ";
+    Printer << "@once ";
     break;
   case Node::Kind::CalledAtMostOnceFunctionType:
-    Printer << "@called(atMostOnce) ";
+    Printer << "@callable(once) ";
     break;
   case Node::Kind::AutoClosureType:
   case Node::Kind::EscapingAutoClosureType:
@@ -1272,6 +1285,21 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       Printer << " ";
       print(Node->getChild(Idx++), depth + 1);
       Printer << "]";
+      break;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      if (Idx + 7 > End)
+        return;
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ", Components : [";
+      for (int I = 0; I != 3; ++I) {
+        if (I != 0)
+          Printer << ", ";
+        print(Node->getChild(Idx++), depth + 1);
+        Printer << " : ";
+        print(Node->getChild(Idx++), depth + 1);
+      }
+      Printer << "]]";
       break;
     default:
       assert(
@@ -2017,6 +2045,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::EscapingClosureProp:
       Printer << "Escaping Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      Printer << "Differentiable Function Propagated";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";
       return nullptr;
@@ -2491,6 +2522,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::BackDeploymentFallback:
     Printer << "back deployment fallback for ";
     return nullptr;
+  case Node::Kind::BackDeploymentCopy:
+    Printer << "back deployment copy of ";
+    return nullptr;
   case Node::Kind::ProtocolSymbolicReference:
     Printer << "protocol symbolic reference 0x";
     Printer.writeHex(Node->getIndex());
@@ -2557,6 +2591,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::TypeMetadataDemanglingCache:
     Printer << "demangling cache variable for type metadata for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::TypeMetadataMangledNameRef:
+    Printer << "mangled name ref for type metadata for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
@@ -2928,10 +2966,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "@isolated(any)";
     return nullptr;
   case Node::Kind::ImplCalledOnceFunction:
-    Printer << "@called(exactlyOnce)";
+    Printer << "@once";
     return nullptr;
   case Node::Kind::ImplCalledAtMostOnceFunction:
-    Printer << "@called(atMostOnce)";
+    Printer << "@callable(once)";
     return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
@@ -3531,15 +3569,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   }
   case Node::Kind::UniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "unique existential shape symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    printSymbolicReferencePayload(Printer, Node);
     return nullptr;
   case Node::Kind::NonUniqueExtendedExistentialTypeShapeSymbolicReference:
     Printer << "non-unique existential shape symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    printSymbolicReferencePayload(Printer, Node);
     return nullptr;
   case Node::Kind::ObjectiveCProtocolSymbolicReference:
     Printer << "objective-c protocol symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    printSymbolicReferencePayload(Printer, Node);
     return nullptr;
   case Node::Kind::SymbolicExtendedExistentialType: {
     auto shape = Node->getChild(0);
@@ -3549,7 +3587,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "symbolic existential type ("
             << (isUnique ? "" : "non-")
             << "unique) 0x";
-    Printer.writeHex(shape->getIndex());
+    printSymbolicReferencePayload(Printer, shape);
     Printer << " <";
     print(Node->getChild(1), depth + 1);
     if (Node->getNumChildren() > 2) {

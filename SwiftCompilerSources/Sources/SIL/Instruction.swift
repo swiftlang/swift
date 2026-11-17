@@ -175,16 +175,9 @@ public class Instruction : CustomStringConvertible, Hashable {
       return true
 
     case let builtin as BuiltinInst:
-      switch builtin.id {
-      case .CopyArray:
-        // Copying array elements only retains the elements. It cannot run any user code and
-        // therefore cannot observe a de-initializer running earlier.
-        return false
-      default:
-        // A memory accessing builtin can be an implicit load weak, a synchronization point or a
-        // pointer access.
-        return builtin.mayReadOrWriteMemory
-      }
+      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+      // pointer access.
+      return builtin.mayReadOrWriteMemory
 
     case let endBorrow as EndBorrowInst:
       // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
@@ -311,7 +304,7 @@ private struct FindPointerOrGlobalWalker : AddressUseDefWalker {
     switch accessBase {
     case .box, .stack, .class, .tail, .argument, .yield, .storeBorrow, .index:
       return .continueWalk
-    case .global, .pointer, .unidentified:
+    case .global, .pointer, .borrowMutateAccessor, .unidentified:
       return .abortWalk
     }
   }
@@ -366,6 +359,11 @@ public class SingleValueInstruction : Instruction, Value {
   public final func replace(with replacement: Value, _ context: some MutatingContext) {
     uses.replaceAll(with: replacement, context)
     context.erase(instruction: self)
+  }
+  
+  /// Replaces this instruction with an undef and erases the instruction.
+  public final func replaceWithUndef(_ context: some MutatingContext) {
+    replace(with: Undef.get(type: type, context), context)
   }
 }
 
@@ -616,6 +614,13 @@ final public class DiagnoseInst : Instruction, UnaryInstruction {
 
     /// The marked value is a copy that is not permitted by the language (use-after-consume, noncopyable, etc)
     case unpermittedCopy
+
+    /// The marked address is the destination of a second initialization of immutable storage.
+    case letReinit
+
+    /// The marked address holds `self` in a derived class initializer, which may be used before `super.init`
+    /// initializes its superclass part.
+    case missingSuperInit
   }
 
   public var kind: DiagnoseKind { DiagnoseKind(rawValue: bridged.Diagnose_getKind())! }
@@ -759,10 +764,34 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
+  /// Destroys the debug reconstruction block, leaving the operand to describe the
+  /// variable directly. Only valid when the block does nothing but return its only
+  /// argument, as the block's return type is what carries the variable type.
+  public func clearDebugReconstructionBlock(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.DebugValue_clearDebugReconstructionBlock()
+    context.notifyInstructionChanged(self)
+  }
+
   public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
   public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
-  public func killOperand(index: Int, withType type: Type? = nil) {
+  public func killOperand(index: Int, withType type: Type? = nil,
+                          _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
+    context.notifyInstructionChanged(self)
+  }
+
+  /// Replaces this instruction with an equivalent one whose operand list is `values`,
+  /// and returns it. The reconstruction block must already match `values`.
+  /// This instruction is erased if the change can't be done in place.
+  public func replaceOperands(with values: [Value], _ context: some MutatingContext) -> DebugValueInst {
+    context.notifyInstructionsChanged()
+    let newInst = values.withBridgedValues {
+      bridged.DebugValue_replaceOperands($0)
+    }.getAs(DebugValueInst.self)
+    context.notifyInstructionChanged(newInst)
+    return newInst
   }
 }
 
@@ -917,10 +946,11 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //===----------------------------------------------------------------------===//
 
 @_semantics("fast_cast")
-public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
+public protocol LoadInstruction: SingleValueInstruction {}
 
 extension LoadInstruction {
-  public var address: Value { operand.value }
+  public var addressOperand: Operand { operands[0] }
+  public var address: Value { addressOperand.value }
 }
 
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
@@ -1490,7 +1520,22 @@ class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
 final public
 class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
   public var fromFunction: Value { operand.value }
-  public var withoutActuallyEscaping: Bool { bridged.ConvertFunctionInst_withoutActuallyEscaping() }
+
+  /// The kind of the conversion. The raw values match `swift::ConvertFunctionInst::Kind`.
+  public enum Kind: Int {
+    /// An ordinary conversion between ABI-compatible function types.
+    case ordinary = 0
+
+    /// The conversion turns a non-escaping closure into an escaping function type.
+    case withoutActuallyEscaping = 1
+
+    /// The conversion turns an exactly-once function into an at-most-once function.
+    case withoutActuallyDeiniting = 2
+  }
+
+  public var conversionKind: Kind { Kind(rawValue: bridged.ConvertFunctionInst_getConversionKind())! }
+  public var withoutActuallyEscaping: Bool { conversionKind == .withoutActuallyEscaping }
+  public var withoutActuallyDeiniting: Bool { conversionKind == .withoutActuallyDeiniting }
 }
 
 final public
@@ -1677,20 +1722,26 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
   public var numArguments: Int { bridged.PartialApplyInst_numArguments() }
 
   /// The execution semantics of the resulting closure, such as
-  /// `@called(atMostOnce)`, or nil if it can be called any number of times.
+  /// at-most-once, or nil if it can be called any number of times.
   public var executionSemantics: ExecutionSemantics? {
     let semantics = bridged.PartialApplyInst_getExecutionSemantics()
     return semantics.hasValue ? semantics.value : nil
   }
 
-  /// True if the resulting closure can be called at most once, which is the case
-  /// for every kind of `@called` attribute.
-  public var hasCalledAtMostOnceSemantics: Bool { executionSemantics != nil }
+  /// True if the resulting closure can't be copied.
+  public var isNoncopyable: Bool { type.isMoveOnly }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
   /// non-escaping prior to ClosureLifetimeFixup.
   public var isOnStack: Bool { bridged.PartialApplyInst_isOnStack() }
+
+  /// Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping partial_apply converted by
+  /// convert_escape_to_noescape [not_guaranteed]. If ClosureLifetimeFixup will promote this closure to
+  /// partial_apply [on_stack], return that conversion.
+  public var nonEscapingClosureConversion: ConvertEscapeToNoEscapeInst? {
+    bridged.PartialApplyInst_getNonEscapingClosureConversion().instruction as! ConvertEscapeToNoEscapeInst?
+  }
 
   // Warning: ClosureLifetimeFixup does not promote all non-escaping closures to on-stack. When that promotion fails, it
   // creates a fake destroy of the closure after the captured values that the closure depends on. This is invalid OSSA,
@@ -1735,6 +1786,41 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 
   public override var mayCallFunction: Bool { true }
+
+  /// A non-trivial object typed self of a borrow accessor with guaranteed result.
+  public var selfObjectOfGuaranteedBorrowAccessorResult: Operand? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfOperand = selfArgumentOperand, !selfOperand.value.type.isAddress else {
+      return nil
+    }
+    return selfOperand
+  }
+
+  /// A non-trivial address typed self of a borrow accessor with guaranteed result.
+  public var selfAddressOfGuaranteedBorrowAccessorResult: Value? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
+
+  /// The self of a borrow or mutate accessor with an address result.
+  public var selfOfBorrowMutateAccessorAddressResult: Value? {
+    guard functionConvention.hasAddressResult else {
+      return nil
+    }
+    return selfArgument
+  }
+
+  /// The address-typed self of a borrow or mutate accessor with an address result.
+  public var selfAddressOfBorrowMutateAccessorAddressResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
@@ -2034,12 +2120,34 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
 
+  /// The optional value hint.
+  ///
+  /// If not nil, the loaded value is exactly the value of the value hint.
+  /// This is used if the `load_borrow` cannot be replaced by the value hint in OSSA because it would violate
+  /// ownership rules, e.g. if the value hint is consumed (e.g. by a `store`) before the `load_borrow`.
+  /// The value hint is not an ownership use, i.e. it does not need to be alive at the `load_borrow`.
+  public var valueHint: Value? { operands.count == 2 ? operands[1].value : nil }
+
+  /// Sets the value hint, which must have the same type as the `load_borrow`.
+  /// The caller is responsible that the loaded value is exactly the value of `valueHint`.
+  public func set(valueHint: Value, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrow_setValueHint(valueHint.bridged)
+    context.notifyInstructionChanged(self)
+  }
+
   // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
   //
   // This can only occur during raw SIL before move-only checking occurs. Developers can write incorrect
   // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+
+  public func set(isUnchecked: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrowInst_setUnchecked(isUnchecked)
+    context.notifyInstructionChanged(self)
+  }
 
   public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
@@ -2152,6 +2260,9 @@ final public class BeginApplyInst : MultipleValueInstruction, FullApplySite {
 
   public var token: Value { getResult(index: resultCount - (isCalleeAllocated ? 2 : 1)) }
 
+  /// The callee-allocated coroutine frame, which must be deallocated after the coroutine ends.
+  public var calleeAllocation: Value? { isCalleeAllocated ? getResult(index: resultCount - 1) : nil }
+
   public var yieldedValues: Results {
     Results(inst: self, numResults: resultCount - (isCalleeAllocated ? 2 : 1))
   }
@@ -2253,7 +2364,19 @@ final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
 final public class DeallocPackMetadataInst : Instruction, Deallocation {}
 
-final public class OpenPackElementInst : SingleValueInstruction {}
+final public class OpenPackElementInst : SingleValueInstruction {
+  public var openedGenericEnvironment: GenericEnvironment {
+    GenericEnvironment(bridged: bridged.OpenPackElementInst_getOpenedGenericEnvironment())
+  }
+  public var elementArchetypeSubstitutionMap: SubstitutionMap? {
+    let map = SubstitutionMap(
+      bridged: bridged.OpenPackElementInst_tryGetElementArchetypeSubstitutionMap())
+    if map.isEmpty {
+      return nil
+    }
+    return map
+  }
+}
 final public class PackLengthInst : SingleValueInstruction {
   public var packType: CanonicalType {
     CanonicalType(bridged: bridged.PackLengthInst_getPackType())
@@ -2263,6 +2386,9 @@ final public class PackLengthInst : SingleValueInstruction {
 @_semantics("fast_cast")
 public protocol AnyPackIndexInst : SingleValueInstruction {
   var indexedPackType: CanonicalType { get }
+  // The structural index of the accessed component within the pack, if it is
+  // statically known.
+  var structuralIndex: Int? { get }
 }
 
 extension AnyPackIndexInst {
@@ -2271,11 +2397,54 @@ extension AnyPackIndexInst {
   }
 }
 
-final public class DynamicPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
-final public class PackPackIndexInst : SingleValueInstruction, AnyPackIndexInst {}
+final public class DynamicPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var structuralIndex: Int? {
+    // If the dynamic index is statically known, and the indexed pack has a
+    // prefix of non-pack-expansion elements up to and including the dynamic
+    // index, then the dynamic index is equivalent to a structural index with
+    // the same value.
+    guard let index = (operand.value as? IntegerLiteralInst)?.value
+    else {
+      return nil
+    }
+
+    let elements = indexedPackType.rawType.elementTypesOfPackType
+    guard index < elements.count,
+          elements[...index].allSatisfy({ !$0.isPackExpansion })
+    else {
+      return nil
+    }
+
+    return index
+  }
+}
+
+final public class PackPackIndexInst : SingleValueInstruction, UnaryInstruction, AnyPackIndexInst {
+  public var componentStartIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentStartIndex())
+  }
+  public var componentEndIndex: Int {
+    Int(bridged.PackPackIndexInst_getComponentEndIndex())
+  }
+  public var sliceIndexOperand: AnyPackIndexInst {
+    operand.value as! AnyPackIndexInst
+  }
+  public var structuralIndex: Int? {
+    if let staticSliceIndex = sliceIndexOperand.structuralIndex {
+      // This instruction produces a dynamic index into a slice of the operand
+      // pack, which starts at componentStartIndex.
+      return componentStartIndex + staticSliceIndex
+    }
+    return nil
+  }
+}
+
 final public class ScalarPackIndexInst : SingleValueInstruction, AnyPackIndexInst {
   public var componentIndex: Int {
     Int(bridged.ScalarPackIndexInst_getComponentIndex())
+  }
+  public var structuralIndex: Int? {
+    componentIndex
   }
 }
 

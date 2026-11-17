@@ -20,6 +20,7 @@
 
 // FIXME: Until we have private imports, we need SwiftShims in the toolchain.
 // RUN: cp -r %test-resource-dir/shims %t/empty-toolchain/usr/lib/swift/shims
+// RUN: cp %test-resource-dir/module.modulemap %t/empty-toolchain/usr/lib/swift/module.modulemap
 
 // %t/really-empty-toolchain does not contain a standard library or SwiftShims.
 // RUN: %empty-directory(%t/really-empty-toolchain)
