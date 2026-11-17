@@ -93,7 +93,7 @@ add_compile_options(
 
 # Generate BacktracingDT 6.2
 set(backtracingdt62_macos_version "26.0")
-if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
+if(NOT SwiftCore_ENABLE_STRICT_AVAILABILITY AND APPLE AND CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS "26.0")
   set(backtracingdt62_macos_version "${CMAKE_OSX_DEPLOYMENT_TARGET}")
 endif()
 set(backtracingdt62_version "macOS ${backtracingdt62_macos_version}, macCatalyst ${backtracingdt62_macos_version}, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999")
