@@ -16,3 +16,21 @@ struct Butt: ~Copyable {
 }
 
 func foo(x: (consuming Butt) -> Void) {}
+
+// rdar://192905676
+
+protocol Crucible: ~Copyable {
+  borrowing func cruce()
+}
+
+func bar(_: (consuming any Crucible & ~Copyable) -> Void) {}
+
+func barrow(_: borrowing any Crucible & ~Copyable) {}
+
+func butt() {
+  bar { t in
+    t.cruce()
+    barrow(t)
+  }
+}
+
