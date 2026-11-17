@@ -2959,7 +2959,8 @@ __attribute__((constructor)) static void setupStandardConcurrencyDescriptors() {
   };
   _swift_registerConcurrencyRuntime(
       &descriptors,
-      &_swift_task_isCurrentGlobalActor);
+      &_swift_task_isCurrentGlobalActor,
+      &swift_distributed_actor_is_remote);
 }
 SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 

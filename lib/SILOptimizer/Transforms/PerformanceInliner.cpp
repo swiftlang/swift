@@ -478,6 +478,13 @@ bool isAllocator(SILFunction *callee) {
 //   %topPb = partial_apply(..., %pb, ...)
 //   %tuple = tuple(..., %topPb)
 //   return %tuple
+// (IV), where %pb comes from (I), (II), or (III):
+//   %convertedPb = convert_function %pb to ...
+//   %subsetPb = partial_apply %subsetThunk(%convertedPb)
+//   %reabstractedPb = partial_apply %reabstractionThunk(%subsetPb)
+//   %topPb = partial_apply(..., %reabstractedPb, ...)
+//   %tuple = tuple(..., %topPb)
+//   return %tuple
 static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
   auto *applyOfVJP = dyn_cast<ApplyInst>(applySiteOfVJP.getInstruction());
   if (applyOfVJP == nullptr)
@@ -511,7 +518,46 @@ static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
     return use ? use->getUser() : nullptr;
   };
 
+  // Treat reabstraction thunks and AutoDiff subset
+  // parameter thunks as transparent adapters.
+  auto isPullbackAdapter = [](PartialApplyInst *pai, SILValue pullback) {
+    if (pai->getNumArguments() != 1 || pai->getArgument(0) != pullback ||
+        !pullback->getType().isFunction())
+      return false;
+
+    auto *callee = pai->getReferencedFunctionOrNull();
+    if (!callee)
+      return false;
+    if (callee->isThunk() == IsReabstractionThunk)
+      return true;
+
+    swift::Demangle::Context ctx;
+    if (auto *root = ctx.demangleSymbolAsNode(callee->getName())) {
+      return root->findByKind(
+                 swift::Demangle::Node::Kind::AutoDiffSubsetParametersThunk,
+                 /*maxDepth=*/1) != nullptr;
+    }
+    return false;
+  };
+
+  auto lookThroughSingleUseConversions = [&](SILValue value) {
+    while (auto *conversion =
+               dyn_cast_or_null<ConvertFunctionInst>(getSingleUser(value)))
+      value = conversion;
+    return value;
+  };
+
+  calleePullback = lookThroughSingleUseConversions(calleePullback);
   auto *pai = dyn_cast_or_null<PartialApplyInst>(getSingleUser(calleePullback));
+  while (pai && isPullbackAdapter(pai, calleePullback)) {
+    SILValue nextPullback = lookThroughSingleUseConversions(pai);
+    auto *next =
+        dyn_cast_or_null<PartialApplyInst>(getSingleUser(nextPullback));
+    if (!next)
+      break;
+    calleePullback = nextPullback;
+    pai = next;
+  }
   if (!pai)
     return false;
 

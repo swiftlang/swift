@@ -838,6 +838,12 @@ public:
                                _swift_task_isCurrentGlobalActorHook)(
       const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
+  /// Hook function that calls into the concurrency library to check whether a
+  /// distributed actor instance is a remote proxy.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  extern SWIFT_CC(swift) bool (*__ptrauth_swift_concurrency_hook
+                               _swift_distributedActorIsRemoteHook)(HeapObject *);
+
 } // end namespace swift
 
 #endif /* SWIFT_RUNTIME_PRIVATE_H */
