@@ -500,6 +500,30 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
   }
 }
 
+static SILType formFieldType(SILType baseType, CanType loweredFieldType) {
+  if (baseType.isAddress() || baseType.getClassDecl() != nullptr)
+    return SILType::getPrimitiveAddressType(loweredFieldType);
+  return SILType::getPrimitiveObjectType(loweredFieldType);
+}
+
+static CanType getLoweredAbstractMemberType(
+    SILType baseType, MissingMemberDecl *member, TypeConverter &TC,
+    TypeExpansionContext context) {
+  // Keep substitution at the same boundary as ordinary member lowering. Once
+  // abstract layouts can describe generic parameters, apply this map to the
+  // recovered layout before lowering it.
+  auto substitutions =
+      baseType.getASTType()->getContextSubstitutionMap(member->getDeclContext());
+  assert(substitutions.empty() &&
+         "substitution of abstract member layouts is not implemented");
+
+  auto *layout = member->getStorageLayout();
+  assert(layout && "missing member must have a storage layout");
+  Type memberType =
+      HiddenType::get(member->getASTContext(), layout, CanType());
+  return TC.getLoweredRValueType(context, memberType);
+}
+
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
   NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
@@ -530,11 +554,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassDecl() != nullptr) {
-    return SILType::getPrimitiveAddressType(loweredTy);
-  } else {
-    return SILType::getPrimitiveObjectType(loweredTy);
-  }
+  return formFieldType(*this, loweredTy);
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,
@@ -544,6 +564,17 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M,
 
 SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
+}
+
+SILType SILType::getFieldType(MissingMemberDecl *field, TypeConverter &TC,
+                              TypeExpansionContext context) const {
+  return formFieldType(
+      *this, getLoweredAbstractMemberType(*this, field, TC, context));
+}
+
+SILType SILType::getFieldType(MissingMemberDecl *field, SILModule &M,
+                              TypeExpansionContext context) const {
+  return getFieldType(field, M.Types, context);
 }
 
 SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {
