@@ -47,15 +47,6 @@ struct PriorityQueue<T> {
     self.didPlace = didPlace
   }
 
-  /// Take the queue.
-  ///
-  /// This returns a copy of the queue, and empties the original.
-  mutating func take() -> PriorityQueue<T> {
-    var q = PriorityQueue(compare: self.compare, didPlace: self.didPlace)
-    swap(&self, &q)
-    return q
-  }
-
   /// Push an item onto the queue.
   ///
   /// Parameters:
@@ -160,23 +151,6 @@ struct PriorityQueue<T> {
       downHeap(ndx: ndx)
     }
     return result
-  }
-
-  /// Remove the first item (in storage order) matching a condition.
-  ///
-  /// Parameters:
-  ///
-  /// - where: A closure that returns `true` for the item to remove.
-  ///
-  /// Returns: The removed item, or `nil` if nothing matched.
-  ///
-  mutating func removeFirst(where condition: (borrowing T) -> Bool) -> T? {
-    for ndx in 0..<storage.count {
-      if condition(storage[ndx]) {
-        return remove(at: ndx)
-      }
-    }
-    return nil
   }
 
   /// Fix the heap condition by iterating upwards.

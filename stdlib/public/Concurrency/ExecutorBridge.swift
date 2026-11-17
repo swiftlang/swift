@@ -107,7 +107,26 @@ internal func _jobClaimForTimer(_ job: Builtin.Job) -> Bool
 
 @available(StdlibDeploymentTarget 6.5, *)
 @_silgen_name("swift_job_getScheduledPrivateData")
-internal func _jobGetScheduledPrivateData(_ job: Builtin.Job) -> UnsafeMutableRawPointer?
+internal func _jobGetScheduledPrivateData(
+  _ job: Builtin.Job, _ size: UnsafeMutablePointer<Int>
+) -> UnsafeMutableRawPointer?
+
+/// Pass `body` the storage that the scheduler of a job can use, if it has any
+/// (see `ExecutorJob.withUnsafeScheduledPrivateData`).  This is what the
+/// methods of `ExecutorJob` and `UnownedJob` share, and the runtime says how big
+/// the storage is.
+@available(StdlibDeploymentTarget 6.5, *)
+@safe
+internal func _withScheduledPrivateData<R, E>(
+  of job: Builtin.Job,
+  body: (UnsafeMutableRawBufferPointer?) throws(E) -> R
+) throws(E) -> R {
+  var size = 0
+  guard let base = unsafe _jobGetScheduledPrivateData(job, &size) else {
+    return try body(nil)
+  }
+  return unsafe try body(UnsafeMutableRawBufferPointer(start: base, count: size))
+}
 
 /// Returns the job's flags; works for any job, not only tasks
 @available(SwiftStdlib 5.1, *)

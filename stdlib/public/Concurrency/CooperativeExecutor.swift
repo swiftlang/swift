@@ -62,35 +62,91 @@ struct WaitQueue {
     }
   }
 
-  /// What we keep in a job's own storage, which is the first two of its words:
-  /// where the job is in the heap, plus one so that the zero that the storage
-  /// starts out as means that it isn't (and is again once the job is taken
-  /// off the heap), and which of our wait queues the job is in.
-  private static func heapIndex(of job: UnownedJob) -> Int? {
-    let stored: Int = job.withUnsafeScheduledPrivateData { storage in
-      unsafe storage?.load(as: Int.self) ?? 0
+  /// What we keep in a job's own storage, a word each:
+  ///
+  /// * the job's `JobState`, which includes where it is in the heap;
+  /// * which of our wait queues the job is in (see
+  ///   `CooperativeExecutor.continuousClockToken`).
+  ///
+  /// We can look at the storage of a job when we are asked to cancel it,
+  /// because the runtime only asks while the job is there (see the
+  /// documentation of `JobCanceller.cancel(jobWithToken:)`), and so the token
+  /// for such a job is just its address.
+  private enum Word {
+    static let heapIndex = 0
+    static let clockToken = 1
+  }
+
+  /// What a job with storage of its own is doing, as far as we are concerned,
+  /// which is kept in the first word of its storage.
+  ///
+  /// There is nothing for a job that has been run: we are not asked about those,
+  /// since the runtime only cancels a job that has not run, and running one
+  /// can free its storage.
+  enum JobState: Equatable {
+    /// We have not got it, which is what the zero that its storage starts out
+    /// as means.
+    case notQueued
+
+    /// It is in the heap, at this index.
+    case queued(heapIndex: Int)
+
+    /// Its timer fired, but it had been cancelled first, so `cancel` has to run
+    /// it.
+    case cancelOwed
+
+    init(rawValue: Int) {
+      switch rawValue {
+      case 0: self = .notQueued
+      case -1: self = .cancelOwed
+      case 1...: self = .queued(heapIndex: rawValue - 1)
+      default:
+        fatalError("a job's storage has a state that the cooperative executor "
+                   + "didn't put in it: \(rawValue)")
+      }
     }
-    return stored > 0 ? stored - 1 : nil
-  }
 
-  private static func setHeapIndex(_ index: Int?,
-                                   in storage: UnsafeMutableRawPointer) {
-    unsafe storage.storeBytes(of: index.map { $0 + 1 } ?? 0, as: Int.self)
-  }
-
-  /// Which of the executor's clocks a job in the heap is waiting on (see
-  /// `CooperativeExecutor.continuousClockToken`), kept next to its heap index.
-  static func clockToken(of job: UnownedJob) -> Int {
-    return job.withUnsafeScheduledPrivateData { storage in
-      unsafe storage?.load(fromByteOffset: MemoryLayout<Int>.stride,
-                           as: Int.self) ?? 0
+    var rawValue: Int {
+      switch self {
+      case .notQueued: return 0
+      case .queued(let heapIndex): return heapIndex + 1
+      case .cancelOwed: return -1
+      }
     }
   }
 
-  static func setClockToken(_ token: Int, in storage: UnsafeMutableRawPointer) {
-    unsafe storage.storeBytes(of: token,
-                              toByteOffset: MemoryLayout<Int>.stride,
+  private static func load(_ word: Int,
+                           from storage: UnsafeMutableRawPointer) -> Int {
+    return unsafe storage.load(fromByteOffset: word * MemoryLayout<Int>.stride,
+                               as: Int.self)
+  }
+
+  private static func store(_ value: Int, _ word: Int,
+                            in storage: UnsafeMutableRawPointer) {
+    unsafe storage.storeBytes(of: value,
+                              toByteOffset: word * MemoryLayout<Int>.stride,
                               as: Int.self)
+  }
+
+  static func state(in storage: UnsafeMutableRawPointer) -> JobState {
+    return JobState(rawValue: unsafe load(Word.heapIndex, from: storage))
+  }
+
+  static func setState(_ state: JobState,
+                       in storage: UnsafeMutableRawPointer) {
+    unsafe store(state.rawValue, Word.heapIndex, in: storage)
+  }
+
+  static func clockToken(in storage: UnsafeMutableRawPointer) -> Int {
+    return unsafe load(Word.clockToken, from: storage)
+  }
+
+  /// Set a job's storage up, when we are given it to schedule.  It is not
+  /// necessarily as the runtime made it: the job may have been through another
+  /// scheduler, or a clock, which has used it.
+  static func prepare(_ storage: UnsafeMutableRawPointer, clockToken: Int) {
+    unsafe setState(.notQueued, in: storage)
+    unsafe store(clockToken, Word.clockToken, in: storage)
   }
 
   /// Where each waiting job is in the heap, so that cancelling one doesn't
@@ -164,7 +220,7 @@ struct WaitQueue {
         if let slot = $0.slot {
           slots.setHeapIndex($1, of: slot)
         } else {
-          unsafe Self.setHeapIndex($1, in: $0.storage!)
+          unsafe Self.setState(.queued(heapIndex: $1), in: $0.storage!)
         }
       })
     self.clock = clock
@@ -201,25 +257,65 @@ struct WaitQueue {
     while let entry = queue.pop(when: { $0.deadline < now }) {
       if let slot = entry.slot {
         slots.release(slot)
-      } else {
-        unsafe Self.setHeapIndex(nil, in: entry.storage!)
+        body(ExecutorJob(entry.job))
+        continue
       }
-      body(ExecutorJob(entry.job))
+
+      // The runtime decides between the timer and a cancellation for a job
+      // like this one, so we have to ask it whether the job is ours.  If it
+      // isn't, it was cancelled first, and `cancel` has been, or is about to
+      // be, called, and runs it.  That can't happen here, since we run
+      // everything on one thread, and cancel from it, so this costs a call to
+      // the runtime for each timer that fires for nothing that we need; it is
+      // here because this is how a scheduler is meant to do it, and this
+      // executor is the one that others will read.
+      let storage = unsafe entry.storage!
+      if entry.job.claimForTimer() {
+        // It is no longer in the heap.  (Do this before running it, which can
+        // free its storage.)
+        unsafe Self.setState(.notQueued, in: storage)
+        body(ExecutorJob(entry.job))
+      } else {
+        unsafe Self.setState(.cancelOwed, in: storage)
+      }
     }
   }
 
-  /// Remove a job that has its own storage, if it is still waiting.
+  /// Cancel a job that has its own storage, which is `storage`.  Returns the job
+  /// if we are to run it: it is still waiting, so we take it off the heap, or
+  /// its timer fired but it was cancelled first and we left it for this.
   ///
-  /// The job must not have been run, as it will have been freed if it has,
-  /// which is true of a job that the runtime scheduled for a `Task.sleep()`
-  /// and cancels it from its cancellation handler.
-  mutating func cancelScheduled(_ job: UnownedJob) -> ExecutorJob? {
-    guard let index = Self.heapIndex(of: job) else {
-      return nil
+  /// The job has to be there to be cancelled: the runtime only asks for a job
+  /// that has not run.  And since it has decided that the job is cancelled, and
+  /// won't let its timer have it, nothing but this will run it, so it is an error
+  /// for it to be neither in the heap, where `didPlace` said it was, nor owed to
+  /// us; rather than lose the job, and leave its task waiting forever, we stop.
+  mutating func cancelScheduled(_ job: UnownedJob,
+                                storage: UnsafeMutableRawPointer)
+    -> ExecutorJob {
+    switch unsafe Self.state(in: storage) {
+    case .queued(let index):
+      guard index < queue.storage.count
+              && Self.same(queue.storage[index].job, job) else {
+        fatalError("the cooperative executor was asked to cancel a job that "
+                   + "isn't where it says it is in the heap")
+      }
+      _ = queue.remove(at: index)
+    case .cancelOwed:
+      break
+    case .notQueued:
+      // `schedule` puts the job in the heap before it returns its token, so
+      // we can only get here if we are asked about a job that has run.
+      fatalError("the cooperative executor was asked to cancel a job that it "
+                 + "doesn't have")
     }
-    let entry = queue.remove(at: index)
-    unsafe Self.setHeapIndex(nil, in: entry.storage!)
-    return ExecutorJob(entry.job)
+    unsafe Self.setState(.notQueued, in: storage)
+    return ExecutorJob(job)
+  }
+
+  /// Whether two jobs are the same one.
+  private static func same(_ a: UnownedJob, _ b: UnownedJob) -> Bool {
+    return unsafe unsafeBitCast(a, to: Int.self) == unsafeBitCast(b, to: Int.self)
   }
 
   /// Remove the job with the specified ID, if it is still waiting.
@@ -266,10 +362,12 @@ struct WaitQueue {
 public final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
 
-  /// The queue that `runUntil(_:)` takes the jobs to run from.  It is swapped
-  /// with `runQueue` rather than replaced by a new queue, so that both keep
-  /// their storage and running a job allocates nothing once they have grown.
-  var runningQueue: PriorityQueue<UnownedJob>
+  /// A queue that `runUntil(_:)` has finished with, which still has the
+  /// storage that it grew, kept so that the next trip round the loop can use it
+  /// instead of allocating a new one.  It is `nil` while a loop has it, so a
+  /// `runUntil(_:)` that is called from a job that the first is running gets a
+  /// queue of its own.
+  var spareRunQueue: PriorityQueue<UnownedJob>?
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
   var continuousWaitQueue = WaitQueue(clock: .continuous)
@@ -342,9 +440,13 @@ public final class CooperativeExecutor: Executor, @unchecked Sendable {
     }
   }
 
+  /// A new, empty run queue, which runs higher priority jobs first.
+  private static func makeRunQueue() -> PriorityQueue<UnownedJob> {
+    return PriorityQueue(compare: { $0.priority > $1.priority })
+  }
+
   public init() {
-    runQueue = PriorityQueue(compare: { $0.priority > $1.priority })
-    runningQueue = PriorityQueue(compare: { $0.priority > $1.priority })
+    runQueue = Self.makeRunQueue()
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -401,12 +503,15 @@ extension CooperativeExecutor: SchedulingExecutor {
     return Int(truncatingIfNeeded: UInt32.max)
   }
 
-  /// A token for a job that has its own storage, which it refers to by address.
+  /// A token for a job that has its own storage, which it refers to by
+  /// address.  That is enough to identify it, since the runtime only cancels a
+  /// job of this kind that has not run (see `JobCanceller.cancel`).
   private static func tokenData(address job: UnownedJob) -> InlineArray<2, Int> {
     return [unsafe unsafeBitCast(job, to: Int.self), addressTokenMarker]
   }
 
-  /// The job that a token refers to by address, or nil if it isn't one.
+  /// The job that a token refers to by address, or nil if it isn't that kind of
+  /// token.
   private static func jobAddressed(by token: borrowing JobCancellationToken)
     -> UnownedJob? {
     guard UInt32(truncatingIfNeeded: token.opaqueData[1])
@@ -455,7 +560,7 @@ extension CooperativeExecutor: SchedulingExecutor {
     // ID, and the token is just the job.
     if let storage = job.withUnsafeScheduledPrivateData(
          body: { unsafe $0?.baseAddress }) {
-      unsafe WaitQueue.setClockToken(clockToken, in: storage)
+      unsafe WaitQueue.prepare(storage, clockToken: clockToken)
       let scheduled = UnownedJob(job)
       if clockToken == Self.continuousClockToken {
         unsafe continuousWaitQueue.enqueueScheduled(scheduled, storage: storage,
@@ -488,14 +593,21 @@ extension CooperativeExecutor: SchedulingExecutor {
     let job: ExecutorJob?
     if let scheduled = Self.jobAddressed(by: token) {
       // A job with storage of its own, which the runtime only cancels while it
-      // is still waiting (and so while it is still there to look at).
-      switch WaitQueue.clockToken(of: scheduled) {
+      // is still there, so we can look at it.  (It asks at most once, too.)
+      guard let storage = scheduled.withUnsafeScheduledPrivateData(
+              body: { unsafe $0?.baseAddress }) else {
+        return false
+      }
+      switch unsafe WaitQueue.clockToken(in: storage) {
       case Self.continuousClockToken:
-        job = continuousWaitQueue.cancelScheduled(scheduled)
+        job = unsafe continuousWaitQueue.cancelScheduled(scheduled,
+                                                         storage: storage)
       case Self.suspendingClockToken:
-        job = suspendingWaitQueue.cancelScheduled(scheduled)
+        job = unsafe suspendingWaitQueue.cancelScheduled(scheduled,
+                                                         storage: storage)
       default:
-        job = nil
+        fatalError("a job's storage has a clock that the cooperative executor "
+                   + "didn't put in it")
       }
     } else {
       let (id, clockToken) = Self.decode(token)
@@ -539,6 +651,13 @@ extension CooperativeExecutor: RunLoopExecutor {
     try runUntil { false }
   }
 
+  /// Run jobs until `condition` is true, or there are no more to run.
+  ///
+  /// This can be called from a job that the executor is running.  The jobs that
+  /// the outer call has taken from the queue, but not yet run, wait until the
+  /// inner call returns: it runs those that are enqueued, and timers that
+  /// expire, from then on, so a condition that depends on one of the others
+  /// will not become true while it runs.
   public func runUntil(_ condition: () -> Bool) throws {
     shouldStop = false
     while !shouldStop && !condition() {
@@ -553,15 +672,19 @@ extension CooperativeExecutor: RunLoopExecutor {
       #endif
 
       // Now run any queued jobs
-      // Jobs that are enqueued while we do that go in `runQueue`, which is
-      // empty (and keeps the storage that the queue that we have just drained
-      // had) after the swap.
-      swap(&runQueue, &runningQueue)
-      while let job = runningQueue.pop() {
+      // Take the queue, leaving an empty one, so that jobs that are enqueued
+      // while we run these (by them, or by a `runUntil(_:)` that one of them
+      // calls) are not mixed up with them.  The empty one is last time's, so
+      // that no storage has to be allocated for it.
+      var runQ = spareRunQueue ?? Self.makeRunQueue()
+      spareRunQueue = nil
+      swap(&runQueue, &runQ)
+      while let job = runQ.pop() {
         unsafe ExecutorJob(job).runSynchronously(
           on: self.asUnownedSerialExecutor()
         )
       }
+      spareRunQueue = runQ
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
       // Finally, wait until the next deadline

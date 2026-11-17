@@ -138,6 +138,19 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
   private var nextGeneration: UInt64 = 1
   private var _storageChecks = 0
   private var _storageProblems = 0
+  private var _cancelCalls = 0
+
+  private var _afterFiring: (() -> Void)?
+
+  /// Called on the loop, straight after the job for a timer that has fired has
+  /// been run.
+  var afterFiring: (() -> Void)? {
+    get { generationQueue.sync { _afterFiring } }
+    set { generationQueue.sync { _afterFiring = newValue } }
+  }
+
+  /// How many times we have been asked to cancel a job.
+  var cancelCalls: Int { generationQueue.sync { _cancelCalls } }
 
   /// How many times we have checked the scheduled storage that jobs have, and
   /// how many of those found something wrong with it.
@@ -192,13 +205,15 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
     return loop.sync { _refusals }
   }
 
-  /// Wait, by polling, until there are `count` timers pending.
-  func waitForPendingCount(_ count: Int) {
+  /// Wait, by polling, until there are `count` timers pending, and say whether
+  /// there are.
+  func waitForPendingCount(_ count: Int) -> Bool {
     var attempts = 0
     while pendingCount != count && attempts < 5000 {
       usleep(1000)
       attempts += 1
     }
+    return pendingCount == count
   }
 
   /// Stop the loop from running anything until the returned function is
@@ -217,7 +232,10 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
 
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
-    // A job that isn't a scheduled continuation has no storage of this kind.
+    // The job of a task has no storage of this kind, and the continuation of a
+    // sleeping task, which does, comes to `schedule` and not to this.  (A clock
+    // that hops through a trampoline would enqueue one here, and none of these
+    // tests uses one.)
     checked(job.withUnsafeScheduledPrivateData { $0 == nil })
     loop.async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
@@ -262,6 +280,7 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
         // The job is ours, so its storage is too.
         self.expect(generation, in: job)
         job.runSynchronously(on: self.asUnownedTaskExecutor())
+        self.afterFiring?()
       } else {
         // The job was cancelled first, so `cancel` has been, or is about to be,
         // called, and it will run the job.
@@ -276,6 +295,7 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> Bool {
+    generationQueue.sync { _cancelCalls += 1 }
     let address = UInt(bitPattern: token.opaqueData[0])
     let generation = UInt64(token.opaqueData[1])
     let job = unsafeBitCast(address, to: UnownedJob.self)
@@ -473,7 +493,12 @@ func waitUntil(_ condition: () -> Bool) async throws {
         let task = Task(executorPreference: executor) {
           try await Task.sleep(for: .milliseconds(100))
         }
-        executor.waitForPendingCount(1)
+        guard executor.waitForPendingCount(1) else {
+          expectUnreachable("the sleep's timer was never scheduled")
+          task.cancel()
+          _ = await task.result
+          return
+        }
 
         // Hold the loop while the deadline passes, so that the timer's
         // closure is queued before anything that cancelling queues; then
@@ -503,7 +528,12 @@ func waitUntil(_ condition: () -> Bool) async throws {
         let task = Task(executorPreference: executor) {
           try await Task.sleep(for: .milliseconds(100))
         }
-        executor.waitForPendingCount(1)
+        guard executor.waitForPendingCount(1) else {
+          expectUnreachable("the sleep's timer was never scheduled")
+          task.cancel()
+          _ = await task.result
+          return
+        }
 
         // This time `cancel` is queued first, so the timer's closure finds
         // the timer gone, and must leave the job, which may be gone too,
@@ -523,6 +553,54 @@ func waitUntil(_ condition: () -> Bool) async throws {
         expectEqual(0, executor.pendingCount)
         expectEqual(0, executor.storageProblems)
       }
+    }
+
+    tests.test("The runtime does not cancel the job of a timer that has fired") {
+      // Tokens for the continuation of a sleeping task are only the address of
+      // the job, so an executor relies on the runtime not to ask it to cancel
+      // one that has run.  Cancel the task in the moment between the timer's
+      // job running, which resumes the continuation, and the task getting going
+      // again, when its cancellation handler is still there.
+      final class Holder: @unchecked Sendable {
+        private let queue = DispatchQueue(label: "Holder")
+        private var _task: Task<Bool, any Error>?
+        var task: Task<Bool, any Error>? {
+          get { queue.sync { _task } }
+          set { queue.sync { _task = newValue } }
+        }
+        private var _hookRan = false
+        var hookRan: Bool {
+          get { queue.sync { _hookRan } }
+          set { queue.sync { _hookRan = newValue } }
+        }
+      }
+      let holder = Holder()
+      let executor = LoopExecutor()
+      executor.afterFiring = {
+        holder.hookRan = true
+        holder.task?.cancel()
+      }
+
+      let task = Task(executorPreference: executor) { () -> Bool in
+        // Don't start the sleep until the hook can see the task, however long
+        // that takes.
+        while holder.task == nil {
+          await Task.yield()
+        }
+        try await Task.sleep(for: .milliseconds(20))
+        return Task.isCancelled
+      }
+      holder.task = task
+
+      // The sleep finishes normally, and the task has been cancelled by the
+      // time that it knows.
+      let wasCancelled = try! await task.value
+      // (If the timer's job resumed the task inline, it would be finished
+      // before the hook cancelled it, and this is what would say so.)
+      expectTrue(holder.hookRan, "the task finished before the timer's hook ran")
+      expectTrue(wasCancelled)
+      expectEqual(0, executor.cancelCalls)
+      expectEqual(0, executor.storageProblems)
     }
 
     tests.test("A scheduler that serialises its timers needs no claim of its own") {

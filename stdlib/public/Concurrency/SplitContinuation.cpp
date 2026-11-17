@@ -108,7 +108,9 @@ struct SplitContinuationStorage : public Job {
   /// because nothing outside this file knows about anything after `Outcome`.
   ///
   /// The size is part of the API (see `ExecutorJob.withUnsafeScheduledPrivateData`
-  /// and `swift_job_getScheduledPrivateData`); it is eight words.
+  /// and `swift_job_getScheduledPrivateData`), which gets it from here, so the
+  /// code has only this to change; the documentation of that method, and the
+  /// proposal, say how big it is, and will need to change with it.
   void *ExecutorPrivate[8];
 
   /// The value of `Outcome` once the job has run without being cancelled.
@@ -449,11 +451,15 @@ bool swift_job_claimForTimer(Job *job) {
 }
 
 /// The storage that an executor can use for a continuation that it has been
-/// asked to schedule: `nullptr` if the job is not a split continuation, and so
-/// doesn't have any.  Eight words long; see `SplitContinuationStorage`.
+/// asked to schedule, and its size in bytes: `nullptr` (and a size of zero) if
+/// the job is not a split continuation, and so doesn't have any.
 extern "C" SWIFT_CC(swift)
-void *swift_job_getScheduledPrivateData(Job *job) {
-  if (!SplitContinuationStorage::classof(job))
+void *swift_job_getScheduledPrivateData(Job *job, size_t *size) {
+  if (!SplitContinuationStorage::classof(job)) {
+    *size = 0;
     return nullptr;
-  return cast<SplitContinuationStorage>(job)->ExecutorPrivate;
+  }
+  auto *storage = cast<SplitContinuationStorage>(job);
+  *size = sizeof(storage->ExecutorPrivate);
+  return storage->ExecutorPrivate;
 }

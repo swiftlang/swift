@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library )
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library  -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %S/Inputs/PendingJobs.swift)
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library  -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault %S/Inputs/PendingJobs.swift)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -19,28 +19,6 @@ import _Concurrency
 
 import Foundation
 import Darwin
-
-
-/// Delayed jobs that haven't run or been cancelled yet.  Whoever removes a job
-/// from here owns it, which is how the timer and `cancel` decide between them.
-final class PendingJobs: @unchecked Sendable {
-  private let queue = DispatchQueue(label: "PendingJobs")
-  private var jobs: [UInt64: UnownedJob] = [:]
-  private var nextID: UInt64 = 1
-
-  func add(_ job: UnownedJob) -> UInt64 {
-    return queue.sync {
-      let id = nextID
-      nextID += 1
-      jobs[id] = job
-      return id
-    }
-  }
-
-  func take(_ id: UInt64) -> UnownedJob? {
-    return queue.sync { jobs.removeValue(forKey: id) }
-  }
-}
 
 // Sneaky trick to make this type objc reference counted.
 //

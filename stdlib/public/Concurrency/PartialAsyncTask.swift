@@ -116,78 +116,22 @@ public struct UnownedJob: Sendable {
     return _jobIsResumption(context)
   }
 
-  /// Claim a scheduled job for its timer.
-  ///
-  /// A scheduler calls this when the job's timer has fired, before it runs or
-  /// enqueues the job.  If it returns `true`, the timer owns the job: the
-  /// scheduler must run or enqueue it, and the runtime will not ask it to
-  /// cancel the job (see ``JobCanceller/cancel(jobWithToken:)``).  If it
-  /// returns `false`, the job has been cancelled and the scheduler has been (or
-  /// is about to be) asked to cancel it, so the scheduler must leave the job
-  /// alone and let `cancel(jobWithToken:)` run it.
-  ///
-  /// This is what lets a scheduler whose timer and cancellation are serialised
-  /// (an event loop, say, which handles a cancellation from another thread by
-  /// putting it in an inbox) avoid keeping an atomic of its own to decide which
-  /// of the two gets the job: exactly one of "the claim succeeded" and "the
-  /// scheduler is asked to cancel" happens for any job that the runtime
-  /// scheduled itself, as `Task.sleep()` does, and until one has, the job is
-  /// not run, freed or invalidated.  A scheduler that is asked to cancel a
-  /// job can therefore rely on it being there.
-  ///
-  /// A scheduler must make the claim while nothing else can run the job, so a
-  /// scheduler on which cancellation can run the job on another thread while
-  /// its timer fires (the Dispatch executor's is one) cannot use it in place
-  /// of its own claim: the job may already have been run, and freed, by the
-  /// time that the claim is made.
-  ///
-  /// A job that the runtime did not schedule itself has no such state, so for
-  /// those this always returns `true`, and it remains the scheduler's job to
-  /// see that it doesn't run twice.  It is safe to call this more than once.
+  /// Claim a scheduled job for its timer.  See `ExecutorJob.claimForTimer()`.
   @_spi(ExperimentalScheduling)
   @available(StdlibDeploymentTarget 6.5, *)
   public func claimForTimer() -> Bool {
     return _jobClaimForTimer(context)
   }
 
-  /// Execute a closure, passing it the executor's own storage for a job that
-  /// has been scheduled, if it has any.
-  ///
-  /// A job that the runtime scheduled itself, as `Task.sleep()` does with the
-  /// continuation that it is waiting on, has eight words of storage, zeroed
-  /// when the job is created, for the scheduler that it was given to: enough
-  /// for a scheduler to keep what it needs for the timer (links, a heap index,
-  /// the deadline) in the job, instead of allocating something.  Any other
-  /// job has none, and the closure is passed `nil`; a scheduler then has to
-  /// keep what it needs somewhere else, such as the job's executor private
-  /// data (see `withUnsafeExecutorPrivateData`), which is two words long, or
-  /// in an allocation of its own.
-  ///
-  /// The storage belongs to the scheduler from when it is given the job (when
-  /// `schedule` is called) until it runs the job, or until a cancellation that
-  /// it was asked for has run it, so it can be used for whatever the scheduler
-  /// likes in that time.  It is not valid after the job has run, since running
-  /// it can free it; and, as with the executor private data, the scheduler is
-  /// responsible for making sure that anything that it refers to is cleaned up
-  /// before the job is run.
-  ///
-  /// Parameters:
-  ///
-  /// - body: The closure to execute.  It is given `nil` for a job with no
-  ///         storage; otherwise the storage, which is aligned for a pointer.
-  ///
-  /// Returns the result of executing the closure.
+  /// Execute a closure, passing it the scheduler's own storage for a job that
+  /// has been scheduled, if it has any.  See
+  /// `ExecutorJob.withUnsafeScheduledPrivateData(body:)`.
   @_spi(ExperimentalScheduling)
   @available(StdlibDeploymentTarget 6.5, *)
   @safe public func withUnsafeScheduledPrivateData<R, E>(
     body: (UnsafeMutableRawBufferPointer?) throws(E) -> R
   ) throws(E) -> R {
-    guard let base = unsafe _jobGetScheduledPrivateData(context) else {
-      return try body(nil)
-    }
-    let size = unsafe 8 * MemoryLayout<OpaquePointer>.stride
-    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
-                                                         count: size))
+    return try _withScheduledPrivateData(of: context, body: body)
   }
   #endif
 
@@ -522,8 +466,9 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// has been scheduled, if it has any.
   ///
   /// A job that the runtime scheduled itself, as `Task.sleep()` does with the
-  /// continuation that it is waiting on, has eight words of storage, zeroed
-  /// when the job is created, for the scheduler that it was given to: enough
+  /// continuation that it is waiting on, has storage, zeroed when the job is
+  /// created, for the scheduler that it was given to (eight words at present,
+  /// but use the count of the buffer, rather than that number): enough
   /// for a scheduler to keep what it needs for the timer (links, a heap index,
   /// the deadline) in the job, instead of allocating something.  Any other
   /// job has none, and the closure is passed `nil`; a scheduler then has to
@@ -534,7 +479,10 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// The storage belongs to the scheduler from when it is given the job (when
   /// `schedule` is called) until it runs the job, or until a cancellation that
   /// it was asked for has run it, so it can be used for whatever the scheduler
-  /// likes in that time.  It is not valid after the job has run, since running
+  /// likes in that time.  An executor that is merely asked to `enqueue` a job
+  /// that has storage (as a clock that hops through a trampoline does, with the
+  /// job that it was given to schedule) is not that scheduler, and has no
+  /// claim on it.  It is not valid after the job has run, since running
   /// it can free it; and, as with the executor private data, the scheduler is
   /// responsible for making sure that anything that it refers to is cleaned up
   /// before the job is run.
@@ -550,12 +498,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @safe public func withUnsafeScheduledPrivateData<R, E>(
     body: (UnsafeMutableRawBufferPointer?) throws(E) -> R
   ) throws(E) -> R {
-    guard let base = unsafe _jobGetScheduledPrivateData(self.context) else {
-      return try body(nil)
-    }
-    let size = unsafe 8 * MemoryLayout<OpaquePointer>.stride
-    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
-                                                         count: size))
+    return try _withScheduledPrivateData(of: self.context, body: body)
   }
   #endif
 

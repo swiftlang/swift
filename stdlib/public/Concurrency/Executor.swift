@@ -160,7 +160,9 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// has already run or been cancelled must do nothing and return `false`,
   /// and a token must never match a different job; in particular, `cancel` can
   /// be called more than once with the same token, and only the first call
-  /// may return `true`.
+  /// may return `true`.  (The exception is a job that the runtime scheduled
+  /// itself, whose token is only used by the runtime, once, while the job is
+  /// there; see "Tokens for a job that the runtime scheduled" below.)
   ///
   /// ### Implementing `cancel`
   ///
@@ -223,6 +225,30 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// `cancel` runs the job on another cannot use the claim on its own, since
   /// the job may be gone by the time that it makes it; it needs its own claim,
   /// as the Dispatch executor has.
+  ///
+  /// ### Tokens for a job that the runtime scheduled
+  ///
+  /// A token is not usually proof against being used after its job has gone: it
+  /// must do nothing, and match no other job, whenever it is used.  A token
+  /// that is only the address of a job cannot do that, since the memory of a job
+  /// that has gone is reused, and looking at it to find out whether it has gone
+  /// is looking at memory that may be free.  So for a job that the runtime
+  /// scheduled itself, the contract is different, and it is the runtime that
+  /// keeps it: it calls `cancel` for such a job at most once, and only while the
+  /// job has not run, so the job is there when `cancel` is called, and `cancel`
+  /// may look at it and identify it by its address.  (The token for such a job
+  /// is held inside the `ScheduledContinuation` that `schedule` returns, which
+  /// is only cancelled by `ContinuationWaiter.wait(for:)`, and that asks the
+  /// continuation first, and does not call `cancel` for a job that has run.)
+  ///
+  /// What this asks of a scheduler, or a clock, that is given such a job to
+  /// schedule is to hand back the token, and not to keep it, copy what is in
+  /// it, or use it to cancel the job itself: once it has been given the job,
+  /// nothing but the runtime knows when the job has gone.  A token can't be
+  /// copied, and has to be returned, so the only way to keep one is to make a
+  /// second with the `@unsafe` initializer, which is what this rules out; and
+  /// using it before the token is returned, while the job is certainly there,
+  /// is fine.
   ///
   /// A job that the runtime did not schedule itself, because a client gave it to
   /// `schedule(_:at:tolerance:clock:)` as a job, is not arbitrated: for those,
