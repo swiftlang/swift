@@ -1001,7 +1001,20 @@ SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
     bool concreteValueIsConsumed =
         COEI.CEI->ConcreteValue &&
         COEI.CEI->ConcreteValue->getOwnershipKind() == OwnershipKind::Owned;
-    if ((COEI.OAI.isExistentialValueFromValueHint || concreteValueIsConsumed) &&
+    // A guaranteed concrete value is not available at the apply if the
+    // existential is copied out of its borrow scope, e.g.
+    //   %b = begin_borrow %c
+    //   %e = init_existential_ref %b             // %b is guaranteed
+    //   %copy = copy_value %e
+    //   end_borrow %b
+    //   %o = open_existential_ref %copy
+    //   apply %f(%o)
+    bool concreteValueIsOutOfScope =
+        COEI.OAI.isExistentialValueCopied && COEI.CEI->ConcreteValue &&
+        COEI.CEI->ConcreteValue->getOwnershipKind() ==
+            OwnershipKind::Guaranteed;
+    if ((COEI.OAI.isExistentialValueFromValueHint || concreteValueIsConsumed ||
+         concreteValueIsOutOfScope) &&
         COEI.OAI.OpenedArchetypeValue->getOwnershipKind() !=
             OwnershipKind::Owned) {
       // The init_existential_ref was found via the value hint of a
