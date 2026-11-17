@@ -2620,6 +2620,9 @@ public:
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
 
+  /// Drop the debug variable from this alloc_box.
+  void invalidateVarInfo() { VarInfo.invalidate(); }
+
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
         (bool)UsesMoveableValueDebugInfo;
