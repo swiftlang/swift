@@ -118,19 +118,16 @@ ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
   }
   llvm::SmallVector<SILType> storageEntries;
 
-  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
-
-  // Add the heap header as the first entry
+  auto header = HeapHeaderKind::None;
   if (hasObjCImplementation()) {
-    storageEntries.push_back(rawPointerType);
+    header = HeapHeaderKind::ObjC;
   } else if (!HeaderSize.isZero()) {
     assert(HeaderSize == IGM.RefCountedStructSize &&
            "Swift object with non-standard header size");
-    storageEntries.push_back(rawPointerType);
-    storageEntries.push_back(rawPointerType);
+    header = HeapHeaderKind::Swift;
   }
 
   collectAllStoredPropertyTypes(IGM, selfType, storageEntries);
 
-  return irgen::computeTypedMallocTypeDescriptor(IGM, storageEntries);
+  return irgen::computeTypedMallocTypeDescriptor(IGM, header, storageEntries);
 }

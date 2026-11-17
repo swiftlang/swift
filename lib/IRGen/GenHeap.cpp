@@ -807,12 +807,6 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
   }
   llvm::SmallVector<SILType> storageEntries;
 
-  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
-
-  // Add the heap header as the first entry
-  storageEntries.push_back(rawPointerType);
-  storageEntries.push_back(rawPointerType);
-
   for (auto elType : ElementTypes) {
     if (!elType) {
       // FIXME: In partial function application, the bindings get stored as
@@ -823,7 +817,8 @@ HeapLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM) const {
     storageEntries.push_back(elType.getObjectType());
   }
 
-  return ::computeTypedMallocTypeDescriptor(IGM, storageEntries);
+  return ::computeTypedMallocTypeDescriptor(IGM, HeapHeaderKind::Swift,
+                                            storageEntries);
 }
 
 /// Emit a static initializer that makes the runtime initialize the header of
@@ -2588,15 +2583,30 @@ uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
 } // namespace
 
 std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
-    IRGenModule &IGM, llvm::SmallVectorImpl<SILType> &fieldTypes,
-    bool isArray) {
+    IRGenModule &IGM, HeapHeaderKind header,
+    llvm::SmallVectorImpl<SILType> &fieldTypes, bool isArray) {
   if (!IGM.isTypedAllocationAvailable()) {
     return std::nullopt;
   }
 
+  llvm::SmallVector<SILType, 8> storageEntries;
+  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
+  switch (header) {
+  case HeapHeaderKind::None:
+    break;
+  case HeapHeaderKind::ObjC:
+    storageEntries.push_back(rawPointerType);
+    break;
+  case HeapHeaderKind::Swift:
+    storageEntries.push_back(rawPointerType);
+    storageEntries.push_back(rawPointerType);
+    break;
+  }
+  storageEntries.append(fieldTypes.begin(), fieldTypes.end());
+
   llvm::SmallVector<LayoutSemanticsSpan, 4> layoutProperties;
   uint64_t offset = 0;
-  for (auto fieldType : fieldTypes) {
+  for (auto fieldType : storageEntries) {
     auto &fieldTI = IGM.getTypeInfo(fieldType);
     auto *fieldTLE =
         fieldTI.buildTypeLayoutEntry(IGM, fieldType, /*useStructLayouts*/ true);
