@@ -6929,6 +6929,16 @@ void SILGenFunction::emitOpenExistentialExprImpl(
                              SGFAccessKind::BorrowedAddressRead);
       existentialValue = emitBorrowedLValue(load, std::move(lv));
     }
+    // Do the same for a reference to a locally-mutable parameter that is implicitly
+    // loaded from.
+    if (auto dr = dyn_cast<DeclRefExpr>(existentialExpr)) {
+      auto pd = dyn_cast<ParamDecl>(dr->getDecl());
+      if (pd && pd->getIntroducer() == VarDecl::Introducer::Var) {
+        LValue lv = emitLValue(dr,
+                               SGFAccessKind::BorrowedAddressRead);
+        existentialValue = emitBorrowedLValue(dr, std::move(lv));
+      }
+    }
   }
 
   if (!existentialValue) {
