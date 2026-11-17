@@ -18,6 +18,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -694,10 +695,10 @@ unsigned irgen::countExportableFields(IRGenModule &IGM,
 SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
   switch (getKind()) {
   case Field::Var:
-    return baseType.getFieldType(getVarDecl(), IGM.getSILModule(),
-                                 TypeExpansionContext::minimal());
   case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return baseType.getFieldType(getStoredPropertyLayoutMember(),
+                                 IGM.getSILModule(),
+                                 TypeExpansionContext::minimal());
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
@@ -711,9 +712,15 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
 Type Field::getInterfaceType(IRGenModule &IGM) const {
   switch (getKind()) {
   case Field::Var:
-    return getVarDecl()->getInterfaceType();
-  case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+  case Field::MissingMember: {
+    auto member = getStoredPropertyLayoutMember();
+    if (auto *field = member.getVarDeclOrNull())
+      return field->getInterfaceType();
+
+    auto *layout = member.getFallbackLayout();
+    assert(layout && "missing field has no storage layout");
+    return HiddenType::get(IGM.Context, layout, CanType());
+  }
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
   case Field::NonDefaultDistributedActorStorage:
@@ -725,9 +732,8 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
 StringRef Field::getName() const {
   switch (getKind()) {
   case Field::Var:
-    return getVarDecl()->getName().str();
   case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return getStoredPropertyLayoutMember().getName().getBaseIdentifier().str();
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
   case Field::NonDefaultDistributedActorStorage:

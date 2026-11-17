@@ -3312,8 +3312,8 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 
@@ -3445,8 +3445,8 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 
@@ -4257,9 +4257,12 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
     case Field::Var:
       break;
 
-    // We should never be in this case when emitting a type.
+    // We cannot emit an offset global for a missing member, even if we know
+    // the offset, as we lack a VarDecl to mangle. Even if we could do this,
+    // MissingMembers themselves shouldn't be accessed directly, so we don't
+    // expect anyone to use the global anyways.
     case Field::MissingMember:
-      llvm_unreachable("unexpected missing member when emitting type");
+      return;
 
     // We don't need to emit an offset global for the default-actor
     // storage, which is never accessed directly.

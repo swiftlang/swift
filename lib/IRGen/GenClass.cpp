@@ -85,8 +85,9 @@ static bool classHasIncompleteLayout(IRGenModule &IGM,
     return false;
 
   for (auto field : theClass->getStoredPropertiesAndMissingMemberPlaceholders())
-    if (isa<MissingMemberDecl>(field))
-      return true;
+    if (auto *missing = dyn_cast<MissingMemberDecl>(field))
+      if (!missing->getStorageLayout())
+        return true;
 
   return false;
 }
@@ -360,7 +361,7 @@ namespace {
       auto fn = [&](Field field) {
         // Ignore missing properties here; we should have flagged these
         // with the classHasIncompleteLayout call above.
-        if (!field.isConcrete()) {
+        if (!field.hasKnownLayout()) {
           assert(Options & ClassMetadataFlags::ClassHasMissingMembers);
           return;
         }
