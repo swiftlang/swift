@@ -137,6 +137,7 @@ KnownProtocolKind swift::getKnownProtocolKind(InvertibleProtocolKind ip) {
     case InvertibleProtocolKind::Id: return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -164,6 +165,7 @@ KnownProtocolKind swift::getKnownProtocolKind(RepressibleProtocolKind ip) {
     return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -3011,6 +3013,7 @@ static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {
   case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ASTContext::addSucceededCanImportModule(

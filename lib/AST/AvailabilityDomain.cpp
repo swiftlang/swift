@@ -150,6 +150,7 @@ bool AvailabilityDomain::isVersioned() const {
     // FIXME: [availability] Support versioned custom availability domains
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::isVersionValid(
@@ -184,6 +185,7 @@ bool AvailabilityDomain::isVersionValid(
   case Kind::Custom:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::supportsContextRefinement() const {
@@ -198,6 +200,7 @@ bool AvailabilityDomain::supportsContextRefinement() const {
   case Kind::Custom:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::supportsQueries() const {
@@ -212,6 +215,7 @@ bool AvailabilityDomain::supportsQueries() const {
   case Kind::Custom:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::isActive(const ASTContext &ctx,
@@ -234,6 +238,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx,
     // the future someone might want to define a domain but leave it inactive.
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx,
@@ -260,6 +265,7 @@ bool AvailabilityDomain::mustBeSpecifiedAlone() const {
     // specified together in the future, this will need to be re-designed.
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static std::optional<llvm::VersionTuple>
@@ -282,6 +288,7 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
       return ctx.LangOpts.getMinPlatformVersion();
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 std::optional<AvailabilityRange>
@@ -324,6 +331,7 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   case Kind::Custom:
     return getCustomDomain()->getName().str();
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
@@ -343,6 +351,7 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   case Kind::Custom:
     return getCustomDomain()->getName().str();
   }
+  llvm_unreachable("covered switch");
 }
 
 ValueDecl *AvailabilityDomain::getDecl() const {
@@ -383,6 +392,7 @@ static bool domainIsStrictSubsetOf(const AvailabilityDomain &child,
     // Custom domains do not yet support inheritance relationships.
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
@@ -418,6 +428,7 @@ bool AvailabilityDomain::isRoot() const {
     // For now, all custom domains are their own root.
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 AvailabilityDomain AvailabilityDomain::getRootDomain() const {
@@ -610,6 +621,7 @@ AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
     // be copied to the other context, allocating new storage if necessary.
     llvm::report_fatal_error("unsupported");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool StableAvailabilityDomainComparator::operator()(
@@ -638,6 +650,7 @@ bool StableAvailabilityDomainComparator::operator()(
            rhs.getNameForAttributePrinting();
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,

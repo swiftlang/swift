@@ -541,6 +541,7 @@ bool GenericSignatureImpl::isRequirementSatisfied(
   case CheckRequirementResult::SubstitutionFailure:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 SmallVector<Requirement, 4>
@@ -1324,6 +1325,7 @@ void swift::validateGenericSignature(ASTContext &context,
         return (layout && layout == victim.getLayoutConstraint());
       }
       }
+      llvm_unreachable("covered switch");
     };
 
     if (satisfied(requirements[victimIndex])) {

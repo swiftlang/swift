@@ -451,6 +451,7 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
                        req.getLayoutConstraint());
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ConcreteContraction::

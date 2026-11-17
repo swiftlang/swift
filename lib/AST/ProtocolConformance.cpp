@@ -1680,6 +1680,7 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
          case ConformanceLookupKind::NonStructural:
            return true;
          }
+         llvm_unreachable("covered switch");
       });
 
   // If we want to add structural conformances, do so now.

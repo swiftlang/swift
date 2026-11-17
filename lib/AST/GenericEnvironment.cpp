@@ -35,6 +35,7 @@ size_t GenericEnvironment::numTrailingObjects(
   case Kind::Opaque:
     return 1;
   }
+  llvm_unreachable("covered switch");
 }
 
 size_t GenericEnvironment::numTrailingObjects(
@@ -48,6 +49,7 @@ size_t GenericEnvironment::numTrailingObjects(
   case Kind::Opaque:
     return 1;
   }
+  llvm_unreachable("covered switch");
 }
 
 size_t GenericEnvironment::numTrailingObjects(
@@ -61,6 +63,7 @@ size_t GenericEnvironment::numTrailingObjects(
   case Kind::Existential:
     return 1;
   }
+  llvm_unreachable("covered switch");
 }
 
 size_t GenericEnvironment::numTrailingObjects(
@@ -74,6 +77,7 @@ size_t GenericEnvironment::numTrailingObjects(
   case Kind::Element:
     return 1;
   }
+  llvm_unreachable("covered switch");
 }
 
 size_t GenericEnvironment::numTrailingObjects(OverloadToken<Type>) const {
@@ -323,6 +327,7 @@ GenericEnvironment::maybeApplyOuterContextSubstitutions(Type type) const {
     return type;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Type GenericEnvironment::mapTypeIntoEnvironment(GenericEnvironment *env,

@@ -69,6 +69,7 @@ struct SILThunkKind {
     case Identity:
       return Demangle::MangledSILThunkKind::Identity;
     }
+    llvm_unreachable("covered switch");
   }
 };
 
