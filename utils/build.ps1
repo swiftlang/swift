@@ -296,13 +296,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
-    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10.exe";
+    PinnedSHA256 = "23FC57903FADFF78F6AC89BACFB1EBD79A48274B0DBAD4D705A4A700CD825E52";
     PinnedVersion = "6.4.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10-arm64.exe"
+    PinnedSHA256 = "B3A93EA91AE9FB46F31435B92BF394EE4534161F76EA8E9FE1AB9F21784D1F05";
     PinnedVersion = "6.4.0";
   };
 }
@@ -1834,7 +1834,7 @@ function Get-Dependencies {
 
         Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem "$BundleRoot\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
