@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -500,6 +501,26 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
   }
 }
 
+static SILType formFieldType(SILType baseType, CanType loweredFieldType) {
+  if (baseType.isAddress() || baseType.getClassDecl() != nullptr)
+    return SILType::getPrimitiveAddressType(loweredFieldType);
+  return SILType::getPrimitiveObjectType(loweredFieldType);
+}
+
+static CanType getLoweredAbstractMemberType(
+    SILType baseType, MissingMemberDecl *member, TypeConverter &TC,
+    TypeExpansionContext context) {
+  auto substitutions =
+      baseType.getASTType()->getContextSubstitutionMap(member->getDeclContext());
+  auto *layout = member->getStorageLayout();
+  assert(layout && "missing member must have a storage layout");
+  layout = layout->getWithSubstitutions(member->getASTContext(),
+                                        substitutions);
+  Type memberType =
+      HiddenType::get(member->getASTContext(), layout, CanType());
+  return TC.getLoweredRValueType(context, memberType);
+}
+
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
   NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
@@ -530,11 +551,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassDecl() != nullptr) {
-    return SILType::getPrimitiveAddressType(loweredTy);
-  } else {
-    return SILType::getPrimitiveObjectType(loweredTy);
-  }
+  return formFieldType(*this, loweredTy);
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,
@@ -544,6 +561,23 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M,
 
 SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
+}
+
+SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
+                              TypeConverter &TC,
+                              TypeExpansionContext context) const {
+  if (auto *var = field.getVarDeclOrNull())
+    return getFieldType(var, TC, context);
+
+  return formFieldType(*this,
+                       getLoweredAbstractMemberType(
+                           *this, field.getMissingMemberDecl(), TC, context));
+}
+
+SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
+                              SILModule &M,
+                              TypeExpansionContext context) const {
+  return getFieldType(field, M.Types, context);
 }
 
 SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {

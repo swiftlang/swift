@@ -10322,6 +10322,64 @@ public:
   }
 };
 
+/// A view over either a complete declaration or a layout-only placeholder.
+///
+/// This base provides the state common to the declaration-specific layout
+/// member views below. It is intentionally a value type rather than an AST
+/// node hierarchy.
+class LayoutMemberView {
+  Decl *Member;
+
+  MissingMemberDecl *getMissingMemberDeclOrNull() const {
+    return dyn_cast<MissingMemberDecl>(Member);
+  }
+
+protected:
+  explicit LayoutMemberView(Decl *member) : Member(member) {
+    assert(member && "layout member must not be null");
+  }
+
+public:
+  Decl *getDecl() const { return Member; }
+
+  bool isMissing() const { return isa<MissingMemberDecl>(Member); }
+
+  DeclContext *getDeclContext() const { return Member->getDeclContext(); }
+  ASTContext &getASTContext() const { return Member->getASTContext(); }
+
+  DeclName getName() const {
+    if (auto *missing = getMissingMemberDeclOrNull())
+      return missing->getName();
+    return cast<ValueDecl>(Member)->getName();
+  }
+
+  AbstractTypeLayout *getFallbackLayout() const {
+    if (auto *missing = getMissingMemberDeclOrNull())
+      return missing->getStorageLayout();
+    return nullptr;
+  }
+
+  bool hasKnownLayout() const {
+    return !isMissing() || getFallbackLayout();
+  }
+
+  bool isAvailableDuringLowering() const {
+    return Member->isAvailableDuringLowering();
+  }
+};
+
+/// A layout member that represents a stored property.
+class StoredPropertyLayoutMemberView : public LayoutMemberView {
+public:
+  explicit StoredPropertyLayoutMemberView(VarDecl *field)
+      : LayoutMemberView(field) {}
+
+  explicit StoredPropertyLayoutMemberView(MissingMemberDecl *field)
+      : LayoutMemberView(field) {}
+
+  VarDecl *getVarDeclOrNull() const { return dyn_cast<VarDecl>(getDecl()); }
+};
+
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.

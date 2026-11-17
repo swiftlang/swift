@@ -120,8 +120,9 @@ case TypeKind::Id:
     case TypeKind::Integer:
       return t;
 
-    // TODO: Transform the parent and rebuild the type to support hidden
-    // generic types.
+    // TODO: Once abstract layouts can encode generic parameters, mark
+    // HiddenType as containing type parameters and rebuild its layout through
+    // AbstractTypeLayout::getWithSubstitutions().
     case TypeKind::Hidden:
       return t;
 

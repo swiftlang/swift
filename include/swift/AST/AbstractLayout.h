@@ -27,7 +27,9 @@
 
 namespace swift {
 
+class ASTContext;
 class SerializableHiddenTypeInfoRepresentation;
+class SubstitutionMap;
 
 struct AbstractTypeLayout {
   std::string mangledName;
@@ -35,6 +37,9 @@ struct AbstractTypeLayout {
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
       typeInfoRepresentation;
+
+  AbstractTypeLayout *getWithSubstitutions(
+      ASTContext &context, SubstitutionMap substitutions);
 };
 
 } // namespace swift
