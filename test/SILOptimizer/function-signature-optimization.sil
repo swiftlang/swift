@@ -1,0 +1,1983 @@
+// RUN: %target-sil-opt -module-name=test -function-signature-optimization -enable-experimental-feature Lifetimes %s | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+sil_stage canonical
+
+import Swift
+import Builtin
+import SwiftShims
+
+struct S {
+  var x: AnyObject
+  var y: AnyObject
+}
+
+struct GenS<T> {
+  var x: Array<T>
+  var y: Array<T>
+}
+
+struct S2 {
+  var x: Int
+  var y: AnyObject
+}
+
+struct Wrapper {
+  var x: AnyObject
+}
+
+struct S3 {
+  var x: AnyObject
+  var y: AnyObject
+  var z: AnyObject
+  var w: AnyObject
+}
+
+struct WrapperS {
+  var s: S
+}
+
+struct NC: ~Copyable {
+  var x: AnyObject
+}
+
+sil @use_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+sil @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+sil @use_S : $@convention(thin) (@guaranteed S) -> ()
+sil @barrier : $@convention(thin) () -> ()
+sil @decl_dead_arg : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+
+// CHECK-LABEL: sil shared [ossa] @$s8dead_argTf4dn_n : $@convention(thin) (Int) -> Int {
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function '$s8dead_argTf4dn_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @dead_arg :
+// CHECK:         %2 = function_ref @$s8dead_argTf4dn_n : $@convention(thin) (Int) -> Int
+// CHECK:         %3 = apply %2(%1)
+// CHECK:         return %3
+// CHECK:       } // end sil function 'dead_arg'
+sil [ossa] @dead_arg : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s8dead_argTf4dn_n :
+// CHECK:         [[A:%.*]] = apply [[F]](%1)
+// CHECK:         br bb1([[A]])
+// CHECK:       bb1([[R:%.*]] : $Int):
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'call_dead_arg'
+sil [ossa] @call_dead_arg : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s14guaranteed_argTf4o_n : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK:       bb0(%0 : @owned $AnyObject):
+// CHECK:         %1 = apply undef(%0) : $@convention(thin) (@owned AnyObject) -> ()
+// CHECK:       } // end sil function '$s14guaranteed_argTf4o_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @guaranteed_arg :
+// CHECK:         %1 = copy_value %0
+// CHECK:         %2 = function_ref @$s14guaranteed_argTf4o_n : $@convention(thin) (@owned AnyObject) -> ()
+// CHECK:         %3 = apply %2(%1)
+// CHECK:       } // end sil function 'guaranteed_arg'
+sil [ossa] @guaranteed_arg : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = apply undef(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[C:%.*]] = copy_value [[B]]
+// CHECK:         [[F:%.*]] = function_ref @$s14guaranteed_argTf4o_n : $@convention(thin) (@owned AnyObject) -> ()
+// CHECK:         apply [[F]]([[C]])
+// CHECK:         end_borrow [[B]]
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'call_guaranteed_arg'
+sil [ossa] @call_guaranteed_arg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  return %3
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s9owned_argTf4g_n : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK:       bb0(%0 : @guaranteed $AnyObject):
+// CHECK:         %1 = apply undef(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:       } // end sil function '$s9owned_argTf4g_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @owned_arg :
+// CHECK:         %1 = function_ref @$s9owned_argTf4g_n : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:         %2 = apply %1(%0)
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'owned_arg'
+sil [ossa] @owned_arg : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = apply undef(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_arg :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[M:%.*]] = move_value [lexical] [[C]]
+// CHECK:         [[F:%.*]] = function_ref @$s9owned_argTf4g_n : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:         apply [[F]]([[M]])
+// CHECK:         destroy_value [[M]]
+// CHECK:       } // end sil function 'call_owned_arg'
+sil [ossa] @call_owned_arg : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @owned_arg : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  return %3
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s16partial_dead_argTf4x_nTf4nd_n : $@convention(thin) (@guaranteed AnyObject) -> () {
+// CHECK:       bb0(%0 : @guaranteed $AnyObject):
+// CHECK:         fix_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function '$s16partial_dead_argTf4x_nTf4nd_n'
+
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [ossa] @$s16partial_dead_argTf4x_n : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> () {
+// CHECK:       bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject):
+// CHECK:         %2 = function_ref @$s16partial_dead_argTf4x_nTf4nd_n : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:         %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:       } // end sil function '$s16partial_dead_argTf4x_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @partial_dead_arg : $@convention(thin) (@guaranteed S) -> () {
+// CHECK:       bb0(%0 : @guaranteed $S):
+// CHECK:         %1 = begin_borrow %0
+// CHECK:         (%2, %3) = destructure_struct %1
+// CHECK:         %4 = function_ref @$s16partial_dead_argTf4x_n : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> ()
+// CHECK:         %5 = apply %4(%2, %3) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> ()
+// CHECK:         end_borrow %1                                   // id: %6
+// CHECK:       } // end sil function 'partial_dead_arg'
+sil [ossa] @partial_dead_arg : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = struct_extract %0, #S.x
+  fix_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_partial_dead_arg :
+// CHECK:         ([[X:%.*]], [[Y:%.*]]) = destructure_struct
+// CHECK:         [[B:%.*]] = begin_borrow [lexical] [[X]]
+// CHECK:         [[F:%.*]] = function_ref @$s16partial_dead_argTf4x_nTf4nd_n : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:           = apply [[F]]([[B]]) : $@convention(thin) (@guaranteed AnyObject) -> ()
+// CHECK:       } // end sil function 'call_partial_dead_arg'
+sil [ossa] @call_partial_dead_arg : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = copy_value %0
+  %2 = function_ref @partial_dead_arg : $@convention(thin) (@guaranteed S) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @partial_dead_generic_arg : $@convention(thin) <T> (@guaranteed GenS<T>) -> () {
+bb0(%0 : @guaranteed $GenS<T>):
+  %1 = struct_extract %0, #GenS.x
+  fix_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_partial_dead_generic_arg :
+// CHECK:         ([[X:%.*]], [[Y:%.*]]) = destructure_struct
+// CHECK:         [[F:%.*]] = function_ref @$s24partial_dead_generic_argTf4x_nTf4nd_n : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+// CHECK:           = apply [[F]]<T>([[X]]) : $@convention(thin) <τ_0_0> (@guaranteed Array<τ_0_0>) -> ()
+// CHECK:       } // end sil function 'call_partial_dead_generic_arg'
+sil [ossa] @call_partial_dead_generic_arg : $@convention(thin) <T> (@guaranteed GenS<T>) -> () {
+bb0(%0 : @guaranteed $GenS<T>):
+  %1 = copy_value %0
+  %2 = function_ref @partial_dead_generic_arg : $@convention(thin) <T> (@guaranteed GenS<T>) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <T> (@guaranteed GenS<T>) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @partial_dead_and_dead_arg : $@convention(thin) (@guaranteed S2, @guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $S2, %1 : @guaranteed $AnyObject):
+  %2 = struct_extract %0, #S2.x
+  fix_lifetime %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_partial_dead_and_dead_arg :
+// CHECK:         ([[X:%.*]], [[Y:%.*]]) = destructure_struct
+// CHECK:         [[F:%.*]] = function_ref @$s017partial_dead_and_B4_argTf4xd_nTf4nd_n : $@convention(thin) (Int) -> ()
+// CHECK:           = apply [[F]]([[X]]) : $@convention(thin) (Int) -> ()
+// CHECK:       } // end sil function 'call_partial_dead_and_dead_arg'
+sil [ossa] @call_partial_dead_and_dead_arg : $@convention(thin) <T> (@guaranteed S2, @guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $S2, %1 : @guaranteed $AnyObject):
+  %2 = copy_value %0
+  %3 = function_ref @partial_dead_and_dead_arg : $@convention(thin) (@guaranteed S2, @guaranteed AnyObject) -> ()
+  %4 = apply %3(%2, %1) : $@convention(thin) (@guaranteed S2, @guaranteed AnyObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @dead_and_partial_dead_arg : $@convention(thin) (@guaranteed AnyObject, @guaranteed S2) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $S2):
+  %2 = struct_extract %1, #S2.x
+  fix_lifetime %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_and_partial_dead_arg :
+// CHECK:         ([[X:%.*]], [[Y:%.*]]) = destructure_struct
+// CHECK:         [[F:%.*]] = function_ref @$s017dead_and_partial_A4_argTf4dx_nTf4nd_n : $@convention(thin) (Int) -> ()
+// CHECK:           = apply [[F]]([[X]]) : $@convention(thin) (Int) -> ()
+// CHECK:       } // end sil function 'call_dead_and_partial_dead_arg'
+sil [ossa] @call_dead_and_partial_dead_arg : $@convention(thin) <T> (@guaranteed AnyObject, @guaranteed S2) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $S2):
+  %2 = copy_value %1
+  %3 = function_ref @dead_and_partial_dead_arg : $@convention(thin) (@guaranteed AnyObject, @guaranteed S2) -> ()
+  %4 = apply %3(%0, %2) : $@convention(thin) (@guaranteed AnyObject, @guaranteed S2) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @implicitly_generic : $@convention(thin) <T> (Int) -> () {
+bb0(%0 : $Int):
+  %1 = metatype $@thick T.Type
+  fix_lifetime %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_implicitly_generic :
+// CHECK:         [[F:%.*]] = function_ref @$s18implicitly_genericTf4d_n : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:           = apply [[F]]<S>() : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:       } // end sil function 'call_implicitly_generic'
+sil [ossa] @call_implicitly_generic : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @implicitly_generic : $@convention(thin) <T> (Int) -> ()
+  %4 = apply %3<S>(%0) : $@convention(thin) <T> (Int) -> ()
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @implicitly_generic2 : $@convention(thin) <T> (Int) -> () {
+bb0(%0 : $Int):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  fix_lifetime %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_implicitly_generic2 :
+// CHECK:         [[F:%.*]] = function_ref @$s19implicitly_generic2Tf4d_n : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:           = apply [[F]]<S>() : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:       } // end sil function 'call_implicitly_generic2'
+sil [ossa] @call_implicitly_generic2 : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @implicitly_generic2 : $@convention(thin) <T> (Int) -> ()
+  %4 = apply %3<S>(%0) : $@convention(thin) <T> (Int) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// A `debug_value undef` of a generic type doesn't make the specialized function generic.
+// CHECK-LABEL: sil shared [ossa] @$s15undef_debug_valTf4d_n : $@convention(thin) () -> Int64 {
+// CHECK-NOT:     debug_value
+// CHECK:       } // end sil function '$s15undef_debug_valTf4d_n'
+sil [ossa] @undef_debug_val : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64 {
+bb0(%0 : @guaranteed $GenS<T>):
+  debug_value undef : $GenS<T>, let, name "x"
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int64 (%1)
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_undef_debug_val :
+// CHECK:         [[F:%.*]] = function_ref @$s15undef_debug_valTf4d_n : $@convention(thin) () -> Int64
+// CHECK:           = apply [[F]]() : $@convention(thin) () -> Int64
+// CHECK:       } // end sil function 'call_undef_debug_val'
+sil [ossa] @call_undef_debug_val : $@convention(thin) (@guaranteed GenS<Int>) -> Int64 {
+bb0(%0 : @guaranteed $GenS<Int>):
+  %1 = function_ref @undef_debug_val : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64
+  %2 = apply %1<Int>(%0) : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64
+  return %2
+}
+
+sil [ossa] @implicitly_generic_undef : $@convention(thin) <T> (Int) -> () {
+bb0(%0 : $Int):
+  fix_lifetime undef : $GenS<T>
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_implicitly_generic_undef :
+// CHECK:         [[F:%.*]] = function_ref @$s24implicitly_generic_undefTf4d_n : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:           = apply [[F]]<S>() : $@convention(thin) <τ_0_0> () -> ()
+// CHECK:       } // end sil function 'call_implicitly_generic_undef'
+sil [ossa] @call_implicitly_generic_undef : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %3 = function_ref @implicitly_generic_undef : $@convention(thin) <T> (Int) -> ()
+  %4 = apply %3<S>(%0) : $@convention(thin) <T> (Int) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// A dead generic metatype argument is kept, because IRGen uses it as a source for the type metadata.
+sil [ossa] @dead_generic_metatype : $@convention(thin) <T> (@thick T.Type, Int) -> () {
+bb0(%0 : $@thick T.Type, %1 : $Int):
+  %2 = metatype $@thick T.Type
+  fix_lifetime %2
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_generic_metatype :
+// CHECK:         [[F:%.*]] = function_ref @$s21dead_generic_metatypeTf4nd_n : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+// CHECK:           = apply [[F]]<S>(%1) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+// CHECK:       } // end sil function 'call_dead_generic_metatype'
+sil [ossa] @call_dead_generic_metatype : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = metatype $@thick S.Type
+  %3 = function_ref @dead_generic_metatype : $@convention(thin) <T> (@thick T.Type, Int) -> ()
+  %4 = apply %3<S>(%1, %0) : $@convention(thin) <T> (@thick T.Type, Int) -> ()
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @dead_generic_metatype2 : $@convention(thin) <T> (@thick T.Type) -> () {
+bb0(%0 : $@thick T.Type):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  fix_lifetime %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_only_dead_generic_metatype :
+// CHECK:         [[F:%.*]] = function_ref @dead_generic_metatype2 : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+// CHECK:           = apply [[F]]<S>(%0) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()
+// CHECK:       } // end sil function 'call_only_dead_generic_metatype'
+sil [ossa] @call_only_dead_generic_metatype : $@convention(thin) () -> () {
+bb0:
+  %1 = metatype $@thick S.Type
+  %3 = function_ref @dead_generic_metatype2 : $@convention(thin) <T> (@thick T.Type) -> ()
+  %4 = apply %3<S>(%1) : $@convention(thin) <T> (@thick T.Type) -> ()
+  %r = tuple ()
+  return %r
+}
+
+sil [Osize] [ossa] @dead_arg_osize : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_osize :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_osize :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dead_arg_osize'
+sil [ossa] @call_dead_arg_osize : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_osize : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+sil public_external [ossa] @dead_arg_external : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  return %1
+}
+
+// CHECK-LABEL: sil [thunk] [ossa] @call_dead_arg_external_from_thunk :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_external :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dead_arg_external_from_thunk'
+sil [thunk] [ossa] @call_dead_arg_external_from_thunk : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_external : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_external :
+// CHECK:         [[F:%.*]] = function_ref @$s17dead_arg_externalTf4dn_n :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_dead_arg_external'
+sil [ossa] @call_dead_arg_external : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_external : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// An owned -> guaranteed specialization of a callee which is called with `try_apply`.
+// CHECK-LABEL: sil shared [ossa] @$s18throwing_owned_argTf4g_n : $@convention(thin) (@guaranteed AnyObject) -> @error any Error {
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function '$s18throwing_owned_argTf4g_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @throwing_owned_arg :
+// CHECK:         try_apply {{%.*}}(%0) : $@convention(thin) (@guaranteed AnyObject) -> @error any Error, normal bb1, error bb2
+// CHECK:       bb1({{%.*}} : $()):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       bb2({{%.*}} : @owned $any Error):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'throwing_owned_arg'
+sil [ossa] @throwing_owned_arg : $@convention(thin) (@owned AnyObject) -> @error any Error {
+bb0(%0 : @owned $AnyObject):
+  %1 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @call_throwing_owned_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s18throwing_owned_argTf4g_n :
+// CHECK:         try_apply [[F]]
+// CHECK:       } // end sil function 'call_throwing_owned_arg'
+sil [ossa] @call_throwing_owned_arg : $@convention(thin) (@guaranteed AnyObject) -> @error any Error {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @throwing_owned_arg : $@convention(thin) (@owned AnyObject) -> @error any Error
+  try_apply %2(%1) : $@convention(thin) (@owned AnyObject) -> @error any Error, normal bb1, error bb2
+
+bb1(%4 : $()):
+  return %4
+
+bb2(%6 : @owned $any Error):
+  throw %6
+}
+
+// A dead thin metatype argument is not removed, because it has no runtime representation.
+// A dead argument which only has debug uses is removed.
+// CHECK-LABEL: sil shared [ossa] @$s18dead_thin_metatypeTf4nd_n : $@convention(thin) (@thin Int.Type) -> () {
+// CHECK-NOT:     debug_value
+// CHECK:       } // end sil function '$s18dead_thin_metatypeTf4nd_n'
+sil [ossa] @dead_thin_metatype : $@convention(thin) (@thin Int.Type, @guaranteed AnyObject) -> () {
+bb0(%0 : $@thin Int.Type, %1 : @guaranteed $AnyObject):
+  debug_value %1, let, name "x"
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_thin_metatype :
+// CHECK:         [[M:%.*]] = metatype $@thin Int.Type
+// CHECK:         [[F:%.*]] = function_ref @$s18dead_thin_metatypeTf4nd_n :
+// CHECK:         apply [[F]]([[M]])
+// CHECK:       } // end sil function 'call_dead_thin_metatype'
+sil [ossa] @call_dead_thin_metatype : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = metatype $@thin Int.Type
+  %2 = function_ref @dead_thin_metatype : $@convention(thin) (@thin Int.Type, @guaranteed AnyObject) -> ()
+  %3 = apply %2(%1, %0) : $@convention(thin) (@thin Int.Type, @guaranteed AnyObject) -> ()
+  return %3
+}
+
+// An owned move-only argument is not converted to guaranteed. Only the dead argument is removed.
+// CHECK-LABEL: sil shared [ossa] @$s19owned_move_only_argTf4nd_n : $@convention(thin) (@owned NC) -> () {
+// CHECK:       bb0(%0 : @owned $NC):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function '$s19owned_move_only_argTf4nd_n'
+sil [ossa] @owned_move_only_arg : $@convention(thin) (@owned NC, @guaranteed AnyObject) -> () {
+bb0(%0 : @owned $NC, %1 : @guaranteed $AnyObject):
+  destroy_value %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_move_only_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s19owned_move_only_argTf4nd_n :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_owned_move_only_arg'
+sil [ossa] @call_owned_move_only_arg : $@convention(thin) (@owned NC, @guaranteed AnyObject) -> () {
+bb0(%0 : @owned $NC, %1 : @guaranteed $AnyObject):
+  %2 = function_ref @owned_move_only_arg : $@convention(thin) (@owned NC, @guaranteed AnyObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@owned NC, @guaranteed AnyObject) -> ()
+  return %3
+}
+
+// Moving the destroy across the deinit barrier to the caller would change the deinit order.
+// CHECK-LABEL: sil [ossa] @call_owned_arg_destroy_before_barrier :
+// CHECK:         [[F:%.*]] = function_ref @owned_arg_destroy_before_barrier :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_owned_arg_destroy_before_barrier'
+sil [ossa] @owned_arg_destroy_before_barrier : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  destroy_value %0
+  %2 = function_ref @barrier : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4
+}
+
+sil [ossa] @call_owned_arg_destroy_before_barrier : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @owned_arg_destroy_before_barrier : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  return %3
+}
+
+// The owned argument is consumed by something else than a `destroy_value`.
+// CHECK-LABEL: sil [ossa] @call_owned_arg_consumed :
+// CHECK:         [[F:%.*]] = function_ref @owned_arg_consumed :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_owned_arg_consumed'
+sil [ossa] @owned_arg_consumed : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+sil [ossa] @call_owned_arg_consumed : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @owned_arg_consumed : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  return %3
+}
+
+// The caller doesn't pass a copy, so there is no copy-destroy pair to remove.
+// CHECK-LABEL: sil [ossa] @owned_arg_not_specialized :
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'owned_arg_not_specialized'
+sil [ossa] @owned_arg_not_specialized : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_arg_without_copy :
+// CHECK:         [[F:%.*]] = function_ref @owned_arg_not_specialized :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_owned_arg_without_copy'
+sil [ossa] @call_owned_arg_without_copy : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @owned_arg_not_specialized : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@owned AnyObject) -> ()
+  return %3
+}
+
+// Each path from the function entry executes exactly one copy.
+// CHECK-LABEL: sil shared [ossa] @$s33guaranteed_arg_copied_in_branchesTf4on_n : $@convention(thin) (@owned AnyObject, Builtin.Int1) -> () {
+// CHECK-NOT:     copy_value
+// CHECK:       bb1:
+// CHECK-NEXT:    apply {{%.*}}(%0)
+// CHECK:       bb2:
+// CHECK-NEXT:    apply {{%.*}}(%0)
+// CHECK:       } // end sil function '$s33guaranteed_arg_copied_in_branchesTf4on_n'
+sil [ossa] @guaranteed_arg_copied_in_branches : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Builtin.Int1):
+  %2 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = copy_value %0
+  %5 = apply %2(%4) : $@convention(thin) (@owned AnyObject) -> ()
+  br bb3
+
+bb2:
+  %7 = copy_value %0
+  %8 = apply %2(%7) : $@convention(thin) (@owned AnyObject) -> ()
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_in_branches :
+// CHECK:         [[F:%.*]] = function_ref @$s33guaranteed_arg_copied_in_branchesTf4on_n :
+// CHECK:         apply [[F]](
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_in_branches'
+sil [ossa] @call_guaranteed_arg_copied_in_branches : $@convention(thin) (@owned AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $AnyObject, %1 : $Builtin.Int1):
+  %2 = function_ref @guaranteed_arg_copied_in_branches : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  destroy_value %0
+  return %3
+}
+
+// Not all paths from the function entry execute a copy.
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_in_one_branch :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_copied_in_one_branch :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_in_one_branch'
+sil [ossa] @guaranteed_arg_copied_in_one_branch : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = copy_value %0
+  %4 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned AnyObject) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = tuple ()
+  return %9
+}
+
+sil [ossa] @call_guaranteed_arg_copied_in_one_branch : $@convention(thin) (@owned AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $AnyObject, %1 : $Builtin.Int1):
+  %2 = function_ref @guaranteed_arg_copied_in_one_branch : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  destroy_value %0
+  return %3
+}
+
+// Two copies in the same block.
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_twice :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_copied_twice :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_twice'
+sil [ossa] @guaranteed_arg_copied_twice : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %2 = copy_value %0
+  %3 = apply %1(%2) : $@convention(thin) (@owned AnyObject) -> ()
+  %4 = copy_value %0
+  %5 = apply %1(%4) : $@convention(thin) (@owned AnyObject) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+sil [ossa] @call_guaranteed_arg_copied_twice : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_copied_twice : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  return %3
+}
+
+// A copy is on the path to another copy.
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_on_path :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_copied_on_path :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_on_path'
+sil [ossa] @guaranteed_arg_copied_on_path : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %2 = copy_value %0
+  %3 = apply %1(%2) : $@convention(thin) (@owned AnyObject) -> ()
+  br bb1
+
+bb1:
+  %4 = copy_value %0
+  %5 = apply %1(%4) : $@convention(thin) (@owned AnyObject) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+sil [ossa] @call_guaranteed_arg_copied_on_path : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_copied_on_path : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  return %3
+}
+
+// The copy is in a loop.
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_in_loop :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_copied_in_loop :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_in_loop'
+sil [ossa] @guaranteed_arg_copied_in_loop : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Builtin.Int1):
+  br bb1
+
+bb1:
+  %3 = copy_value %0
+  %4 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned AnyObject) -> ()
+  cond_br %1, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %9 = tuple ()
+  return %9
+}
+
+sil [ossa] @call_guaranteed_arg_copied_in_loop : $@convention(thin) (@owned AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $AnyObject, %1 : $Builtin.Int1):
+  %2 = function_ref @guaranteed_arg_copied_in_loop : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Builtin.Int1) -> ()
+  destroy_value %0
+  return %3
+}
+
+// The guaranteed argument has another use besides the copy.
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_copied_and_used :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_copied_and_used :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_copied_and_used'
+sil [ossa] @guaranteed_arg_copied_and_used : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = copy_value %0
+  %4 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned AnyObject) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+sil [ossa] @call_guaranteed_arg_copied_and_used : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_copied_and_used : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  return %3
+}
+
+// The callee could be specialized guaranteed -> owned, but none of the call sites can benefit
+// from it, because the passed value is not just destroyed after the call.
+// CHECK-LABEL: sil [ossa] @guaranteed_arg_not_specialized :
+// CHECK:         copy_value %0
+// CHECK:       } // end sil function 'guaranteed_arg_not_specialized'
+sil [ossa] @guaranteed_arg_not_specialized : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_used_after_call :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_not_specialized :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_used_after_call'
+sil [ossa] @call_guaranteed_arg_used_after_call : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_not_specialized : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  fix_lifetime %0
+  destroy_value %0
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_barrier_after_call :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_not_specialized :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_barrier_after_call'
+sil [ossa] @call_guaranteed_arg_barrier_after_call : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_not_specialized : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %4 = function_ref @barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_guaranteed_arg_with_guaranteed_value :
+// CHECK:         [[F:%.*]] = function_ref @guaranteed_arg_not_specialized :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_guaranteed_arg_with_guaranteed_value'
+sil [ossa] @call_guaranteed_arg_with_guaranteed_value : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %2 = function_ref @guaranteed_arg_not_specialized : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  return %3
+}
+
+// A `debug_value` of the argument after the former copy is moved to the function entry, because
+// the argument is consumed now.
+// CHECK-LABEL: sil shared [ossa] @$s31guaranteed_arg_with_debug_valueTf4o_n : $@convention(thin) (@owned AnyObject) -> () {
+// CHECK:       bb0(%0 : @owned $AnyObject):
+// CHECK-NEXT:    debug_value %0, let, name "x"
+// CHECK:         apply {{%.*}}(%0)
+// CHECK-NOT:     debug_value
+// CHECK:       } // end sil function '$s31guaranteed_arg_with_debug_valueTf4o_n'
+sil [ossa] @guaranteed_arg_with_debug_value : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = copy_value %0
+  %2 = function_ref @use_owned : $@convention(thin) (@owned AnyObject) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@owned AnyObject) -> ()
+  debug_value %0, let, name "x"
+  %4 = tuple ()
+  return %4
+}
+
+sil [ossa] @call_guaranteed_arg_with_debug_value : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %2 = function_ref @guaranteed_arg_with_debug_value : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  destroy_value %0
+  return %3
+}
+
+// More than two fields are used, so the struct is not exploded.
+// CHECK-LABEL: sil [ossa] @call_three_used_fields :
+// CHECK:         [[F:%.*]] = function_ref @three_used_fields :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_three_used_fields'
+sil [ossa] @three_used_fields : $@convention(thin) (@guaranteed S3) -> () {
+bb0(%0 : @guaranteed $S3):
+  %1 = struct_extract %0, #S3.x
+  fix_lifetime %1
+  %2 = struct_extract %0, #S3.y
+  fix_lifetime %2
+  %3 = struct_extract %0, #S3.z
+  fix_lifetime %3
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @call_three_used_fields : $@convention(thin) (@guaranteed S3) -> () {
+bb0(%0 : @guaranteed $S3):
+  %1 = copy_value %0
+  %2 = function_ref @three_used_fields : $@convention(thin) (@guaranteed S3) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S3) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Two fields are used (one of them twice), so the struct is exploded and the two unused fields are removed.
+// CHECK-LABEL: sil shared [ossa] @$s15two_used_fieldsTf4x_nTf4nndd_n : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> () {
+// CHECK:       bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject):
+// CHECK-NEXT:    fix_lifetime %0
+// CHECK-NEXT:    fix_lifetime %1
+// CHECK-NEXT:    fix_lifetime %0
+// CHECK:       } // end sil function '$s15two_used_fieldsTf4x_nTf4nndd_n'
+sil [ossa] @two_used_fields : $@convention(thin) (@guaranteed S3) -> () {
+bb0(%0 : @guaranteed $S3):
+  %1 = struct_extract %0, #S3.x
+  fix_lifetime %1
+  %2 = struct_extract %0, #S3.y
+  fix_lifetime %2
+  %3 = struct_extract %0, #S3.x
+  fix_lifetime %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_two_used_fields :
+// CHECK:         [[F:%.*]] = function_ref @$s15two_used_fieldsTf4x_nTf4nndd_n :
+// CHECK:         apply [[F]](
+// CHECK:       } // end sil function 'call_two_used_fields'
+sil [ossa] @call_two_used_fields : $@convention(thin) (@guaranteed S3) -> () {
+bb0(%0 : @guaranteed $S3):
+  %1 = copy_value %0
+  %2 = function_ref @two_used_fields : $@convention(thin) (@guaranteed S3) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S3) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// The only unused field is trivial, so there is nothing to gain from exploding the struct.
+// CHECK-LABEL: sil [ossa] @call_unused_trivial_field :
+// CHECK:         [[F:%.*]] = function_ref @unused_trivial_field :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_unused_trivial_field'
+sil [ossa] @unused_trivial_field : $@convention(thin) (@guaranteed S2) -> () {
+bb0(%0 : @guaranteed $S2):
+  %1 = struct_extract %0, #S2.y
+  fix_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @call_unused_trivial_field : $@convention(thin) (@guaranteed S2) -> () {
+bb0(%0 : @guaranteed $S2):
+  %1 = copy_value %0
+  %2 = function_ref @unused_trivial_field : $@convention(thin) (@guaranteed S2) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S2) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// The struct argument is also used as a whole.
+// CHECK-LABEL: sil [ossa] @call_struct_arg_with_other_use :
+// CHECK:         [[F:%.*]] = function_ref @struct_arg_with_other_use :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_struct_arg_with_other_use'
+sil [ossa] @struct_arg_with_other_use : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = struct_extract %0, #S.x
+  fix_lifetime %1
+  %3 = function_ref @use_S : $@convention(thin) (@guaranteed S) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed S) -> ()
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @call_struct_arg_with_other_use : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = copy_value %0
+  %2 = function_ref @struct_arg_with_other_use : $@convention(thin) (@guaranteed S) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// The caller doesn't pass a copy of the struct.
+// CHECK-LABEL: sil [ossa] @partial_dead_arg_not_specialized :
+// CHECK:         struct_extract %0, #S.x
+// CHECK:       } // end sil function 'partial_dead_arg_not_specialized'
+sil [ossa] @partial_dead_arg_not_specialized : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = struct_extract %0, #S.x
+  fix_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_partial_dead_arg_without_copy :
+// CHECK:         [[F:%.*]] = function_ref @partial_dead_arg_not_specialized :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_partial_dead_arg_without_copy'
+sil [ossa] @call_partial_dead_arg_without_copy : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %2 = function_ref @partial_dead_arg_not_specialized : $@convention(thin) (@guaranteed S) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed S) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// A single-field wrapper struct is looked through when checking for unused fields.
+// Exploding the wrapper passes the inner struct.
+// CHECK-LABEL: sil shared [ossa] @$s24partial_dead_wrapped_argTf4x_n : $@convention(thin) (@guaranteed S) -> () {
+// CHECK:       bb0(%0 : @guaranteed $S):
+// CHECK-NEXT:    [[E:%.*]] = struct_extract %0, #S.x
+// CHECK-NEXT:    fix_lifetime [[E]]
+// CHECK:       } // end sil function '$s24partial_dead_wrapped_argTf4x_n'
+sil [ossa] @partial_dead_wrapped_arg : $@convention(thin) (@guaranteed WrapperS) -> () {
+bb0(%0 : @guaranteed $WrapperS):
+  %1 = struct_extract %0, #WrapperS.s
+  %2 = struct_extract %1, #S.x
+  fix_lifetime %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @call_partial_dead_wrapped_arg :
+// CHECK:         [[D:%.*]] = destructure_struct
+// CHECK:         [[F:%.*]] = function_ref @$s24partial_dead_wrapped_argTf4x_n :
+// CHECK:         apply [[F]]([[D]])
+// CHECK:       } // end sil function 'call_partial_dead_wrapped_arg'
+sil [ossa] @call_partial_dead_wrapped_arg : $@convention(thin) (@guaranteed WrapperS) -> () {
+bb0(%0 : @guaranteed $WrapperS):
+  %1 = copy_value %0
+  %2 = function_ref @partial_dead_wrapped_arg : $@convention(thin) (@guaranteed WrapperS) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed WrapperS) -> ()
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// There is nothing to gain for a function which never returns.
+// CHECK-LABEL: sil [ossa] @call_dead_arg_no_return :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_no_return :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_dead_arg_no_return'
+sil [ossa] @dead_arg_no_return : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  unreachable
+}
+
+sil [ossa] @call_dead_arg_no_return : $@convention(thin) (@guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject):
+  %1 = function_ref @dead_arg_no_return : $@convention(thin) (@guaranteed AnyObject) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@guaranteed AnyObject) -> ()
+  unreachable
+}
+
+// Non-OSSA callees and external declarations are not optimized.
+// CHECK-LABEL: sil [ossa] @call_dead_arg_non_ossa_and_decl :
+// CHECK:         [[F1:%.*]] = function_ref @dead_arg_non_ossa :
+// CHECK:         [[A:%.*]] = apply [[F1]](%0, %1)
+// CHECK:         [[F2:%.*]] = function_ref @decl_dead_arg :
+// CHECK:         apply [[F2]](%0, [[A]])
+// CHECK:       } // end sil function 'call_dead_arg_non_ossa_and_decl'
+sil @dead_arg_non_ossa : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : $AnyObject, %1 : $Int):
+  return %1
+}
+
+sil [ossa] @call_dead_arg_non_ossa_and_decl : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_non_ossa : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %4 = function_ref @decl_dead_arg : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %5 = apply %4(%0, %3) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %5
+}
+
+// Non-OSSA callers are not optimized.
+// CHECK-LABEL: sil @non_ossa_caller :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_shared :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'non_ossa_caller'
+sil @non_ossa_caller : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_shared : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// Multiple call sites use the same specialization.
+// CHECK-LABEL: sil shared [ossa] @$s15dead_arg_sharedTf4dn_n : $@convention(thin) (Int) -> Int {
+// CHECK:       } // end sil function '$s15dead_arg_sharedTf4dn_n'
+sil [ossa] @dead_arg_shared : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_shared_1 :
+// CHECK:         [[F:%.*]] = function_ref @$s15dead_arg_sharedTf4dn_n :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_dead_arg_shared_1'
+sil [ossa] @call_dead_arg_shared_1 : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_shared : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_shared_2 :
+// CHECK:         [[F:%.*]] = function_ref @$s15dead_arg_sharedTf4dn_n :
+// CHECK:         apply [[F]](%1)
+// CHECK:       } // end sil function 'call_dead_arg_shared_2'
+sil [ossa] @call_dead_arg_shared_2 : $@convention(thin) (@guaranteed AnyObject, Int) -> Int {
+bb0(%0 : @guaranteed $AnyObject, %1 : $Int):
+  %2 = function_ref @dead_arg_shared : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, Int) -> Int
+  return %3
+}
+
+// A method becomes a thin function after specialization.
+// CHECK-LABEL: sil shared [ossa] @$s16method_dead_selfTf4nd_n : $@convention(thin) (Int) -> Int {
+// CHECK:       } // end sil function '$s16method_dead_selfTf4nd_n'
+sil [ossa] @method_dead_self : $@convention(method) (Int, @guaranteed S) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $S):
+  return %0
+}
+
+// CHECK-LABEL: sil [ossa] @call_method_dead_self :
+// CHECK:         [[F:%.*]] = function_ref @$s16method_dead_selfTf4nd_n : $@convention(thin) (Int) -> Int
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_method_dead_self'
+sil [ossa] @call_method_dead_self : $@convention(thin) (Int, @guaranteed S) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $S):
+  %2 = function_ref @method_dead_self : $@convention(method) (Int, @guaranteed S) -> Int
+  %3 = apply %2(%0, %1) : $@convention(method) (Int, @guaranteed S) -> Int
+  return %3
+}
+
+// The `@guaranteed` result is borrowed from "self". Therefore "self" is not exploded and the
+// specialized function stays a method.
+// CHECK-LABEL: sil shared [ossa] @$s15borrow_accessorTf4dn_n : $@convention(method) (@guaranteed S) -> @guaranteed AnyObject {
+// CHECK:       bb0(%0 : @guaranteed $S):
+// CHECK-NEXT:    [[E:%.*]] = struct_extract %0, #S.x
+// CHECK-NEXT:    return [[E]]
+// CHECK:       } // end sil function '$s15borrow_accessorTf4dn_n'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @borrow_accessor :
+// CHECK:         [[A:%.*]] = apply {{%.*}}(%1) : $@convention(method) (@guaranteed S) -> @guaranteed AnyObject
+// CHECK-NEXT:    return_borrow [[A]] from_scopes ([[A]])
+// CHECK:       } // end sil function 'borrow_accessor'
+sil [ossa] @borrow_accessor : $@convention(method) (@guaranteed AnyObject, @guaranteed S) -> @guaranteed AnyObject {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $S):
+  %2 = struct_extract %1, #S.x
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_borrow_accessor :
+// CHECK:         [[F:%.*]] = function_ref @$s15borrow_accessorTf4dn_n :
+// CHECK:         [[A:%.*]] = apply [[F]](
+// CHECK:         end_borrow [[A]]
+// CHECK:       } // end sil function 'call_borrow_accessor'
+sil [ossa] @call_borrow_accessor : $@convention(thin) (@guaranteed AnyObject, @guaranteed S) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $S):
+  %2 = copy_value %1
+  %3 = function_ref @borrow_accessor : $@convention(method) (@guaranteed AnyObject, @guaranteed S) -> @guaranteed AnyObject
+  %4 = apply %3(%0, %2) : $@convention(method) (@guaranteed AnyObject, @guaranteed S) -> @guaranteed AnyObject
+  fix_lifetime %4
+  end_borrow %4
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// Changing the conventions or removing arguments would invalidate lifetime dependencies, which
+// refer to argument indices.
+
+// A dead argument of a function with a lifetime dependent result.
+// CHECK-LABEL: sil [ossa] @dead_arg_result_lifetime_dependence :
+// CHECK:       bb0(%0 : @guaranteed $AnyObject, %1 : @owned $MutableSpan<Int>):
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'dead_arg_result_lifetime_dependence'
+sil [ossa] @dead_arg_result_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int> {
+bb0(%0 : @guaranteed $AnyObject, %1 : @owned $MutableSpan<Int>):
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_result_lifetime_dependence :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_result_lifetime_dependence :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dead_arg_result_lifetime_dependence'
+sil [ossa] @call_dead_arg_result_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int> {
+bb0(%0 : @guaranteed $AnyObject, %1 : @owned $MutableSpan<Int>):
+  %2 = function_ref @dead_arg_result_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int>
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int>
+  return %3
+}
+
+// A dead argument of a function with a lifetime dependent `@inout` parameter.
+// CHECK-LABEL: sil [ossa] @dead_arg_inout_lifetime_dependence :
+// CHECK:       bb0(%0 : @guaranteed $AnyObject, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+// CHECK:       } // end sil function 'dead_arg_inout_lifetime_dependence'
+sil [ossa] @dead_arg_inout_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  store %2 to [assign] %1
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @call_dead_arg_inout_lifetime_dependence :
+// CHECK:         [[F:%.*]] = function_ref @dead_arg_inout_lifetime_dependence :
+// CHECK:         apply [[F]](%0, %1, %2)
+// CHECK:       } // end sil function 'call_dead_arg_inout_lifetime_dependence'
+sil [ossa] @call_dead_arg_inout_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  %3 = function_ref @dead_arg_inout_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> ()
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@guaranteed AnyObject, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> ()
+  return %4
+}
+
+// An owned argument, which is only destroyed, of a function with a lifetime dependent result.
+// CHECK-LABEL: sil [ossa] @owned_arg_lifetime_dependence :
+// CHECK:       bb0(%0 : @owned $AnyObject, %1 : @owned $MutableSpan<Int>):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'owned_arg_lifetime_dependence'
+sil [ossa] @owned_arg_lifetime_dependence : $@convention(thin) (@owned AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int> {
+bb0(%0 : @owned $AnyObject, %1 : @owned $MutableSpan<Int>):
+  destroy_value %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_arg_lifetime_dependence :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[F:%.*]] = function_ref @owned_arg_lifetime_dependence :
+// CHECK:         apply [[F]]([[C]], %1)
+// CHECK:       } // end sil function 'call_owned_arg_lifetime_dependence'
+sil [ossa] @call_owned_arg_lifetime_dependence : $@convention(thin) (@guaranteed AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int> {
+bb0(%0 : @guaranteed $AnyObject, %1 : @owned $MutableSpan<Int>):
+  %2 = copy_value %0
+  %3 = function_ref @owned_arg_lifetime_dependence : $@convention(thin) (@owned AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int>
+  %4 = apply %3(%2, %1) : $@convention(thin) (@owned AnyObject, @owned MutableSpan<Int>) -> @lifetime(copy 1) @owned MutableSpan<Int>
+  return %4
+}
+
+//===----------------------------------------------------------------------===//
+//                    Owned -> guaranteed result conversion
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: sil shared [ossa] @$s17owned_result_loadTf4nnnn_g : $@convention(thin) (@inout S, @inout S, Int, Int) -> @guaranteed S {
+// CHECK:       bb1:
+// CHECK-NEXT:    [[LB:%.*]] = load_borrow %0
+// CHECK-NEXT:    br bb3([[LB]])
+// CHECK:       bb2:
+// The self-recursive calls now go directly to the specialized function.
+// CHECK:         apply {{.*}} : $@convention(thin) (@inout S, @inout S, Int, Int) -> @guaranteed S
+// CHECK-NOT:     destroy_value
+// CHECK:         [[A:%.*]] = apply {{.*}} : $@convention(thin) (@inout S, @inout S, Int, Int) -> @guaranteed S
+// CHECK-NEXT:    br bb3([[A]])
+// CHECK:       bb3([[P:%.*]] : @reborrow $S):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[P]] from ()
+// CHECK-NEXT:    return_borrow [[BF]] from_scopes ([[BF]])
+// CHECK:       } // end sil function '$s17owned_result_loadTf4nnnn_g'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @owned_result_load :
+// CHECK:         [[A:%.*]] = apply {{.*}} : $@convention(thin) (@inout S, @inout S, Int, Int) -> @guaranteed S
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK-NEXT:    return [[C]]
+// CHECK:       } // end sil function 'owned_result_load'
+
+// A `load [copy]` from an `@inout` argument, joined with the result of a self-recursive call.
+// This is the shape of the `Walsh` benchmark's `walshImpl`.
+sil [ossa] @owned_result_load : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S {
+bb0(%0 : $*S, %1 : $*S, %2 : $Int, %3 : $Int):
+  %4 = struct_extract %2, #Int._value
+  %5 = struct_extract %3, #Int._value
+  %6 = builtin "cmp_eq_Int64"(%4, %5) : $Builtin.Int1
+  cond_br %6, bb1, bb2
+
+bb1:
+  %8 = load [copy] %0
+  br bb3(%8)
+
+bb2:
+  %10 = function_ref @owned_result_load : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S
+  %11 = apply %10(%1, %0, %2, %3) : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S
+  destroy_value %11
+  %13 = apply %10(%1, %0, %2, %3) : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S
+  br bb3(%13)
+
+bb3(%15 : @owned $S):
+  return %15
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_result_load :
+// CHECK:         [[F:%.*]] = function_ref @$s17owned_result_loadTf4nnnn_g :
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1, %2, %3)
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'call_owned_result_load'
+sil [ossa] @call_owned_result_load : $@convention(thin) (@inout S, @inout S, Int, Int) -> () {
+bb0(%0 : $*S, %1 : $*S, %2 : $Int, %3 : $Int):
+  %4 = function_ref @owned_result_load : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(thin) (@inout S, @inout S, Int, Int) -> @owned S
+  fix_lifetime %5
+  destroy_value %5
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s27owned_result_guaranteed_argTf4n_g : $@convention(thin) (@guaranteed S) -> @guaranteed AnyObject {
+// CHECK:         [[E:%.*]] = struct_extract %0, #S.x
+// CHECK:         [[B:%.*]] = begin_borrow [[E]]
+// CHECK:         return_borrow [[B]] from_scopes ([[B]])
+// CHECK:       } // end sil function '$s27owned_result_guaranteed_argTf4n_g'
+
+// A `copy_value` of a value which the caller guarantees anyway.
+sil [ossa] @owned_result_guaranteed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject {
+bb0(%0 : @guaranteed $S):
+  %1 = struct_extract %0, #S.y
+  fix_lifetime %1
+  %2 = struct_extract %0, #S.x
+  %3 = copy_value %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_result_guaranteed_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s27owned_result_guaranteed_argTf4n_g :
+// CHECK:         [[A:%.*]] = apply [[F]](%0)
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK:       } // end sil function 'call_owned_result_guaranteed_arg'
+sil [ossa] @call_owned_result_guaranteed_arg : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %2 = function_ref @owned_result_guaranteed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s19forwarded_owned_argTf4gn_g : $@convention(thin) (@guaranteed Wrapper, Int) -> @guaranteed S2 {
+// CHECK:       bb0(%0 : @guaranteed $Wrapper, %1 : $Int):
+// CHECK:         [[E:%.*]] = destructure_struct %0
+// CHECK:         [[S:%.*]] = struct $S2 (%1, [[E]])
+// CHECK:         return_borrow [[S]] from_scopes ()
+// CHECK:       } // end sil function '$s19forwarded_owned_argTf4gn_g'
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @forwarded_owned_arg :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[A:%.*]] = apply {{%.*}}([[B]], %1)
+// CHECK:         [[C:%.*]] = copy_value [[A]]
+// CHECK:         end_borrow [[A]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         destroy_value %0
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'forwarded_owned_arg'
+
+// The result is forwarded from an owned argument.
+sil [ossa] @forwarded_owned_arg : $@convention(thin) (@owned Wrapper, Int) -> @owned S2 {
+bb0(%0 : @owned $Wrapper, %1 : $Int):
+  %2 = destructure_struct %0
+  %3 = struct $S2 (%1, %2)
+  return %3
+}
+
+// The copy of the guaranteed argument is removed.
+// CHECK-LABEL: sil [ossa] @call_forwarded_owned_arg :
+// CHECK-NOT:     copy_value
+// CHECK:         [[F:%.*]] = function_ref @$s19forwarded_owned_argTf4gn_g :
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1)
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'call_forwarded_owned_arg'
+sil [ossa] @call_forwarded_owned_arg : $@convention(thin) (@guaranteed Wrapper, Int) -> () {
+bb0(%0 : @guaranteed $Wrapper, %1 : $Int):
+  %2 = copy_value %0
+  %3 = function_ref @forwarded_owned_arg : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  %4 = apply %3(%2, %1) : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  fix_lifetime %4
+  destroy_value %4
+  %7 = tuple ()
+  return %7
+}
+
+// The argument is not a copy, so the conversion would not remove a copy.
+// CHECK-LABEL: sil [ossa] @dont_convert_forwarded_owned_arg_without_copy :
+// CHECK:         [[F:%.*]] = function_ref @forwarded_owned_arg :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'dont_convert_forwarded_owned_arg_without_copy'
+sil [ossa] @dont_convert_forwarded_owned_arg_without_copy : $@convention(thin) (@owned Wrapper, Int) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $Int):
+  %3 = function_ref @forwarded_owned_arg : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  %4 = apply %3(%0, %1) : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  fix_lifetime %4
+  destroy_value %4
+  %7 = tuple ()
+  return %7
+}
+
+// A copy of an owned value would need a borrow scope around the result's lifetime.
+// CHECK-LABEL: sil [ossa] @dont_convert_forwarded_owned_arg_with_owned_copy :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[F:%.*]] = function_ref @forwarded_owned_arg :
+// CHECK:         apply [[F]]([[C]], %1)
+// CHECK:       } // end sil function 'dont_convert_forwarded_owned_arg_with_owned_copy'
+sil [ossa] @dont_convert_forwarded_owned_arg_with_owned_copy : $@convention(thin) (@owned Wrapper, Int) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $Int):
+  %2 = copy_value %0
+  %3 = function_ref @forwarded_owned_arg : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  %4 = apply %3(%2, %1) : $@convention(thin) (@owned Wrapper, Int) -> @owned S2
+  fix_lifetime %4
+  destroy_value %4
+  destroy_value %0
+  %7 = tuple ()
+  return %7
+}
+
+// An apply with a `@guaranteed` result requires its direct `@guaranteed` arguments to be guaranteed
+// values, so an owned argument prevents the result conversion.
+// CHECK-LABEL: sil [ossa] @dont_convert_result_with_owned_arg :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_guaranteed_arg :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'dont_convert_result_with_owned_arg'
+sil [ossa] @dont_convert_result_with_owned_arg : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %2 = function_ref @owned_result_guaranteed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  destroy_value %3
+  destroy_value %0
+  %5 = tuple ()
+  return %5
+}
+
+// The same for a self-recursive call.
+// CHECK-LABEL: sil [ossa] @dont_convert_recursive_result_with_owned_arg :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_convert_recursive_result_with_owned_arg'
+sil [ossa] @dont_convert_recursive_result_with_owned_arg : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> @owned S {
+bb0(%0 : $*S, %1 : @guaranteed $AnyObject, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  %4 = load [copy] %0
+  br bb3(%4)
+
+bb2:
+  %6 = copy_value %1
+  %7 = function_ref @dont_convert_recursive_result_with_owned_arg : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> @owned S
+  %8 = apply %7(%0, %6, %2) : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> @owned S
+  destroy_value %6
+  br bb3(%8)
+
+bb3(%11 : @owned $S):
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_convert_recursive_result_with_owned_arg :
+// CHECK:         [[F:%.*]] = function_ref @dont_convert_recursive_result_with_owned_arg :
+// CHECK:       } // end sil function 'call_dont_convert_recursive_result_with_owned_arg'
+sil [ossa] @call_dont_convert_recursive_result_with_owned_arg : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> () {
+bb0(%0 : $*S, %1 : @guaranteed $AnyObject, %2 : $Builtin.Int1):
+  %3 = function_ref @dont_convert_recursive_result_with_owned_arg : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> @owned S
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@inout S, @guaranteed AnyObject, Builtin.Int1) -> @owned S
+  destroy_value %4
+  %6 = tuple ()
+  return %6
+}
+
+// The loaded memory is written to before the function returns, so the borrow scope of a
+// `load_borrow` could not be extended to the `return`.
+// CHECK-LABEL: sil [ossa] @dont_borrow_result_if_memory_written :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_result_if_memory_written'
+sil [ossa] @dont_borrow_result_if_memory_written : $@convention(thin) (@inout S, @owned S) -> @owned S {
+bb0(%0 : $*S, %1 : @owned $S):
+  %2 = load [copy] %0
+  store %1 to [assign] %0
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_result_if_memory_written :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_result_if_memory_written :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dont_borrow_result_if_memory_written'
+sil [ossa] @call_dont_borrow_result_if_memory_written : $@convention(thin) (@inout S, @owned S) -> () {
+bb0(%0 : $*S, %1 : @owned $S):
+  %2 = function_ref @dont_borrow_result_if_memory_written : $@convention(thin) (@inout S, @owned S) -> @owned S
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout S, @owned S) -> @owned S
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// A local allocation is gone when the function returns.
+// CHECK-LABEL: sil [ossa] @dont_borrow_result_from_local_memory :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_result_from_local_memory'
+sil [ossa] @dont_borrow_result_from_local_memory : $@convention(thin) (@owned S) -> @owned S {
+bb0(%0 : @owned $S):
+  %1 = alloc_stack $S
+  store %0 to [init] %1
+  %3 = load [copy] %1
+  destroy_addr %1
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_result_from_local_memory :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_result_from_local_memory :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_dont_borrow_result_from_local_memory'
+sil [ossa] @call_dont_borrow_result_from_local_memory : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %1 = function_ref @dont_borrow_result_from_local_memory : $@convention(thin) (@owned S) -> @owned S
+  %2 = apply %1(%0) : $@convention(thin) (@owned S) -> @owned S
+  destroy_value %2
+  %4 = tuple ()
+  return %4
+}
+
+// The caller consumes the result, so it would have to copy it anyway.
+// CHECK-LABEL: sil [ossa] @dont_borrow_result_if_caller_consumes :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_result_if_caller_consumes'
+sil [ossa] @dont_borrow_result_if_caller_consumes : $@convention(thin) (@inout S) -> @owned S {
+bb0(%0 : $*S):
+  %1 = load [copy] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_result_if_caller_consumes :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_result_if_caller_consumes :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_dont_borrow_result_if_caller_consumes'
+sil [ossa] @call_dont_borrow_result_if_caller_consumes : $@convention(thin) (@inout S) -> @owned S {
+bb0(%0 : $*S):
+  %1 = function_ref @dont_borrow_result_if_caller_consumes : $@convention(thin) (@inout S) -> @owned S
+  %2 = apply %1(%0) : $@convention(thin) (@inout S) -> @owned S
+  return %2
+}
+
+// The loaded value is also destroyed in a dead-end block. Converting the `load [copy]` to a
+// `load_borrow` would result in a `destroy_value` of a guaranteed value.
+// CHECK-LABEL: sil [ossa] @dont_borrow_result_destroyed_in_dead_end :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_result_destroyed_in_dead_end'
+sil [ossa] @dont_borrow_result_destroyed_in_dead_end : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  %2 = load [copy] %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  return %2
+
+bb2:
+  destroy_value [dead_end] %2
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_result_destroyed_in_dead_end :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_result_destroyed_in_dead_end :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dont_borrow_result_destroyed_in_dead_end'
+sil [ossa] @call_dont_borrow_result_destroyed_in_dead_end : $@convention(thin) (@inout S, Builtin.Int1) -> () {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  %2 = function_ref @dont_borrow_result_destroyed_in_dead_end : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// The copied value is also consumed in a dead-end block. Converting the `copy_value` to a
+// `begin_borrow` would result in passing a guaranteed value to an `@owned` argument.
+sil @take_owned_S : $@convention(thin) (@owned S) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_borrow_copied_result_consumed_in_dead_end :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_copied_result_consumed_in_dead_end'
+sil [ossa] @dont_borrow_copied_result_consumed_in_dead_end : $@convention(thin) (@guaranteed S, Builtin.Int1) -> @owned S {
+bb0(%0 : @guaranteed $S, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  return %2
+
+bb2:
+  %4 = function_ref @take_owned_S : $@convention(thin) (@owned S) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@owned S) -> ()
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_copied_result_consumed_in_dead_end :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_copied_result_consumed_in_dead_end :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dont_borrow_copied_result_consumed_in_dead_end'
+sil [ossa] @call_dont_borrow_copied_result_consumed_in_dead_end : $@convention(thin) (@guaranteed S, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $S, %1 : $Builtin.Int1):
+  %2 = function_ref @dont_borrow_copied_result_consumed_in_dead_end : $@convention(thin) (@guaranteed S, Builtin.Int1) -> @owned S
+  %3 = apply %2(%0, %1) : $@convention(thin) (@guaranteed S, Builtin.Int1) -> @owned S
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// The result of the re-directed recursive call is handed on to the caller with the
+// `return_borrow`, so the borrowed argument memory must not be modified before this function
+// returns.
+// CHECK-LABEL: sil [ossa] @dont_borrow_recursive_result_across_write :
+// CHECK-NOT:     _g
+// CHECK:       } // end sil function 'dont_borrow_recursive_result_across_write'
+sil [ossa] @dont_borrow_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = load [copy] %0
+  br bb3(%2)
+
+bb2:
+  %4 = function_ref @dont_borrow_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %5 = apply %4(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %6 = load [copy] %0
+  store %6 to [assign] %0
+  br bb3(%5)
+
+bb3(%8 : @owned $S):
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @call_dont_borrow_recursive_result_across_write :
+// CHECK:         [[F:%.*]] = function_ref @dont_borrow_recursive_result_across_write :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_dont_borrow_recursive_result_across_write'
+sil [ossa] @call_dont_borrow_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> () {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  %2 = function_ref @dont_borrow_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+sil @s_user : $@convention(thin) (@guaranteed S) -> ()
+
+// The result of the *returned* recursive call stays valid, but the result of the first recursive
+// call is used across a write to the borrowed argument memory
+// CHECK-LABEL: sil shared [ossa] @$s34copy_recursive_result_across_writeTf4nn_g : $@convention(thin) (@inout S, Builtin.Int1) -> @guaranteed S {
+// CHECK:       bb2:
+// CHECK:         [[A1:%.*]] = apply {{.*}} : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+// CHECK-NEXT:    [[C:%.*]] = load [copy] %0
+// CHECK:         store
+// CHECK:         apply {{.*}}([[A1]]) : $@convention(thin) (@guaranteed S) -> ()
+// CHECK:         destroy_value [[A1]]
+// CHECK:         [[A2:%.*]] = apply {{.*}} : $@convention(thin) (@inout S, Builtin.Int1) -> @guaranteed S
+// CHECK-NEXT:    br bb3([[A2]])
+// CHECK:       } // end sil function '$s34copy_recursive_result_across_writeTf4nn_g'
+sil [ossa] @copy_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %2 = load [copy] %0
+  br bb3(%2)
+
+bb2:
+  %4 = function_ref @copy_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %5 = apply %4(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %6 = load [copy] %0
+  store %6 to [assign] %0
+  %8 = function_ref @s_user : $@convention(thin) (@guaranteed S) -> ()
+  %9 = apply %8(%5) : $@convention(thin) (@guaranteed S) -> ()
+  destroy_value %5
+  %11 = apply %4(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  br bb3(%11)
+
+bb3(%13 : @owned $S):
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @call_copy_recursive_result_across_write :
+// CHECK:         [[F:%.*]] = function_ref @$s34copy_recursive_result_across_writeTf4nn_g :
+// CHECK:         apply [[F]](%0, %1)
+// CHECK:       } // end sil function 'call_copy_recursive_result_across_write'
+sil [ossa] @call_copy_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> () {
+bb0(%0 : $*S, %1 : $Builtin.Int1):
+  %2 = function_ref @copy_recursive_result_across_write : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  %3 = apply %2(%0, %1) : $@convention(thin) (@inout S, Builtin.Int1) -> @owned S
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// A `load [copy]` from a projection of an `@inout` argument.
+// CHECK-LABEL: sil shared [ossa] @$s24owned_result_inout_fieldTf4n_g : $@convention(thin) (@inout S) -> @guaranteed AnyObject {
+// CHECK:         [[A:%.*]] = struct_element_addr %0, #S.x
+// CHECK-NEXT:    [[LB:%.*]] = load_borrow [[A]]
+// CHECK-NEXT:    return_borrow [[LB]] from_scopes ([[LB]])
+// CHECK:       } // end sil function '$s24owned_result_inout_fieldTf4n_g'
+sil [ossa] @owned_result_inout_field : $@convention(thin) (@inout S) -> @owned AnyObject {
+bb0(%0 : $*S):
+  %1 = struct_element_addr %0, #S.x
+  %2 = load [copy] %1
+  return %2
+}
+
+// The caller writes to the borrowed memory during the lifetime of the result.
+// CHECK-LABEL: sil [ossa] @call_owned_result_inout_field_with_write :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_inout_field :
+// CHECK:         [[A:%.*]] = apply [[F]](%0)
+// CHECK:         destroy_value [[A]]
+// CHECK:       } // end sil function 'call_owned_result_inout_field_with_write'
+sil [ossa] @call_owned_result_inout_field_with_write : $@convention(thin) (@inout S, @owned S) -> () {
+bb0(%0 : $*S, %1 : @owned $S):
+  %2 = function_ref @owned_result_inout_field : $@convention(thin) (@inout S) -> @owned AnyObject
+  %3 = apply %2(%0) : $@convention(thin) (@inout S) -> @owned AnyObject
+  store %1 to [assign] %0
+  fix_lifetime %3
+  destroy_value %3
+  %r = tuple ()
+  return %r
+}
+
+// The caller writes to the borrowed memory only after the lifetime of the result.
+// CHECK-LABEL: sil [ossa] @call_owned_result_inout_field_write_after_lifetime :
+// CHECK:         [[F:%.*]] = function_ref @$s24owned_result_inout_fieldTf4n_g :
+// CHECK:         [[A:%.*]] = apply [[F]](%0)
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK-NEXT:    store %1 to [assign] %0
+// CHECK:       } // end sil function 'call_owned_result_inout_field_write_after_lifetime'
+sil [ossa] @call_owned_result_inout_field_write_after_lifetime : $@convention(thin) (@inout S, @owned S) -> () {
+bb0(%0 : $*S, %1 : @owned $S):
+  %2 = function_ref @owned_result_inout_field : $@convention(thin) (@inout S) -> @owned AnyObject
+  %3 = apply %2(%0) : $@convention(thin) (@inout S) -> @owned AnyObject
+  fix_lifetime %3
+  destroy_value %3
+  store %1 to [assign] %0
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @owned_result_from_borrowed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject {
+bb0(%0 : @guaranteed $S):
+  %1 = struct_extract %0, #S.x
+  %2 = copy_value %1
+  return %2
+}
+
+// The borrow scope of the argument ends during the lifetime of the result.
+// CHECK-LABEL: sil [ossa] @call_owned_result_borrow_scope_ends_early :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_from_borrowed_arg :
+// CHECK:         [[A:%.*]] = apply [[F]](
+// CHECK:         destroy_value [[A]]
+// CHECK:       } // end sil function 'call_owned_result_borrow_scope_ends_early'
+sil [ossa] @call_owned_result_borrow_scope_ends_early : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %1 = begin_borrow %0
+  %2 = function_ref @owned_result_from_borrowed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  end_borrow %1
+  fix_lifetime %3
+  destroy_value %3
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// The borrow scope of the argument covers the lifetime of the result.
+// CHECK-LABEL: sil [ossa] @call_owned_result_in_borrow_scope :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[F:%.*]] = function_ref @$s30owned_result_from_borrowed_argTf4n_g :
+// CHECK:         [[A:%.*]] = apply [[F]]([[B]])
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'call_owned_result_in_borrow_scope'
+sil [ossa] @call_owned_result_in_borrow_scope : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %1 = begin_borrow %0
+  %2 = function_ref @owned_result_from_borrowed_arg : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed S) -> @owned AnyObject
+  fix_lifetime %3
+  destroy_value %3
+  end_borrow %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// The result is a phi of copies of different guaranteed arguments.
+// CHECK-LABEL: sil shared [ossa] @$s23owned_result_copied_phiTf4nnn_g : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Builtin.Int1) -> @guaranteed AnyObject {
+// CHECK:       bb1:
+// CHECK-NEXT:    [[B0:%.*]] = begin_borrow %0
+// CHECK-NEXT:    br bb3([[B0]])
+// CHECK:       bb2:
+// CHECK-NEXT:    [[B1:%.*]] = begin_borrow %1
+// CHECK-NEXT:    br bb3([[B1]])
+// CHECK:       bb3([[P:%.*]] : @reborrow $AnyObject):
+// CHECK-NEXT:    [[BF:%.*]] = borrowed [[P]] from
+// CHECK-NEXT:    return_borrow [[BF]] from_scopes ([[BF]])
+// CHECK:       } // end sil function '$s23owned_result_copied_phiTf4nnn_g'
+sil [ossa] @owned_result_copied_phi : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Builtin.Int1) -> @owned AnyObject {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  %4 = copy_value %0
+  br bb3(%4)
+
+bb2:
+  %6 = copy_value %1
+  br bb3(%6)
+
+bb3(%8 : @owned $AnyObject):
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_result_copied_phi :
+// CHECK:         [[F:%.*]] = function_ref @$s23owned_result_copied_phiTf4nnn_g :
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1, %2)
+// CHECK-NEXT:    fix_lifetime [[A]]
+// CHECK-NEXT:    end_borrow [[A]]
+// CHECK:       } // end sil function 'call_owned_result_copied_phi'
+sil [ossa] @call_owned_result_copied_phi : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject, %2 : $Builtin.Int1):
+  %3 = function_ref @owned_result_copied_phi : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Builtin.Int1) -> @owned AnyObject
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject, Builtin.Int1) -> @owned AnyObject
+  fix_lifetime %4
+  destroy_value %4
+  %r = tuple ()
+  return %r
+}
+
+// A `load_borrow` must not be used after the end of its enclosing access scope.
+// CHECK-LABEL: sil [ossa] @call_owned_result_load_in_access_scope :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_load_in_access_scope :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_owned_result_load_in_access_scope'
+sil [ossa] @owned_result_load_in_access_scope : $@convention(thin) (@inout S) -> @owned S {
+bb0(%0 : $*S):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  return %2
+}
+
+sil [ossa] @call_owned_result_load_in_access_scope : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  %1 = function_ref @owned_result_load_in_access_scope : $@convention(thin) (@inout S) -> @owned S
+  %2 = apply %1(%0) : $@convention(thin) (@inout S) -> @owned S
+  fix_lifetime %2
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// The copied value is borrowed from a local borrow scope and not from a function argument.
+// CHECK-LABEL: sil [ossa] @call_owned_result_copy_of_owned_value :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_copy_of_owned_value :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_owned_result_copy_of_owned_value'
+sil [ossa] @owned_result_copy_of_owned_value : $@convention(thin) (@owned S) -> @owned AnyObject {
+bb0(%0 : @owned $S):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S.x
+  %3 = copy_value %2
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+sil [ossa] @call_owned_result_copy_of_owned_value : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %1 = function_ref @owned_result_copy_of_owned_value : $@convention(thin) (@owned S) -> @owned AnyObject
+  %2 = apply %1(%0) : $@convention(thin) (@owned S) -> @owned AnyObject
+  fix_lifetime %2
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @forwarded_owned_arg_not_specialized :
+// CHECK:         destructure_struct %0
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'forwarded_owned_arg_not_specialized'
+sil [ossa] @forwarded_owned_arg_not_specialized : $@convention(thin) (@owned Wrapper) -> @owned AnyObject {
+bb0(%0 : @owned $Wrapper):
+  %1 = destructure_struct %0
+  return %1
+}
+
+// The copy has another use, so it cannot be removed.
+// CHECK-LABEL: sil [ossa] @call_forwarded_owned_arg_copy_used_twice :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[F:%.*]] = function_ref @forwarded_owned_arg_not_specialized :
+// CHECK:         apply [[F]]([[C]])
+// CHECK:       } // end sil function 'call_forwarded_owned_arg_copy_used_twice'
+sil [ossa] @call_forwarded_owned_arg_copy_used_twice : $@convention(thin) (@guaranteed Wrapper) -> () {
+bb0(%0 : @guaranteed $Wrapper):
+  %1 = copy_value %0
+  fix_lifetime %1
+  %3 = function_ref @forwarded_owned_arg_not_specialized : $@convention(thin) (@owned Wrapper) -> @owned AnyObject
+  %4 = apply %3(%1) : $@convention(thin) (@owned Wrapper) -> @owned AnyObject
+  fix_lifetime %4
+  destroy_value %4
+  %r = tuple ()
+  return %r
+}
+
+// The caller needs to own the result.
+// CHECK-LABEL: sil [ossa] @call_forwarded_owned_arg_result_consumed :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         [[F:%.*]] = function_ref @forwarded_owned_arg_not_specialized :
+// CHECK:         apply [[F]]([[C]])
+// CHECK:       } // end sil function 'call_forwarded_owned_arg_result_consumed'
+sil [ossa] @call_forwarded_owned_arg_result_consumed : $@convention(thin) (@guaranteed Wrapper) -> @owned AnyObject {
+bb0(%0 : @guaranteed $Wrapper):
+  %1 = copy_value %0
+  %2 = function_ref @forwarded_owned_arg_not_specialized : $@convention(thin) (@owned Wrapper) -> @owned AnyObject
+  %3 = apply %2(%1) : $@convention(thin) (@owned Wrapper) -> @owned AnyObject
+  return %3
+}
+
+// The forwarding instruction has two non-trivial operands.
+// CHECK-LABEL: sil [ossa] @call_forwarded_two_owned_args :
+// CHECK:         [[F:%.*]] = function_ref @forwarded_two_owned_args :
+// CHECK:         apply [[F]](
+// CHECK:       } // end sil function 'call_forwarded_two_owned_args'
+sil [ossa] @forwarded_two_owned_args : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned S {
+bb0(%0 : @owned $AnyObject, %1 : @owned $AnyObject):
+  %2 = struct $S (%0, %1)
+  return %2
+}
+
+sil [ossa] @call_forwarded_two_owned_args : $@convention(thin) (@guaranteed AnyObject, @guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $AnyObject, %1 : @guaranteed $AnyObject):
+  %2 = copy_value %0
+  %3 = copy_value %1
+  %4 = function_ref @forwarded_two_owned_args : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned S
+  %5 = apply %4(%2, %3) : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> @owned S
+  fix_lifetime %5
+  destroy_value %5
+  %r = tuple ()
+  return %r
+}
+
+// The forwarded argument is also destroyed in a dead-end block, which would end up destroying a
+// guaranteed value.
+// CHECK-LABEL: sil [ossa] @call_forwarded_arg_also_destroyed_in_dead_end :
+// CHECK:         [[F:%.*]] = function_ref @forwarded_arg_also_destroyed_in_dead_end :
+// CHECK:         apply [[F]](
+// CHECK:       } // end sil function 'call_forwarded_arg_also_destroyed_in_dead_end'
+sil [ossa] @forwarded_arg_also_destroyed_in_dead_end : $@convention(thin) (@owned Wrapper, Builtin.Int1) -> @owned AnyObject {
+bb0(%0 : @owned $Wrapper, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = destructure_struct %0
+  return %3
+
+bb2:
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+sil [ossa] @call_forwarded_arg_also_destroyed_in_dead_end : $@convention(thin) (@guaranteed Wrapper, Builtin.Int1) -> () {
+bb0(%0 : @guaranteed $Wrapper, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  %3 = function_ref @forwarded_arg_also_destroyed_in_dead_end : $@convention(thin) (@owned Wrapper, Builtin.Int1) -> @owned AnyObject
+  %4 = apply %3(%2, %1) : $@convention(thin) (@owned Wrapper, Builtin.Int1) -> @owned AnyObject
+  fix_lifetime %4
+  destroy_value %4
+  %r = tuple ()
+  return %r
+}
+
+// The result is not converted to `@guaranteed` if the function has a lifetime dependence.
+// CHECK-LABEL: sil [ossa] @owned_result_lifetime_dependence :
+// CHECK:         load [copy] %0
+// CHECK:       } // end sil function 'owned_result_lifetime_dependence'
+sil [ossa] @owned_result_lifetime_dependence : $@convention(thin) (@inout S, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> @owned S {
+bb0(%0 : $*S, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  store %2 to [assign] %1
+  %4 = load [copy] %0
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @call_owned_result_lifetime_dependence :
+// CHECK:         [[F:%.*]] = function_ref @owned_result_lifetime_dependence :
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1, %2)
+// CHECK:         destroy_value [[A]]
+// CHECK:       } // end sil function 'call_owned_result_lifetime_dependence'
+sil [ossa] @call_owned_result_lifetime_dependence : $@convention(thin) (@inout S, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> () {
+bb0(%0 : $*S, %1 : $*MutableSpan<Int>, %2 : @owned $MutableSpan<Int>):
+  %3 = function_ref @owned_result_lifetime_dependence : $@convention(thin) (@inout S, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> @owned S
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@inout S, @lifetime(copy 2) @inout MutableSpan<Int>, @owned MutableSpan<Int>) -> @owned S
+  fix_lifetime %4
+  destroy_value %4
+  %r = tuple ()
+  return %r
+}
+
+// The implicit isolation parameter of a `nonisolated(nonsending)` function must not be removed.
+// CHECK-LABEL: sil shared [ossa] @$s15nonsending_funcTf4nd_n : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK:       } // end sil function '$s15nonsending_funcTf4nd_n'
+sil [ossa] @nonsending_func : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $AnyObject):
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @call_nonsending_func :
+// CHECK:         [[F:%.*]] = function_ref @$s15nonsending_funcTf4nd_n :
+// CHECK:         apply [[F]](%0)
+// CHECK:       } // end sil function 'call_nonsending_func'
+sil [ossa] @call_nonsending_func : $@convention(thin) @async (@guaranteed Builtin.ImplicitActor, @guaranteed AnyObject) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $AnyObject):
+  %2 = function_ref @nonsending_func : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed AnyObject) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed AnyObject) -> ()
+  return %3
+}
