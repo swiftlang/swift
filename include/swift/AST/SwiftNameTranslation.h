@@ -144,6 +144,33 @@ bool isVisibleToCxx(const ValueDecl *VD, AccessLevel minRequiredAccess,
 /// Determine whether the given generic signature can be exposed to C++.
 bool isExposableToCxx(GenericSignature genericSig);
 
+/// How a declaration is annotated for C++ with '@_expose', taking the types
+/// that enclose it into account.
+enum class CxxExposure {
+  /// Neither the declaration nor an enclosing type has a C++ '@_expose'.
+  Unannotated,
+  /// The declaration or an enclosing type is '@_expose(Cxx)', and none of
+  /// them is '@_expose(!Cxx)'.
+  Exposed,
+  /// The declaration or an enclosing type is '@_expose(!Cxx)'.
+  NotExposed,
+};
+
+/// Returns the C++ exposure of \p VD. '@_expose(!Cxx)' on \p VD or on any
+/// enclosing type wins over '@_expose(Cxx)', as a member of a type that is
+/// not printed cannot be printed either.
+CxxExposure getCxxExposure(const ValueDecl *VD);
+
+/// Returns true if the generated C++ header may print \p VD, a declaration
+/// of the module the header is generated for, or the accessor of a printed
+/// storage declaration.
+///
+/// This may give false positives, as layout-dependent checks are skipped and
+/// some declarations are only skipped later by the printer, but it does not
+/// give false negatives.
+bool mayBePrintedInCxxHeader(const ValueDecl *VD, AccessLevel minRequiredAccess,
+                             bool requiresExposeAttr);
+
 } // end namespace cxx_translation
 
 } // end namespace swift

@@ -712,10 +712,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
 
   // C++ content
   emitCxxConditional(os, [&] {
-    // FIXME: Expose Swift with @expose by default.
-    bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
-                     M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
-    if (!enableCxx)
+    if (!frontendOpts.clangHeaderHasCxxContent(
+            M->DeclContext::getASTContext().LangOpts.EnableCXXInterop))
       return;
 
     llvm::StringSet<> exposedModules;
@@ -728,14 +726,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
 
     // Explicit @expose attribute is required only when the user specifies
     // -clang-header-expose-decls flag.
-    // FIXME: should we detect any presence of @expose and require it then?
-    bool requiresExplicitExpose =
-        frontendOpts.ClangHeaderExposedDecls.has_value() &&
-        (*frontendOpts.ClangHeaderExposedDecls ==
-             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
-         *frontendOpts.ClangHeaderExposedDecls ==
-             FrontendOptions::ClangHeaderExposeBehavior::
-                 HasExposeAttrOrImplicitDeps);
+    bool requiresExplicitExpose = frontendOpts.clangHeaderRequiresExposeAttr();
     // Swift stdlib dependencies are emitted into the same header when
     // -clang-header-expose-decls flag is not specified, or when it allows
     // implicit dependency emission.

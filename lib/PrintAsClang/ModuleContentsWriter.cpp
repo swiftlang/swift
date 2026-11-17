@@ -1125,7 +1125,8 @@ public:
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
                       vd->getASTContext().getErrorDecl() == vd) ||
-                     swift::hasExposeNotCxxAttr(vd);
+                     cxx_translation::getCxxExposure(vd) ==
+                         cxx_translation::CxxExposure::NotExposed;
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.

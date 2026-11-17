@@ -425,6 +425,14 @@ struct SILDeclRef {
   /// foreign language or environment,
   static bool declExposedToForeignLanguage(const ValueDecl *decl);
 
+  /// True if the generated C++ header for \p M may print the declaration, so
+  /// that the header can reference it.
+  static bool declMayBePrintedInCxxHeader(const ValueDecl *decl,
+                                          const SILModule &M);
+
+  /// True if the generated C++ header for \p M may call this entry point.
+  bool mayBeCalledFromCxxHeader(const SILModule &M) const;
+
   /// True if the declaration should have a non-unique definition based on the
   /// embedded linkage model.
   static bool declHasNonUniqueDefinition(const ValueDecl *decl);
