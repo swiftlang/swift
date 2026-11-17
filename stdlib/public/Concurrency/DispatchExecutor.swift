@@ -70,8 +70,8 @@ extension DispatchMainExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> Bool {
-    return _dispatchCancel(token.opaqueData[0])
+    -> JobCancellationResult {
+    return _dispatchCancelResult(token.opaqueData[0])
   }
 
   public func supportsScheduling(on clock: SystemClockID) -> Bool {
@@ -105,8 +105,8 @@ extension DispatchGlobalTaskExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> Bool {
-    return _dispatchCancel(token.opaqueData[0])
+    -> JobCancellationResult {
+    return _dispatchCancelResult(token.opaqueData[0])
   }
 
   public func supportsScheduling(on clock: SystemClockID) -> Bool {
@@ -116,6 +116,17 @@ extension DispatchGlobalTaskExecutor: SchedulingExecutor {
   public func release(token: borrowing JobCancellationToken) {
     _dispatchReleaseSource(token.opaqueData[0])
   }
+}
+
+/// Take a job back from its timer, if it has not started, and give it to the
+/// caller.
+@available(StdlibDeploymentTarget 6.5, *)
+fileprivate func _dispatchCancelResult(_ source: Int) -> JobCancellationResult {
+  let job = _dispatchCancel(source)
+  if job == 0 {
+    return .cancelled
+  }
+  return .removed(ExecutorJob(unsafe unsafeBitCast(job, to: UnownedJob.self)))
 }
 
 // .. Clock Support ............................................................

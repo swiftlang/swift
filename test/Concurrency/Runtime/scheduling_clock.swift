@@ -78,14 +78,16 @@ final class ManualClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
     let id = UInt64(token.opaqueData[0])
-    // Run the job now, where it would have run when the clock got there.
+    // Run the job now, where it would have run when the clock got there.  (We
+    // can't give it back: it is a trampoline, and not the job that was asked
+    // for.)
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
       (entry.destination ?? target).enqueue(ExecutorJob(entry.job))
-      return true
     }
-    return false
+    return .cancelled
   }
 
   /// Move the clock forward, running everything that has become due.
@@ -182,14 +184,16 @@ final class HoldingClock: SchedulingClock, JobCanceller, @unchecked Sendable {
     return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
     let id = UInt64(token.opaqueData[0])
-    // Run the job now, where it would have run when the clock got there.
+    // Run the job now, where it would have run when the clock got there.  (We
+    // can't give it back: it is a trampoline, and not the job that was asked
+    // for.)
     if let entry = queue.sync(execute: { pending.removeValue(forKey: id) }) {
       (entry.destination ?? target).enqueue(ExecutorJob(entry.job))
-      return true
     }
-    return false
+    return .cancelled
   }
 
   /// Move the clock forward, running everything that has become due.
@@ -286,8 +290,33 @@ final class RefusingExecutor: TaskExecutor, SchedulingExecutor,
     fatalError("a standard clock should never be scheduled on this executor")
   }
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
-    return false
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
+    return .cancelled
+  }
+}
+
+/// Check that cancelling didn't give a job back.
+@available(SwiftStdlib 6.5, *)
+func expectCancelled(_ result: consuming JobCancellationResult) {
+  switch consume result {
+  case .removed:
+    expectUnreachable("the job should not have been given back")
+  case .cancelled:
+    break
+  }
+}
+
+/// If cancelling gave a job back, enqueue it on `executor`, which is what the
+/// timer would have done when it fired.
+@available(SwiftStdlib 6.5, *)
+func enqueueIfGivenBack(_ result: consuming JobCancellationResult,
+                        on executor: some Executor) {
+  switch consume result {
+  case .removed(let job):
+    executor.enqueue(job)
+  case .cancelled:
+    break
   }
 }
 
@@ -439,11 +468,11 @@ func waitUntil(_ condition: () -> Bool) async throws {
 
       try! await waitUntil { clock.pendingCount == 1 }
       let token = proxy.takeToken()!
-      expectTrue(token.cancel())
+      expectCancelled(token.cancel())
       expectEqual(0, clock.pendingCount)
 
       // Cancelling doesn't consume the token, and a second cancel does nothing.
-      expectFalse(token.cancel())
+      expectCancelled(token.cancel())
 
       // The clock runs the trampoline that it was holding early, which runs
       // the original job, once.
@@ -466,7 +495,9 @@ func waitUntil(_ condition: () -> Bool) async throws {
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(0, runs.value)
 
-      expectTrue(proxy.takeToken()!.cancel())
+      // The default executor gives the job back, and we enqueue it, where the
+      // timer would have, which runs it.
+      enqueueIfGivenBack(proxy.takeToken()!.cancel(), on: proxy)
       expectEqual(9, await task.value)
       expectEqual(1, runs.value)
     }
@@ -836,7 +867,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
       expectEqual(0, runs.value)
 
       // Cancelling runs the trampoline now, which runs the original job.
-      expectTrue(proxy.takeToken()!.cancel())
+      expectCancelled(proxy.takeToken()!.cancel())
       expectEqual(11, await task.value)
       try! await Task.sleep(for: .milliseconds(50))
       expectEqual(1, runs.value)

@@ -436,7 +436,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// cancel the job (see ``JobCanceller/cancel(jobWithToken:)``).  If it
   /// returns `false`, the job has been cancelled and the scheduler has been (or
   /// is about to be) asked to cancel it, so the scheduler must leave the job
-  /// alone and let `cancel(jobWithToken:)` run it.
+  /// alone and let `cancel(jobWithToken:)` give it back or run it.
   ///
   /// This is what lets a scheduler whose timer and cancellation are serialised
   /// (an event loop, say, which handles a cancellation from another thread by

@@ -153,11 +153,51 @@ extension SchedulingClock {
   }
 }
 
+/// The canceller for a job that has been scheduled by way of a trampoline: a job
+/// that the clock has, and which enqueues the job that was asked for.
+///
+/// Cancelling the trampoline early is just what cancelling the job should do,
+/// but the clock may give the trampoline back, and the caller is not expecting
+/// to be given a job that it has never seen, since it wants the one that it
+/// asked for.  So we cancel the clock's token ourselves, and if we are given the
+/// trampoline, enqueue it, which is what the clock would have done when it
+/// ran it.  (We don't run it, as we may be in a task's cancellation handler.)
+@available(StdlibDeploymentTarget 6.5, *)
+@safe
+private final class _TrampolineCanceller: JobCanceller, @unchecked Sendable {
+  /// The clock's token for the trampoline.  It is only here so that a token can
+  /// be borrowed from a class, which it can't be as a stored property, so it is
+  /// kept by pointer: put there by `init`, and removed by `release(token:)`.
+  private let clockToken: UnsafeMutablePointer<JobCancellationToken>
+
+  init(_ token: consuming JobCancellationToken) {
+    unsafe clockToken = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe clockToken.initialize(to: token)
+  }
+
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
+    switch unsafe clockToken.pointee.cancel() {
+    case .removed(let trampoline):
+      Task<Never, Never>.defaultExecutor.enqueue(trampoline)
+    case .cancelled:
+      break
+    }
+    return .cancelled
+  }
+
+  func release(token: borrowing JobCancellationToken) {
+    unsafe clockToken.deinitialize(count: 1)
+    unsafe clockToken.deallocate()
+  }
+}
+
 /// Run `job` on `executor` at some point after the fire time, by scheduling a
 /// trampoline job on `clock`, which enqueues `job` on `executor` when it runs.
 ///
 /// Cancelling the trampoline runs it early, which is just what cancelling `job`
-/// should do, so the clock's token for it serves as the token for `job`.
+/// should do, so the clock's token for it serves as the token for `job`, by way
+/// of `_TrampolineCanceller`.
 @available(StdlibDeploymentTarget 6.5, *)
 internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
   _ job: consuming ExecutorJob,
@@ -184,7 +224,10 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
   let trampoline = ExecutorJob(
     context: Builtin.convertTaskToJob(trampolineTask))
 
-  return clock.schedule(trampoline, at: fireTime, tolerance: tolerance)
+  let clockToken = clock.schedule(trampoline, at: fireTime,
+                                  tolerance: tolerance)
+  return unsafe JobCancellationToken(
+    canceller: _TrampolineCanceller(clockToken), opaqueData: [0, 0])
 }
 
 /// A canceller for work that was handed to the runtime's global enqueue
@@ -200,8 +243,9 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
 private final class _NonCancellingCanceller: JobCanceller, @unchecked Sendable {
   static let shared = _NonCancellingCanceller()
 
-  func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
-    return false
+  func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
+    return .cancelled
   }
 }
 

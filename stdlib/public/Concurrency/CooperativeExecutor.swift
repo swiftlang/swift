@@ -589,14 +589,14 @@ extension CooperativeExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> Bool {
+    -> JobCancellationResult {
     let job: ExecutorJob?
     if let scheduled = Self.jobAddressed(by: token) {
       // A job with storage of its own, which the runtime only cancels while it
       // is still there, so we can look at it.  (It asks at most once, too.)
       guard let storage = scheduled.withUnsafeScheduledPrivateData(
               body: { unsafe $0?.baseAddress }) else {
-        return false
+        return .cancelled
       }
       switch unsafe WaitQueue.clockToken(in: storage) {
       case Self.continuousClockToken:
@@ -620,13 +620,14 @@ extension CooperativeExecutor: SchedulingExecutor {
         job = nil
       }
     }
-    // Run the job now, rather than when its timer fires.
+    // We are on the only thread that touches the timers, so we can always give
+    // the job back, and let whoever is cancelling it run it now, rather than
+    // when its timer fires.
     switch consume job {
     case .some(let job):
-      runOrEnqueue(job)
-      return true
+      return .removed(job)
     case .none:
-      return false
+      return .cancelled
     }
   }
 

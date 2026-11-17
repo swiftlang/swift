@@ -68,17 +68,13 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
   }
 
   // We can't remove jobs from `asyncAfter`, but we can make its closure do
-  // nothing, and run the job now instead.
-  public func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+  // nothing, and give the job back.
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> JobCancellationResult {
     guard let job = pending.take(UInt64(token.opaqueData[0])) else {
-      return false
+      return .cancelled
     }
-    if job.isResumption {
-      job.runSynchronously(on: self.asUnownedTaskExecutor())
-    } else {
-      enqueue(ExecutorJob(job))
-    }
-    return true
+    return .removed(ExecutorJob(job))
   }
 }
 

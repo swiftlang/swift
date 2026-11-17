@@ -100,20 +100,21 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> Bool {
+    -> JobCancellationResult {
     let id = UInt64(token.opaqueData[0])
     // Run the job now, if the timer hasn't taken it: here, if all it does is
-    // resume a task, and otherwise by enqueuing it.
+    // resume a task, and otherwise by enqueuing it.  (This executor doesn't give
+    // jobs back, which is allowed.)
     guard let job = queue.sync(execute: { pending.removeValue(forKey: id) })
     else {
-      return false
+      return .cancelled
     }
     if job.isResumption {
       job.runSynchronously(on: asUnownedTaskExecutor())
     } else {
       enqueue(ExecutorJob(job))
     }
-    return true
+    return .cancelled
   }
 }
 
@@ -294,7 +295,7 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
   }
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
-    -> Bool {
+    -> JobCancellationResult {
     generationQueue.sync { _cancelCalls += 1 }
     let address = UInt(bitPattern: token.opaqueData[0])
     let generation = UInt64(token.opaqueData[1])
@@ -315,7 +316,7 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
         self.enqueue(ExecutorJob(job))
       }
     }
-    return true
+    return .cancelled
   }
 }
 

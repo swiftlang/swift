@@ -426,40 +426,25 @@ uintptr_t swift_dispatchEnqueueWithDeadline(bool global,
 }
 
 /// Cancel a job scheduled by swift_dispatchEnqueueWithDeadline(), which
-/// means running or enqueuing it now, rather than when its timer fires.
+/// means taking it off its timer and giving it back.
 ///
-/// Returns true if the job had not already been run (or cancelled), and so
-/// has been enqueued, or false.  This does not release the caller's
-/// reference; call swift_dispatchReleaseSource() for that.
+/// Returns the job if it had not already been run (or cancelled), and so is
+/// the caller's now, or null.  This does not release the caller's reference;
+/// call swift_dispatchReleaseSource() for that.
 extern "C" SWIFT_CC(swift)
-bool swift_dispatchCancel(uintptr_t token) {
+uintptr_t swift_dispatchCancel(uintptr_t token) {
   if (!token)
-    return false;  // The job was enqueued directly
+    return 0;  // The job was enqueued directly
   auto *jobSource = reinterpret_cast<struct swift_job_source *>(token);
   SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
 
   if (!job)
-    return false;
+    return 0;
 
   dispatch_source_cancel(jobSource->source);
   dispatch_release(jobSource->source);
 
-  // A job that only resumes a task can run here and now, which also means
-  // that the task is enqueued at its own priority, rather than the job waiting
-  // in a queue chosen by the job's priority, which may be out of date.
-  if (swift_job_isResumption(job)) {
-    __swift_run_job(job);
-    return true;
-  }
-
-  // Otherwise enqueue the job where the timer would have run it.  (We must not
-  // run it here: we may be in a task's cancellation handler.)
-  if (job->schedulerPrivate[SwiftJobDispatchQueueIndex]
-        == DISPATCH_QUEUE_GLOBAL_EXECUTOR)
-    swift_dispatchEnqueueGlobal(job);
-  else
-    swift_dispatchEnqueueMain(job);
-  return true;
+  return reinterpret_cast<uintptr_t>(job);
 }
 
 /// Release the reference to a scheduled job's state that was returned from

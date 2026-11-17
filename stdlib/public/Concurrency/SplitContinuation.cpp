@@ -25,6 +25,7 @@
 #include "llvm/Support/MathExtras.h"
 #include <atomic>
 #include <cstddef>
+#include <cstring>
 
 using namespace swift;
 
@@ -99,20 +100,6 @@ struct SplitContinuationStorage : public Job {
   /// `swift_continuation_cancelScheduled` claimed it with, at +1.
   std::atomic<SwiftError *> Outcome;
 
-  /// Storage for the executor that a continuation has been scheduled on, to
-  /// use for its own bookkeeping (a link, a heap index, a deadline, and so on)
-  /// instead of allocating, from when it is scheduled until it is run or
-  /// claimed.  This is in addition to the job's `SchedulerPrivate` words,
-  /// which the header leaves too little of, and which can't be extended
-  /// without moving the fields after them.  It is on the end of the storage
-  /// because nothing outside this file knows about anything after `Outcome`.
-  ///
-  /// The size is part of the API (see `ExecutorJob.withUnsafeScheduledPrivateData`
-  /// and `swift_job_getScheduledPrivateData`), which gets it from here, so the
-  /// code has only this to change; the documentation of that method, and the
-  /// proposal, say how big it is, and will need to change with it.
-  void *ExecutorPrivate[8];
-
   /// The value of `Outcome` once the job has run without being cancelled.
   static SwiftError *fired() { return reinterpret_cast<SwiftError *>(1); }
 
@@ -120,7 +107,7 @@ struct SplitContinuationStorage : public Job {
       : Job({JobKind::SplitContinuation, priority}, &process,
             jobHeapMetadataPtr, /*captureCurrentVoucher=*/false),
         ResumeContext(nullptr), AwaitingTask(nullptr),
-        ResultIsEmpty(resultIsEmpty), Outcome(nullptr), ExecutorPrivate() {}
+        ResultIsEmpty(resultIsEmpty), Outcome(nullptr) {}
 
   /// Running the job resumes the continuation: normally, unless it was
   /// cancelled first, in which case by throwing the error it was cancelled
@@ -158,6 +145,23 @@ static_assert(offsetof(SplitContinuationStorage, ResumeContext) ==
 static size_t splitContextOffset() {
   return llvm::alignTo(sizeof(SplitContinuationStorage),
                        alignof(ContinuationAsyncContext));
+}
+
+/// How much storage there is for the scheduler of a continuation that can be
+/// scheduled, which is to say one with no result (see `ResultIsEmpty`).  Eight
+/// words.  A continuation that has a result has none, since it can't be
+/// scheduled and the space would be wasted on it.
+///
+/// The size is part of the API (see `ExecutorJob.withUnsafeScheduledPrivateData`
+/// and `swift_job_getScheduledPrivateData`, which gets it from here), so the
+/// code has only this to change; the documentation of that method, and the
+/// proposal, say how big it is, and will need to change with it.
+static constexpr size_t ScheduledPrivateDataSize = 8 * sizeof(void *);
+
+/// Where the storage for the scheduler is: in the allocation, straight after
+/// the context, where the result would have been if there were one.
+static size_t splitScheduledPrivateDataOffset() {
+  return splitContextOffset() + sizeof(ContinuationAsyncContext);
 }
 
 /// Whether `continuation` is a split continuation rather than a task.  Either
@@ -260,7 +264,15 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   // result needs slack to align its storage within the allocation.
   size_t slack = resultAlign > MaximumAlignment ? resultAlign - 1 : 0;
 
-  void *allocation = swift_task_alloc(resultOffset + slack + resultSize);
+  // A continuation with no result can be scheduled as a job, and so gets storage
+  // for its scheduler, after the context, where the result would be.
+  size_t scheduledSize = resultSize == 0 ? ScheduledPrivateDataSize : 0;
+
+  void *allocation = swift_task_alloc(resultOffset + slack + resultSize
+                                      + scheduledSize);
+  if (scheduledSize)
+    memset(static_cast<char *>(allocation) + splitScheduledPrivateDataOffset(),
+           0, scheduledSize);
   auto *context = reinterpret_cast<ContinuationAsyncContext *>(
       static_cast<char *>(allocation) + contextOffset);
 
@@ -429,6 +441,14 @@ bool swift::swift_continuation_cancelScheduled(SplitContinuation *continuation,
   return false;
 }
 
+/// Run a continuation that an executor has given back as a job, which resumes
+/// it (throwing the error that `swift_continuation_cancelScheduled` recorded).
+extern "C" SWIFT_CC(swift)
+void swift_continuation_runCancelled(SplitContinuation *continuation) {
+  swift_job_run(reinterpret_cast<Job *>(continuation),
+                SerialExecutorRef::generic());
+}
+
 /// Called by a scheduler when the timer for a job has fired, before it runs or
 /// enqueues the job.  See `UnownedJob.claimForTimer()`.
 extern "C" SWIFT_CC(swift)
@@ -452,7 +472,8 @@ bool swift_job_claimForTimer(Job *job) {
 
 /// The storage that an executor can use for a continuation that it has been
 /// asked to schedule, and its size in bytes: `nullptr` (and a size of zero) if
-/// the job is not a split continuation, and so doesn't have any.
+/// the job is not a split continuation with no result, which are the ones that
+/// can be scheduled, and so doesn't have any.
 extern "C" SWIFT_CC(swift)
 void *swift_job_getScheduledPrivateData(Job *job, size_t *size) {
   if (!SplitContinuationStorage::classof(job)) {
@@ -460,6 +481,10 @@ void *swift_job_getScheduledPrivateData(Job *job, size_t *size) {
     return nullptr;
   }
   auto *storage = cast<SplitContinuationStorage>(job);
-  *size = sizeof(storage->ExecutorPrivate);
-  return storage->ExecutorPrivate;
+  if (!storage->ResultIsEmpty) {
+    *size = 0;
+    return nullptr;
+  }
+  *size = ScheduledPrivateDataSize;
+  return reinterpret_cast<char *>(storage) + splitScheduledPrivateDataOffset();
 }
