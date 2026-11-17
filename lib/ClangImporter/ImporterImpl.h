@@ -1019,6 +1019,20 @@ public:
     return it->second;
   }
 
+  /// Maps each type that exposes an unusable foreign type to that unusable
+  /// type and why.
+  ///
+  /// An unusable type maps to itself; other entries are added lazily.
+  /// FIXME: If a type exposes several unusable types, this only records one.
+  ///
+  /// Types known not to expose an unusable type are not in this map; they are
+  /// marked with \c NominalTypeDecl::setNoExposedUnusableForeignTypes instead.
+  llvm::DenseMap<const NominalTypeDecl *, UnusableForeignType>
+      UnusableForeignTypes;
+
+  /// Returns the unusable foreign type exposed by values of \p type, if any.
+  UnusableForeignType exposesUnusableForeignType(Type type);
+
   /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
   /// libkern's OSObject hierarchy.
   llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
