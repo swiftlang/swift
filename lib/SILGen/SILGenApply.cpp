@@ -200,7 +200,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
     return true;
 
   // So are C++ constructors that initialize a foreign reference type.
-  if (constant.isForeignReferenceInitializer())
+  if (constant.isCXXForeignReferenceInitializer())
     return true;
 
   // Extension methods currently must be statically dispatched, unless they're
@@ -679,7 +679,7 @@ public:
     // A C++ constructor that initializes a foreign reference type is imported
     // as a static factory, but its initializing entry point takes `self` as
     // the trailing `this` argument, like a C++ instance method.
-    if (constant->isForeignReferenceInitializer())
+    if (constant->isCXXForeignReferenceInitializer())
       result.foreign.self = ImportAsMemberStatus();
 
     return result;

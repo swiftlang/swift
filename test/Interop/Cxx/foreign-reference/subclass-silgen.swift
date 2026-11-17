@@ -39,9 +39,12 @@ public final class DefaultSub: SubclassableShared {
 // CHECK-NEXT:    builtin "initializeForeignReferenceSubclassVTables"<FieldSub>([[NEWSUB]]) : $()
 // CHECK-NEXT:    store [[NEWSUB]] to [init]
 
-// The initializing entry point has no symbol of its own yet: it must not use
-// the symbol of the static factory that the initializer was imported from.
-// CHECK:       sil {{.*}}[clang SharedConstructed.init] @$sSo17SharedConstructedVyABs5Int32VcfcTo : $@convention(cxx_method) (Int32, @guaranteed SharedConstructed) -> @owned SharedConstructed
+// The initializing entry point is the base-object variant of the C++
+// constructor, not the static factory that the initializer was imported from.
+// The Microsoft C++ ABI has no base-object variant, so the complete-object one
+// is used there.
+// CHECK-SYSV:  sil {{.*}}[asmname "_ZN17SharedConstructedC2Ei"] [clang SharedConstructed.init] @$sSo17SharedConstructedVyABs5Int32VcfcTo : $@convention(cxx_method) (Int32, @guaranteed SharedConstructed) -> @owned SharedConstructed
+// CHECK-WIN:   sil {{.*}}[asmname "??0SharedConstructed@@{{.*}}"] [clang SharedConstructed.init] @$sSo17SharedConstructedVyABs5Int32VcfcTo : $@convention(cxx_method) (Int32, @guaranteed SharedConstructed) -> @owned SharedConstructed
 
 // The destroying destructor does not chain to the C++ base's destructor: the
 // imported foreign reference type has no Swift deinit, and uses the release
