@@ -170,7 +170,10 @@ install(TARGETS swift_Concurrency
   LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_Concurrency)
-emit_symbol_graph(swift_Concurrency)
+if(SwiftCore_ENABLE_SYMBOL_GRAPHS)
+  target_link_libraries(swift_Concurrency PRIVATE SwiftCore_SymbolGraph)
+  set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/symbol-graphs")
+endif()
 install_swift_interface(swift_Concurrency)
 
 # Configure plist creation for Darwin platforms.

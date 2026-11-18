@@ -88,7 +88,6 @@ include(CheckIncludeFileCXX)
 include(CompilerSettings)
 include(DefaultSettings)
 include(EmitSwiftInterface)
-include(EmitSymbolGraph)
 include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
@@ -140,6 +139,21 @@ defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift ba
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
 defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
+
+# Carries the flags that emit symbol graphs. Targets opt in by linking it:
+#
+#   target_link_libraries(<target> PRIVATE SwiftCore_SymbolGraph)
+#
+# The output directory comes from the linking target, so the path stays correct
+# for downstream projects that import this target from the install tree.
+# Extensions of other modules are emitted as `<module>@<extended>.symbols.json`.
+add_library(SwiftCore_SymbolGraph INTERFACE)
+target_compile_options(SwiftCore_SymbolGraph INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph-dir$<SEMICOLON>$<TARGET_PROPERTY:BINARY_DIR>/symbol-graphs>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -symbol-graph-allow-availability-platforms -Xfrontend Swift>")
+install(TARGETS SwiftCore_SymbolGraph
+  EXPORT SwiftCoreTargets)
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
