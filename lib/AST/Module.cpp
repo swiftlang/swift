@@ -1682,6 +1682,9 @@ void ModuleDecl::getDisplayDeclsRecursivelyAndImports(
       if (CD->isImplicit())
         continue;
     }
+    // filters units re-exported from Clang submodules to avoid duplicate symbols
+    if (D->getModuleContext()->isClangBridgingHeaderImportModule())
+      continue;
     auto inserted = visited.insert(D).second;
     assert(inserted && "there should be no duplicate decls");
   }
