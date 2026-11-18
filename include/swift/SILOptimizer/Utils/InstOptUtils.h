@@ -581,6 +581,10 @@ findLocalApplySites(FunctionRefBaseInst *fri);
 /// Gets the base implementation of a method.
 AbstractFunctionDecl *getBaseMethod(AbstractFunctionDecl *FD);
 
+/// Replaces each apply of \p pai with an apply of its function that takes the
+/// captures as arguments. Returns true if the applies are replaced and the
+/// captures are kept alive for them. This deletes \p pai if its call consumes
+/// it (see isClosureConsumedByCall()).
 bool tryOptimizeApplyOfPartialApply(
     PartialApplyInst *pai, SILBuilderContext &builderCtxt,
     InstModCallbacks callbacks = InstModCallbacks());

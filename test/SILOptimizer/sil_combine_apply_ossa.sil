@@ -1444,10 +1444,12 @@ bb0(%0 : $*Int, %1 : @guaranteed $Builtin.NativeObject, %2 : $Int):
 
 // When the apply is the only user of each conversion, the conversions are
 // deleted along with the old apply, so the partial_apply is applied directly.
+// Its call is then combined, and the closure is deleted.
 //
 // CHECK-LABEL: sil [ossa] @test_convert_function_only_used_by_apply :
-// CHECK:         [[PA:%.*]] = partial_apply [called_once]
-// CHECK:         apply [[PA]](%0, %2) : $@once @callee_owned (Int) -> @out Int
+// CHECK:         [[FN:%.*]] = function_ref @exactlyOnceThunk
+// CHECK-NOT:     partial_apply
+// CHECK:         apply [[FN]](%0, %2, %1)
 // CHECK:       } // end sil function 'test_convert_function_only_used_by_apply'
 sil [ossa] @test_convert_function_only_used_by_apply : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int) -> @out Int {
 bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int):
@@ -1462,8 +1464,9 @@ bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $I
 }
 
 // CHECK-LABEL: sil [ossa] @test_mark_dependence_only_used_by_apply :
-// CHECK:         [[PA:%.*]] = partial_apply [called_once]
-// CHECK-NEXT:    apply [[PA]](%0, %2) : $@once @callee_owned (Int) -> @out Int
+// CHECK:         [[FN:%.*]] = function_ref @exactlyOnceThunk
+// CHECK-NOT:     partial_apply
+// CHECK:         apply [[FN]](%0, %2, %1)
 // CHECK:       } // end sil function 'test_mark_dependence_only_used_by_apply'
 sil [ossa] @test_mark_dependence_only_used_by_apply : $@convention(thin) (@owned @noescape @once @callee_owned (Int) -> Int, Int, @guaranteed Builtin.NativeObject) -> @out Int {
 bb0(%0 : $*Int, %1 : @owned $@noescape @once @callee_owned (Int) -> Int, %2 : $Int, %3 : @guaranteed $Builtin.NativeObject):
@@ -1768,4 +1771,112 @@ bb0(%0 : @guaranteed $NoncopyableCapture):
   %6 = apply %5() : $@noescape @callee_guaranteed () -> Int
   destroy_value %5
   unreachable
+}
+
+sil @consumeNoncopyableCapture : $@convention(thin) (@owned NoncopyableCapture) -> ()
+
+// The call of an at-most-once closure consumes it, so after its call is
+// combined, the closure is deleted, and the path that dropped the closure
+// destroys the capture instead.
+//
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_called_or_dropped :
+// CHECK:         [[F:%.*]] = function_ref @consumeNoncopyableCapture
+// CHECK-NOT:     partial_apply
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]](%1)
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %1
+// CHECK:       } // end sil function 'test_at_most_once_closure_called_or_dropped'
+sil [ossa] @test_at_most_once_closure_called_or_dropped : $@convention(thin) (Builtin.Int1, @owned NoncopyableCapture) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @owned $NoncopyableCapture):
+  %2 = function_ref @consumeNoncopyableCapture : $@convention(thin) (@owned NoncopyableCapture) -> ()
+  %3 = partial_apply [on_stack] [called_at_most_once] %2(%1) : $@convention(thin) (@owned NoncopyableCapture) -> ()
+  %4 = move_value [lexical] %3 : $@noescape @callable(once) @callee_owned () -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %6 = apply %4() : $@noescape @callable(once) @callee_owned () -> ()
+  br bb3
+
+bb2:
+  destroy_value %4 : $@noescape @callable(once) @callee_owned () -> ()
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+sil @consumeAddress : $@convention(thin) <T> (@in T) -> ()
+
+// The context of an on-stack at-most-once closure only borrows a copyable
+// address capture, so the combined call, which consumes it, takes a copy.
+//
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_borrowed_in_capture :
+// CHECK:         [[CAPTURE:%.*]] = alloc_stack $T
+// CHECK:         [[COPY:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr [[CAPTURE]] to [init] [[COPY]]
+// CHECK-NEXT:    apply {{%.*}}<T>([[COPY]])
+// CHECK:         destroy_addr [[CAPTURE]]
+// CHECK:       } // end sil function 'test_at_most_once_closure_borrowed_in_capture'
+sil [ossa] @test_at_most_once_closure_borrowed_in_capture : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  copy_addr %0 to [init] %1 : $*T
+  %3 = function_ref @consumeAddress : $@convention(thin) <T> (@in T) -> ()
+  %4 = partial_apply [on_stack] [called_at_most_once] %3<T>(%1) : $@convention(thin) <T> (@in T) -> ()
+  %5 = apply %4() : $@noescape @callable(once) @callee_owned () -> ()
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @readInt : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// An escaping closure captures the value in memory when it's formed, so the
+// combined call reads a copy, not the memory, which is changed and deallocated
+// before the call.
+//
+// CHECK-LABEL: sil [ossa] @test_escaping_at_most_once_closure_trivial_address_capture :
+// CHECK:         [[MEMORY:%.*]] = alloc_stack $Int
+// CHECK:         [[COPY:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    copy_addr [[MEMORY]] to [init] [[COPY]]
+// CHECK:         apply {{%.*}}([[COPY]])
+// CHECK:       } // end sil function 'test_escaping_at_most_once_closure_trivial_address_capture'
+sil [ossa] @test_escaping_at_most_once_closure_trivial_address_capture : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2 : $*Int
+  %4 = function_ref @readInt : $@convention(thin) (@in_guaranteed Int) -> ()
+  %5 = partial_apply [called_at_most_once] %4(%2) : $@convention(thin) (@in_guaranteed Int) -> ()
+  store %1 to [trivial] %2 : $*Int
+  dealloc_stack %2 : $*Int
+  %8 = apply %5() : $@callable(once) @callee_owned () -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil @readKlassAddress : $@convention(thin) (@in_guaranteed Klass) -> ()
+
+// The store_borrow's scope ends before the call, so the combined call reads a
+// copy of the capture.
+//
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_store_borrow_capture :
+// CHECK:         [[BORROW:%.*]] = store_borrow
+// CHECK:         copy_addr [[BORROW]] to [init] [[COPY:%.*]] :
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    apply {{%.*}}([[COPY]])
+// CHECK:       } // end sil function 'test_at_most_once_closure_store_borrow_capture'
+sil [ossa] @test_at_most_once_closure_store_borrow_capture : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = alloc_stack $Klass
+  %2 = store_borrow %0 to %1 : $*Klass
+  %3 = function_ref @readKlassAddress : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %4 = partial_apply [on_stack] [called_at_most_once] %3(%2) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  end_borrow %2 : $*Klass
+  %6 = apply %4() : $@noescape @callable(once) @callee_owned () -> ()
+  dealloc_stack %1 : $*Klass
+  %8 = tuple ()
+  return %8 : $()
 }
