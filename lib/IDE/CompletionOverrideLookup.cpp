@@ -452,6 +452,7 @@ StringRef CompletionOverrideLookup::getResultBuilderDocComment(
     return "Builds a partial result component by combining an accumulated "
            "component and a new component";
   }
+  llvm_unreachable("covered switch");
 }
 
 void CompletionOverrideLookup::addResultBuilderBuildCompletion(

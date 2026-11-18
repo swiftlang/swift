@@ -920,6 +920,7 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
     case clang::CountAttributedType::EndedBy:
       llvm_unreachable("CountAttributedType cannot be ended_by");
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {

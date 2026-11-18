@@ -201,6 +201,7 @@ public:
     case SwiftCacheToolAction::Invalid:
       return 0; // No action. Probably just print help. Return.
     }
+    llvm_unreachable("covered switch");
   }
 
 private:

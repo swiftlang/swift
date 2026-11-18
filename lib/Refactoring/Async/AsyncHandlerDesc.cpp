@@ -154,6 +154,7 @@ std::optional<swift::Type> AsyncHandlerDesc::getErrorType() const {
       // type.
       return GenericArgs.back();
     }
+    llvm_unreachable("covered switch");
   } else {
     return std::nullopt;
   }
@@ -264,6 +265,7 @@ AsyncHandlerDesc::getSuccessParamAsyncReturnType(swift::Type Ty) const {
   case HandlerType::INVALID:
     llvm_unreachable("Invalid handler type");
   }
+  llvm_unreachable("covered switch");
 }
 
 Identifier AsyncHandlerDesc::getAsyncReturnTypeLabel(size_t Index) const {

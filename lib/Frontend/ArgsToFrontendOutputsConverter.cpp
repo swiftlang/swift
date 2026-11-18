@@ -565,6 +565,7 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   case swift::FrontendOptions::ActionType::EmitPolyglotAST:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Whether diagnostics are serialized as SARIF rather than in the binary

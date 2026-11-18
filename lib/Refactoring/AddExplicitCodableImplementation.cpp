@@ -32,7 +32,7 @@ class AddCodableContext {
     case IterableDeclContextKind::ExtensionDecl:
       return cast<ExtensionDecl>(IDC)->getExtendedNominal();
     }
-    assert(false && "unhandled IterableDeclContextKind");
+    llvm_unreachable("unhandled IterableDeclContextKind");
   }
 
   /// Get the left brace location of the type-or-extension decl.
@@ -43,7 +43,7 @@ class AddCodableContext {
     case IterableDeclContextKind::ExtensionDecl:
       return cast<ExtensionDecl>(IDC)->getBraces().Start;
     }
-    assert(false && "unhandled IterableDeclContextKind");
+    llvm_unreachable("unhandled IterableDeclContextKind");
   }
 
   /// Get the token location where the text should be inserted after.
