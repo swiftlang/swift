@@ -2154,6 +2154,7 @@ namespace {
         assert(
           (!payloadTI.isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                 &refCounting)
+           || refCounting == ReferenceCounting::Custom
            || payloadTI.canValueWitnessExtraInhabitantsUpTo(IGM, 0))
           && "single-refcounted thing should be able to value-witness "
              "extra inhabitant zero");
@@ -4043,8 +4044,11 @@ namespace {
       for (auto &elt : ElementsWithPayload) {
         // refcounting is only set in the else branches
         ReferenceCounting refcounting;
+        // Foreign reference types each have their own retain/release
+        // functions, so there is no shared entry point to call.
         if (!elt.ti->isSingleRetainablePointer(ResilienceExpansion::Maximal,
-                                               &refcounting)) {
+                                               &refcounting) ||
+            refcounting == ReferenceCounting::Custom) {
           allSingleRefcount = false;
         } else if (haveRefcounting) {
           // Only support a single style of reference counting for now.
