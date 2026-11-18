@@ -902,22 +902,16 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
          isa<MoveValueInst>(inst);
 }
 
-static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
-                                                 SILParameterInfo paramInfo,
-                                                 const SILFunction &F) {
-  // If we have a non-trivial type and the argument is passed in @inout, we do
-  // not need to destroy it here. This is something that is implicit in the
-  // partial_apply design that will be revisited when partial_apply is
-  // redesigned.
-  if (paramInfo.isIndirectMutating())
+/// Returns true if the context of an escaping closure owns a capture of
+/// \p type that the closure's function takes as \p paramInfo, which is true
+/// unless the capture is trivial or inout.
+static bool isCaptureOwnedByEscapingClosure(SILType type,
+                                            SILParameterInfo paramInfo,
+                                            const SILFunction &function) {
+  // An inout capture isn't destroyed.
+  if (SILArgumentConvention(paramInfo.getConvention()).isInoutConvention())
     return false;
-
-  // If we have a trivial type, we do not need to put in any extra releases.
-  if (arg->getType().isTrivial(F))
-    return false;
-
-  // We handle all other cases.
-  return true;
+  return !type.isTrivial(function);
 }
 
 void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
@@ -990,8 +984,8 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILParameterInfo paramInfo,
                                            InstModCallbacks callbacks,
                                            IsDeadEnd_t isDeadEnd) {
-  if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
-                                            builder.getFunction()))
+  if (!isCaptureOwnedByEscapingClosure(arg->getType(), paramInfo,
+                                       builder.getFunction()))
     return;
 
   emitDestroyOperation(builder, loc, arg, callbacks, isDeadEnd);
@@ -1057,19 +1051,15 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                         SmallVectorImpl<Operand *> &argOperands,
                                         bool includeTrivialAddrArgs) {
   ApplySite applySite(pai);
-  SILFunctionConventions calleeConv = applySite.getSubstCalleeConv();
-  unsigned firstCalleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
-  auto argList = pai->getArgumentOperands();
   SILFunction *F = pai->getFunction();
 
-  for (unsigned i : indices(argList)) {
-    auto argConv = calleeConv.getSILArgumentConvention(firstCalleeArgIdx + i);
-    if (argConv.isInoutConvention())
-      continue;
-
-    Operand &argOp = argList[i];
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    SILParameterInfo paramInfo = applySite.getParamInfoForOperand(argOp);
     SILType ty = argOp.get()->getType();
-    if (!ty.isTrivial(*F) || (includeTrivialAddrArgs && ty.isAddress()))
+    bool isInout =
+        SILArgumentConvention(paramInfo.getConvention()).isInoutConvention();
+    if (isCaptureOwnedByEscapingClosure(ty, paramInfo, *F) ||
+        (includeTrivialAddrArgs && ty.isAddress() && !isInout))
       argOperands.push_back(&argOp);
   }
 }
