@@ -11,16 +11,22 @@ This script takes the same parameters as BuildSequential.ps1 and runs the same
 scripts, but runs the steps that do not depend on each other at the same time,
 in separate processes:
 
+- The early swift-driver builds while the tools that run during the build do,
+  before the Stage1 compilers.
 - After the Stage1 toolchain, the Windows SDKs of the other architectures and
   the Android SDK build in the background, while the SDK of the host and then
   the toolchain build. The other Windows SDKs install into their own platform
   roots, which are merged into the image when they are done.
+- The developer tools that only need the SDK build while the Stage2 compilers
+  do. Then compiler-rt, the macros and swift-format build while swift-driver,
+  swift-build, SwiftPM and SourceKit-LSP do.
 - The package tests run in the background. The test suites of the compilers
   build what they need once, then check-swift runs while the other tests run
   in the background.
 - The installer builds in the background while the tests run.
 
-The background processes run at a lower priority and log to
+The background processes that nothing waits for soon run at a lower priority.
+They log to
 <BinaryCache>\BuildMulti\<name>.log, which this script prints when they end.
 
 See BuildSequential.ps1 for the parameters.
@@ -284,12 +290,28 @@ if ($Clean) {
   Clear-BuildTree ($WindowsSDKBuilds + $AndroidSDKBuilds)
 }
 
-if ($Toolchain) {
-  Invoke-BuildScript "BuildToolchain-Bootstrap" BuildToolchain.ps1 $Parameters @{
-    Mode = "Bootstrap";
-    WindowsSDKArchitectures = $SelectedWindowsSDKArchitectures;
-    AndroidSDKArchitectures = $SelectedAndroidSDKArchitectures;
+$ToolchainOverrides = @{
+  WindowsSDKArchitectures = $SelectedWindowsSDKArchitectures;
+  AndroidSDKArchitectures = $SelectedAndroidSDKArchitectures;
+}
+
+# Runs steps of BuildToolchain.ps1 in this process, or in the background with
+# -Background.
+function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [switch] $Background) {
+  $Name = "BuildToolchain$(if ($Mode) { "-$Mode" })-$($Steps -join "-")"
+  $Overrides = $ToolchainOverrides + @{ Mode = $Mode; Steps = $Steps }
+  if ($Background) {
+    return Start-BuildJob $Name BuildToolchain.ps1 $Overrides
   }
+  Invoke-BuildScript $Name BuildToolchain.ps1 $Parameters $Overrides
+}
+
+if ($Toolchain) {
+  # The early swift-driver only needs the pinned toolchain.
+  $DriverJob = Invoke-ToolchainSteps Bootstrap EarlySwiftDriver -Background
+  Invoke-ToolchainSteps Bootstrap BuildTools
+  Wait-BuildJobs @($DriverJob)
+  Invoke-ToolchainSteps Bootstrap Stage1
   Remove-InstalledSDKs $WindowsSDKBuilds
 }
 
@@ -338,10 +360,25 @@ if ($SelectedWindowsSDKArchitectures -contains $HostSDKArchitecture) {
 }
 
 if ($Toolchain) {
-  Invoke-BuildScript "BuildToolchain" BuildToolchain.ps1 $Parameters @{
-    WindowsSDKArchitectures = $SelectedWindowsSDKArchitectures;
-    AndroidSDKArchitectures = $SelectedAndroidSDKArchitectures;
-  }
+  # The developer tools that only need the SDK build while the Stage2 compilers
+  # build. They build at normal priority, as they mostly compile one Swift
+  # module at a time and would otherwise wait for the compilers.
+  Invoke-ToolchainSteps "" CMark
+  $ToolsJob = Invoke-ToolchainSteps "" Tools -Background
+  Invoke-ToolchainSteps "" Compilers
+
+  # Then, what uses the Stage2 build tree, with the longest chain of
+  # dependencies here.
+  $LateJobs = @(
+    (Invoke-ToolchainSteps "" CompilerRuntime -Background),
+    (Invoke-ToolchainSteps "" Macros -Background)
+  )
+  Wait-BuildJobs @($ToolsJob)
+  $LateJobs += Invoke-ToolchainSteps "" Format -Background
+  Invoke-ToolchainSteps "" PackageManager
+  Wait-BuildJobs $LateJobs
+
+  Invoke-ToolchainSteps "" Finish
 }
 
 Wait-BuildJobs $SDKJobs
