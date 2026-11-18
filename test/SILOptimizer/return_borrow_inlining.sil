@@ -243,7 +243,7 @@ bb0(%0 : @guaranteed $Outer):
   %2 = apply %1(%0) : $@convention(method) (@guaranteed Outer) -> @guaranteed Container
   %3 = function_ref @container_k : $@convention(method) (@guaranteed Container) -> @guaranteed Klass
   %4 = apply %3(%2) : $@convention(method) (@guaranteed Container) -> @guaranteed Klass
-  return_borrow %4 from_scopes (%2, %4)
+  return_borrow %4 from_scopes (%4, %2)
 }
 
 // Nested scopes end from inner to outer.
@@ -266,12 +266,12 @@ bb0(%0 : @guaranteed $Outer):
 }
 
 // The caller's return_borrow enclosing value is replaced by the callee's, from
-// outer to inner.
+// inner to outer.
 //
 // CHECK-LABEL: sil [ossa] @test_nested_return_borrow : $@convention(method) (@guaranteed Outer) -> @guaranteed Klass {
 // CHECK:       [[C:%.*]] = apply {{%.*}}(%0)
 // CHECK:       [[K:%.*]] = apply {{%.*}}([[C]])
-// CHECK:       return_borrow [[K]] from_scopes ([[C]], [[K]])
+// CHECK:       return_borrow [[K]] from_scopes ([[K]], [[C]])
 // CHECK: } // end sil function 'test_nested_return_borrow'
 sil [ossa] @test_nested_return_borrow : $@convention(method) (@guaranteed Outer) -> @guaranteed Klass {
 bb0(%0 : @guaranteed $Outer):
@@ -465,7 +465,7 @@ bb0(%0 : $*Outer):
 // CHECK:         [[LB:%.*]] = load_borrow %0
 // CHECK-NEXT:    [[C:%.*]] = struct_extract [[LB]], #Outer._c
 // CHECK:         [[K:%.*]] = apply {{%.*}}([[C]])
-// CHECK-NEXT:    return_borrow [[K]] from_scopes ([[LB]], [[K]])
+// CHECK-NEXT:    return_borrow [[K]] from_scopes ([[K]], [[LB]])
 // CHECK-LABEL: } // end sil function 'test_return_borrow_caller_scope'
 sil [ossa] @test_return_borrow_caller_scope : $@convention(method) (@in_guaranteed Outer) -> @guaranteed Klass {
 bb0(%0 : $*Outer):
@@ -473,7 +473,7 @@ bb0(%0 : $*Outer):
   %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Outer) -> @guaranteed Container
   %3 = function_ref @container_k : $@convention(method) (@guaranteed Container) -> @guaranteed Klass
   %4 = apply %3(%2) : $@convention(method) (@guaranteed Container) -> @guaranteed Klass
-  return_borrow %4 from_scopes (%2, %4)
+  return_borrow %4 from_scopes (%4, %2)
 }
 
 // A callee that returns a projection of a @guaranteed self has no return_borrow

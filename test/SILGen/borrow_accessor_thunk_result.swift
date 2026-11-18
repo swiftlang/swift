@@ -98,7 +98,7 @@ open class Derived : Base {
 // CHECK-SIL-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s28borrow_accessor_thunk_result1SVAA1PA2aDP2ntAA10NonTrivialVvbTW : $@convention(witness_method: P) (@in_guaranteed S) -> @guaranteed NonTrivial {
 // CHECK-SIL:   [[SELF:%.*]] = load_borrow %0
 // CHECK-SIL:   [[RES:%.*]] = apply {{%.*}}([[SELF]]) : $@convention(method) (@guaranteed S) -> @guaranteed NonTrivial
-// CHECK-SIL-NEXT: return_borrow [[RES]] from_scopes ([[SELF]], [[RES]])
+// CHECK-SIL-NEXT: return_borrow [[RES]] from_scopes ([[RES]], [[SELF]])
 // CHECK-SIL: } // end sil function '$s28borrow_accessor_thunk_result1SVAA1PA2aDP2ntAA10NonTrivialVvbTW'
 
 // CHECK-SIL-LABEL: sil shared [transparent] [serialized] [thunk] [ossa] @$s28borrow_accessor_thunk_result1SVAA1PA2aDP1iSivbTW : $@convention(witness_method: P) (@in_guaranteed S) -> @guaranteed Int {

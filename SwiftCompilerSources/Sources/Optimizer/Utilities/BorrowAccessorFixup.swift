@@ -62,14 +62,14 @@ func fixupBorrowAccessors(in function: Function, _ context: FunctionPassContext)
     }
   }
 
-  // The scopes are ordered from outer to inner.
+  // The scopes are ordered from inner to outer.
   let builder = Builder(before: returnInst, context)
   builder.createReturnBorrow(of: returnInst.returnedValue, fromScopes: enclosingScopes.map { $0.value })
   context.erase(instruction: returnInst)
   return true
 }
 
-/// Returns the local borrow scopes that enclose `value`, ordered from outer to inner.
+/// Returns the local borrow scopes that enclose `value`, ordered from inner to outer.
 private func getEnclosingLocalScopes(of value: Value, _ context: FunctionPassContext) -> [BeginBorrowValue] {
   var scopes = [BeginBorrowValue]()
   var worklist = ValueWorklist(context)
@@ -84,7 +84,7 @@ private func getEnclosingLocalScopes(of value: Value, _ context: FunctionPassCon
     worklist.pushIfNotVisited(contentsOf: current.getEnclosingValues(context))
   }
   // Walking up visits inner scopes before outer scopes.
-  return scopes.reversed()
+  return scopes
 }
 
 func registerBorrowAccessorFixup() {

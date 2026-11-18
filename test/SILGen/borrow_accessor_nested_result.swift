@@ -108,7 +108,7 @@ public struct Projecting {
 // CHECK:   [[INNER:%.*]] = apply {{%.*}}(%0) : $@convention(method) (@guaranteed Loadable) -> @guaranteed Inner
 // CHECK-NOT: unchecked_ownership
 // CHECK:   [[K:%.*]] = apply {{%.*}}([[INNER]]) : $@convention(method) (@guaranteed Inner) -> @guaranteed Klass
-// CHECK-NEXT: return_borrow [[K]] from_scopes ([[INNER]], [[K]])
+// CHECK-NEXT: return_borrow [[K]] from_scopes ([[K]], [[INNER]])
 // CHECK: } // end sil function '$s29borrow_accessor_nested_result8LoadableV0C1KAA5KlassCvb'
 
 // CHECK-LABEL: sil [ossa] @$s29borrow_accessor_nested_result8LoadableV0C1ISivb : $@convention(method) (@guaranteed Loadable) -> @guaranteed Int {
@@ -131,7 +131,7 @@ public struct Projecting {
 // CHECK:   [[INNER:%.*]] = apply {{%.*}}<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed AddressOnly<τ_0_0>) -> @guaranteed Inner
 // CHECK-NOT: unchecked_ownership
 // CHECK:   [[K:%.*]] = apply {{%.*}}([[INNER]]) : $@convention(method) (@guaranteed Inner) -> @guaranteed Klass
-// CHECK-NEXT: return_borrow [[K]] from_scopes ([[INNER]], [[K]])
+// CHECK-NEXT: return_borrow [[K]] from_scopes ([[K]], [[INNER]])
 // CHECK: } // end sil function '$s29borrow_accessor_nested_result11AddressOnlyV0C1KAA5KlassCvb'
 
 // CHECK-LABEL: sil [ossa] @$s29borrow_accessor_nested_result11AddressOnlyV0C1ISivb : $@convention(method) <T> (@in_guaranteed AddressOnly<T>) -> @guaranteed Int {

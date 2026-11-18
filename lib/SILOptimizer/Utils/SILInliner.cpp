@@ -384,7 +384,8 @@ class SILInlineCloner
   // before the yield.
   llvm::SmallVector<SILValue, 16> valuesToComplete;
 
-  // The borrow scopes that enclose the inlined result of a borrow accessor.
+  // The borrow scopes that enclose the inlined result of a borrow accessor,
+  // ordered from inner to outer.
   SmallVector<SILValue, 4> resultEnclosingScopes;
 
   // Block in the original caller serving as the successor of the inlined
@@ -765,9 +766,12 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   if (auto *RBI = dyn_cast<ReturnBorrowInst>(Terminator)) {
     auto returnedValue = getMappedValue(RBI->getReturnValue());
     // Collect the mapped enclosing values.
+    SmallVector<SILValue, 4> calleeScopes;
     for (auto enclosingValue : RBI->getEnclosingValues()) {
-      resultEnclosingScopes.push_back(getMappedValue(enclosingValue));
+      calleeScopes.push_back(getMappedValue(enclosingValue));
     }
+    resultEnclosingScopes.insert(resultEnclosingScopes.begin(),
+                                 calleeScopes.begin(), calleeScopes.end());
     getBuilder().createBranch(getOpLocation(RBI->getLoc()), ReturnToBB,
                               returnedValue);
     return;
@@ -868,7 +872,7 @@ void SILInlineCloner::fixupBorrowAccessorResult() {
 
   // End the callee's enclosing scopes at the caller's end_borrows of the
   // result.
-  for (SILValue scope : llvm::reverse(resultEnclosingScopes)) {
+  for (SILValue scope : resultEnclosingScopes) {
     for (auto *endBorrow : callerEndBorrows) {
       SILBuilderWithScope(endBorrow, getBuilder())
           .createEndBorrow(endBorrow->getLoc(), scope);

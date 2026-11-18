@@ -5230,7 +5230,8 @@ sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand ('
 
 return_borrow %0 : $T from_scopes (%1, %2 ...)
 // %0 must be a @guaranteed value
-// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`,
+//   ordered from inner to outer
 // $T must be the return type of the current function
 ```
 
