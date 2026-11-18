@@ -549,17 +549,22 @@ private:
                            OptionalTypeKind optKind) {
     if (!objectTypeDecl)
       return false;
+    // Typed pointers are printed as C pointers, and an optional one as a
+    // nullable C pointer.
+    auto &ctx = objectTypeDecl->getASTContext();
+    bool isTypedPointer = objectTypeDecl == ctx.getUnsafePointerDecl() ||
+                          objectTypeDecl == ctx.getUnsafeMutablePointerDecl();
     auto knownCxxTypeInfo =
         owningPrinter.typeMapping.getKnownCxxTypeInfo(objectTypeDecl);
     // An optional payload bridges to a Swift `Optional` wrapper, unless the
     // wrapped type maps to a nullable C++ type (e.g. a pointer), in which case
     // the optionality is folded into that trivial representation.
     bool resultIsSwiftOptional =
-        optKind != OTK_None &&
+        optKind != OTK_None && !isTypedPointer &&
         !(knownCxxTypeInfo && knownCxxTypeInfo->canBeNullable);
     if (resultIsSwiftOptional)
       return false;
-    return knownCxxTypeInfo || isClangPOD(objectTypeDecl);
+    return isTypedPointer || knownCxxTypeInfo || isClangPOD(objectTypeDecl);
   }
 
   void visitEnumDeclCxx(EnumDecl *ED) {

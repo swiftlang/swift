@@ -11,6 +11,8 @@ public enum MatchResult {
     case scalar(Unicode.Scalar?)
     case value(Int32?)
     case rawptr(UnsafeRawPointer?)
+    case typedptr(UnsafePointer<Bool>?)
+    case mutptr(UnsafeMutablePointer<Int32>)
 }
 
 // An optional value-type payload is returned via returnNewValue, not by
@@ -38,5 +40,23 @@ public enum MatchResult {
 
 // CHECK:      SWIFT_INLINE_THUNK void const * _Nullable MatchResult::getRawptr() const {
 // CHECK:        void const * _Nullable result;
+// CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
+// CHECK-NEXT:   return result;
+
+// Typed pointers are C pointers too, whether or not they are optional.
+
+// CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_typedptr::operator()(bool const * _Nullable val) const {
+// CHECK:        memcpy(result._getOpaquePointer(), &val, sizeof(val));
+
+// CHECK:      SWIFT_INLINE_THUNK bool const * _Nullable MatchResult::getTypedptr() const {
+// CHECK:        bool const * _Nullable result;
+// CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
+// CHECK-NEXT:   return result;
+
+// CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_mutptr::operator()(int32_t * _Nonnull val) const {
+// CHECK:        memcpy(result._getOpaquePointer(), &val, sizeof(val));
+
+// CHECK:      SWIFT_INLINE_THUNK int32_t * _Nonnull MatchResult::getMutptr() const {
+// CHECK:        int32_t * _Nonnull result;
 // CHECK-NEXT:   memcpy(&result, payloadFromDestruction, sizeof(result));
 // CHECK-NEXT:   return result;
