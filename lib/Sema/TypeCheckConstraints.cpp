@@ -2306,9 +2306,16 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
 /// Whether \p expr names a binding, or a path of stored properties rooted at
 /// one, such that consuming it would invalidate that storage.
 static bool isConsumableStorageRef(ModuleDecl *module, Expr *expr) {
+  auto isStoredVar = [&](ValueDecl *decl, AccessSemantics semantics) {
+    auto *vd = dyn_cast_or_null<VarDecl>(decl);
+    return vd && vd->isAccessedViaPhysicalStorage(semantics, AccessKind::Read,
+                                                  module,
+                                                  ResilienceExpansion::Minimal);
+  };
+
   while (true) {
-    if (isa<DeclRefExpr>(expr))
-      return true;
+    if (auto *dre = dyn_cast<DeclRefExpr>(expr))
+      return isStoredVar(dre->getDecl(), dre->getAccessSemantics());
 
     if (auto *le = dyn_cast<LoadExpr>(expr)) {
       expr = le->getSubExpr();
@@ -2316,10 +2323,7 @@ static bool isConsumableStorageRef(ModuleDecl *module, Expr *expr) {
     }
 
     if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
-      auto *vd = dyn_cast<VarDecl>(mre->getMember().getDecl());
-      if (!vd || !vd->isAccessedViaPhysicalStorage(
-                     mre->getAccessSemantics(), AccessKind::Read, module,
-                     ResilienceExpansion::Minimal))
+      if (!isStoredVar(mre->getMember().getDecl(), mre->getAccessSemantics()))
         return false;
       expr = mre->getBase();
       continue;

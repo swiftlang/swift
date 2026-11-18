@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix legacy-
 // RUN: %target-typecheck-verify-swift -enable-lifetime-resolution
 
 struct NC: ~Copyable {}
@@ -178,4 +178,22 @@ func testStoredProperties(_ h: consuming Holder) {
                           // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
   restockBorrow(h.storedCarrot) // expected-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
                                 // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+}
+
+var globalStoredNC = NC()
+var globalComputedNC: NC { NC() }
+
+func testVarDeclRefs() {
+  testBorrowing(globalStoredNC) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                                // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+
+  testBorrowing(globalComputedNC) // expected-legacy-error {{implicit conversion to 'NC?' is consuming}}
+                                  // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+
+  var localComputedNC: NC { NC() }
+  var localComputedCarrot: Carrot { Carrot() }
+  testBorrowing(localComputedNC) // expected-legacy-error {{implicit conversion to 'NC?' is consuming}}
+                                 // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+  restockBorrow(localComputedCarrot) // expected-legacy-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                                     // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
 }
