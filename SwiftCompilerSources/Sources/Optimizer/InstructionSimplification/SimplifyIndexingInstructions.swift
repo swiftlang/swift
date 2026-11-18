@@ -15,7 +15,14 @@ import SIL
 extension IndexAddrInst : Simplifiable, SILCombineSimplifiable {
 
   func simplify(_ context: SimplifyContext) {
-    if tryRemoveZeroIndex(context) {
+    if parentBlock.isDebugReconstructionBlock,
+       // This optimization is disabled (except in debug reconstruction blocks) to support old
+       // SDKs (swift < 6.5) where the stdlib doesn't use the UnsafePointer's `project` API for
+       // projecting array elements.
+       // Without `project` alias-analysis wouldn't detect detect potential aliasing of first
+       // array element addresses (where the index of `index_addr` is 0).
+       tryRemoveZeroIndex(context)
+    {
       return
     }
 

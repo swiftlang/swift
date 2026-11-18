@@ -1611,3 +1611,19 @@ bb0(%0 : $*S):
   return %10 : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @dont_destroy_source_of_addr_cast_with_zero_index :
+// CHECK:         store %1 to [assign] %6
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_destroy_source_of_addr_cast_with_zero_index'
+sil [ossa] @dont_destroy_source_of_addr_cast_with_zero_index : $@convention(thin) (@inout Vector, @owned AnyObject) -> () {
+bb0(%0 : $*Vector, %1 : @owned $AnyObject):
+  %2 = unchecked_addr_cast %0 to $*AnyObject
+  %3 = integer_literal $Builtin.Word, 0
+  %4 = index_addr %2, %3
+  %5 = address_to_pointer %4 to $Builtin.RawPointer
+  %6 = pointer_to_address %5 to [strict] $*AnyObject
+  store %1 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
