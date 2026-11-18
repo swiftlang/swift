@@ -3221,6 +3221,11 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
+    // Nested types are only printed as part of their enclosing type.
+    if (isa<NominalTypeDecl>(VD) && !VD->hasClangNode())
+      if (auto *parent = VD->getDeclContext()->getSelfNominalTypeDecl())
+        if (!parent->hasClangNode() && !shouldInclude(parent))
+          return false;
   }
 
   // In C output mode print only the C variant `@c` (no `@_cdecl`),
