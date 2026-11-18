@@ -188,6 +188,7 @@ using TTakeUnsafeTuple = TTake<UnsafeTuple>;
 struct HoldsShared {
   SharedObject* obj;
 
+  // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'getObj'; it returns a pointer to foreign reference type 'SharedObject'}}
   SharedObject* getObj() const SWIFT_RETURNS_INDEPENDENT_VALUE
                                SWIFT_RETURNS_UNRETAINED;
 };
