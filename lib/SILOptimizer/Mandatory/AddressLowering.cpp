@@ -4788,11 +4788,15 @@ protected:
   NO_OPAQUE_OPERAND(TupleAddrConstructor)
   NO_OPAQUE_OPERAND(Vector)
 
+  // Removed before this pass in the default pipeline.
+  NO_OPAQUE_OPERAND(Assign)
+  NO_OPAQUE_OPERAND(AssignOrInit)
+  NO_OPAQUE_OPERAND(Diagnose)
+  NO_OPAQUE_OPERAND(EndFormalScope)
+
   // Can see an opaque operand, but has no rewrite yet. This lists known gaps
   // only: a new instruction needs a rewrite, or a NO_OPAQUE_OPERAND entry
   // with a reason if none of its operands can be opaque.
-  UNIMPLEMENTED_OPAQUE_OPERAND(Assign)
-  UNIMPLEMENTED_OPAQUE_OPERAND(AssignOrInit)
   UNIMPLEMENTED_OPAQUE_OPERAND(AutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginCOWMutation)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginDeallocRef)
@@ -4800,10 +4804,8 @@ protected:
   UNIMPLEMENTED_OPAQUE_OPERAND(DeinitExistentialValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceAddrBorrow)
   UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(Diagnose)
   UNIMPLEMENTED_OPAQUE_OPERAND(DropDeinit)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndCOWMutation)
-  UNIMPLEMENTED_OPAQUE_OPERAND(EndFormalScope)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndInitLetRef)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndLifetime)
   UNIMPLEMENTED_OPAQUE_OPERAND(ExtractExecutor)
