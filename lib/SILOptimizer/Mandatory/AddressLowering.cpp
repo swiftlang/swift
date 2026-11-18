@@ -6136,6 +6136,16 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
 
   allocator.sinkProjections();
 
+  // Mark the function lowered now, so its conventions and verification see
+  // address form immediately.
+  //
+  // This must happen before deleting the rewritten instructions. Deleting an
+  // instruction kills its debug uses, and a killed debug_value of an
+  // address-only type keeps its address form only once the function has lowered
+  // addresses. Otherwise, it is left as an object-typed undef, which the
+  // verifier rejects.
+  function->setHasLoweredAddresses(true);
+
   deleteRewrittenInstructions(pass);
 
   StackNesting::fixNesting(function);
@@ -6144,11 +6154,6 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   // createStackAllocation or StackNesting.
   pm->invalidateAnalysis(
       function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
-
-  // Mark the function lowered now, so its conventions and verification see
-  // address form immediately (the module stage only reaches Canonical after all
-  // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  function->setHasLoweredAddresses(true);
 }
 
 //===----------------------------------------------------------------------===//
