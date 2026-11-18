@@ -782,10 +782,8 @@ private:
             [&](auto &types) {
               auto *ED = elementDecl->getParentEnum();
               // Printing function body
-              StringRef resultStorage =
-                  owningPrinter.hasInlineMovedFromState(ED)
-                      ? "result._storage"
-                      : "result._getOpaquePointer()";
+              StringRef resultStorage = "::swift::_impl::ValueTypeStorage::"
+                                        "getUninitializedStorage(result)";
               outOfLineOS << "    auto result = ";
               outOfLineSyntaxPrinter.printNominalTypeQualifier(
                   ED, ED->getModuleContext());
@@ -3286,21 +3284,9 @@ bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
   if (decl->isResilient())
     return true;
   // The size and alignment are also unknown when a field is resilient.
-  if (!interopContext.getIrABIDetails().getTypeSizeAlignment(
-          decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
-                                            : ResilienceExpansion::Maximal))
-    return true;
-  // A noncopyable inline wrapper needs an invalid Swift representation for
-  // its moved-from state. Otherwise use the allocation's null state.
-  return cxx_translation::isNoncopyableValueTypeExposableToCxx(decl) &&
-         !interopContext.getIrABIDetails().getTypeExtraInhabitant(decl);
-}
-
-bool DeclAndTypePrinter::hasInlineMovedFromState(const NominalTypeDecl *decl) {
-  auto &abiDetails = interopContext.getIrABIDetails();
-  // Trivial wrappers keep their defaulted C++ special members.
-  return !isOpaqueLayout(decl) && !abiDetails.isTypeTrivial(decl) &&
-         abiDetails.getTypeExtraInhabitant(decl).has_value();
+  return !interopContext.getIrABIDetails().getTypeSizeAlignment(
+      decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
+                                        : ResilienceExpansion::Maximal);
 }
 
 bool DeclAndTypePrinter::isVisible(const ValueDecl *vd) const {

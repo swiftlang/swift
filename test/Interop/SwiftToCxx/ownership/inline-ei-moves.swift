@@ -21,7 +21,7 @@
 
 // CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) BoolWeak final {
 // CHECK: BoolWeak(BoolWeak &&other) noexcept {
-// CHECK: if (other._isMovedFrom()) {
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<false>(*this, other);
 // CHECK: BoolWeak() noexcept { _setMovedFrom(); }
 // CHECK: bool _isMovedFrom() const noexcept {
 // CHECK-NEXT: return (static_cast<unsigned char>(_storage[0]) & 255) == 2;
@@ -70,6 +70,7 @@
 
 // CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) PaddedRef final {
 // CHECK: PaddedRef(PaddedRef &&other) noexcept {
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
 // CHECK: bool _isMovedFrom() const noexcept {
 // CHECK-NEXT: return (static_cast<unsigned char>(_storage[{{[1-9][0-9]*}}]) & 255) == 0 &&
 // CHECK: void _setMovedFrom() noexcept {
@@ -118,11 +119,10 @@ public final class Ref {
 // CHECK-NEXT: if (_isMovedFrom()) return;
 // CHECK: SingleRef(SingleRef &&other) noexcept {
 // CHECK: SingleRef &operator =(SingleRef &&other) noexcept {
-// CHECK: void *oldReference;
-// CHECK-NEXT: memcpy(&oldReference, _storage, sizeof(oldReference));
-// CHECK: other._setMovedFrom();
-// CHECK-NEXT: }
-// CHECK-NEXT: swift::_impl::swift_release(oldReference);
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: auto oldValue = static_cast<class SingleRef &&>(*this);
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: return *this;
 // CHECK: SingleRef(const SingleRef &other) noexcept {
 // CHECK-NEXT: if (other._isMovedFrom()) {
 // CHECK: void _setMovedFrom() noexcept {
@@ -158,17 +158,22 @@ public final class Ref {
 // CHECK: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT: friend class _impl::_impl_TrivialBool;
 
-// The special members name their parameter 'other', and the moved-from check
-// calls the C 'abort', so neither may pick up these Swift names instead.
+// Generated helpers and C library calls must not hide Swift methods.
 @frozen public struct other {
   public var ref: Ref
   public var count = 0
   public init(_ ref: Ref) { self.ref = ref }
   public mutating func abort() {}
+  public mutating func _moveFrom(_ other: inout Self) {}
+  public mutating func _getUninitializedStorage() {}
+  public mutating func memcpy() {}
 }
 
 // CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) other final {
 // CHECK: *this = static_cast<class other>(other);
+// CHECK-DAG: void _moveFrom(other& other)
+// CHECK-DAG: void _getUninitializedStorage()
+// CHECK-DAG: void memcpy()
 // CHECK: _getOpaquePointer() const noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
 
 public func borrow(_ value: borrowing PaddedRef) -> Int { Int(value.prefix) }

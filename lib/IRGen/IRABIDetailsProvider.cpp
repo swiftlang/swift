@@ -127,7 +127,7 @@ public:
            TI.isBitwiseTakable(ResilienceExpansion::Minimal);
   }
 
-  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+  bool isTypeBitwiseTakable(const NominalTypeDecl *TD) {
     auto type = TD->getDeclaredTypeInContext();
     // The header is also used outside this module's resilience domain. The
     // locally lowered TypeInfo alone may expose a resilient field's layout.
@@ -136,8 +136,13 @@ public:
       return false;
     const auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     return typeInfo.isFixedSize(ResilienceExpansion::Minimal) &&
-           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) &&
-           typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal);
+  }
+
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+    return isTypeBitwiseTakable(TD) &&
+           IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext())
+               .isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
   }
 
   std::optional<IRABIDetailsProvider::ExtraInhabitant>
@@ -567,6 +572,10 @@ IRABIDetailsProvider::getTypeExtraInhabitant(const NominalTypeDecl *TD) {
 
 bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
   return impl->isTypeTrivial(TD);
+}
+
+bool IRABIDetailsProvider::isTypeBitwiseTakable(const NominalTypeDecl *TD) {
+  return impl->isTypeBitwiseTakable(TD);
 }
 
 bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(

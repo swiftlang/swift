@@ -40,18 +40,12 @@
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~Array() noexcept {
 // CHECK: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(Array &&other) noexcept {
-// CHECK-NEXT: if (other._isMovedFrom()) {
-// CHECK-NEXT: _setMovedFrom();
-// CHECK-NEXT: return;
-// CHECK-NEXT: }
-// CHECK: vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT: other._setMovedFrom();
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array &operator =(Array &&other) noexcept {
 // CHECK-NEXT: if (this == &other) return *this;
-// CHECK: alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
-// CHECK-NEXT: vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
-// CHECK: vwTable->destroy(_oldValue, metadata._0);
+// CHECK-NEXT: auto oldValue = static_cast<class Array &&>(*this);
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
@@ -59,7 +53,7 @@
 // CHECK-NEXT: _setMovedFrom();
 // CHECK-NEXT: return;
 // CHECK-NEXT: }
-// CHECK: vwTable->initializeWithCopy(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK: vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) noexcept SWIFT_SYMBOL({{.*}});
@@ -101,26 +95,20 @@
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~String() noexcept {
 // CHECK:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String(String &&other) noexcept {
-// CHECK-NEXT:  if (other._isMovedFrom()) {
-// CHECK-NEXT:  _setMovedFrom();
-// CHECK-NEXT:  return;
-// CHECK-NEXT:  }
-// CHECK:  vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT:  other._setMovedFrom();
-// CHECK-NEXT:  }
-// CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(String &&other) noexcept {
-// CHECK-NEXT:  if (this == &other) return *this;
-// CHECK:  alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
-// CHECK-NEXT:  vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
-// CHECK:  vwTable->destroy(_oldValue, metadata._0);
-// CHECK-NEXT:  return *this;
-// CHECK-NEXT:  }
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK String &operator =(String &&other) noexcept {
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: auto oldValue = static_cast<class String &&>(*this);
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) noexcept {
 // CHECK-NEXT:  if (other._isMovedFrom()) {
 // CHECK-NEXT:  _setMovedFrom();
 // CHECK-NEXT:  return;
 // CHECK-NEXT:  }
-// CHECK:  vwTable->initializeWithCopy(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK:  vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK-NEXT:  if (_isMovedFrom() || other._isMovedFrom()) {
@@ -140,7 +128,7 @@
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
 // CHECK-NEXT:  auto result = _make();
 // CHECK-NEXT:  auto res = _impl::$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge void *)nsString);
-// CHECK-NEXT:  memcpy(result._storage, &res, sizeof(res));
+// CHECK-NEXT:  memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &res, sizeof(res));
 // CHECK-NEXT:  return result;
 // CHECK-NEXT:  }
 // CHECK-EMPTY:

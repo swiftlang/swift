@@ -233,6 +233,9 @@ public:
   /// to clients.
   bool isTypeTrivial(const NominalTypeDecl *TD);
 
+  /// Whether clients can move a value of this type by copying its bytes.
+  bool isTypeBitwiseTakable(const NominalTypeDecl *TD);
+
   /// Whether the type has the representation and ownership operations of a
   /// single native Swift reference, even outside its resilience domain.
   bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);

@@ -97,6 +97,7 @@
 // CHECK-NEXT: _storage[0] = static_cast<char>(0);
 // CHECK: }
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
+// CHECK-NEXT: friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push

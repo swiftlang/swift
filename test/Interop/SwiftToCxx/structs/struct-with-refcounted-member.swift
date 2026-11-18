@@ -43,8 +43,7 @@ public func identity<T>(_ value: T) -> T {
 // CHECK-NEXT:     swift::_impl::swift_release(reference);
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(StructWithRefcountedMember &&other) noexcept {
-// CHECK:          memcpy(_storage, other._storage, sizeof(void *));
-// CHECK-NEXT:     other._setMovedFrom();
+// CHECK-NEXT:     ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
 // CHECK:        SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) noexcept {
 // CHECK-NEXT:     if (other._isMovedFrom()) {
 // CHECK-NEXT:       _setMovedFrom();
@@ -53,7 +52,7 @@ public func identity<T>(_ value: T) -> T {
 // CHECK-NEXT:     void *reference;
 // CHECK-NEXT:     memcpy(&reference, other._getOpaquePointer(), sizeof(reference));
 // CHECK-NEXT:     swift::_impl::swift_retain(reference);
-// CHECK-NEXT:     memcpy(_storage, &reference, sizeof(reference));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), &reference, sizeof(reference));
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember &operator =(const StructWithRefcountedMember &other) noexcept {
 // CHECK-NEXT:     if (_isMovedFrom() || other._isMovedFrom()) {

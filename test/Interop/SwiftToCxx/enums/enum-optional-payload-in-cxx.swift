@@ -22,7 +22,7 @@ public enum MatchResult {
 // CHECK-NEXT:   });
 
 // CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_value::operator()(const swift::Optional<int32_t>& val) const {
-// CHECK:        swift::_impl::implClassFor<swift::Optional<int32_t>>::type::initializeWithTake(result._getOpaquePointer(), swift::_impl::implClassFor<swift::Optional<int32_t>>::type::getOpaquePointer(*valCopy));
+// CHECK:        swift::_impl::implClassFor<swift::Optional<int32_t>>::type::initializeWithTake(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), swift::_impl::implClassFor<swift::Optional<int32_t>>::type::getOpaquePointer(*valCopy));
 
 // CHECK:      SWIFT_INLINE_THUNK swift::Optional<int32_t> MatchResult::getValue() const {
 // CHECK:        return swift::_impl::implClassFor<swift::Optional<int32_t>>::type::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
@@ -34,7 +34,7 @@ public enum MatchResult {
 // path.
 
 // CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_rawptr::operator()(void const * _Nullable val) const {
-// CHECK:        memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK:        memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 
 // CHECK:      SWIFT_INLINE_THUNK void const * _Nullable MatchResult::getRawptr() const {
 // CHECK:        void const * _Nullable result;

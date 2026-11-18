@@ -45,6 +45,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT:   alignas(8) char _storage[8];
 // CHECK-NEXT:   friend class _impl::_impl_StructWithIntField;
+// CHECK-NEXT:   friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -64,7 +65,7 @@
 // CHECK-NEXT: template<class T>
 // CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER StructWithIntField returnNewValue(T callable) {
 // CHECK-NEXT:   auto result = StructWithIntField::_make();
-// CHECK-NEXT:   callable(result._getOpaquePointer());
+// CHECK-NEXT:   callable(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result));
 // CHECK-NEXT:   return result;
 // CHECK-NEXT:  }
 // CHECK-NEXT: static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
@@ -103,7 +104,8 @@ public struct StructWithIntField {
 // Special name gets renamed in C++.
 // CHECK: class SWIFT_SYMBOL({{.*}}) register_ final {
 // CHECK: alignas(8) char _storage[16];
-// CHECK-NEXT:   friend class
+// CHECK-NEXT:   friend class _impl::_impl_register_;
+// CHECK-NEXT:   friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push

@@ -102,5 +102,7 @@ public struct FrozenMO: ~Copyable {
 // EVO: class SWIFT_SYMBOL({{.*}}) FrozenMO final {
 // EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
 // EVO: swift::_impl::OpaqueStorage _storage;
+// EVO-NOT: isOpaqueLayout<Unsup::FrozenMO>
+// EVO: inline const constexpr bool usesBoxedStorage<Unsup::FrozenMO> = true;
 // EVO: class SWIFT_SYMBOL({{.*}}) MO final {
 // EVO: SWIFT_INLINE_THUNK MO(MO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
