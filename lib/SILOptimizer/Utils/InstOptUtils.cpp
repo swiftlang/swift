@@ -1226,16 +1226,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // captures, and is responsible for releasing them via its destructor.
     // Release such captures here to make up for that.
     if (pa->isNoncopyable()) {
-      SILBuilderContext builderCtxt(pa->getModule());
-      for (Operand &argOp : pa->getArgumentOperands()) {
-        // A capture that was transferred to a combined apply is undef.
-        if (!isCaptureOwnedByOnStackClosure(argOp) ||
-            isa<SILUndef>(argOp.get()))
-          continue;
-
-        SILBuilderWithScope builder(pa, builderCtxt);
-        emitDestroyOperation(builder, pa->getLoc(), argOp.get(), callbacks);
-      }
+      SILBuilderWithScope builder(pa);
+      emitDestroysOfCapturesOwnedByClosure(pa, builder, pa->getLoc(),
+                                           callbacks);
     }
 
     for (auto *inst : reverse(deleteInsts)) {
@@ -1300,6 +1293,36 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
   salvageDebugInfo(closure);
   callbacks.deleteInst(closure);
   return true;
+}
+
+bool swift::isCaptureOwnedByClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai)
+    return false;
+  if (pai->isOnStack())
+    return isCaptureOwnedByOnStackClosure(argOp);
+  ApplySite site(pai);
+  return site.isArgumentOperand(argOp) &&
+         isCaptureOwnedByEscapingClosure(argOp.get()->getType(),
+                                         site.getParamInfoForOperand(argOp),
+                                         *pai->getFunction());
+}
+
+void swift::emitDestroysOfCapturesOwnedByClosure(PartialApplyInst *pai,
+                                                 SILBuilder &builder,
+                                                 SILLocation loc,
+                                                 InstModCallbacks callbacks,
+                                                 IsDeadEnd_t isDeadEnd) {
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    // A capture that was transferred to a combined apply is undef.
+    if (isa<SILUndef>(argOp.get()) || !isCaptureOwnedByClosure(argOp))
+      continue;
+    // A dead end needs no destroy of a value in memory, and destroy_addr has
+    // no dead-end form, so it would run the value's deinit.
+    if (isDeadEnd && argOp.get()->getType().isAddress())
+      continue;
+    emitDestroyOperation(builder, loc, argOp.get(), callbacks, isDeadEnd);
+  }
 }
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {

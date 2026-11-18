@@ -286,6 +286,19 @@ bool tryDeleteDeadClosure(SingleValueInstruction *closure,
 bool canDeleteDeadClosure(SingleValueInstruction *closure,
                           function_ref<bool(SILInstruction *)> isRemoved);
 
+/// Returns true if the context of the closure that the partial_apply of
+/// \p argOp forms owns the capture \p argOp, so destroying the closure
+/// destroys the capture.
+bool isCaptureOwnedByClosure(Operand &argOp);
+
+/// Emits a destroy of each capture that the context of the closure \p pai
+/// owns, except for a capture that is undef. A dead end doesn't destroy a
+/// capture in memory.
+void emitDestroysOfCapturesOwnedByClosure(PartialApplyInst *pai,
+                                          SILBuilder &builder, SILLocation loc,
+                                          InstModCallbacks callbacks,
+                                          IsDeadEnd_t isDeadEnd = IsntDeadEnd);
+
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
 /// one is attempting to delete the partial apply.
