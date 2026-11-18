@@ -11,15 +11,20 @@
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: embedded_stdlib
 
-struct NoEscapeNoCopy: ~Escapable, ~Copyable {}
+// NOTE: The pointer here is to give the type a lifetime dependency.
+struct NoEscapeNoCopy: ~Escapable, ~Copyable {
+  let p: UnsafeRawPointer?
+}
 
 protocol Foo {
-    var bar: NoEscapeNoCopy {get}
+  var bar: NoEscapeNoCopy {get}
 }
 
 public struct Baz: Foo {
-    var bar: NoEscapeNoCopy {
-      NoEscapeNoCopy() // expected-error{{lifetime-dependent value escapes its scope}}
-                       // expected-note@-1{{it depends on the lifetime of this parent value}}
-    } // expected-note{{this use causes the lifetime-dependent value to escape}}
+  // FIXME: "compiler-generated" is wrong since the getter is explicit
+  // https://github.com/swiftlang/swift/issues/94426
+  var bar: NoEscapeNoCopy { // expected-note {{error in compiler-generated 'get'}}
+    NoEscapeNoCopy(p: nil) // expected-error {{lifetime-dependent value escapes its scope}}
+    // expected-note@-1 {{it depends on the lifetime of this parent value}}
+  } // expected-note {{this use causes the lifetime-dependent value to escape}}
 }
