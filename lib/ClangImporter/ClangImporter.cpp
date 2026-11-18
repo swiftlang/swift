@@ -7475,9 +7475,23 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
 
     // The synthesized body forwards every parameter to the base method.
     SmallVector<ParamDecl *, 4> params;
-    for (auto [index, param] : llvm::enumerate(*fn->getParameters()))
-      params.push_back(SwiftDeclSynthesizer::cloneParamForForwarding(
-          context, param, "__param" + Twine(index)));
+    params.reserve(fn->getParameters()->size());
+    for (auto [index, param] : llvm::enumerate(*fn->getParameters())) {
+      auto *cloned = SwiftDeclSynthesizer::cloneParamForForwarding(
+          context, param, "__param" + Twine(index));
+      // The base method takes by-value parameters owned, but a native Swift
+      // method borrows them by default, so forwarding would need a copy. Take
+      // noncopyable parameters as consuming instead. A `const T &` parameter is
+      // also imported as a default `T`, but the base method only borrows it.
+      auto *clangParam =
+          dyn_cast_or_null<clang::ParmVarDecl>(param->getClangDecl());
+      auto paramTy = cloned->getInterfaceType();
+      if (cloned->getSpecifier() == ParamSpecifier::Default && clangParam &&
+          !clangParam->getType()->isReferenceType() &&
+          !paramTy->hasTypeParameter() && paramTy->isNoncopyable())
+        cloned->setSpecifier(ParamSpecifier::Consuming);
+      params.push_back(cloned);
+    }
 
     auto out = FuncDecl::createImplicit(
         context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),

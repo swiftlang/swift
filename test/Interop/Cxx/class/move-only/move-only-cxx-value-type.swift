@@ -86,4 +86,24 @@ MoveOnlyCxxValueType.test("Test move only type with an empty base") {
   expectEqual(b.third.x, 13)
 }
 
+MoveOnlyCxxValueType.test("Test inherited method taking move only type by value") {
+  var d = NonCopyableParamDerived()
+  expectEqual(d.takesNonCopyable(NonCopyable(5)), 5)
+
+  let nc = NonCopyable(3)
+  expectEqual(d.mutTakesNonCopyable(nc, 4), 12)
+  expectEqual(d.x, 12)
+
+  let dd = NonCopyableParamDerivedDerived()
+  expectEqual(dd.takesNonCopyable(NonCopyable(7)), 7)
+}
+
+MoveOnlyCxxValueType.test("Test inherited method borrowing move only type") {
+  let d = NonCopyableParamDerived()
+  let nc = NonCopyable(3)
+  expectEqual(d.takesNonCopyableConstRef(nc), 3)
+  expectEqual(d.takesNonCopyableConstRef(nc), 3)
+  expectEqual(nc.x, 3)
+}
+
 runAllTests()
