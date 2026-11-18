@@ -27,10 +27,12 @@
 ///     // "Humperdinck"
 @frozen
 public struct Repeated<Element> {
+  @abi(let count: Int)
   @usableFromInline
   internal let _count: Int
 
   /// The number of elements in this collection.
+  @abi(var _count: Int)
   @inlinable
   public var count: Int { _assumeNonNegative(_count) }
 

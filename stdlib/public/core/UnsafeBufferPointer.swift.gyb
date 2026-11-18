@@ -41,6 +41,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   @usableFromInline
   @_preInverseGenerics
   @safe
+  @abi(let count: Int)
   internal let _count: Int
 
   /// The number of elements in the buffer.
@@ -48,6 +49,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_preInverseGenerics
+  @abi(var _count: Int)
   @inlinable
   @safe
   public var count: Int { _assumeNonNegative(_count) }
