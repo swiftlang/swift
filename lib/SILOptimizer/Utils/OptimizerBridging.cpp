@@ -408,14 +408,34 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   return BridgedOwnedString(Mangler.mangle());
 }
 
-BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices,
-                                                          BridgedFunction function) const {
+BridgedOwnedString BridgedPassContext::mangleWithSignatureSpecializedArgs(BridgedArrayRef bridgedArgSpecializations,
+                                                                          bool resultOwnedToGuaranteed,
+                                                                          BridgedFunction function) const {
   SILFunction *f = function.getFunction();
   Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
-  for (SwiftInt idx : bridgedDeadArgIndices.unbridged<SwiftInt>()) {
-    Mangler.setArgumentDead((unsigned)idx);
+  for (auto argMangling : bridgedArgSpecializations.unbridged<SignatureSpecializedArgMangling>()) {
+    unsigned argIdx = (unsigned)argMangling.argIdx;
+    switch (argMangling.kind) {
+      case SignatureSpecializedArgMangling::Kind::ownedToGuaranteed:
+        Mangler.setArgumentOwnedToGuaranteed(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::guaranteedToOwned:
+        Mangler.setArgumentGuaranteedToOwned(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::dead:
+        Mangler.setArgumentDead(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::explode:
+        Mangler.setArgumentSROA(argIdx);
+        break;
+    }
+  }
+  if (resultOwnedToGuaranteed) {
+    // The mangling for a direct result which is not returned at +1. It demangles
+    // to "Return = Owned To Guaranteed".
+    Mangler.setReturnValueOwnedToUnowned();
   }
   return BridgedOwnedString(Mangler.mangle());
 }

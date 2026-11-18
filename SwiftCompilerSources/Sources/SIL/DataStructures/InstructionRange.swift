@@ -41,7 +41,7 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   /// The underlying block range.
   public private(set) var blockRange: BasicBlockRange
 
-  private var insertedInsts: InstructionSet
+  public private(set) var insertedInstructions: InstructionSet
 
   // For efficiency, this set does not include instructions in blocks which are not the begin or any end block.
   private var inExclusiveRange: InstructionSet
@@ -70,13 +70,13 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   private init(beginBlock: BasicBlock, _ context: some Context) {
     self.blockRange = BasicBlockRange(begin: beginBlock, context)
-    self.insertedInsts = InstructionSet(context)
+    self.insertedInstructions = InstructionSet(context)
     self.inExclusiveRange = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
   public mutating func insert(_ inst: Instruction) {
-    insertedInsts.insert(inst)
+    insertedInstructions.insert(inst)
     insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
     if blockRange.insert(inst.parentBlock) {
       // The first time an instruction is inserted in another block than the begin-block we need to insert
@@ -105,7 +105,11 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the inclusive range contains `inst`.
   public func inclusiveRangeContains (_ inst: Instruction) -> Bool {
-    contains(inst) || insertedInsts.contains(inst)
+    contains(inst) || insertedInstructions.contains(inst)
+  }
+
+  public func isEnd(_ inst: Instruction) -> Bool {
+    !contains(inst) && insertedInstructions.contains(inst)
   }
 
   /// Returns the end instructions.
@@ -113,7 +117,7 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   /// Warning: this returns `begin` if no instructions were inserted.
   public var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
-      $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
+      $0.instructions.reversed().first(where: { insertedInstructions.contains($0)})!
     }
   }
 
@@ -139,7 +143,7 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     blockRange.inserted.lazy.flatMap {
       var include = blockRange.contains($0)
       return $0.instructions.reversed().lazy.filter {
-        if insertedInsts.contains($0) {
+        if insertedInstructions.contains($0) {
           let isInterior = include
           include = true
           return isInterior
@@ -174,7 +178,7 @@ public struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   /// TODO: once we have move-only types, make this a real deinit.
   public mutating func deinitialize() {
     inExclusiveRange.deinitialize()
-    insertedInsts.deinitialize()
+    insertedInstructions.deinitialize()
     blockRange.deinitialize()
   }
 }

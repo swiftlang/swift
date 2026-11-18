@@ -302,7 +302,11 @@ extension FullApplySite {
 }
 
 extension ApplySite {
-  func replace(withCallTo callee: Function, arguments newArguments: [Value], _ context: some MutatingContext) {
+  /// Replaces this apply with an apply of `callee`, taking all other properties from the original apply.
+  /// Returns the new apply.
+  @discardableResult
+  func replace(withCallTo callee: Function, arguments newArguments: [Value],
+               _ context: some MutatingContext) -> ApplySite {
     let builder = Builder(before: self, context)
     let calleeRef = builder.createFunctionRef(callee)
 
@@ -317,8 +321,11 @@ extension ApplySite {
                                          applyInst.substitutionMap,
                                          arguments: newArguments,
                                          isNonThrowing: applyInst.isNonThrowing,
+                                         isNonAsync: applyInst.isNonAsync,
+                                         specializationInfo: applyInst.specializationInfo,
                                          argumentLocationsFrom: self)
       applyInst.replace(with: newApply, context)
+      return newApply
 
     case let partialAp as PartialApplyInst:
       let newApply = builder.createPartialApply(function: calleeRef,
@@ -331,21 +338,28 @@ extension ApplySite {
                                                 executionSemantics: partialAp.executionSemantics,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
+      return newApply
 
     case let tryApply as TryApplyInst:
-      builder.createTryApply(function: calleeRef,
-                             tryApply.substitutionMap,
-                             arguments: newArguments,
-                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
-                             argumentLocationsFrom: self)
+      let newApply = builder.createTryApply(function: calleeRef,
+                                            tryApply.substitutionMap,
+                                            arguments: newArguments,
+                                            normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
+                                            isNonAsync: tryApply.isNonAsync,
+                                            specializationInfo: tryApply.specializationInfo,
+                                            argumentLocationsFrom: self)
       context.erase(instruction: tryApply)
+      return newApply
 
     case let beginApply as BeginApplyInst:
       let newApply = builder.createBeginApply(function: calleeRef,
                                               beginApply.substitutionMap,
                                               arguments: newArguments,
+                                              isNonThrowing: beginApply.isNonThrowing,
+                                              isNonAsync: beginApply.isNonAsync,
                                               argumentLocationsFrom: self)
       beginApply.replace(with: newApply, context)
+      return newApply
 
     default:
       fatalError("unknown apply")

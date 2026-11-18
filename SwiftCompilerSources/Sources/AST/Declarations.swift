@@ -126,6 +126,10 @@ public class NominalTypeDecl: GenericTypeDecl {
     return result
   }
 
+  final public var storedProperties: StoredPropertiesArray {
+    StoredPropertiesArray(nominal: self)
+  }
+
   public func add(member: Decl) {
     bridged.NominalTypeDecl_addMember(member.bridged)
   }
@@ -411,6 +415,17 @@ public class GenericParameterList {
 }
 
 public typealias TrailingWhereClause = BridgedTrailingWhereClause
+
+public struct StoredPropertiesArray : RandomAccessCollection {
+  fileprivate let nominal: NominalTypeDecl
+
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { nominal.bridged.NominalType_getNumStoredProperties() }
+
+  public subscript(_ index: Int) -> VarDecl {
+    return nominal.bridged.NominalType_getStoredProperty(index).getAs(VarDecl.self)
+  }
+}
 
 public class ParameterList : RandomAccessCollection {
   public var startIndex: Int { 0 }

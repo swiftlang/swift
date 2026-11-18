@@ -13,7 +13,6 @@ swift_compiler_sources(Optimizer
   ControlFlowUtils.swift
   Devirtualization.swift
   EscapeUtils.swift
-  FunctionSignatureTransforms.swift
   GenericSpecialization.swift
   LifetimeCompletion.swift
   LifetimeDependenceUtils.swift
@@ -22,5 +21,6 @@ swift_compiler_sources(Optimizer
   OptUtils.swift
   OwnershipLiveness.swift
   OwnershipUtilities.swift
+  SignatureOptimizationUtilities.swift
   Test.swift
 )

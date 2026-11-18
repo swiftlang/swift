@@ -373,6 +373,8 @@ struct BridgedDeclObj {
           void * _Nonnull resultArray,
           void (* _Nonnull appendFn)(void * _Nonnull resultArray, BridgedDeclObj protocol)) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
+  BRIDGED_INLINE SwiftInt NominalType_getNumStoredProperties() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj NominalType_getStoredProperty(SwiftInt index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Enum_getRawType() const;
   BRIDGED_INLINE bool Enum_hasCasesUnavailableDuringLowering() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
@@ -3278,6 +3280,7 @@ struct BridgedASTType {
   BRIDGED_INLINE bool hasLocalArchetype() const;
   BRIDGED_INLINE bool hasOpaqueArchetype() const;
   BRIDGED_INLINE bool hasExistentialArchetype() const;
+  BRIDGED_INLINE bool hasPrimaryArchetype() const;
   BRIDGED_INLINE bool hasDynamicSelf() const;
   BRIDGED_INLINE bool isArchetype() const;
   BRIDGED_INLINE bool archetypeRequiresClass() const;
@@ -3353,6 +3356,7 @@ struct BridgedASTType {
   NominalType_getGenericArgs() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray
   PackType_getElementTypes() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getTypeOfMember(BridgedDeclObj varDecl) const;
 };
 
 class BridgedCanType {
