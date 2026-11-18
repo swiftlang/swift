@@ -1594,7 +1594,11 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
       default:
         swift_unreachable("unsupported function witness");
       case FunctionMetadataDifferentiabilityKind::NonDifferentiable:
-        Data.ValueWitnesses = &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
+        // The context of a function that can never be 'Transferable' is
+        // confined to a single isolation domain.
+        Data.ValueWitnesses = key.getExtFlags().isNonTransferable()
+                                  ? &NonTransferableThickFunctionValueWitnesses
+                                  : &VALUE_WITNESS_SYM(FUNCTION_MANGLING);
         break;
       }
     }
