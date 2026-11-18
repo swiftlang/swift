@@ -462,6 +462,11 @@ private struct MultiDefResolver {
   func adjustAccessForTake(_ addr: Value) {
     assert(addr.type.isAddress)
 
+    // A take out of an open_existential_addr requires it to be mutable.
+    if let openExt = addr.definingInstruction as? OpenExistentialAddrInst, openExt.isImmutable {
+      openExt.set(isImmutable: false, context: context)
+    }
+
     guard case let .access(beginAccess) = addr.enclosingAccessScope else {
       return
     }

@@ -1606,6 +1606,12 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
   }
 }
 
+void BridgedInstruction::OpenExistentialAddr_setImmutable(bool immutable) const {
+  getAs<swift::OpenExistentialAddrInst>()->setAccessKind(
+      immutable ? swift::OpenedExistentialAccess::Immutable
+                : swift::OpenedExistentialAccess::Mutable);
+}
+
 BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
   return {getAs<swift::OpenExistentialRefInst>()->getDefinedOpenedArchetype()->getGenericEnvironment()};
 }
