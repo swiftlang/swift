@@ -23,8 +23,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// XFAIL: OS=linux-{{.*}}
-
 // Verify that ThreadSanitizer correctly observes happens-before edges across
 // Synchronization.Mutex.withLock
 
