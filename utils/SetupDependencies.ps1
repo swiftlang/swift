@@ -681,7 +681,11 @@ function Extract-Toolchain {
 
     Invoke-Program -OutNull subst.exe X: "$InstallRoot"
     $DriveMapped = $true
-    Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
+    # The build only uses the compilers with assertions, the SDKs and the
+    # runtime of the pinned toolchain.
+    Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | Where-Object {
+      $_.Name -notmatch "noasserts|^(dbg|ide|python)\." -and ($Android -or $_.Name -ne "android.msi")
+    } | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       # Administrative installs do not run rtl.msi's SetDirectory actions.
       $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
