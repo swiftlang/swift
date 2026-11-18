@@ -2913,54 +2913,54 @@ void ConstraintSystem::replayChanges(
     PreparedOverload *preparedOverload) {
   struct Visitor {
     void visitAddedTypeVariable(TypeVariableType *typeVar) {
-      self->addTypeVariable(typeVar);
+      cs.addTypeVariable(typeVar);
     }
 
     void visitAddedConstraint(Constraint *constraint) {
-      self->simplifyDisjunctionChoice(constraint);
+      cs.simplifyDisjunctionChoice(constraint);
     }
 
     void visitAddedBindConstraint(Type firstType, Type secondType) {
-      self->addConstraint(ConstraintKind::Bind,
-                          firstType,
-                          secondType,
-                          locator,
-                          /*isFavored=*/false);
+      cs.addConstraint(ConstraintKind::Bind,
+                       firstType,
+                       secondType,
+                       locator,
+                       /*isFavored=*/false);
     }
 
     void visitOpenedTypes(ArrayRef<OpenedType> replacements) {
       // FIXME: Get rid of this conditional.
-      if (self->getOpenedTypes(locator).empty())
-        self->recordOpenedType(locator, replacements);
+      if (cs.getOpenedTypes(locator).empty())
+        cs.recordOpenedType(locator, replacements);
     }
 
     void visitOpenedExistentialType(ExistentialArchetypeType *existential) {
-      self->recordOpenedExistentialType(locator, existential);
+      cs.recordOpenedExistentialType(locator, existential);
     }
 
     void visitOpenedPackExpansionType(PackExpansionType *expansion,
                                       TypeVariableType *typeVar) {
-      self->recordOpenedPackExpansionType(expansion, typeVar);
+      cs.recordOpenedPackExpansionType(expansion, typeVar);
     }
 
     void visitAppliedPropertyWrapper(Type wrapperType,
                                      PropertyWrapperInitKind initKind) {
       Expr *anchor = getAsExpr(locator->getAnchor());
-      self->applyPropertyWrapper(anchor, {wrapperType, initKind});
+      cs.applyPropertyWrapper(anchor, {wrapperType, initKind});
     }
 
     void visitAddedFix(ConstraintFix *fix, FixImpact impact) {
-      self->recordFix(fix, impact);
+      cs.recordFix(fix, impact);
     }
 
     void visitRecordedNodeType(ASTNode node, Type type) {
-      self->setType(node, type);
+      cs.setType(node, type);
     }
 
-    ConstraintSystem *self;
+    ConstraintSystem &cs;
     ConstraintLocator *locator;
     PreparedOverload *preparedOverload;
-  } visitor{this, locator, preparedOverload};
+  } visitor{*this, locator, preparedOverload};
 
   for (auto &change : preparedOverload->getChanges()) {
     change.visit(visitor);
