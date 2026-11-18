@@ -7341,6 +7341,50 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
   }
 }
 
+/// The schema Swift uses for a `__ptrauth` field's value outside the field.
+static PointerAuthInfo
+getSwiftSidePointerAuthInfo(IRGenFunction &IGF, VarDecl *field,
+                            SILType fieldAddrType,
+                            llvm::Value *storageAddress) {
+  // Only C function pointers stay signed. Check the Clang type, since some
+  // (e.g. variadic ones) are imported as OpaquePointer.
+  auto clangType = cast<clang::ValueDecl>(field->getClangDecl())->getType();
+  if (!clangType->isFunctionPointerType())
+    return PointerAuthInfo();
+
+  auto &schema = IGF.IGM.getOptions().PointerAuth.FunctionPointers;
+
+  // ClangImporter imports nullable pointers as optional types.
+  SILType valueType = fieldAddrType.getOptionalObjectType();
+  if (!valueType)
+    valueType = fieldAddrType;
+  if (auto fnType = valueType.getAs<SILFunctionType>())
+    return PointerAuthInfo::emit(IGF, schema, storageAddress,
+                                 PointerAuthEntity(fnType));
+
+  // No Swift function type, so the value is signed as in C.
+  if (!schema)
+    return PointerAuthInfo();
+  uint64_t discriminator = 0;
+  switch (schema.getOtherDiscrimination()) {
+  case PointerAuthSchema::Discrimination::None:
+    break;
+  case PointerAuthSchema::Discrimination::Type:
+    discriminator = const_cast<clang::ASTContext &>(IGF.IGM.getClangASTContext())
+                        .getPointerAuthTypeDiscriminator(
+                            clangType->getPointeeType());
+    break;
+  case PointerAuthSchema::Discrimination::Decl:
+    llvm_unreachable("function pointers are not decl-discriminated");
+  case PointerAuthSchema::Discrimination::Constant:
+    discriminator = schema.getConstantDiscrimination();
+    break;
+  }
+  return PointerAuthInfo::emit(
+      IGF, schema, storageAddress,
+      llvm::ConstantInt::get(IGF.IGM.Int64Ty, discriminator));
+}
+
 static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
   switch (kind) {
   case SILAccessKind::Read:
@@ -7456,12 +7500,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       Builder.emitBlock(resignNonNull);
       auto oldAuthInfo =
           PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
-      // ClangImporter imports the c function pointer as an optional type.
-      PointerAuthEntity entity(
-          sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-      auto newAuthInfo = PointerAuthInfo::emit(
-          *this, IGM.getOptions().PointerAuth.FunctionPointers,
-          pointerToSignedFptr, entity);
+      auto newAuthInfo = getSwiftSidePointerAuthInfo(
+          *this, sea->getField(), sea->getType(), pointerToSignedFptr);
       auto *resignedFptr =
           emitPointerAuthResign(*this, signedFptr, oldAuthInfo, newAuthInfo);
       Builder.CreateStore(resignedFptr, tempAddressToIntPtr,
@@ -7607,13 +7647,10 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
 
     Builder.emitBlock(resignNonNull);
 
-    // If non-null, resign
-    // ClangImporter imports the c function pointer as an optional type.
-    PointerAuthEntity entity(
-        sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-    auto oldAuthInfo = PointerAuthInfo::emit(
-        *this, IGM.getOptions().PointerAuth.FunctionPointers,
-        tempAddress, entity);
+    // If non-null, sign or resign.
+    auto oldAuthInfo =
+        getSwiftSidePointerAuthInfo(*this, sea->getField(),
+                                    sea->getType(), tempAddress);
     auto newAuthInfo =
         PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
     auto *signedFptr = emitPointerAuthResign(*this, tempAddressValue,
