@@ -3345,7 +3345,6 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     LLVM_DEBUG(llvm::dbgs() << "Performing forward traversal from errorUse "
                                "looking for the cause of liveness!\n");
 
-    llvm::SmallSetVector<SILInstruction *, 1> violatingInst;
     bool foundSingleBlockError = false;
     while (auto *block = worklist.pop()) {
       LLVM_DEBUG(llvm::dbgs()
