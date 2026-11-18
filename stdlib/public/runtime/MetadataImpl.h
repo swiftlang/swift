@@ -211,6 +211,18 @@ struct SwiftRetainableBox :
   }
 };
 
+/// A box implementation class for Swift object pointers that are confined to
+/// a single isolation domain.
+struct NonAtomicSwiftRetainableBox
+    : RetainableBoxBase<NonAtomicSwiftRetainableBox, HeapObject *> {
+  static HeapObject *retain(HeapObject *obj) {
+    swift_nonatomic_retain(obj);
+    return obj;
+  }
+
+  static void release(HeapObject *obj) { swift_nonatomic_release(obj); }
+};
+
 /// A box implementation class for Swift unowned object pointers.
 struct SwiftUnownedRetainableBox :
     RetainableBoxBase<SwiftUnownedRetainableBox, HeapObject*> {
