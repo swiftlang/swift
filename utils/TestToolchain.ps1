@@ -570,6 +570,8 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
         }
       }
 
+      # The configuration is the same, so CMake does not run again.
+      $CMakeMode = "Build"
       Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
       Build-CMakeProject @BuildCMakeArgs -BuildTargets @($Suites | ForEach-Object { $CompilerTestSuites[$_].Depends })
     }
