@@ -75,7 +75,9 @@ extension _Deque._Storage {
   }
 
   internal var count: Int {
-    unsafe _buffer.withUnsafeMutablePointerToHeader { unsafe $0.pointee.count }
+    unsafe _buffer.withUnsafeMutablePointerToHeader {
+      unsafe _assumeNonNegative($0.pointee.count)
+    }
   }
 
   internal var startSlot: _DequeSlot {
