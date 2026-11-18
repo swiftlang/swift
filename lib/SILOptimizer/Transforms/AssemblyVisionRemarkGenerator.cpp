@@ -253,12 +253,6 @@ static SingleValueInstruction *isSupportedProjection(Projection p, SILValue v) {
   llvm_unreachable("Covered switch is not covered?!");
 }
 
-static bool hasNonInlinedDebugScope(SILInstruction *i) {
-  if (auto *scope = i->getDebugScope())
-    return !scope->InlinedCallSite;
-  return false;
-}
-
 namespace {
 
 /// A helper struct that attempts to infer the decl associated with a value from
@@ -283,15 +277,15 @@ bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
   if (use->isTypeDependent())
     return false;
 
-  // Then see if we have a debug_value that is associated with a non-inlined
-  // debug scope. Such an instruction is an instruction that is from the
-  // current function.
+  // Then see if we have a debug_value whose variable has a non-inlined debug
+  // scope. Such a variable is from the current function.
   auto debugInst = DebugVarCarryingInst(use->getUser());
   if (!debugInst)
     return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Found DebugInst: " << **debugInst);
-  if (!hasNonInlinedDebugScope(*debugInst))
+  auto varInfo = debugInst.getVarInfo();
+  if (!varInfo || varInfo->Scope->InlinedCallSite)
     return false;
 
   // See if we have already inferred this debug_value as a potential source
@@ -322,10 +316,6 @@ bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
   if (!DecllessDebugValueUseSILDebugInfo)
     return false;
 
-  auto varInfo = debugInst.getVarInfo();
-  if (!varInfo)
-    return false;
-
   auto name = varInfo->Name;
   if (name.empty())
     return false;
@@ -337,7 +327,7 @@ bool ValueUseToDeclInferrer::findDecls(Operand *use, SILValue value) {
                      use->get() == value /*print projection path*/);
   }
   resultingInferredDecls.push_back(Argument(
-      {keyKind, "InferredValue"}, std::move(msg), debugInst->getLoc()));
+      {keyKind, "InferredValue"}, std::move(msg), *varInfo->Loc));
   return true;
 }
 
