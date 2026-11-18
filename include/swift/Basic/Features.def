@@ -292,6 +292,7 @@ LANGUAGE_FEATURE(BuiltinGepProjection, 0, "gepProjection Builtin")
 LANGUAGE_FEATURE(BuiltinDereferenceable, 0, "Builtin.dereferenceable")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 LANGUAGE_FEATURE(BuiltinContinuationNonCopyableSuccess, 0, "Builtin.{resume,withUnsafe}*Continuation* relaxed to allow Success: ~Copyable")
+LANGUAGE_FEATURE(BuiltinSplitContinuations, 564, "Split continuation builtins")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 /// Allow the kind of an OS version query function in the
 /// `availability.osversion` semantics attribute.
