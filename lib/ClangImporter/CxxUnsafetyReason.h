@@ -18,6 +18,7 @@
 namespace clang {
 class NamedDecl;
 class RecordDecl;
+class Type;
 } // end namespace clang
 
 namespace swift::importer {
@@ -45,6 +46,9 @@ enum class CxxUnsafetyReason {
   ExplicitAnnotation,
   /// A non-escapable view with a lifetime dependency Swift cannot track.
   IndirectView,
+  /// A class template specialization imported as a class with a non-escapable
+  /// template argument. Swift classes are always escapable.
+  NonEscapableTemplateArgument,
 };
 
 /// Why a C++ type's escapability could not be determined. Each case is one
@@ -68,6 +72,11 @@ struct CxxUnsafetyExplanation {
   CxxUnsafetyReason reason;
   /// The declaration to name, or null for reasons that have nothing to name.
   const clang::NamedDecl *culprit = nullptr;
+  /// For the template argument reasons: the offending argument.
+  const clang::Type *argument = nullptr;
+  /// For the template argument reasons of a type imported as a class: the base
+  /// class whose template argument it is, or null if it is the type's own.
+  const clang::RecordDecl *base = nullptr;
 };
 
 /// Why a type's escapability is unknown, and what to blame for it.
