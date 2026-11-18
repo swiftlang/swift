@@ -2260,6 +2260,54 @@ void ModuleFile::consumeHiddenTypeXRefPathPieces(
   }
 }
 
+/// Appends to \p results the imported clang class template specialization with
+/// the given \p usr, searching the specializations of the clang class templates
+/// among \p candidates.
+static void
+lookupClangTemplateSpecialization(ArrayRef<ValueDecl *> candidates,
+                                  StringRef usr,
+                                  SmallVectorImpl<ValueDecl *> &results) {
+  for (auto *m : candidates) {
+    if (!m->hasClangNode())
+      continue;
+    // Macros have a clang node but no clang decl.
+    if (auto *ctd =
+            dyn_cast_or_null<clang::ClassTemplateDecl>(m->getClangDecl())) {
+      auto *loader = m->getASTContext().getClangModuleLoader();
+      for (const auto *spec : ctd->specializations()) {
+        llvm::SmallString<128> buffer;
+        clang::index::generateUSRForDecl(spec, buffer);
+        if (usr == buffer) {
+          auto import = loader->importDeclDirectly(spec);
+          if (import && !llvm::is_contained(results, import))
+            results.push_back(cast<ValueDecl>(import));
+        }
+      }
+    }
+  }
+}
+
+/// Looks up the first path piece of a cross-reference in \p module.
+static void lookupTopLevelXRef(ModuleDecl *module, DeclBaseName name,
+                               Identifier privateDiscriminator,
+                               bool importedFromClang,
+                               SmallVectorImpl<ValueDecl *> &values) {
+  if (!privateDiscriminator.empty() && importedFromClang) {
+    // A clang class template specialization, serialized using the template
+    // name and the USR of the specialization.
+    SmallVector<ValueDecl *, 4> templates;
+    module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                            NLFlags::RemoveOverridden, templates);
+    lookupClangTemplateSpecialization(templates, privateDiscriminator.str(),
+                                      values);
+  } else if (!privateDiscriminator.empty()) {
+    module->lookupMember(values, module, name, privateDiscriminator);
+  } else {
+    module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                            NLFlags::RemoveOverridden, values);
+  }
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -2326,14 +2374,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
-    if (privateDiscriminator) {
-      baseModule->lookupMember(values, baseModule, name,
-                               getIdentifier(privateDiscriminator));
-    } else {
-      baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NLFlags::RemoveOverridden,
-                                  values);
-    }
+    lookupTopLevelXRef(baseModule, name, getIdentifier(privateDiscriminator),
+                       importedFromClang, values);
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
                  importedFromClang, isStatic, std::nullopt, values);
     if (values.empty() && importedFromClang && name.isOperator() && filterTy) {
@@ -2536,14 +2578,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         }
 
         values.clear();
-        if (privateDiscriminator) {
-          otherModule->lookupMember(values, otherModule, name,
-                                   getIdentifier(privateDiscriminator));
-        } else {
-          otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NLFlags::RemoveOverridden,
-                                       values);
-        }
+        lookupTopLevelXRef(otherModule, name,
+                           getIdentifier(privateDiscriminator),
+                           importedFromClang, values);
 
         std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
         if (!values.empty()) {
@@ -2785,24 +2822,8 @@ giveUpFastPath:
           // This is a clang imported class template, that's
           // serialized using original template name, and
           // its USR that denotes the specific specialization.
-          auto members = nominal->lookupDirect(memberName);
-          for (const auto &m : members) {
-            if (!m->hasClangNode())
-              continue;
-            if (auto *ctd =
-                    dyn_cast<clang::ClassTemplateDecl>(m->getClangDecl())) {
-              for (const auto *spec : ctd->specializations()) {
-                llvm::SmallString<128> buffer;
-                clang::index::generateUSRForDecl(spec, buffer);
-                if (privateDiscriminator.str() == buffer) {
-                  if (auto import = getContext()
-                                        .getClangModuleLoader()
-                                        ->importDeclDirectly(spec))
-                    values.push_back(cast<ValueDecl>(import));
-                }
-              }
-            }
-          }
+          lookupClangTemplateSpecialization(nominal->lookupDirect(memberName),
+                                            privateDiscriminator.str(), values);
         } else {
           ModuleDecl *searchModule = M;
           if (!searchModule)
