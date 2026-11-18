@@ -327,6 +327,62 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
   return M.isTypeMetadataAccessible(type.getASTType());
 }
 
+/// Returns true if a value of the fixed-ABI type \p type can be destroyed
+/// using only type metadata this module can access.
+static bool canDestroyFixedABIValue(SILModule &M, SILType type,
+                                    TypeExpansionContext forExpansion) {
+  type = type.removingMoveOnlyWrapper();
+  if (!type.isMoveOnly(/*orWrapped=*/false))
+    return true;
+  auto props = M.Types.getTypeProperties(type, forExpansion);
+  if (props.isInfinite() ||
+      props.mayHaveCustomDeinit() == HasOnlyDefaultDeinit)
+    return true;
+
+  if (auto *nominal = type.getNominalDecl()) {
+    if (isTypeMetadataForLayoutAccessible(M, type))
+      return true;
+    if (nominal->hasValueTypeDestructor())
+      return false;
+    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+      for (VarDecl *field : structDecl->getStoredProperties()) {
+        if (!canDestroyFixedABIValue(
+                M, type.getFieldType(field, M, forExpansion), forExpansion))
+          return false;
+      }
+      return true;
+    }
+    if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      for (EnumElementDecl *elt : enumDecl->getAllElements()) {
+        if (elt->hasAssociatedValues() &&
+            !canDestroyFixedABIValue(
+                M, type.getEnumElementType(elt, M, forExpansion),
+                forExpansion))
+          return false;
+      }
+      return true;
+    }
+    return true;
+  }
+
+  if (auto tupleType = type.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
+      if (!canDestroyFixedABIValue(M, type.getTupleElementType(i),
+                                   forExpansion))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto fixedArray = type.getAs<BuiltinFixedArrayType>()) {
+    return canDestroyFixedABIValue(
+        M, M.Types.getLoweredType(fixedArray->getElementType(), forExpansion),
+        forExpansion);
+  }
+
+  return true;
+}
+
 /// Can we perform value operations on the given type?  We have no way
 /// of doing value operations on resilient-layout types from other modules
 /// that are ABI-private to their defining module.  But if the type is not
@@ -334,9 +390,8 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 /// value witness table stored there.
 bool SILModule::isTypeABIAccessible(SILType type,
                                     TypeExpansionContext forExpansion) {
-  // Fixed-ABI types can have value operations done without metadata.
   if (Types.getTypeProperties(type, forExpansion).isFixedABI())
-    return true;
+    return canDestroyFixedABIValue(*this, type, forExpansion);
 
   assert(!type.is<ReferenceStorageType>() &&
          !type.is<SILFunctionType>() &&
