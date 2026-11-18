@@ -27,9 +27,9 @@ address of the allocated memory.
 `alloc_stack` always allocates memory on the stack even for
 runtime-sized type.
 
-`alloc_stack` is a stack allocation instruction. See the section above
-on stack discipline. The corresponding stack deallocation instruction is
-`dealloc_stack`.
+`alloc_stack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_stack`.
 
 The `dynamic_lifetime` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time. This
@@ -68,9 +68,9 @@ Allocates uninitialized memory on the stack for a value pack of the
 given type, which must be a pack type. The result of the instruction is
 the address of the allocated memory.
 
-`alloc_pack` is a stack allocation instruction. See the section above on
-stack discipline. The corresponding stack deallocation instruction is
-`dealloc_pack`.
+`alloc_pack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack`.
 
 ### alloc_pack_metadata
 
@@ -81,9 +81,9 @@ sil-instruction ::= 'alloc_pack_metadata' $()
 Inserted as the last SIL lowering pass of IRGen, indicates that the next
 instruction may have on-stack pack metadata allocated on its behalf.
 
-Notionally, `alloc_pack_metadata` is a stack allocation instruction. See
-the section above on stack discipline. The corresponding stack
-deallocation instruction is `dealloc_pack_metadata`.
+Notionally, `alloc_pack_metadata` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack_metadata`.
 
 Only valid in Lowered SIL.
 
@@ -4374,9 +4374,10 @@ These instructions are collectively called the *pack indexing
 instructions*. Each of them produces a single value of type
 `Builtin.PackIndex`. Instructions that consume pack indices generally
 provide a projected element type which is required to be structurally
-well-typed for the given pack index and the actual pack type they index
-into. This rule depends on the exact pack indexing instruction used and
-is described in a section above.
+well-typed for the given pack index and the actual pack type they
+index into. This rule depends on the exact pack indexing instruction
+used and is described in [Structural type matching for pack
+indices](SIL.md#structural-type-matching-for-pack-indices).
 
 All pack indexing instructions carry an **indexed pack type**, which is
 a formal type that must be a pack type. Pack indexing instructions can
