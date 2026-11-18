@@ -1351,7 +1351,9 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
-    if (theEnum->hasCases() && theEnum->hasOnlyCasesWithoutAssociatedValues()) {
+    bool isImportedEnum = theEnum->isObjC() && theEnum->hasClangNode();
+    if ((theEnum->hasCases() || isImportedEnum) &&
+        theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       // Simple enumerations conform to Equatable.
       addSynthesized(ctx.getProtocol(KnownProtocolKind::Equatable));
 

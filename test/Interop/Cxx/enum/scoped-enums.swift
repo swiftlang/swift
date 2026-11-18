@@ -2,6 +2,7 @@
 
 // REQUIRES: executable_test
 
+import CxxStdlib
 import ScopedEnums
 import StdlibUnittest
 
@@ -61,5 +62,19 @@ ScopedEnumsTestSuite.test("Make and compare (ScopedEnumWChar)") {
   expectNotEqual(ScopedEnumWChar(rawValue: 0), .y)
 }
 #endif
+
+ScopedEnumsTestSuite.test("Hash and compare (ScopedEnumEmpty)") {
+  let one = ScopedEnumEmpty(rawValue: 1)!
+  let two = ScopedEnumEmpty(rawValue: 2)!
+  let set: Set = [one, two, one]
+  expectEqual(set.count, 2)
+}
+
+ScopedEnumsTestSuite.test("Compare arrays (std.byte)") {
+  let one = std.byte(rawValue: 1)!
+  let two = std.byte(rawValue: 2)!
+  expectTrue([one, two] == [one, two])
+  expectFalse([one, two] == [two, one])
+}
 
 runAllTests()

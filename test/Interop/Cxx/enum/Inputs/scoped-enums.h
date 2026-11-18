@@ -32,3 +32,5 @@ struct HasChar32Enum {
     error = 1
   } status;
 };
+
+enum class ScopedEnumEmpty {};
