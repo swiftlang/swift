@@ -320,7 +320,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "  _type = src._type;\n";
   os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "      _buffer, const_cast<void **>(src._buffer), _type);\n";
-  os << "  _copyWitnessTables(src);\n";
+  os << "  Storage::operator=(src);\n";
   os << "}\n\n";
 
   // _initializeWithValue
@@ -380,12 +380,11 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "SWIFT_INLINE_THUNK\n";
   os << cls << "::" << "SwiftExistentialType(\n";
   os << "    const " << cls << " &other) noexcept\n";
-  os << "    : _type(other._type) {\n";
+  os << "    : Storage(other), _type(other._type) {\n";
   os << "  static_assert(ExistentialTagTraits<Tags...>::IsCopyable,\n";
   os << "      \"copying a ~Copyable existential; Tags contain NonCopyable\");\n";
   os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "      _buffer, const_cast<void **>(other._buffer), _type);\n";
-  os << "  _copyWitnessTables(other);\n";
   os << "}\n\n";
 
   // Move constructor. Uses copy semantics; C++ move is non-consuming.
@@ -393,12 +392,11 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "SWIFT_INLINE_THUNK\n";
   os << cls << "::" << "SwiftExistentialType(\n";
   os << "    " << cls << " &&other) noexcept\n";
-  os << "    : _type(other._type) {\n";
+  os << "    : Storage(other), _type(other._type) {\n";
   os << "  static_assert(ExistentialTagTraits<Tags...>::IsCopyable,\n";
   os << "      \"moving a ~Copyable existential; Tags contain NonCopyable\");\n";
   os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "      _buffer, other._buffer, _type);\n";
-  os << "  _copyWitnessTables(other);\n";
   os << "}\n\n";
 
   // Copy assignment
@@ -414,7 +412,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "    _type = other._type;\n";
   os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "        _buffer, const_cast<void **>(other._buffer), _type);\n";
-  os << "    _copyWitnessTables(other);\n";
+  os << "    Storage::operator=(other);\n";
   os << "  }\n";
   os << "  return *this;\n";
   os << "}\n\n";
@@ -432,7 +430,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "    _type = other._type;\n";
   os << "    _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "        _buffer, other._buffer, _type);\n";
-  os << "    _copyWitnessTables(other);\n";
+  os << "    Storage::operator=(other);\n";
   os << "  }\n";
   os << "  return *this;\n";
   os << "}\n\n";
