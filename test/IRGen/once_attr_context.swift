@@ -49,8 +49,9 @@ public func makeWithResource(
 
 // A stack-promoted context is initialized with the same trapping destructor. The
 // caller never releases it, because the callee consumes the closure. The
-// forwarder destroys the fields, but it must not release or deallocate the
-// context, since the caller's frame owns the storage.
+// context borrows the Copyable capture, so the forwarder doesn't destroy it, and
+// it must not release or deallocate the context either, since the caller's
+// frame owns the storage. The caller releases its own copy of the capture.
 public func take(_ f: @once () -> Void) { f() }
 
 public func makeOnStack(_ box: Box) {
@@ -59,14 +60,13 @@ public func makeOnStack(_ box: Box) {
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test11makeOnStackyyAA3BoxCF"(ptr %0)
 // CHECK: call ptr @swift_initStackObject(ptr getelementptr inbounds{{.*}} @metadata.{{[0-9]+}}
-// CHECK-NOT: swift_release
+// CHECK: call swiftcc void @"$s4test4takeyyyyXEnF"(
+// CHECK: call void @swift_release(ptr %0)
 // CHECK: ret void
 
 // CHECK-LABEL: define internal swiftcc void @"$s4test11makeOnStack{{.*}}TA"(ptr swiftself %0)
-// CHECK-NOT: swift_release(ptr %0)
-// CHECK: call void @swift_release(ptr %{{.*}})
-// CHECK-NOT: swift_deallocUninitializedObject
-// CHECK: ret void
+// CHECK: call swiftcc void @"$s4test11makeOnStack{{.*}}"(
+// CHECK-NEXT: ret void
 
 public func takeEscaping(_ f: @escaping @once () -> Void) { f() }
 

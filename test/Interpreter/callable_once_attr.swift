@@ -140,6 +140,28 @@ func testMixedConsumingAndBorrowingCaptures() {
 // CHECK-NEXT: Tracker(mixed) deinit
 testMixedConsumingAndBorrowingCaptures()
 
+// A closure's context borrows a `borrowing` parameter that it captures, so
+// neither a call nor a drop of the closure destroys the parameter.
+@inline(never)
+func testBorrowingParameterCapture(_ t: borrowing Tracker, call: Bool) {
+  if call {
+    consume({ _ in print("Tracker(\(t.tag)) captured") }, Payload(tag: ""))
+  } else {
+    dontConsume { _ in print("Tracker(\(t.tag)) captured") }
+  }
+  print("Tracker(\(t.tag)) still alive")
+}
+
+// CHECK-NEXT: Tracker(borrowing) captured
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) deinit
+do {
+  let t = Tracker("borrowing")
+  testBorrowingParameterCapture(t, call: true)
+  testBorrowingParameterCapture(t, call: false)
+}
+
 // A zero-sized `~Copyable` consuming capture must still be destroyed
 // (regression test: an empty capture must not be dropped from the
 // context's layout, since it would then never be destroyed at all).

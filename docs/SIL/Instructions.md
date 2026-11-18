@@ -2923,7 +2923,9 @@ signature). Instead:
     that are passed directly and the noncopyable address-only values that
     are passed as `@in` arguments. The `partial_apply` consumes such an 
     `@in` argument, which leaves its memory uninitialized, and the caller
-    has nothing left to destroy.
+    has nothing left to destroy. Like any other on-stack context, it
+    borrows the values that the closure doesn't consume, whether or not
+    they are Copyable.
 2.  If the `partial_apply` has an escaping function type (not
     `[on_stack]`) then the closure context will be heap allocated with a
     retain count of 1. Any closed over parameters (except for `@inout`

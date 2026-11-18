@@ -526,8 +526,8 @@ static SILValue insertMarkDependenceForCapturedArguments(PartialApplyInst *pai,
       if (m->hasGuaranteedInitialKind())
         continue;
 
-    // A noncopyable closure's on-stack context takes ownership of its
-    // Copyable captures directly.
+    // A noncopyable closure's on-stack context takes ownership of the
+    // values that the closure consumes.
     if (pai->isNoncopyable() && !arg.get()->getType().isAddress())
       continue;
 
@@ -785,16 +785,15 @@ static SILValue tryRewriteToPartialApplyStack(
         }
       }
 
-      // A noncopyable closure's on-stack context takes ownership of
-      // its Copyable captured arguments unlike regular closures that always
-      // borrow. This is done because a noncopyable closure has a
-      // destructor. A move-only consuming capture has to be transferred
-      // into the closure, not borrowed as well.
+      // Unlike a regular closure, which always borrows its captures, a
+      // noncopyable closure's on-stack context takes ownership of the values
+      // that the closure consumes, which its destructor destroys if the
+      // closure isn't called. It borrows its other captures.
       bool isConsumedInCaller = ApplySite(origPA)
                                     .getArgumentConvention(arg)
                                     .isOwnedConventionInCaller();
       if (origPA->isNoncopyable() && !foundNoImplicitCopy &&
-          (!argValue->getType().isMoveOnly() || isConsumedInCaller)) {
+          isConsumedInCaller) {
         args.push_back(argValue);
         continue;
       }
@@ -1148,10 +1147,9 @@ static SILValue tryRewriteToPartialApplyStack(
           builder.createEndBorrow(newPA->getLoc(), argBorrow);
         }
 
-        // Unlike regular on-stack closures noncopyable ones don't borrow
-        // their non-trivially destroyable Copyable captures because they always
-        // have a destructor and so no separate cleanup for such values in
-        // necessary.
+        // A noncopyable closure's context owns the values that the closure
+        // consumes, and its destructor destroys them if the closure isn't
+        // called, so they need no separate cleanup.
         if (newPA->isNoncopyable() && !argBorrow &&
             !argValue->getType().isAddress())
           return SILValue();

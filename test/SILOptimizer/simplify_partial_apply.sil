@@ -465,6 +465,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %3 = move_value [lexical] %2 : $@noescape @once @callee_guaranteed () -> ()
   %4 = apply %3() : $@noescape @once @callee_guaranteed () -> ()
   destroy_value %3 : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %0 : $Builtin.NativeObject
   %6 = tuple ()
   return %6 : $()
 }
@@ -485,6 +486,7 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %5 = apply %3() : $@noescape @once @callee_guaranteed () -> ()
   destroy_value %4 : $Builtin.NativeObject
   destroy_value %3 : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %0 : $Builtin.NativeObject
   %8 = tuple ()
   return %8 : $()
 }
@@ -495,10 +497,11 @@ struct NoncopyableKlass: ~Copyable {
   var k: Klass
 }
 
-sil @owned_and_borrowed_capture_closure : $@convention(thin) (@guaranteed Klass, @guaranteed NoncopyableKlass) -> ()
+sil @owned_and_borrowed_capture_closure : $@convention(thin) (@owned Klass, @guaranteed NoncopyableKlass) -> ()
 
 // Without ownership, deleting the dead closure destroys the copyable value that
-// its context owns, but not the noncopyable value that it borrows.
+// its context owns because the closure consumes it, but not the noncopyable
+// value that it borrows.
 //
 // CHECK-LABEL: sil @test_dead_called_at_most_once_owned_and_borrowed_captures
 // CHECK-NOT:     partial_apply
@@ -507,10 +510,29 @@ sil @owned_and_borrowed_capture_closure : $@convention(thin) (@guaranteed Klass,
 // CHECK:       } // end sil function 'test_dead_called_at_most_once_owned_and_borrowed_captures'
 sil @test_dead_called_at_most_once_owned_and_borrowed_captures : $@convention(thin) (@owned Klass, @guaranteed NoncopyableKlass) -> () {
 bb0(%0 : $Klass, %1 : $NoncopyableKlass):
-  %2 = function_ref @owned_and_borrowed_capture_closure : $@convention(thin) (@guaranteed Klass, @guaranteed NoncopyableKlass) -> ()
-  %3 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2(%0, %1) : $@convention(thin) (@guaranteed Klass, @guaranteed NoncopyableKlass) -> ()
+  %2 = function_ref @owned_and_borrowed_capture_closure : $@convention(thin) (@owned Klass, @guaranteed NoncopyableKlass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2(%0, %1) : $@convention(thin) (@owned Klass, @guaranteed NoncopyableKlass) -> ()
   strong_release %3 : $@noescape @callable(once) @callee_guaranteed () -> ()
   dealloc_stack %3 : $@noescape @callable(once) @callee_guaranteed () -> ()
   %r = tuple()
   return %r : $()
 }
+
+// Without ownership, deleting the dead closure doesn't destroy a copyable value
+// that its context borrows.
+//
+// CHECK-LABEL: sil @test_dead_called_at_most_once_borrowed_copyable_capture
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     {{strong_release|release_value}}
+// CHECK:       } // end sil function 'test_dead_called_at_most_once_borrowed_copyable_capture'
+sil @test_dead_called_at_most_once_borrowed_copyable_capture : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = function_ref @borrowed_capture_closure : $@convention(thin) (@guaranteed Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  strong_release %2 : $@noescape @callable(once) @callee_guaranteed () -> ()
+  dealloc_stack %2 : $@noescape @callable(once) @callee_guaranteed () -> ()
+  %r = tuple()
+  return %r : $()
+}
+
+sil @borrowed_capture_closure : $@convention(thin) (@guaranteed Klass) -> ()

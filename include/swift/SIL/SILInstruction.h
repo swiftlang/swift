@@ -3505,6 +3505,16 @@ public:
   /// `SILFunctionType::isNoncopyable()`.
   bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
 
+  /// Returns true if this closure's on-stack context borrows the value
+  /// argument \p argOp instead of owning it.
+  ///
+  /// An on-stack context borrows each value argument, except that the context
+  /// of a noncopyable closure owns the values that the closure consumes.
+  /// Always false for an escaping closure, whose context owns its value
+  /// arguments, and for an address argument, whose ownership follows from its
+  /// convention.
+  bool contextBorrowsArgument(const Operand &argOp) const;
+
   /// Returns true if calling the resulting closure consumes it. See
   /// `SILFunctionType::isCallConsuming()`.
   bool isCallConsuming() const { return getFunctionType()->isCallConsuming(); }

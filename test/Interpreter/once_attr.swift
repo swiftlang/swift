@@ -172,3 +172,54 @@ testCalledOnEitherPath(false, "either second")
 // CHECK-NEXT: second path
 // CHECK-NEXT: Resource(either second) used
 // CHECK-NEXT: Resource(either second) deinit
+
+// An exactly-once closure's context borrows a `borrowing` parameter that it
+// captures, so the call doesn't destroy the parameter.
+
+final class Tracker {
+  let tag: String
+  init(_ tag: String) { self.tag = tag }
+  deinit { print("Tracker(\(tag)) deinit") }
+}
+
+func callOnce(_ body: @once () -> Void) { body() }
+
+@inline(never)
+func testBorrowingParameterCapture(_ t: borrowing Tracker) {
+  callOnce { print("Tracker(\(t.tag)) captured") }
+  print("Tracker(\(t.tag)) still alive")
+}
+
+// CHECK-NEXT: Tracker(borrowing) captured
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) deinit
+do {
+  let t = Tracker("borrowing")
+  testBorrowingParameterCapture(t)
+}
+
+// An exactly-once closure that consumes a Copyable capture consumes a copy of
+// it, so the captured value lives until the end of its own scope.
+
+@inline(never)
+func sinkTracker(_ t: consuming Tracker) { print("Tracker(\(t.tag)) consumed") }
+
+@inline(never)
+func testConsumedCopyableCapture(_ tag: String, explicitly: Bool) {
+  let t = Tracker(tag)
+  if explicitly {
+    callOnce { sinkTracker(consume t) }
+  } else {
+    callOnce { sinkTracker(t) }
+  }
+  print("Tracker(\(t.tag)) still alive")
+}
+
+// CHECK-NEXT: Tracker(implicit) consumed
+// CHECK-NEXT: Tracker(implicit) still alive
+// CHECK-NEXT: Tracker(implicit) deinit
+testConsumedCopyableCapture("implicit", explicitly: false)
+// CHECK-NEXT: Tracker(explicit) consumed
+// CHECK-NEXT: Tracker(explicit) still alive
+// CHECK-NEXT: Tracker(explicit) deinit
+testConsumedCopyableCapture("explicit", explicitly: true)
