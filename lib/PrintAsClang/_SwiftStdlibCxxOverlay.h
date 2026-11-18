@@ -55,12 +55,10 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
 }
 
 /// Constructs a Swift string from a C++ string.
+/// Replaces ill-formed UTF-8 sequences with the Unicode replacement character.
 SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
-#ifdef __EmbeddedSwift__
-  auto res = _impl::$eSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
-#else
-  auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
-#endif
+  auto res = _impl::swift_stdlib_StringFromUTF8(
+      reinterpret_cast<const uint8_t *>(str.data()), str.size());
   memcpy(_getOpaquePointer(), &res, sizeof(res));
 }
 

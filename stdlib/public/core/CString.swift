@@ -14,6 +14,17 @@
 
 import SwiftShims
 
+// Used by the C++ standard library overlay to copy counted UTF-8, preserving
+// embedded NULs and repairing ill-formed code unit sequences.
+@_silgen_name("swift_stdlib_StringFromUTF8")
+@usableFromInline
+internal func _StringFromUTF8(
+  _ bytes: UnsafePointer<UInt8>, _ count: UInt
+) -> String {
+  let buffer = unsafe UnsafeBufferPointer(start: bytes, count: Int(count))
+  return unsafe String(decoding: buffer, as: UTF8.self)
+}
+
 extension String {
 
   /// Creates a new string by copying the null-terminated UTF-8 data referenced
