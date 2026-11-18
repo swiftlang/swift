@@ -1420,6 +1420,16 @@ bool swift::canReplaceCallsOfConsumedClosure(
                                       closureUses);
 }
 
+bool swift::canCopyCapturesOfConsumedClosure(PartialApplyInst *pai) {
+  DEBUG_ASSERT(isClosureConsumedByCall(pai));
+  if (pai->getFunctionType()->isNondeinitable())
+    return false;
+  return llvm::none_of(pai->getArgumentOperands(), [](Operand &argOp) {
+    return argOp.get()->getType().isMoveOnly() &&
+           isCaptureOwnedByClosure(argOp);
+  });
+}
+
 void swift::makeCapturesOwnedByClosureLexical(PartialApplyInst *pai,
                                               InstModCallbacks callbacks) {
   if (!pai->getFunction()->hasOwnership() || !isLexicalPartialApply(pai))

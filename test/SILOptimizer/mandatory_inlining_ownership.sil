@@ -954,6 +954,39 @@ bb2:
   unreachable
 }
 
+sil [transparent] [ossa] @callEscapingAtMostOnceIf : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $@callable(once) @callee_owned () -> Builtin.Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %3 = apply %1() : $@callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%3 : $Builtin.Int64)
+
+bb2:
+  destroy_value %1 : $@callable(once) @callee_owned () -> Builtin.Int64
+  %6 = integer_literal $Builtin.Int64, 0
+  br bb3(%6 : $Builtin.Int64)
+
+bb3(%8 : $Builtin.Int64):
+  return %8 : $Builtin.Int64
+}
+
+sil [transparent] [ossa] @callEscapingAtMostOnceOnEitherPath : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $@callable(once) @callee_owned () -> Builtin.Int64):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %3 = apply %1() : $@callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%3 : $Builtin.Int64)
+
+bb2:
+  %5 = apply %1() : $@callable(once) @callee_owned () -> Builtin.Int64
+  br bb3(%5 : $Builtin.Int64)
+
+bb3(%7 : $Builtin.Int64):
+  return %7 : $Builtin.Int64
+}
+
 // The closure's uses that go away with it include a mark_dependence and a
 // debug_value.
 //
@@ -1054,6 +1087,102 @@ bb0(%0 : $Builtin.Int1, %1 : @owned $NoncopyableKlass):
   %4 = function_ref @callExactlyOnceElseTrap : $@convention(thin) (Builtin.Int1, @owned @noescape @once @callee_owned () -> Builtin.Int64) -> Builtin.Int64
   %5 = apply %4(%0, %3) : $@convention(thin) (Builtin.Int1, @owned @noescape @once @callee_owned () -> Builtin.Int64) -> Builtin.Int64
   return %5 : $Builtin.Int64
+}
+
+// An escaping closure's context owns each of its captures. The call would
+// destroy the capture that its function only borrows, so it's destroyed after
+// the inlined call instead.
+//
+// CHECK-LABEL: sil [ossa] @test_inline_call_of_escaping_at_most_once_closure :
+// CHECK:       bb0(%0 : $Builtin.Int1, [[CAPTURE:%.*]] : @owned $Klass):
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     copy_value
+// CHECK:       bb1:
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value [[CAPTURE]] : $Klass
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [[CAPTURE]] : $Klass
+// CHECK:       } // end sil function 'test_inline_call_of_escaping_at_most_once_closure'
+sil [ossa] @test_inline_call_of_escaping_at_most_once_closure : $@convention(thin) (Builtin.Int1, @owned Klass) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  %2 = function_ref @borrowingClosure : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %3 = partial_apply [called_at_most_once] %2(%1) : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %4 = function_ref @callEscapingAtMostOnceIf : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %5 = apply %4(%0, %3) : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// The capture is noncopyable, so the inlined call consumes it.
+//
+// CHECK-LABEL: sil [ossa] @test_inline_call_of_escaping_at_most_once_closure_consumed_capture :
+// CHECK:       bb0(%0 : $Builtin.Int1, [[CAPTURE:%.*]] : @owned $NoncopyableKlass):
+// CHECK-NOT:     partial_apply
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value [[CAPTURE]] : $NoncopyableKlass
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [[CAPTURE]] : $NoncopyableKlass
+// CHECK:       } // end sil function 'test_inline_call_of_escaping_at_most_once_closure_consumed_capture'
+sil [ossa] @test_inline_call_of_escaping_at_most_once_closure_consumed_capture : $@convention(thin) (Builtin.Int1, @owned NoncopyableKlass) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $NoncopyableKlass):
+  %2 = function_ref @consumingClosure : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %3 = partial_apply [called_at_most_once] %2(%1) : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %4 = function_ref @callEscapingAtMostOnceIf : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %5 = apply %4(%0, %3) : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// With a second call, the escaping closure can't be deleted after inlining the
+// first call, but its copyable capture can be copied for it as for any other
+// escaping closure. After inlining the second call, the closure is deleted.
+//
+// CHECK-LABEL: sil [ossa] @test_inline_calls_of_escaping_at_most_once_closure_on_either_path :
+// CHECK:         copy_value
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'test_inline_calls_of_escaping_at_most_once_closure_on_either_path'
+sil [ossa] @test_inline_calls_of_escaping_at_most_once_closure_on_either_path : $@convention(thin) (Builtin.Int1, @owned Klass) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  %2 = function_ref @borrowingClosure : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %3 = partial_apply [called_at_most_once] %2(%1) : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %4 = function_ref @callEscapingAtMostOnceOnEitherPath : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %5 = apply %4(%0, %3) : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// The noncopyable capture can't be copied, so neither call is inlined.
+//
+// CHECK-LABEL: sil [ossa] @test_dont_inline_calls_of_escaping_at_most_once_closure_on_either_path :
+// CHECK:         partial_apply [called_at_most_once]
+// CHECK:         apply {{%.*}}() : $@callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:         apply {{%.*}}() : $@callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       } // end sil function 'test_dont_inline_calls_of_escaping_at_most_once_closure_on_either_path'
+sil [ossa] @test_dont_inline_calls_of_escaping_at_most_once_closure_on_either_path : $@convention(thin) (Builtin.Int1, @owned NoncopyableKlass) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $NoncopyableKlass):
+  %2 = function_ref @consumingClosure : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %3 = partial_apply [called_at_most_once] %2(%1) : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %4 = function_ref @callEscapingAtMostOnceOnEitherPath : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %5 = apply %4(%0, %3) : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+// withoutActuallyDeiniting lets an exactly-once closure be destroyed, but its
+// destructor still traps. Neither deleting the closure after inlining its call
+// nor destroying it after the inlined call would keep the trap, so the call
+// isn't inlined.
+//
+// CHECK-LABEL: sil [ossa] @test_dont_inline_call_of_escaping_exactly_once_closure_without_actually_deiniting :
+// CHECK:         partial_apply [called_once]
+// CHECK:         apply {{%.*}}() : $@callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:         destroy_value {{%.*}} : $@callable(once) @callee_owned () -> Builtin.Int64
+// CHECK:       } // end sil function 'test_dont_inline_call_of_escaping_exactly_once_closure_without_actually_deiniting'
+sil [ossa] @test_dont_inline_call_of_escaping_exactly_once_closure_without_actually_deiniting : $@convention(thin) (Builtin.Int1, @owned Klass) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int1, %1 : @owned $Klass):
+  %2 = function_ref @borrowingClosure : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %3 = partial_apply [called_once] %2(%1) : $@convention(thin) (@guaranteed Klass) -> Builtin.Int64
+  %4 = convert_function %3 : $@once @callee_owned () -> Builtin.Int64 to [without_actually_deiniting] $@callable(once) @callee_owned () -> Builtin.Int64
+  %5 = function_ref @callEscapingAtMostOnceIf : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  %6 = apply %5(%0, %4) : $@convention(thin) (Builtin.Int1, @owned @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
+  return %6 : $Builtin.Int64
 }
 
 sil [transparent] [ossa] @consumingCopyableAddressClosure : $@convention(thin) <T> (@in T) -> Builtin.Int64 {

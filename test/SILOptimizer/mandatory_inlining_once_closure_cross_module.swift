@@ -31,6 +31,11 @@ public func and(_ lhs: Bool, _ rhs: @autoclosure @callable(once) () throws -> Bo
   lhs ? try rhs() : false
 }
 
+@_transparent
+public func callEscaping(_ f: @escaping @autoclosure @callable(once) () -> Bool) -> Bool {
+  f()
+}
+
 //--- Client.swift
 
 import Lib
@@ -74,3 +79,14 @@ public func consumedValue(_ a: Int, _ x: Int) -> Bool {
   return and(a > 0, consume(resource))
 }
 
+// An escaping closure's noncopyable capture can't be copied for the inlined
+// call, so the closure is deleted instead.
+//
+// CHECK-LABEL: sil @$s6Client21escapingConsumedValueySbSiF :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     retain_value
+// CHECK:       } // end sil function '$s6Client21escapingConsumedValueySbSiF'
+public func escapingConsumedValue(_ x: Int) -> Bool {
+  let resource = Resource(x)
+  return callEscaping(consume(resource))
+}
