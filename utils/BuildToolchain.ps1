@@ -57,9 +57,11 @@ Otherwise:
 - Compilers: the Stage2 compilers.
 - CompilerRuntime: compiler-rt for the SDK architectures.
 - Macros: the Foundation and Testing macros.
-- Tools: the developer tools that only need the SDK and CMark.
+- Tools: the developer tools that only need the SDK and CMark, including
+  swift-driver and swift-build.
 - Format: swift-format.
-- PackageManager: swift-driver, swift-build, SwiftPM and SourceKit-LSP.
+- PackageManager: the makeOptions tool of swift-driver, SwiftPM and
+  SourceKit-LSP.
 - Finish: the NoAsserts compilers, the layout of the image, the binding of the
   executables to the runtime and the mimalloc patch.
 The steps after Compilers need its build tree, and PackageManager and Format
@@ -1131,6 +1133,31 @@ function Build-Driver([Hashtable] $Platform,
                       [string]    $LLVM_DIR,
                       [string]    $Clang_DIR,
                       [string]    $Swift_DIR) {
+  $Defines = @{
+    BUILD_SHARED_LIBS = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
+    LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
+    ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+    SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+    SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
+    } else {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
+    };
+    SWIFT_DRIVER_BUILD_TOOLS = "NO";
+  }
+  # makeOptions uses the headers of the Stage2 compilers, so it only builds
+  # with their build tree.
+  if ($Swift_DIR) {
+    $Defines.SWIFT_DRIVER_BUILD_TOOLS = "YES"
+    $Defines += @{
+      LLVM_DIR = $LLVM_DIR;
+      Clang_DIR = $Clang_DIR;
+      Swift_DIR = $Swift_DIR;
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform Driver) `
@@ -1140,23 +1167,7 @@ function Build-Driver([Hashtable] $Platform,
     -CXXCompiler $Compilers.CXX `
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
-      SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
-      } else {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
-      };
-      SWIFT_DRIVER_BUILD_TOOLS = "YES";
-      LLVM_DIR = $LLVM_DIR;
-      Clang_DIR = $Clang_DIR;
-      Swift_DIR = $Swift_DIR;
-    }
+    -Defines $Defines
 }
 
 function Build-Crypto([Hashtable] $Platform,
@@ -1893,6 +1904,8 @@ function Invoke-Steps {
       Invoke-BuildStep Build-DocC $HostPlatform $ToolArgs
       Invoke-BuildStep Build-Inspect $HostPlatform $ToolArgs
       Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Driver $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Build $HostPlatform $ToolArgs
     }
 
     if (Test-Step "Format") {
@@ -1900,12 +1913,12 @@ function Invoke-Steps {
     }
 
     if (Test-Step "PackageManager") {
-      Invoke-BuildStep Build-Driver $HostPlatform $ToolArgs @{
+      # swift-driver builds again with makeOptions, which the Tools step skips.
+      Invoke-BuildStep Build-Driver $HostPlatform $ToolArgs -SummaryVariant "makeOptions" @{
         LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
         Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
         Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
       }
-      Invoke-BuildStep Build-Build $HostPlatform $ToolArgs
       Invoke-BuildStep Build-PackageManager $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
       Invoke-BuildStep Build-SourceKitLSP $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
     }
