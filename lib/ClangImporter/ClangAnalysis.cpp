@@ -709,9 +709,6 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
 std::optional<ResultConvention>
 swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
                                                   ASTContext &ctx) {
-  if (!ctx.LangOpts.hasFeature(Feature::LibkernOwnershipConventions))
-    return std::nullopt;
-
   auto *func = dyn_cast<clang::FunctionDecl>(decl);
   if (!func)
     return std::nullopt;
