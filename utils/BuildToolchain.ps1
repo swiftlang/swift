@@ -69,7 +69,8 @@ need the Tools step.
 Steps whose CMake projects to only configure, before running -Steps, so that
 they can be configured before what they depend on is built. They can be
 Compilers, which also builds libxml2, Macros, Tools, Format and PackageManager.
-The projects of the other steps that they use must be configured.
+The projects of the other steps that they use must be configured, and built if
+they export Swift modules: CMake checks that their module directories exist.
 
 .PARAMETER Configured
 Do not configure again the projects of -Steps that are configured, which

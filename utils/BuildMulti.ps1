@@ -371,13 +371,14 @@ if ($Toolchain) {
   # build. They build at normal priority, as they mostly compile one Swift
   # module at a time and would otherwise wait for the compilers.
   #
-  # The configuration of a project only needs the configuration of the projects
-  # that it uses, so the job of the tools also configures the tools that use the
-  # Stage2 build tree, after the Stage2 compilers are configured. They then
-  # build without being configured again.
+  # The macros only need the configuration of the Stage2 compilers, so the job
+  # of the tools also configures them, after the Stage2 compilers are
+  # configured. They then build without being configured again. The other
+  # tools need the projects that they use to be built: CMake checks that their
+  # module directories exist.
   Invoke-ToolchainSteps "" CMark
   Invoke-ToolchainSteps "" -ConfigureSteps Compilers
-  $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Tools,Macros,Format,PackageManager -Configured -Background
+  $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Macros -Configured -Background
   Invoke-ToolchainSteps "" Compilers -Configured
 
   # Then, what uses the Stage2 build tree, with the longest chain of
@@ -385,8 +386,8 @@ if ($Toolchain) {
   $LateJobs = @(Invoke-ToolchainSteps "" CompilerRuntime -Background)
   Wait-BuildJobs @($ToolsJob)
   $LateJobs += Invoke-ToolchainSteps "" Macros -Configured -Background
-  $LateJobs += Invoke-ToolchainSteps "" Format -Configured -Background
-  Invoke-ToolchainSteps "" PackageManager -Configured
+  $LateJobs += Invoke-ToolchainSteps "" Format -Background
+  Invoke-ToolchainSteps "" PackageManager
   Wait-BuildJobs $LateJobs
 
   Invoke-ToolchainSteps "" Finish
