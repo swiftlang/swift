@@ -4057,10 +4057,12 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::CanBeObjCClass:
   case BuiltinValueKind::CopyArray:
   case BuiltinValueKind::CreateAsyncTask:
+  case BuiltinValueKind::CreateSplitContinuation:
   case BuiltinValueKind::CreateTaskGroup:
   case BuiltinValueKind::CreateTaskGroupWithFlags:
   case BuiltinValueKind::DeallocRawTyped:
   case BuiltinValueKind::DestroyArray:
+  case BuiltinValueKind::DestroySplitContinuation:
   case BuiltinValueKind::GetObjCTypeEncoding:
   case BuiltinValueKind::InitializeDistributedRemoteActor:
   case BuiltinValueKind::InjectEnumTag:
