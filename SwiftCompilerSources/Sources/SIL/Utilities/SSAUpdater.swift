@@ -273,14 +273,25 @@ public struct SSAUpdater<Context: MutatingContext> {
 /// iterating over a block), it cannot tell which of them is visible at a given use point
 /// within that block. `InstructionBasedSSAUpdater` fixes this by additionally recording
 /// the instruction for each block after which a value becomes available, and picking the
-/// closest dominating value for an instruction query in the same block. Queries in other
-/// blocks fall back to the normal per-block SSA construction of `SSAUpdater`.
+/// closest dominating value for an instruction query in the same block. A value can also be
+/// registered as available before the first instruction of a block (e.g. a block argument), in
+/// which case it is visible to all instructions of the block which are not preceded by another
+/// available value. Queries in other blocks fall back to the normal per-block SSA construction
+/// of `SSAUpdater`.
 public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
 
-  /// The available values within a single basic block, ordered by their position in the block.
+  /// The available values within a single basic block: an optional value which is available
+  /// before the first instruction, plus the values which become available after specific
+  /// instructions, ordered by their position in the block.
   private struct ValuesInBlock {
-    var values = SingleInlineArray<(value: Value, atInstruction: Instruction)>()
+    /// A value which is available right at the beginning of the block, before its first instruction,
+    /// e.g. a block argument.
+    var valueBeforeFirstInstruction: Value? = nil
+
+    var values = SingleInlineArray<(value: Value, afterInstruction: Instruction)>()
+
     var lastInstruction: Instruction? = nil
+
     var isSorted = false
 
     /// Records `value` as available after `instruction`.
@@ -299,6 +310,16 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
       }
     }
 
+    /// Records `value` as available before the first instruction of `block`.
+    ///
+    /// Returns true if no value was added for an instruction of this block yet, i.e. if `value`
+    /// needs to be registered with the underlying `SSAUpdater` as *the* available value for this
+    /// block.
+    mutating func addValueBeforeFirstInstruction(value: Value) -> Bool {
+      valueBeforeFirstInstruction = value
+      return lastInstruction == nil
+    }
+
     /// Returns the available value which is defined closest to, but still strictly before,
     /// `instruction` in this block, or nil if no available value precedes `instruction`.
     ///
@@ -307,10 +328,10 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
     /// value.
     mutating func getAvailableValue(before instruction: Instruction) -> Value? {
       if values.isEmpty {
-        return nil
+        return valueBeforeFirstInstruction
       }
       if !isSorted {
-        values.sort(by: { $0.atInstruction.strictlyDominatesInBlock($1.atInstruction) })
+        values.sort(by: { $0.afterInstruction.strictlyDominatesInBlock($1.afterInstruction) })
         isSorted = true
       }
 
@@ -320,17 +341,17 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
 
       while low != high {
         let mid = (low + high + 1) / 2
-        if instruction.dominatesInBlock(vals[mid].atInstruction) {
+        if instruction.dominatesInBlock(vals[mid].afterInstruction) {
           high = mid - 1
         } else {
           low = mid
         }
       }
-      let (value, atInstruction) = vals[low]
-      if atInstruction.strictlyDominatesInBlock(instruction) {
+      let (value, afterInstruction) = vals[low]
+      if afterInstruction.strictlyDominatesInBlock(instruction) {
         return value
       }
-      return nil
+      return valueBeforeFirstInstruction
     }
   }
 
@@ -355,18 +376,37 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
     }
   }
 
+  /// Registers `value` as available before the first instruction of `block`.
+  ///
+  /// This is for the case that a value becomes available before the first instruction of `block`, so
+  /// that there is no instruction to anchor the position at.
+  /// Note that `getValue(atBeginOf:)` still returns the value which is live on _entry_ of `block`,
+  /// i.e. it ignores `value`.
+  public mutating func addAvailableValue(_ value: Value, beforeFirstInstructionOf block: BasicBlock) {
+    if availableValues[block, default: ValuesInBlock()].addValueBeforeFirstInstruction(value: value) {
+      ssaUpdater.addAvailableValue(value, in: block)
+    }
+  }
+
   /// Constructs SSA for a value that is live at `instruction`.
   ///
   /// If an available value was added after some instruction which precedes `instruction` in the
-  /// same block, that value is returned directly. Otherwise this falls back to `SSAUpdater`,
-  /// which may insert phi arguments to merge values coming from different blocks.
+  /// same block, the closest such value is returned directly. Otherwise, if a value was added
+  /// before the first instruction of the block, that value is returned. Otherwise this falls back
+  /// to `SSAUpdater`, which may insert phi arguments to merge values coming from different blocks.
   public mutating func getValue(before instruction: Instruction) -> Value {
-    if var valuesInBlock = availableValues[instruction.parentBlock],
-       let value = valuesInBlock.getAvailableValue(before: instruction)
-    {
+    let block = instruction.parentBlock
+    if let value = availableValues[block]?.getAvailableValue(before: instruction) {
       return value
     }
-    return ssaUpdater.getValue(atBeginOf: instruction.parentBlock)
+    return ssaUpdater.getValue(atBeginOf: block)
+  }
+
+  /// Returns the value which is live on entry of `block`, i.e. ignoring all available values which
+  /// are registered within `block` itself, also ignoring a value which is registered as available
+  /// _before_ the first instruction of `block`.
+  public mutating func getValue(atBeginOf block: BasicBlock) -> Value {
+    return ssaUpdater.getValue(atBeginOf: block)
   }
 
   /// The phi arguments which were inserted so far by `getValue`, in the order they were created.
@@ -426,11 +466,29 @@ let instructionBasedSSAUpdaterTest = Test("instruction_based_ssa_updater") {
     return
   }
 
+  // Block arguments without uses are available before the first instruction of their block.
+  // By default they are added after all other available values. With a `true` test argument they
+  // are added before all other available values.
+  let addBlockArgumentsFirst = arguments.hasUntaken ? arguments.takeBool() : false
+  let unusedBlockArguments = function.blocks.flatMap { block in
+    block.arguments.filter { $0.uses.isEmpty && $0.type == firstValue.0.type }
+  }
+
   var ssaUpdater = InstructionBasedSSAUpdater(type: firstValue.0.type, ownership: firstValue.0.ownership, context)
   defer { ssaUpdater.deinitialize() }
 
+  if addBlockArgumentsFirst {
+    for arg in unusedBlockArguments {
+      ssaUpdater.addAvailableValue(arg, beforeFirstInstructionOf: arg.parentBlock)
+    }
+  }
   for (v, insertionPoint) in availableValues {
     ssaUpdater.addAvailableValue(v, after: insertionPoint)
+  }
+  if !addBlockArgumentsFirst {
+    for arg in unusedBlockArguments {
+      ssaUpdater.addAvailableValue(arg, beforeFirstInstructionOf: arg.parentBlock)
+    }
   }
 
   for inst in function.instructions {
