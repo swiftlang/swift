@@ -27,6 +27,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 #if os(anyAppleOS)
@@ -290,26 +292,26 @@ extension arm_gprs {
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return X86_64Context(with: mcontext as! darwin_x86_64_mcontext)
   }
-  #elseif os(Linux) && arch(x86_64)
+  #elseif (os(Linux) || os(Android)) && arch(x86_64)
   init(with mctx: mcontext_t) {
-    gprs.setR(X86_64Register.rax.rawValue, to: UInt64(bitPattern: mctx.gregs.13))
-    gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(bitPattern: mctx.gregs.12))
-    gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(bitPattern: mctx.gregs.14))
-    gprs.setR(X86_64Register.rdx.rawValue, to: UInt64(bitPattern: mctx.gregs.11))
-    gprs.setR(X86_64Register.rdi.rawValue, to: UInt64(bitPattern: mctx.gregs.9))
-    gprs.setR(X86_64Register.rsi.rawValue, to: UInt64(bitPattern: mctx.gregs.8))
-    gprs.setR(X86_64Register.rbp.rawValue, to: UInt64(bitPattern: mctx.gregs.10))
-    gprs.setR(X86_64Register.rsp.rawValue, to: UInt64(bitPattern: mctx.gregs.15))
-    gprs.setR(X86_64Register.r8.rawValue, to: UInt64(bitPattern: mctx.gregs.0))
-    gprs.setR(X86_64Register.r9.rawValue, to: UInt64(bitPattern: mctx.gregs.1))
-    gprs.setR(X86_64Register.r10.rawValue, to: UInt64(bitPattern: mctx.gregs.2))
-    gprs.setR(X86_64Register.r11.rawValue, to: UInt64(bitPattern: mctx.gregs.3))
-    gprs.setR(X86_64Register.r12.rawValue, to: UInt64(bitPattern: mctx.gregs.4))
-    gprs.setR(X86_64Register.r13.rawValue, to: UInt64(bitPattern: mctx.gregs.5))
-    gprs.setR(X86_64Register.r14.rawValue, to: UInt64(bitPattern: mctx.gregs.6))
-    gprs.setR(X86_64Register.r15.rawValue, to: UInt64(bitPattern: mctx.gregs.7))
-    gprs.rip = UInt64(bitPattern: mctx.gregs.16)
-    gprs.rflags = UInt64(bitPattern: mctx.gregs.17)
+    gprs.setR(X86_64Register.rax.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.13))
+    gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.12))
+    gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.14))
+    gprs.setR(X86_64Register.rdx.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.11))
+    gprs.setR(X86_64Register.rdi.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.9))
+    gprs.setR(X86_64Register.rsi.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.8))
+    gprs.setR(X86_64Register.rbp.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.10))
+    gprs.setR(X86_64Register.rsp.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.15))
+    gprs.setR(X86_64Register.r8.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.0))
+    gprs.setR(X86_64Register.r9.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.1))
+    gprs.setR(X86_64Register.r10.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.2))
+    gprs.setR(X86_64Register.r11.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.3))
+    gprs.setR(X86_64Register.r12.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.4))
+    gprs.setR(X86_64Register.r13.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.5))
+    gprs.setR(X86_64Register.r14.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.6))
+    gprs.setR(X86_64Register.r15.rawValue, to: UInt64(truncatingIfNeeded: mctx.gregs.7))
+    gprs.rip = UInt64(truncatingIfNeeded: mctx.gregs.16)
+    gprs.rflags = UInt64(truncatingIfNeeded: mctx.gregs.17)
     gprs.cs = UInt16(mctx.gregs.18 & 0xffff)
     gprs.fs = UInt16((mctx.gregs.18 >> 16) & 0xffff)
     gprs.gs = UInt16((mctx.gregs.18 >> 32) & 0xffff)
@@ -480,7 +482,7 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 50 }
 
-  #if os(Linux) && arch(i386)
+  #if (os(Linux) || os(Android)) && arch(i386)
   init(with mctx: mcontext_t) {
     gprs.setR(I386Register.eax.rawValue, to: UInt32(bitPattern: mctx.gregs.11))
     gprs.setR(I386Register.ecx.rawValue, to: UInt32(bitPattern: mctx.gregs.10))
@@ -711,7 +713,7 @@ extension arm_gprs {
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return ARM64Context(with: mcontext as! darwin_arm64_mcontext)
   }
-  #elseif os(Linux) && arch(arm64)
+  #elseif (os(Linux) || os(Android)) && arch(arm64)
   init(with mctx: mcontext_t) {
     withUnsafeMutablePointer(to: &gprs._x) {
       $0.withMemoryRebound(to: UInt64.self, capacity: 32){ to in
@@ -878,7 +880,7 @@ extension arm_gprs {
 
   public static var registerCount: Int { return 16 }
 
-  #if os(Linux) && arch(arm)
+  #if (os(Linux) || os(Android)) && arch(arm)
   init(with mctx: mcontext_t) {
     withUnsafeMutablePointer(to: &gprs._r) {
       $0.withMemoryRebound(to: UInt32.self, capacity: 16) { to in
