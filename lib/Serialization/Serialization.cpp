@@ -3356,6 +3356,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           case AvailabilityDomain::Kind::Custom:
             return AvailabilityDomainKind::Custom;
         }
+        llvm_unreachable("covered switch");
       };
 
       auto domainKind = getDomainKind(domain);

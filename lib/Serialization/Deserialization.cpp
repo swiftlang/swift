@@ -6405,6 +6405,7 @@ decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
     llvm_unreachable("custom domains aren't handled here");
     return AvailabilityDomain::forUniversal();
   }
+  llvm_unreachable("covered switch");
 }
 
 Expected<AvailableAttr *>
