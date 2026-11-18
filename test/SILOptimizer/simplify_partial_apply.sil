@@ -536,3 +536,23 @@ bb0(%0 : $Klass):
 }
 
 sil @borrowed_capture_closure : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil @consuming_capture_closure : $@convention(thin) (@owned NoncopyableKlass) -> ()
+
+// Combining the call of an at-most-once closure would delete the closure, so
+// at -Onone, where a debug_value keeps the closure, the call isn't combined.
+//
+// CHECK-LABEL: sil [ossa] @test_called_at_most_once_closure_with_debug_value
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:         debug_value [[CLOSURE]] : $@noescape @callable(once) @callee_owned () -> (), let, name "f"
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_called_at_most_once_closure_with_debug_value'
+sil [ossa] @test_called_at_most_once_closure_with_debug_value : $@convention(thin) (@owned NoncopyableKlass) -> () {
+bb0(%0 : @owned $NoncopyableKlass):
+  %1 = function_ref @consuming_capture_closure : $@convention(thin) (@owned NoncopyableKlass) -> ()
+  %2 = partial_apply [on_stack] [called_at_most_once] %1(%0) : $@convention(thin) (@owned NoncopyableKlass) -> ()
+  debug_value %2 : $@noescape @callable(once) @callee_owned () -> (), let, name "f"
+  %4 = apply %2() : $@noescape @callable(once) @callee_owned () -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
