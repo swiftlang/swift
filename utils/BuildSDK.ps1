@@ -58,6 +58,13 @@ Default: dynamic, static
 The directory of the platform to install the SDK into.
 Default: <BuildRoot>\Program Files\Swift\Platforms\<Platform>.platform
 
+.PARAMETER Steps
+What to build, by default all of it:
+- CDispatch: only the C libdispatch of the dynamic SDK of each architecture,
+  which the Stage2 compilers use, so that they can be configured while the
+  rest of the SDK builds.
+- SDK: the SDK, including the C libdispatch.
+
 .PARAMETER EnableCaching
 Enable build caching using LLVM CAS to speed up rebuilds.
 
@@ -112,6 +119,8 @@ param
   [ValidatePattern("^(dynamic|static)(,(dynamic|static))*$")]
   [string[]] $LinkModes = @("dynamic", "static"),
   [string] $PlatformRoot = "",
+  [ValidatePattern("^(CDispatch|SDK)(,(CDispatch|SDK))*$")]
+  [string[]] $Steps = @("CDispatch", "SDK"),
 
   [switch] $EnableCaching,
 
@@ -140,6 +149,8 @@ if ($Architectures.Length -eq 1) { $Architectures = $Architectures[0].Split(",")
 if ($SupportedArchitectures.Length -eq 1) { $SupportedArchitectures = $SupportedArchitectures[0].Split(",") }
 
 if ($LinkModes.Length -eq 1) { $LinkModes = $LinkModes[0].Split(",") }
+
+if ($Steps.Length -eq 1) { $Steps = $Steps[0].Split(",") }
 
 $OS = [OS]$Platform
 
@@ -1311,6 +1322,15 @@ function Build-Inspect([Hashtable] $Platform,
 
 try {
 
+if ($Steps -notcontains "SDK") {
+  foreach ($Build in $SDKBuilds) {
+    $C = if ($Build.OS -eq [OS]::Windows) { $Compilers.Stage1.C } else { $Compilers.Stage1.GNUC }
+    $CXX = if ($Build.OS -eq [OS]::Windows) { $Compilers.Stage1.CXX } else { $Compilers.Stage1.GNUCXX }
+    Invoke-BuildStep Build-CDispatch $Build -CCompiler $C -CXXCompiler $CXX -Phase "Dynamic"
+  }
+  exit 0
+}
+
 if ($IncludeDS2) {
   # The builds of the other platforms share the build tree of this tool.
   Invoke-Exclusively "RegsGen2" {
@@ -1436,5 +1456,5 @@ if ($OS -eq [OS]::Windows) {
   Write-BuildError $_
   exit 1
 } finally {
-  Write-BuildTimings "BuildSDK-$Platform-$($Architectures -join "-")"
+  Write-BuildTimings "BuildSDK-$Platform-$($Architectures -join "-")$(if ($Steps -notcontains "SDK") { "-CDispatch" })"
 }

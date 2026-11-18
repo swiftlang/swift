@@ -387,19 +387,34 @@ if ($Android) {
   }
 }
 
+$HostSDKOverrides = $null
 if ($SelectedWindowsSDKArchitectures -contains $HostSDKArchitecture) {
-  Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters @{
+  $HostSDKOverrides = @{
     Platform = "Windows";
     Architectures = @($HostSDKArchitecture);
     SupportedArchitectures = $SelectedWindowsSDKArchitectures;
     LinkModes = $WindowsSDKLinkModes;
   }
 } elseif ($Toolchain) {
-  Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters @{
+  $HostSDKOverrides = @{
     Platform = "Windows";
     Architectures = @($HostSDKArchitecture);
     LinkModes = @("dynamic");
   }
+}
+
+# The Stage2 compilers only need the C libdispatch of the SDK of the host to be
+# configured, so they are configured while the rest of the SDK builds.
+$Stage2ConfigureJob = $null
+if ($HostSDKOverrides) {
+  if ($Toolchain) {
+    Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture-CDispatch" BuildSDK.ps1 $Parameters ($HostSDKOverrides + @{
+      Steps = @("CDispatch");
+    })
+    Invoke-ToolchainSteps "" CMark
+    $Stage2ConfigureJob = Invoke-ToolchainSteps "" -ConfigureSteps Compilers -Background
+  }
+  Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters $HostSDKOverrides
 }
 
 if ($Toolchain) {
@@ -412,8 +427,12 @@ if ($Toolchain) {
   # configured. They then build without being configured again. The other
   # tools need the projects that they use to be built: CMake checks that their
   # module directories exist.
-  Invoke-ToolchainSteps "" CMark
-  Invoke-ToolchainSteps "" -ConfigureSteps Compilers
+  if ($Stage2ConfigureJob) {
+    Wait-BuildJobs @($Stage2ConfigureJob)
+  } else {
+    Invoke-ToolchainSteps "" CMark
+    Invoke-ToolchainSteps "" -ConfigureSteps Compilers
+  }
   $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Macros -Configured -Background
 
   # The Stage2 compilers have enough work to use all the processors, so they
