@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "BitPatternReader.h"
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
@@ -149,16 +150,16 @@ public:
     if (!TI.getFixedExtraInhabitantCount(IGM))
       return std::nullopt;
 
-    unsigned bits = layout->size * 8;
-    auto mask = TI.getFixedExtraInhabitantMask(IGM).zextOrTrunc(bits);
-    if (mask.isZero())
+    auto mask = TI.getFixedExtraInhabitantMask(IGM);
+    if (mask.isZero() || mask.getBitWidth() != layout->size * 8)
       return std::nullopt;
-    auto value = TI.getFixedExtraInhabitantValue(IGM, bits, 0);
+    auto value = TI.getFixedExtraInhabitantValue(IGM, mask.getBitWidth(), 0);
+    BitPatternReader maskReader(mask, IGM.Triple.isLittleEndian());
+    BitPatternReader valueReader(value, IGM.Triple.isLittleEndian());
     IRABIDetailsProvider::ExtraInhabitant result;
     for (unsigned i = 0; i < layout->size; ++i) {
-      unsigned offset = IGM.Triple.isLittleEndian() ? i : layout->size - i - 1;
-      result.mask.push_back(mask.extractBitsAsZExtValue(8, offset * 8));
-      result.value.push_back(value.extractBitsAsZExtValue(8, offset * 8));
+      result.mask.push_back(maskReader.read(8).getZExtValue());
+      result.value.push_back(valueReader.read(8).getZExtValue());
     }
     return result;
   }

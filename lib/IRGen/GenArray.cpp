@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "BitPatternBuilder.h"
 #include "FixedTypeInfo.h"
 #include "GenType.h"
 #include "IRGenModule.h"
@@ -328,8 +329,15 @@ public:
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
     if (ArraySize == 0)
       return APInt::getAllOnes(0);
-    APInt elementMask = Element.getFixedExtraInhabitantMask(IGM);
-    return elementMask.zext(this->getFixedSize().getValueInBits());
+    unsigned bits = this->getFixedSize().getValueInBits();
+    auto elementMask = Element.getFixedExtraInhabitantMask(IGM);
+    // An element without extra inhabitants can return a one-bit zero mask.
+    if (elementMask.isZero())
+      return APInt::getZero(bits);
+    BitPatternBuilder mask(IGM.Triple.isLittleEndian());
+    mask.append(std::move(elementMask));
+    mask.padWithClearBitsTo(bits);
+    return mask.build().value();
   }
 
   /// Create a constant of the given bit width holding one of the extra
@@ -339,7 +347,11 @@ public:
   APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
                                      unsigned bits,
                                      unsigned index) const override {
-    return Element.getFixedExtraInhabitantValue(IGM, bits, index);
+    BitPatternBuilder value(IGM.Triple.isLittleEndian());
+    value.append(Element.getFixedExtraInhabitantValue(
+        IGM, Element.getFixedSize().getValueInBits(), index));
+    value.padWithClearBitsTo(bits);
+    return value.build().value();
   }
     
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
