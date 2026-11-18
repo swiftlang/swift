@@ -721,7 +721,7 @@ extension Continuation where Success: ~Copyable {
     _ serialExecutor: Builtin.Executor,
     _ taskExecutor: Builtin.Executor
   ) {
-    unsafe _continuationResumeOnExecutors(
+    _continuationResumeOnExecutors(
       _takeContext(), value, nil, serialExecutor, taskExecutor)
   }
 
@@ -735,7 +735,7 @@ extension Continuation where Success: ~Copyable {
   ) {
     // There is no value to return, so pass an empty one for the runtime to
     // destroy.
-    unsafe _continuationResumeOnExecutors(
+    _continuationResumeOnExecutors(
       _takeContext(), (), error, serialExecutor, taskExecutor)
   }
 
