@@ -1,7 +1,21 @@
 include(macCatalystUtils)
 
+# The files generated for the targets that use file sets are private to them,
+# so the targets that use them do not wait for these files.
+if(POLICY CMP0154)
+  cmake_policy(SET CMP0154 NEW)
+endif()
+
 # Workaround a cmake bug, see the corresponding function in swift-syntax
 function(force_add_dependencies TARGET)
+  # The files only make the target build again when its dependencies change,
+  # so an empty file set makes them private: the C++ libraries that link with
+  # the target compile while its dependencies build.
+  get_target_property(header_sets ${TARGET} HEADER_SETS)
+  if(NOT "forced_dependencies" IN_LIST header_sets)
+    target_sources(${TARGET} PRIVATE FILE_SET forced_dependencies TYPE HEADERS)
+  endif()
+
   foreach(DEPENDENCY ${ARGN})
     string(REGEX REPLACE "[<>:\"/\\|?*]" _ sanitized ${DEPENDENCY})
     set(depfile "${CMAKE_CURRENT_BINARY_DIR}/forced-${sanitized}-dep.swift")
