@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1047; // @_tailAllocated attribute
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1048; // noncopyable closure contexts borrow guaranteed captures
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///

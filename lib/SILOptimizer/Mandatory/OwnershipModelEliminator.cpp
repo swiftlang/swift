@@ -494,7 +494,6 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   // closure is allowed to also consume its captures), but now
   // that we've lowered those borrows away, we need to make those dependence
   // relationships explicit so that the optimizer continues respecting them.
-  ApplySite applySite(inst);
   MarkDependenceInst *firstNewMDI = nullptr;
   auto newValue = withBuilder<SILValue>(inst->getNextInstruction(),
                                         [&](SILBuilder &b, SILLocation loc) {
@@ -503,23 +502,18 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
       SILValue op = argOp.get();
       // Trivial types have infinite lifetimes already.
       if (op->getType().isTrivial(*inst->getFunction())) {
-        break;
+        continue;
       }
       // Address operands should already have their dependence marked, since
       // borrowing doesn't model values in memory.
       if (op->getType().isAddress()) {
-        break;
+        continue;
       }
 
       // In the noncopyable case, consumed captures don't need the
-      // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
-      // value.
-      if (inst->isNoncopyable()) {
-        auto argConv = applySite.getArgumentConvention(argOp);
-        if (!(op->getType().isMoveOnly() &&
-              !argConv.isOwnedConventionInCaller()))
-          continue;
-      }
+      // dependence but the borrowed ones still do.
+      if (!inst->contextBorrowsArgument(argOp))
+        continue;
 
       // If this is a nontrivial value argument, insert the mark_dependence.
       auto mdi = b.createMarkDependence(loc, newValue, op,

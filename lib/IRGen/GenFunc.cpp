@@ -1894,19 +1894,13 @@ getPartialApplicationForwarderEmission(
 }
 
 /// Returns the fields of a stack-promoted closure context that the context
-/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
-/// that the enclosing function still owns, so nothing in the context may
-/// destroy it.
-llvm::BitVector
-getUnownedContextFields(HeapLayout const &layout,
-                        ArrayRef<ParameterConvention> conventions) {
+/// doesn't own.
+static llvm::BitVector
+getUnownedContextFields(ArrayRef<ParameterConvention> conventions,
+                        ArrayRef<unsigned> borrowedFields) {
   llvm::BitVector unownedFields(conventions.size());
-  for (unsigned i : indices(conventions)) {
-    auto fieldTy = layout.getElementTypes()[i];
-    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
-        fieldTy.isMoveOnly())
-      unownedFields.set(i);
-  }
+  for (unsigned i : borrowedFields)
+    unownedFields.set(i);
   return unownedFields;
 }
 
@@ -2006,7 +2000,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     bool calleeHasContext, const Signature &origSig,
     CanSILFunctionType origType, CanSILFunctionType substType,
     CanSILFunctionType outType, SubstitutionMap subs, HeapLayout const *layout,
-    ArrayRef<ParameterConvention> conventions) {
+    ArrayRef<ParameterConvention> conventions,
+    ArrayRef<unsigned> borrowedFields) {
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
@@ -2188,7 +2183,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
   llvm::BitVector unownedFields;
   if (layout && outType->isNoEscape())
-    unownedFields = getUnownedContextFields(*layout, conventions);
+    unownedFields = getUnownedContextFields(conventions, borrowedFields);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2593,6 +2588,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
+  // The fields of a stack-promoted context that hold the values it borrows.
+  SmallVector<unsigned, 2> borrowedFields;
 
   // A context's HeapLayout stores all of the partially applied args.
   // A HeapLayout is "fixed" if all of its fields have a fixed layout.
@@ -2639,6 +2636,19 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     if (schema.empty() && !param.isFormalIndirect() &&
         ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       return;
+
+    // A stack-promoted context borrows each value that the closure doesn't
+    // consume. The context of a noncopyable closure, whose call consumes it,
+    // can't be such a value itself.
+    bool isBorrowed =
+        outType->isNoEscape() &&
+        (param.getConvention() == ParameterConvention::Direct_Guaranteed ||
+         param.getConvention() == ParameterConvention::Direct_Unowned);
+    if (isBorrowed) {
+      borrowedFields.push_back(argConventions.size());
+      if (outType->isNoncopyable())
+        hasSingleSwiftRefcountedContext = No;
+    }
 
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
@@ -2815,10 +2825,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     auto origSig = IGF.IGM.getSignature(origType);
 
-    llvm::Value *forwarder =
-      emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
-                                      origSig, origType, substType,
-                                      outType, subs, nullptr, argConventions);
+    llvm::Value *forwarder = emitPartialApplicationForwarder(
+        IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
+        outType, subs, nullptr, argConventions, borrowedFields);
     forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
     forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
@@ -2890,7 +2899,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
         llvm::BitVector unownedFields =
-            getUnownedContextFields(layout, argConventions);
+            getUnownedContextFields(argConventions, borrowedFields);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
@@ -2991,7 +3000,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   llvm::Value *forwarder = emitPartialApplicationForwarder(
       IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
-      outType, subs, &layout, argConventions);
+      outType, subs, &layout, argConventions, borrowedFields);
   forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
