@@ -6864,9 +6864,10 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
                               ? LValueType::get(param->getTypeInContext())
                               : param->getTypeInContext());
 
-    forwardingParams.push_back(param->isInOut()
-                                   ? Argument::implicitInOut(ctx, paramRefExpr)
-                                   : Argument::unlabeled(paramRefExpr));
+    auto arg = param->isInOut() ? Argument::implicitInOut(ctx, paramRefExpr)
+                                : Argument::unlabeled(paramRefExpr);
+    arg.setLabel(param->getArgumentName());
+    forwardingParams.push_back(arg);
   }
 
   Argument selfArg = [&]() {
