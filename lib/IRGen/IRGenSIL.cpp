@@ -1070,6 +1070,9 @@ public:
                          bool IsAnonymous, bool WasMoved,
                          SILDebugInfoExpression *ExprToExtend = nullptr,
                          std::optional<Alignment> Align = std::nullopt) {
+    // Mark the shadow copy code as compiler-generated.
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1143,6 +1146,8 @@ public:
                               bool WasMoved,
                               llvm::SmallVectorImpl<llvm::Value *> &copy,
                               SILDebugInfoExpression *ExprToExtend = nullptr) {
+    // Mark the shadow copy code as compiler-generated.
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
@@ -1196,7 +1201,6 @@ public:
       Alloca =
         LTI.allocateStack(*this, Type, VarInfo.Name + ".debug").getAddress();
       zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
       LTI.initialize(*this, e, Alloca, false /* isOutlined */);
       auto shadow = Alloca.getAddress();
       // Async functions use the value of the artificial address.
