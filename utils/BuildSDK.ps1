@@ -855,10 +855,8 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
     # Match Build-SDKDependencies: pick GNU drivers for non-Windows targets.
     $CDispatchC   = if ($Platform.OS -eq [OS]::Windows) { $Compilers.C   } else { $Compilers.GNUC   }
     $CDispatchCXX = if ($Platform.OS -eq [OS]::Windows) { $Compilers.CXX } else { $Compilers.GNUCXX }
+    # The dependencies of Foundation are built before the SDKs.
     Build-CDispatch $Platform -CCompiler $CDispatchC -CXXCompiler $CDispatchCXX -Phase $Variant
-    if ($BuildFoundation) {
-      Build-SDKDependencies @($Platform) -Compilers $Compilers
-    }
 
     # ── Core ──────────────────────────────────────────────────────────────────
     Record-OperationTime $Platform "Build-${Variant}Runtime" {
