@@ -25,6 +25,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 /// Provides a per-thread image cache for PDB processing.  This means
