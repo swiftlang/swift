@@ -13,6 +13,12 @@
 // and converted like any other integer. (In C++ they're builtin types, which
 // are imported as `Unicode.Scalar`.) This test emits a module, so the
 // wrappers' bodies are type-checked too.
+//
+// FIXME: There's no compound `wchar_t` count test here, because how it's converted
+// depends on whether `wchar_t` is signed, which varies by target. It's `int`
+// on Apple platforms and x86_64 Linux, but `unsigned int` on ARM Linux and
+// Android, so `c + 1` is `(c + CInt(1))` on some targets and
+// `(c + CUnsignedInt(CInt(1)))` on others.
 
 //--- test.h
 #pragma once
@@ -75,28 +81,6 @@ void wcharBare(const int * __counted_by(c) __noescape p, wchar_t c);
 //   expected-remark@10{{macro content: |    return unsafe wcharBare(_pPtr.baseAddress, c)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
-void wcharCompound(const int * __counted_by(c + 1) __noescape p, wchar_t c);
-// expected-expansion@-1:75{{
-//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func wcharCompound(_ p: Span<CInt>, _ c: wchar_t) {|}}
-//   expected-remark@3{{macro content: |    if p.count != (c + CInt(1)) {|}}
-//   expected-remark@4{{macro content: |      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {|}}
-//   expected-remark@5{{macro content: |        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {|}}
-//   expected-remark@6{{macro content: |          fatalError("bounds check failure in \\(function): expected \\(expected) but got \\(actual)")|}}
-//   expected-remark@7{{macro content: |        }|}}
-//   expected-remark@8{{macro content: |        _fail("wcharCompound", expected, actual)|}}
-//   expected-remark@9{{macro content: |      }|}}
-//   expected-remark@10{{macro content: |      _boundsCheckFailure((c + CInt(1)), p.count)|}}
-//   expected-remark@11{{macro content: |    }|}}
-//   expected-remark@12{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
-//   expected-remark@13{{macro content: |        unsafe $0|}}
-//   expected-remark@14{{macro content: |    }|}}
-//   expected-remark@15{{macro content: |    defer {|}}
-//   expected-remark@16{{macro content: |        _fixLifetime(p)|}}
-//   expected-remark@17{{macro content: |    }|}}
-//   expected-remark@18{{macro content: |    return unsafe wcharCompound(_pPtr.baseAddress, c)|}}
-//   expected-remark@19{{macro content: |}|}}
-// }}
 
 //--- module.modulemap
 module Test {
@@ -119,9 +103,4 @@ func callChar32Compound(_ p: Span<CInt>, _ c: char32_t) {
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 func callWCharBare(_ p: Span<CInt>) {
   wcharBare(p)
-}
-
-@available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-func callWCharCompound(_ p: Span<CInt>, _ c: CInt) {
-  wcharCompound(p, c)
 }
