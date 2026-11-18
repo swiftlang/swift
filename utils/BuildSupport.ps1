@@ -361,6 +361,14 @@ function Write-Summary {
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
+
+  # CMake configures each project before building it, one at a time.
+  $Configures = @($TimingData | Where-Object { $_."Build Step" -eq "Configure" })
+  if ($Configures) {
+    $ConfigureTicks = ($Configures | ForEach-Object { $_."Elapsed Time".Ticks } | Measure-Object -Sum).Sum
+    $FormattedConfigureTime = "{0:hh\:mm\:ss\.ff}" -f [TimeSpan]::FromTicks($ConfigureTicks)
+    Write-Host "Configuring the $($Configures.Count) CMake projects took $FormattedConfigureTime in total, some of them at the same time."
+  }
 }
 
 
@@ -1556,6 +1564,11 @@ $Assemblers = @{
   }
 }
 
+# What Build-CMakeProject does: "All" configures and builds the project,
+# "Configure" only configures it, and "Build" builds it without configuring it
+# again if it is configured, after a run with "Configure".
+$CMakeMode = "All"
+
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1985,25 +1998,39 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$CMakeBin $cmakeGenerateArgs"
-    Invoke-Program $CMakeBin @cmakeGenerateArgs
-
-    # Build all requested targets in one invocation. Test targets such as
-    # ExperimentalTest do not depend on the default target, so build it first.
-    if ($BuildTargets -contains "default") {
-      Invoke-Program $CMakeBin --build $Bin
+    # A tree that was configured ahead is not configured again: ninja
+    # configures it again if a file that CMake read changed.
+    $Project = Split-Path -Leaf $Bin
+    if ($CMakeMode -ne "Build" -or -not (Test-Path "$Bin\CMakeCache.txt")) {
+      Record-OperationTime $Platform "Configure" -SummaryVariant $Project {
+        Write-Host "$CMakeBin $cmakeGenerateArgs"
+        Invoke-Program $CMakeBin @cmakeGenerateArgs
+      }
+    } else {
+      Write-Host "Using the configuration of '$Bin'"
     }
-    $Targets = @($BuildTargets | Where-Object { $_ -ne "default" })
-    if ($Targets.Length -gt 0) {
-      Invoke-Program $CMakeBin --build $Bin --target @Targets
-    }
 
-    if ($BuildTargets.Length -eq 0 -and $InstallTo) {
-      Invoke-Program $CMakeBin --build $Bin --target install
+    if ($CMakeMode -ne "Configure") {
+      Record-OperationTime $Platform "Build" -SummaryVariant $Project {
+        # Build all requested targets in one invocation. Test targets such as
+        # ExperimentalTest do not depend on the default target, so build it first.
+        if ($BuildTargets -contains "default") {
+          Invoke-Program $CMakeBin --build $Bin
+        }
+        $Targets = @($BuildTargets | Where-Object { $_ -ne "default" })
+        if ($Targets.Length -gt 0) {
+          Invoke-Program $CMakeBin --build $Bin --target @Targets
+        }
+
+        if ($BuildTargets.Length -eq 0 -and $InstallTo) {
+          Invoke-Program $CMakeBin --build $Bin --target install
+        }
+      }
     }
   }
 
-  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished building '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
+  $Done = if ($CMakeMode -eq "Configure") { "configuring" } else { "building" }
+  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Finished $Done '$Src' to '$Bin' in $($Stopwatch.Elapsed)"
   Write-Host ""
 }
 
