@@ -472,6 +472,7 @@ static bool doesUnownedFixupRequireUses(SILValue newValue) {
     return true;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 // Determine whether it is valid to replace \p oldValue with \p newValue and

@@ -356,6 +356,7 @@ bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
   case OwnershipKind::Unowned:
     llvm_unreachable("requires an owned or guaranteed orignalDef");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>
@@ -403,6 +404,7 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::GuaranteedForwarding:
     llvm_unreachable("ownership incompatible with an owned value");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>
@@ -467,6 +469,7 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::DestroyingConsume:
     llvm_unreachable("ownership incompatible with a guaranteed value");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>

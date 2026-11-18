@@ -350,6 +350,7 @@ CanSILFunctionType SILFunctionType::getLinearComponentType(
         getDifferentiabilityParameterIndices(), module.Types,
         LookUpConformanceInModule());
   }
+  llvm_unreachable("covered switch");
 }
 
 CanSILFunctionType

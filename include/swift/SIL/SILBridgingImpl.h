@@ -614,6 +614,7 @@ swift::ValueOwnershipKind BridgedValue::unbridge(Ownership ownership) {
     case BridgedValue::Ownership::Guaranteed: return swift::OwnershipKind::Guaranteed;
     case BridgedValue::Ownership::None:       return swift::OwnershipKind::None;
   }
+  llvm_unreachable("covered switch");
 }
 
 swift::ValueBase * _Nonnull BridgedValue::getSILValue() const {
@@ -2874,6 +2875,7 @@ swift::SILBuilder BridgedBuilder::unbridged() const {
   case BridgedBuilder::InsertAt::intoGlobal:
     return swift::SILBuilder(BridgedGlobalVar(insertionObj).getGlobal());
   }
+  llvm_unreachable("covered switch");
 }
 
 swift::SILLocation BridgedBuilder::regularLoc() const {

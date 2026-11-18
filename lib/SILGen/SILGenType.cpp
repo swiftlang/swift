@@ -1237,6 +1237,7 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Mutate:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit a default witness table for a resilient protocol definition.

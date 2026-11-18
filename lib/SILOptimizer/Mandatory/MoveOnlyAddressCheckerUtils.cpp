@@ -4309,6 +4309,7 @@ bool ExtendUnconsumedLiveness::isLiveAtBegin(SILBasicBlock *block,
   case Effect::Gen:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,
