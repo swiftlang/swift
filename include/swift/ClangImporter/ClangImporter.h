@@ -852,7 +852,7 @@ public:
   LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
 
   const clang::CXXMethodDecl *
-  getAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
+  lookupCXXAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
 
   bool hasNonTrivialAssignmentOperator(const StructDecl *decl);
 

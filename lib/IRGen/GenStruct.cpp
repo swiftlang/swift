@@ -868,7 +868,7 @@ namespace {
       auto *importer =
           static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader());
       auto *assignOp = const_cast<clang::CXXMethodDecl *>(
-          importer->getAssignmentOperator(cxxRecordDecl, isMove));
+          importer->lookupCXXAssignmentOperator(cxxRecordDecl, isMove));
       if (!assignOp)
         return nullptr;
 
