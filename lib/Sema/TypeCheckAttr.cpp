@@ -7230,6 +7230,7 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   case AccessorKind::Mutate:
     return DescriptiveDeclKind::MutateAccessor;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// An abstract function declaration lookup error.

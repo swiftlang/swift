@@ -725,6 +725,7 @@ public:
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Finds the associated declaration on-demand and caches it.

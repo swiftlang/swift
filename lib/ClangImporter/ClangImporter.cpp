@@ -10294,6 +10294,7 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
     // about Swift 'public' vs 'open'; see above).
     return AccessLevel::Public;
   }
+  llvm_unreachable("covered switch");
 }
 
 AccessLevel

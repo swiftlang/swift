@@ -245,6 +245,7 @@ struct Score {
     case SK_MissingSynthesizableConformance:
       return "type with missing synthesizable conformance";
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Print Score list a with brief description of any non-zero ScoreKinds.

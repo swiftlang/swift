@@ -672,6 +672,7 @@ static StringRef adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
     }
     return expandedCode;
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(

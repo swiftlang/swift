@@ -2284,6 +2284,7 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
     case TypeAdjustment::ExecutionSemanticsToPlain:
       return funcType->hasCalledAtMostOnceSemantics();
     }
+    llvm_unreachable("covered switch");
   };
   auto adjust = [=](const ASTExtInfo &info) -> ASTExtInfo {
     switch (adjustment) {
@@ -2294,6 +2295,7 @@ Type swift::adjustInferredAssociatedType(TypeAdjustment adjustment, Type type,
     case TypeAdjustment::ExecutionSemanticsToPlain:
       return info.withExecutionSemantics(std::nullopt);
     }
+    llvm_unreachable("covered switch");
   };
 
   // If we have a noescape function type, make it escaping.

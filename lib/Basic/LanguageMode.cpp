@@ -33,6 +33,7 @@ std::pair<unsigned, unsigned> LanguageMode::version() const {
     return {version::Version::getFutureMajorLanguageVersion(), 0};
 #include "swift/Basic/LanguageModes.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 std::string LanguageMode::versionString() const {
@@ -47,6 +48,7 @@ std::string LanguageMode::versionString() const {
   case AnyLanguageMode::future:
     return std::to_string(version::Version::getFutureMajorLanguageVersion());
   }
+  llvm_unreachable("covered switch");
 }
 
 void LanguageMode::dump() const { llvm::errs() << versionString(); }

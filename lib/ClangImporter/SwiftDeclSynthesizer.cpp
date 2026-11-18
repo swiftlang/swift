@@ -4059,6 +4059,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   case CxxRecordSemanticsKind::SwiftClassType:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Function body synthesizer for a deinit of a noncopyable type, which

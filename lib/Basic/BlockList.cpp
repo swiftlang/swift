@@ -34,6 +34,7 @@ struct swift::BlockListStore::Implementation {
     case BlockListKeyKind::Undefined:
       return nullptr;
     }
+    llvm_unreachable("covered switch");
   }
   static std::string getScalaString(llvm::yaml::Node *N) {
     llvm::SmallString<64> Buffer;

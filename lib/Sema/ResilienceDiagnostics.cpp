@@ -342,6 +342,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
     return isInternalBridgingHeader &&
            where.getExportedLevel() == ExportedLevel::ImplicitlyExported;
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,

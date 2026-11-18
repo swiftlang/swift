@@ -1122,6 +1122,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   case StmtConditionElement::CK_PatternBinding:
     return typeCheckPatternBindingStmtConditionElement(elt, isFalsable, dc);
   }
+  llvm_unreachable("covered switch");
 }
 
 /// If \p elt is a `#available` or `#unavailable` condition element whose

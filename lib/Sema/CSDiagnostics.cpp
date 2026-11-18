@@ -2657,6 +2657,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
                      : std::nullopt;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,

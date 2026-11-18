@@ -1009,6 +1009,7 @@ public:
       return ParamSpecifier::Consuming;
       break;
     }
+    llvm_unreachable("covered switch");
   }
 
   static GenericSignature normalizeGenericSignature(GenericSignature original) {

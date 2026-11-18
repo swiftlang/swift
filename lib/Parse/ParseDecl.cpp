@@ -390,6 +390,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
       case AvailableAttr::Kind::NoAsync:
         return "noasync";
       }
+      llvm_unreachable("covered switch");
     };
 
     if (ArgumentKind == IsInvalid) {
@@ -1082,6 +1083,7 @@ Parser::parseStorageRestrictionsAttribute(SourceLoc AtLoc, SourceLoc Loc) {
       status.setIsParseError();
       return status;
     }
+    llvm_unreachable("covered switch");
   };
 
   ParserStatus argumentStatus = parseArgument();
@@ -9328,6 +9330,7 @@ getCorrespondingLegacyAccessorKind(AccessorKind kind) {
   case AccessorKind::Mutate:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 static void diagnoseConflictingAccessors(Parser &P, AccessorDecl *first,

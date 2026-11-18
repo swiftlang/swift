@@ -113,6 +113,14 @@ static bool hasUncheckedAddrCast(SILValue v) {
   if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
     return hasUncheckedAddrCast(bai->getOperand());
   }
+  // An `index_addr` with a zero index doesn't change the AccessPath. Therefore
+  // it can appear between the cast and the destroyed address, e.g.
+  //   %1 = unchecked_addr_cast %vector to $*Element
+  //   %2 = index_addr %1, 0
+  //   destroy_addr %2
+  if (auto *iai = dyn_cast<IndexAddrInst>(v)) {
+    return hasUncheckedAddrCast(iai->getBase());
+  }
   if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
     if (isAccessStorageCast(svi)) {
       return hasUncheckedAddrCast(svi->getAllOperands()[0].get());
