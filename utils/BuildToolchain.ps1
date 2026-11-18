@@ -65,6 +65,16 @@ Otherwise:
 The steps after Compilers need its build tree, and PackageManager and Format
 need the Tools step.
 
+.PARAMETER ConfigureSteps
+Steps whose CMake projects to only configure, before running -Steps, so that
+they can be configured before what they depend on is built. They can be
+Compilers, which also builds libxml2, Macros, Tools, Format and PackageManager.
+The projects of the other steps that they use must be configured.
+
+.PARAMETER Configured
+Do not configure again the projects of -Steps that are configured, which
+-ConfigureSteps did.
+
 .PARAMETER EnableCaching
 Enable build caching using LLVM CAS to speed up rebuilds.
 
@@ -128,6 +138,8 @@ param
   [ValidateSet("", "Bootstrap")]
   [string] $Mode = "",
   [string[]] $Steps = @(),
+  [string[]] $ConfigureSteps = @(),
+  [switch] $Configured,
 
   [switch] $EnableCaching,
 
@@ -165,6 +177,8 @@ if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $Windows
 
 if ($Steps.Length -eq 1) { $Steps = $Steps[0].Split(",") }
 
+if ($ConfigureSteps.Length -eq 1) { $ConfigureSteps = $ConfigureSteps[0].Split(",") }
+
 $KnownSteps = if ($Mode -eq "Bootstrap") {
   @("BuildTools", "EarlySwiftDriver", "Stage1")
 } else {
@@ -176,9 +190,21 @@ foreach ($Step in $Steps) {
   }
 }
 
-# Whether to run a step, which is the case of all of them by default.
+# The steps that do nothing else than building CMake projects, and the
+# Compilers step, which only configures the compilers in this case.
+$ConfigurableSteps = if ($Mode -eq "Bootstrap") { @() } else { @("Compilers", "Macros", "Tools", "Format", "PackageManager") }
+foreach ($Step in $ConfigureSteps) {
+  if ($Step -notin $ConfigurableSteps) {
+    throw "Cannot only configure step '$Step', expected one of $($ConfigurableSteps -join ", ")"
+  }
+}
+
+# The steps that Invoke-Steps runs.
+$ActiveSteps = @()
+
+# Whether to run a step.
 function Test-Step([string] $Name) {
-  return $Steps.Length -eq 0 -or $Steps -contains $Name
+  return $ActiveSteps -contains $Name
 }
 
 if ($UseHostToolchain -is [string]) {
@@ -555,6 +581,7 @@ function Build-Compilers([Hashtable] $Platform,
     -CacheScript $CacheScript `
     -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
 
+  if ($CMakeMode -eq "Configure") { return }
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
     Copy-WindowsRuntimeToToolchain $Platform $ToolchainRoot $RuntimeLocation
@@ -1744,142 +1771,70 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
 
 try {
 
-if ($Mode -eq "Bootstrap") {
-  # ── Build Tools ───────────────────────────────────────────────────────────
-  if (Test-Step "BuildTools") {
-    Invoke-BuildStep Build-CMark $BuildPlatform
-    Invoke-BuildStep Build-BuildTools $BuildPlatform
-    Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap" -SummaryVariant "Bootstrap"
-  }
-
-  # ── Early Swift Driver ────────────────────────────────────────────────────
-  if (Test-Step "EarlySwiftDriver") {
-    Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver -SummaryVariant "EarlySwiftDriver"
-    Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
-  }
-
-  # ── Stage1 Compiler ───────────────────────────────────────────────────────
-  if (Test-Step "Stage1") {
-    Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers -SummaryVariant "Stage1/Asserts" @{
-      CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
-      Assembler       = $Assemblers.Host;
-      CCompiler       = $Compilers.Host.C;
-      CXXCompiler     = $Compilers.Host.CXX;
-      SwiftCompiler   = $Compilers.Pinned.Swift;
-      SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
-      ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage1Compilers;
-      RuntimeLocation = Get-PinnedToolchainToolsDir;
+# Runs the steps in $ActiveSteps, in order.
+function Invoke-Steps {
+  if ($Mode -eq "Bootstrap") {
+    # ── Build Tools ─────────────────────────────────────────────────────────
+    if (Test-Step "BuildTools") {
+      Invoke-BuildStep Build-CMark $BuildPlatform
+      Invoke-BuildStep Build-BuildTools $BuildPlatform
+      Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap" -SummaryVariant "Bootstrap"
     }
 
-    # ── Bootstrap Macros ────────────────────────────────────────────────────
-    Invoke-BuildStep Build-BootstrapFoundationMacros $BuildPlatform @{
-      SwiftCompiler   = $Compilers.Pinned.Swift;
-      SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+    # ── Early Swift Driver ──────────────────────────────────────────────────
+    if (Test-Step "EarlySwiftDriver") {
+      Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver -SummaryVariant "EarlySwiftDriver"
+      Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
     }
-    Invoke-BuildStep Build-BootstrapTestingMacros $BuildPlatform @{
-      SwiftCompiler   = $Compilers.Pinned.Swift;
-      SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+
+    # ── Stage1 Compiler ─────────────────────────────────────────────────────
+    if (Test-Step "Stage1") {
+      Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers -SummaryVariant "Stage1/Asserts" @{
+        CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
+        Assembler       = $Assemblers.Host;
+        CCompiler       = $Compilers.Host.C;
+        CXXCompiler     = $Compilers.Host.CXX;
+        SwiftCompiler   = $Compilers.Pinned.Swift;
+        SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
+        ToolchainRoot   = Get-ProjectToolchainRoot $BuildPlatform Stage1Compilers;
+        RuntimeLocation = Get-PinnedToolchainToolsDir;
+      }
+
+      # ── Bootstrap Macros ──────────────────────────────────────────────────
+      Invoke-BuildStep Build-BootstrapFoundationMacros $BuildPlatform @{
+        SwiftCompiler   = $Compilers.Pinned.Swift;
+        SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
+        SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+      }
+      Invoke-BuildStep Build-BootstrapTestingMacros $BuildPlatform @{
+        SwiftCompiler   = $Compilers.Pinned.Swift;
+        SwiftSDK        = Get-PinnedToolchainSDK -OS $BuildPlatform.OS;
+        SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
+      }
     }
-  }
-} else {
-  # The developer tools build with the Stage1 compilers. The ones of the Tools
-  # step only need the SDK, so they can build at the same time as the Stage2
-  # compilers. The others use the swift-syntax or the LLVM CMake modules of the
-  # Stage2 build tree.
-  $HostSwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS
-  $Stage2SwiftSyntax = Get-ProjectCMakeModules $HostPlatform Stage2Compilers
+  } else {
+    # The developer tools build with the Stage1 compilers. The ones of the Tools
+    # step only need the SDK, so they can build at the same time as the Stage2
+    # compilers. The others use the swift-syntax or the LLVM CMake modules of the
+    # Stage2 build tree.
+    $HostSwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS
+    $Stage2SwiftSyntax = Get-ProjectCMakeModules $HostPlatform Stage2Compilers
 
-  # ── CMark ─────────────────────────────────────────────────────────────────
-  # The compilers and the documentation tools use it.
-  if (Test-Step "CMark") {
-    Invoke-BuildStep Build-CMark $HostPlatform
-  }
-
-  # ── Stage2 Compiler ───────────────────────────────────────────────────────
-  if (Test-Step "Compilers") {
-    Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
-      Assembler       = $Assemblers.Stage1;
-      CCompiler       = $Compilers.Stage1.C;
-      CXXCompiler     = $Compilers.Stage1.CXX;
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = $HostSwiftSDK;
-      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+    # ── CMark ───────────────────────────────────────────────────────────────
+    # The compilers and the documentation tools use it.
+    if (Test-Step "CMark") {
+      Invoke-BuildStep Build-CMark $HostPlatform
     }
-    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
-  }
 
-  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  if (Test-Step "CompilerRuntime") {
-    $CompilerRuntimeBuilds | ForEach-Object {
-      Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
-    }
-  }
+    # ── Stage2 Compiler ─────────────────────────────────────────────────────
+    if (Test-Step "Compilers") {
+      # Configuring the compilers checks libxml2, so it builds in any case.
+      $CompilersMode = $CMakeMode
+      if ($CMakeMode -eq "Configure") { $script:CMakeMode = "All" }
+      Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
+      $script:CMakeMode = $CompilersMode
 
-  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
-  if (Test-Step "Macros") {
-    Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = $HostSwiftSDK;
-      SwiftSyntax_DIR = $Stage2SwiftSyntax;
-    }
-    Invoke-BuildStep Build-TestingMacros $HostPlatform @{
-      SwiftCompiler   = $Compilers.Stage1.Swift;
-      SwiftSDK        = $HostSwiftSDK;
-      SwiftSyntax_DIR = $Stage2SwiftSyntax;
-    }
-  }
-
-  # ── Stage2 Toolchain ──────────────────────────────────────────────────────
-  $ToolArgs = @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = $HostSwiftSDK;
-  }
-
-  if (Test-Step "Tools") {
-    Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
-    Invoke-BuildStep Build-ToolsSupportCore $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-LLBuild $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-ArgumentParser $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-ASN1 $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-Crypto $HostPlatform $ToolArgs @{ Assembler = $Assemblers.Stage1 }
-    Invoke-BuildStep Build-Collections $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-Certificates $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-System $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-Subprocess $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-ToolsProtocols $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-Markdown $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
-    Invoke-BuildStep Build-IndexStoreDB $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-SymbolKit $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-DocC $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-Inspect $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform $ToolArgs
-  }
-
-  if (Test-Step "Format") {
-    Invoke-BuildStep Build-Format $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
-  }
-
-  if (Test-Step "PackageManager") {
-    Invoke-BuildStep Build-Driver $HostPlatform $ToolArgs @{
-      LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
-      Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
-      Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
-    }
-    Invoke-BuildStep Build-Build $HostPlatform $ToolArgs
-    Invoke-BuildStep Build-PackageManager $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
-    Invoke-BuildStep Build-SourceKitLSP $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
-  }
-
-  if (Test-Step "Finish") {
-    Repair-Toolchain $HostPlatform.ToolchainInstallRoot
-
-    # ── Stage2 NoAsserts Compiler ───────────────────────────────────────────
-    if ($IncludeNoAsserts) {
-      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers -SummaryVariant "Stage2/NoAsserts" @{
+      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
         Assembler       = $Assemblers.Stage1;
         CCompiler       = $Compilers.Stage1.C;
         CXXCompiler     = $Compilers.Stage1.CXX;
@@ -1887,49 +1842,144 @@ if ($Mode -eq "Bootstrap") {
         SwiftSDK        = $HostSwiftSDK;
         DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
       }
-
-      Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
-
-      # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
-      # Use robocopy for efficient copying
-      #   /E : Copies subdirectories, including empty ones.
-      #   /XC: Excludes existing files with the same timestamp but different file sizes.
-      #   /XN: Excludes existing files that are newer than the copy in the source directory.
-      #   /XO: Excludes existing files that are older than the copy in the source directory.
-      #   /NFL: Do not list copied files in output
-      #   /NDL: Do not list directories in output
-      #   /NJH: Do not write a job header
-      #   /NC: Do not write file classes
-      #   /NS: Do not write file sizes
-      #   /NP: Do not show progress indicator
-      & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
-      Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts" -SummaryVariant "NoAsserts"
+      if ($CMakeMode -ne "Configure") {
+        Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
+      }
     }
 
-    if ($HostPlatform.OS -eq [OS]::Windows) {
-      $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSwiftSDK
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
-        ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
-        RuntimeLocation = $HostRuntimeBin;
+    # ── Stage2 Compiler Runtimes ────────────────────────────────────────────
+    if (Test-Step "CompilerRuntime") {
+      $CompilerRuntimeBuilds | ForEach-Object {
+        Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
       }
+    }
+
+    # ── Stage2 Compiler Macros ──────────────────────────────────────────────
+    if (Test-Step "Macros") {
+      Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = $HostSwiftSDK;
+        SwiftSyntax_DIR = $Stage2SwiftSyntax;
+      }
+      Invoke-BuildStep Build-TestingMacros $HostPlatform @{
+        SwiftCompiler   = $Compilers.Stage1.Swift;
+        SwiftSDK        = $HostSwiftSDK;
+        SwiftSyntax_DIR = $Stage2SwiftSyntax;
+      }
+    }
+
+    # ── Stage2 Toolchain ────────────────────────────────────────────────────
+    $ToolArgs = @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = $HostSwiftSDK;
+    }
+
+    if (Test-Step "Tools") {
+      Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
+      Invoke-BuildStep Build-ToolsSupportCore $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-LLBuild $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-ArgumentParser $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-ASN1 $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Crypto $HostPlatform $ToolArgs @{ Assembler = $Assemblers.Stage1 }
+      Invoke-BuildStep Build-Collections $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Certificates $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-System $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Subprocess $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-ToolsProtocols $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Markdown $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
+      Invoke-BuildStep Build-IndexStoreDB $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-SymbolKit $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-DocC $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-Inspect $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform $ToolArgs
+    }
+
+    if (Test-Step "Format") {
+      Invoke-BuildStep Build-Format $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
+    }
+
+    if (Test-Step "PackageManager") {
+      Invoke-BuildStep Build-Driver $HostPlatform $ToolArgs @{
+        LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
+        Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
+        Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
+      }
+      Invoke-BuildStep Build-Build $HostPlatform $ToolArgs
+      Invoke-BuildStep Build-PackageManager $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
+      Invoke-BuildStep Build-SourceKitLSP $HostPlatform $ToolArgs @{ SwiftSyntax_DIR = $Stage2SwiftSyntax }
+    }
+
+    if (Test-Step "Finish") {
+      Repair-Toolchain $HostPlatform.ToolchainInstallRoot
+
+      # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────
       if ($IncludeNoAsserts) {
-        Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
-          ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+        Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers -SummaryVariant "Stage2/NoAsserts" @{
+          Assembler       = $Assemblers.Stage1;
+          CCompiler       = $Compilers.Stage1.C;
+          CXXCompiler     = $Compilers.Stage1.CXX;
+          SwiftCompiler   = $Compilers.Stage1.Swift;
+          SwiftSDK        = $HostSwiftSDK;
+          DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+        }
+
+        Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
+
+        # Only compilers have NoAsserts enabled. Copy the rest of the Toolchain binaries from the Asserts output
+        # Use robocopy for efficient copying
+        #   /E : Copies subdirectories, including empty ones.
+        #   /XC: Excludes existing files with the same timestamp but different file sizes.
+        #   /XN: Excludes existing files that are newer than the copy in the source directory.
+        #   /XO: Excludes existing files that are older than the copy in the source directory.
+        #   /NFL: Do not list copied files in output
+        #   /NDL: Do not list directories in output
+        #   /NJH: Do not write a job header
+        #   /NC: Do not write file classes
+        #   /NS: Do not write file sizes
+        #   /NP: Do not show progress indicator
+        & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
+        Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts" -SummaryVariant "NoAsserts"
+      }
+
+      if ($HostPlatform.OS -eq [OS]::Windows) {
+        $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSwiftSDK
+        Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
+          ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
           RuntimeLocation = $HostRuntimeBin;
         }
+        if ($IncludeNoAsserts) {
+          Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
+            ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
+            RuntimeLocation = $HostRuntimeBin;
+          }
+        }
       }
-    }
 
-    # Patching rewrites the compilers, so it comes after the last step that
-    # writes them.
-    Invoke-BuildStep Build-mimalloc $HostPlatform
-    Invoke-BuildStep Patch-mimalloc $HostPlatform
+      # Patching rewrites the compilers, so it comes after the last step that
+      # writes them.
+      Invoke-BuildStep Build-mimalloc $HostPlatform
+      Invoke-BuildStep Patch-mimalloc $HostPlatform
+    }
   }
+}
+
+# The projects of -ConfigureSteps are configured first, then -Steps run, all of
+# the steps by default.
+if ($ConfigureSteps) {
+  $ActiveSteps = $ConfigureSteps
+  $CMakeMode = "Configure"
+  Invoke-Steps
+}
+if ($Steps -or -not $ConfigureSteps) {
+  $ActiveSteps = if ($Steps) { $Steps } else { $KnownSteps }
+  $CMakeMode = if ($Configured) { "Build" } else { "All" }
+  Invoke-Steps
 }
 
 } catch {
   Write-BuildError $_
   exit 1
 } finally {
-  Write-BuildTimings "BuildToolchain$(if ($Mode) { "-$Mode" })$(if ($Steps) { "-$($Steps -join "-")" })"
+  Write-BuildTimings "BuildToolchain$(if ($Mode) { "-$Mode" })$(if ($ConfigureSteps) { "-Configure-$($ConfigureSteps -join "-")" })$(if ($Steps) { "-$($Steps -join "-")" })"
 }

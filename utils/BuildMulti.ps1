@@ -296,10 +296,17 @@ $ToolchainOverrides = @{
 }
 
 # Runs steps of BuildToolchain.ps1 in this process, or in the background with
-# -Background.
-function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [switch] $Background) {
-  $Name = "BuildToolchain$(if ($Mode) { "-$Mode" })-$($Steps -join "-")"
-  $Overrides = $ToolchainOverrides + @{ Mode = $Mode; Steps = $Steps }
+# -Background. The projects of -ConfigureSteps are configured first, and with
+# -Configured, the projects of -Steps that are configured are not configured
+# again.
+function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $ConfigureSteps = @(), [switch] $Configured, [switch] $Background) {
+  $Name = "BuildToolchain$(if ($Mode) { "-$Mode" })$(if ($ConfigureSteps -and -not $Steps) { "-Configure-$($ConfigureSteps -join "-")" })$(if ($Steps) { "-$($Steps -join "-")" })"
+  $Overrides = $ToolchainOverrides + @{
+    Mode = $Mode;
+    Steps = $Steps;
+    ConfigureSteps = $ConfigureSteps;
+    Configured = $Configured;
+  }
   if ($Background) {
     return Start-BuildJob $Name BuildToolchain.ps1 $Overrides
   }
@@ -363,19 +370,23 @@ if ($Toolchain) {
   # The developer tools that only need the SDK build while the Stage2 compilers
   # build. They build at normal priority, as they mostly compile one Swift
   # module at a time and would otherwise wait for the compilers.
+  #
+  # The configuration of a project only needs the configuration of the projects
+  # that it uses, so the job of the tools also configures the tools that use the
+  # Stage2 build tree, after the Stage2 compilers are configured. They then
+  # build without being configured again.
   Invoke-ToolchainSteps "" CMark
-  $ToolsJob = Invoke-ToolchainSteps "" Tools -Background
-  Invoke-ToolchainSteps "" Compilers
+  Invoke-ToolchainSteps "" -ConfigureSteps Compilers
+  $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Tools,Macros,Format,PackageManager -Configured -Background
+  Invoke-ToolchainSteps "" Compilers -Configured
 
   # Then, what uses the Stage2 build tree, with the longest chain of
-  # dependencies here.
-  $LateJobs = @(
-    (Invoke-ToolchainSteps "" CompilerRuntime -Background),
-    (Invoke-ToolchainSteps "" Macros -Background)
-  )
+  # dependencies here. The Macros wait for the configuration of the tools.
+  $LateJobs = @(Invoke-ToolchainSteps "" CompilerRuntime -Background)
   Wait-BuildJobs @($ToolsJob)
-  $LateJobs += Invoke-ToolchainSteps "" Format -Background
-  Invoke-ToolchainSteps "" PackageManager
+  $LateJobs += Invoke-ToolchainSteps "" Macros -Configured -Background
+  $LateJobs += Invoke-ToolchainSteps "" Format -Configured -Background
+  Invoke-ToolchainSteps "" PackageManager -Configured
   Wait-BuildJobs $LateJobs
 
   Invoke-ToolchainSteps "" Finish
