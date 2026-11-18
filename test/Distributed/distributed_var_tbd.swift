@@ -6,7 +6,7 @@
 // off the getter ('...SivgTETu'), otherwise TBDGen and IRGen disagree.
 // '-enable-testing' is required to make the internal declarations visible to
 // TBDGen, which is what SwiftPM does for debug builds.
-// RUN: %target-swift-frontend -c -o /dev/null %s -module-name Library -swift-version 5 -target %target-swift-5.7-abi-triple -I %t -parse-as-library -enable-testing -validate-tbd-against-ir=all
+// RUN: %target-swift-frontend -c -o /dev/null %s -module-name Library -target %target-swift-5.7-abi-triple -I %t -parse-as-library -enable-testing -validate-tbd-against-ir=all
 
 // REQUIRES: concurrency
 // REQUIRES: distributed

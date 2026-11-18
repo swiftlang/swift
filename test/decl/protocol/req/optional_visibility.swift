@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-objc-interop
 
 @objc protocol Opt {
   @objc optional func f(callback: @escaping () -> ())

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded -wmo
-// RUN: %target-swift-frontend -swift-version 5 -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t/MyModule.swiftmodule %t/MyModule.swift -parse-stdlib -enable-experimental-feature Embedded -wmo
+// RUN: %target-swift-frontend -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s
 
 // REQUIRES: swift_feature_Embedded
 

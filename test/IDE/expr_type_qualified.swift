@@ -1,5 +1,5 @@
-// RUN: %target-swift-ide-test -print-expr-type -fully-qualified-types -source-filename %S/Inputs/ExprType.swift -swift-version 5 | %FileCheck %s -check-prefix=CHECK-SUGAR
-// RUN: %target-swift-ide-test -print-expr-type -fully-qualified-types -source-filename %S/Inputs/ExprType.swift -swift-version 5 -canonicalize-type | %FileCheck %s -check-prefix=CHECK-CANON
+// RUN: %target-swift-ide-test -print-expr-type -fully-qualified-types -source-filename %S/Inputs/ExprType.swift | %FileCheck %s -check-prefix=CHECK-SUGAR
+// RUN: %target-swift-ide-test -print-expr-type -fully-qualified-types -source-filename %S/Inputs/ExprType.swift -canonicalize-type | %FileCheck %s -check-prefix=CHECK-CANON
 
 // CHECK-SUGAR: func foo() -> Int { return <expr type:"Swift.Int">1</expr> }
 // CHECK-SUGAR: func bar(f: Float) -> Float { return <expr type:"Swift.Float"><expr type:"(Swift.Float) -> Swift.Float">bar</expr>(f: <expr type:"Swift.Float">1</expr>)</expr> }

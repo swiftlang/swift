@@ -4,9 +4,9 @@
 // REQUIRES: OS=macosx
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -target %target-cpu-apple-macosx10.50 -enable-experimental-feature BodyMacros -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name main %s > %t/macro_availability.sil
+// RUN: %target-swift-emit-silgen -target %target-cpu-apple-macosx10.50 -enable-experimental-feature BodyMacros -enable-experimental-feature CodeItemMacros -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name main %s > %t/macro_availability.sil
 
 // Each expansion is checked with its own prefix because the order in which
 // SILGen emits macro expanded declarations does not match their source order.

@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name swift-utils.log \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Utils.swiftmodule \
@@ -52,7 +52,7 @@
 // CHECK-PRIVATE-UTILS: package var ufiPkgVar
 
 // RUN: %target-swift-frontend -emit-module %t/Client.swift \
-// RUN:   -module-name Client -swift-version 5 -I %t \
+// RUN:   -module-name Client -I %t \
 // RUN:   -package-name swift-utils.log \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \

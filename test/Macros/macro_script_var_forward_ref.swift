@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/MacroDefinition.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/MacroDefinition.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/main.swift
 // RUN: not --crash %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) -DCRASH %t/main.swift

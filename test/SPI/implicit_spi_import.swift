@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -module-name Lib -swift-version 5 -I %t \
+// RUN:   -module-name Lib -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
@@ -18,7 +18,7 @@
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/ClientC.swift -I %t
 
 // RUN: %target-swift-frontend -emit-module %t/ClientA.swift \
-// RUN:   -module-name ClientA -swift-version 5 -I %t \
+// RUN:   -module-name ClientA -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/ClientA.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientA.private.swiftinterface
@@ -28,7 +28,7 @@
 // CHECK-A: @_spi(_) public func useImplicit() -> Lib::_Klass
 
 // RUN: %target-swift-frontend -emit-module %t/ClientB.swift \
-// RUN:   -module-name ClientB -swift-version 5 -I %t \
+// RUN:   -module-name ClientB -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/ClientB.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientB.private.swiftinterface
@@ -40,7 +40,7 @@
 // CHECK-B: @_spi(core) public func useSPICore() -> Lib::CoreStruct
 
 // RUN: %target-swift-frontend -emit-module %t/ClientZ.swift \
-// RUN:   -module-name ClientZ -swift-version 5 -I %t \
+// RUN:   -module-name ClientZ -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/ClientZ.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientZ.private.swiftinterface

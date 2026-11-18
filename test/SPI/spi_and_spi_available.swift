@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -library-level=api -require-explicit-availability=ignore
 
 // REQUIRES: OS=macosx

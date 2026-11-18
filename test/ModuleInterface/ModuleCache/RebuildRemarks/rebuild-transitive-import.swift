@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t/ModuleCache)
 
 // 1. Create a module called InnerModule, and put its interface into the build dir.
-// RUN: echo 'public func inInnerModule() {}' | %target-swift-frontend - -typecheck -emit-module-interface-path %t/Build/InnerModule.swiftinterface -enable-library-evolution -swift-version 5 -module-name InnerModule
+// RUN: echo 'public func inInnerModule() {}' | %target-swift-frontend - -typecheck -emit-module-interface-path %t/Build/InnerModule.swiftinterface -enable-library-evolution -module-name InnerModule
 
 // 2. Build the .swiftinterface to a .swiftmodule, which will have a dependency on the interface
 // RUN: %target-swift-frontend -compile-module-from-interface -o %t/Build/InnerModule.swiftmodule %t/Build/InnerModule.swiftinterface

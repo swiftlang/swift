@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser, asserts
 // REQUIRES: OS=macosx
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name MacrosTest -target %target-cpu-apple-macos50
+// RUN: %target-typecheck-verify-swift -module-name MacrosTest -target %target-cpu-apple-macos50
 
 @freestanding(expression)
 macro overloadedOnAvailability(_: Any) -> Int = #externalMacro(module: "MacroLibrary", type: "MyOldMacro")

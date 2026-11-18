@@ -1,5 +1,5 @@
 // {"kind":"emit-silgen","signature":"(anonymous namespace)::TranslateArguments::translate(swift::Lowering::AbstractionPattern, swift::ArrayRefView<swift::AnyFunctionType::Param, swift::AnyFunctionType::CanParam, swift::AnyFunctionType::CanParam::getFromParam(swift::AnyFunctionType::Param const&), true>, swift::Lowering::AbstractionPattern, swift::ArrayRefView<swift::AnyFunctionType::Param, swift::AnyFunctionType::CanParam, swift::AnyFunctionType::CanParam::getFromParam(swift::AnyFunctionType::Param const&), true>, bool)"}
-// RUN: %target-swift-frontend -emit-silgen -verify -language-mode 5 %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s
 // https://github.com/swiftlang/swift/issues/67091
 func test<each T>(_: inout (repeat each T) -> Void) {
 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -O -swift-version 5 -plugin-path %swift-plugin-dir -module-name main | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -O -plugin-path %swift-plugin-dir -module-name main | %FileCheck %s
 
 // REQUIRES: concurrency
 

@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift %s -swift-version 5 -module-name main -disable-availability-checking -plugin-path %swift-plugin-dir
+// RUN: %target-typecheck-verify-swift %s -module-name main -disable-availability-checking -plugin-path %swift-plugin-dir
 
 // expected-error@+1{{reference requires a lifetimeDependence on the same value}}
 @_SwiftifyImport(.reference(pointer: .return))

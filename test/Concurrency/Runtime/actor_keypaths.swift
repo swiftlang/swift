@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple)
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -10,7 +10,7 @@
 actor Page {
     let initialNumWords : Int
 
-    private let numWordsMem: UnsafeMutablePointer<Int>
+    nonisolated(unsafe) private let numWordsMem: UnsafeMutablePointer<Int>
 
     nonisolated
     var numWords : Int {
@@ -24,7 +24,7 @@ actor Page {
         numWordsMem.initialize(to: words)
     }
 
-    convenience init(_ words: Int) {
+    init(_ words: Int) {
         self.init(withWords: words)
         numWords = words
     }

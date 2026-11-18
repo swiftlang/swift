@@ -4,7 +4,7 @@
 
 // RUN: echo "public func foo() {}" > %t/Foo.swift
 
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -module-name NoUserModuleVersion -swift-version 5 -disable-implicit-concurrency-module-import -emit-module-interface-path %t/textual/NoUserModuleVersion.swiftinterface -enable-library-evolution -emit-module-path %t/binary/NoUserModuleVersion.swiftmodule
+// RUN: %target-swift-frontend -emit-module %t/Foo.swift -module-name NoUserModuleVersion -disable-implicit-concurrency-module-import -emit-module-interface-path %t/textual/NoUserModuleVersion.swiftinterface -enable-library-evolution -emit-module-path %t/binary/NoUserModuleVersion.swiftmodule
 
 // RUN: %target-typecheck-verify-swift -disable-implicit-concurrency-module-import -I %t/textual
 // RUN: %target-typecheck-verify-swift -disable-implicit-concurrency-module-import -I %t/binary

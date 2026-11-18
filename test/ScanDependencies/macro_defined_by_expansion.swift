@@ -7,7 +7,7 @@
 // RUN: split-file %s %t
 // RUN: touch %t/%target-library-name(MacroDefinition)
 // RUN: %target-swift-frontend -scan-dependencies -module-name MacroUser \
-// RUN:   -module-cache-path %t/clang-module-cache -swift-version 5 \
+// RUN:   -module-cache-path %t/clang-module-cache \
 // RUN:   -external-plugin-path %t#%swift-plugin-server \
 // RUN:   %t/main.swift -o %t/deps.json
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps.json MacroUser macroDependencies | %FileCheck %s

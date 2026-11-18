@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath
 // RUN: %target-swift-frontend -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name Macros -emit-module -emit-module-path %t/Macros.swiftmodule -emit-symbol-graph -emit-symbol-graph-dir %t/
 // RUN: %validate-json %t/Macros.symbols.json %t/Macros.formatted.symbols.json
 
@@ -15,7 +15,7 @@
 // Now do the same thing with a `swift-symbolgraph-extract`-processed symbol graph.
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/stringify_macro.swift -g -no-toolchain-stdlib-rpath
 // RUN: %target-swift-frontend -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name Macros -emit-module -emit-module-path %t/Macros.swiftmodule
 // RUN: %target-swift-symbolgraph-extract -module-name Macros -I %t -pretty-print -output-dir %t
 

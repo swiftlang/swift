@@ -7,31 +7,31 @@
 /// Generate dependencies.
 // RUN: %target-swift-frontend -emit-module %t/LibA.swift \
 // RUN:   -module-name LibA -emit-module-path %t/LibA.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/LibB.swift \
 // RUN:   -module-name LibB -emit-module-path %t/LibB.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution -I %t
+// RUN:   -enable-library-evolution -I %t
 // RUN: %target-swift-frontend -emit-module %t/LibC.swift \
 // RUN:   -module-name LibC -emit-module-path %t/LibC.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution -I %t
+// RUN:   -enable-library-evolution -I %t
 
 // RUN: %target-swift-frontend -typecheck %t/TwoIOI.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI1.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/SPIOnlyAndIOI2.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/TwoSPIOnly.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/OneSPIOnly1.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 // RUN: %target-swift-frontend -typecheck %t/OneSPIOnly2.swift -I %t -verify -verify-ignore-unrelated \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports -verify
 
 /// Setup 2 indirect imports of LibA, allowing the same LibA to be imported

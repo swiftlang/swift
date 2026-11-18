@@ -8,14 +8,14 @@
 // RUN: %empty-directory(%t/SDK)
 // RUN: mkdir -p %t/SDK/Frameworks/SecretModule.framework/Modules/SecretModule.swiftmodule
 // RUN: %target-swift-frontend -emit-module -module-name SecretModule \
-// RUN:     -swift-version 5 -enable-library-evolution -parse-stdlib \
+// RUN:     -enable-library-evolution -parse-stdlib \
 // RUN:     -o %t/SDK/Frameworks/SecretModule.framework/Modules/SecretModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SecretModule.framework/Modules/SecretModule.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     %t/SecretModule.swift
 
 // RUN: mkdir -p %t/SDK/Frameworks/SystemDepCommon.framework/Modules/SystemDepCommon.swiftmodule
 // RUN: %target-swift-frontend -emit-module -module-name SystemDepCommon \
-// RUN:     -swift-version 5 -enable-library-evolution -parse-stdlib \
+// RUN:     -enable-library-evolution -parse-stdlib \
 // RUN:     -o %t/SDK/Frameworks/SystemDepCommon.framework/Modules/SystemDepCommon.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SystemDepCommon.framework/Modules/SystemDepCommon.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -23,7 +23,7 @@
 
 // RUN: mkdir -p %t/SDK/Frameworks/SystemDepA.framework/Modules/SystemDepA.swiftmodule
 // RUN: %target-swift-frontend -emit-module -module-name SystemDepA \
-// RUN:     -swift-version 5 -enable-library-evolution -parse-stdlib \
+// RUN:     -enable-library-evolution -parse-stdlib \
 // RUN:     -o %t/SDK/Frameworks/SystemDepA.framework/Modules/SystemDepA.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SystemDepA.framework/Modules/SystemDepA.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -31,7 +31,7 @@
 
 // RUN: mkdir -p %t/SDK/Frameworks/SystemDepB.framework/Modules/SystemDepB.swiftmodule
 // RUN: %target-swift-frontend -emit-module -module-name SystemDepB \
-// RUN:     -swift-version 5 -enable-library-evolution -parse-stdlib \
+// RUN:     -enable-library-evolution -parse-stdlib \
 // RUN:     -o %t/SDK/Frameworks/SystemDepB.framework/Modules/SystemDepB.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SystemDepB.framework/Modules/SystemDepB.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -39,7 +39,7 @@
 
 // RUN: mkdir -p %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule
 // RUN: %target-swift-frontend -emit-module -module-name SystemModule \
-// RUN:     -swift-version 5 -enable-library-evolution -parse-stdlib \
+// RUN:     -enable-library-evolution -parse-stdlib \
 // RUN:     -o %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule/%module-target-triple.swiftmodule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SystemModule.framework/Modules/SystemModule.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -Fsystem %t/SDK/Frameworks \
@@ -48,7 +48,7 @@
 /// Index a client of SystemModule reading from the swiftinterface.
 /// Because of disable-deserialization-recovery and leakyFunc, reading from
 /// the swiftmodule would crash.
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -index-ignore-stdlib \
@@ -74,7 +74,7 @@
 
 /// Now rebuild the same module. We should not reload or re-index any of the
 /// system modules.
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -index-ignore-stdlib \
@@ -94,7 +94,7 @@
 /// Rebuild again, but this time remove the index. We should re-index, but not
 /// reload the module as it was already built.
 // RUN: %empty-directory(%t/idx)
-// RUN: %target-swift-frontend -typecheck -parse-stdlib -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -parse-stdlib \
 // RUN:     -index-system-modules \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -index-ignore-stdlib \

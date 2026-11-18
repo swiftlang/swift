@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-Osize -swift-version 5 -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo %target-embedded-posix-shim) | %FileCheck %s
+// RUN: %target-run-simple-swift(-Osize -enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo %target-embedded-posix-shim) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib

@@ -6,12 +6,12 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module %t/main.swift -module-name Test \
-// RUN:     -I %t/Inputs -cxx-interoperability-mode=default -swift-version 5 \
+// RUN:     -I %t/Inputs -cxx-interoperability-mode=default \
 // RUN:     -emit-module-interface-path %t/Test.swiftinterface \
 // RUN:     -o %t/Test.swiftmodule
 
 // RUN: %target-swift-frontend -emit-silgen %t/main.swift -module-name Test \
-// RUN:     -I %t/Inputs -cxx-interoperability-mode=default -swift-version 5 \
+// RUN:     -I %t/Inputs -cxx-interoperability-mode=default \
 // RUN: | %FileCheck %s
 
 //--- Inputs/module.modulemap

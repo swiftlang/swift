@@ -1,12 +1,12 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck --enable-var-scope %s
+// RUN: %target-swift-frontend -emit-silgen %s -module-name test -target %target-swift-5.1-abi-triple | %FileCheck --enable-var-scope %s
 // REQUIRES: concurrency
 
 actor MyActor { }
 
 @globalActor
 struct GlobalActor {
-  static var shared: MyActor = MyActor()
+  static let shared: MyActor = MyActor()
 }
 
 @GlobalActor

@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -access-notes-path %t/extra.accessnotes
+// RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -access-notes-path %t/extra.accessnotes
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
@@ -17,7 +17,7 @@
 
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
-// RUN:   -swift-version 5 -disable-implicit-swift-modules \
+// RUN:   -disable-implicit-swift-modules \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/main.swift @%t/MyApp.cmd -access-notes-path %t/extra.accessnotes -Raccess-note=all 2>&1 | %FileCheck %s

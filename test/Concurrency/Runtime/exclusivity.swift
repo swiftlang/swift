@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library)
-// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -25,9 +25,9 @@
 import _Concurrency
 import StdlibUnittest
 
-var global1: Int = 5
-var global2: Int = 6
-var global3: Int = 7
+nonisolated(unsafe) var global1: Int = 5
+nonisolated(unsafe) var global2: Int = 6
+nonisolated(unsafe) var global3: Int = 7
 
 #if canImport(Darwin)
 import Darwin
@@ -56,7 +56,7 @@ public func debugLog(_ s: String) {
 struct Runner {
     @MainActor
     @inline(never)
-    static func withExclusiveAccessAsync<T, U>(to x: inout T, f: (inout T) async -> U) async -> U {
+    static func withExclusiveAccessAsync<T, U>(to x: inout T, f: @MainActor (inout T) async -> U) async -> U {
         await f(&x)
     }
 

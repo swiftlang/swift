@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
 // RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module

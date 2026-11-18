@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -enable-implicit-dynamic  -I %t -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-implicit-dynamic  -I %t -emit-silgen %s | %FileCheck %s
 
 // Make sure that these functions are not implicitly marked dynamic.
 

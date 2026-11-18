@@ -10,14 +10,12 @@
 
 //#-- Prepare the macro shared library plugin for -plugin-path.
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugin/%target-library-name(StringifyPlugin) \
 // RUN:   -module-name StringifyPlugin \
 // RUN:   %t/src/StringifyPlugin.swift
 
 //#-- Prepare the macro shared library plugin for -external-plugin-path.
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/external-plugin/%target-library-name(AssertPlugin) \
 // RUN:   -module-name AssertPlugin \
 // RUN:   %t/src/AssertPlugin.swift
@@ -27,7 +25,6 @@
 
 //#-- Prepare the macro library.
 // RUN: %target-swift-frontend \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-module -o %t/lib/MacroLib.swiftmodule \
 // RUN:   -module-name MacroLib \
 // RUN:   -plugin-path %t/plugin \
@@ -44,7 +41,7 @@
 
 //#-- Without macro (no -D USE_MACRO)
 // RUN: %target-swift-frontend \
-// RUN:   -swift-version 5 -typecheck \
+// RUN:   -typecheck \
 // RUN:   -primary-file %t/src/test.swift \
 // RUN:   %t/src/other.swift \
 // RUN:   -I %t/lib \
@@ -62,7 +59,7 @@
 //#-- With macro - primary (-D USE_MACRO)
 // RUN: %target-swift-frontend \
 // RUN:   -D USE_MACRO \
-// RUN:   -swift-version 5 -typecheck \
+// RUN:   -typecheck \
 // RUN:   -primary-file %t/src/test.swift \
 // RUN:   %t/src/other.swift \
 // RUN:   -I %t/lib \
@@ -80,7 +77,7 @@
 //#-- With macro - non-primary (-D USE_MACRO)
 // RUN: %target-swift-frontend \
 // RUN:   -D USE_MACRO \
-// RUN:   -swift-version 5 -typecheck \
+// RUN:   -typecheck \
 // RUN:   %t/src/test.swift \
 // RUN:   -primary-file %t/src/other.swift \
 // RUN:   -I %t/lib \

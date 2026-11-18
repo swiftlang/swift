@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
 
 public enum PublicEnum {
   case publicCase

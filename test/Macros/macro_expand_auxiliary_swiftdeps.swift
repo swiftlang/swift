@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Make sure we pick up extension macros and top-level peers in swiftdeps.
 

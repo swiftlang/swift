@@ -2,17 +2,17 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -module-name A_Internal -o %t/A_Internal.swiftmodule -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name A_Internal -o %t/A_Internal.swiftmodule \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -emit-module-interface-path %t/A_Internal.swiftinterface -enable-library-evolution -I %t %t/A_Internal.swift
 
-// RUN: %target-swift-frontend -emit-module -module-name A -o %t/A.swiftmodule -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name A -o %t/A.swiftmodule \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -emit-module-interface-path %t/A.swiftinterface -enable-library-evolution -I %t %t/A.swift
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache %t/main.swift \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas -swift-version 5
+// RUN:   -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
@@ -28,7 +28,7 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule  \
 // RUN:   -cache-compile-job -cas-path %t/cas \
-// RUN:   -disable-implicit-swift-modules -swift-version 5 -enable-cross-import-overlays \
+// RUN:   -disable-implicit-swift-modules -enable-cross-import-overlays \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/main.swift @%t/MyApp.cmd

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx11 -swift-version 5
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx11
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

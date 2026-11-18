@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-module %s -I %t \
 // RUN:   -module-name Library -project-name ProjectName \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/Library.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Library.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Library.package.swiftinterface

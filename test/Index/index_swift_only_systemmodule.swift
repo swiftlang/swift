@@ -22,7 +22,6 @@ print(someFunc())
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     %t/some-module.swift
 
 // -----------------------------------------------------------------------------
@@ -86,7 +85,6 @@ print(someFunc())
 // RUN:     -module-name SomeModule \
 // RUN:     -emit-module-interface-path %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftinterface \
 // RUN:     -o /dev/null \
-// RUN:     -swift-version 5 \
 // RUN:     -enable-library-evolution \
 // RUN:     %t/some-module.swift
 

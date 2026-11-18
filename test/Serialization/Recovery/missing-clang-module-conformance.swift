@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/custom-modules %t/
-// RUN: %target-swift-frontend -emit-module %s -module-name MyModule -emit-module-path %t/MyModule.swiftmodule -I %t/custom-modules -swift-version 5
+// RUN: %target-swift-frontend -emit-module %s -module-name MyModule -emit-module-path %t/MyModule.swiftmodule -I %t/custom-modules
 
 /// Delete the clang module
 // RUN: rm -r %t/custom-modules/

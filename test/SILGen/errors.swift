@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -swift-version 5 -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -Xllvm -sil-print-debuginfo -verify -primary-file %s %S/Inputs/errors_other.swift | %FileCheck %s
 
 import Swift
 

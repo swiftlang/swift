@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
+// RUN: %target-typecheck-verify-swift -package-name myPkg
 
 // https://github.com/swiftlang/swift/issues/65640
 

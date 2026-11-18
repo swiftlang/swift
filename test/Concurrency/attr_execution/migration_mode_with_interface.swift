@@ -4,14 +4,14 @@
 /// Build the library
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -target %target-swift-5.1-abi-triple \
-// RUN:   -module-name Lib -swift-version 5 -enable-library-evolution \
+// RUN:   -module-name Lib -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 // RUN: rm %t/Lib.swiftmodule
 
 // Build the client using interface
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 5 -I %t %t/src/Test.swift -enable-upcoming-feature NonisolatedNonsendingByDefault:migrate
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -I %t %t/src/Test.swift -enable-upcoming-feature NonisolatedNonsendingByDefault:migrate
 
 // REQUIRES: asserts
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault

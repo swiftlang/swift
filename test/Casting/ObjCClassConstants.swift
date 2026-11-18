@@ -17,12 +17,12 @@
 //
 // RUN: %target-clang -fmodules -c %S/Inputs/ObjCClassConstants/ObjCClassConstants.m -o %t/ObjCClassConstants.objc.o
 //
-// RUN: %target-build-swift -swift-version 5 -g -Onone -module-name a -I %S/Inputs/ObjCClassConstants -c %s -o %t/ObjCClassConstants.swift.Onone.o
+// RUN: %target-build-swift -g -Onone -module-name a -I %S/Inputs/ObjCClassConstants -c %s -o %t/ObjCClassConstants.swift.Onone.o
 // RUN: %target-swiftc_driver %t/ObjCClassConstants.objc.o %t/ObjCClassConstants.swift.Onone.o -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %target-run %t/a.swift5.Onone.out
 //
-// RUN: %target-build-swift -swift-version 5 -g -O -module-name a -I %S/Inputs/ObjCClassConstants -c %s -o %t/ObjCClassConstants.swift.O.o
+// RUN: %target-build-swift -g -O -module-name a -I %S/Inputs/ObjCClassConstants -c %s -o %t/ObjCClassConstants.swift.O.o
 // RUN: %target-swiftc_driver %t/ObjCClassConstants.objc.o %t/ObjCClassConstants.swift.O.o -o %t/a.swift5.O.out
 // RUN: %target-codesign %t/a.swift5.O.out
 // RUN: %target-run %t/a.swift5.O.out

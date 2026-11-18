@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/indirects.swiftmodule %S/Inputs/implementation-only-imports/indirects.swift \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module -o %t/directs.swiftmodule -I %t %S/Inputs/implementation-only-imports/directs.swift \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 // RUN: %target-swift-frontend -typecheck -verify %s -I %t \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 @_implementationOnly import directs
 // expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}

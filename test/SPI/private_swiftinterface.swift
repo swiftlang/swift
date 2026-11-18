@@ -2,8 +2,8 @@
 /// one doesn't leak SPI decls and info.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
-// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -swift-version 5 -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/spi_helper.swift -module-name SPIHelper -emit-module-path %t/SPIHelper.swiftmodule -enable-library-evolution -emit-module-interface-path %t/SPIHelper.swiftinterface -emit-private-module-interface-path %t/SPIHelper.private.swiftinterface
+// RUN: %target-swift-frontend -emit-module %S/Inputs/ioi_helper.swift -module-name IOIHelper -emit-module-path %t/IOIHelper.swiftmodule -enable-library-evolution -emit-module-interface-path %t/IOIHelper.swiftinterface -emit-private-module-interface-path %t/IOIHelper.private.swiftinterface
 
 /// Make sure that the public swiftinterface of spi_helper doesn't leak SPI.
 // RUN: %FileCheck -check-prefix=CHECK-HELPER %s < %t/SPIHelper.swiftinterface
@@ -25,10 +25,10 @@
 // CHECK-HELPER-PRIVATE-NEXT:  public func prespecializedMethod<T>(_ t: T)
 
 
-// RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -swift-version 5 -module-name SPIHelper -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %t/SPIHelper.swiftinterface -emit-module-path %t/SPIHelper-from-public-swiftinterface.swiftmodule -module-name SPIHelper -enable-library-evolution
 
 /// Test the textual interfaces generated from this test.
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -I %t -module-name Main
 // RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=CHECK-PUBLIC %s
 // RUN: cat %t/Main.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=NEGATIVE-PUBLIC %s
@@ -37,7 +37,7 @@
 
 /// Both the public and private textual interfaces should have
 /// SPI information with `-library-level spi`.
-// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
+// RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -I %t -module-name SPIModule -library-level spi
 // RUN: cat %t/SPIModule.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: cat %t/SPIModule.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.swiftinterface

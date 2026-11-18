@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 
 // Check that verification won't reject a valid interface:
-// RUN: %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -swift-version 5 -o %t/MyModule.o -verify-emitted-module-interface -module-name MyModule %s
+// RUN: %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -o %t/MyModule.o -verify-emitted-module-interface -module-name MyModule %s
 
 // Check that verification will reject an invalid interface:
-// RUN: not %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -swift-version 5 -o %t/MyModule.o -verify-emitted-module-interface -module-name MyModule -Xfrontend -debug-emit-invalid-swiftinterface-syntax %s 2>&1 | %FileCheck %s
+// RUN: not %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -o %t/MyModule.o -verify-emitted-module-interface -module-name MyModule -Xfrontend -debug-emit-invalid-swiftinterface-syntax %s 2>&1 | %FileCheck %s
 
 // ...but not if verification is off.
-// RUN: %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -swift-version 5 -o %t/MyModule.o -no-verify-emitted-module-interface -module-name MyModule -Xfrontend -debug-emit-invalid-swiftinterface-syntax %s
+// RUN: %target-build-swift -emit-library -enable-library-evolution -emit-module-interface -emit-module -o %t/MyModule.o -no-verify-emitted-module-interface -module-name MyModule -Xfrontend -debug-emit-invalid-swiftinterface-syntax %s
 
 public struct MyStruct {}
 

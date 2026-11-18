@@ -10,21 +10,21 @@
 
 // Primary execution of this test. Uses the default minimum inlining version,
 // which is the version when Swift was introduced.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version min
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version min
 
 
 // Check that `-library-level api` implies `-target-min-inlining-version min`
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -library-level api -require-explicit-availability=ignore
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -library-level api -require-explicit-availability=ignore
 
 
 // Check that these rules are only applied when requested and that at least some
 // diagnostics are not present without it.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple 2>&1 | %FileCheck --check-prefix INLINING-VERSION-TARGET %s
+// RUN: not %target-typecheck-verify-swift -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple 2>&1 | %FileCheck --check-prefix INLINING-VERSION-TARGET %s
 
 
 // Check that -target-min-inlining-version overrides -library-level, allowing
 // library owners to disable this behavior for API libraries if needed.
-// RUN: not %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api -require-explicit-availability=ignore 2>&1 | %FileCheck --check-prefix INLINING-VERSION-TARGET %s
+// RUN: not %target-typecheck-verify-swift -enable-library-evolution -parse-as-library -module-name Test -target %target-next-stable-abi-triple -target-min-inlining-version target -library-level api -require-explicit-availability=ignore 2>&1 | %FileCheck --check-prefix INLINING-VERSION-TARGET %s
 
 
 // INLINING-VERSION-TARGET: error: expected error not produced

@@ -14,9 +14,9 @@
 // RUN: echo "ABI breakage: func foo() has been removed" > %t/complete-allowlist.txt
 // RUN: echo "ABI breakage: func bar() is a new API without '@available'" >> %t/complete-allowlist.txt
 
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module -o %t.mod1/Foo.swiftmodule  %t.mod1/Foo.swift -parse-as-library -enable-library-evolution -emit-module-source-info -emit-module-source-info-path %t.mod1/Foo.swiftsourceinfo -emit-module-interface-path %t.mod1/Foo.swiftinterface -module-name Foo -swift-version 5
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module -o %t.mod1/Foo.swiftmodule  %t.mod1/Foo.swift -parse-as-library -enable-library-evolution -emit-module-source-info -emit-module-source-info-path %t.mod1/Foo.swiftsourceinfo -emit-module-interface-path %t.mod1/Foo.swiftinterface -module-name Foo
 
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module -o %t.mod2/Foo.swiftmodule  %t.mod2/Foo.swift -parse-as-library -enable-library-evolution -emit-module-source-info -emit-module-source-info-path %t.mod2/Foo.swiftsourceinfo -emit-module-interface-path %t.mod2/Foo.swiftinterface -module-name Foo -swift-version 5
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -emit-module -o %t.mod2/Foo.swiftmodule  %t.mod2/Foo.swift -parse-as-library -enable-library-evolution -emit-module-source-info -emit-module-source-info-path %t.mod2/Foo.swiftsourceinfo -emit-module-interface-path %t.mod2/Foo.swiftinterface -module-name Foo
 
 // RUN: %api-digester -dump-sdk -module Foo -output-dir %t.baseline -module-cache-path %t.module-cache %clang-importer-sdk-nosource -I %t.mod1 -abi -use-interface-for-module Foo
 

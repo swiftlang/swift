@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas
+// RUN:   %s -o %t/deps.json -cache-compile-job -cas-path %t/cas
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd

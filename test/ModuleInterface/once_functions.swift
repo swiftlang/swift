@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -parse-as-library -language-mode 5 -enable-library-evolution -enable-experimental-feature OnceFunctions -module-name OnceFunctions -emit-module-interface-path %t/calledonce.swiftinterface %t/OnceFunctions.swift
+// RUN: %target-swift-frontend -typecheck -parse-as-library -enable-library-evolution -enable-experimental-feature OnceFunctions -module-name OnceFunctions -emit-module-interface-path %t/calledonce.swiftinterface %t/OnceFunctions.swift
 // RUN: %target-swift-frontend -typecheck-module-from-interface %t/calledonce.swiftinterface -module-name OnceFunctions
 // RUN: %FileCheck %s --input-file %t/calledonce.swiftinterface
 
@@ -9,7 +9,7 @@
 // built from source or the one built from the interface.
 // RUN: %empty-directory(%t/FromSource)
 // RUN: %empty-directory(%t/FromInterface)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -language-mode 5 -enable-library-evolution -enable-experimental-feature OnceFunctions -experimental-skip-non-inlinable-function-bodies -module-name OnceFunctions -o %t/FromSource/OnceFunctions.swiftmodule %t/OnceFunctions.swift
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -enable-experimental-feature OnceFunctions -experimental-skip-non-inlinable-function-bodies -module-name OnceFunctions -o %t/FromSource/OnceFunctions.swiftmodule %t/OnceFunctions.swift
 // RUN: %target-swift-frontend -compile-module-from-interface %t/calledonce.swiftinterface -module-name OnceFunctions -o %t/FromInterface/OnceFunctions.swiftmodule
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature OnceFunctions -module-name Client -I %t/FromSource %t/Client.swift -o %t/FromSource.sil
 // RUN: %target-swift-frontend -emit-silgen -enable-experimental-feature OnceFunctions -module-name Client -I %t/FromInterface %t/Client.swift -o %t/FromInterface.sil

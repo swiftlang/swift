@@ -114,7 +114,7 @@ package func first_package_function() {}
 //
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Hidden)
-// RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/Hidden/comments.swiftmodule -emit-module-interface-path %t/comments.swiftinterface -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s -enable-library-evolution -swift-version 5
+// RUN: %target-swift-frontend -module-name comments -package-name comments -emit-module -emit-module-path %t/Hidden/comments.swiftmodule -emit-module-interface-path %t/comments.swiftinterface -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s -enable-library-evolution
 // RUN: %llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
-// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t -swift-version 5 | %FileCheck %s -check-prefix=INTERFACE
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -enable-swiftsourceinfo -source-filename %s -I %t | %FileCheck %s -check-prefix=INTERFACE

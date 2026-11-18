@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library)
-// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift( -Xfrontend -sil-verify-all -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -21,7 +21,7 @@ let printCounters = false
 @available(SwiftStdlib 5.1, *)
 actor Counter {
   private var value = 0
-  private let scratchBuffer: UnsafeMutableBufferPointer<Int>
+  nonisolated(unsafe) private let scratchBuffer: UnsafeMutableBufferPointer<Int>
 
   init(maxCount: Int) {
     scratchBuffer = .allocate(capacity: maxCount)

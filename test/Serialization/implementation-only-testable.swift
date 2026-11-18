@@ -6,21 +6,21 @@
 
 /// Build the hidden implementation-only dependency and the testable module.
 // RUN: %target-swift-frontend -emit-module %t/HiddenDep.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/TestedLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution -I %t \
+// RUN:   -enable-library-evolution -I %t \
 // RUN:   -enable-testing
 
 /// A client should ignore the transitive implementation-only dependency for a
 /// normal import.
 // RUN: %target-swift-frontend -typecheck %t/ClientNormalImport.swift -o %t \
-// RUN:   -swift-version 5 -I %t -Rmodule-loading 2>&1 | \
+// RUN:   -I %t -Rmodule-loading 2>&1 | \
 // RUN:   %FileCheck --check-prefix=CHECK-NOT-LOADED %s
 
 /// A client should load the transitive implementation-only dependency of
 /// a module imported @testable.
 // RUN: %target-swift-frontend -typecheck %t/ClientTestableImport.swift -o %t \
-// RUN:   -swift-version 5 -I %t -Rmodule-loading 2>&1 | %FileCheck %s
+// RUN:   -I %t -Rmodule-loading 2>&1 | %FileCheck %s
 
 /// If the dependency is missing we don't fail at loading, but we may still
 /// fail later accessing decls missing because of references to the not-loaded module.
@@ -28,13 +28,13 @@
 
 /// The transitive dependency is not loaded but a client can still build fine.
 // RUN: %target-swift-frontend -typecheck %t/ClientNormalImport.swift -o %t \
-// RUN:   -swift-version 5 -I %t -Rmodule-loading 2>&1 | \
+// RUN:   -I %t -Rmodule-loading 2>&1 | \
 // RUN:   %FileCheck %s --check-prefix=CHECK-NOT-LOADED
 
 /// Clients referencing a decl that depends on the hidden module don't see the
 /// decl, it is dropped by deserialization recovery.
 // RUN: %target-swift-frontend -typecheck %t/ClientTestableImport.swift -o %t \
-// RUN:   -swift-version 5 -I %t -verify
+// RUN:   -I %t -verify
 
 //--- HiddenDep.swift
 

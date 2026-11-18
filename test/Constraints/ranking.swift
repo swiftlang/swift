@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 -g | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -g | %FileCheck %s
 
 protocol P {
   var p: P { get set }

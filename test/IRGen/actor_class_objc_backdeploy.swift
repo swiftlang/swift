@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -target %target-cpu-apple-macosx11.0 -module-name actor_class_objc | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -target %target-cpu-apple-macosx11.0 -module-name actor_class_objc | %IRGenFileCheck %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

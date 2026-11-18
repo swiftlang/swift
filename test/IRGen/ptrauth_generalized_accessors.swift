@@ -1,4 +1,4 @@
-// RUN: %swift -swift-version 5 -target arm64e-apple-ios12.0 -parse-stdlib %s -emit-ir -disable-llvm-optzns -o - | %FileCheck %s --check-prefix=CHECK
+// RUN: %swift -target arm64e-apple-ios12.0 -parse-stdlib %s -emit-ir -disable-llvm-optzns -o - | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: CODEGENERATOR=ARM
 

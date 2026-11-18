@@ -3,12 +3,12 @@
 // Build the library and print its interface.
 // RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
-// RUN:   -enable-library-evolution -swift-version 5 -module-name Lib \
+// RUN:   -enable-library-evolution -module-name Lib \
 // RUN:   %s -DLIB
 // RUN: %FileCheck %s < %t/Lib.swiftinterface
 
 // The interface must compile back into a module...
-// RUN: %target-swift-frontend -compile-module-from-interface -swift-version 5 \
+// RUN: %target-swift-frontend -compile-module-from-interface \
 // RUN:   -module-name Lib -o %t/LibFromInterface.swiftmodule %t/Lib.swiftinterface
 
 // ...and a client must be able to use it through that module.

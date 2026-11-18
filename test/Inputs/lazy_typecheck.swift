@@ -98,16 +98,16 @@ struct InternalWrapper {
 
 // MARK: - Global vars
 
-public var publicGlobalVar: Int = NoTypecheck.int
-public var publicGlobalVarTypealias: PublicIntAlias = 1
-public var publicGlobalVarInferredType = ""
-public var publicGlobalVarInferredInferredGeneric: [_] = [1]
-public var publicGlobalVarTypealiasGeneric: PublicIntAlias? = 1
-public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
+nonisolated(unsafe) public var publicGlobalVar: Int = NoTypecheck.int
+nonisolated(unsafe) public var publicGlobalVarTypealias: PublicIntAlias = 1
+nonisolated(unsafe) public var publicGlobalVarInferredType = ""
+nonisolated(unsafe) public var publicGlobalVarInferredInferredGeneric: [_] = [1]
+nonisolated(unsafe) public var publicGlobalVarTypealiasGeneric: PublicIntAlias? = 1
+nonisolated(unsafe) public var (publicGlobalVarInferredTuplePatX, publicGlobalVarInferredTuplePatY) = (0, 1)
 
-var internalGlobalVar: NoTypecheck = NoTypecheck()
-var internalGlobalVarInferredType = NoTypecheck()
-var internalGlobalTypealiasVar: PublicIntAlias = NoTypecheck.int
+nonisolated(unsafe) var internalGlobalVar: NoTypecheck = NoTypecheck()
+nonisolated(unsafe) var internalGlobalVarInferredType = NoTypecheck()
+nonisolated(unsafe) var internalGlobalTypealiasVar: PublicIntAlias = NoTypecheck.int
 
 @backDeployed(before: macOS 99, iOS 99, tvOS 99, watchOS 99, visionOS 99)
 public private(set) var publicGlobalVarBackDeployedWithPrivateSetter: Int {

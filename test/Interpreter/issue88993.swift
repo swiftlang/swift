@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -language-mode 5 -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 

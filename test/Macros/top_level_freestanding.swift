@@ -1,19 +1,19 @@
 // REQUIRES: swift_swift_parser, executable_test
 //
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -parse-as-library -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -parse-as-library -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-SIL %s
 
 // Type check testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5  %S/Inputs/top_level_freestanding_other.swift
+// RUN: %target-typecheck-verify-swift -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS  %S/Inputs/top_level_freestanding_other.swift
 
 // Type check testing with imported macro declarations
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY -swift-version 5  %S/Inputs/top_level_freestanding_other.swift -I %t
+// RUN: %target-typecheck-verify-swift -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -DIMPORT_MACRO_LIBRARY  %S/Inputs/top_level_freestanding_other.swift -I %t
 
 // Execution testing
-// RUN: %target-build-swift -g -swift-version 5 -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) %s %S/Inputs/top_level_freestanding_other.swift -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %target-build-swift -g -parse-as-library -load-plugin-library %t/%target-library-name(MacroDefinition) %s %S/Inputs/top_level_freestanding_other.swift -o %t/main -module-name MacroUser
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

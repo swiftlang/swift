@@ -37,7 +37,7 @@
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -swift-version 5 -verify
+// RUN:   -verify
 
 // REQUIRES: swift_feature_InternalImportsByDefault
 

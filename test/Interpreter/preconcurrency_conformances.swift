@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-build-swift %t/src/Interface.swift -swift-version 5 -emit-module -emit-library \
-// RUN:    -target %target-cpu-apple-macosx10.15 -swift-version 5 \
+// RUN: %target-build-swift %t/src/Interface.swift -emit-module -emit-library \
+// RUN:    -target %target-cpu-apple-macosx10.15 \
 // RUN:    -enable-library-evolution \
 // RUN:    -module-name Interface \
 // RUN:    -Xlinker -install_name -Xlinker @executable_path/%target-library-name(Interface) \
 // RUN:    -o %t/%target-library-name(Interface) \
 // RUN:    -emit-module-interface-path %t/Interface.swiftinterface
 
-// RUN: %target-build-swift %t/src/Types.swift -swift-version 5 -emit-module -emit-library -enable-library-evolution -module-name Types -o %t/%target-library-name(Types) \
+// RUN: %target-build-swift %t/src/Types.swift -emit-module -emit-library -enable-library-evolution -module-name Types -o %t/%target-library-name(Types) \
 // RUN:    -target %target-cpu-apple-macosx10.15 \
 // RUN:    -I %t -L %t -l Interface \
 // RUN:    -Xlinker -install_name -Xlinker @executable_path/%target-library-name(Types) \

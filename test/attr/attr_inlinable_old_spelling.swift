@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 @_inlineable public func oldInlinableFunction() {}
 // expected-error@-1 {{'@_inlineable' has been renamed to '@inlinable'}}{{2-13=inlinable}}

@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -target arm64-apple-macos11 -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   %t/test.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas \
+// RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas \
 // RUN:   -I %t/include -clang-target arm64-apple-macos13
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/a.cmd
@@ -20,7 +20,7 @@
 
 // RUN: %target-swift-frontend -c -o %t/test.o -target arm64-apple-macos11 \
 // RUN:   -clang-target arm64-apple-macos13 -cache-compile-job -cas-path %t/cas \
-// RUN:   -disable-implicit-swift-modules -swift-version 5 -parse-stdlib -O \
+// RUN:   -disable-implicit-swift-modules -parse-stdlib -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/test.swift @%t/MyApp.cmd

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -suppress-warnings \
 // RUN:     -o %t/lifetime_dependence.swiftmodule \

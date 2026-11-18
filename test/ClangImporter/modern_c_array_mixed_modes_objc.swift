@@ -99,7 +99,7 @@ module CLib {
 
 //--- src/LegacyLib.swift
 
-// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/fragile/LegacyLib.o -emit-module-path %t/fragile/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/fragile/LegacyLib.o -emit-module-path %t/fragile/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -target %target-has-inline-array-triple
 
 import CLib
 
@@ -119,7 +119,7 @@ import CLib
 
 //--- src/ModernLib.swift
 
-// RUN: %target-swift-frontend %t/src/ModernLib.swift -I %t/include -c -module-name ModernLib -o %t/fragile/ModernLib.o -emit-module-path %t/fragile/ModernLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
+// RUN: %target-swift-frontend %t/src/ModernLib.swift -I %t/include -c -module-name ModernLib -o %t/fragile/ModernLib.o -emit-module-path %t/fragile/ModernLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
 
 import CLib
 
@@ -145,9 +145,9 @@ import CLib
 
 //--- src/LegacyExec.swift
 
-// RUN: %target-build-swift -emit-sil %t/src/LegacyExec.swift -g -o %t/fragile/LegacyExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-build-swift -emit-sil %t/src/LegacyExec.swift -g -o %t/fragile/LegacyExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -target %target-has-inline-array-triple
 // RUN: %FileCheck --input-file %t/fragile/LegacyExec.sil --check-prefixes SIL,LEGACY %s
-// RUN: %target-build-swift -emit-executable %t/src/LegacyExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/LegacyExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-build-swift -emit-executable %t/src/LegacyExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/LegacyExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -target %target-has-inline-array-triple
 // RUN: %target-codesign %t/fragile/LegacyExec
 // RUN: %target-run %t/fragile/LegacyExec > %t/fragile/LegacyExec.txt
 // RUN: %FileCheck --input-file %t/fragile/LegacyExec.txt --check-prefix OUTPUT %s
@@ -182,9 +182,9 @@ print("Svc", asyncResult.pointee.0, asyncResult.pointee.1, asyncResult.pointee.2
 
 //--- src/ModernExec.swift
 
-// RUN: %target-build-swift -emit-sil %t/src/ModernExec.swift -g -o %t/fragile/ModernExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
+// RUN: %target-build-swift -emit-sil %t/src/ModernExec.swift -g -o %t/fragile/ModernExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
 // RUN: %FileCheck --input-file %t/fragile/ModernExec.sil --check-prefixes SIL,MODERN %s
-// RUN: %target-build-swift -emit-executable %t/src/ModernExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/ModernExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
+// RUN: %target-build-swift -emit-executable %t/src/ModernExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/ModernExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
 // RUN: %target-codesign %t/fragile/ModernExec
 // RUN: %target-run %t/fragile/ModernExec > %t/fragile/ModernExec.txt
 // RUN: %FileCheck --input-file %t/fragile/ModernExec.txt --check-prefix OUTPUT %s

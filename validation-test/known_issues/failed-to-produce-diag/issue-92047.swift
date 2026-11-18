@@ -1,5 +1,5 @@
 // rdar://186868294 (https://github.com/swiftlang/swift/issues/92047)
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 @resultBuilder
 struct Builder {

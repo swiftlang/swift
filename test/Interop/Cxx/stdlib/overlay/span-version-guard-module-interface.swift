@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend \
-// RUN:   -swift-version 5 \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module \
 // RUN:   -module-name Cxx \

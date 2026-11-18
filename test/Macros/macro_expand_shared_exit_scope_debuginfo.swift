@@ -1,8 +1,8 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -parse-as-library -o - -g | %FileCheck %s
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-swift-frontend -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -parse-as-library -o - -g | %FileCheck %s
 
 // The scope of an exit block must match its location, inside or outside of a
 // macro expansion.

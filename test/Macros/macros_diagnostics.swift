@@ -1,7 +1,7 @@
 // REQUIRES: swift_swift_parser, asserts
 // REQUIRES: swift_feature_CodeItemMacros
 
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
 @expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
 // expected-note@-1 3{{'stringify' declared here}}

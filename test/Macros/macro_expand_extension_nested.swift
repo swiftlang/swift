@@ -1,13 +1,13 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -verify -o %t/Library.swiftmodule -module-name Library %s -load-plugin-library %t/%target-library-name(MacroDefinition) -enable-library-evolution -emit-module-interface-path %t/Library.swiftinterface -emit-tbd -emit-tbd-path %t/Library.tbd -tbd-install_name libLibrary.dylib
+// RUN: %target-swift-frontend -emit-module -verify -o %t/Library.swiftmodule -module-name Library %s -load-plugin-library %t/%target-library-name(MacroDefinition) -enable-library-evolution -emit-module-interface-path %t/Library.swiftinterface -emit-tbd -emit-tbd-path %t/Library.tbd -tbd-install_name libLibrary.dylib
 
 // Make sure we can serialize a primary file, where the auxiliary extensions
 // are cross-references into their macro expansion buffers.
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -verify -o %t/LibraryPrimary.swiftmodule -module-name Library -primary-file %s -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -emit-module -verify -o %t/LibraryPrimary.swiftmodule -module-name Library -primary-file %s -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // Make sure we don't end up with any duplicate decls in the interface or tbd.
 // RUN: %FileCheck %s --check-prefix NESTED < %t/Library.swiftinterface

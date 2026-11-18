@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete %s
 
 // REQUIRES: concurrency
 

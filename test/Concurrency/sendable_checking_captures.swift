@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-typecheck-verify-swift -swift-version 5 -strict-concurrency=complete -verify-additional-prefix complete-
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -verify-additional-prefix complete-
 
 class NonSendable {} // expected-complete-note 3{{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 

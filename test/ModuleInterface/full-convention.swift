@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -swift-version 5 -emit-module-interface-path %t/full-convention.swiftinterface -enable-library-evolution %s -experimental-print-full-convention -use-clang-function-types
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -emit-module-interface-path %t/full-convention.swiftinterface -enable-library-evolution %s -experimental-print-full-convention -use-clang-function-types
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck-module-from-interface %t/full-convention.swiftinterface
 // RUN: %FileCheck %s < %t/full-convention.swiftinterface
 

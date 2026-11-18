@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -swift-version 5 -DLIBRARY %s -emit-module -module-name Library -o %t/Library.swiftmodule
-// RUN: %target-typecheck-verify-swift -swift-version 5 -I %t -verify-additional-file Library.SampleComposition3 -verify-additional-file Library.SampleComposition4
+// RUN: %target-swift-frontend -DLIBRARY %s -emit-module -module-name Library -o %t/Library.swiftmodule
+// RUN: %target-typecheck-verify-swift -I %t -verify-additional-file Library.SampleComposition3 -verify-additional-file Library.SampleComposition4
 
 #if LIBRARY
 // Define a couple protocols with no requirements that're easy to conform to

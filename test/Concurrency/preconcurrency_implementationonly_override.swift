@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/ImplementationOnlyDefs.swiftmodule -module-name ImplementationOnlyDefs %S/Inputs/ImplementationOnlyDefs.swift \
-// RUN:   -enable-library-evolution -swift-version 5
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -verify-ignore-unrelated %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=targeted %s
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -swift-version 5 -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete %s
+// RUN:   -enable-library-evolution
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -emit-sil -o /dev/null -verify -verify-ignore-unrelated %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=targeted %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -I %t -enable-library-evolution -emit-sil -o /dev/null -verify -verify-ignore-unrelated -strict-concurrency=complete %s
 
 // REQUIRES: concurrency
 

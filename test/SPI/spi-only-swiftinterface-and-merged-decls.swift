@@ -6,7 +6,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -experimental-spi-only-imports \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface

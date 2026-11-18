@@ -2,14 +2,14 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -module-name LibBinary -swift-version 5 -I %t \
+// RUN:   -module-name LibBinary -I %t \
 // RUN:   -package-name libPkg \
 // RUN:   -emit-module-path %t/LibBinary.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/ClientLoadBinary.swift -package-name libPkg -I %t -verify
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -module-name LibInterface -swift-version 5 -I %t \
+// RUN:   -module-name LibInterface -I %t \
 // RUN:   -package-name libPkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibBinary.swiftmodule \

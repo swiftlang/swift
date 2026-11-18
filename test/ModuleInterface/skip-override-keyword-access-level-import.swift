@@ -2,11 +2,11 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 
 // RUN: %target-swift-frontend -typecheck %t/PublicImport.swift \
 // RUN:   %t/InternalImport.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 -module-name Client \
+// RUN:   -enable-library-evolution -module-name Client \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Client.private.swiftinterface

@@ -21,7 +21,7 @@
 // Should fail by default
 //
 
-// RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -I %t/lib/swift -module-name ClientLibrary -swift-version 5 2>/dev/null
+// RUN: not %target-swift-emit-module-interface(%t.swiftinterface) %s -I %t/lib/swift -module-name ClientLibrary 2>/dev/null
 
 
 import DeclaringLibrary

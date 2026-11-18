@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/LibCore.swift -public-module-name Lib
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %t/Lib.swift
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/other.swift -I %t -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/other.swift -I %t -verify -enable-upcoming-feature MemberImportVisibility
 
 // REQUIRES: swift_feature_MemberImportVisibility
 

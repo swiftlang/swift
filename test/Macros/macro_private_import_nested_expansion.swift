@@ -5,12 +5,12 @@
 // RUN: split-file --leading-lines %s %t
 
 // Build macro plugin
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
 // Build library module
 // RUN: %target-swift-frontend -emit-module -module-name MyLib -o %t/MyLib.swiftmodule %t/MyLib.swift -enable-library-evolution
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -load-plugin-library %t/%target-library-name(MacroPlugin) -I %t %t/Client.swift -module-name Client
+// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroPlugin) -I %t %t/Client.swift -module-name Client
 
 //--- MacroPlugin.swift
 import SwiftSyntax

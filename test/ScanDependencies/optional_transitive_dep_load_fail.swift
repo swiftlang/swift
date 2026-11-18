@@ -35,7 +35,7 @@
 @testable import Foo
 
 // Step 1: build Foo Swift module
-// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name -enable-library-evolution -I %S/Inputs/CHeaders -I %S/Inputs/Swift -enable-testing -swift-version 5 -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
+// RUN: %target-swift-frontend -emit-module %t/Foo.swift -emit-module-path %t/Foo.swiftmodule/%target-swiftmodule-name -module-name Foo -emit-module-interface-path %t/Foo.swiftmodule/%target-swiftinterface-name -enable-library-evolution -I %S/Inputs/CHeaders -I %S/Inputs/Swift -enable-testing -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 
 // Step 2: scan dependencies and ensure the transitive dependency on "A" is missing
 // RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -I %t -sdk %t -prebuilt-module-cache-path %t/clang-module-cache

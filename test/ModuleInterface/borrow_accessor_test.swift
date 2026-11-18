@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -o %t/borrow_accessors.swiftmodule \
 // RUN:     -emit-module-interface-path %t/borrow_accessors.swiftinterface \
 // RUN:     %S/Inputs/borrow_accessors.swift

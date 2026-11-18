@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -swift-version 5 -print-indexed-symbols -source-filename %s | %FileCheck %s
+// RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %s | %FileCheck %s
 
 // Test that appendInterpolation methods are referenced from string interpolation
 // (https://github.com/swiftlang/swift/issues/56189)

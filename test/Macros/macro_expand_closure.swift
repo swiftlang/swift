@@ -1,14 +1,14 @@
 // REQUIRES: swift_swift_parser, executable_test
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-build-swift -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
 
 // Debug info SIL testing
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+// RUN: %target-swift-frontend -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
 
 
 @freestanding(expression) public macro multiStatement() -> Int = #externalMacro(module: "MacroDefinition", type: "MultiStatementClosure")

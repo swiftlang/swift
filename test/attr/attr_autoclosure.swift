@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}

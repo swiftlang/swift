@@ -7,7 +7,7 @@
 /// Scenario 1.
 // RUN: %target-swift-frontend -emit-sil %t/Lib.swift -package-name pkg \
 // RUN:   -wmo -allow-non-resilient-access -package-cmo \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -Xllvm -sil-print-function=topFunc -o %t/Lib.sil
 // RUN: %FileCheck %s < %t/Lib.sil
 

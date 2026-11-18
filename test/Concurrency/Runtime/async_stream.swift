@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -strict-concurrency=complete -parse-as-library
 // RUN: %target-run-simple-swift( -parse-as-library)
-// RUN: %target-run-simple-swift( -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift( -parse-as-library -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 // Tests for the diagnostics emitted in Sema for checking constantness of
 // function arguments annotated to be so. Note that these annotation are

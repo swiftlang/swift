@@ -1,11 +1,11 @@
 // REQUIRES: swift_swift_parser, objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/objc_cxx_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/objc_cxx_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-build-swift -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
 // RUN: %target-codesign %t/main
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk) -typecheck -swift-version 5 -parse-as-library -enable-objc-interop -emit-objc-header-path %t/MacroUser.h -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk) -typecheck -parse-as-library -enable-objc-interop -emit-objc-header-path %t/MacroUser.h -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser
 // RUN: %FileCheck --check-prefix CHECK %s < %t/MacroUser.h
 
 @attached(member, names: prefixed(member_))

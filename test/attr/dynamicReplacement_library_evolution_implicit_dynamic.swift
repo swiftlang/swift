@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-objc-interop -enable-library-evolution -enable-implicit-dynamic -I %t
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -enable-library-evolution -enable-implicit-dynamic -I %t
 
 struct Container {
   var property: Int { return 1 }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=targeted -swift-version 5 -parse-as-library -emit-sil -verify %s
+// RUN: %target-swift-frontend -strict-concurrency=targeted -parse-as-library -emit-sil -verify %s
 
 @_nonSendable
 class NonSendableType {

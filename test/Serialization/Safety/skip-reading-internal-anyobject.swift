@@ -6,7 +6,7 @@
 
 /// Build library.
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule
 
 /// Build client.

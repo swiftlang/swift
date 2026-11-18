@@ -4,7 +4,6 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
-// RUN:   -swift-version 5 \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -enable-upcoming-feature NonisolatedNonsendingByDefault \
 // RUN:   -module-name main -I %t -verify

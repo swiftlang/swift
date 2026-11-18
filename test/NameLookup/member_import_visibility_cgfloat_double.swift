@@ -3,8 +3,8 @@
 
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/Library.swiftmodule -parse-as-library %t/Library.swift
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -verify -I %t %t/Client.swift
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -verify -I %t %t/Client.swift -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck -verify -I %t %t/Client.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t %t/Client.swift -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_MemberImportVisibility

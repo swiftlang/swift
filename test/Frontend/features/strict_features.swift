@@ -4,8 +4,8 @@
 // misspecified features.
 // RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -enable-upcoming-feature UnknownFeature %s 2>&1 | %FileCheck %s --check-prefix=CHECK-UNKNOWN-UPCOMING
 // RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -enable-experimental-feature UnknownFeature %s 2>&1 | %FileCheck %s --check-prefix=CHECK-UNKNOWN-EXPERIMENTAL
-// RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -swift-version 5 -enable-experimental-feature ConciseMagicFile %s 2>&1 | %FileCheck %s --check-prefix=CHECK-NOT-EXPERIMENTAL-ENABLE
-// RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -swift-version 5 -enable-experimental-feature ConciseMagicFile -disable-experimental-feature ConciseMagicFile %s 2>&1 | %FileCheck %s --check-prefix=CHECK-NOT-EXPERIMENTAL-DISABLE
+// RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -enable-experimental-feature ConciseMagicFile %s 2>&1 | %FileCheck %s --check-prefix=CHECK-NOT-EXPERIMENTAL-ENABLE
+// RUN: %target-swift-frontend -typecheck -Wwarning StrictLanguageFeatures -enable-experimental-feature ConciseMagicFile -disable-experimental-feature ConciseMagicFile %s 2>&1 | %FileCheck %s --check-prefix=CHECK-NOT-EXPERIMENTAL-DISABLE
 
 // REQUIRES: swift_feature_ConciseMagicFile
 

@@ -3,11 +3,11 @@
 // RUN: split-file %s %t/src
 
 // RUN: %target-swift-frontend -emit-module %t/src/A.swift \
-// RUN:   -module-name A -swift-version 5 -enable-library-evolution \
+// RUN:   -module-name A -enable-library-evolution \
 // RUN:   -emit-module-path %t/A.swiftmodule
 
 // RUN: %target-swift-frontend -emit-module %t/src/B.swift \
-// RUN:   -I %t -module-name B -swift-version 5 -enable-library-evolution \
+// RUN:   -I %t -module-name B -enable-library-evolution \
 // RUN:   -emit-module-path %t/B.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/src/main.swift \

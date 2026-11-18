@@ -1,6 +1,6 @@
 // REQUIRES: tsan_runtime
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -sanitize=thread -swift-version 5 -emit-silgen -primary-file %S/Inputs/OSLogConstantEvaluable.swift -o %t/OSLogConstantEvaluableTsanTest_silgen.sil
+// RUN: %target-swift-frontend -sanitize=thread -emit-silgen -primary-file %S/Inputs/OSLogConstantEvaluable.swift -o %t/OSLogConstantEvaluableTsanTest_silgen.sil
 //
 // Run the (mandatory) passes on which constant evaluator depends, and run the
 // constant evaluator on the SIL produced after the dependent passes are run.

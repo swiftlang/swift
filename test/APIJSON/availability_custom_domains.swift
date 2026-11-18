@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop, OS=macosx
 // REQUIRES: swift_feature_CustomAvailability
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -parse-as-library -module-name MyModule -swift-version 5 \
+// RUN: %target-swift-frontend %s -typecheck -parse-as-library -module-name MyModule \
 // RUN:   -enable-library-evolution -library-level api -emit-api-descriptor-path %t/api.json \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \

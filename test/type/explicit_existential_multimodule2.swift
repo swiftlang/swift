@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s         -swift-version 5 -emit-module -DM -module-name M -emit-module-path %t/M.swiftmodule
-// RUN: %target-swift-frontend %s -verify -swift-version 5 -typecheck -I %t -enable-upcoming-feature ExistentialAny
+// RUN: %target-swift-frontend %s         -emit-module -DM -module-name M -emit-module-path %t/M.swiftmodule
+// RUN: %target-swift-frontend %s -verify -typecheck -I %t -enable-upcoming-feature ExistentialAny
 
 // REQUIRES: swift_feature_ExistentialAny
 

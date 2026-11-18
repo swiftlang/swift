@@ -4,17 +4,17 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/PublicLib.swiftmodule %t/EmptyLib.swift
 // RUN: %target-swift-frontend -emit-module \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/SPILib.swiftmodule %t/EmptyLib.swift
 // RUN: %target-swift-frontend -emit-module \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/IOILib.swiftmodule %t/EmptyLib.swift
 
 // RUN: %target-swift-frontend -emit-module \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/Client.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:     -emit-private-module-interface-path %t/Client.private.swiftinterface \

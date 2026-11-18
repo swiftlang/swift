@@ -20,7 +20,7 @@
 
 /// Create AppleLoggingIF.swiftinterface by aliasing XLogging
 ///
-// RUN: %target-swift-frontend -module-name AppleLoggingIF %t/FileLogging.swift -module-alias XLogging=AppleLoggingIF -I %t -emit-module -emit-module-interface-path %t/AppleLoggingIF.swiftinterface -swift-version 5 -enable-library-evolution -I %t
+// RUN: %target-swift-frontend -module-name AppleLoggingIF %t/FileLogging.swift -module-alias XLogging=AppleLoggingIF -I %t -emit-module -emit-module-interface-path %t/AppleLoggingIF.swiftinterface -enable-library-evolution -I %t
 // RUN: test -f %t/AppleLoggingIF.swiftinterface
 
 /// Scanned dependencies should contain real name AppleLoggingIF

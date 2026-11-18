@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -typecheck -swift-version 5 \
+// RUN: not %target-swift-frontend -typecheck \
 // RUN:   -diagnostic-style llvm %s 2>&1 \
 // RUN:   | %FileCheck --strict-whitespace --enable-windows-compatibility %s
 

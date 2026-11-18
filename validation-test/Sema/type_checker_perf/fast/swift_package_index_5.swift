@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000 -swift-version 5
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
 // REQUIRES: tools-release,no_asan
 
 func g<T>(_: T) throws {

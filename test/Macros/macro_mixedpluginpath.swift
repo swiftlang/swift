@@ -9,7 +9,6 @@
 
 //#-- Prepare the macro dylib plugin.
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   %t/src/MacroDefinition.float.swift \
@@ -17,20 +16,19 @@
 
 //#-- Prepare the macro dylib plugin.
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugins_local/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   %t/src/MacroDefinition.int.swift \
 // RUN:   -g -no-toolchain-stdlib-rpath
 
 //#-- Check '-load-plugin-library' takes precedence over '-plugin-path'.
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -verify \
 // RUN:   -load-plugin-library %t/plugins_local/%target-library-name(MacroDefinition) \
 // RUN:   -plugin-path %t/plugins \
 // RUN:   %t/src/test.swift
 
 //#-- Different argument order changes the search order, hence fail.
-// RUN: not %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: not %target-swift-frontend -typecheck -verify \
 // RUN:   -plugin-path %t/plugins \
 // RUN:   -load-plugin-library %t/plugins_local/%target-library-name(MacroDefinition) \
 // RUN:   %t/src/test.swift

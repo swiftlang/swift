@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(LibA)) -DBEFORE -module-name LibA -emit-module -emit-module-path %t/LibA.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_libA.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(ReplacementA)) -I%t -L%t -lLibA -module-name ReplacementA -swift-version 5 %S/Inputs/dynamic_replacement_ReplacementA.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(LibA)) -module-name LibA -emit-module -emit-module-path %t/LibA.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_libA.swift
-// RUN: %target-build-swift -I%t -L%t -lLibA -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(LibA)) -DBEFORE -module-name LibA -emit-module -emit-module-path %t/LibA.swiftmodule %S/Inputs/dynamic_replacement_libA.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(ReplacementA)) -I%t -L%t -lLibA -module-name ReplacementA %S/Inputs/dynamic_replacement_ReplacementA.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(LibA)) -module-name LibA -emit-module -emit-module-path %t/LibA.swiftmodule %S/Inputs/dynamic_replacement_libA.swift
+// RUN: %target-build-swift -I%t -L%t -lLibA -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main %t/%target-library-name(LibA) %t/%target-library-name(ReplacementA)
 // RUN: %target-run %t/main %t/%target-library-name(LibA) %t/%target-library-name(ReplacementA)
 

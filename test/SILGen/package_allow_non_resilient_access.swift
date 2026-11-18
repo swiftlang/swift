@@ -3,7 +3,7 @@
 
 /// Utils module needs to opt in to allow non-resilient access from clients.
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-allow-non-resilient-access \
@@ -24,7 +24,7 @@
 /// Utils can be built with both -enable-testing and -experimental-allow-non-resilient-access.
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-testing \
 // RUN:   -experimental-allow-non-resilient-access \
@@ -38,7 +38,7 @@
 /// decls, with a warning.
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-skip-non-exportable-decls \
@@ -51,7 +51,7 @@
 /// Override -experimental-skip-non-inlinable-function-bodies-without-types with warning
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-skip-non-inlinable-function-bodies-without-types \
@@ -64,7 +64,7 @@
 /// Override -experimental-skip-non-inlinable-function-bodies with warning
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-skip-non-inlinable-function-bodies \
@@ -77,7 +77,7 @@
 /// Override -experimental-skip-all-function-bodies with warning
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-skip-all-function-bodies \
@@ -90,7 +90,7 @@
 /// Override -experimental-lazy-typecheck with warning
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -experimental-lazy-typecheck \
@@ -103,7 +103,7 @@
 /// Override -tbd-is-installapi with warning
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -tbd-is-installapi \
@@ -116,7 +116,7 @@
 /// Build Utils interface files.
 // RUN: rm -rf %t/Utils.swiftmodule
 // RUN: %target-swift-frontend %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module \

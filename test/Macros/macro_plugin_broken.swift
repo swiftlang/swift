@@ -4,13 +4,12 @@
 // RUN: split-file %s %t
 
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 -o %t/broken-plugin \
+// RUN:   -o %t/broken-plugin \
 // RUN:   -module-name=TestPlugin \
 // RUN:   %t/broken_plugin.swift
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
-// RUN:   -swift-version 5 \
 // RUN:   -load-plugin-executable %t/broken-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
 // RUN:   -serialize-diagnostics-path %t/macro_expand.dia \

@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s -emit-module -emit-module-interface-path %t/test.swiftmodule \
-// RUN:   -swift-version 5 \
 // RUN:   -o /dev/null \
 // RUN:   -enable-library-evolution \
 // RUN:   -verify \
@@ -10,7 +9,6 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 // RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-module -emit-module-interface-path %t/test.swiftmodule \
-// RUN:   -swift-version 5 \
 // RUN:   -o /dev/null \
 // RUN:   -enable-library-evolution \
 // RUN:   -verify \

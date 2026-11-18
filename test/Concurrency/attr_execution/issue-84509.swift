@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
-// RUN:   -swift-version 5 \
 // RUN:   -enable-upcoming-feature NonisolatedNonsendingByDefault \
 // RUN:   -module-name main -I %t -verify -verify-ignore-unrelated \
 // RUN:   -parse-as-library -o %t/main.o

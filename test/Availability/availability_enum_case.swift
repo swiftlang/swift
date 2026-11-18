@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift -emit-module %S/Inputs/availability_enum_case_other.swift -target %target-cpu-apple-macosx50 -emit-module-interface-path %t/availability_enum_case_other.swiftinterface -swift-version 5 -enable-library-evolution
+// RUN: %target-build-swift -emit-module %S/Inputs/availability_enum_case_other.swift -target %target-cpu-apple-macosx50 -emit-module-interface-path %t/availability_enum_case_other.swiftinterface -enable-library-evolution
 // RUN: %target-typecheck-verify-swift -I %t
 
-// RUN: %target-build-swift -emit-module %S/Inputs/availability_enum_case_other.swift -target %target-cpu-apple-macosx50 -emit-module-interface-path %t/availability_enum_case_other.swiftinterface -swift-version 5 -enable-library-evolution -whole-module-optimization
+// RUN: %target-build-swift -emit-module %S/Inputs/availability_enum_case_other.swift -target %target-cpu-apple-macosx50 -emit-module-interface-path %t/availability_enum_case_other.swiftinterface -enable-library-evolution -whole-module-optimization
 // RUN: %target-typecheck-verify-swift -I %t
 
 // REQUIRES: OS=macosx

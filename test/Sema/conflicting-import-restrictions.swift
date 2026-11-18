@@ -6,7 +6,7 @@
 /// Generate dependencies.
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 
 /// Build clients.
 // RUN: %target-swift-frontend -typecheck %t/SPIOnly_Exported.swift -I %t -verify \

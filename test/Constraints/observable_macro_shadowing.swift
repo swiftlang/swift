@@ -3,7 +3,7 @@
 // RUN: split-file %s %t/src
 
 // RUN: %target-swift-frontend -emit-module %t/src/Test.swift \
-// RUN:   -module-name Test -swift-version 5 -enable-library-evolution \
+// RUN:   -module-name Test -enable-library-evolution \
 // RUN:   -emit-module-path %t/Test.swiftmodule
 
 // RUN: %target-swift-frontend -typecheck %t/src/main.swift \

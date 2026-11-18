@@ -2,11 +2,11 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROFILE=@__swiftmacro\\S*.swift" --sanitize-path-regex "MACROPATH=TMP_DIR/swift-generated-sources/MACROFILE" %t/llvm-render.expected
-// RUN: not env %tmpdir=%t %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
-// RUN: %target-swift-frontend -swift-version 5 -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
+// RUN: not env %tmpdir=%t %target-swift-frontend -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff --sanitize-regex "MACROFILE=@__swiftmacro\\S*.swift" --sanitize-path-regex "MACROPATH=TMP_DIR/swift-generated-sources/MACROFILE" %t/llvm-render.expected
+// RUN: not env %tmpdir=%t %target-swift-frontend -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -diagnostic-style=swift 2>&1 | %PathSanitizingDiff %t/swift-syntax-render.expected
+// RUN: %target-swift-frontend -typecheck %t/test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -verify
 
 // Ensure that child notes in other buffers are rendered properly.
 

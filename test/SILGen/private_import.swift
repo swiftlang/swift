@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -module-name Mod -emit-module -enable-private-imports -swift-version 5 -o %t %S/Inputs/private_import_module.swift
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t -primary-file %s %S/private_import_other.swift -module-name main -swift-version 5
-// RUN: %target-swift-emit-silgen -I %t -primary-file %s %S/private_import_other.swift -module-name main -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -I %t %s %S/private_import_other.swift -module-name main -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-silgen -I %t %S/private_import_other.swift %s -module-name main -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-frontend -module-name Mod -emit-module -enable-private-imports -o %t %S/Inputs/private_import_module.swift
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -I %t -primary-file %s %S/private_import_other.swift -module-name main
+// RUN: %target-swift-emit-silgen -I %t -primary-file %s %S/private_import_other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %t %s %S/private_import_other.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %t %S/private_import_other.swift %s -module-name main | %FileCheck %s
 // RUN: %target-swift-emit-ir -I %t -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
 // RUN: %target-swift-emit-ir -I %t -O -primary-file %s %S/private_import_other.swift -module-name main -o /dev/null
 

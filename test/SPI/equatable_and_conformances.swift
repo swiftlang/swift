@@ -1,6 +1,6 @@
 // Test how SPI affects access control in protocol conformance lookup.
 
-// RUN: %target-build-swift %s -swift-version 5
+// RUN: %target-build-swift %s
 
 // rdar://61043406
 

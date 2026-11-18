@@ -1,9 +1,9 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name auto_closures -parse-stdlib -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name auto_closures -parse-stdlib %s | %FileCheck %s
 
 struct Bool {}
-var false_ = Bool()
+let false_ = Bool()
 
 // CHECK-LABEL: sil hidden [ossa] @$s13auto_closures05call_A8_closureyAA4BoolVADyXKF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> Bool
 func call_auto_closure(_ x: @autoclosure () -> Bool) -> Bool {

@@ -5,7 +5,6 @@
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %t/src/main.swift \
 // RUN:   -enable-objc-interop \
 // RUN:   -import-objc-header %t/src/Test.h \
-// RUN:   -swift-version 5 \
 // RUN:   -module-name main -I %t -verify -verify-ignore-unrelated | %FileCheck %t/src/main.swift
 
 // REQUIRES: objc_interop

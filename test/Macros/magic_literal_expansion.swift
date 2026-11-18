@@ -1,9 +1,9 @@
 // REQUIRES: swift_swift_parser, executable_test
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5 -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t
+// RUN: %target-build-swift -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -emit-tbd -emit-tbd-path %t/MacroUser.tbd -I %t
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file --leading-lines %s %t
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/MacroDefinition.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/MacroDefinition.swift -g -no-toolchain-stdlib-rpath
 // RUN: %target-swift-ide-test -print-indexed-symbols -include-locals -source-filename %t/Test.swift -load-plugin-library %t/%target-library-name(MacroDefinition) -parse-as-library | %FileCheck %s
 
 //--- MacroDefinition.swift

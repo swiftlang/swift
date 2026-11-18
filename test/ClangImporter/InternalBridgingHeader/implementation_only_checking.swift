@@ -2,40 +2,40 @@
 // RUN: mkdir -p %t/tmp
 
 // Test with the normal bridging header.
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix no-import-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix no-import-
 
 // RUN: not %target-swift-frontend -typecheck -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk %s 2>&1 | %FileCheck %s
 
 // Test with a precompiled bridging header.
-// RUN: %target-swift-frontend -emit-pch -o %t/c-bridging-header.pch %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -swift-version 5
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %t/c-bridging-header.pch -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix no-import-
+// RUN: %target-swift-frontend -emit-pch -o %t/c-bridging-header.pch %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %t/c-bridging-header.pch -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix no-import-
 
 // Test the spelling of the suggested import with InternalImportsByDefault.
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix internal-imports-by-default- -enable-upcoming-feature InternalImportsByDefault
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix internal-imports-by-default- -enable-upcoming-feature InternalImportsByDefault
 
 // Test that any import of a module reached through the bridging header, even
 // a less permissive one, makes it a dependency for layouts exposed to clients.
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -D FILEPRIVATE_IMPORT
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -D FILEPRIVATE_IMPORT
 
 // Test that importing another module with a bridging header doesn't count as
 // an import of what this bridging header declares or includes, even though
 // all bridging headers share one header module.
 // RUN: echo 'typedef int OtherInt;' > %t/other-bridging-header.h
 // RUN: echo 'public func otherFunc() {}' > %t/HasBridgingHeader.swift
-// RUN: %target-swift-frontend -emit-module -o %t -module-name HasBridgingHeader %t/HasBridgingHeader.swift -import-objc-header %t/other-bridging-header.h -sdk %clang-importer-sdk -swift-version 5
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix other-module- -I %t -D OTHER_MODULE_IMPORT
+// RUN: %target-swift-frontend -emit-module -o %t -module-name HasBridgingHeader %t/HasBridgingHeader.swift -import-objc-header %t/other-bridging-header.h -sdk %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix other-module- -I %t -D OTHER_MODULE_IMPORT
 
 // Test that a module imported only implementation-only by another module isn't
 // an import of it, since that other module's clients don't load it.
 // RUN: echo '@_implementationOnly import ctypes' > %t/ImplOnlyImportsCTypes.swift
-// RUN: %target-swift-frontend -emit-module -o %t -module-name ImplOnlyImportsCTypes %t/ImplOnlyImportsCTypes.swift -sdk %clang-importer-sdk -swift-version 5
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix impl-only-via-other- -I %t -D IMPL_ONLY_VIA_OTHER_MODULE
+// RUN: %target-swift-frontend -emit-module -o %t -module-name ImplOnlyImportsCTypes %t/ImplOnlyImportsCTypes.swift -sdk %clang-importer-sdk
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -verify-additional-prefix non-library-evolution- -verify-additional-prefix ctypes-not-imported- -verify-additional-prefix impl-only-via-other- -I %t -D IMPL_ONLY_VIA_OTHER_MODULE
 
 // Test library-evolution differences.
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -enable-library-evolution
 
 // Verify with SerializeAbstractTypeLayoutForHiddenTypes enabled, diagnostics are silenced, as if library evolution was enabled
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -swift-version 5 -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -internal-import-bridging-header %S/../Inputs/c-bridging-header.h -sdk %clang-importer-sdk -verify-ignore-unknown -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
 
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 // REQUIRES: swift_feature_InternalImportsByDefault

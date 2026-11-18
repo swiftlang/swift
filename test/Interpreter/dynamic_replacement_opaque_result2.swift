@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift  -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-build-swift  -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
-// RUN: %target-build-swift  -o %t/main %target-rpath(%t) %s -swift-version 5 -enable-library-evolution
+// RUN: %target-build-swift  -o %t/main %target-rpath(%t) %s -enable-library-evolution
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

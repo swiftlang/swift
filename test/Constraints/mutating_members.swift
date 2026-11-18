@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 %s
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 protocol P {}
 

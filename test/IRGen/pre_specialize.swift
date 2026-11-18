@@ -12,7 +12,7 @@
 // RUN: %target-swift-frontend -I %t -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-swift-frontend -I %t -O -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=missing -emit-module -emit-module-path=%t/B.swiftmodule -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
-// RUN: %target-build-swift -swift-version 5 -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
+// RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
 
 // Module B code generation with A.swiftmodule with library evolution.
 // RUN: %empty-directory(%t)
@@ -20,15 +20,15 @@
 // RUN: %target-swift-frontend -I %t -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-swift-frontend -I %t -O -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=missing -emit-module -emit-module-path=%t/B.swiftmodule -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
-// RUN: %target-build-swift -swift-version 5 -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
+// RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
 
 // Module B code generation with A.swiftinterface with library evolution.
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -emit-library -o %t/%target-library-name(A) -swift-version 5
+// RUN: %target-build-swift -enable-library-evolution -Xfrontend -validate-tbd-against-ir=all -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -emit-library -o %t/%target-library-name(A)
 // RUN: %target-swift-frontend -I %t -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-swift-frontend -I %t -O -emit-ir -primary-file %S/Inputs/pre_specialize_module_B.swift -module-name B | %FileCheck %s -check-prefix=CHECK-B
 // RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=missing -emit-module -emit-module-path=%t/B.swiftmodule -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
-// RUN: %target-build-swift -swift-version 5 -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
+// RUN: %target-build-swift -I %t -Xfrontend -validate-tbd-against-ir=all -enable-library-evolution -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -emit-library -o %t/%target-library-name(B) -L %t -lA
 
 // Module A tests
 // --------------
@@ -127,14 +127,14 @@
 
 // .swiftinterface
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -c -enable-library-evolution -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -o  %t/A.o -swift-version 5
-// RUN: %target-build-swift -c -enable-library-evolution -I %t -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -o %t/B.o -swift-version 5
+// RUN: %target-build-swift -c -enable-library-evolution -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -o  %t/A.o
+// RUN: %target-build-swift -c -enable-library-evolution -I %t -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -o %t/B.o
 // RUN: %target-swift-frontend -O -I %t -emit-ir -primary-file %s -module-name C | %FileCheck %s -check-prefix=CHECK-C
 
 // Optimized .swiftinterface
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -c -enable-library-evolution -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -o  %t/A.o -swift-version 5
-// RUN: %target-build-swift -O -c -enable-library-evolution -I %t -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -o %t/B.o -swift-version 5
+// RUN: %target-build-swift -O -c -enable-library-evolution -emit-module-interface-path %t/A.swiftinterface -module-name A %S/Inputs/pre_specialize_module.swift -o  %t/A.o
+// RUN: %target-build-swift -O -c -enable-library-evolution -I %t -emit-module-interface-path %t/B.swiftinterface -module-name B %S/Inputs/pre_specialize_module_B.swift -o %t/B.o
 // RUN: %target-swift-frontend -O -I %t -emit-ir -primary-file %s -module-name C | %FileCheck %s -check-prefix=CHECK-C
 
 import A

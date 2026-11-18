@@ -1,6 +1,6 @@
-// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -swift-version 5 -module-name filtered -usr-filter 's:8filtered9ProtEmptyP' | %FileCheck %s -check-prefix=EMPTY
-// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -swift-version 5 -module-name filtered -usr-filter 's:8filtered4ProtP' | %FileCheck %s -check-prefix=PROTO
-// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -swift-version 5 -module-name filtered -usr-filter 's:8filtered5Prot1P' | %FileCheck %s -check-prefix=PROTO1
+// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -module-name filtered -usr-filter 's:8filtered9ProtEmptyP' | %FileCheck %s -check-prefix=EMPTY
+// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -module-name filtered -usr-filter 's:8filtered4ProtP' | %FileCheck %s -check-prefix=PROTO
+// RUN: %target-swift-ide-test -print-expr-type -source-filename %S/Inputs/ExprTypeFiltered.swift -module-name filtered -usr-filter 's:8filtered5Prot1P' | %FileCheck %s -check-prefix=PROTO1
 
 // EMPTY: class Clas: Prot {
 // EMPTY:   var value: Clas { return self }

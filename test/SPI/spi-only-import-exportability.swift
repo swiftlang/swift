@@ -6,11 +6,11 @@
 /// Generate dependencies.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift \
 // RUN:   -module-name PublicLib -emit-module-path %t/PublicLib.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/SPIOnlyImportedLib.swift \
 // RUN:   -module-name SPIOnlyImportedLib \
 // RUN:   -emit-module-path %t/SPIOnlyImportedLib.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution -I %t
+// RUN:   -enable-library-evolution -I %t
 
 /// Test the client.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -verify -verify-ignore-unrelated \

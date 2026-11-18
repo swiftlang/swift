@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -verify -swift-version 5 %s
+// RUN: %target-swift-frontend -parse -verify %s
 
 func test<T>(make: () -> [T], consume: (T) -> Void) { consume(make()[0]) }
 

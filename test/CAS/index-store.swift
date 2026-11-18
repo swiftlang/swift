@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module %t/A.swift -I %t -module-name A \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/A.swiftinterface \
 // RUN:   -o %t/A.swiftmodule
 

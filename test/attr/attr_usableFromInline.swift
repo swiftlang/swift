@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -disable-objc-attr-requires-foundation-module -enable-objc-interop -package-name myPkg
-// RUN: %target-typecheck-verify-swift -swift-version 5 -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-testing -package-name myPkg
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module -enable-objc-interop -package-name myPkg
+// RUN: %target-typecheck-verify-swift -disable-objc-attr-requires-foundation-module -enable-objc-interop -enable-testing -package-name myPkg
 
 @usableFromInline private func privateVersioned() {}
 // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'privateVersioned()' is private}}

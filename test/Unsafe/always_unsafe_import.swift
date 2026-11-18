@@ -2,7 +2,7 @@
 
 // Build a library that exports always-unsafe declarations, both as a binary
 // module and as a module interface.
-// RUN: %target-swift-frontend -emit-module -o %t/always_unsafe_lib.swiftmodule -emit-module-interface-path %t/always_unsafe_lib.swiftinterface -enable-library-evolution -swift-version 5 -module-name always_unsafe_lib -enable-experimental-feature AlwaysUnsafeAttribute %S/Inputs/always_unsafe_lib.swift
+// RUN: %target-swift-frontend -emit-module -o %t/always_unsafe_lib.swiftmodule -emit-module-interface-path %t/always_unsafe_lib.swiftinterface -enable-library-evolution -module-name always_unsafe_lib -enable-experimental-feature AlwaysUnsafeAttribute %S/Inputs/always_unsafe_lib.swift
 
 // The requirement survives serialization into a binary module.
 // RUN: %target-typecheck-verify-swift -I %t

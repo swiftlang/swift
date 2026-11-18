@@ -7,7 +7,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t-scratch)
 
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s --color
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t -dump-macro-expansions %s 2>&1 | %FileCheck %s --color
 
 import Observation
 

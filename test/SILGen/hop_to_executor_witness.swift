@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5 | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

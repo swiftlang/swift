@@ -3,7 +3,7 @@
 
 // The C++ overlay can use '@unsafe(always)' without the experimental feature,
 // so this does not require it to be available in this compiler.
-// RUN: %target-swift-frontend -emit-module -o %t/Cxx.swiftmodule -emit-module-interface-path %t/Cxx.swiftinterface -enable-library-evolution -swift-version 5 -module-name Cxx %t/Cxx.swift
+// RUN: %target-swift-frontend -emit-module -o %t/Cxx.swiftmodule -emit-module-interface-path %t/Cxx.swiftinterface -enable-library-evolution -module-name Cxx %t/Cxx.swift
 // RUN: %FileCheck %s --input-file %t/Cxx.swiftinterface
 
 // The attribute survives rebuilding the overlay from its interface, which is

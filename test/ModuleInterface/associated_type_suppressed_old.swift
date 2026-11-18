@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypes \
 // RUN:     -o %t/basic_suppressed_assoc.swiftmodule \
 // RUN:     -emit-module-interface-path %t/basic_suppressed_assoc.swiftinterface \

@@ -2,7 +2,7 @@
 //
 // RUN: %gyb %S/Inputs/BoxingCasts.swift.gyb -o %t/BoxingCasts.swift
 //
-// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -Onone -swift-version 5 %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
+// RUN: %line-directive %t/BoxingCasts.swift -- %target-build-swift -g -module-name a -Onone %t/BoxingCasts.swift -o %t/a.swift5.Onone.out
 // RUN: %target-codesign %t/a.swift5.Onone.out
 // RUN: %line-directive %t/BoxingCasts.swift -- %target-run %t/a.swift5.Onone.out
 //

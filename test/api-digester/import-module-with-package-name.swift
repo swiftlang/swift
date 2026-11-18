@@ -9,7 +9,7 @@
 // Make sure api-digester loads an interface with package-name correctly
 
 // Generate module Lib
-// RUN: %target-swift-frontend  %t/Lib.swift -emit-module -module-name Lib -emit-module-path %t.mod/Lib.swiftmodule -emit-module-interface-path %t.mod/Lib.swiftinterface -emit-private-module-interface-path %t.mod/Lib.private.swiftinterface -package-name myLib -parse-as-library -enable-library-evolution -module-cache-path %t.module-cache -swift-version 5
+// RUN: %target-swift-frontend  %t/Lib.swift -emit-module -module-name Lib -emit-module-path %t.mod/Lib.swiftmodule -emit-module-interface-path %t.mod/Lib.swiftinterface -emit-private-module-interface-path %t.mod/Lib.private.swiftinterface -package-name myLib -parse-as-library -enable-library-evolution -module-cache-path %t.module-cache
 
 // Dumping sdk for Lib ABI via .swiftmodule file should work
 // RUN: %api-digester -dump-sdk -abort-on-module-fail -abi -module Lib -o - -module-cache-path %t.module-cache -I %t.mod > %t.dump-lib-binary.json
@@ -30,7 +30,7 @@
 // LIB-INTERFACE: libFunc
 
 // Generate module Client
-// RUN: %target-swift-frontend %t/Client.swift -emit-module -module-name Client -emit-module-path %t.mod/Client.swiftmodule -emit-module-interface-path %t.mod/Client.swiftinterface -emit-private-module-interface-path %t.mod/Client.private.swiftinterface -package-name myLib -parse-as-library -enable-library-evolution -module-cache-path %t.module-cache -swift-version 5  -I %t.mod
+// RUN: %target-swift-frontend %t/Client.swift -emit-module -module-name Client -emit-module-path %t.mod/Client.swiftmodule -emit-module-interface-path %t.mod/Client.swiftinterface -emit-private-module-interface-path %t.mod/Client.private.swiftinterface -package-name myLib -parse-as-library -enable-library-evolution -module-cache-path %t.module-cache  -I %t.mod
 
 // RUN: rm -f %t.mod/Lib.swiftmodule
 // RUN: rm -f %t.module-cache/Lib*.swiftmodule

@@ -6,7 +6,7 @@
 /// Resilient scenario, we ignore underlying type of non-inlinable functions.
 /// Build libraries.
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface -verify
 
@@ -37,7 +37,6 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-module-path %t/Lib.swiftmodule -verify
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
 // RUN:   -verify -Xllvm -debug-only=Serialization \

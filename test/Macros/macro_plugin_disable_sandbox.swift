@@ -10,7 +10,6 @@
 
 //== Build the plugins
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library \
 // RUN:   -o %t/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name=MacroDefinition \
@@ -23,7 +22,6 @@
 // RUN: not sandbox-exec -p '(version 1)(allow default)' \
 // RUN:   %target-swift-frontend \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \
@@ -34,7 +32,6 @@
 // RUN:   %target-swift-frontend \
 // RUN:   -disable-sandbox \
 // RUN:   -typecheck -verify \
-// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -load-plugin-executable %t/mock-plugin#TestPlugin \
 // RUN:   -module-name MyApp \

@@ -7,7 +7,7 @@
 // comments (but not whitespace).
 
 // Create a plugin that adds a new function as a member without any trivia
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
 //--- MacroPlugin.swift
 import SwiftSyntax

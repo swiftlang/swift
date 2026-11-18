@@ -3,12 +3,12 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %t/main.swift
+// RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/main.swift
 
 // FIXME: This ought to not crash (https://github.com/swiftlang/swift/issues/88740)
-// RUN: not --crash %target-swift-frontend -typecheck -verify -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %t/main.swift -DCRASH
+// RUN: not --crash %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/main.swift -DCRASH
 
 //--- macro.swift
 

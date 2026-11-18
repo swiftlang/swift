@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -profile-generate -swift-version 5 -emit-silgen -primary-file %S/Inputs/OSLogConstantEvaluable.swift -o %t/OSLogConstantEvaluableProfilerTest_silgen.sil
+// RUN: %target-swift-frontend -profile-generate -emit-silgen -primary-file %S/Inputs/OSLogConstantEvaluable.swift -o %t/OSLogConstantEvaluableProfilerTest_silgen.sil
 //
 // Run the (mandatory) passes on which constant evaluator depends, and run the
 // constant evaluator on the SIL produced after the dependent passes are run.

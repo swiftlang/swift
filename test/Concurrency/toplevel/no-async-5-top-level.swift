@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 5 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple %s -verify
 
 // There are no `await`s made from the top-level, so it is not an async context.
 // `a` is just a normal top-level global variable with no actor isolation.

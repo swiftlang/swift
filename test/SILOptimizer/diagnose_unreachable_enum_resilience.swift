@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -enable-library-evolution -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -enable-library-evolution -primary-file %s -o /dev/null -verify
 
 // Re-run with optimizations to check if -O does not make any difference
-// RUN: %target-swift-frontend -O -emit-sil -swift-version 5 -enable-library-evolution -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -O -emit-sil -enable-library-evolution -primary-file %s -o /dev/null -verify
 
 public enum NonExhaustive {
   case a

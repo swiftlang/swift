@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-build-swift %t/src/Library.swift -swift-version 5 -emit-module -emit-library \
+// RUN: %target-build-swift %t/src/Library.swift -emit-module -emit-library \
 // RUN:    -enable-library-evolution \
 // RUN:    -module-name Library \
 // RUN:    -o %t/%target-library-name(Library) \

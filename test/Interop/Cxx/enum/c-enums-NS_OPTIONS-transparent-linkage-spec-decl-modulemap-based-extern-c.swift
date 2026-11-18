@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t/cache)
-// RUN: %target-swift-frontend %s -swift-version 5 -I %S/Inputs -typecheck -module-cache-path %t/cache -enable-experimental-cxx-interop 2>&1 | %FileCheck --allow-empty %s
+// RUN: %target-swift-frontend %s -I %S/Inputs -typecheck -module-cache-path %t/cache -enable-experimental-cxx-interop 2>&1 | %FileCheck --allow-empty %s
 
 // REQUIRES: objc_interop
 

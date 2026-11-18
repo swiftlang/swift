@@ -3,7 +3,7 @@
 
 // RUN: %empty-directory(%t)
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -no-toolchain-stdlib-rpath -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -no-toolchain-stdlib-rpath
 
 // RUN: %target-swift-emit-module-interface(%t/Macros.swiftinterface) -module-name Macros %s -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: %FileCheck %s < %t/Macros.swiftinterface --check-prefix CHECK

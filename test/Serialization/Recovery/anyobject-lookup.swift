@@ -2,7 +2,7 @@
 /// rdar://89494507
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -I %S/Inputs/custom-modules -enable-library-evolution -swift-version 5
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -DLIB_B %s -module-name B -emit-module-path %t/B.swiftmodule -I %t -I %S/Inputs/custom-modules -enable-library-evolution
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -DLIB_C %s -I %t -verify
 // Add this flag to the previous line to get back the original crash: -disable-deserialization-recovery
 

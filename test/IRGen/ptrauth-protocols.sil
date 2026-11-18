@@ -1,4 +1,4 @@
-// RUN: %swift -swift-version 5 -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
+// RUN: %swift -target arm64e-apple-ios12.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s --check-prefix=CHECK
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios

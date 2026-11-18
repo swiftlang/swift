@@ -1,9 +1,9 @@
 // REQUIRES: swift_swift_parser, executable_test
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
 
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
 
 // RUN: %target-swift-frontend -parse-as-library -enable-library-evolution -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -experimental-skip-non-exportable-decls | %FileCheck %s
 

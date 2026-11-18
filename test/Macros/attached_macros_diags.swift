@@ -1,8 +1,8 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacrosTest
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -parse-as-library -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacrosTest
 
 @attached(peer) macro m1() = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
 

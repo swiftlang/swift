@@ -4,9 +4,9 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/macro_decl.swiftmodule %t/macro_decl.swift -module-name macro_decl -load-plugin-library %t/%target-library-name(MacroDefinition)
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -verify -cxx-interoperability-mode=default -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t -I %t/Inputs %t/client.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-swift-frontend -emit-module -o %t/macro_decl.swiftmodule %t/macro_decl.swift -module-name macro_decl -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t -I %t/Inputs %t/client.swift
 
 //--- macro_decl.swift
 @attached(extension)

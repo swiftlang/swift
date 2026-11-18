@@ -20,7 +20,7 @@
 /// Test the generated swiftinterface.
 // RUN: %target-swift-frontend -typecheck %t/FileA.swift %t/FileB.swift \
 // RUN:   -experimental-spi-only-imports \
-// RUN:   -swift-version 5 -enable-library-evolution -module-name Main -I %t \
+// RUN:   -enable-library-evolution -module-name Main -I %t \
 // RUN:   -emit-module-interface-path %t/Main.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Main.private.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Main.swiftinterface) -I %t
@@ -33,7 +33,7 @@
 /// also has SPI details.
 // RUN: %target-swift-frontend -typecheck %t/FileA.swift %t/FileB.swift \
 // RUN:   -experimental-spi-only-imports \
-// RUN:   -swift-version 5 -enable-library-evolution -module-name SPIMain -I %t \
+// RUN:   -enable-library-evolution -module-name SPIMain -I %t \
 // RUN:   -emit-module-interface-path %t/SPIMain.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/SPIMain.private.swiftinterface \
 // RUN:   -library-level spi

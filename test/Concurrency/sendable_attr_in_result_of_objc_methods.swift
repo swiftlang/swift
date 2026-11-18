@@ -4,7 +4,6 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/src/main.swift \
 // RUN:   -import-objc-header %t/src/Test.h \
-// RUN:   -swift-version 5 \
 // RUN:   -target %target-swift-5.1-abi-triple \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -module-name main -I %t -verify

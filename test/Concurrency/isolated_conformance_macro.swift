@@ -5,9 +5,9 @@
 // RUN: split-file %s %t
 
 // Build the macro library
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -strict-concurrency=complete -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main.swift
+// RUN: %target-swift-frontend -typecheck -verify -strict-concurrency=complete -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name M %t/main.swift
 
 //--- macro.swift
 import SwiftSyntax

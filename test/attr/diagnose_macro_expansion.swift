@@ -4,7 +4,7 @@
 // RUN: split-file %s %t
 
 // Build the macro library
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %t/macro.swift
 
 // Type check and verify the test itself which applies @diagnose to a macro expansion expression
 // RUN: %target-swift-frontend -typecheck -verify -load-plugin-library %t/%target-library-name(MacroDefinition) %t/test.swift

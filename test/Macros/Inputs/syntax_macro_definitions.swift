@@ -775,6 +775,8 @@ private func extractCodeStringArgument(
       return string.content.text
     case .expressionSegment(_):
       throw CustomError.message("Macro cannot handle string interpolation")
+    @unknown default:
+      fatalError()
     }
   }.joined(separator: "")
 }
@@ -1120,6 +1122,9 @@ public struct AddAsyncMacro: PeerMacro {
 
       case .none:
         successReturnType = nil
+
+      @unknown default:
+        fatalError()
       }
     } else {
       successReturnType = returnType

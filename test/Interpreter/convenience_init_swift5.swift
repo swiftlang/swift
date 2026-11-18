@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-build-swift %s -o %t/main -swift-version 5
+// RUN: %target-build-swift %s -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 

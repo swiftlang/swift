@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil %s -O -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil %s -O | %FileCheck %s
 
 public final class Class<T: Sendable> {
   @inline(never)

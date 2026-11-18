@@ -6,19 +6,19 @@
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/InternalLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/FileprivateLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 -verify -verify-ignore-unrelated \
+// RUN:   -enable-library-evolution -verify -verify-ignore-unrelated \
 // RUN:   -package-name package
 
 //--- PublicLib.swift

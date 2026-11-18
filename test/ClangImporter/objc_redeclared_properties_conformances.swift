@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %clang-importer-sdk -typecheck %t/main.swift -I %t/include -verify -swift-version 5
-// RUN: %target-swift-frontend %clang-importer-sdk -typecheck %t/main.swift -I %t/include -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility
+// RUN: %target-swift-frontend %clang-importer-sdk -typecheck %t/main.swift -I %t/include -verify
+// RUN: %target-swift-frontend %clang-importer-sdk -typecheck %t/main.swift -I %t/include -verify -enable-upcoming-feature MemberImportVisibility
 
 // RUN: %target-swift-ide-test %clang-importer-sdk -print-module -module-to-print Conformances -I %t/include -source-filename %t/main.swift | %FileCheck %s
 

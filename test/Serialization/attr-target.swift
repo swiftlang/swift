@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-experimental-feature TargetAttribute -parse-as-library -emit-module-path %t/a.swiftmodule -module-name a -emit-module-interface-path %t/a.swiftinterface -enable-library-evolution -swift-version 5 %s
+// RUN: %target-swift-frontend -enable-experimental-feature TargetAttribute -parse-as-library -emit-module-path %t/a.swiftmodule -module-name a -emit-module-interface-path %t/a.swiftinterface -enable-library-evolution %s
 // RUN: %llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --check-prefix BC-CHECK --implicit-check-not UnknownCode %s
 // RUN: %target-swift-ide-test -enable-experimental-feature TargetAttribute -print-module -module-to-print a -source-filename x -I %t | %FileCheck --check-prefix MODULE-CHECK %s
 // RUN: %FileCheck --check-prefix INTERFACE-CHECK %s < %t/a.swiftinterface

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: not %target-swift-frontend -typecheck %s -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -serialize-diagnostics-path %t/diags.dia
+// RUN: not %target-swift-frontend -typecheck %s -load-plugin-library %t/%target-library-name(MacroDefinition) -serialize-diagnostics-path %t/diags.dia
 
 // RUN: c-index-test -read-diagnostics %t/diags.dia 2>&1 | %FileCheck -check-prefix DIAGS %s
 

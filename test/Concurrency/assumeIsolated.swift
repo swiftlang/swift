@@ -1,4 +1,4 @@
-// RUN: %target-build-swift -swift-version 5 %s -strict-concurrency=complete -Xfrontend -verify
+// RUN: %target-build-swift %s -strict-concurrency=complete -Xfrontend -verify
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx

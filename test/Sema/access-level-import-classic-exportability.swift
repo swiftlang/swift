@@ -11,12 +11,12 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -package-name pkg \
 // RUN:   -verify -verify-ignore-unrelated
 
 /// CheckImplementationOnly doesn't change the results.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -package-name pkg \
 // RUN:   -enable-experimental-feature CheckImplementationOnly \
 // RUN:   -verify -verify-ignore-unrelated
 
@@ -35,13 +35,13 @@
 
 /// Check diagnostics.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -package-name pkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -verify -verify-ignore-unrelated
 
 /// CheckImplementationOnly doesn't change the results.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -package-name pkg -swift-version 5 \
+// RUN:   -package-name pkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature CheckImplementationOnly \
 // RUN:   -verify -verify-ignore-unrelated

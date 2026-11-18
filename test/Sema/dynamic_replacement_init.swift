@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -swift-version 5 -enable-implicit-dynamic -enable-private-imports -emit-module -primary-file %S/Inputs/dynamic_replacements_init_A.swift -emit-module -module-name ModuleA -emit-module-path %t/ModuleA.swiftmodule
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -verify %s -I %t
+// RUN: %target-swift-frontend -enable-implicit-dynamic -enable-private-imports -emit-module -primary-file %S/Inputs/dynamic_replacements_init_A.swift -emit-module -module-name ModuleA -emit-module-path %t/ModuleA.swiftmodule
+// RUN: %target-swift-frontend -typecheck -verify %s -I %t
 
 @_private(sourceFile: "dynamic_replacements_init_A.swift") import ModuleA
 

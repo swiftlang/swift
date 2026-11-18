@@ -7,7 +7,7 @@
 // (ie. calls within an added function).
 
 // Create the plugin with various macros for testing
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(IndexMacros) -module-name=IndexMacros %t/IndexMacros.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(IndexMacros) -module-name=IndexMacros %t/IndexMacros.swift -g -no-toolchain-stdlib-rpath
 
 // Check indexed symbols
 // RUN: %target-swift-ide-test -print-indexed-symbols -source-filename %t/IndexTest.swift -load-plugin-library %t/%target-library-name(IndexMacros) -parse-as-library > %t/index.out

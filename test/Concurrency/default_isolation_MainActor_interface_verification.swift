@@ -3,7 +3,7 @@
 
 /// Build the library A
 // RUN: %target-swift-frontend -emit-module %t/src/A.swift \
-// RUN:   -module-name A -swift-version 5 \
+// RUN:   -module-name A \
 // RUN:   -default-isolation MainActor \
 // RUN:   -enable-library-evolution \
 // RUN:     -emit-module-path %t/A.swiftmodule \
