@@ -313,6 +313,23 @@ static  bool fixupReferenceCounts(
   return invalidatedStackNesting;
 }
 
+/// Returns true if fixupReferenceCounts() can copy the captures of the closure
+/// \p pai, which its call consumes, for its inlined call. See
+/// canCopyCapturesOfConsumedClosure().
+static bool canFixupReferenceCountsOfConsumedClosure(
+    PartialApplyInst *pai, ArrayRef<ParameterConvention> conventions) {
+  // fixupReferenceCounts() expects the closure to consume each capture, which
+  // only an escaping closure does, and it doesn't copy consumed address
+  // captures or packs.
+  if (pai->isOnStack() || !canCopyCapturesOfConsumedClosure(pai))
+    return false;
+  return llvm::none_of(conventions, [](ParameterConvention convention) {
+    return convention == ParameterConvention::Indirect_In ||
+           convention == ParameterConvention::Indirect_In_CXX ||
+           isPackParameter(convention);
+  });
+}
+
 // Handle the case where the callee of the apply is either a load or a
 // project_box that was used by a deleted load. If we fail to optimize,
 // return an invalid SILValue.
@@ -959,14 +976,16 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 
-      // The call of an on-stack at-most-once or exactly-once closure consumes
-      // it, so after inlining the call, the closure has to be deleted.
+      // The call of an at-most-once or exactly-once closure consumes it, so
+      // after inlining the call, the closure has to be deleted, unless an
+      // escaping closure's captures can be copied for the inlined body.
       bool deletesClosure = false;
       SmallVector<SILInstruction *, 4> closureUses;
-      if (PAI && PAI->isOnStack() && isClosureConsumedByCall(PAI)) {
+      if (PAI && isClosureConsumedByCall(PAI)) {
         deletesClosure =
             canReplaceCallsOfConsumedClosure(PAI, InnerAI, closureUses);
-        if (!deletesClosure)
+        if (!deletesClosure && !canFixupReferenceCountsOfConsumedClosure(
+                                   PAI, CapturedArgConventions))
           continue;
       }
 

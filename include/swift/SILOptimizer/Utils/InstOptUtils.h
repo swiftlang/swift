@@ -315,6 +315,9 @@ bool isLexicalPartialApply(PartialApplyInst *pai);
 /// 2. Call makeCapturesOwnedByClosureLexical().
 /// 3. Call destroyUnconsumedCapturesAfterCall() for each call, and replace it.
 /// 4. Call deleteClosureOfReplacedCalls().
+///
+/// If the closure can't be deleted, the calls can still be replaced like
+/// those of any other closure if canCopyCapturesOfConsumedClosure() is true.
 bool isClosureConsumedByCall(PartialApplyInst *pai);
 
 /// Returns true if the closure \p pai, which its call consumes, can be deleted
@@ -328,6 +331,12 @@ bool isClosureConsumedByCall(PartialApplyInst *pai);
 bool canReplaceCallsOfConsumedClosure(
     PartialApplyInst *pai, ArrayRef<FullApplySite> calls,
     SmallVectorImpl<SILInstruction *> &closureUses);
+
+/// Returns true if the calls of the closure \p pai, which its call consumes,
+/// can be replaced without deleting the closure, by copying its captures for
+/// them. The closure's destructor then runs after them, so it must not trap,
+/// and the captures that the closure owns must be copyable.
+bool canCopyCapturesOfConsumedClosure(PartialApplyInst *pai);
 
 /// Makes each capture that the context of the closure \p pai owns lexical if
 /// the closure is lexical. Deleting the closure after replacing its calls
