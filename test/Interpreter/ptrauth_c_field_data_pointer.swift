@@ -3,6 +3,9 @@
 // RUN: %target-build-swift %t/main.swift -import-objc-header %t/header.h -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %t/main.swift
+// RUN: %target-build-swift -O %t/main.swift -import-objc-header %t/header.h -o %t/a-opt.out
+// RUN: %target-codesign %t/a-opt.out
+// RUN: %target-run %t/a-opt.out | %FileCheck %t/main.swift
 // RUN: %target-build-swift %t/main.swift -import-objc-header %t/header.h -o %t/a-td.out \
 // RUN:   -Xcc -Xclang -Xcc -fptrauth-function-pointer-type-discrimination
 // RUN: %target-codesign %t/a-td.out
@@ -80,3 +83,19 @@ print("variadic read: \(call_fn(v.fn!))")
 var w = vbox()
 w.fn = get_sum()
 print("variadic write: \(call_field(&w))")
+
+// Key paths use accessors, so they have no stored offset.
+
+let k = UnsafeMutablePointer<node>.allocate(capacity: 2)
+let kb = k + 1
+// CHECK: key path read: true
+c_set_parent(k, kb)
+print("key path read: \(k.pointee[keyPath: \node.parent] == kb)")
+// CHECK: key path write: true
+k.pointee[keyPath: \node.parent] = nil
+k.pointee[keyPath: \node.parent] = kb
+print("key path write: \(c_get_parent(k) == kb)")
+k.deallocate()
+
+// CHECK: offset: nil
+print("offset: \(MemoryLayout<node>.offset(of: \node.parent).map(String.init) ?? "nil")")

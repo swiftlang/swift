@@ -2119,6 +2119,13 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
         decl->isStatic())
       return false;
 
+    // Use accessors, which sign and authenticate, for __ptrauth fields.
+    if (auto *var = dyn_cast<VarDecl>(decl)) {
+      if (M.getOptions().EnableImportPtrauthFieldFunctionPointers &&
+          var->getPointerAuthQualifier().isPresent())
+        return false;
+    }
+
     // If the field offset depends on the generic instantiation, we have to
     // load it from metadata when instantiating the keypath component.
     //

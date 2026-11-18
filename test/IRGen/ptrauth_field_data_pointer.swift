@@ -125,3 +125,26 @@ public func readVariadic(_ n: UnsafeMutablePointer<node>) -> OpaquePointer? {
 public func writeVariadic(_ n: UnsafeMutablePointer<node>, _ f: OpaquePointer?) {
   n.pointee.vfn = f
 }
+
+// Key paths authenticate and sign too.
+
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}readKeyPath{{.*}}"(ptr
+// CHECK:   call i64 @llvm.ptrauth.auth(i64 {{%.*}}, i32 2, i64 {{%.*}})
+// CHECK-NOT: @llvm.ptrauth.resign
+// CHECK: {{^}$}}
+public func readKeyPath(_ n: node) -> UnsafeMutablePointer<node>? {
+  return n[keyPath: \node.parent]
+}
+
+// CHECK-LABEL: define {{.*}} @"$s{{.*}}writeKeyPath{{.*}}"(ptr
+// CHECK:   call i64 @llvm.ptrauth.sign(i64 {{%.*}}, i32 2, i64 {{%.*}})
+// CHECK-NOT: @llvm.ptrauth.resign
+// CHECK: {{^}$}}
+public func writeKeyPath(_ n: inout node, _ p: UnsafeMutablePointer<node>?) {
+  n[keyPath: \node.parent] = p
+}
+
+// Clang fields have no property descriptor to reference.
+public func keyPathParent() -> WritableKeyPath<node, UnsafeMutablePointer<node>?> {
+  return \node.parent
+}
