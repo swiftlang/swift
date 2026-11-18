@@ -6,8 +6,6 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// FIXME: miscompile/verifier error after optimization
-
 import Builtin
 
 @frozen
