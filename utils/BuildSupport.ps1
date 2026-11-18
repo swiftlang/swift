@@ -1289,6 +1289,19 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   }
 }
 
+# Enter-VsDevShell runs VsDevCmd.bat, which starts many processes and takes
+# long when the processors are busy, so the changes that it makes to the
+# environment are reused for the next calls with the same arguments.
+$VsDevShellChanges = @{}
+
+function Get-EnvironmentVariables {
+  $Variables = @{}
+  foreach ($Variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+    $Variables[$Variable.Key] = $Variable.Value
+  }
+  return $Variables
+}
+
 function Invoke-VsDevShell([Hashtable] $Platform) {
   if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
     Write-Warning "Invoke-VsDevShell called on non-Windows platform."
@@ -1305,9 +1318,42 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $DevCmdArguments += " -winsdk=$WinSDKVersion"
   }
 
-  # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
-  Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-  Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+  if ($script:VsDevShellChanges.Contains($DevCmdArguments)) {
+    foreach ($Change in $script:VsDevShellChanges[$DevCmdArguments]) {
+      $Value = $Change.Value
+      if ($null -ne $Change.Prefix) {
+        $Value = $Change.Prefix + [Environment]::GetEnvironmentVariable($Change.Name) + $Change.Suffix
+      }
+      [Environment]::SetEnvironmentVariable($Change.Name, $Value)
+    }
+  } else {
+    $Before = Get-EnvironmentVariables
+
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
+    Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+    Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+
+    # VsDevCmd.bat adds entries around the values of lists like PATH.
+    $After = Get-EnvironmentVariables
+    $Changes = @()
+    foreach ($Name in $After.Keys) {
+      $Old = $Before[$Name]
+      $New = $After[$Name]
+      if ($Old -ceq $New) { continue }
+      $Index = if ($Old -and $New.Contains(";")) { $New.IndexOf($Old, [StringComparison]::Ordinal) } else { -1 }
+      if ($Index -ge 0) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $New.Substring(0, $Index); Suffix = $New.Substring($Index + $Old.Length) }
+      } else {
+        $Changes += @{ Name = $Name; Value = $New; Prefix = $null; Suffix = $null }
+      }
+    }
+    foreach ($Name in $Before.Keys) {
+      if (-not $After.Contains($Name)) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $null; Suffix = $null }
+      }
+    }
+    $script:VsDevShellChanges[$DevCmdArguments] = $Changes
+  }
 
   if ($CustomWinSDKRoot) {
     # Using a non-installed Windows SDK. Setup environment variables manually.
