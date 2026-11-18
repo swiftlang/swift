@@ -415,7 +415,18 @@ if ($Toolchain) {
   Invoke-ToolchainSteps "" CMark
   Invoke-ToolchainSteps "" -ConfigureSteps Compilers
   $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Macros -Configured -Background
-  Invoke-ToolchainSteps "" Compilers -Configured
+
+  # The Stage2 compilers have enough work to use all the processors, so they
+  # build at the lowest priority. Otherwise the tools and the SDKs, which build
+  # one project at a time, wait for processors and end well after them.
+  $ThisProcess = Get-Process -Id $PID
+  $ThisPriority = $ThisProcess.PriorityClass
+  $ThisProcess.PriorityClass = [Diagnostics.ProcessPriorityClass]::Idle
+  try {
+    Invoke-ToolchainSteps "" Compilers -Configured
+  } finally {
+    $ThisProcess.PriorityClass = $ThisPriority
+  }
 
   # Then, what uses the Stage2 build tree, with the longest chain of
   # dependencies here. The Macros wait for the configuration of the tools.
@@ -425,9 +436,11 @@ if ($Toolchain) {
   $LateJobs += Invoke-ToolchainSteps "" Macros -Configured -Background
   $LateJobs += Invoke-ToolchainSteps "" Format -Background
   # The tests of the compilers only use the Stage2 build tree, so what they need
-  # builds now, unless the NoAsserts compilers build in that tree later.
+  # builds now, unless the NoAsserts compilers build in that tree later. It
+  # builds many files at the same time, so it does not take the processors from
+  # the tools, which build one project at a time.
   if ($CompilerTests -and -not $IncludeNoAsserts) {
-    $TestBuildJob = Start-BuildJob "TestToolchain-Build" TestToolchain.ps1 @{
+    $TestBuildJob = Start-BuildJob "TestToolchain-Build" TestToolchain.ps1 -BelowNormal @{
       Test = $CompilerTests;
       Steps = @("Build");
     }
