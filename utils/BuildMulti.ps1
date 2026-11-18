@@ -17,9 +17,10 @@ in separate processes:
   the Android SDK build in the background, while the SDK of the host and then
   the toolchain build. The other Windows SDKs install into their own platform
   roots, which are merged into the image when they are done.
-- The developer tools that only need the SDK build while the Stage2 compilers
-  do. Then compiler-rt, the macros and swift-format build while swift-driver,
-  swift-build, SwiftPM and SourceKit-LSP do.
+- The developer tools that only need the SDK, including swift-driver and
+  swift-build, build while the Stage2 compilers do. Then compiler-rt, the
+  macros, swift-format and what the tests of the compilers need build while
+  SwiftPM and SourceKit-LSP do.
 - The package tests run in the background. The test suites of the compilers
   build what they need once, then check-swift runs while the other tests run
   in the background.
@@ -322,11 +323,45 @@ if ($Toolchain) {
   Remove-InstalledSDKs $WindowsSDKBuilds
 }
 
+$CompilerTests = @()
+$PackageTests = @()
+$OtherTests = @()
+$TestBuildJob = $null
+if ($Test -and -not $IsCrossCompiling) {
+  $CompilerTests = @($Test | Where-Object { $_ -in "clang", "lld", "lldb", "lldb-swift", "llvm", "swift" })
+  $PackageTests = @($Test | Where-Object { $_ -in "foundation", "swift-format", "sourcekit-lsp", "swiftpm", "llbuild" })
+  # The xctest tests use the FileCheck that the compiler tests build, and the
+  # libdispatch that the dispatch tests rebuild.
+  $OtherTests = @($Test | Where-Object { $_ -notin $CompilerTests -and $_ -notin $PackageTests })
+}
+
 # The projects of the SDK install some files to the same paths for every
 # architecture, so the SDKs of the other architectures install into their own
 # platform roots, merged into the image when they are done.
 $SDKJobs = @()
 $StagedPlatformRoots = @()
+
+# Merges the SDKs of the other architectures into the image once they are
+# built. This rewrites files that the builds with the SDK of the host read, so
+# it happens while nothing else uses the image.
+function Merge-StagedPlatformRoots {
+  Wait-BuildJobs $script:SDKJobs
+  $script:SDKJobs = @()
+  if ($script:StagedPlatformRoots) {
+    Record-OperationTime $BuildPlatform "Merge-PlatformRoots" {
+      foreach ($PlatformRoot in $script:StagedPlatformRoots) {
+        Write-Host "Merging '$PlatformRoot' into '$(Get-PlatformRoot Windows)'"
+        & robocopy.exe $PlatformRoot (Get-PlatformRoot Windows) /E /NFL /NDL /NJH /NJS /NP | Out-Null
+        # robocopy reports copied files with exit codes below 8.
+        if ($LastExitCode -ge 8) {
+          throw "robocopy failed with exit code $LastExitCode"
+        }
+      }
+    }
+  }
+  $script:StagedPlatformRoots = @()
+}
+
 foreach ($Architecture in $SelectedWindowsSDKArchitectures) {
   if ($Architecture -eq $HostSDKArchitecture) { continue }
   $PlatformRoot = "$BinaryCache\SDKStaging\$Architecture\Windows.platform"
@@ -343,8 +378,9 @@ foreach ($Architecture in $SelectedWindowsSDKArchitectures) {
   $StagedPlatformRoots += $PlatformRoot
 }
 
+$AndroidSDKJobs = @()
 if ($Android) {
-  $SDKJobs += Start-BuildJob "BuildSDK-Android" BuildSDK.ps1 -BelowNormal @{
+  $AndroidSDKJobs += Start-BuildJob "BuildSDK-Android" BuildSDK.ps1 -BelowNormal @{
     Platform = "Android";
     Architectures = $AndroidSDKArchitectures;
     LinkModes = $AndroidSDKLinkModes;
@@ -385,27 +421,25 @@ if ($Toolchain) {
   # dependencies here. The Macros wait for the configuration of the tools.
   $LateJobs = @(Invoke-ToolchainSteps "" CompilerRuntime -Background)
   Wait-BuildJobs @($ToolsJob)
+  Merge-StagedPlatformRoots
   $LateJobs += Invoke-ToolchainSteps "" Macros -Configured -Background
   $LateJobs += Invoke-ToolchainSteps "" Format -Background
+  # The tests of the compilers only use the Stage2 build tree, so what they need
+  # builds now, unless the NoAsserts compilers build in that tree later.
+  if ($CompilerTests -and -not $IncludeNoAsserts) {
+    $TestBuildJob = Start-BuildJob "TestToolchain-Build" TestToolchain.ps1 @{
+      Test = $CompilerTests;
+      Steps = @("Build");
+    }
+  }
   Invoke-ToolchainSteps "" PackageManager
   Wait-BuildJobs $LateJobs
 
   Invoke-ToolchainSteps "" Finish
 }
 
-Wait-BuildJobs $SDKJobs
-if ($StagedPlatformRoots) {
-  Record-OperationTime $BuildPlatform "Merge-PlatformRoots" {
-    foreach ($PlatformRoot in $StagedPlatformRoots) {
-      Write-Host "Merging '$PlatformRoot' into '$(Get-PlatformRoot Windows)'"
-      & robocopy.exe $PlatformRoot (Get-PlatformRoot Windows) /E /NFL /NDL /NJH /NJS /NP | Out-Null
-      # robocopy reports copied files with exit codes below 8.
-      if ($LastExitCode -ge 8) {
-        throw "robocopy failed with exit code $LastExitCode"
-      }
-    }
-  }
-}
+Merge-StagedPlatformRoots
+Wait-BuildJobs $AndroidSDKJobs
 
 # The installer does not change the image, so it builds while the tests run.
 $InstallerJobs = @()
@@ -421,12 +455,6 @@ if ($Package) {
 $TestJobs = @()
 $Failure = $null
 if ($Test -and -not $IsCrossCompiling) {
-  $CompilerTests = @($Test | Where-Object { $_ -in "clang", "lld", "lldb", "lldb-swift", "llvm", "swift" })
-  $PackageTests = @($Test | Where-Object { $_ -in "foundation", "swift-format", "sourcekit-lsp", "swiftpm", "llbuild" })
-  # The xctest tests use the FileCheck that the compiler tests build, and the
-  # libdispatch that the dispatch tests rebuild.
-  $OtherTests = @($Test | Where-Object { $_ -notin $CompilerTests -and $_ -notin $PackageTests })
-
   # The package tests build in their own trees, with the toolchain of the image.
   if ($PackageTests) {
     $TestJobs += Start-BuildJob "TestToolchain-Packages" TestToolchain.ps1 -BelowNormal @{
@@ -436,7 +464,9 @@ if ($Test -and -not $IsCrossCompiling) {
 
   # The compiler suites build what they need in the same tree, so this happens
   # once before they run.
-  if ($CompilerTests) {
+  if ($TestBuildJob) {
+    Wait-BuildJobs @($TestBuildJob)
+  } elseif ($CompilerTests) {
     Invoke-BuildScript "TestToolchain-Build" TestToolchain.ps1 $Parameters @{
       Test = $CompilerTests;
       Steps = @("Build");
