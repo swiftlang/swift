@@ -97,7 +97,6 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
-#if os(Linux) || os(Android) || os(macOS) || os(Windows)
 @_spi(MemoryReaders)
 @available(BacktracingDT 6.2, *)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
@@ -129,4 +128,3 @@ extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
     self.init(for: UncachedLocalMemoryReader())
   }
 }
-#endif // os(Linux) || os(Android) || os(macOS)
