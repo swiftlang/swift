@@ -281,6 +281,8 @@ std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
     return swift::transform(asi->getVarInfo(false),  [&](SILDebugVariable var) {
+      // The variable's scope belongs to the original function.
+      var.Scope = nullptr;
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
@@ -291,6 +293,8 @@ findDebugLocationAndVariable(SILValue originalValue) {
         // into alloc_stack (which describes the location)
         if (var.DIExpr.startsWithDeref())
           var.DIExpr.eraseElement(var.DIExpr.element_begin());
+        // The variable's scope belongs to the original function.
+        var.Scope = nullptr;
         return std::make_pair(dvi->getDebugLocation(), var);
       });
   }
