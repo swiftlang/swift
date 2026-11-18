@@ -925,9 +925,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // If we don't have conditionally available substitutions, we won't emit
     // the descriptor at all, but still make sure we report "shared" linkage
     // so that TBD files don't include a bogus symbol.
+    //
+    // The naming declaration is only emitted into clients if its body is
+    // serialized, which is not the case for a member of an internal type under
+    // `-enable-testing`. In that case, the descriptor must be public.
     auto *srcDecl = opaqueType->getNamingDecl();
-    if (srcDecl->isAlwaysEmittedIntoClient())
-      return SILLinkage::Shared;
+    if (srcDecl->isAlwaysEmittedIntoClient()) {
+      ValueDecl *implDecl = srcDecl;
+      if (auto *storage = dyn_cast<AbstractStorageDecl>(srcDecl))
+        implDecl = storage->getOpaqueAccessor(AccessorKind::Get);
+      if (!implDecl || SILDeclRef(implDecl).isSerialized())
+        return SILLinkage::Shared;
+    }
 
     return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
   }

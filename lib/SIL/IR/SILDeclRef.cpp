@@ -575,29 +575,40 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // Always-emit-into-client declarations are like the default arguments of
-    // public functions; they are roots for dead code elimination and have
-    // serialized bodies, but no public symbol in the generated binary.
-    if (d->isAlwaysEmittedIntoClient())
-      return Limit::AlwaysEmitIntoClient;
-    if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-      auto *storage = accessor->getStorage();
-      if (storage->isAlwaysEmittedIntoClient())
-        return Limit::AlwaysEmitIntoClient;
-    }
-
-    // A transparent member of a type that is back-deployed into the client
-    // doesn't inherit back deployment.
-    if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (nominal->isBackDeployedIntoClient()) {
-        const Decl *owner = d;
-        if (auto accessor = dyn_cast<AccessorDecl>(d))
-          owner = accessor->getStorage();
-        if (d->getAttrs().hasAttribute<TransparentAttr>() ||
-            owner->getAttrs().hasAttribute<TransparentAttr>())
-          return Limit::AlwaysEmitIntoClient;
+    auto isEmittedIntoClient = [&]() -> bool {
+      // Always-emit-into-client declarations are like the default arguments
+      // of public functions; they are roots for dead code elimination and
+      // have serialized bodies, but no public symbol in the generated binary.
+      if (d->isAlwaysEmittedIntoClient())
+        return true;
+      if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+        auto *storage = accessor->getStorage();
+        if (storage->isAlwaysEmittedIntoClient())
+          return true;
       }
-    }
+
+      // A transparent member of a type that is back-deployed into the client
+      // doesn't inherit back deployment.
+      if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (nominal->isBackDeployedIntoClient()) {
+          const Decl *owner = d;
+          if (auto accessor = dyn_cast<AccessorDecl>(d))
+            owner = accessor->getStorage();
+          if (d->getAttrs().hasAttribute<TransparentAttr>() ||
+              owner->getAttrs().hasAttribute<TransparentAttr>())
+            return true;
+        }
+      }
+      return false;
+    };
+
+    // The body of an always-emit-into-client declaration is only serialized
+    // if the declaration is formally public. Otherwise, it can't be emitted
+    // into clients, so ignore the limit. This actually means that the
+    // declaration *can be ABI public* if the effective access level is public,
+    // which happens under `-enable-testing` with a member of an internal type.
+    if (isEmittedIntoClient() && constant.isSerialized())
+      return Limit::AlwaysEmitIntoClient;
     break;
   }
   case Kind::EnumElement:
@@ -768,11 +779,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     case Limit::None:
       return SILLinkage::Package;
     case Limit::AlwaysEmitIntoClient:
-      // Drop the AEIC if the enclosing decl is not effectively public.
-      // This matches what we do in the `internal` case.
-      if (isSerialized())
-        return SILLinkage::PackageNonABI;
-      else return SILLinkage::Package;
+      return SILLinkage::PackageNonABI;
     case Limit::OnDemand:
       return SILLinkage::Shared;
     case Limit::NeverPublic:
