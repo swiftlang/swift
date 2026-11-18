@@ -320,6 +320,7 @@ static bool shouldIncludeDecl(Decl *D, bool ForSourceInfo) {
   case DocCommentSerializationTarget::SwiftDocAndSourceInfo:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 static void writeDeclCommentTable(

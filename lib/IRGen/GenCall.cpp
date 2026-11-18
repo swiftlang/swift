@@ -1171,6 +1171,7 @@ SignatureExpansion::expandDirectErrorType() {
     return std::make_pair(combined.combinedTy, &errorTI);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 static const clang::FieldDecl *
