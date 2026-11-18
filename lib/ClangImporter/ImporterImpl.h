@@ -1905,6 +1905,16 @@ public:
                                         const clang::FunctionDecl *clangDecl,
                                         bool allowNSUIntegerAsInt);
 
+  /// Computes the imported Swift type of the Clang `VarDecl` \p clangDecl,
+  /// without a corresponding Swift `VarDecl`.
+  ///
+  /// \param clangDecl The Clang `VarDecl` to import the type of.
+  /// \param inSystemModule Whether \p clangDecl is from a system module.
+  ///
+  /// \returns The imported Swift type, or a null `ImportedType` on failure.
+  ImportedType importClangVarType(const clang::VarDecl *clangDecl,
+                                  bool inSystemModule);
+
   /// Import the parameter list for a function
   ///
   /// \param clangDecl The underlying declaration, if any; should only be

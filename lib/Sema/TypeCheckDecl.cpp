@@ -2744,12 +2744,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
 
-    if (auto clangDecl = VD->getClangDecl()) {
-      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
-
-      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
-          clangVarDecl, VD, VD->getDeclContext());
-    }
+    if (VD->getClangDecl())
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(VD);
 
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {

@@ -338,8 +338,7 @@ private:
     // which imports the member too.
     if (const auto *var = dyn_cast<clang::VarDecl>(decl))
       if (ClangModuleUnit *module = CI.getClangModuleForDecl(var))
-        return CI.SwiftContext.getClangModuleLoader()->importVarDeclType(
-            var, /*swiftDecl=*/nullptr, module);
+        return CI.importClangVarType(var, isInSystemModule(module)).getType();
     return Type();
   }
 
