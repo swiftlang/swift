@@ -1024,12 +1024,10 @@ bool swift::isCaptureOwnedByOnStackClosure(Operand &argOp) {
     return argOp.isConsuming();
 
   // Without ownership, follow IRGen: the context owns each nontrivial value
-  // that it captures, except for a borrowed noncopyable value.
+  // that it captures, unless it borrows the value.
   if (arg->getType().isAddress() || arg->getType().isTrivial(*function))
     return false;
-  return !arg->getType().isMoveOnly() ||
-         site.getArgumentConvention(argOp) !=
-             SILArgumentConvention::Direct_Guaranteed;
+  return !pai->contextBorrowsArgument(argOp);
 }
 
 static bool

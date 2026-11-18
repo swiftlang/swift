@@ -130,8 +130,9 @@ final class Box {
 // parameter, and it's only called on one path.
 // CHECK-LABEL: sil hidden @$s42callable_once_attr_closure_stack_promotion22testInlinedAutoclosureyS2b_AA3BoxCtF : $@convention(thin) (Bool, @guaranteed Box) -> Bool {
 // CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on
 // CHECK:   [[SLOT:%.*]] = alloc_stack [lexical] [var_decl] $@noescape @callable(once) @callee_owned () -> Bool
-// CHECK:   store [[PA]] to [[SLOT]]
+// CHECK:   store [[DEP]] to [[SLOT]]
 // CHECK:   cond_br {{%.*}}, [[CALL:bb[0-9]+]], [[SKIP:bb[0-9]+]]
 // CHECK: [[CALL]]:
 // CHECK:   apply
@@ -159,4 +160,24 @@ func transparentDiscard(_ fn: @callable(once) () -> Int) -> Int {
 // CHECK: } // end sil function '$s42callable_once_attr_closure_stack_promotion18testInlinedDiscardyS2iF'
 func testInlinedDiscard(_ x: Int) -> Int {
   transparentDiscard { x }
+}
+
+// The on-stack context borrows a `borrowing` parameter that the closure
+// doesn't consume, so the parameter isn't copied.
+final class Klass {}
+func use(_ k: Klass) {}
+
+// CHECK-LABEL: sil hidden @$s42callable_once_attr_closure_stack_promotion28testBorrowingCopyableCaptureyyAA5KlassCF : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[K:%.*]] : @noImplicitCopy $Klass):
+// CHECK-NOT: strong_retain
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once] {{%.*}}([[K]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on [[K]]
+// CHECK:   apply {{%.*}}([[DEP]])
+// CHECK:   dealloc_stack [[PA]]
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function '$s42callable_once_attr_closure_stack_promotion28testBorrowingCopyableCaptureyyAA5KlassCF'
+func testBorrowingCopyableCapture(_ k: borrowing Klass) {
+  calledAtMostOnce {
+    use(k)
+  }
 }

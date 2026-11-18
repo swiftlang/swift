@@ -37,13 +37,14 @@ public final class Tracker {}
 
 public func callAtMostOnce(_ f: @callable(once) () -> Void) { f() }
 
-// The context of a non-escaping at-most-once closure is on the stack, so its
-// forwarder destroys the context without releasing it.
+// The context of a non-escaping at-most-once closure is on the stack, and it
+// borrows the captures that the closure doesn't consume, so its forwarder
+// neither destroys nor releases the context.
 // AT-MOST-ONCE-LABEL: define {{.*}}swiftcc void @"$e{{.*}}16borrowedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // AT-MOST-ONCE-NOT: swift_release
-// AT-MOST-ONCE: call swiftcc void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
-// AT-MOST-ONCE-NOT: swift_release
-// AT-MOST-ONCE: ret void
+// AT-MOST-ONCE-NOT: __swift_closure_destructor
+// AT-MOST-ONCE: call swiftcc void @"$e{{.*}}16borrowedCapturesyySiFyyXEfU_"(
+// AT-MOST-ONCE-NEXT: ret void
 public func borrowedCaptures(_ x: Int) {
   let t = Tracker()
   callAtMostOnce {

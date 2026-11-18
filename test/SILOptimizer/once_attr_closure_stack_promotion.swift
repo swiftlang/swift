@@ -123,7 +123,8 @@ func makeInt() -> Int { 42 }
 // another one.
 // CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion29testFunctionValueThroughThunkSiyF : $@convention(thin) () -> Int {
 // CHECK:   [[INNER:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}({{%.*}}) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Int) -> Int
-// CHECK:   [[OUTER:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[INNER]]) : $@convention(thin) (@owned @noescape @once @callee_owned () -> Int) -> @out Int
+// CHECK:   [[DEP:%.*]] = mark_dependence [[INNER]] on
+// CHECK:   [[OUTER:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[DEP]]) : $@convention(thin) (@owned @noescape @once @callee_owned () -> Int) -> @out Int
 // CHECK:   apply
 // CHECK:   dealloc_stack [[OUTER]]
 // CHECK:   dealloc_stack [[INNER]]
@@ -204,4 +205,73 @@ func run(_ body: () -> Void) { body() }
 // CHECK: } // end sil function '$s33once_attr_closure_stack_promotion23testBorrowedOnceCaptureyyyyXEF'
 func testBorrowedOnceCapture(_ fn: borrowing @once () -> Void) {
   run { inspect(fn) }
+}
+
+// The on-stack context borrows a `borrowing` parameter that the closure
+// doesn't consume, so the parameter isn't copied.
+final class Klass {}
+func use(_ k: Klass) {}
+
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion28testBorrowingCopyableCaptureyyAA5KlassCF : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[K:%.*]] : @noImplicitCopy $Klass):
+// CHECK-NOT: strong_retain
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[K]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on [[K]]
+// CHECK:   apply {{%.*}}([[DEP]])
+// CHECK:   dealloc_stack [[PA]]
+// CHECK-NOT: strong_release
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion28testBorrowingCopyableCaptureyyAA5KlassCF'
+func testBorrowingCopyableCapture(_ k: borrowing Klass) {
+  calledExactlyOnce {
+    use(k)
+  }
+}
+
+// The closure can't own a Copyable capture, even one that it consumes, so the
+// closure consumes a copy of it, and the on-stack context borrows the capture,
+// as an ordinary closure's does.
+func sink(_ k: consuming Klass) {}
+
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyF : $@convention(thin) () -> () {
+// CHECK:   [[K:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[K]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on [[K]]
+// CHECK:   apply {{%.*}}([[DEP]])
+// CHECK:   dealloc_stack [[PA]]
+// CHECK:   strong_release [[K]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyF'
+
+// CHECK-LABEL: sil private @$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[CAPTURE:%.*]] : @closureCapture $Klass):
+// CHECK:   strong_retain [[CAPTURE]]
+// CHECK:   [[SINK:%.*]] = function_ref @$s33once_attr_closure_stack_promotion4sinkyyAA5KlassCnF
+// CHECK:   apply [[SINK]]([[CAPTURE]]) : $@convention(thin) (@owned Klass) -> ()
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyFyyXEfU_'
+func testConsumedCopyableCapture() {
+  let k = Klass()
+  calledExactlyOnce {
+    sink(k)
+  }
+}
+
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyF : $@convention(thin) () -> () {
+// CHECK:   [[K:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+// CHECK:   [[PA:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}([[K]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on [[K]]
+// CHECK:   apply {{%.*}}([[DEP]])
+// CHECK:   dealloc_stack [[PA]]
+// CHECK:   strong_release [[K]]
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyF'
+
+// CHECK-LABEL: sil private @$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[CAPTURE:%.*]] : @closureCapture $Klass):
+// CHECK:   strong_retain [[CAPTURE]]
+// CHECK:   [[SINK:%.*]] = function_ref @$s33once_attr_closure_stack_promotion4sinkyyAA5KlassCnF
+// CHECK:   apply [[SINK]]([[CAPTURE]]) : $@convention(thin) (@owned Klass) -> ()
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyFyyXEfU_'
+func testExplicitlyConsumedCopyableCapture() {
+  let k = Klass()
+  calledExactlyOnce {
+    sink(consume k)
+  }
 }

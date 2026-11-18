@@ -1137,22 +1137,24 @@ bb3:
   return %12 : $()
 }
 
-sil @callAtMostOnceKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
+sil @callAtMostOnceKlassCapture : $@convention(thin) (Int, @owned Klass) -> ()
 
-// The context of an on-stack at-most-once closure owns a copyable capture, so
-// the combined apply uses a copy of it that outlives the deleted closure.
+// The context of an on-stack at-most-once closure owns a copyable capture that
+// the closure consumes, so the combined apply consumes a copy of it, and the
+// context's reference is released when the closure is deleted.
 //
 // CHECK-LABEL: sil @combine_at_most_once_closure_owned_capture :
 // CHECK-NOT:     strong_release
 // CHECK:         [[F:%.*]] = function_ref @callAtMostOnceKlassCapture
+// CHECK-NEXT:    strong_retain %0
 // CHECK-NEXT:    apply [[F]](%1, %0)
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    tuple ()
 // CHECK-LABEL: } // end sil function 'combine_at_most_once_closure_owned_capture'
 sil @combine_at_most_once_closure_owned_capture : $@convention(thin) (@owned Klass, Int) -> () {
 bb0(%0 : $Klass, %1 : $Int):
-  %2 = function_ref @callAtMostOnceKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
-  %3 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2(%0) : $@convention(thin) (Int, @guaranteed Klass) -> ()
+  %2 = function_ref @callAtMostOnceKlassCapture : $@convention(thin) (Int, @owned Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %2(%0) : $@convention(thin) (Int, @owned Klass) -> ()
   %4 = apply %3(%1) : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
   strong_release %3 : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
   dealloc_stack %3 : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
@@ -1160,20 +1162,43 @@ bb0(%0 : $Klass, %1 : $Int):
   return %8 : $()
 }
 
-sil @callOnceKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
+sil @callOnceKlassCapture : $@convention(thin) (Int, @owned Klass) -> ()
 
 // The same for an exactly-once closure.
 //
 // CHECK-LABEL: sil @combine_once_closure_owned_capture :
 // CHECK-NOT:     strong_release
 // CHECK:         [[F:%.*]] = function_ref @callOnceKlassCapture
+// CHECK-NEXT:    strong_retain %0
 // CHECK-NEXT:    apply [[F]](%1, %0)
 // CHECK-NEXT:    strong_release %0
 // CHECK-NEXT:    tuple ()
 // CHECK-LABEL: } // end sil function 'combine_once_closure_owned_capture'
 sil @combine_once_closure_owned_capture : $@convention(thin) (@owned Klass, Int) -> () {
 bb0(%0 : $Klass, %1 : $Int):
-  %2 = function_ref @callOnceKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
+  %2 = function_ref @callOnceKlassCapture : $@convention(thin) (Int, @owned Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2(%0) : $@convention(thin) (Int, @owned Klass) -> ()
+  %4 = apply %3(%1) : $@noescape @once @callee_guaranteed (Int) -> ()
+  strong_release %3 : $@noescape @once @callee_guaranteed (Int) -> ()
+  dealloc_stack %3 : $@noescape @once @callee_guaranteed (Int) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @callOnceBorrowedKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
+
+// The context of an exactly-once closure borrows a capture that the closure
+// doesn't consume, so the combined apply uses the capture directly, without a
+// copy or a release.
+//
+// CHECK-LABEL: sil @combine_once_closure_borrowed_capture :
+// CHECK:         [[F:%.*]] = function_ref @callOnceBorrowedKlassCapture
+// CHECK-NEXT:    apply [[F]](%1, %0)
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'combine_once_closure_borrowed_capture'
+sil @combine_once_closure_borrowed_capture : $@convention(thin) (@guaranteed Klass, Int) -> () {
+bb0(%0 : $Klass, %1 : $Int):
+  %2 = function_ref @callOnceBorrowedKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()
   %3 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2(%0) : $@convention(thin) (Int, @guaranteed Klass) -> ()
   %4 = apply %3(%1) : $@noescape @once @callee_guaranteed (Int) -> ()
   strong_release %3 : $@noescape @once @callee_guaranteed (Int) -> ()

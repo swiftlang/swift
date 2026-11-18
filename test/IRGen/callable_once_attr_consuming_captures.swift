@@ -56,10 +56,9 @@ public func allOwnedCaptures(_ x: Int) {
 }
 
 // A closure that mixes a consumed capture (`Direct_Owned`, `r`) with a
-// borrowed one (`Direct_Guaranteed`, `t`): the forwarder still needs to
-// release the surviving `t` field, but must skip the already-taken `r`
-// field. The context itself is stack-allocated, so there's no separate
-// "free as uninitialized" call once `t` has been released.
+// borrowed one (`Direct_Guaranteed`, `t`): the forwarder takes `r`, and the
+// stack-allocated context only borrows `t`, so there's nothing left to release
+// or free.
 //
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test13mixedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK:  [[TRACKER_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
@@ -68,11 +67,7 @@ public func allOwnedCaptures(_ x: Int) {
 // CHECK:  [[X_ADDR:%.*]] = getelementptr inbounds{{.*}} %T4test8ResourceV, ptr [[RESOURCE_ADDR]], i32 0, i32 0
 // CHECK:  [[VALUE:%.*]] = load i64, ptr [[X_ADDR]]
 // CHECK:  call swiftcc void @"$s4test13mixedCapturesyySiFyyXEfU_"(ptr [[TRACKER]], i64 [[VALUE]])
-// CHECK:  [[TO_DESTROY_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %T4test8ResourceV }>, ptr %0, i32 0, i32 1
-// CHECK:  [[TO_DESTROY:%.*]] = load ptr, ptr [[TO_DESTROY_ADDR]]
-// CHECK:  call void @swift_release(ptr [[TO_DESTROY]])
-// CHECK-NOT: call void @swift_deallocUninitializedObject
-// CHECK: ret void
+// CHECK-NEXT: ret void
 public func mixedCaptures(_ x: Int) {
   let r = Resource(x: x)
   let t = Tracker()
@@ -152,8 +147,7 @@ public func neverCalledEscaping(_ x: Int) {
 
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_TA"(ptr swiftself %0)
 // CHECK: call swiftcc void @"$s4test19allBorrowedCapturesyySiFyyXEfU_"(ptr {{%.*}}, i64 {{%.*}})
-// The context is on the stack, so it's destroyed without being released.
-// CHECK-NEXT: call swiftcc void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// The context borrows all of its captures, so there's nothing to destroy.
 // CHECK-NEXT: ret void
 public func allBorrowedCaptures(_ x: Int) {
   let t = Tracker()
@@ -168,12 +162,10 @@ public func allBorrowedCaptures(_ x: Int) {
 // CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
 // CHECK: call swiftcc void @"$s4test18dontCallAtMostOnceyyyyXEnF"(ptr @"$s4test30allBorrowedCapturesNeverCalledyySiFyyXEfU_TA{{(\.ptrauth)?}}", ptr %closure)
 //
+// The context borrows all of its captures, so its destructor does nothing.
 // CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
-// CHECK: [[FIELD:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr, %TSi }>, ptr %0, i32 0, i32 1
-// CHECK: [[TRACKER:%.*]] = load ptr, ptr [[FIELD]]
-// CHECK: call void @swift_release(ptr [[TRACKER]])
-// CHECK-NOT: call void @swift_deallocObject
-// CHECK: ret void
+// CHECK-NEXT: entry:
+// CHECK-NEXT: ret void
 public func allBorrowedCapturesNeverCalled(_ x: Int) {
   let t = Tracker()
   dontCallAtMostOnce {
@@ -219,6 +211,47 @@ public func noncopyableBorrowedCaptureNeverCalled(_ x: Int) {
 // CHECK-NOT: call void @swift_release
 // CHECK-NOT: call void @swift_deallocObject
 // CHECK: ret void
+
+// The context borrows a `borrowing` parameter instead of owning a copy, so
+// neither the forwarder nor the destructor releases it.
+//
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test22borrowingCaptureCalledyyAA7TrackerCF"(ptr %0)
+// CHECK-NOT: call ptr @swift_retain
+// CHECK: [[CTX:%.*]] = alloca i8, i64 24, align 16
+// CHECK-NOT: call ptr @swift_retain
+// CHECK: call ptr @swift_initStackObject(ptr {{.*}}, ptr [[CTX]])
+// CHECK: call swiftcc void @"$s4test14callAtMostOnceyyyyXEnF"(ptr @"$s4test22borrowingCaptureCalledyyAA7TrackerCFyyXEfU_TA{{(\.ptrauth)?}}", ptr %closure)
+// CHECK-NOT: call void @swift_release
+// CHECK: ret void
+func borrowingCaptureCalled(_ t: borrowing Tracker) {
+  callAtMostOnce {
+    _ = t
+  }
+}
+
+// CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: ret void
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test22borrowingCaptureCalledyyAA7TrackerCFyyXEfU_TA"(ptr swiftself %0)
+// CHECK: call swiftcc void @"$s4test22borrowingCaptureCalledyyAA7TrackerCFyyXEfU_"(ptr {{%.*}})
+// CHECK-NEXT: ret void
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test27borrowingCaptureNeverCalledyyAA7TrackerCF"(ptr %0)
+// CHECK-NOT: call ptr @swift_retain
+// CHECK: call ptr @swift_initStackObject
+// CHECK: call swiftcc void @"$s4test18dontCallAtMostOnceyyyyXEnF"(ptr @"$s4test27borrowingCaptureNeverCalledyyAA7TrackerCFyyXEfU_TA{{(\.ptrauth)?}}", ptr %closure)
+// CHECK-NOT: call void @swift_release
+// CHECK: ret void
+func borrowingCaptureNeverCalled(_ t: borrowing Tracker) {
+  dontCallAtMostOnce {
+    _ = t
+  }
+}
+
+// CHECK-LABEL: define{{.*}} void @__swift_closure_destructor{{.*}}(ptr swiftself %0)
+// CHECK-NEXT: entry:
+// CHECK-NEXT: ret void
 
 public struct GenericResource<T>: ~Copyable {
   var x: T

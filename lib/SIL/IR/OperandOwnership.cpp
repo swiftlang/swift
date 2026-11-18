@@ -662,16 +662,10 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
-    if (i->isNoncopyable()) {
-      auto argConv = ApplySite(i).getArgumentConvention(op);
-      // Borrowed non-Copyable captures aren't owned by the closure.
-      if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
-        return OperandOwnership::Borrow;
-      // ... the rest of the operands are consumed.
-      return OperandOwnership::ForwardingConsume;
-    }
-
-    return OperandOwnership::Borrow;
+    // A noncopyable closure's context owns, and so consumes, the values that
+    // the closure consumes.
+    return i->contextBorrowsArgument(op) ? OperandOwnership::Borrow
+                                         : OperandOwnership::ForwardingConsume;
   }
   // All non-trivial types should be captured.
   return OperandOwnership::ForwardingConsume;
