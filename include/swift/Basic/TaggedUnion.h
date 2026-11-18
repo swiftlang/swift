@@ -58,10 +58,16 @@ protected:
   TaggedUnionBase(Kind theKind) : TheKind(theKind) {}
 
 public:
+  template <Kind K>
+  using typeForKind = typename StorageType::template typeForKind<K>;
+
+  template <class T>
+  using enable_if_constructible_t =
+    std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()>;
+
   /// Construct the union with a value of the given type, which must
   /// (ignoring references) be one of the declared members of the union.
-  template <class T,
-            typename = std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()> >
+  template <class T, typename = enable_if_constructible_t<T>>
   TaggedUnionBase(T &&value) {
     using TargetType = TaggedUnionImpl::simplify_member_type<T>;
     TheKind = StorageType::template kindForMember<TargetType>();
