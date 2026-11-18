@@ -68,6 +68,7 @@ class PointerAuthQualifier;
 namespace swift {
   struct AbstractTypeLayout;
   enum class AccessSemantics : unsigned char;
+  enum class DeclRuntimeAvailability : uint8_t;
   class AccessorDecl;
   class ApplyExpr;
   class AvailabilityQuery;
@@ -894,9 +895,11 @@ protected:
     HasLazyConformances : 1
   );
 
-  SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
+  SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2+1+2,
     NumberOfFieldOffsetVectorEntries : 1,
-    NumberOfVTableEntries : 2
+    NumberOfVTableEntries : 2,
+    HasSerializedRuntimeAvailability : 1,
+    SerializedRuntimeAvailability : 2
   );
 
   } Bits;
@@ -10282,6 +10285,8 @@ class MissingMemberDecl : public Decl {
       fieldOffsetVectorEntries;
     assert(getNumberOfFieldOffsetVectorEntries() == fieldOffsetVectorEntries
            && "not enough bits");
+    Bits.MissingMemberDecl.HasSerializedRuntimeAvailability = false;
+    Bits.MissingMemberDecl.SerializedRuntimeAvailability = 0;
     setImplicit();
   }
   friend class Decl;
@@ -10317,6 +10322,13 @@ public:
   AbstractTypeLayout *getStorageLayout() const {
     return StorageLayout;
   }
+
+  bool hasSerializedRuntimeAvailability() const {
+    return Bits.MissingMemberDecl.HasSerializedRuntimeAvailability;
+  }
+
+  DeclRuntimeAvailability getSerializedRuntimeAvailability() const;
+  void setSerializedRuntimeAvailability(DeclRuntimeAvailability availability);
 
   SourceRange getSourceRange() const {
     return SourceRange();

@@ -1331,6 +1331,12 @@ namespace decls_block {
     DeclIDField // API decl
   >;
 
+  /// The runtime availability classification used by SIL and IR lowering.
+  using DeclRuntimeAvailabilityLayout = BCRecordLayout<
+    DECL_RUNTIME_AVAILABILITY,
+    BCFixed<2>
+  >;
+
   /// A field containing the pieces of a \c DeclNameRef and the information
   /// needed to reconstruct it.
   using DeclNameRefLayout = BCRecordLayout<

@@ -288,6 +288,7 @@ protected:
   uint8_t numTableEntries = 0;
   MemberAbstractTypeLayoutID memberAbstractTypeLayoutID = {};
   TypeID memberTypeID = {};
+  std::optional<uint8_t> runtimeAvailability;
 
 public:
   DeclName getName() const {
@@ -307,6 +308,12 @@ public:
     return memberAbstractTypeLayoutID;
   }
   TypeID getMemberTypeID() const { return memberTypeID; }
+  std::optional<uint8_t> getRuntimeAvailability() const {
+    return runtimeAvailability;
+  }
+  void setRuntimeAvailability(uint8_t availability) {
+    runtimeAvailability = availability;
+  }
 
   bool isA(const void *const ClassID) const override {
     return ClassID == classID() || ErrorInfoBase::isA(ClassID);

@@ -4390,6 +4390,7 @@ public:
     if (D->isInvalid())
       writeDeclErrorFlag();
 
+    writeDeclRuntimeAvailability(D);
     writeDeserializationSafety(D);
 
     auto abiRole = ABIRoleInfo(D);
@@ -4414,6 +4415,17 @@ public:
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[ErrorFlagLayout::Code];
     ErrorFlagLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+  }
+
+  void writeDeclRuntimeAvailability(const Decl *D) {
+    using namespace decls_block;
+    auto availability = evaluateOrDefault(
+        D->getASTContext().evaluator, DeclRuntimeAvailabilityRequest{D},
+        DeclRuntimeAvailability::PotentiallyAvailable);
+    unsigned abbrCode =
+        S.DeclTypeAbbrCodes[DeclRuntimeAvailabilityLayout::Code];
+    DeclRuntimeAvailabilityLayout::emitRecord(
+        S.Out, S.ScratchRecord, abbrCode, static_cast<unsigned>(availability));
   }
 
   void writeABIOnlyCounterpart(const Decl *counterpart) {
@@ -7789,6 +7801,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
   registerDeclTypeAbbr<ABIOnlyCounterpartLayout>();
+  registerDeclTypeAbbr<DeclRuntimeAvailabilityLayout>();
   registerDeclTypeAbbr<DeclNameRefLayout>();
 
   registerDeclTypeAbbr<ClangTypeLayout>();

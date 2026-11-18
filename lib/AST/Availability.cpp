@@ -654,6 +654,11 @@ static DeclRuntimeAvailability getDeclRuntimeAvailability(const Decl *decl) {
 DeclRuntimeAvailability
 DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
                                          const Decl *decl) const {
+  if (auto *missing = dyn_cast<MissingMemberDecl>(decl)) {
+    if (missing->hasSerializedRuntimeAvailability())
+      return missing->getSerializedRuntimeAvailability();
+  }
+
   auto inherited = DeclRuntimeAvailability::PotentiallyAvailable;
   if (auto *parent = decl->parentDeclForAvailability())
     inherited = getDeclRuntimeAvailability(parent);
@@ -665,6 +670,22 @@ DeclRuntimeAvailabilityRequest::evaluate(Evaluator &evaluator,
 
   auto availability = computeDeclRuntimeAvailability(decl);
   return std::max(inherited, availability);
+}
+
+DeclRuntimeAvailability
+MissingMemberDecl::getSerializedRuntimeAvailability() const {
+  assert(hasSerializedRuntimeAvailability());
+  return static_cast<DeclRuntimeAvailability>(
+      Bits.MissingMemberDecl.SerializedRuntimeAvailability);
+}
+
+void MissingMemberDecl::setSerializedRuntimeAvailability(
+    DeclRuntimeAvailability availability) {
+  Bits.MissingMemberDecl.HasSerializedRuntimeAvailability = true;
+  Bits.MissingMemberDecl.SerializedRuntimeAvailability =
+      static_cast<unsigned>(availability);
+  assert(getSerializedRuntimeAvailability() == availability &&
+         "not enough bits");
 }
 
 bool Decl::isUnreachableAtRuntime() const {

@@ -3605,6 +3605,20 @@ class DeclDeserializer {
   std::optional<std::pair<ABIAttr *, DeclID>> unresolvedABIAttr;
   /// State for setting up an ABIAttr's counterpart relationship.
   DeclID ABIDeclCounterpartID = 0;
+  std::optional<DeclRuntimeAvailability> RuntimeAvailability;
+
+  llvm::Error attachRuntimeAvailability(llvm::Error error) {
+    if (!RuntimeAvailability)
+      return error;
+
+    auto errorInfo = takeErrorInfo(std::move(error));
+    if (errorInfo->isA<DeclDeserializationError>()) {
+      auto *declError = static_cast<DeclDeserializationError *>(errorInfo.get());
+      declError->setRuntimeAvailability(
+          static_cast<uint8_t>(*RuntimeAvailability));
+    }
+    return std::move(errorInfo);
+  }
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -6647,6 +6661,15 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       // Defer resolving `ABIDeclCounterpartID` until `finishRecursiveAttrs()`
       // because the two decls reference each other.
       ABIDeclCounterpartID = counterpartID;
+    } else if (recordID == DECL_RUNTIME_AVAILABILITY) {
+      unsigned rawAvailability;
+      decls_block::DeclRuntimeAvailabilityLayout::readRecord(
+          scratch, rawAvailability);
+      if (rawAvailability >
+          static_cast<unsigned>(DeclRuntimeAvailability::AlwaysUnavailable))
+        return MF.diagnoseFatal();
+      RuntimeAvailability =
+          static_cast<DeclRuntimeAvailability>(rawAvailability);
     } else if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
@@ -7509,7 +7532,7 @@ DeclDeserializer::getDeclCheckedImpl(
 
   auto commonError = deserializeDeclCommon();
   if (commonError)
-    return std::move(commonError);
+    return attachRuntimeAvailability(std::move(commonError));
 
   if (matchAttributes) {
     // Deserialize the full decl only if matchAttributes finds a match.
@@ -7548,10 +7571,10 @@ DeclDeserializer::getDeclCheckedImpl(
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto declOrError = deserialize##RECORD_NAME(scratch, blobData); \
     if (!declOrError) \
-      return declOrError; \
+      return attachRuntimeAvailability(declOrError.takeError()); \
     declOrOffset = declOrError.get(); \
     if (auto finishError = finishRecursiveAttrs()) \
-      return finishError; \
+      return attachRuntimeAvailability(std::move(finishError)); \
     break; \
   }
 
@@ -9327,6 +9350,10 @@ Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
         context, containingClass, error.getName(),
         error.getNumberOfTableEntries(),
         error.needsFieldOffsetVectorEntry(), storageLayout);
+    if (auto availability = error.getRuntimeAvailability())
+      cast<MissingMemberDecl>(suppliedMissingMember)
+          ->setSerializedRuntimeAvailability(
+              static_cast<DeclRuntimeAvailability>(*availability));
   };
 
   // Emit the diagnostics/remarks out of the ModularizationError
@@ -9366,6 +9393,10 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
         suppliedMissingMember = MissingMemberDecl::create(
             context, containingProto, error.getName(),
             error.getNumberOfTableEntries(), 0);
+        if (auto availability = error.getRuntimeAvailability())
+          cast<MissingMemberDecl>(suppliedMissingMember)
+              ->setSerializedRuntimeAvailability(
+                  static_cast<DeclRuntimeAvailability>(*availability));
       };
   llvm::handleAllErrors(std::move(error), handleMissingProtocolMember);
   return suppliedMissingMember;
@@ -9414,6 +9445,9 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
         auto *missing = MissingMemberDecl::create(
             context, cast<NominalTypeDecl>(container), declError->getName(), 0,
             hasStorage, layout.get());
+        if (auto availability = declError->getRuntimeAvailability())
+          missing->setSerializedRuntimeAvailability(
+              static_cast<DeclRuntimeAvailability>(*availability));
         diagnoseAndConsumeError(std::move(errorInfo));
         return missing;
       }
