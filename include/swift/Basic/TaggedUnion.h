@@ -294,6 +294,55 @@ public:
   using super::super;
 };
 
+namespace TaggedUnionImpl {
+
+template <class K, class Index,
+          Index (&getIndexForKind)(K kind),
+          K (&getDefaultKindForIndex)(Index index)>
+struct ExplicitKindHelper {
+  using Kind = K;
+
+  template <class IndexType>
+  static constexpr IndexType coerceKindToIndex(Kind kind) {
+    return IndexType(getIndexForKind(kind));
+  }
+
+  template <class IndexType>
+  static constexpr Kind coerceIndexToKind(IndexType index) {
+    return getDefaultKindForIndex(Index(index));
+  }
+};
+
+} // end namespace TaggedUnionImpl
+
+/// A tagged union that uses a specific enum for its kind type.
+///
+/// The enum doesn't have to be 1-1 with its members, but it will use
+/// getDefaultKindForIndex to decide which member to construct if you
+/// construct it with a specific member type.
+template <class Kind, class Members,
+          typename Members::Index (&getIndexForKind)(Kind),
+          Kind (&getDefaultKindForIndex)(typename Members::Index)>
+class ExplicitTaggedUnion
+  : public TaggedUnionBase<TaggedUnionImpl::ExplicitKindHelper<
+                             Kind,
+                             typename Members::Index,
+                             getIndexForKind,
+                             getDefaultKindForIndex>,
+                           Members> {
+  using super =
+           TaggedUnionBase<TaggedUnionImpl::ExplicitKindHelper<
+                             Kind,
+                             typename Members::Index,
+                             getIndexForKind,
+                             getDefaultKindForIndex>,
+                           Members>;
+public:
+  using super::super;
+
+  Kind getKind() const { return this->TheKind; }
+};
+
 } // end namespace swift
 
 #endif
