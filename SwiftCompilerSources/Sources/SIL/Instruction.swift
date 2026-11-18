@@ -1195,6 +1195,12 @@ class DeinitExistentialValueInst : Instruction {}
 final public
 class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
   public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+
+  public func set(isImmutable: Bool, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.OpenExistentialAddr_setImmutable(isImmutable)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public
