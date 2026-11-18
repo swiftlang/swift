@@ -896,10 +896,7 @@ void DeadObjectElimination::salvageDebugInfo(SILInstruction *toBeRemoved) {
   if (!varInfo)
     return;
 
-  // Note: The instruction should logically be in SI's scope.
-  // However, LLVM does not support variables and stores in different scopes,
-  // so we use the variable's scope.
-  SILBuilder Builder(SI, varInfo->Scope);
+  SILBuilderWithScope Builder(SI);
   Builder.createDebugValue(SI->getLoc(), SI->getSrc(), *varInfo);
 }
 
