@@ -3703,16 +3703,6 @@ IsABIAccessible_t irgen::isTypeABIAccessibleIfFixedSize(IRGenModule &IGM,
   if (ty->isCopyable())
     return IsABIAccessible;
 
-  // Check for a deinit. If this type does not define a deinit it is ABI
-  // accessible because we can just project onto its sub elements.
-  auto nom = ty->getAnyNominal();
-  if (!nom || !nom->hasValueTypeDestructor())
-    return IsABIAccessible;
-
-  if (IGM.getSILModule().isTypeMetadataAccessible(ty) ||
-      IGM.getSILModule().lookUpMoveOnlyDeinitForType(
-          SILType::getPrimitiveObjectType(ty), false /*deserialize lazily*/))
-    return IsABIAccessible;
-
-  return IsNotABIAccessible;
+  return IsABIAccessible_t(
+      IGM.isTypeABIAccessible(SILType::getPrimitiveObjectType(ty)));
 }
