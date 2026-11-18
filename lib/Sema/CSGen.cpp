@@ -4266,6 +4266,7 @@ bool ConstraintSystem::generateConstraints(
     return false;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {

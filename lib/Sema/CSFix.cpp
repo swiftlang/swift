@@ -54,6 +54,7 @@ std::optional<ScoreKind> ConstraintFix::impact() const {
   case FixBehavior::Suppress:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 ASTNode ConstraintFix::getAnchor() const { return getLocator()->getAnchor(); }

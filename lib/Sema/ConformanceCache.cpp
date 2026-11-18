@@ -285,6 +285,7 @@ bool ConformanceCache::isConformanceTransitiveForSubtype(
     // Can't say anything in this case.
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ConformanceCache::checkTransitiveSubtypeConformance(

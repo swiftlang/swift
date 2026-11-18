@@ -853,6 +853,7 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
     return GeneratedSourceInfo::Name##MacroExpansion;
 #include "swift/Basic/MacroRoles.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // If this storage declaration is a variable with an explicit initializer,
@@ -1119,6 +1120,7 @@ static uint8_t getRawMacroRole(MacroRole role) {
   case MacroRole::Preamble: return 9;
   case MacroRole::Body: return 10;
   }
+  llvm_unreachable("covered switch");
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 

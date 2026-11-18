@@ -555,6 +555,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   case ActorIsolation::Unspecified:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {

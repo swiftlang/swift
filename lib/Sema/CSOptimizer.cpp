@@ -310,6 +310,7 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
         case RequirementKind::Layout:
           return false;
         }
+        llvm_unreachable("covered switch");
       }))
     return false;
 

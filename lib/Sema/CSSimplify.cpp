@@ -2051,6 +2051,7 @@ public:
     case MatchKind::Conversion:
       return matchConversion();
     }
+    llvm_unreachable("covered switch");
   }
 
 private:
@@ -2908,6 +2909,7 @@ matchFunctionThrowing(ConstraintSystem &cs,
     return ConstraintSystem::SolutionKind::Solved;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Determines the types that \p kind of \p func1 and \p func2 depend on, with
@@ -9682,6 +9684,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
       case PTK_AutoreleasingUnsafeMutablePointer:
         llvm_unreachable("no implicit conversion");
       }
+      llvm_unreachable("covered switch");
     };
 
     // String -> UnsafePointer<Void>
@@ -10848,6 +10851,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       case ExistentialMemberAccessLimitation::None:
         return false;
       }
+      llvm_unreachable("covered switch");
     };
 
     // Metatype extension members are only accessible on the protocol
