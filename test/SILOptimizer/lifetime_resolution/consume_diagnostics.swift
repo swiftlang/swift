@@ -464,3 +464,44 @@ func escapingCaptureConsumeOperatorReinitialized() {
   }
   use(c)
 }
+
+// --- existentials ---
+
+protocol P: ~Copyable {
+  consuming func con()
+  mutating func mut()
+}
+struct PBox: ~Copyable { var e: any P & ~Copyable }
+func takeP(_ x: consuming any P & ~Copyable) {} // expected-note 2 {{consider making this parameter 'borrowing' if 'takeP' does not need ownership of it}}
+
+extension PBox {
+  mutating func consumeWithoutReinit() {
+    e.con() // expected-error {{missing reinitialization of inout parameter 'self.e' after consume}}
+  }
+}
+
+func existentialMutatedAfterConsume(_ x: consuming any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  takeP(x) // expected-note {{consumed here; 'takeP' takes ownership of this argument}}
+  x.mut() // expected-error {{'x' used after consume}}
+}
+
+func existentialConsumedInLoop(_ x: consuming any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  for _ in 0..<3 {
+    x.con() // expected-error {{'x' consumed in a loop}}
+  }
+}
+
+func existentialBorrowedConsumed(_ x: borrowing any P & ~Copyable) { // expected-note {{make 'x' a 'consuming' parameter to take ownership of it}}
+  takeP(x) // expected-error {{'x' is borrowed and cannot be consumed}}
+}
+
+func existentialInoutNotReinitialized(_ x: inout any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  x.con() // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
+}
+
+func existentialInoutReinitializedOnOneBranch(_ x: inout any P & ~Copyable, _ y: consuming any P & ~Copyable, _ b: Bool) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  x.con() // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
+  if b {
+    x = y
+  }
+}

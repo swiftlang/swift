@@ -499,9 +499,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      auto diags = findSyntacticErrorForConsume(DC->getParentModule(),
-                                                consumeExpr->getLoc(),
-                                                consumeExpr->getSubExpr());
+      DeferredDiags diags;
+      if (!Ctx.SILOpts.EnableLifetimeResolution)
+        diags = findSyntacticErrorForConsume(DC->getParentModule(),
+                                             consumeExpr->getLoc(),
+                                             consumeExpr->getSubExpr());
       for (auto &diag : diags)
         diag.emit(Ctx);
 
@@ -1601,12 +1603,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
+  assert(!module->getASTContext().SILOpts.EnableLifetimeResolution &&
+         "LifetimeResolution permits all consumes; delete this function once "
+         "it is enabled by default");
   DeferredDiags result;
-
-  // LifetimeResolution can handle all kinds of consumes, such as those on
-  // copyable types and results of functions, without restrictions.
-  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
-    return result;
 
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 

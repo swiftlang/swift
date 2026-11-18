@@ -27,6 +27,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
@@ -2302,6 +2303,36 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   return nullptr;
 }
 
+/// Whether \p expr names a binding, or a path of stored properties rooted at
+/// one, such that consuming it would invalidate that storage.
+static bool isConsumableStorageRef(ModuleDecl *module, Expr *expr) {
+  auto isStoredVar = [&](ValueDecl *decl, AccessSemantics semantics) {
+    auto *vd = dyn_cast_or_null<VarDecl>(decl);
+    return vd && vd->isAccessedViaPhysicalStorage(semantics, AccessKind::Read,
+                                                  module,
+                                                  ResilienceExpansion::Minimal);
+  };
+
+  while (true) {
+    if (auto *dre = dyn_cast<DeclRefExpr>(expr))
+      return isStoredVar(dre->getDecl(), dre->getAccessSemantics());
+
+    if (auto *le = dyn_cast<LoadExpr>(expr)) {
+      expr = le->getSubExpr();
+      continue;
+    }
+
+    if (auto *mre = dyn_cast<MemberRefExpr>(expr)) {
+      if (!isStoredVar(mre->getMember().getDecl(), mre->getAccessSemantics()))
+        return false;
+      expr = mre->getBase();
+      continue;
+    }
+
+    return false;
+  }
+}
+
 bool swift::canAddExplicitConsume(constraints::Solution &sol,
                                   ModuleDecl *module,
                                   Expr *expr) {
@@ -2310,6 +2341,11 @@ bool swift::canAddExplicitConsume(constraints::Solution &sol,
   // Is it already wrapped in a `consume`?
   if (isa<ConsumeExpr>(expr))
     return false;
+
+  // Under the new move checker, you can write `consume` on an rvalue,
+  // so only suggest writing it if storage is being consumed.
+  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
+    return isConsumableStorageRef(module, expr);
 
   // Is this expression valid to wrap inside a `consume`?
   auto diags = findSyntacticErrorForConsume(module, SourceLoc(), expr,
