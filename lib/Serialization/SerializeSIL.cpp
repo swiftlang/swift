@@ -3705,8 +3705,6 @@ void SILSerializer::writeDebugVariable(const SILInstruction &SI,
       DebugVarTypeCategory, attrs, ListOfValues);
 
   if (ScopeToWrite) {
-    assert(ScopeToWrite->getInlinedFunction() ==
-           SI.getDebugScope()->getInlinedFunction());
     writeDebugScopes(ScopeToWrite, SM);
     // Add a delimiter record since debug scope records are read by the
     // deserializer in a loop until the first non debug scope record is

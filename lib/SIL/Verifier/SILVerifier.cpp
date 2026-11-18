@@ -1863,17 +1863,19 @@ public:
 
     SILType DebugVarTy = *varInfo->Type;
 
-    auto *debugScope = inst->getDebugScope();
+    auto *varScope = varInfo->Scope;
+    require(varScope->getParentFunction() == inst->getFunction(),
+            "debug variable scope belongs to a different function");
     if (varInfo->ArgNo)
       require(!varInfo->Name.empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
-    // slot if our debug scope is not an inlined call site.
+    // slot if the variable's scope is not an inlined call site.
     //
     // This catches SIL transformations that accidentally remove inline
     // information (stored in the SILDebugScope) from debug-variable-carrying
     // instructions.
-    if (debugScope && !debugScope->InlinedCallSite)
+    if (!varScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
@@ -1899,12 +1901,6 @@ public:
         DebugVars[argNum] = {varInfo->Name, DebugVarTy};
       }
 
-    // Check the (auxiliary) debug variable scope
-    if (const SILDebugScope *VarDS = varInfo->Scope)
-      require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
-              "Scope of the debug variable should have the same parent function"
-              " as that of instruction.");
-
     // Check that every var info with the same name, scope and location, refer
     // to a variable of the same type
     llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
@@ -1912,8 +1908,7 @@ public:
       varInfo->Loc = inst->getLoc();
     if (!varInfo->Loc)
       varInfo->Loc = SILLocation::invalid();
-    VarID Key(varInfo->Scope ? varInfo->Scope : debugScope,
-              UniqueName, *varInfo->Loc);
+    VarID Key(varScope, UniqueName, *varInfo->Loc);
     auto CachedVar = DebugVarTypes.insert({Key, DebugVarTy});
     if (!CachedVar.second) {
       auto lhs = CachedVar.first->second.removingMoveOnlyWrapper();
