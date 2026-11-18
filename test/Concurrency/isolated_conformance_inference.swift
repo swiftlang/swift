@@ -266,3 +266,167 @@ nonisolated func testWitnessesFromNonisolated(
   let _: any SomeGlobalActorRequirement = differentActor // expected-error{{main actor-isolated conformance of 'SDifferentActorWitness' to 'SomeGlobalActorRequirement' cannot be used in nonisolated context}}
   let _: any AsyncRequirement = asyncWitness // expected-error{{main actor-isolated conformance of 'CAsyncWitness' to 'AsyncRequirement' cannot be used in nonisolated context}}
 }
+
+// A conformance implied by a conformance to a protocol that inherits
+// 'SendableMetatype' is not inferred to be isolated.
+
+// The requirement is isolated like its witness.
+protocol PIsolatedRequirement {
+  @MainActor func f()
+}
+
+protocol SendablePIsolatedRequirement: PIsolatedRequirement, Sendable {}
+
+@MainActor
+final class CIsolatedRequirement: SendablePIsolatedRequirement {
+  func f() {}
+}
+
+// An 'async' witness.
+protocol PAsync {
+  func f() async
+}
+
+protocol SendablePAsync: PAsync, Sendable {}
+
+@SomeGlobalActor
+final class CAsyncWitnessSendableRefinement: SendablePAsync {
+  func f() async {}
+}
+
+// A synchronous witness for a nonisolated requirement is diagnosed.
+protocol SendableP: P, Sendable {}
+
+@SomeGlobalActor
+final class CSyncWitness: SendableP {
+  // expected-error@-1 {{conformance of 'CSyncWitness' to protocol 'P' crosses into global actor 'SomeGlobalActor'-isolated code and can cause data races}}
+  // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
+  func f() {}
+  // expected-note@-1 {{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2 {{mark instance method 'f()' 'nonisolated'}}
+}
+
+// 'Sendable' two refinements up.
+protocol Leaf {
+  func leaf()
+}
+
+protocol Middle: Leaf {}
+
+protocol Root: Middle, Sendable {}
+
+@MainActor
+final class CTwoRefinementsUp: Root {
+  // expected-error@-1 {{conformance of 'CTwoRefinementsUp' to protocol 'Leaf' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
+  func leaf() {}
+  // expected-note@-1 {{main actor-isolated instance method 'leaf()' cannot satisfy nonisolated requirement}}
+  // expected-note@-2 {{mark instance method 'leaf()' 'nonisolated'}}
+}
+
+// Several implied conformances, with associated types that refer back to the
+// conforming type.
+protocol SendableRandomAccessCollection: RandomAccessCollection, Sendable {}
+
+@MainActor
+struct IsolatedSubscriptCollection: SendableRandomAccessCollection {
+  // expected-error@-1 {{conformance of 'IsolatedSubscriptCollection' to protocol 'RandomAccessCollection' crosses into main actor-isolated code and can cause data races}}
+  // expected-error@-2 {{conformance of 'IsolatedSubscriptCollection' to protocol 'BidirectionalCollection' crosses into main actor-isolated code and can cause data races}}
+  // expected-error@-3 {{conformance of 'IsolatedSubscriptCollection' to protocol 'Collection' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-4 3 {{turn data races into runtime errors with '@preconcurrency'}}
+  nonisolated var startIndex: Int { 0 }
+  nonisolated var endIndex: Int { 0 }
+  subscript(position: Int) -> Int { 0 }
+  // expected-note@-1 3 {{main actor-isolated subscript 'subscript(_:)' cannot satisfy nonisolated requirement}}
+  // expected-note@-2 3 {{mark subscript 'subscript(_:)' 'nonisolated'}}
+
+  typealias Iterator = IndexingIterator<IsolatedSubscriptCollection>
+  typealias SubSequence = Slice<IsolatedSubscriptCollection>
+}
+
+// The class's isolation is inferred from the protocol.
+@MainActor
+protocol MainActorSendableP: CustomStringConvertible, Sendable {
+  func g() async
+}
+
+final class CInferredIsolation: MainActorSendableP {
+  // expected-error@-1 {{conformance of 'CInferredIsolation' to protocol 'CustomStringConvertible' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
+  func g() async {}
+  var description: String { "" }
+  // expected-note@-1 {{main actor-isolated property 'description' cannot satisfy nonisolated requirement}}
+  // expected-note@-2 {{mark property 'description' 'nonisolated'}}
+}
+
+// Restating the conformance in an extension doesn't make it inferred isolated,
+// so the isolated witness is diagnosed.
+final class CRestatedConformance: MainActorSendableP {
+  func g() async {}
+}
+
+// FIXME: The suggestion to isolate the conformance doesn't help: an isolated
+// conformance can't satisfy 'MainActorSendableP', which refines
+// 'CustomStringConvertible' and 'Sendable'.
+extension CRestatedConformance: CustomStringConvertible {
+  // expected-error@-1:33 {{conformance of 'CRestatedConformance' to protocol 'CustomStringConvertible' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2:33 {{isolate this conformance to the main actor with '@MainActor'}}
+  // expected-note@-3:33 {{turn data races into runtime errors with '@preconcurrency'}}
+  var description: String { "" }
+  // expected-note@-1:7 {{main actor-isolated property 'description' cannot satisfy nonisolated requirement}}
+  // expected-note@-2:7 {{mark property 'description' 'nonisolated'}}
+}
+
+// The outcome doesn't depend on which of several conformances that imply the
+// conformance comes first.
+protocol RefinesPAsync: PAsync {}
+
+@MainActor
+final class CSendableRefinementFirst: SendablePAsync, RefinesPAsync {
+  func f() async {}
+}
+
+@MainActor
+final class CSendableRefinementLast: RefinesPAsync, SendablePAsync {
+  func f() async {}
+}
+
+// ... or on whether the 'Sendable' refinement is stated in an extension.
+@MainActor
+final class CSendableRefinementInExtension: RefinesPAsync {
+  func f() async {}
+}
+
+extension CSendableRefinementInExtension: SendablePAsync {}
+
+// 'Sendable' on the conforming type, rather than on a protocol that implies the
+// conformance, doesn't stop the inference.
+@MainActor
+final class CSendableType: Sendable, PDerived {
+  func f() {}
+}
+
+nonisolated func usePIsolatedRequirement<T: PIsolatedRequirement>(_: T.Type) {}
+nonisolated func usePAsync<T: PAsync>(_: T.Type) {}
+nonisolated func useLeaf<T: Leaf>(_: T.Type) {}
+nonisolated func useRandomAccessCollection<T: RandomAccessCollection>(_: T.Type) {}
+nonisolated func useP<T: P>(_: T.Type) {}
+nonisolated func usePDerived<T: PDerived>(_: T.Type) {}
+
+nonisolated func testImpliedConformancesFromNonisolated() {
+  usePIsolatedRequirement(CIsolatedRequirement.self)
+  usePAsync(CAsyncWitnessSendableRefinement.self)
+  useLeaf(CTwoRefinementsUp.self)
+  useRandomAccessCollection(IsolatedSubscriptCollection.self)
+  usePAsync(CSendableRefinementFirst.self)
+  usePAsync(CSendableRefinementLast.self)
+  usePAsync(CSendableRefinementInExtension.self)
+
+  // No 'Sendable' refinement: still inferred isolated.
+  useP(ImpliedConformanceInference.self)
+  // expected-error@-1 {{main actor-isolated conformance of 'ImpliedConformanceInference' to 'P' cannot be used in nonisolated context}}
+  usePDerived(ImpliedConformanceInference.self)
+  // expected-error@-1 {{main actor-isolated conformance of 'ImpliedConformanceInference' to 'PDerived' cannot be used in nonisolated context}}
+  useP(CSendableType.self)
+  // expected-error@-1 {{main actor-isolated conformance of 'CSendableType' to 'P' cannot be used in nonisolated context}}
+}
