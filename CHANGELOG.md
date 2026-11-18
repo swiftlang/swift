@@ -5,6 +5,40 @@
 
 ## Swift (next)
 
+* [SE-0564][]:
+  A new form of `withContinuation` that accepts an `async` body and passes two halves of a
+  continuation: the `Continuation` that resumes it, and a new
+  `ContinuationWaiter` that waits for it. Waiting on the waiter can install
+  cancellation and priority escalation handlers that are active only while the
+  task is suspended on the continuation, so they never run before the
+  continuation is registered:
+
+  ```swift
+  func read(into buffer: ReadBuffer) async throws -> Int {
+    try await withContinuation(of: Int.self) { continuation, waiter in
+      let id = eventLoop.register(.read(fd, buffer), continuation)
+      return try await waiter.wait(onCancel: { _ in eventLoop.cancel(id) })
+    }
+  }
+  ```
+
+  `Continuation`, `UnsafeContinuation` and `CheckedContinuation` also have new
+  `resumeSynchronously` methods. An executor can use them to offer its current
+  execution context to the resumed task. If the task resumes on that executor,
+  it runs inline instead of being enqueued:
+
+  ```swift
+  completion.continuation.resumeSynchronously(
+    returning: completion.bytesRead,
+    isolatedTo: self.asUnownedSerialExecutor()
+  )
+  ```
+
+  Priority escalation handlers, including the handler of
+  `withTaskPriorityEscalationHandler`, are now called once with the task's
+  current priority as both arguments when they are installed. Thus, an
+  escalation that happens before the handler is installed is not missed.
+
 * [#88082][]:
 
   Forward references to top-level script variables with storage are now
@@ -11354,6 +11388,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
 [SE-0551]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0551-span-of-one.md
+[SE-0564]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0564-split-continuations.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

@@ -32,12 +32,15 @@ func run() {
       await withTaskPriorityEscalationHandler {
         started.signal()
         while Task.currentPriority != .medium {}
-      } onPriorityEscalated: { _, _ in
+      } onPriorityEscalated: { old, new in
+        // Skip the call made when the handler is installed.
+        guard old != new else { return }
         firstHandlerRan.value = true
       }
       await withTaskPriorityEscalationHandler {
         for _ in 0..<20_000 { _ = Task.currentPriority }
       } onPriorityEscalated: { old, new in
+        guard old != new else { return }
         fatalError("iteration \(i): escalated from \(old) to \(new) after the task saw \(new)")
       }
       done.signal()

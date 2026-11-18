@@ -1189,7 +1189,7 @@ void swift_continuation_destroySplit(SplitContinuation *continuation);
 /// Resume a continuation, offering the current thread to run the resumed task
 /// instead of enqueuing it.
 ///
-/// `continuation` may be an normal continuation or a split continuation.
+/// `continuation` may be a normal continuation or a split continuation.
 /// If `error` is null, the continuation returns `result`, which is moved into
 /// the continuation; otherwise it throws `error`, and `result` is destroyed.
 /// Both are passed at +1.

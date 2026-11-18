@@ -2975,7 +2975,6 @@ static void swift_task_removePriorityEscalationHandlerImpl(
   swift_task_dealloc(record);
 }
 
-
 SWIFT_CC(swift)
 static bool swift_task_cancellationShieldPushImpl() {
   if (AsyncTask *task = swift_task_getCurrent()) {
