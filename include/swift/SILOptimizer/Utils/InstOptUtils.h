@@ -299,6 +299,58 @@ void emitDestroysOfCapturesOwnedByClosure(PartialApplyInst *pai,
                                           InstModCallbacks callbacks,
                                           IsDeadEnd_t isDeadEnd = IsntDeadEnd);
 
+/// Returns true if the closure \p pai has a lexical lifetime, which a
+/// `move_value [lexical]` of it, or of a value that forwards it, introduces.
+bool isLexicalPartialApply(PartialApplyInst *pai);
+
+/// Returns true if calling the closure \p pai consumes it, which is true for
+/// an at-most-once or exactly-once closure that is `@callee_owned`.
+///
+/// Replacing a call of such a closure, either by inlining the call or by
+/// calling the closure's function directly, ends the closure's lifetime
+/// without consuming it, and the replacement consumes the captures that the
+/// closure consumes instead. To keep the closure and its captures balanced:
+///
+/// 1. Check canReplaceCallsOfConsumedClosure().
+/// 2. Call makeCapturesOwnedByClosureLexical().
+/// 3. Call destroyUnconsumedCapturesAfterCall() for each call, and replace it.
+/// 4. Call deleteClosureOfReplacedCalls().
+bool isClosureConsumedByCall(PartialApplyInst *pai);
+
+/// Returns true if the closure \p pai, which its call consumes, can be deleted
+/// after its calls \p calls are replaced, and collects its other uses, except
+/// for debug uses, in \p closureUses. \p closureUses is complete only if this
+/// returns true.
+///
+/// Each other use must go away with the closure. An exactly-once closure's
+/// destructor traps, so it may be destroyed only in a dead end. Each capture
+/// must be available to the replaced calls without a copy.
+bool canReplaceCallsOfConsumedClosure(
+    PartialApplyInst *pai, ArrayRef<FullApplySite> calls,
+    SmallVectorImpl<SILInstruction *> &closureUses);
+
+/// Makes each capture that the context of the closure \p pai owns lexical if
+/// the closure is lexical. Deleting the closure after replacing its calls
+/// leaves the captures to live until the closure's destroys, which its
+/// lexical lifetime kept in place.
+void makeCapturesOwnedByClosureLexical(PartialApplyInst *pai,
+                                       InstModCallbacks callbacks);
+
+/// Destroys the captures that the context of the closure \p pai owns but that
+/// its function doesn't consume, after its call \p call. The call would
+/// destroy them when it consumes the closure. Call this before replacing
+/// \p call.
+void destroyUnconsumedCapturesAfterCall(PartialApplyInst *pai,
+                                        FullApplySite call,
+                                        InstModCallbacks callbacks);
+
+/// After the calls of the closure \p pai are replaced, deletes the closure
+/// and its other uses \p closureUses, and salvages its debug uses. Where a use
+/// destroyed the closure, destroys the captures that its context owns instead.
+void deleteClosureOfReplacedCalls(PartialApplyInst *pai,
+                                  ArrayRef<SILInstruction *> closureUses,
+                                  InstModCallbacks callbacks);
+
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
 /// one is attempting to delete the partial apply.
