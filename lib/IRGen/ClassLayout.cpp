@@ -110,9 +110,11 @@ void ClassLayout::collectAllStoredPropertyTypes(
   }
 }
 
-std::optional<uint64_t>
-ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
-                                              SILType selfType) const {
+std::optional<uint64_t> ClassLayout::computeTypedMallocTypeDescriptor(
+    IRGenModule &IGM, SILType selfType,
+    ArrayRef<SILType> tailElementTypes) const {
+  if (!IGM.isTypedAllocationAvailable())
+    return std::nullopt;
   if (!isFixedSize()) {
     return std::nullopt;
   }
@@ -129,5 +131,12 @@ ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
 
   collectAllStoredPropertyTypes(IGM, selfType, storageEntries);
 
-  return irgen::computeTypedMallocTypeDescriptor(IGM, header, storageEntries);
+  if (tailElementTypes.empty())
+    return irgen::computeTypedMallocTypeDescriptor(IGM, header, storageEntries);
+
+  // The tail-allocated arrays follow the header. Their counts aren't known
+  // here, so describe them as one array of a union of their element types.
+  return irgen::computeTypedMallocTypeDescriptor(
+      IGM, header, storageEntries,
+      TypedMemoryCallsiteFlags::HeaderPrefixedArray, tailElementTypes);
 }

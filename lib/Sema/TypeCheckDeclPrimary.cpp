@@ -3683,6 +3683,8 @@ public:
       visit(Member);
     }
 
+    TypeChecker::checkTailAllocatedCounts(CD);
+
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
     if (CD->requiresStoredPropertyInits())

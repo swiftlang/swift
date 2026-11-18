@@ -1689,6 +1689,7 @@ namespace  {
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
     UNINTERESTING_ATTR(Target)
+    UNINTERESTING_ATTR(TailAllocated)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)

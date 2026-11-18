@@ -73,6 +73,14 @@ enum class TypedMemoryLayoutSemantics : uint16_t {
   LLVM_MARK_AS_BITMASK_ENUM(/* LargestFlag = */ GenericData)
 };
 
+// The shape of the allocation a typed memory descriptor describes. Mirrors
+// clang::TypedMemoryCallsiteFlags.
+enum class TypedMemoryCallsiteFlags : uint8_t {
+  FixedSize = 1 << 0,
+  Array = 1 << 1,
+  HeaderPrefixedArray = 1 << 2,
+};
+
 struct LayoutSemanticsSpan {
   uint64_t Offset;
   uint64_t Width;
