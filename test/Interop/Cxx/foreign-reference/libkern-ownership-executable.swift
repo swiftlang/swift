@@ -1,6 +1,4 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -enable-experimental-feature LibkernOwnershipConventions -Xfrontend -disable-availability-checking )
-
-// REQUIRES: swift_feature_LibkernOwnershipConventions
+// RUN: %target-run-simple-swift(-I %S/Inputs -I %swift_src_root/lib/ClangImporter/SwiftBridging -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking )
 
 // REQUIRES: executable_test
 

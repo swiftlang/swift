@@ -123,8 +123,6 @@ enum { NumOptionalTypeKinds = 2 };
 
 /// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
 /// decide whether to apply libkern's ownership convention.
-///
-/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
 enum class LibkernSubclass {
   None,
   OSObject,
