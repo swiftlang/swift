@@ -1752,6 +1752,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       case ActorIsolation::Erased:
         llvm::report_fatal_error("Should never see this");
       }
+      llvm_unreachable("covered switch");
     }();
     args.push_back(B.convertToImplicitActor(loc, value));
   }

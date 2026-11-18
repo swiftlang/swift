@@ -1048,6 +1048,7 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getIsolationCrossing();
     }
+    llvm_unreachable("covered switch");
   }
 
   SubstitutionMap getSubstitutionMap() const {
@@ -1059,6 +1060,7 @@ public:
     case FullApplySiteKind::BeginApplyInst:
       return cast<BeginApplyInst>(**this)->getSubstitutionMap();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return the applied argument index for the given operand ignoring indirect

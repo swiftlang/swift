@@ -680,6 +680,7 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   case ActorIsolation::NonisolatedNonsending:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILGenFunction::isCtorWithHopsInjectedByDefiniteInit() {

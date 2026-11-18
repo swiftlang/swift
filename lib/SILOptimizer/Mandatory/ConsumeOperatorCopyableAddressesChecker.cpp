@@ -2142,6 +2142,7 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     // Conservatively reject for now.
     return MoveConstraint::Illegal;
   }
+  llvm_unreachable("covered switch");
 }
 
 // Returns true if we emitted a diagnostic and handled the single block

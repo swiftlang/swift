@@ -1266,6 +1266,7 @@ static SILValue destValueForDynamicCast(SILDynamicCastInst dynCast) {
     case SILDynamicCastKind::UnconditionalCheckedCastInst:
       return cast<UnconditionalCheckedCastInst>(inst);
   }
+  llvm_unreachable("covered switch");
 }
 
 SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst) {
@@ -1462,6 +1463,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     return lhsIsolation == rhsIsolation;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILIsolationInfo::isEqual(const SILIsolationInfo &other) const {

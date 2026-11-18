@@ -4131,6 +4131,7 @@ public:
     case ReturnTerm:
       return std::get<Operand *>(value)->get();
     }
+    llvm_unreachable("covered switch");
   }
   CopyAddrInst *getCopyAddr() const { return std::get<CopyAddrInst *>(value); }
   StoreInst *getStore() const { return std::get<StoreInst *>(value); }
@@ -4151,6 +4152,7 @@ public:
     case ReturnTerm:
       return getReturnTerm()->getParentBlock();
     }
+    llvm_unreachable("covered switch");
   }
 
   SILInstruction *getDefiningInsertionPoint() const {
@@ -4168,6 +4170,7 @@ public:
     case ReturnTerm:
       return getReturnTerm()->getUser();
     }
+    llvm_unreachable("covered switch");
   }
 
   SILLocation getLoc() const {
@@ -4181,6 +4184,7 @@ public:
     case ReturnTerm:
       return getDefiningInsertionPoint()->getLoc();
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator==(SILValue otherValue) const {
@@ -4194,6 +4198,7 @@ public:
     case ReturnTerm:
       return lookThroughAccess(getValue()) == lookThroughAccess(otherValue);
     }
+    llvm_unreachable("covered switch");
   }
 
   static bool

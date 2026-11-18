@@ -1151,6 +1151,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::NoEffect;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a block used as a noescape function argument, attempt to find all

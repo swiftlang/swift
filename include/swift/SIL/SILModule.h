@@ -1321,6 +1321,7 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Print a simple description of a SILModule for the request evaluator.

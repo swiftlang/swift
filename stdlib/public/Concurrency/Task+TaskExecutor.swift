@@ -224,6 +224,8 @@ internal func _popTaskExecutorPreference(
   record: TaskExecutorPreferenceStatusRecord
 )
 
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 /// Get the "undefined" task executor reference.
 ///
 /// It can be used to compare against, and is semantically equivalent to
@@ -241,5 +243,3 @@ internal func _getUndefinedTaskExecutor() -> Builtin.Executor {
   // and return it directly.
   unsafe unsafeBitCast((UInt(0), UInt(0)), to: Builtin.Executor.self)
 }
-
-#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

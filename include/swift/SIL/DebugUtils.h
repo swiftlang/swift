@@ -479,6 +479,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::AllocBox:
       return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
     }
+    llvm_unreachable("covered switch");
   }
   
   /// Returns true if this DebugVarCarryingInst is a `debug_value`
@@ -493,6 +494,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::AllocBox:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// If we are attempting to create a "debug_value" clone of this debug var
@@ -512,6 +514,7 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     case Kind::AllocBox:
       return cast<AllocBoxInst>(**this);
     }
+    llvm_unreachable("covered switch");
   }
 
   /// If \p value is an alloc_stack, alloc_box use that. Otherwise, see if \p

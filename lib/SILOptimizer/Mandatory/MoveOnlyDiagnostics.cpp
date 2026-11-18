@@ -271,7 +271,8 @@ void DiagnosticEmitter::emitMissingConsumeInDiscardingContext(
     case SILLocation::CleanupKind:
     case SILLocation::ArtificialUnreachableKind:
       return false;
-    };
+    }
+    llvm_unreachable("covered switch");
   };
 
   // An instruction corresponding to the logical place where the value is
@@ -965,6 +966,7 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
       case PartialMutation::Kind::Reinit:
         return diag::sil_movechecking_cannot_partially_reinit_has_deinit;
       }
+      llvm_unreachable("covered switch");
     }();
     diagnose(astContext, user, diagnostic, varName);
     registerDiagnosticEmitted(address);
@@ -985,6 +987,7 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
       case PartialMutation::Kind::Reinit:
         return diag::sil_movechecking_cannot_partially_reinit_nonfrozen;
       }
+      llvm_unreachable("covered switch");
     }();
     diagnose(astContext, user, diagnostic, varName,
              nominal.getDeclaredInterfaceType(), nominal.getModuleContext());
@@ -1002,6 +1005,7 @@ void DiagnosticEmitter::emitCannotPartiallyMutateError(
         return diag::
             sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient;
       }
+      llvm_unreachable("covered switch");
     }();
     diagnose(astContext, user, diagnostic, varName,
              nominal.getDeclaredInterfaceType());

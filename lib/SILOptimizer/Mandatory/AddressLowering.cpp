@@ -2789,6 +2789,7 @@ protected:
       case FullApplySiteKind::TryApplyInst:
         return cast<TryApplyInst>(apply)->getErrorBB()->begin();
     }
+    llvm_unreachable("covered switch");
   }
 
   void makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs);
@@ -3008,6 +3009,7 @@ SILBasicBlock::iterator ApplyRewriter::getResultInsertionPoint() {
     llvm_unreachable("coroutines don't have indirect results");
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Return the storage address for the indirect output corresponding to the
@@ -4057,10 +4059,12 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::CanBeObjCClass:
   case BuiltinValueKind::CopyArray:
   case BuiltinValueKind::CreateAsyncTask:
+  case BuiltinValueKind::CreateSplitContinuation:
   case BuiltinValueKind::CreateTaskGroup:
   case BuiltinValueKind::CreateTaskGroupWithFlags:
   case BuiltinValueKind::DeallocRawTyped:
   case BuiltinValueKind::DestroyArray:
+  case BuiltinValueKind::DestroySplitContinuation:
   case BuiltinValueKind::GetObjCTypeEncoding:
   case BuiltinValueKind::InitializeDistributedRemoteActor:
   case BuiltinValueKind::InjectEnumTag:
@@ -4098,6 +4102,7 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::AddTaskLocalValue:
   case BuiltinValueKind::AddressOfRawLayout:
   case BuiltinValueKind::GetEnumTag:
+  case BuiltinValueKind::GetSplitContinuationAddr:
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:
   case BuiltinValueKind::TaskLocalValuePush:

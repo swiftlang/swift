@@ -5775,6 +5775,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
         // and wrap it up as an `Optional<any Actor>`.
         llvm::report_fatal_error("Should never see this?!");
       }
+      llvm_unreachable("covered switch");
     }();
 
     assert(forwardedIsolationValue);
@@ -7302,6 +7303,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         }
       }
       }
+      llvm_unreachable("covered switch");
     }();
 
     args.push_back(B.convertToImplicitActor(loc, arg));
@@ -7828,6 +7830,7 @@ void SILGenFunction::emitProtocolWitness(
         }
       }
       }
+      llvm_unreachable("covered switch");
     }();
 
     args.push_back(B.convertToImplicitActor(loc, arg));

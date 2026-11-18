@@ -49,6 +49,7 @@ ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
   case OwnershipKind::Unowned:
     return ManagedValue::forUnmanaged(value);
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit a copy of this value with independent ownership.
