@@ -43,6 +43,12 @@ extension CanonicalType {
     precondition(isBox)
     return BoxFieldsArray(boxType: self, function: function)
   }
+
+  public func isTrivial(in function: Function) -> Bool {
+    let t = hasTypeParameter ? function.mapTypeIntoEnvironment(rawType).canonical
+                             : self
+    return t.loweredType(in: function).isTrivial(in: function)
+  }
 }
 
 extension Decl {

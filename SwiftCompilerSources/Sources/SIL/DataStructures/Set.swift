@@ -126,6 +126,30 @@ public struct ValueSet : IntrusiveSet {
   }
 }
 
+public struct ArgumentSet : IntrusiveSet {
+  private var arguments: ValueSet
+
+  public init(_ context: some Context) {
+    self.arguments = ValueSet(context)
+  }
+
+  public mutating func deinitialize() {
+    arguments.deinitialize()
+  }
+
+  public func contains(_ argument: Argument) -> Bool { arguments.contains(argument) }
+
+  /// Returns true if `argument` was not contained in the set before inserting.
+  @discardableResult
+  public mutating func insert(_ argument: Argument) -> Bool {
+    return arguments.insert(argument)
+  }
+
+  public mutating func erase(_ argument: Argument) { arguments.erase(argument) }
+
+  public var description: String { arguments.description }
+}
+
 /// A set of instructions.
 ///
 /// This is an extremely efficient implementation which does not need memory
@@ -350,3 +374,5 @@ public struct IterableSet<Set: IntrusiveSet> : CollectionLikeSequence {
 public typealias IterableInstructionSet = IterableSet<InstructionSet>
 public typealias SpecificIterableInstructionSet<InstType: Instruction> = IterableSet<SpecificInstructionSet<InstType>>
 public typealias IterableBasicBlockSet = IterableSet<BasicBlockSet>
+public typealias IterableValueSet = IterableSet<ValueSet>
+public typealias IterableArgumentSet = IterableSet<ArgumentSet>

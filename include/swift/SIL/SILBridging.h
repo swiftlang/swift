@@ -1519,6 +1519,7 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createReturnBorrow(BridgedValue op,
                                                                            BridgedValueArray enclosingValues) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThrow(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThrowAddr() const;
   SWIFT_IMPORT_UNSAFE BridgedInstruction createSwitchEnumInst(BridgedValue enumVal,
                                           OptionalBridgedBasicBlock defaultBlock,
                                           const void * _Nullable enumCases, SwiftInt numEnumCases) const;

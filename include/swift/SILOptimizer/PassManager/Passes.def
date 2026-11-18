@@ -208,6 +208,8 @@ MODULE_PASS(WitnessTableSpecialization, "witness-table-specialization",
      "Creates specialized witness tables for existentials of specialized generic types")
 MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
      "Diagnose violations of Embedded Swift language restrictions")
+MODULE_PASS(FunctionSignatureOptimization, "function-signature-optimization",
+     "Change parameter conventions of functions")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
