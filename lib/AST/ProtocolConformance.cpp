@@ -1197,6 +1197,15 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
+    // A missing conformance might be satisfied by the substituted type, e.g.,
+    // a missing `T: Sendable` becomes the real `Int: Sendable` when T := Int.
+    if (kind == BuiltinConformanceKind::Missing &&
+        !substType->hasTypeParameter() && !substType->hasTypeVariable()) {
+      if (auto found = swift::lookupConformance(substType, getProtocol(),
+                                                /*allowMissing=*/true))
+        return found;
+    }
+
     auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
     return ProtocolConformanceRef(concrete);
