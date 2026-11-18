@@ -43,7 +43,7 @@ bb0:
 // Yes, can optimize when the dominating access has a nested call.
 // CHECK-LABEL: sil hidden [noinline] @testDominatingRDRC_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingRDRC_RD'
 sil hidden [noinline] @testDominatingRDRC_RD : $@convention(thin) () -> () {
 bb0:
@@ -81,7 +81,7 @@ bb0:
 // Yes, can optimize when the dominating access has a nested call.
 // CHECK-LABEL: sil hidden [noinline] @testDominatingMDRC_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingMDRC_RD'
 sil hidden [noinline] @testDominatingMDRC_RD : $@convention(thin) () -> () {
 bb0:
@@ -148,7 +148,7 @@ bb0(%0 : $C):
 // Yes, can optimize when the dominating access is inside a coroutine.
 // CHECK-LABEL: sil @testDominatingRDA_RD : $@convention(thin) (@guaranteed C) -> () {
 // CHECK: begin_access [read] [dynamic]
-// CHECK: begin_access [read] [static] [no_nested_conflict]
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingRDA_RD'
 sil @testDominatingRDA_RD : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : $C):
