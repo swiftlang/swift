@@ -689,6 +689,41 @@ static bool isValidObjectiveCErrorResultType(DeclContext *dc, Type type) {
   llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
 }
 
+/// Check if \p AFD is a top-level \c @c function that would be valid if
+/// switched to \c @objc , and if so, emit a note and fix-it suggesting it.
+static void suggestObjCForCFunction(const AbstractFunctionDecl *AFD,
+                                    ObjCReason reason) {
+  auto &ctx = AFD->getASTContext();
+  auto *cdeclAttr = dyn_cast_or_null<CDeclAttr>(reason.getAttr());
+  if (reason != ObjCReason::ExplicitlyCDecl || !cdeclAttr ||
+      cdeclAttr->Underscored ||
+      !AFD->getDeclContext()->isModuleScopeContext() ||
+      !ctx.LangOpts.EnableObjCInterop ||
+      AFD->getAttrs().hasAttribute<ObjCImplementationAttr>())
+    return;
+
+  // Probe ObjC representability without emitting diagnostics.
+  DiagnosticTransaction transaction(ctx.Diags);
+  auto objcReason = ObjCReason(ObjCReason::ExplicitlyUnderscoreCDecl,
+                               cdeclAttr);
+  std::optional<ForeignAsyncConvention> asyncConv;
+  std::optional<ForeignErrorConvention> errorConv;
+  bool validInObjC =
+      isRepresentableInLanguage(AFD, objcReason, asyncConv, errorConv);
+  transaction.abort();
+  if (!validInObjC)
+    return;
+
+  // Build the replacement text: @objc or @objc(name).
+  std::string replacement;
+  if (cdeclAttr->Name.empty())
+    replacement = "@objc";
+  else
+    replacement = ("@objc(" + cdeclAttr->Name + ")").str();
+  ctx.Diags.diagnose(cdeclAttr->getLocation(), diag::cdecl_suggest_objc)
+      .fixItReplace(cdeclAttr->getRangeWithAt(), replacement);
+}
+
 bool swift::isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
@@ -705,17 +740,26 @@ bool swift::isRepresentableInLanguage(
 
   // If you change this function, you must add or modify a test in PrintAsClang.
   ASTContext &ctx = AFD->getASTContext();
-  DiagnosticStateRAII diagState(ctx.Diags);
   auto language = Reason.getForeignLanguage();
 
+  DiagnosticStateRAII diagState(ctx.Diags);
+
+  /// Emit general notes for a failure and return \c false . Call this instead
+  /// of returning \c false directly.
+  auto failure = [&]() -> bool {
+    // Must be emitted in the scope of `diagState`.
+    suggestObjCForCFunction(AFD, Reason);
+    return false;
+  };
+
   if (checkObjCInForeignClassContext(AFD, Reason))
-    return false;
+    return failure();
   if (checkObjCWithGenericParams(AFD, Reason))
-    return false;
+    return failure();
   if (checkObjCInExtensionContext(AFD, Reason))
-    return false;
+    return failure();
   if (checkObjCActorIsolation(AFD, Reason))
-    return false;
+    return failure();
 
   auto behavior = behaviorLimitForObjCReason(Reason, ctx);
   // A `@cxx` implementation of a C++ operator may be a Swift operator.
@@ -724,7 +768,7 @@ bool swift::isRepresentableInLanguage(
                     ? diag::objc_operator_proto
                     : diag::objc_operator))
         .limitBehavior(behavior);
-    return false;
+    return failure();
   }
 
   if (auto accessor = dyn_cast<AccessorDecl>(AFD)) {
@@ -746,7 +790,7 @@ bool swift::isRepresentableInLanguage(
                             diag::objc_observing_accessor, accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
-      return false;
+      return failure();
     }
 
     case AccessorKind::Get:
@@ -758,11 +802,11 @@ bool swift::isRepresentableInLanguage(
         diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
             .limitBehavior(behavior);
         Reason.describe(accessor);
-        return false;
+        return failure();
       }
       return true;
     case AccessorKind::DistributedGet:
-      return false;
+      return failure();
 
     case AccessorKind::Set:
       if (!storageIsObjC) {
@@ -773,7 +817,7 @@ bool swift::isRepresentableInLanguage(
         diagnoseAndRemoveAttr(accessor, Reason.getAttr(), error)
             .limitBehavior(behavior);
         Reason.describe(accessor);
-        return false;
+        return failure();
       }
       return true;
 
@@ -782,14 +826,14 @@ bool swift::isRepresentableInLanguage(
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(), diag::objc_addressor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
-      return false;
+      return failure();
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
                             diag::objc_borrow_mutate_accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
-      return false;
+      return failure();
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
@@ -798,14 +842,14 @@ bool swift::isRepresentableInLanguage(
                             diag::objc_coroutine_accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
-      return false;
+      return failure();
 
     case AccessorKind::Init:
       diagnoseAndRemoveAttr(accessor, Reason.getAttr(),
                             diag::objc_init_accessor)
           .limitBehavior(behavior);
       Reason.describe(accessor);
-      return false;
+      return failure();
     }
     llvm_unreachable("bad kind");
   }
@@ -824,7 +868,7 @@ bool swift::isRepresentableInLanguage(
                                          AFD, isConsuming)
                                .limitBehavior(behavior));
         Reason.describe(AFD);
-        return false;
+        return failure();
       }
     }
   }
@@ -847,7 +891,7 @@ bool swift::isRepresentableInLanguage(
       !isParamListRepresentableInLanguage(AFD,
                                           AFD->getParameters(),
                                           Reason)) {
-    return false;
+    return failure();
   }
 
   if (auto FD = dyn_cast<FuncDecl>(AFD)) {
@@ -867,7 +911,7 @@ bool swift::isRepresentableInLanguage(
                                          FD->getResultTypeSourceRange(),
                                          behavior, Reason);
       Reason.describe(FD);
-      return false;
+      return failure();
     }
   }
 
@@ -884,7 +928,7 @@ bool swift::isRepresentableInLanguage(
                          AFD->diagnose(diag::typed_throw_in_objc_forbidden, AFD)
                              .limitBehavior(behavior));
       Reason.describe(AFD);
-      return false;
+      return failure();
     }
   }
 
@@ -899,7 +943,7 @@ bool swift::isRepresentableInLanguage(
                              .limitBehavior(behavior));
       Reason.describe(AFD);
 
-      return false;
+      return failure();
     }
 
     // The completion handler transformation cannot properly represent a
@@ -910,7 +954,7 @@ bool swift::isRepresentableInLanguage(
           .limitBehavior(behavior);
       Reason.describe(AFD);
 
-      return false;
+      return failure();
     }
 
     // The completion handler parameter always goes at the end.
@@ -955,11 +999,11 @@ bool swift::isRepresentableInLanguage(
     if (auto tupleType = resultType->getAs<TupleType>()) {
       for (const auto &tupleElt : tupleType->getElements()) {
         if (addCompletionHandlerParam(tupleElt.getType()))
-          return false;
+          return failure();
       }
     } else {
       if (addCompletionHandlerParam(resultType))
-        return false;
+        return failure();
     }
 
     // For a throwing asynchronous function, an Error? parameter is added
@@ -1016,7 +1060,7 @@ bool swift::isRepresentableInLanguage(
             .limitBehavior(behavior));
         Reason.describe(AFD);
 
-        return false;
+        return failure();
       }
     } else if (resultType->isVoid()) {
       // Functions that return nothing (void) can be throwing; they indicate
@@ -1031,7 +1075,7 @@ bool swift::isRepresentableInLanguage(
 
       if (boolDecl == nullptr) {
         AFD->diagnose(diag::broken_stdlib_type, "Bool");
-        return false;
+        return failure();
       }
 
       errorResultType = boolDecl->getDeclaredInterfaceType()->getCanonicalType();
@@ -1051,7 +1095,7 @@ bool swift::isRepresentableInLanguage(
           .highlight(throwsLoc)
           .limitBehavior(behavior));
       Reason.describe(AFD);
-      return false;
+      return failure();
     } else {
       // Other result types are not permitted.
       softenIfAccessNote(AFD, Reason.getAttr(),
@@ -1060,7 +1104,7 @@ bool swift::isRepresentableInLanguage(
           .highlight(throwsLoc)
           .limitBehavior(behavior));
       Reason.describe(AFD);
-      return false;
+      return failure();
     }
 
     // The error type is always 'AutoreleasingUnsafeMutablePointer<NSError?>?'.
@@ -5113,35 +5157,6 @@ TypeCheckForeignFunctionRequest::evaluate(Evaluator &evaluator,
     }
   } else {
     reason.setAttrInvalid();
-
-    // Suggest @objc when a top-level @c function uses types valid under
-    // @objc. Only with ObjC interop enabled, and never for @implementation
-    // functions, where @c must match the imported declaration.
-    if (auto *cdeclAttr = dyn_cast<CDeclAttr>(attr);
-        cdeclAttr && !cdeclAttr->Underscored &&
-        FD->getDeclContext()->isModuleScopeContext() &&
-        ctx.LangOpts.EnableObjCInterop &&
-        !FD->getAttrs().hasAttribute<ObjCImplementationAttr>()) {
-      // Probe ObjC representability without emitting diagnostics.
-      DiagnosticTransaction transaction(ctx.Diags);
-      auto objcReason = ObjCReason(ObjCReason::ExplicitlyUnderscoreCDecl, attr);
-      std::optional<ForeignAsyncConvention> asyncConv;
-      std::optional<ForeignErrorConvention> errorConv;
-      bool validInObjC =
-          isRepresentableInLanguage(FD, objcReason, asyncConv, errorConv);
-      transaction.abort();
-
-      if (validInObjC) {
-        // Build the replacement text: @objc or @objc(name).
-        std::string replacement;
-        if (cdeclAttr->Name.empty())
-          replacement = "@objc";
-        else
-          replacement = ("@objc(" + cdeclAttr->Name + ")").str();
-        ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_suggest_objc)
-            .fixItReplace(attr->getRangeWithAt(), replacement);
-      }
-    }
   }
   return {};
 }
