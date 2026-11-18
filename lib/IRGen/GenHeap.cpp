@@ -2584,7 +2584,9 @@ uint64_t getTypedMemoryDescriptorStableSipHash(StringRef Str) {
 
 std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
     IRGenModule &IGM, HeapHeaderKind header,
-    llvm::SmallVectorImpl<SILType> &fieldTypes, bool isArray) {
+    llvm::SmallVectorImpl<SILType> &fieldTypes,
+    TypedMemoryCallsiteFlags callsiteFlags,
+    ArrayRef<SILType> tailElementTypes) {
   if (!IGM.isTypedAllocationAvailable()) {
     return std::nullopt;
   }
@@ -2634,6 +2636,37 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
     offset += fieldTLE->fixedSize(IGM)->getValue();
   }
 
+  // The tail element types form a union: they all start at the same offset,
+  // aligned for all of them.
+  llvm::SmallVector<TypeLayoutEntry *, 4> tailElementTLEs;
+  uint64_t unionAlignmentMask = 0, unionSize = 0;
+  for (auto tailElementType : tailElementTypes) {
+    auto &tailElementTI = IGM.getTypeInfo(tailElementType);
+    auto *tailElementTLE =
+        tailElementTI.buildTypeLayoutEntry(IGM, tailElementType,
+                                           /*useStructLayouts*/ true);
+    if (!tailElementTLE->isFixedSize(IGM)) {
+      return std::nullopt;
+    }
+    tailElementTLEs.push_back(tailElementTLE);
+    unionAlignmentMask =
+        std::max(unionAlignmentMask,
+                 tailElementTLE->fixedAlignment(IGM)->getMaskValue());
+    unionSize = std::max(unionSize, tailElementTLE->fixedSize(IGM)->getValue());
+  }
+  uint64_t unionOffset = (offset + unionAlignmentMask) & ~unionAlignmentMask;
+  if (unionOffset > offset) {
+    layoutProperties.push_back({offset, unionOffset - offset,
+                                TypedMemoryLayoutSemantics::GenericData});
+  }
+  for (auto *tailElementTLE : tailElementTLEs) {
+    if (!tailElementTLE->computeLayoutSemantics(IGM, unionOffset,
+                                                layoutProperties)) {
+      return std::nullopt;
+    }
+  }
+  offset = unionOffset + unionSize;
+
   llvm::stable_sort(layoutProperties,
                     [&](LayoutSemanticsSpan L, LayoutSemanticsSpan R) {
                       return L.Offset < R.Offset;
@@ -2672,7 +2705,7 @@ std::optional<uint64_t> irgen::computeTypedMallocTypeDescriptor(
       getTypedMemoryDescriptorStableSipHash(layoutString) & 0xffffffff;
 
   uint64_t summary = 0; // Version 0
-  summary |= (isArray ? 2 : 1) << 6; // Callsite flags: Array | FixedSize
+  summary |= uint64_t(callsiteFlags) << 6; // Callsite flags
   summary |= 2 << 10;   // Type kind: Swift
   summary |= ((uint64_t)layoutSemantics) << 16;
 

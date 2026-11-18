@@ -2294,6 +2294,23 @@ bool SILParser::parseForwardingOwnershipKind(
   return false;
 }
 
+bool SILParser::parseTailElems(SmallVectorImpl<SILType> &ElementTypes,
+                               SmallVectorImpl<SILValue> &ElementCounts,
+                               SILBuilder &B) {
+  SILType ElemTy;
+  if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() || P.Tok.getText() != "*")
+    return true;
+  P.consumeToken();
+
+  SILValue ElemCount;
+  if (parseTypedValueRef(ElemCount, B))
+    return true;
+
+  ElementTypes.push_back(ElemTy);
+  ElementCounts.push_back(ElemCount);
+  return false;
+}
+
 ///  (',' sil-loc)? (',' sil-scope-ref)?
 bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
   // Parse the debug information, if any.
@@ -5478,18 +5495,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (Optional == "non_nested") {
         isNested = StackAllocationIsNotNested;
       } else if (Optional == "tail_elems") {
-        SILType ElemTy;
-        if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
-            P.Tok.getText() != "*")
+        if (parseTailElems(ElementTypes, ElementCounts, B))
           return true;
-        P.consumeToken();
-
-        SILValue ElemCount;
-        if (parseTypedValueRef(ElemCount, B))
-          return true;
-
-        ElementTypes.push_back(ElemTy);
-        ElementCounts.push_back(ElemCount);
       } else {
         return true;
       }
@@ -5550,9 +5557,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDeallocPackMetadata(InstLoc, Val);
     break;
   case SILInstructionKind::DeallocRefInst: {
+    SmallVector<SILType, 2> ElementTypes;
+    SmallVector<SILValue, 2> ElementCounts;
+    while (P.consumeIf(tok::l_square)) {
+      Identifier Id;
+      parseSILIdentifier(Id, diag::expected_in_attribute_list);
+      StringRef Optional = Id.str();
+      if (Optional == "tail_elems") {
+        if (parseTailElems(ElementTypes, ElementCounts, B))
+          return true;
+      } else {
+        return true;
+      }
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    }
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDeallocRef(InstLoc, Val);
+    ResultVal = B.createDeallocRef(InstLoc, Val, ElementTypes, ElementCounts);
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {

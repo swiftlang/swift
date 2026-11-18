@@ -1038,6 +1038,22 @@ public:
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
 
+  /// The `@_tailAllocated` element types of \p classType's class, substituted
+  /// for it, as formal types and lowered with the owner's generic abstraction
+  /// (which the SIL verifier requires of `alloc_ref` and `dealloc_ref`).
+  /// Returns false if the class has none or this isn't Embedded Swift.
+  bool getTailAllocatedElementTypes(CanType classType,
+                                    SmallVectorImpl<CanType> &formalTypes,
+                                    SmallVectorImpl<SILType> &loweredTypes);
+
+  /// The tail elements of a `@_tailAllocated` class instance, for its
+  /// `dealloc_ref`: the attribute's element types and the counts read from its
+  /// counts property. Empty if the class has none or this isn't Embedded
+  /// Swift.
+  void emitTailAllocatedElements(SILLocation loc, SILValue selfValue,
+                                 SmallVectorImpl<SILType> &tailTypes,
+                                 SmallVectorImpl<SILValue> &tailCounts);
+
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);

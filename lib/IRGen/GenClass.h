@@ -175,9 +175,9 @@ namespace irgen {
                                           TailArraysRef TailArrays);
 
   /// Emit class deallocation.
-  void emitClassDeallocation(IRGenFunction &IGF,
-                             SILType selfType,
-                             llvm::Value *selfValue);
+  void emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
+                             llvm::Value *selfValue,
+                             TailArraysRef TailArrays = {});
 
   /// Emit class deallocation.
   void emitPartialClassDeallocation(IRGenFunction &IGF,

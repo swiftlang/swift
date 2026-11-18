@@ -2160,6 +2160,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  VarDecl *loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                       uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");

@@ -1713,8 +1713,10 @@ public:
       *this << "[stack] ";
     if (!ARI->isStackAllocationNested())
       *this << "[non_nested] ";
-    auto Types = ARI->getTailAllocatedTypes();
-    auto Counts = ARI->getTailAllocatedCounts();
+    printTailElems(ARI->getTailAllocatedTypes(), ARI->getTailAllocatedCounts());
+  }
+
+  void printTailElems(ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
@@ -3084,6 +3086,7 @@ public:
     *this << getIDAndType(ESRL->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
+    printTailElems(DI->getTailAllocatedTypes(), DI->getTailAllocatedCounts());
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {

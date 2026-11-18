@@ -1794,6 +1794,24 @@ void ResolveRawLayoutTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
+// ResolveTailAllocatedTypesRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<Type>>
+ResolveTailAllocatedTypesRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  if (llvm::any_of(attr->Types, [](Type type) { return !type; }))
+    return std::nullopt;
+  return ArrayRef<Type>(attr->Types);
+}
+
+void ResolveTailAllocatedTypesRequest::cacheResult(ArrayRef<Type> value) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(value.size() == attr->Types.size());
+  llvm::copy(value, attr->Types.begin());
+}
+
+//----------------------------------------------------------------------------//
 // RenamedDeclRequest computation.
 //----------------------------------------------------------------------------//
 

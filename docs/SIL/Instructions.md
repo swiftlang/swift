@@ -507,10 +507,15 @@ Marks the deallocation of the stack space for an `alloc_ref [stack]`.
 ### dealloc_ref
 
 ```
-sil-instruction ::= 'dealloc_ref' sil-operand
+sil-instruction ::= 'dealloc_ref'
+                      ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                      sil-operand
 
 dealloc_ref %0 : $T
+dealloc_ref [tail_elems $E * %1 : $Builtin.Int64] %0 : $T
 // $T must be a class type
+// $E is the type of the tail-allocated elements
+// %1 must be of a builtin integer type
 ```
 
 Deallocates an uninitialized class type instance, bypassing the
@@ -518,6 +523,13 @@ reference counting mechanism.
 
 The type of the operand must match the allocated type exactly, or else
 undefined behavior results.
+
+The optional `tail_elems` attributes specify the element types and element
+counts of the tail-allocated arrays, which must be the ones the instance was
+allocated with, in the same order, so that the deallocation can pass the
+allocation's size (and, with typed allocation, its type ID). The
+count-operand must be of a builtin integer type. The `tail_elems` attributes
+are required for a class with `@_tailAllocated` in Embedded Swift.
 
 The instance must have a retain count of one.
 

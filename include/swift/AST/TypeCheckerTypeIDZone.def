@@ -449,6 +449,12 @@ SWIFT_REQUEST(TypeChecker, ResolvePreInverseGenericsRequest,
 SWIFT_REQUEST(TypeChecker, ResolveRawLayoutTypeRequest,
               Type(StructDecl *, RawLayoutAttr *, bool),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveTailAllocatedTypesRequest,
+              ArrayRef<Type>(ClassDecl *, TailAllocatedAttr *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TailAllocatedCountsDeclRequest,
+              VarDecl *(ClassDecl *, TailAllocatedAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SPIGroupsRequest,
               llvm::ArrayRef<Identifier>(Decl *),
               SeparatelyCached | SplitCached, NoLocationInfo)

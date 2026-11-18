@@ -701,6 +701,11 @@ LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
 
+/// Enable @_tailAllocated, which describes the tail-allocated elements of a
+/// class so that typed deallocation in Embedded Swift can pass the size and
+/// type ID of the allocation.
+EXPERIMENTAL_FEATURE(TailAllocatedAttribute, true)
+
 /// Enable type-based scope restrictions on ~Escapable types.
 EXPERIMENTAL_FEATURE(ScopeRestrictions, false)
 
