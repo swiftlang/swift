@@ -114,7 +114,7 @@ const IRGenOptions &IRGenFunction::getOptions() const {
 
 // Returns the default atomicity of the module.
 Atomicity IRGenFunction::getDefaultAtomicity() {
-  return getSILModule().isDefaultAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
+  return IGM.getDefaultAtomicity();
 }
 
 /// Call the llvm.memcpy intrinsic.  The arguments need not already
