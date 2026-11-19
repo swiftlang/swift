@@ -106,6 +106,18 @@ bb0(%0 : @guaranteed $T):
   return %5 : $Builtin.RawPointer
 }
 
+// A loadable argument has no storage until AddressLowering converts it to an
+// address argument, so it is only accepted when it is guaranteed.
+//
+// VALID-LABEL: sil {{.*}}@loadable_argument :
+// VALID:         value_to_address %0 : $Builtin.Int64
+sil [ossa] @loadable_argument : $@convention(thin) (@in_guaranteed Builtin.Int64) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = address_to_pointer %1 : $*Builtin.Int64 to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
 //--- verifier-errors.sil
 import Builtin
 
@@ -123,6 +135,18 @@ bb0(%0 : @guaranteed $T):
   %3 = address_to_pointer %2 : $*T to $Builtin.RawPointer
   destroy_value %1 : $T
   return %3 : $Builtin.RawPointer
+}
+
+// A loadable argument is only accepted when it is guaranteed.
+//
+// OPAQUE-VALUES:       Begin Error in function loadable_owned_argument
+// OPAQUE-VALUES:       SIL verification failed: value_to_address of a loadable value must be a guaranteed indirect argument
+// OPAQUE-VALUES:       End Error in function loadable_owned_argument
+sil [ossa] @loadable_owned_argument : $@convention(thin) (@in Builtin.Int64) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = address_to_pointer %1 : $*Builtin.Int64 to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
 }
 
 //--- not-opaque-values.sil

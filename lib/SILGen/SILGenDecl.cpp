@@ -2793,11 +2793,11 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
   
   assert(ownership == ValueOwnership::Shared);
 
-  // The address of an address-only argument is value_to_address of the
+  // The address of a guaranteed indirect argument is value_to_address of the
   // argument. A buffer that holds a copy of it would have a different address.
   if (auto *param = dyn_cast<ParamDecl>(decl)) {
-    auto found = AddressOnlyGuaranteedArguments.find(param);
-    if (found != AddressOnlyGuaranteedArguments.end() &&
+    auto found = GuaranteedIndirectArguments.find(param);
+    if (found != GuaranteedIndirectArguments.end() &&
         isFullyAbstractedLowering(*this,
                                   decl->getTypeInContext()->getRValueType(),
                                   found->second->getType())) {

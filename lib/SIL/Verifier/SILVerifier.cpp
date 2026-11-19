@@ -5854,8 +5854,6 @@ public:
   void checkValueToAddressInst(ValueToAddressInst *VAI) {
     require(!F.hasLoweredAddresses(),
             "value_to_address is only valid in opaque values");
-    require(VAI->getType().isAddressOnly(F),
-            "value_to_address must produce an address-only value");
 
     auto isVariable = [](SILValue value) {
       if (auto *arg = dyn_cast<SILFunctionArgument>(value))
@@ -5888,6 +5886,16 @@ public:
             "value_to_address operand must be an indirect argument, a "
             "[var_decl] move_value or begin_borrow, a borrow accessor result, "
             "or a guaranteed coroutine yield");
+
+    // AddressLowering resolves the address of a loadable value only for a
+    // guaranteed indirect argument, whose address is the argument itself.
+    if (!VAI->getOperand()->getType().isAddressOnly(F)) {
+      auto *arg = dyn_cast<SILFunctionArgument>(VAI->getOperand());
+      require(arg && arg->getArgumentConvention() ==
+                         SILArgumentConvention::Indirect_In_Guaranteed,
+              "value_to_address of a loadable value must be a guaranteed "
+              "indirect argument");
+    }
   }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {

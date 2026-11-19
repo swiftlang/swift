@@ -8291,9 +8291,7 @@ class ValueToAddressInst
   ValueToAddressInst(SILDebugLocation DebugLoc, SILValue Operand)
       : UnaryInstructionBase(DebugLoc, Operand,
                              Operand->getType().getAddressType()) {
-    assert(Operand->getType().isObject() &&
-           Operand->getType().isAddressOnly(*Operand->getFunction()) &&
-           "Expected an address-only object operand");
+    assert(Operand->getType().isObject() && "Expected an object operand");
   }
 };
 
