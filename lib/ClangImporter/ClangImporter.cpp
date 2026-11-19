@@ -1250,14 +1250,7 @@ ClangImporter::computeClangImporterFileSystem(
   if (fileMapping.redirectedFiles.empty() && fileMapping.overridenFiles.empty())
     return baseFS;
 
-  // Compute and set working directory.
   const auto &importerOpts = ctx.ClangImporterOpts;
-  auto workingDirPos =
-      std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
-                "-working-directory");
-  if (workingDirPos != importerOpts.ExtraArgs.rend() &&
-      workingDirPos != importerOpts.ExtraArgs.rbegin())
-    baseFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
 
   if (!fileMapping.redirectedFiles.empty()) {
     if (importerOpts.DumpClangDiagnostics) {
@@ -1272,6 +1265,19 @@ ClangImporter::computeClangImporterFileSystem(
 
   auto overridenVFS =
       llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>();
+  auto overlayVFS =
+      llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(baseFS);
+  overlayVFS->pushOverlay(overridenVFS);
+
+  // Set the working directory on all layers before adding files, so relative
+  // paths are stored and looked up using the same working directory.
+  auto workingDirPos =
+      std::find(importerOpts.ExtraArgs.rbegin(), importerOpts.ExtraArgs.rend(),
+                "-working-directory");
+  if (workingDirPos != importerOpts.ExtraArgs.rend() &&
+      workingDirPos != importerOpts.ExtraArgs.rbegin())
+    overlayVFS->setCurrentWorkingDirectory(*(workingDirPos - 1));
+
   for (auto &file : fileMapping.overridenFiles) {
     if (importerOpts.DumpClangDiagnostics) {
       llvm::errs() << "clang importer overriding file '"
@@ -1287,9 +1293,6 @@ ClangImporter::computeClangImporterFileSystem(
       content = llvm::MemoryBufferRef(allocateString(content.getBuffer()), "");
     overridenVFS->addFileNoOwn(file->getBufferIdentifier(), 0, content);
   }
-  auto overlayVFS =
-      llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(baseFS);
-  overlayVFS->pushOverlay(std::move(overridenVFS));
   return overlayVFS;
 }
 
