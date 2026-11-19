@@ -173,6 +173,19 @@ extension SingleValueInstruction {
 
   private func sinkToEndOfLifetime(use: Operand, _ context: SimplifyContext) {
     let builder = Builder(before: use.instruction, context)
+
+    if let destroy = use.instruction as? DestroyValueInst, !hasValueTypeDestructor {
+      // Instead of re-creating the aggregate, just destroy its fields.
+      // This is what SimplifyDestroyValue would do anyway, but doing it here avoids creating (and later removing)
+      // an aggregate instruction for each destroy, which would cause quadratic complexity in SILCombine
+      // if there are many destroys.
+      for op in operands where op.value.ownership == .owned {
+        builder.createDestroyValue(operand: op.value, isDeadEnd: destroy.isDeadEnd)
+      }
+      // The original destroy is erased together with this aggregate in `splitOwnedAggregate`.
+      return
+    }
+
     let delayedAggregate: Value
     switch self {
     case is StructInst:
@@ -183,6 +196,14 @@ extension SingleValueInstruction {
       fatalError("unexpected aggregate instruction")
     }
     use.set(to: delayedAggregate, context)
+  }
+
+  private var hasValueTypeDestructor: Bool {
+    if self is StructInst {
+      // Moving the destroy to a non-copyable struct's fields would drop the deinit call!
+      return type.nominal!.valueTypeDestructor != nil
+    }
+    return false
   }
 }
 
