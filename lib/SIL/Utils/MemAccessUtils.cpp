@@ -783,6 +783,23 @@ bool swift::isIdentityAndOwnershipPreservingRefCast(
   }
 }
 
+// Like isIdentityPreservingRefCast, but doesn't look through
+// unconditional_checked_cast. Used to find the reference root of class, tail
+// and box access storage.
+//
+// Class properties are identified by their field index. If the root were found
+// by looking through checked casts, properties of unrelated (e.g. sibling)
+// classes with the same field index would be treated as identical storage:
+//
+//   %a = unconditional_checked_cast %0 to A
+//   %x = ref_element_addr %a, #A.x   // field index 0
+//   %b = unconditional_checked_cast %0 to B
+//   %y = ref_element_addr %b, #B.y   // field index 0
+static bool isAccessStorageRefCast(SingleValueInstruction *svi) {
+  return isIdentityPreservingRefCast(svi) &&
+         !isa<UnconditionalCheckedCastInst>(svi);
+}
+
 namespace {
 
 // Essentially RC identity where the starting point is already a reference.
@@ -812,7 +829,7 @@ protected:
         continue;
       }
       // If preserveOwnership is true, stop at the first owned root
-      if (!isIdentityPreservingRefCast(svi)) {
+      if (!isAccessStorageRefCast(svi)) {
         break;
       }
       ref = svi->getOperand(0);
@@ -1866,7 +1883,7 @@ AccessPathDefUseTraversal::UseKind
 AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
                                                 DFSEntry dfs) {
   if (dfs.isRef()) {
-    if (isIdentityPreservingRefCast(svi)) {
+    if (isAccessStorageRefCast(svi)) {
       pushUsers(svi, dfs);
       return IgnoredUse;
     }
