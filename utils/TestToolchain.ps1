@@ -860,6 +860,12 @@ function Test-SourceKitLSP {
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
+    # The tests wait for the background indexing, which runs at the lowest
+    # priority, so they wait longer when other tests run at the same time.
+    if (-not $env:SOURCEKIT_LSP_TEST_TIMEOUT) {
+      $env:SOURCEKIT_LSP_TEST_TIMEOUT = "600"
+    }
+
     Build-SPMProject `
       -Action TestParallel `
       -Src "$SourceCache\sourcekit-lsp" `
