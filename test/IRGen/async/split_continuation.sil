@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -sil-verify-all | %IRGenFileCheck %s
 
 // REQUIRES: concurrency
 // REQUIRES: PTRSIZE=64
@@ -32,11 +32,31 @@ bb0:
 // CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1)
 // CHECK:   [[CTXADDR:%.*]] = getelementptr inbounds nuw %swift.task, ptr %1, i32 0, i32 {{[0-9]+}}
 // CHECK:   [[CTX:%.*]] = load ptr, ptr [[CTXADDR]]
-// CHECK:   [[PARENT:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr [[CTX]], i32 0, i32 0
+// With pointer authentication, the context is authenticated after the load, and
+// the parent context and the resume function are signed before the stores. Each
+// uses its field's address blended with the discriminator from
+// SpecialPointerAuthDiscriminators: TaskResumeContext (30010),
+// AsyncContextParent (48546) and AsyncContextResume (55047).
+// CHECK-ptrauth:   [[CTXADDRINT:%.*]] = ptrtoint ptr [[CTXADDR]] to i64
+// CHECK-ptrauth:   [[CTXDISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[CTXADDRINT]], i64 30010)
+// CHECK-ptrauth:   [[CTXINT:%.*]] = ptrtoint ptr [[CTX]] to i64
+// CHECK-ptrauth:   [[AUTHED:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[CTXINT]], i32 2, i64 [[CTXDISC]])
+// CHECK-ptrauth:   [[CTXPTR:%.*]] = inttoptr i64 [[AUTHED]] to ptr
+// CHECK-ptrauth:   [[PARENT:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr [[CTXPTR]], i32 0, i32 0
+// CHECK-noptrauth: [[PARENT:%.*]] = getelementptr inbounds nuw %swift.continuation_context, ptr [[CTX]], i32 0, i32 0
 // CHECK:   [[PARENTFIELD:%.*]] = getelementptr inbounds nuw %swift.context, ptr [[PARENT]], i32 0, i32 0
+// CHECK-ptrauth:   [[PARENTADDRINT:%.*]] = ptrtoint ptr [[PARENTFIELD]] to i64
+// CHECK-ptrauth:   [[PARENTDISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[PARENTADDRINT]], i64 48546)
+// CHECK-ptrauth:   call i64 @llvm.ptrauth.sign(i64 {{%.*}}, i32 2, i64 [[PARENTDISC]])
 // CHECK:   store ptr {{%.*}}, ptr [[PARENTFIELD]]
 // CHECK:   [[RESUMEFIELD:%.*]] = getelementptr inbounds nuw %swift.context, ptr [[PARENT]], i32 0, i32 1
-// CHECK:   store ptr @split_awaitTQ0_, ptr [[RESUMEFIELD]]
+// CHECK-ptrauth:   [[RESUMEADDRINT:%.*]] = ptrtoint ptr [[RESUMEFIELD]] to i64
+// CHECK-ptrauth:   [[RESUMEDISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[RESUMEADDRINT]], i64 55047)
+// CHECK-ptrauth:   [[RESUMEFN:%.*]] = ptrtoint ptr @split_awaitTQ0_ to i64
+// CHECK-ptrauth:   [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 [[RESUMEFN]], i32 0, i64 [[RESUMEDISC]])
+// CHECK-ptrauth:   [[SIGNEDPTR:%.*]] = inttoptr i64 [[SIGNED]] to ptr
+// CHECK-ptrauth:   store ptr [[SIGNEDPTR]], ptr [[RESUMEFIELD]]
+// CHECK-noptrauth: store ptr @split_awaitTQ0_, ptr [[RESUMEFIELD]]
 // CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1)
 // CHECK: }
 
