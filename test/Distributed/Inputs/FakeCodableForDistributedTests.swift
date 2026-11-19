@@ -15,6 +15,8 @@
 /// Fake encoder intended to serialize into a string representation easy to
 /// assert on.
 public final class FakeEncoder {
+  public init() {}
+
   public func encode<T: Encodable>(_ value: T) throws -> String {
     let stringsEncoding = StringsEncoding()
     try value.encode(to: stringsEncoding)
@@ -369,6 +371,8 @@ fileprivate struct StringsSingleValueEncoding: SingleValueEncodingContainer {
 }
 
 public final class FakeDecoder: Decoder {
+  public init() {}
+
   public var codingPath: [CodingKey] = []
   public var userInfo: [CodingUserInfoKey: Any] = [:]
 
