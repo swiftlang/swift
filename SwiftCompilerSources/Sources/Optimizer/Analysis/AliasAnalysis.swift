@@ -833,6 +833,14 @@ private enum ImmutableScope {
           return
         }
         return nil
+      case .pointer(let p2a):
+        // A global `let` whose addressor is not available (otherwise the access base would be `.global`),
+        // e.g. because it's defined in another module. Such a global cannot be initialized in this function.
+        if p2a.isResultOfGlobalLetAddressorCall && !basedAddress.parentFunction.isGlobalInitOnceFunction {
+          self = .wholeFunction
+          return
+        }
+        return nil
       default:
         return nil
       }

@@ -31,4 +31,4 @@ markUsed(advanced.foo(1, 2))
 // DWARF-NOT: "Swift.Optional"
 
 // DWARF-DAG: file_names{{.*}}
-// DWARF-NEXT: "Imports.swift"
+// DWARF-NEXT: {{"|/|\\\\}}Imports.swift"

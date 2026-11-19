@@ -29,6 +29,8 @@
 // ```
 //===----------------------------------------------------------------------===//
 
+import AST
+
 /// AccessBase describes the base address of a memory access (e.g. of a `load` or `store``).
 /// The "base address" is defined as the address which is obtained from the access address by
 /// looking through all address projections.
@@ -204,8 +206,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
-      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .borrowMutateAccessor, .index,
-           .unidentified:
+      case .pointer(let p2a):  return p2a.isResultOfGlobalLetAddressorCall
+      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .borrowMutateAccessor, .index, .unidentified:
         return false
     }
   }
@@ -513,6 +515,19 @@ public extension PointerToAddressInst {
       return global
     }
     return nil
+  }
+
+  /// True if this is the result of a call to the addressor of a global `let` variable.
+  /// Other than `resultOfGlobalAddressorCall` this also works if the global's `GlobalVariable` is
+  /// not known, e.g. if the addressor is defined in another module.
+  var isResultOfGlobalLetAddressorCall: Bool {
+    if isStrict,
+       let apply = pointer as? ApplyInst,
+       let callee = apply.referencedFunction
+    {
+      return callee.isAddressorOfGlobalLet
+    }
+    return false
   }
 }
 
@@ -874,6 +889,17 @@ extension Function {
       return ga.global
     }
     return nil
+  }
+
+  /// True if this is a `[global_init]` function (= addressor) of a global `let` variable.
+  ///
+  /// Other than `globalOfGlobalInitFunction` this also works if the function is only a declaration,
+  /// e.g. the addressor of a global which is defined in another module.
+  public var isAddressorOfGlobalLet: Bool {
+    guard isGlobalInitFunction, let varDecl = declRef.location.decl as? VarDecl else {
+      return false
+    }
+    return varDecl.isLet
   }
 }
 

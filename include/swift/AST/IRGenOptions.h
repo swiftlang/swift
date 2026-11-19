@@ -293,8 +293,9 @@ public:
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
-  /// The DWARF version of debug info.
-  uint8_t DWARFVersion = 4;
+  /// The DWARF version of debug info. The driver always passes the target's
+  /// default explicitly via -dwarf-version.
+  uint8_t DWARFVersion = 5;
 
   /// The command line string that is to be stored in the debug info.
   std::string DebugFlags;
