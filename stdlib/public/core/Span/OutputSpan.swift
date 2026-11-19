@@ -103,6 +103,27 @@ extension OutputSpan where Element: ~Copyable {
   @export(implementation)
   @_transparent
   public var isFull: Bool { count == _nnCapacity() }
+
+  /// Unsafely accesses the number of initialized elements in this span.
+  ///
+  /// Writing through the returned reference changes `count` without
+  /// initializing or deinitializing any element. The caller must keep the
+  /// span consistent: the new count must be between 0 and `capacity`, and
+  /// exactly that many slots at the start of the buffer
+  /// must hold initialized elements.
+  ///
+  /// The returned reference represents a mutation of `self`, and `self`
+  /// cannot be used until the reference is no longer in use.
+  @available(StdlibDeploymentTarget 6.4, *)
+  @unsafe
+  @export(implementation)
+  public var _unsafeStoredCount: MutableRef<Int> {
+    @_lifetime(&self)
+    @_transparent
+    mutating get {
+      MutableRef(&_count)
+    }
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
