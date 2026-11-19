@@ -1,0 +1,96 @@
+//===--- PreparedOverloadChanges.def - Metaprogramming support ---*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with
+// PreparedOverloadChange.
+//
+// Defining an x-macro file for this feels excessive, but any other safe
+// pattern is somehow even worse.
+//
+//===----------------------------------------------------------------------===//
+
+/// CHANGE(ID, STRUCT_BODY, VISIT_ARGS)
+///   ID is the name of the case.
+///   STRUCT_BODY is the body of a struct providing the payload for the case.
+///   VISIT_ARGS is a call argument clause deriving the arguments for the
+///     visit##ID method of the visitor class from a local variable named
+///     `self` of the case's payload struct type.
+#ifndef CHANGE
+#error must define the CHANGE macro before including this file
+#endif
+
+#ifndef LAST_CHANGE
+#define LAST_CHANGE(ID, BODY, VISIT) CHANGE(ID, BODY, VISIT)
+#endif
+
+/// A generic parameter was opened to a type variable.
+CHANGE(AddedTypeVariable, {
+  TypeVariableType *TheType;
+},
+(self.TheType))
+
+/// A generic requirement was opened to a constraint.
+CHANGE(AddedConstraint, {
+  Constraint *TheConstraint;
+},
+(self.TheConstraint))
+
+/// Special case of a Bind constraint.
+CHANGE(AddedBindConstraint, {
+  Type FirstType;
+  Type SecondType;
+},
+(self.FirstType, self.SecondType))
+
+/// A mapping of generic parameter types to type variables
+/// was recorded.
+CHANGE(OpenedTypes, {
+  ArrayRef<OpenedType> Data;
+},
+(self.Data))
+
+/// An existential type was opened.
+CHANGE(OpenedExistentialType, {
+  ExistentialArchetypeType *TheType;
+},
+(self.TheType))
+
+/// A pack expansion type was opened.
+CHANGE(OpenedPackExpansionType, {
+  PackExpansionType *TheExpansion;
+  TypeVariableType *TypeVar;
+},
+(self.TheExpansion, self.TypeVar))
+
+/// A property wrapper was applied to a parameter.
+CHANGE(AppliedPropertyWrapper, {
+  Type WrapperType;
+  PropertyWrapperInitKind InitKind;
+},
+(self.WrapperType, self.InitKind))
+
+/// A fix was recorded because a property wrapper application failed.
+CHANGE(AddedFix, {
+  ConstraintFix *TheFix;
+  FixImpact Impact;
+},
+(self.TheFix, self.Impact))
+
+/// The type of an AST node was changed.
+LAST_CHANGE(RecordedNodeType, {
+  ASTNode Node;
+  Type TheType;
+},
+(self.Node, self.TheType))
+
+#undef LAST_CHANGE
+#undef CHANGE
