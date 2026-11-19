@@ -1692,6 +1692,7 @@ protected:
     if (!isDiagnosedNonEscapable(resultTy))
       return std::nullopt;
 
+    auto *storage = accessor->getStorage();
     std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
@@ -1702,7 +1703,11 @@ protected:
       wrappedAccessorKind = AccessorKind::Get;
       break;
     case AccessorKind::Get:
-      // getters are synthesized as access to a stored property.
+      // A getter wrapping an 'unsafeAddress' accessor loads from an address
+      // projected out of the borrowed 'self'.
+      if (storage->getReadImpl() == ReadImplKind::Address)
+        return LifetimeDependenceKind::Scope;
+      // Other getters are synthesized as access to a stored property.
       break;
     default:
       // Unknown synthesized accessor.
@@ -1711,8 +1716,7 @@ protected:
       return std::nullopt;
     }
     if (wrappedAccessorKind) {
-      auto *var = cast<AbstractStorageDecl>(accessor->getStorage());
-      for (auto *wrappedAccessor : var->getAllAccessors()) {
+      for (auto *wrappedAccessor : storage->getAllAccessors()) {
         if (wrappedAccessor->isImplicit())
           continue;
         if (wrappedAccessor->getAccessorKind() == wrappedAccessorKind) {

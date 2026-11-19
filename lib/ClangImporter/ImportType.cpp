@@ -2406,23 +2406,32 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // A reference to a non-Escapable type cannot be imported (see
   // VisitReferenceType). Some operators that return one are still useful.
   const auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
-  if (method && method->getNumExplicitParams() == 0 &&
-      clangDecl->getReturnType()->isReferenceType() &&
+  if (method && clangDecl->getReturnType()->isReferenceType() &&
       isNonEscapable(SwiftContext.evaluator,
                      clangDecl->getReturnType()->getPointeeType().getTypePtr(),
                      nullptr)) {
+    bool takesNoArguments = method->getNumExplicitParams() == 0;
+
+    // A method synthesized to forward to an inherited operator is not an
+    // operator itself, but backs the same synthesized members.
+    auto effectiveOp = op;
+    for (const auto *forwarded = getForwardedCXXMethod(method); forwarded;
+         forwarded = getForwardedCXXMethod(forwarded))
+      effectiveOp = forwarded->getOverloadedOperator();
+
     // A prefix ++ or -- returns a reference to self, and is only called for its
     // side effect, e.g. by the synthesized 'successor()'. Drop its result.
-    if (op == clang::OO_PlusPlus || op == clang::OO_MinusMinus)
+    if ((effectiveOp == clang::OO_PlusPlus ||
+         effectiveOp == clang::OO_MinusMinus) &&
+        takesNoArguments)
       return voidResult();
 
-    // A dereference operator whose result depends on 'self' backs a 'pointee'
-    // property with an 'unsafeAddress' accessor, which never dereferences the
-    // 'Unsafe(Mutable)Pointer'. Import the reference as one.
-    if (op == clang::OO_Star &&
-        (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
-             clangDecl) ||
-         isSmartPointerDereference(method))) {
+    // A dereference or subscript operator only backs the synthesized 'pointee'
+    // property or subscript. For a non-Escapable element those use address
+    // accessors, which never dereference the 'Unsafe(Mutable)Pointer'. Import
+    // the reference as one.
+    if ((effectiveOp == clang::OO_Star && takesNoArguments) ||
+        effectiveOp == clang::OO_Subscript) {
       auto pointeeQualType = clangDecl->getReturnType()->getPointeeType();
       Type pointeeType = importTypeIgnoreIUO(
           pointeeQualType, ImportTypeKind::Value,

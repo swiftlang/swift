@@ -91,6 +91,15 @@ public class OuterGeneric<T> {
 public func takesNestedInGenericClass(_ c: OuterGeneric<Int>.NestedClass) {}
 public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fatalError() }
 
+// Pointers other than OpaquePointer can't be generic arguments in C++.
+public func returnsDoubleOptionalPointer() -> UnsafePointer<Int>?? { nil }
+public func returnsArrayOfOptionalPointers() -> [UnsafePointer<Int>?] { [] }
+public func takesArrayOfRawPointers(_ p: [UnsafeRawPointer?]) {}
+
+public struct HasDoubleOptionalPointerProperty {
+  public var p: UnsafePointer<Int>??
+}
+
 // CHECK: supported
 
 // Struct1<UInt32> can't be represented in C++, so index1 is not printed.
@@ -142,8 +151,11 @@ public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fat
 
 // CHECK: class Struct1 { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'Struct1' can not yet be represented in C++");
 
+// CHECK: // Unavailable in C++: Swift global function 'returnsArrayOfOptionalPointers()'. Return type '[UnsafePointer<Int>?]' is not representable in C++.
+// CHECK: // Unavailable in C++: Swift global function 'returnsDoubleOptionalPointer()'. Return type 'UnsafePointer<Int>??' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'returnsGenericClass()'. Return type 'GenericClass<Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'returnsNestedInGenericClass()'. Return type 'OuterGeneric<Int>.NestedClass' is not representable in C++.
+// CHECK: // Unavailable in C++: Swift global function 'takesArrayOfRawPointers(_:)'. Parameter 'p' of type '[UnsafeRawPointer?]' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesGenericClass(_:)'. Parameter 'c' of type 'GenericClass<Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesKeyPath(_:)'. Parameter 'k' of type 'KeyPath<Int, Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesNestedInGenericClass(_:)'. Parameter 'c' of type 'OuterGeneric<Int>.NestedClass' is not representable in C++.

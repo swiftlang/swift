@@ -762,6 +762,17 @@ public:
       clang::CXXMethodDecl *>
       synthesizedForwardingMethods;
 
+  /// The C++ method that \p method , if it was built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , forwards to.
+  /// This scans \c synthesizedForwardingMethods , so keep it off hot paths.
+  const clang::CXXMethodDecl *
+  getForwardedCXXMethod(const clang::CXXMethodDecl *method) const {
+    for (const auto &[key, forwarding] : synthesizedForwardingMethods)
+      if (forwarding == method)
+        return std::get<2>(key);
+    return nullptr;
+  }
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>

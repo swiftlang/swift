@@ -13,6 +13,10 @@ public class RecordConfig {
 
     public struct Directory {
         public var path: String?
+
+        public func makeConfig() -> RecordConfig {
+            return RecordConfig()
+        }
     }
 
     public class File {
