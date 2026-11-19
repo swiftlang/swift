@@ -17,8 +17,6 @@ ___stdoutp
 __swift_concurrency_asyncMain
 __swift_concurrency_enqueueGlobal
 __swift_concurrency_enqueueMainExecutor
-__swift_concurrency_getMainExecutor
-__swift_concurrency_isMainExecutor
 _abort
 _exit
 _flockfile

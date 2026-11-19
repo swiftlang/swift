@@ -379,11 +379,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
-    if(NOT "${triple}" MATCHES "-none-")
-      list(APPEND extra_c_compile_flags
-        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
-    endif()
-
     if("${arch}" MATCHES "wasm32")
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
         ExecutorImpl.swift
@@ -400,6 +395,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
         ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       )
+    endif()
+
+    if(NOT "${triple}" MATCHES "-none-")
+      list(APPEND extra_c_compile_flags
+        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
+      list(APPEND SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
+        EmbeddedMainExecutor.swift)
     endif()
 
     # Restrict each call below to the current triple by temporarily narrowing
@@ -464,15 +466,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         embedded-concurrency-dispatch-executor
         swift_ConcurrencyDispatchExecutor
         PARTIAL_SOURCES_INTENDED
-        NON_EMPTY_OBJECT_FILE
         # Dispatch requires a hosted environment, including hosted C++ headers.
         NO_FREESTANDING_CXX
 
         DispatchGlobalExecutor.cpp
-        DispatchExecutor.swift
-
-        DEPENDS
-          "embedded-concurrency-${mod}"
 
         C_COMPILE_FLAGS
           ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
