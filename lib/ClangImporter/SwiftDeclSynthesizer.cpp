@@ -1218,14 +1218,28 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
+  // C++ records that are move-only or can't be passed in registers are taken
+  // by const reference instead, so that reading the field neither consumes nor
+  // copies the record.
   auto recordType = Ctx.getCanonicalTagType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
+  bool getterSelfByRef = false;
+  if (isa<clang::CXXRecordDecl>(structDecl)) {
+    auto *def = structDecl->getDefinitionOrSelf();
+    getterSelfByRef =
+        !def->canPassInRegisters() ||
+        getCxxValueSemanticsKind(recordType.getTypePtr(), ImporterImpl) ==
+            CxxValueSemanticsKind::MoveOnly;
+  }
+  auto getterSelfType = getterSelfByRef
+                            ? Ctx.getLValueReferenceType(recordType.withConst())
+                            : recordType;
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
   auto cGetterType =
-      Ctx.getFunctionType(fieldDecl->getType(), {recordType},
+      Ctx.getFunctionType(fieldDecl->getType(), {getterSelfType},
                           clang::FunctionProtoType::ExtProtoInfo());
   auto cGetterDecl = createClangFunctionDecl(Ctx, structDecl->getDeclContext(),
                                          cGetterName, cGetterType);
@@ -1253,14 +1267,16 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   // Synthesize the getter body
   {
     auto cGetterSelf =
-        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, recordType);
+        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, getterSelfType);
     cGetterDecl->setParams(cGetterSelf);
 
-    auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterSelfExpr = createClangDeclRefExpr(
+        Ctx, cGetterSelf, getterSelfType.getNonReferenceType(),
+        clang::VK_LValue);
     auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
+        /*isarrow=*/false, fieldDecl,
+        getterSelfByRef ? fieldType.withConst() : fieldType, clang::VK_LValue,
         clang::OK_BitField);
     auto cGetterExpr = clang::ImplicitCastExpr::Create(
         Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
