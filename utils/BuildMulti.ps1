@@ -372,20 +372,30 @@ function Merge-StagedPlatformRoots {
   $script:StagedPlatformRoots = @()
 }
 
-foreach ($Architecture in $SelectedWindowsSDKArchitectures) {
-  if ($Architecture -eq $HostSDKArchitecture) { continue }
-  $PlatformRoot = "$BinaryCache\SDKStaging\$Architecture\Windows.platform"
-  if ($Toolchain) {
-    Remove-Item -Force -Recurse $PlatformRoot -ErrorAction Ignore
+function Start-SDKJobs([switch] $Idle) {
+  foreach ($Architecture in $SelectedWindowsSDKArchitectures) {
+    if ($Architecture -eq $HostSDKArchitecture) { continue }
+    $PlatformRoot = "$BinaryCache\SDKStaging\$Architecture\Windows.platform"
+    if ($Toolchain) {
+      Remove-Item -Force -Recurse $PlatformRoot -ErrorAction Ignore
+    }
+    $script:SDKJobs += Start-BuildJob "BuildSDK-Windows-$Architecture" BuildSDK.ps1 -BelowNormal:(-not $Idle) -Idle:$Idle @{
+      Platform = "Windows";
+      Architectures = @($Architecture);
+      SupportedArchitectures = $SelectedWindowsSDKArchitectures;
+      LinkModes = $WindowsSDKLinkModes;
+      PlatformRoot = $PlatformRoot;
+    }
+    $script:StagedPlatformRoots += $PlatformRoot
   }
-  $SDKJobs += Start-BuildJob "BuildSDK-Windows-$Architecture" BuildSDK.ps1 -BelowNormal @{
-    Platform = "Windows";
-    Architectures = @($Architecture);
-    SupportedArchitectures = $SelectedWindowsSDKArchitectures;
-    LinkModes = $WindowsSDKLinkModes;
-    PlatformRoot = $PlatformRoot;
-  }
-  $StagedPlatformRoots += $PlatformRoot
+}
+
+# Without the installer, only the end of the build needs the SDKs of the other
+# architectures. So when the tests run, these SDKs build after the Stage2
+# compilers, with the processors that the tests leave, and merge at the end.
+$DeferSDKJobs = $Toolchain -and $CompilerTests -and -not $Package
+if (-not $DeferSDKJobs) {
+  Start-SDKJobs
 }
 
 $AndroidSDKJobs = @()
@@ -466,12 +476,17 @@ if ($Toolchain) {
   } finally {
     $ThisProcess.PriorityClass = $ThisPriority
   }
+  if ($DeferSDKJobs) {
+    Start-SDKJobs -Idle
+  }
 
   # Then, what uses the Stage2 build tree, with the longest chain of
   # dependencies here. The Macros wait for the configuration of the tools.
   $LateJobs = @(Invoke-ToolchainSteps "" CompilerRuntime -Background)
   Wait-BuildJobs @($ToolsJob)
-  Merge-StagedPlatformRoots
+  if (-not $DeferSDKJobs) {
+    Merge-StagedPlatformRoots
+  }
   $LateJobs += Invoke-ToolchainSteps "" Macros -Configured -Background
   $LateJobs += Invoke-ToolchainSteps "" Format -Background
   # The tests of the compilers only use the Stage2 build tree, so what they need
@@ -490,7 +505,9 @@ if ($Toolchain) {
   Invoke-ToolchainSteps "" Finish
 }
 
-Merge-StagedPlatformRoots
+if (-not $DeferSDKJobs) {
+  Merge-StagedPlatformRoots
+}
 Wait-BuildJobs $AndroidSDKJobs
 
 # The installer does not change the image, so it builds while the tests run.
@@ -569,6 +586,7 @@ if ($Test -and -not $IsCrossCompiling) {
 }
 
 Wait-BuildJobs ($TestJobs + $InstallerJobs)
+Merge-StagedPlatformRoots
 if ($Failure) {
   throw $Failure
 }
