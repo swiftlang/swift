@@ -8365,12 +8365,34 @@ ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
   return {};
 }
 
-Type ClangImporter::importVarDeclType(
-    const clang::VarDecl *decl, VarDecl *swiftDecl, DeclContext *dc) {
+Type ClangImporter::importVarDeclType(VarDecl *VD) {
+  auto *decl = cast<clang::VarDecl>(VD->getClangDecl());
+
+  auto importedType =
+      Impl.importClangVarType(decl, isInSystemModule(VD->getDeclContext()));
+
+  if (!importedType)
+    return ErrorType::get(Impl.SwiftContext);
+
+  if (auto attr = VD->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+    importedType =
+        importer::computeLegacyCArrayType(importedType, attr->getProjection());
+    if (!importedType)
+      return ErrorType::get(Impl.SwiftContext);
+  }
+
+  if (importedType.isImplicitlyUnwrapped())
+    VD->setImplicitlyUnwrappedOptional(true);
+
+  return importedType.getType();
+}
+
+ImportedType
+ClangImporter::Implementation::importClangVarType(const clang::VarDecl *decl,
+                                                  bool inSystemModule) {
   if (decl->getTemplateInstantiationPattern())
-    Impl.getClangSema().InstantiateVariableDefinition(
-        decl->getLocation(),
-        const_cast<clang::VarDecl *>(decl));
+    getClangSema().InstantiateVariableDefinition(
+        decl->getLocation(), const_cast<clang::VarDecl *>(decl));
 
   // If the declaration is const, consider it audited.
   // We can assume that loading a const global variable doesn't
@@ -8382,39 +8404,19 @@ Type ClangImporter::importVarDeclType(
   // Special case: NS Notifications
   if (isNSNotificationGlobal(decl))
     if (auto *newtypeDecl =
-            findSwiftNewtype(decl, Impl.getClangSema(), Impl.CurrentVersion)) {
-      declType = Impl.getClangASTContext().getTypedefType(
+            findSwiftNewtype(decl, getClangSema(), CurrentVersion)) {
+      declType = getClangASTContext().getTypedefType(
           clang::ElaboratedTypeKeyword::None,
           /*Qualifier=*/std::nullopt, newtypeDecl);
     }
 
-  bool inSystemModule = isInSystemModule(dc);
-
   // Note that we deliberately don't bridge most globals because we want to
   // preserve pointer identity.
-  auto importedType = Impl.importType(
+  return importType(
       declType,
       (isAudited ? ImportTypeKind::AuditedVariable : ImportTypeKind::Variable),
-      ImportDiagnosticAdder(Impl, decl, decl->getLocation()), inSystemModule,
+      ImportDiagnosticAdder(*this, decl, decl->getLocation()), inSystemModule,
       Bridgeability::None, getImportTypeAttrs(decl));
-
-  if (!importedType)
-    return ErrorType::get(Impl.SwiftContext);
-
-  if (!swiftDecl)
-    return importedType.getType();
-
-  if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>()) {
-    importedType =
-        importer::computeLegacyCArrayType(importedType, attr->getProjection());
-    if (!importedType)
-      return ErrorType::get(Impl.SwiftContext);
-  }
-
-  if (importedType.isImplicitlyUnwrapped())
-    swiftDecl->setImplicitlyUnwrappedOptional(true);
-
-  return importedType.getType();
 }
 
 bool ClangImporter::isInOverlayModuleForImportedModule(

@@ -749,9 +749,7 @@ public:
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) override;
 
-  Type importVarDeclType(const clang::VarDecl *clangDecl,
-                         VarDecl *swiftDecl,
-                         DeclContext *dc) override;
+  Type importVarDeclType(VarDecl *VD) override;
 
   std::optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
