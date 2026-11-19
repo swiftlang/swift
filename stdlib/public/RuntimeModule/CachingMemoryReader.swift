@@ -97,6 +97,14 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
+// The Uncached{Remote,Local}MemoryReader types have versions for
+// Linux/Android, macOS and Windows.
+// This breaks when building on Mac Catalyst, so we need this check still.
+// Note: RemoteMemoryReader is only really used by swift-backtrace.
+// In the future we will probably get the Runtime module building on other
+// platforms, such as iOS, but we will not use crash backtracing there, so this
+// check will become more important.
+#if os(Linux) || os(Android) || os(macOS) || os(Windows)
 @_spi(MemoryReaders)
 @available(BacktracingDT 6.2, *)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
@@ -128,3 +136,4 @@ extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
     self.init(for: UncachedLocalMemoryReader())
   }
 }
+#endif // os(Linux) || os(Android) || os(macOS) || os(Windows)
