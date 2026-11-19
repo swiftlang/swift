@@ -570,10 +570,15 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
         }
       }
 
-      # The configuration is the same, so CMake does not run again.
+      # The configuration is the same, so CMake does not run again. The suites
+      # other than swift only build C++ before they run, which does not load the
+      # stdlib DLLs, so it builds while the stdlib builds one module at a time.
       $CMakeMode = "Build"
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @($Suites | ForEach-Object { $CompilerTestSuites[$_].Depends })
+      $OtherDepends = @($Suites | Where-Object { $_ -ne "swift" } | ForEach-Object { $CompilerTestSuites[$_].Depends })
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets (@("swift-test-stdlib") + $OtherDepends)
+      if ($Suites -contains "swift") {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $CompilerTestSuites["swift"].Depends
+      }
     }
 
     if ($Run) {
