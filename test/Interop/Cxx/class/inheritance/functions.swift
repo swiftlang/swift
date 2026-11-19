@@ -123,4 +123,9 @@ FunctionsTestSuite.test("base members with unnamed parameters from derived") {
   expectEqual(derived(0), 4)
 }
 
+FunctionsTestSuite.test("base member taking rvalue reference from derived") {
+  let derived = DerivedFromRvalueRefParams()
+  expectEqual(derived.takesRvalueRef(consuming: NonCopyableArg(40), 2), 42)
+}
+
 runAllTests()
