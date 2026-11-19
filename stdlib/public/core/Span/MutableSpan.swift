@@ -1370,6 +1370,9 @@ extension MutableSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.4, *)
 extension MutableSpan: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
+
+  @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
   @export(implementation)

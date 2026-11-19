@@ -577,6 +577,9 @@ extension OutputRawSpan {
 @available(SwiftStdlib 6.4, *)
 extension OutputRawSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<UInt8>.BorrowingIterator
+
+  @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
   @export(implementation)

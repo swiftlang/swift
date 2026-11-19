@@ -663,6 +663,9 @@ extension InputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.5, *)
 extension InputSpan: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.5, *)
+  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
+
+  @available(SwiftStdlib 6.5, *)
   public typealias Failure = Never
 
   @available(SwiftStdlib 6.5, *)

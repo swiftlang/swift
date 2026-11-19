@@ -633,6 +633,9 @@ extension InputRawSpan {
 @available(SwiftStdlib 6.5, *)
 extension InputRawSpan: Iterable {
   @available(SwiftStdlib 6.5, *)
+  public typealias BorrowingIterator = Span<UInt8>.BorrowingIterator
+
+  @available(SwiftStdlib 6.5, *)
   public typealias Failure = Never
 
   @available(SwiftStdlib 6.5, *)
