@@ -1270,6 +1270,12 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
 # environment are reused for the next calls with the same arguments.
 $VsDevShellChanges = @{}
 
+# The scripts that this build starts reuse these changes too, through files in a
+# directory that the first script creates for the build.
+if (-not $env:SWIFT_BUILD_VSDEVSHELL_CACHE) {
+  $env:SWIFT_BUILD_VSDEVSHELL_CACHE = [IO.Path]::Combine([IO.Path]::GetTempPath(), "swift-vsdevshell-$([Guid]::NewGuid())")
+}
+
 function Get-EnvironmentVariables {
   $Variables = @{}
   foreach ($Variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
@@ -1292,6 +1298,15 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
     $DevCmdArguments += " -winsdk=none"
   } elseif ($WinSDKVersion) {
     $DevCmdArguments += " -winsdk=$WinSDKVersion"
+  }
+
+  $CacheFile = [IO.Path]::Combine($env:SWIFT_BUILD_VSDEVSHELL_CACHE, "$($DevCmdArguments -replace '[^A-Za-z0-9.=]+', '_').json")
+  if (-not $script:VsDevShellChanges.Contains($DevCmdArguments) -and (Test-Path $CacheFile)) {
+    # Windows PowerShell does not enumerate the array that ConvertFrom-Json returns.
+    $Cached = Get-Content -Raw -ErrorAction Stop $CacheFile | ConvertFrom-Json
+    $script:VsDevShellChanges[$DevCmdArguments] = @(foreach ($Change in $Cached) {
+      @{ Name = $Change.Name; Value = $Change.Value; Prefix = $Change.Prefix; Suffix = $Change.Suffix }
+    })
   }
 
   if ($script:VsDevShellChanges.Contains($DevCmdArguments)) {
@@ -1329,6 +1344,17 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
       }
     }
     $script:VsDevShellChanges[$DevCmdArguments] = $Changes
+
+    # Written to another file first, as other scripts may read it at any time.
+    # The first script to write it wins.
+    New-Item -ItemType Directory -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE | Out-Null
+    $TemporaryFile = "$CacheFile.$PID.tmp"
+    ConvertTo-Json -InputObject $Changes -Depth 3 | Set-Content -Path $TemporaryFile -Encoding UTF8
+    try {
+      Move-Item -ErrorAction Stop $TemporaryFile $CacheFile
+    } catch {
+      Remove-Item -ErrorAction Ignore $TemporaryFile
+    }
   }
 
   if ($CustomWinSDKRoot) {
