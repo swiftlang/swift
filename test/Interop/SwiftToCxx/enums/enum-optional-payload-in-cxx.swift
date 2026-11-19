@@ -46,7 +46,7 @@ public enum MatchResult {
 // Typed pointers are C pointers too, whether or not they are optional.
 
 // CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_typedptr::operator()(bool const * _Nullable val) const {
-// CHECK:        memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK:        memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 
 // CHECK:      SWIFT_INLINE_THUNK bool const * _Nullable MatchResult::getTypedptr() const {
 // CHECK:        bool const * _Nullable result;
@@ -54,7 +54,7 @@ public enum MatchResult {
 // CHECK-NEXT:   return result;
 
 // CHECK:      SWIFT_INLINE_THUNK MatchResult MatchResult::_impl_mutptr::operator()(int32_t * _Nonnull val) const {
-// CHECK:        memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK:        memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 
 // CHECK:      SWIFT_INLINE_THUNK int32_t * _Nonnull MatchResult::getMutptr() const {
 // CHECK:        int32_t * _Nonnull result;
