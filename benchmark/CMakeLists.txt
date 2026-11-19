@@ -236,6 +236,7 @@ set(SWIFT_BENCH_MODULES
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/CxxAssignment
     cxx-source/CxxSetToCollection
     cxx-source/CxxSpanTests
     cxx-source/CxxStringConversion

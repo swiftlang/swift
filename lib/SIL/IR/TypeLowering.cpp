@@ -32,6 +32,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -2984,6 +2985,10 @@ namespace {
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        auto *importer =
+            static_cast<ClangImporter *>(TC.Context.getClangModuleLoader());
+        if (importer->hasNonTrivialAssignmentOperator(D))
+          properties.setCustomAssign();
       }
 
       if (auto *clangDecl = D->getClangDecl()) {

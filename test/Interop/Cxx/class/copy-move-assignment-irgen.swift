@@ -19,17 +19,15 @@ public func copyAssign() {
 // CHECK-LABEL: define {{.*}}copyAssign
 // CHECK: call {{void|ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE:.*]])
 // CHECK: call {{void|ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE2:.*]])
-// CHECK: call {{void|ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE]])
-// CHECK: call {{void|(noundef )?ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS_|_ZN31NonTrivialCopyAndCopyMoveAssignC2EOS_|_ZN31NonTrivialCopyAndCopyMoveAssignC1ERKS|_ZN31NonTrivialCopyAndCopyMoveAssignC2ERKS_|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@AEBU0@@Z"}}(
-// CHECK-SAME: %[[COPY_INSTANCE]],
-// CHECK-SAME: ptr
-// CHECK-SAME: %[[COPY_INSTANCE2]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignaSERKS_|"\?\?4NonTrivialCopyAndCopyMoveAssign@@QEAAAEAU0@AEBU0@@Z"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE]], ptr {{(nonnull )?}}%[[COPY_INSTANCE2]])
 // CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE2]])
 // CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[COPY_INSTANCE]])
 
 // CHECK-LABEL: define {{.*}}takeAssign
 // CHECK: call {{void|ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[MOVE_INSTANCE:.*]])
-// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[MOVE_INSTANCE]])
+// CHECK: call {{void|ptr}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignC1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignC2Ev|"\?\?0NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[MOVE_TEMPORARY:.*]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignaSEOS_|"\?\?4NonTrivialCopyAndCopyMoveAssign@@QEAAAEAU0@\$\$QEAU0@@Z"}}(ptr {{(nonnull )?}}%[[MOVE_INSTANCE]], ptr {{(nonnull )?}}%[[MOVE_TEMPORARY]])
+// CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[MOVE_TEMPORARY]])
 // CHECK: call {{.*}} @{{_ZN31NonTrivialCopyAndCopyMoveAssignD1Ev|_ZN31NonTrivialCopyAndCopyMoveAssignD2Ev|"\?\?1NonTrivialCopyAndCopyMoveAssign@@QEAA@XZ"}}(ptr {{(nonnull )?}}%[[MOVE_INSTANCE]])
 
 // CHECK-LABEL: }

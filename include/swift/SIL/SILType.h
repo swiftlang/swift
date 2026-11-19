@@ -997,6 +997,8 @@ public:
   /// deinitialization.
   bool mayHaveCustomDeinit(const SILFunction &function) const;
 
+  bool mayHaveCustomAssign(const SILFunction &function) const;
+
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
   /// actors and actors, use isAnyActor().
