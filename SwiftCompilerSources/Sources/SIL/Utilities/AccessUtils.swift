@@ -257,7 +257,10 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case (.box(let pb1), .box(let pb2)):
       return pb1.box.referenceRoot == pb2.box.referenceRoot
     case (.class(let rea1), .class(let rea2)):
-      return rea1.fieldIndex == rea2.fieldIndex &&
+      // Comparing the field index is not sufficient: `referenceRoot` looks through casts, e.g.
+      // `unconditional_checked_cast`. Two fields of different (e.g. sibling) classes can have the same
+      // field index, but are different properties.
+      return rea1.varDecl == rea2.varDecl &&
              rea1.instance.referenceRoot == rea2.instance.referenceRoot
     case (.tail(let rta1), .tail(let rta2)):
       return rta1.instance.referenceRoot == rta2.instance.referenceRoot &&
