@@ -133,7 +133,7 @@ Tests.test("Copy service") {
   expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
 }
 
-Tests.test("Unannotated methods returning an OSObject subclass return +1 unless the name starts with 'get'") {
+Tests.test("Unannotated methods returning an OSMetaClassBase subclass return +1 unless the name starts with 'get'") {
   manager.reset()
 
   do {
@@ -153,7 +153,7 @@ Tests.test("Unannotated methods returning an OSObject subclass return +1 unless 
   expectEqual(manager.getTotalRetains() + 2, manager.getTotalReleases())
 }
 
-Tests.test("Missing annotation on non-OSObject subclass") {
+Tests.test("Missing annotation on non-OSMetaClassBase subclass") {
   manager.reset()
 
   do {
