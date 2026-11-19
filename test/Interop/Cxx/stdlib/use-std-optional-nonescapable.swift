@@ -20,8 +20,9 @@
 // CHECK: @{{.*}}6HolderV7pointeeSo4ViewVvlu : $@convention(method) (@guaranteed Holder) -> UnsafePointer<View>
 // CHECK: @{{.*}}6HolderVySo4ViewVs5Int32Vcilu : $@convention(method) (Int32, @guaranteed Holder) -> UnsafePointer<View>
 
-// 'pointee' projects the wrapped value out of the optional.
-// CHECK: @{{.*}}optionalView{{.*}}7pointeeSo4ViewVvg : $@convention(method) (@in_guaranteed std{{.*}}optional<View>) -> @lifetime(borrow address_for_deps 0) @owned View
+// 'pointee' projects the wrapped value out of the optional. 'CxxOptional'
+// supports non-copyable wrapped values, so it reads 'pointee' with a coroutine.
+// CHECK: @{{.*}}optionalView{{.*}}7pointee7WrappedQzvrTW : $@yield_once @convention(witness_method: CxxOptional) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @yields @in_guaranteed τ_0_1 for <std{{.*}}optional<View>, View>
 
 //--- Inputs/module.modulemap
 module Test {
@@ -43,6 +44,21 @@ inline View makeView(const int &x [[clang::lifetimebound]]) { return {&x}; }
 
 using OptionalView = std::optional<View>;
 using OptionalInt = std::optional<int>;
+
+struct SWIFT_NONESCAPABLE UniqueView {
+  const int *p = nullptr;
+  UniqueView() = default;
+  UniqueView(const UniqueView &) = delete;
+  UniqueView(UniqueView &&) = default;
+};
+
+inline UniqueView makeUniqueView(const int &x [[clang::lifetimebound]]) {
+  UniqueView v;
+  v.p = &x;
+  return v;
+}
+
+using OptionalUniqueView = std::optional<UniqueView>;
 
 struct SWIFT_NONESCAPABLE Holder {
   View v;
@@ -145,6 +161,35 @@ func escapableOptionalIsUnchanged() -> OptionalInt {
   return o
 }
 
+// A wrapped value that is neither Copyable nor Escapable is consumed by the
+// constructor, and the optional copies its lifetime.
+func takeNoncopyableCxxOptional<T: CxxOptional & ~Copyable & ~Escapable>(
+  _ x: borrowing T
+) -> Bool where T.Wrapped: ~Copyable & ~Escapable {
+  x.hasValue
+}
+
+@_lifetime(copy v)
+func wrapUnique(_ v: consuming UniqueView) -> OptionalUniqueView {
+  OptionalUniqueView(v)
+}
+
+@_lifetime(copy v)
+func wrapUniqueGeneric<O: CxxOptional<UniqueView> & ~Copyable & ~Escapable>(
+  _: O.Type, _ v: consuming UniqueView
+) -> O {
+  O(v)
+}
+
+@_lifetime(immortal)
+func makeNilUnique() -> OptionalUniqueView {
+  nil
+}
+
+func hasValueUnique(_ o: borrowing OptionalUniqueView) -> Bool {
+  o.hasValue && takeNoncopyableCxxOptional(o)
+}
+
 @_lifetime(borrow h)
 func deref(_ h: borrowing Holder) -> View {
   h.pointee
@@ -184,6 +229,15 @@ func escapesThroughInit() -> OptionalView {
   return OptionalView(v)
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-4 {{it depends on the lifetime of variable 'x'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func escapesThroughNoncopyableInit() -> OptionalUniqueView {
+  let x: Int32 = 42
+  return OptionalUniqueView(makeUniqueView(x))
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-3 {{it depends on the lifetime of variable 'x'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
 }
 

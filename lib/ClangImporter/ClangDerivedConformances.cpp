@@ -861,31 +861,33 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
 
   auto valueType = clangCtx.getTypeDeclType(value_type);
 
-  if (getCxxValueSemanticsKind(valueType.getTypePtr(), impl) !=
-      CxxValueSemanticsKind::Copyable) {
-    // CxxOptional doesn't support ~Copyable elements, so skip the constructor
-    // synthesis and the conformance, if the wrapped value is move-only.
+  // A copyable value is passed as 'const T &', which Swift imports as a
+  // borrowed parameter. A move-only value is passed as 'T &&', which Swift
+  // imports as a consuming parameter. Values that can be neither copied nor
+  // moved cannot be passed to the constructor.
+  bool isMoveOnly;
+  switch (getCxxValueSemanticsKind(valueType.getTypePtr(), impl)) {
+  case CxxValueSemanticsKind::Copyable:
+    isMoveOnly = false;
+    break;
+  case CxxValueSemanticsKind::MoveOnly:
+    isMoveOnly = true;
+    break;
+  case CxxValueSemanticsKind::Unknown:
     return;
   }
 
-  auto constRefValueType =
-      clangCtx.getLValueReferenceType(valueType.withConst());
-  // Create a fake variable with type of the wrapped value.
-  auto fakeValueVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      constRefValueType, clangCtx.getTrivialTypeSourceInfo(constRefValueType),
-      clang::StorageClass::SC_None);
-  auto fakeValueRefExpr = new (clangCtx) clang::DeclRefExpr(
-      clangCtx, fakeValueVarDecl, false,
-      constRefValueType.getNonReferenceType(), clang::ExprValueKind::VK_LValue,
-      clangDecl->getLocation());
+  // A stand-in for the wrapped value: an lvalue of type 'const T' or, like
+  // 'std::move(value)', an xvalue of type 'T'.
+  auto *fakeValueExpr = new (clangCtx) clang::OpaqueValueExpr(
+      clangDecl->getLocation(), isMoveOnly ? valueType : valueType.withConst(),
+      isMoveOnly ? clang::VK_XValue : clang::VK_LValue);
 
   auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
       clangCtx.getCanonicalTagType(clangDecl));
-  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueRefExpr};
+  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueExpr};
 
-  // Instantiate the templated constructor that would accept this fake variable.
+  // Instantiate the templated constructor that would accept this fake value.
   clang::Sema::SFINAETrap trap(clangSema);
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
@@ -909,6 +911,12 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
 
   auto constructorDecl = constructExpr->getConstructor();
 
+  // A constructor taking 'T &&' would be imported as 'init(consuming:)', but
+  // it has to satisfy the 'init(_:)' requirement of CxxOptional.
+  if (isMoveOnly && !constructorDecl->hasAttr<clang::SwiftNameAttr>())
+    constructorDecl->addAttr(
+        clang::SwiftNameAttr::CreateImplicit(clangCtx, "init(_:)"));
+
   auto importedConstructor =
       impl.importDecl(constructorDecl, impl.CurrentVersion);
   if (!importedConstructor)
@@ -918,10 +926,13 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   // Mark `var pointee` as deprecated to direct users towards `var value`, which
   // is provided by the Cxx overlay. It supports mutation and is UB-safe. Only
   // do so if `value` is actually available, i.e. if the conformance to
-  // CxxOptional was synthesized.
-  auto pointeeDeprecatedAttr = AvailableAttr::createUniversallyDeprecated(
-      ctx, "use 'value' instead for instances of 'std.optional'", "value");
-  pointee->addAttribute(pointeeDeprecatedAttr);
+  // CxxOptional was synthesized. 'value' is not provided for a move-only
+  // wrapped value, which would have to be copied out of 'self'.
+  if (!isMoveOnly) {
+    auto pointeeDeprecatedAttr = AvailableAttr::createUniversallyDeprecated(
+        ctx, "use 'value' instead for instances of 'std.optional'", "value");
+    pointee->addAttribute(pointeeDeprecatedAttr);
+  }
 
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Wrapped"),
                                Wrapped->getUnderlyingType());

@@ -495,7 +495,10 @@ AbstractStorageDecl::getPropertyDescriptorGenericSignature() const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage, and it is eligible to be part of a key path.
   
-  auto contextTy = getDeclContext()->getDeclaredTypeInContext();
+  // In a protocol extension, the root type is 'Self', which may be suppressed
+  // to be ~Copyable or ~Escapable, not the protocol type.
+  auto *dc = getDeclContext();
+  auto contextTy = dc->isTypeContext() ? dc->getSelfTypeInContext() : Type();
   auto contextSig = getInnermostDeclContext()->getGenericSignatureOfContext();
   
   // If the root type is never `Copyable` or `Escapable`, then instance
