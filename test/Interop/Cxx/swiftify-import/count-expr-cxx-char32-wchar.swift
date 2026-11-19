@@ -12,10 +12,14 @@
 // `char32_t` or `wchar_t` parameter as if it were an integer. This test emits a
 // module, so it type-checks the wrappers' bodies and expects the errors. Both
 // are builtin types in C++, which Swift imports as `CChar32` and `CWideChar`,
-// both `Unicode.Scalar`. The wrappers convert the value with `CInt(c)` for
-// `c + 1`, and compute it with e.g. `CChar32(exactly: p.count)!` for a count
-// that is just `c`. There's no `CInt` initializer that takes a
-// `Unicode.Scalar`, and no `Unicode.Scalar(exactly:)` that takes an `Int`
+// both `Unicode.Scalar`. For a count that is just `c`, the wrappers compute it
+// from the buffer with `CChar32(exactly: p.count)!` or
+// `CWideChar(exactly: p.count)!`, and `Unicode.Scalar` has no
+// `init(exactly:)`. A compound `wchar_t` count like `c + 1` also fails where
+// `wchar_t` is signed, e.g. on Apple platforms and x86_64 Linux, because it's
+// converted with `CInt(c)`. That isn't checked here due to `wchar_t` being
+// unsigned on some platforms (e.g. on ARM Linux and Android), it's converted with
+// `CUnsignedInt(c)`, which compiles
 // (https://github.com/swiftlang/swift/issues/94421).
 
 //--- test.h
@@ -41,24 +45,6 @@ void wcharBare(const int * __counted_by(c) p, wchar_t c);
 //   expected-remark@4{{macro content: |    return unsafe wcharBare(p.baseAddress, c)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
-void wcharCompound(const int * __counted_by(c + 1) p, wchar_t c);
-// expected-expansion@-1:64{{
-//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func wcharCompound(_ p: UnsafeBufferPointer<CInt>, _ c: CWideChar) {|}}
-//   expected-error@3{{no exact matches in call to initializer}}
-//   expected-remark@3{{macro content: |    if p.count != (CInt(c) + CInt(1)) {|}}
-//   expected-remark@4{{macro content: |      @inline(never) func _boundsCheckFailure<E: BinaryInteger, A: BinaryInteger>(_ expected: E, _ actual: A) -> Never {|}}
-//   expected-remark@5{{macro content: |        @inline(never) func _fail(_ function: StaticString, _ expected: E, _ actual: A) -> Never {|}}
-//   expected-remark@6{{macro content: |          fatalError("bounds check failure in \\(function): expected \\(expected) but got \\(actual)")|}}
-//   expected-remark@7{{macro content: |        }|}}
-//   expected-remark@8{{macro content: |        _fail("wcharCompound", expected, actual)|}}
-//   expected-remark@9{{macro content: |      }|}}
-//   expected-error@10{{no exact matches in call to initializer}}
-//   expected-remark@10{{macro content: |      _boundsCheckFailure((CInt(c) + CInt(1)), p.count)|}}
-//   expected-remark@11{{macro content: |    }|}}
-//   expected-remark@12{{macro content: |    return unsafe wcharCompound(p.baseAddress, c)|}}
-//   expected-remark@13{{macro content: |}|}}
-// }}
 
 //--- module.modulemap
 module Test {
@@ -75,8 +61,4 @@ func callChar32Bare(_ p: UnsafeBufferPointer<CInt>) {
 
 func callWCharBare(_ p: UnsafeBufferPointer<CInt>) {
   unsafe wcharBare(p)
-}
-
-func callWCharCompound(_ p: UnsafeBufferPointer<CInt>, _ c: CWideChar) {
-  unsafe wcharCompound(p, c)
 }
