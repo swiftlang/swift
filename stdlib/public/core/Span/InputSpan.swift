@@ -57,6 +57,7 @@ extension InputSpan where Element: ~Copyable {
   /// Returns the address of the start of the span's underlying buffer
   ///
   /// NOTE: `_pointer` must be known to be not-nil.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -69,6 +70,7 @@ extension InputSpan where Element: ~Copyable {
   /// region that precedes the initialized elements.
   ///
   /// NOTE: `_pointer` must be known to be not-nil.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -79,6 +81,7 @@ extension InputSpan where Element: ~Copyable {
     return unsafe _start().advanced(by: slot &* MemoryLayout<Element>.stride)
   }
 
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -92,6 +95,7 @@ extension InputSpan where Element: ~Copyable {
 
   /// The address of the first initialized element, or `nil` if this span
   /// does not reference any memory.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @unsafe
@@ -104,14 +108,17 @@ extension InputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.5, *)
 extension InputSpan where Element: ~Copyable {
   /// The number of initialized elements in this span.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_semantics("fixed_storage.get_count")
   public var count: Int { _assumeNonNegative(_count) }
 
+  @available(SwiftStdlib 6.5, *)
   @export(implementation) @inline(always)
   public var capacity: Int { _assumeNonNegative(_capacity) }
 
   /// The number of additional elements that can be added to this span.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var freeCapacity: Int {
@@ -119,11 +126,13 @@ extension InputSpan where Element: ~Copyable {
   }
 
   /// A Boolean value indicating whether the span is empty.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var isEmpty: Bool { count == 0 }
 
   /// A Boolean value indicating whether the span is full.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var isFull: Bool { count == capacity }
@@ -138,6 +147,7 @@ extension InputSpan where Element: ~Copyable {
   ///
   /// The returned reference represents a mutation of `self`, and `self`
   /// cannot be used until the reference is no longer in use.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   public var _unsafeStoredCount: MutableRef<Int> {
@@ -152,6 +162,7 @@ extension InputSpan where Element: ~Copyable {
 @available(SwiftStdlib 6.5, *)
 extension InputSpan where Element: ~Copyable {
 
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   @_lifetime(borrow buffer)
@@ -176,6 +187,7 @@ extension InputSpan where Element: ~Copyable {
   ///       initialized elements, all compacted into the end of the buffer.
   ///   - initializedCount: the number of initialized elements
   ///       at the end of `buffer`.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   @_lifetime(borrow buffer)
@@ -216,6 +228,7 @@ extension InputSpan {
   ///       of initialized elements, all compacted into the end of the slice.
   ///   - initializedCount: the number of initialized elements
   ///       at the end of `buffer`.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   @_lifetime(borrow buffer)
@@ -234,9 +247,11 @@ extension InputSpan {
 @available(SwiftStdlib 6.5, *)
 extension InputSpan where Element: ~Copyable {
   /// The type that represents an initialized index in an `InputSpan`.
+  @available(SwiftStdlib 6.5, *)
   public typealias Index = Int
 
   /// The range of initialized indices for this `InputSpan`.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
@@ -244,6 +259,7 @@ extension InputSpan where Element: ~Copyable {
 
   // SILOptimizer looks for fixed_storage.check_index semantics
   // for bounds check optimizations.
+  @available(SwiftStdlib 6.5, *)
   @_semantics("fixed_storage.check_index")
   @inline(__always)
   @export(implementation)
@@ -256,6 +272,7 @@ extension InputSpan where Element: ~Copyable {
   /// - Parameter index: A valid index into this span.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public subscript(_ index: Index) -> Element {
     @_transparent
@@ -278,6 +295,7 @@ extension InputSpan where Element: ~Copyable {
   /// - Parameter index: A valid index into this span.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   public subscript(unchecked index: Index) -> Element {
@@ -296,6 +314,7 @@ extension InputSpan where Element: ~Copyable {
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
@@ -310,6 +329,7 @@ extension InputSpan where Element: ~Copyable {
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   @_lifetime(self: copy self)
@@ -328,6 +348,7 @@ extension InputSpan where Element: ~Copyable {
   /// Prepend a single element to this span.
   ///
   /// - Parameter value: The element to prepend.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func prepend(_ value: consuming Element) {
@@ -343,6 +364,7 @@ extension InputSpan where Element: ~Copyable {
   /// Returns the first element. The `InputSpan` must not be empty.
   ///
   /// - Returns: The removed element.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func removeFirst() -> Element {
@@ -361,6 +383,7 @@ extension InputSpan where Element: ~Copyable {
   ///
   /// - Parameter n: The number of elements to remove.
   ///     `n` must not be negative or greater than `count`.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func removeFirst(_ n: Int) {
@@ -381,6 +404,7 @@ extension InputSpan where Element: ~Copyable {
   ///    otherwise, `nil`.
   ///
   /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func popFirst() -> Element? {
@@ -390,6 +414,7 @@ extension InputSpan where Element: ~Copyable {
 
   /// Remove all this span's elements and return its memory
   /// to the uninitialized state.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func removeAll() {
@@ -413,6 +438,7 @@ extension InputSpan {
   ///   - repeatedValue: The element to prepend repeatedly.
   ///   - count: The number of times to prepend `repeatedValue`.
   ///       `count` must not exceed `freeCapacity`.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func prepend(repeating repeatedValue: Element, count: Int) {
@@ -429,6 +455,7 @@ extension InputSpan {
 @available(SwiftStdlib 6.5, *)
 extension InputSpan where Element: ~Copyable {
   /// Borrow the underlying initialized memory for read-only access.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var span: Span<Element> {
@@ -442,6 +469,7 @@ extension InputSpan where Element: ~Copyable {
   }
 
   /// Exclusively borrow the underlying initialized memory for mutation.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var mutableSpan: MutableSpan<Element> {
@@ -482,6 +510,7 @@ extension InputSpan where Element: ~Copyable {
   /// - Parameter body: A closure that can read from and write to the
   ///     buffer and update the initialized count.
   /// - Returns: The return value of the `body` closure.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   @_lifetime(self: copy self)
@@ -528,6 +557,7 @@ extension InputSpan where Element: ~Copyable {
   ///      the `InputSpan` initializer.
   /// - Returns: The number of initialized elements remaining at the end of
   ///      the same buffer, as tracked by the consumed `InputSpan` instance.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   public consuming func finalize(
@@ -562,6 +592,7 @@ extension InputSpan {
   ///      the `InputSpan` initializer.
   /// - Returns: The number of initialized elements remaining at the end of
   ///      the same buffer, as tracked by the consumed `InputSpan` instance.
+  @available(SwiftStdlib 6.5, *)
   @unsafe
   @export(implementation)
   public consuming func finalize(
@@ -583,6 +614,7 @@ extension InputSpan where Element: ~Copyable {
   ///     `maxCount` must not be negative. If it exceeds `count`,
   ///     all elements are consumed.
   /// - Returns: An `InputSpan` containing the consumed elements.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(&self)
   public mutating func consumePrefix(
@@ -617,6 +649,7 @@ extension InputSpan where Element: ~Copyable {
   ///   - consumer: A closure that takes ownership of an `InputSpan`
   ///       containing the consumed elements.
   /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public mutating func consumePrefix<E: Error, R: ~Copyable>(
     maxCount: Int,
@@ -632,6 +665,7 @@ extension InputSpan: Iterable where Element: ~Copyable {
   @available(SwiftStdlib 6.5, *)
   public typealias Failure = Never
 
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public var underestimatedCount: Int {
     self.count
