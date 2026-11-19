@@ -21,6 +21,7 @@ struct CopyableStructSendable : Sendable {
 }
 
 func useValue<T : ~Copyable>(_ t: borrowing T) {}
+func sendValue<T: ~Copyable>(_ t: consuming sending T) {}
 func escapingAsyncUse(_ x: @escaping () async -> ()) {
 }
 func nonescapingAsyncUse(_ x: () async -> ()) {
@@ -1544,4 +1545,38 @@ func useAfterFreeClosureTests() {
     acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{mutable var 'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
     x = NoncopyableStructSendable() // expected-note {{access can happen concurrently}}
   }
+}
+
+// The result of calling a closure is named after the variable holding the
+// closure, not the mangled name of the closure or thunk that is called.
+
+func identity<T>(_ t: T) -> T { t }
+
+func useAfterSendClosureParameterResult(_ f: (KlassNonsendable) -> KlassNonsendable) {
+  let x = KlassNonsendable()
+  sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
+  // expected-note @-1 {{'f' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(x) // expected-note {{access can happen concurrently}}
+}
+
+func sendClosureParameterResultTaskIsolatedArgument(_ f: (KlassNonsendable) -> KlassNonsendable, _ x: KlassNonsendable) {
+  sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
+  // expected-note @-1 {{'f' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+}
+
+// The closure is called through a reabstraction thunk.
+func useAfterSendReabstractedClosureResult() {
+  let x = KlassNonsendable()
+  let f = identity({ (y: KlassNonsendable) in y })
+  sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
+  // expected-note @-1 {{'f' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(x) // expected-note {{access can happen concurrently}}
+}
+
+// An immediately-invoked closure literal has no name.
+func useAfterSendImmediatelyInvokedClosureResult() {
+  let x = KlassNonsendable()
+  sendValue({ x }()) // expected-error {{sending value of non-Sendable type 'KlassNonsendable' risks causing data races}}
+  // expected-note @-1 {{Passing value of non-Sendable type 'KlassNonsendable' as a 'sending' argument to global function 'sendValue' risks causing races in between local and caller code}}
+  useValue(x) // expected-note {{access can happen concurrently}}
 }
