@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IRGen/IRABIDetailsProvider.h"
+#include "BitPatternReader.h"
 #include "Callee.h"
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
@@ -126,7 +127,7 @@ public:
            TI.isBitwiseTakable(ResilienceExpansion::Minimal);
   }
 
-  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+  bool isTypeBitwiseTakable(const NominalTypeDecl *TD) {
     auto type = TD->getDeclaredTypeInContext();
     // The header is also used outside this module's resilience domain. The
     // locally lowered TypeInfo alone may expose a resilient field's layout.
@@ -135,8 +136,37 @@ public:
       return false;
     const auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     return typeInfo.isFixedSize(ResilienceExpansion::Minimal) &&
-           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) &&
-           typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal);
+  }
+
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+    return isTypeBitwiseTakable(TD) &&
+           IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext())
+               .isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+  }
+
+  std::optional<IRABIDetailsProvider::ExtraInhabitant>
+  getTypeExtraInhabitant(const NominalTypeDecl *TD) {
+    auto layout = getTypeSizeAlignment(TD, ResilienceExpansion::Minimal);
+    if (!layout || !layout->size)
+      return std::nullopt;
+    auto &TI = cast<FixedTypeInfo>(
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext()));
+    if (!TI.getFixedExtraInhabitantCount(IGM))
+      return std::nullopt;
+
+    auto mask = TI.getFixedExtraInhabitantMask(IGM);
+    if (mask.isZero() || mask.getBitWidth() != layout->size * 8)
+      return std::nullopt;
+    auto value = TI.getFixedExtraInhabitantValue(IGM, mask.getBitWidth(), 0);
+    BitPatternReader maskReader(mask, IGM.Triple.isLittleEndian());
+    BitPatternReader valueReader(value, IGM.Triple.isLittleEndian());
+    IRABIDetailsProvider::ExtraInhabitant result;
+    for (unsigned i = 0; i < layout->size; ++i) {
+      result.mask.push_back(maskReader.read(8).getZExtValue());
+      result.value.push_back(valueReader.read(8).getZExtValue());
+    }
+    return result;
   }
 
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
@@ -537,8 +567,17 @@ IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
   return impl->getTypeSizeAlignment(TD, expansion);
 }
 
+std::optional<IRABIDetailsProvider::ExtraInhabitant>
+IRABIDetailsProvider::getTypeExtraInhabitant(const NominalTypeDecl *TD) {
+  return impl->getTypeExtraInhabitant(TD);
+}
+
 bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
   return impl->isTypeTrivial(TD);
+}
+
+bool IRABIDetailsProvider::isTypeBitwiseTakable(const NominalTypeDecl *TD) {
+  return impl->isTypeBitwiseTakable(TD);
 }
 
 bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
