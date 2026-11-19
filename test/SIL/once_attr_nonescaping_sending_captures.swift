@@ -5,6 +5,15 @@
 // RUN:   -swift-version 6 \
 // RUN:   -verify
 
+// With opaque values, a closure can be address-lowered before its caller.
+// RUN: %target-swift-frontend %s \
+// RUN:   -target %target-swift-5.1-abi-triple \
+// RUN:   -emit-sil \
+// RUN:   -enable-experimental-feature OnceFunctions \
+// RUN:   -enable-sil-opaque-values \
+// RUN:   -swift-version 6 \
+// RUN:   -verify
+
 // REQUIRES: swift_feature_OnceFunctions
 // REQUIRES: concurrency
 
@@ -80,7 +89,9 @@ func testIndependentCapturesDoNotEntangle() async {
 
   useValue(ns1) // expected-note {{access can happen concurrently}}
   useValue(ns2) // Ok
+}
 
+func testCapturesMergedInBodyAreEntangled() {
   func merge<T>(_: T, _: T) {}
   func send(_: sending NS) {}
 
@@ -91,9 +102,10 @@ func testIndependentCapturesDoNotEntangle() async {
     merge(ns3, ns4)
   }
 
-  // FIXME: The following code shouldn't be valid. `ns3` and `ns4` are merged together in the closure and shouldn't be allowed to be sent separately later.
-  send(ns3)
-  send(ns4)
+  // `ns3` and `ns4` are merged together in the closure, so they can't be sent
+  // separately later.
+  send(ns3) // expected-error {{sending 'ns3' risks causing data races}} expected-note {{'ns3' used after being passed as a 'sending' parameter; Later uses could race}}
+  send(ns4) // expected-note {{access can happen concurrently}}
 }
 
 actor A {
@@ -102,7 +114,7 @@ actor A {
 
 func testIsolationCrossingCallAlwaysSends(_ a: A) async {
   let ns = NS()
-  await a.run { // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  await a.run { // expected-error {{sending value of non-Sendable type '@once () -> ()' risks causing data races}} expected-note {{sending value of non-Sendable type '@once () -> ()' to actor-isolated instance method 'run' risks causing data races between actor-isolated and local nonisolated uses}}
     useValue(ns) // never sent
   }
 
@@ -196,7 +208,7 @@ func testReabstractedEscapingClosure() {
 
 func testGenericParameterCapture<T>(_ value: T) {
   calledExactlyOnce {
-    useGeneric(value) // expected-error {{sending 'value' risks causing data races}} expected-note {{'value' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
+    useGeneric(value) // Ok (nothing is sent in the closure)
   }
 
   useGeneric(value)
@@ -230,8 +242,7 @@ func testNoncopyableRefAndUndo() {
 
 func testNoncopyableRefAndUndoBorrowed(v: borrowing NCS) {
   calledExactlyOnce {
-    v.test() // expected-error {{sending 'v' risks causing data races}}
-    // expected-note@-1 {{'v' is captured by a nonisolated closure. nonisolated uses in closure may race against code in the current isolation context}}
+    v.test() // Ok (nothing is sent in the closure)
   }
 
   _ = v
@@ -246,4 +257,281 @@ func testVarMutatedInClosure() {
   }
 
   useValue(value) // Ok
+}
+
+func checkExactlyOnce(_ condition: @autoclosure @once () -> Bool) { _ = condition() }
+
+func testParameterCapturedByAutoclosure(_ ns: NS) {
+  checkExactlyOnce(ns === ns) // Ok (nothing is sent in the autoclosure)
+}
+
+func sendAndCheck(_ ns: sending NS) -> Bool { true }
+
+func testLocalSentByAutoclosure() {
+  let ns = NS()
+  // FIXME: The captures of an autoclosure aren't inferred to be `sending`, so
+  // it can't send them, just like a regular autoclosure (rdar://193244820).
+  checkExactlyOnce(sendAndCheck(ns)) // expected-error {{sending 'ns' risks causing data races}}
+  // expected-note@-1 {{'ns' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+}
+
+extension NS {
+  func testSelfCapture() {
+    calledExactlyOnce { useValue(self) } // Ok (nothing is sent in the closure)
+    useValue(self)
+  }
+}
+
+// A capture that the closure hands back to its caller through an `inout
+// sending` parameter or a `sending` result is sent.
+
+func handBackInOut(_ f: @once (inout sending NS) -> Void) {
+  var x = NS()
+  f(&x)
+  Task { [x] in useValue(x) }
+}
+
+func testCaptureHandedBackInOut() {
+  let ns = NS()
+  handBackInOut { $0 = ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func handBackResult<T>(_ f: @once () -> sending T) {
+  let result = f()
+  Task { useGeneric(result) }
+}
+
+func testCaptureHandedBackAsResult() {
+  let ns = NS()
+  handBackResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func handBackDirectResult(_ f: @once () -> sending NS) {
+  let result = f()
+  Task { useValue(result) }
+}
+
+func testCaptureHandedBackAsDirectResult() {
+  let ns = NS()
+  handBackDirectResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func testNestedClosuresDontSendCapture() {
+  let ns = NS()
+  calledExactlyOnce {
+    calledExactlyOnce {
+      useValue(ns)
+    }
+  }
+  useValue(ns) // Ok (nothing is sent in either closure)
+}
+
+func testNestedClosureSendsCapture() {
+  let ns = NS()
+  calledExactlyOnce { // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+    calledExactlyOnce {
+      sendValue(ns)
+    }
+  }
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+// More ways for a closure to hand a capture back to its caller.
+
+struct HandBackError: Error {}
+
+func handBackInOutThrowing(
+  _ f: @once (inout sending NS) throws -> Void
+) rethrows {
+  var x = NS()
+  try f(&x)
+  Task { [x] in useValue(x) }
+}
+
+func testCaptureHandedBackBeforeThrowing() {
+  let ns = NS()
+  try? handBackInOutThrowing { $0 = ns; throw HandBackError() } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func testCaptureHandedBackOnOnePath(_ b: Bool) {
+  let ns = NS()
+  handBackInOut { if b { $0 = ns } } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func testCaptureHandedBackThenReplaced() {
+  let ns = NS()
+  handBackInOut { $0 = ns; $0 = NS() }
+  useValue(ns) // Ok (the closure doesn't hand back 'ns')
+}
+
+func testCaptureHandedBackInTuple() {
+  let ns = NS()
+  handBackResult { (ns, 1) } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+final class Wrapper {
+  var value: NS?
+}
+
+func testCaptureHandedBackInFreshValue() {
+  let ns = NS()
+  handBackResult { // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+    let wrapper = Wrapper()
+    wrapper.value = ns
+    return wrapper
+  }
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func testCaptureHandedBackInArray() {
+  let ns = NS()
+  // FIXME: The closure hands back 'ns' in the array, so a later use of 'ns'
+  // should be diagnosed. On Darwin, region analysis doesn't merge the elements
+  // of an array literal into the array's region, so `func f(_ ns: NS) ->
+  // sending [NS] { [ns] }` is accepted too (rdar://193244706). Other platforms
+  // diagnose it, so this test doesn't use 'ns' afterwards.
+  handBackResult { [ns] }
+}
+
+func handBackAsyncResult<T>(_ f: @once () async -> sending T) async {
+  let result = await f()
+  Task { useGeneric(result) }
+}
+
+func testCaptureHandedBackByAsyncClosure() async {
+  let ns = NS()
+  await handBackAsyncResult { ns } // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+// A closure can also merge a capture into an actor's region, which the caller
+// can't use concurrently either.
+
+@MainActor final class MainActorBox {
+  static var value: NS?
+}
+
+func runOnMainActor(_ f: @MainActor @once () -> Void) async { await f() }
+
+func testCaptureMergedIntoMainActorRegion() async {
+  let ns = NS()
+  await runOnMainActor { MainActorBox.value = ns } // expected-error {{sending 'ns' risks causing data races}}
+  // expected-note@-1 {{'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+@MainActor func storeOnMainActor(_ ns: NS) {
+  MainActorBox.value = ns
+}
+
+func testCaptureMergedIntoMainActorRegionByCall() async {
+  let ns = NS()
+  await runOnMainActor { storeOnMainActor(ns) } // expected-error {{sending 'ns' risks causing data races}}
+  // expected-note@-1 {{'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+func testCaptureReadOnMainActor() async {
+  let ns = NS()
+  await runOnMainActor { print(ns) }
+  useValue(ns) // Ok (the closure doesn't merge 'ns' into the main actor's region)
+}
+
+actor StateActor {
+  var value: NS?
+}
+
+func withIsolatedActor(_ a: StateActor, _ f: @once (isolated StateActor) -> Void) async {
+  await f(a)
+}
+
+func testCaptureMergedIntoIsolatedParameterRegion(_ a: StateActor) async {
+  let ns = NS()
+  await withIsolatedActor(a) { a in a.value = ns } // expected-error {{sending 'ns' risks causing data races}}
+  // expected-note@-1 {{'ns' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+// A capture that the closure hands back without `sending` stays in the
+// closure's region in the caller.
+
+func handBackNonSendingInOut(_ f: @once (inout NS) -> Void) {
+  var x = NS()
+  f(&x)
+  // FIXME: 'x' is in the region of 'f' after the call, so sending it should be
+  // diagnosed. This is also accepted for a regular closure
+  // (rdar://193245037).
+  Task { [x] in useValue(x) }
+}
+
+func handBackNonSendingResult(_ f: @once () -> NS) {
+  let result = f()
+  // FIXME: 'result' is in the region of 'f', so sending it should be
+  // diagnosed. This is also accepted for a regular closure
+  // (rdar://193245037).
+  Task { useValue(result) }
+}
+
+func testCaptureHandedBackWithoutSending() {
+  let ns = NS()
+  handBackNonSendingInOut { $0 = ns }
+  handBackNonSendingResult { ns }
+  useValue(ns)
+}
+
+// Like the captures of any other closure, a capture that isn't sent is merged
+// with the other arguments of the call that the closure is passed to.
+
+func runWithValue(_ x: NS, _ f: @once () -> Void) { f() }
+
+func testUnsentCaptureMergedWithOtherArguments() {
+  func send(_: sending NS) {}
+
+  let x = NS()
+  let y = NS()
+  runWithValue(x) { useValue(y) }
+  send(x) // expected-error {{sending 'x' risks causing data races}} expected-note {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(y) // expected-note {{access can happen concurrently}}
+}
+
+// Likewise, the captures that an isolated closure doesn't send are merged with
+// each other and with the other non-sending arguments and results of the call.
+
+func testUnsentCapturesOfIsolatedClosureAreEntangled() async {
+  func sendWrapper(_: sending Wrapper) {}
+
+  let wrapper = Wrapper()
+  let ns = NS()
+  await runOnMainActor { wrapper.value = ns }
+  sendValue(ns) // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  sendWrapper(wrapper) // expected-note {{access can happen concurrently}}
+}
+
+func runOnMainActorWithValue(_ x: NS, _ f: @MainActor @once () -> Void) async {
+  await f()
+}
+
+func testUnsentCaptureOfIsolatedClosureMergedWithOtherArguments() async {
+  let x = NS()
+  let y = NS()
+  await runOnMainActorWithValue(x) { print(y) }
+  sendValue(x) // expected-error {{sending 'x' risks causing data races}} expected-note {{'x' used after being passed as a 'sending' parameter; Later uses could race}}
+  useValue(y) // expected-note {{access can happen concurrently}}
+}
+
+func storeResult(_ wrapper: Wrapper, _ f: @once () -> NS) {
+  wrapper.value = f()
+}
+
+@MainActor func testUnsentCaptureOfIsolatedClosureMergedWithResult() {
+  let wrapper = Wrapper()
+  let ns = NS()
+  storeResult(wrapper) { ns }
+  sendValue(ns) // expected-error {{sending 'ns' risks causing data races}} expected-note {{main actor-isolated 'ns' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
 }

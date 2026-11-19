@@ -2355,48 +2355,202 @@ class PartitionOpTranslator {
     partialApplyReachabilityDataflow.propagateReachability();
   }
 
-  /// The argument is a non-escaping at-most-once value,
-  /// if it's a closure, attempt to undo send of it's implicitly
-  /// sending captures if the values weren't actually sent in the
-  /// body of the closure.
-  void tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(
-      Operand *calledAtMostOnceSemanticsArgument) {
+  /// Returns the definition of the closure \p pai's callee, or nullptr if
+  /// it's unknown or only a declaration.
+  static SILFunction *getCalleeDefinition(PartialApplyInst *pai) {
+    auto *calleeFn = pai->getCalleeFunction();
+    if (!calleeFn || !calleeFn->isDefinition())
+      return nullptr;
+    return calleeFn;
+  }
+
+  /// Returns the argument of \p calleeFn that receives the capture \p op.
+  ///
+  /// The captures are the trailing arguments of \p calleeFn. Counting from the
+  /// end doesn't depend on whether the callee's indirect results are already
+  /// arguments: with opaque values, the callee can be address-lowered before
+  /// its caller.
+  static SILFunctionArgument *getCalleeArgument(SILFunction *calleeFn,
+                                                Operand &op) {
+    ApplySite site(op.getUser());
+    unsigned numCaptures = site.getNumArguments();
+    unsigned numArgs = calleeFn->getArguments().size();
+    assert(numCaptures <= numArgs);
+    unsigned captureIndex = site.getAppliedArgIndex(op);
+    return cast<SILFunctionArgument>(
+        calleeFn->getArgument(numArgs - numCaptures + captureIndex));
+  }
+
+  /// Determines which captures of the noncopyable closure \p pai it sends:
+  /// the captures that are explicitly `sending` and, if \p analyzeBody is
+  /// true, the captures that are inferred to be `sending` and that its body
+  /// sends. Returns a bit for each argument operand of \p pai, or
+  /// std::nullopt if the body needs to be analyzed but isn't available.
+  std::optional<llvm::SmallBitVector>
+  getSentCapturesOfNoncopyableClosure(PartialApplyInst *pai, bool analyzeBody) {
+    ApplySite callSite(pai);
+    auto captures = callSite.getArgumentOperands();
+    llvm::SmallBitVector sent(captures.size());
+
+    SmallVector<unsigned, 4> capturesToAnalyze;
+    for (auto [index, op] : llvm::enumerate(captures)) {
+      if (!tryToTrackValue(op.get()))
+        continue;
+      if (callSite.getParamInfoForOperand(op).hasOption(
+              SILParameterInfo::Sending))
+        sent.set(index);
+      else if (analyzeBody)
+        capturesToAnalyze.push_back(index);
+    }
+    if (capturesToAnalyze.empty())
+      return sent;
+
+    auto *calleeFn = getCalleeDefinition(pai);
+    if (!calleeFn)
+      return std::nullopt;
+
+    // A capture that isn't inferred to be `sending`, such as an entry in a
+    // capture list, isn't disconnected in the body, so the body can't send it.
+    SmallVector<unsigned, 4> inferredCaptures;
+    SmallVector<SILValue, 4> calleeArgs;
+    for (unsigned index : capturesToAnalyze) {
+      auto *calleeArg = getCalleeArgument(calleeFn, captures[index]);
+      if (!SILIsolationInfo::isInferredSendingClosureCapture(calleeArg))
+        continue;
+      inferredCaptures.push_back(index);
+      calleeArgs.push_back(calleeArg);
+    }
+    if (inferredCaptures.empty())
+      return sent;
+
+    // If the body can't be analyzed, conservatively send all of the captures
+    // that are inferred to be `sending`.
+    PostOrderFunctionInfo calleePOFI(calleeFn);
+    RegionAnalysisFunctionInfo calleeInfo(calleeFn, &calleePOFI);
+    if (!calleeInfo.isSupportedFunction()) {
+      for (unsigned index : inferredCaptures)
+        sent.set(index);
+      return sent;
+    }
+
+    auto sentArgs = calleeInfo.wereValuesEverSent(calleeArgs);
+    for (auto [argIndex, index] : llvm::enumerate(inferredCaptures)) {
+      if (sentArgs.test(argIndex))
+        sent.set(index);
+    }
+    return sent;
+  }
+
+  /// Returns the isolation of the closure \p pai if translateSILPartialApply
+  /// translates it as an isolated closure, which sends all of its captures
+  /// when it's formed (see translateIsolatedPartialApply). Otherwise, returns
+  /// an invalid SILIsolationInfo.
+  static SILIsolationInfo
+  getIsolationOfIsolatedPartialApply(PartialApplyInst *pai) {
+    // A Sendable closure that isn't global actor isolated, a closure that's
+    // fed into an async let begin, and a reabstraction thunk are translated
+    // differently.
+    if (pai->getFunctionType()->isSendableType()) {
+      auto isolationInfo = SILIsolationInfo::get(pai);
+      if (!isolationInfo || !isolationInfo.hasActorIsolation() ||
+          !isolationInfo.getActorIsolation().isGlobalActor())
+        return {};
+    }
+
+    if (isAsyncLetBeginPartialApply(pai))
+      return {};
+
+    if (auto *calleeFn = pai->getCalleeFunction();
+        calleeFn && calleeFn->isThunk() == IsReabstractionThunk)
+      return {};
+
+    auto isolationInfo = SILIsolationInfo::get(pai);
+    if (!isolationInfo || isolationInfo.isDisconnected())
+      return {};
+    return isolationInfo;
+  }
+
+  /// \p argument is a non-escaping noncopyable value. If it's an isolated
+  /// closure, which sends all of its captures when it's formed (see
+  /// translateIsolatedPartialApply), undo the send of the captures that are
+  /// inferred to be `sending` but that its body doesn't actually send.
+  ///
+  /// The body can tie those captures to each other, to a parameter of the
+  /// closure, or to its result. So, like the captures of a nonisolated
+  /// noncopyable closure, which are merged into the closure's region, they are
+  /// merged with each other and with the other non-sending arguments and
+  /// results of the call, \p nonSendingOperands and \p nonSendingResults.
+  void tryUndoSendOfValuesCapturedByNonescapingNoncopyableClosure(
+      Operand *argument, ArrayRef<Operand *> nonSendingOperands,
+      ArrayRef<SILValue> nonSendingResults) {
     // Dig up partial_apply that represents the closure.
-    auto *pai =
-        getUnderlyingPartialApply(calledAtMostOnceSemanticsArgument->get());
+    auto *pai = getUnderlyingPartialApply(argument->get());
     if (!pai || !pai->hasCalledAtMostOnceSemantics())
       return;
 
-    auto *calleeFn = pai->getCalleeFunction();
+    // Any other noncopyable closure only sends the captures that its body
+    // sends (see translateSILCalledAtMostOncePartialApply).
+    if (!getIsolationOfIsolatedPartialApply(pai))
+      return;
+
+    auto *calleeFn = getCalleeDefinition(pai);
     if (!calleeFn)
       return;
 
-    PostOrderFunctionInfo calleePOFI(calleeFn);
-    RegionAnalysisFunctionInfo calleeInfo(calleeFn, &calleePOFI);
-
-    if (!calleeInfo.isSupportedFunction())
+    auto sentCaptures =
+        getSentCapturesOfNoncopyableClosure(pai, /*analyzeBody=*/true);
+    if (!sentCaptures)
       return;
 
-    ApplySite callSite(pai);
-    for (auto &op : pai->getArgumentOperands()) {
+    SmallVector<std::pair<Operand *, TrackableValue>, 4> unsentCaptures;
+    for (auto [index, op] :
+         llvm::enumerate(ApplySite(pai).getArgumentOperands())) {
+      if (sentCaptures->test(index))
+        continue;
+
+      // The other captures stay sent, like the captures of any other isolated
+      // closure.
+      if (!SILIsolationInfo::isInferredSendingClosureCapture(
+              getCalleeArgument(calleeFn, op)))
+        continue;
+
       auto trackedValue = tryToTrackValue(op.get());
-      if (!trackedValue)
+      if (!trackedValue || trackedValue->value.isSendable())
         continue;
-
-      unsigned argIndex = callSite.getSubstCalleeArgIndex(op);
-      assert(argIndex < calleeFn->getArguments().size());
-      auto *calleeArg =
-          cast<SILFunctionArgument>(calleeFn->getArgument(argIndex));
-
-      // Skip explicitly `sending` captures, and the captures that were merged
-      // instead of sent.
-      if (!SILIsolationInfo::isInferredSendingClosureCapture(calleeArg))
-        continue;
-
-      if (!calleeInfo.wasValueEverSent(calleeArg))
-        builder.addUndoSend(trackedValue->value,
-                            calledAtMostOnceSemanticsArgument->getUser());
+      builder.addUndoSend(trackedValue->value, argument->getUser());
+      unsentCaptures.push_back({&op, trackedValue->value});
     }
+    if (unsentCaptures.empty())
+      return;
+
+    // The other non-sending arguments and results of the call are already in
+    // the closure's region, so merge into any one of them. If there are none,
+    // don't merge into the closure's region, which is actor-isolated.
+    std::optional<TrackableValue> destValue;
+    for (Operand *op : nonSendingOperands) {
+      if (op == argument)
+        continue;
+      if (auto trackedValue = tryToTrackValue(op->get());
+          trackedValue && !trackedValue->value.isSendable()) {
+        destValue = trackedValue->value;
+        break;
+      }
+    }
+    for (SILValue result : nonSendingResults) {
+      if (destValue)
+        break;
+      if (auto trackedValue = tryToTrackValue(result);
+          trackedValue && !trackedValue->value.isSendable())
+        destValue = trackedValue->value;
+    }
+
+    auto capturesToMerge = ArrayRef(unsentCaptures);
+    if (!destValue) {
+      destValue = capturesToMerge.front().second;
+      capturesToMerge = capturesToMerge.drop_front();
+    }
+    for (auto [op, value] : capturesToMerge)
+      builder.addMerge(*destValue, op, RegionMergeReason::NonisolatedFunction);
   }
 
 public:
@@ -2817,68 +2971,32 @@ public:
       builder.addAssignFresh(lookupResult->value);
   }
 
-  void translateSILNoEscapeCalledAtMostOncePartialApply(PartialApplyInst *pai) {
-    ApplySite applySite(pai);
-    REGIONBASEDISOLATION_LOG(
-        llvm::dbgs()
-        << "Translating non-escaping at-most-once Partial Apply!\n");
-
-    auto *calleeFn = pai->getCalleeFunction();
-    if (calleeFn && !calleeFn->isDefinition())
-      calleeFn = nullptr;
-
-    SmallVector<Operand *> operandsToMerge;
-    for (auto &op : applySite.getArgumentOperands()) {
-      auto lookupResult = tryToTrackValue(op.get());
-      if (!lookupResult)
-        continue;
-
-      // A capture that the closure lists without `sending` is merged just
-      // like in a regular closure.
-      if (calleeFn) {
-        auto *calleeArg = cast<SILFunctionArgument>(
-            calleeFn->getArgument(applySite.getSubstCalleeArgIndex(op)));
-        if (!calleeArg->isSending() &&
-            !SILIsolationInfo::isInferredSendingClosureCapture(calleeArg)) {
-          operandsToMerge.push_back(&op);
-          continue;
-        }
-      }
-
-      // All of the other non-Sendable captures are sent. This would be undone
-      // after the call if the value is not actually sent in the body.
-      builder.addRequire(*lookupResult);
-      builder.addSend(lookupResult->value, &op);
-    }
-
-    SmallVector<SILValue, 8> directResults;
-    getApplyResults(pai, directResults);
-    translateSILMultiAssign(
-        directResults,
-        ArrayRef<Operand *>(), // No indirect results for a partial_apply.
-        operandsToMerge, RegionMergeReason::NonisolatedClosure);
-  }
-
   void translateSILCalledAtMostOncePartialApply(PartialApplyInst *pai) {
-    ApplySite applySite(pai);
     REGIONBASEDISOLATION_LOG(llvm::dbgs()
                              << "Translating at-most-once Partial Apply!\n");
 
-    SmallVector<Operand *> operandsToMerge;
-    for (auto &op : applySite.getArgumentOperands()) {
+    // A noncopyable closure sends its explicitly `sending` captures when
+    // it's formed. A nonescaping one also sends the captures that its body
+    // sends, or all of its non-Sendable captures if the body can't be
+    // analyzed. The other captures are merged into the closure's region, like
+    // the captures of any other closure, so that capturing a value that can't
+    // be sent, such as a parameter, isn't diagnosed.
+    auto sentCaptures = getSentCapturesOfNoncopyableClosure(
+        pai, /*analyzeBody=*/isNoEscapePartialApply(pai));
+
+    SmallVector<Operand *, 8> operandsToMerge;
+    for (auto [index, op] :
+         llvm::enumerate(ApplySite(pai).getArgumentOperands())) {
       auto lookupResult = tryToTrackValue(op.get());
       if (!lookupResult)
         continue;
 
-      auto info = applySite.getParamInfoForOperand(op);
-      // If this is an argument to a `sending` parameter, let's mark it as sent.
-      if (info.hasOption(SILParameterInfo::Flag::Sending)) {
-        builder.addRequire(*lookupResult);
-        builder.addSend(lookupResult->value, &op);
-      } else {
-        // Otherwise, it would have to be merged just like in a regular closure.
+      if (sentCaptures && !sentCaptures->test(index)) {
         operandsToMerge.push_back(&op);
+        continue;
       }
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &op);
     }
 
     SmallVector<SILValue, 8> directResults;
@@ -2958,23 +3076,13 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
-        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
+    if (auto isolationRegionInfo = getIsolationOfIsolatedPartialApply(pai))
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
-    }
 
-    // at-most-once closures are allowed to have `sending` captures
-    // which need special handling.
-    if (pai->hasCalledAtMostOnceSemantics()) {
-      // no-escaping closures treat non-Sendable captures that are inferred to
-      // be `sending` as individually sent and undo if the values were never
-      // actually sent in the body.
-      if (isNoEscapePartialApply(pai)) {
-        return translateSILNoEscapeCalledAtMostOncePartialApply(pai);
-      }
-
+    // Noncopyable closures are allowed to send their captures, which needs
+    // special handling.
+    if (pai->hasCalledAtMostOnceSemantics())
       return translateSILCalledAtMostOncePartialApply(pai);
-    }
 
     SmallVector<SILValue, 8> directResults;
     getApplyResults(pai, directResults);
@@ -3019,7 +3127,7 @@ public:
     // For non-self parameters, gather all of the sending parameters and
     // gather our non-sending parameters.
     SmallVector<Operand *, 8> nonSendingParameters;
-    // Non-escaping at-most-once closures require a post-call undo
+    // Isolated non-escaping noncopyable closures require a post-call undo
     // of their un-sent captures.
     SmallVector<Operand *, 2> nonescapingCalledAtMostOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
@@ -3043,7 +3151,7 @@ public:
       if (!fas.isSending(op)) {
         auto argumentType = op.get()->getType();
 
-        // Non-escaping at-most-once closures require special
+        // Isolated non-escaping noncopyable closures require special
         // handling to undo send of non-Sendable captures that
         // weren't sent in the body.
         if (argumentType.hasCalledAtMostOnceSemantics() &&
@@ -3070,6 +3178,12 @@ public:
       }
     }
 
+    SmallVector<SILValue, 8> applyResults;
+    getApplyResults(*fas, applyResults);
+
+    auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
+    auto isolationInfo = SILIsolationInfo::get(*fas);
+
     SWIFT_DEFER {
       for (auto &op : fas->getAllOperands()) {
         if (!fas.isInOutSending(op))
@@ -3080,17 +3194,15 @@ public:
       }
 
       // Attempt to undo send of captures that weren't sent in the body of
-      // a non-escaping at-most-once closure.
+      // an isolated non-escaping noncopyable closure.
+      ArrayRef<SILValue> nonSendingResults;
+      if (!type->hasSendingResult())
+        nonSendingResults = applyResults;
       for (Operand *op : nonescapingCalledAtMostOnceArguments) {
-        tryUndoSendOfValuesCapturedByNonescapingCalledAtMostOnceClosure(op);
+        tryUndoSendOfValuesCapturedByNonescapingNoncopyableClosure(
+            op, nonSendingParameters, nonSendingResults);
       }
     };
-
-    SmallVector<SILValue, 8> applyResults;
-    getApplyResults(*fas, applyResults);
-
-    auto type = fas.getSubstCalleeSILType().castTo<SILFunctionType>();
-    auto isolationInfo = SILIsolationInfo::get(*fas);
 
     // If our result is not a 'sending' result, just do the normal multi-assign.
     if (!type->hasSendingResult()) {
@@ -4112,11 +4224,11 @@ CONSTANT_TRANSLATION(DereferenceBorrowAddrInst, LookThrough)
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
 CONSTANT_TRANSLATION(ExplicitCopyAddrInst, Store)
 // `assign` is ordinarily lowered away by DI before this pass but
-// non-escaping at-most-once and `async let` bodies require analysis
-// as part of the use (calls for at-most-once and `await` for
-// `async let`) to determine whether sends of captures have to be undone
-// and that can happen before DI run on the closure and so `assign` has
-// to be treated as a `store`.
+// non-escaping noncopyable closure and `async let` bodies require analysis
+// (when a noncopyable closure is formed or called, and at the `await` for
+// `async let`) to determine which captures are sent and that can happen
+// before DI run on the closure and so `assign` has to be treated as a
+// `store`.
 CONSTANT_TRANSLATION(AssignInst, Store)
 CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
@@ -5099,7 +5211,7 @@ bool RegionAnalysisFunctionInfo::isClosureCaptured(SILValue value,
 namespace {
 
 /// A minimal evaluator used only to answer whole-function summary queries
-/// like RegionAnalysisFunctionInfo::wasValueEverSent. It mirrors the real
+/// like RegionAnalysisFunctionInfo::wereValuesEverSent. It mirrors the real
 /// isolation/closure-capture callbacks used by SendNonSendable's
 /// DiagnosticEvaluator (so "sent" here matches what diagnostics would
 /// report, including elision), but never emits errors.
@@ -5123,6 +5235,8 @@ struct SendQueryEvaluator final
   bool isTaskIsolatedDerived(Element element) const {
     return info->getValueMap().getIsolationRegion(element).isTaskIsolated();
   }
+
+  using Super::getIsolationRegionInfo;
 
   SILIsolationInfo getIsolationRegionInfo(Element element) const {
     return info->getValueMap().getIsolationRegion(element);
@@ -5156,20 +5270,56 @@ struct SendQueryEvaluator final
 
 } // end anonymous namespace
 
-bool RegionAnalysisFunctionInfo::wasValueEverSent(SILValue value) {
+llvm::SmallBitVector
+RegionAnalysisFunctionInfo::wereValuesEverSent(ArrayRef<SILValue> values) {
   assert(supportedFunction && "Unsupported Function?!");
+  llvm::SmallBitVector result(values.size());
 
-  // First, check if the answer is already known for this value.
-  if (auto iter = sentValuesCache.find(value); iter != sentValuesCache.end())
-    return iter->second;
+  // First, use the answers that are already known, and find the elements of
+  // the values that need to be checked.
+  SmallVector<std::pair<unsigned, Element>, 4> pending;
+  for (auto [index, value] : llvm::enumerate(values)) {
+    if (auto iter = sentValuesCache.find(value);
+        iter != sentValuesCache.end()) {
+      result[index] = iter->second;
+      continue;
+    }
 
-  auto trackableValue = getValueMap().getTrackableValue(value);
-  if (trackableValue.value.isSendable())
-    return false;
+    auto trackableValue = getValueMap().getTrackableValue(value);
+    if (trackableValue.value.isSendable()) {
+      sentValuesCache[value] = false;
+      continue;
+    }
+    pending.push_back({unsigned(index), trackableValue.value.getID()});
+  }
+  if (pending.empty())
+    return result;
 
-  Element elt = trackableValue.value.getID();
+  // A value that the function hands back to its caller through an `inout
+  // sending` parameter or a `sending` indirect result is sent as well. A
+  // `sending` direct result is sent by the return itself.
+  SmallVector<Element, 2> sendingOutElts;
+  for (auto *arg : fn->getArguments()) {
+    auto *fArg = cast<SILFunctionArgument>(arg);
+    if (!fArg->isInOutSending() &&
+        !(fArg->isIndirectResult() && fArg->isSending()))
+      continue;
+    auto argValue = getValueMap().getTrackableValue(fArg);
+    if (!argValue.value.isSendable())
+      sendingOutElts.push_back(argValue.value.getID());
+  }
+
+  unsigned numUnsent = pending.size();
+  auto markSent = [&](unsigned index) {
+    if (!result.test(index)) {
+      result.set(index);
+      --numUnsent;
+    }
+  };
 
   for (const auto &[block, blockState] : getRange()) {
+    if (!numUnsent)
+      break;
     if (!blockState.getLiveness())
       continue;
 
@@ -5179,13 +5329,40 @@ bool RegionAnalysisFunctionInfo::wasValueEverSent(SILValue value) {
 
     for (auto &partitionOp : blockState.getPartitionOps()) {
       eval.apply(partitionOp);
-      if (workingPartition.isSent(elt)) {
-        return sentValuesCache[value] = true;
+      for (auto [index, elt] : pending) {
+        if (workingPartition.isSent(elt))
+          markSent(index);
+      }
+    }
+
+    // A value that the function merges into an actor's region is sent as
+    // well, since the actor can use it after the function returns.
+    for (auto [index, elt] : pending) {
+      if (result.test(index) || !workingPartition.isTrackingElement(elt))
+        continue;
+      auto regionInfo =
+          eval.getIsolationRegionInfo(workingPartition.getRegion(elt));
+      if (regionInfo && regionInfo->isActorIsolated() &&
+          !regionInfo->isUnsafeNonIsolated())
+        markSent(index);
+    }
+
+    if (!block.getTerminator()->isFunctionExiting())
+      continue;
+    for (auto [index, elt] : pending) {
+      if (!workingPartition.isTrackingElement(elt))
+        continue;
+      for (auto outElt : sendingOutElts) {
+        if (workingPartition.isTrackingElement(outElt) &&
+            workingPartition.areElementsInSameRegion(elt, outElt))
+          markSent(index);
       }
     }
   }
 
-  return sentValuesCache[value] = false;
+  for (auto [index, elt] : pending)
+    sentValuesCache[values[index]] = result.test(index);
+  return result;
 }
 
 void RegionAnalysisFunctionInfo::runDataflow() {

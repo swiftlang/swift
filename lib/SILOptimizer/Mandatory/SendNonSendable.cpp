@@ -3675,11 +3675,10 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
     }
 
     // Reaching this operand here means it was individually sent as a capture
-    // of a non-isolated at-most-once closure -- either because it was
+    // of a non-isolated noncopyable closure -- either because it was
     // explicitly `sending`, or because it's an implicit capture of a
-    // non-escaping closure (every such non-Sendable capture is sent
-    // individually, independent of whether the closure as a whole is isolated).
-    // Let's use the captured value's tracked isolation (when it is
+    // non-escaping closure that the body sends (or the body can't be
+    // analyzed). Let's use the captured value's tracked isolation (when it is
     // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
         pai && pai->hasCalledAtMostOnceSemantics()) {
