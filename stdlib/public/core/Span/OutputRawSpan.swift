@@ -140,12 +140,12 @@ extension OutputRawSpan {
     if let baseAddress = buffer.baseAddress {
       _precondition(
         unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
-        "Buffer must not wrap around the address space"
+        "Buffer must not wrap around the address space."
       )
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputRawSpan count is not within capacity"
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
+      "OutputRawSpan count is invalid or greater than capacity."
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
@@ -236,7 +236,10 @@ extension OutputRawSpan {
   // Can we use: @_semantics("fixed_storage.check_index")
   @export(implementation) @inline(__always)
   internal func _checkIndex(_ position: Int) {
-    _precondition(position >= 0 && position < byteCount, "Index out of bounds")
+    _precondition(
+      UInt(bitPattern: position) < UInt(bitPattern: byteCount),
+      "Index out of bounds"
+    )
   }
 
   /// Accesses the byte at the specified offset in the span.
