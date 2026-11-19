@@ -3,6 +3,7 @@
 // RUN: %FileCheck %s < %t/out.ll
 // RUN: %FileCheck %s --check-prefix=METADATA < %t/out.ll
 // RUN: %FileCheck %s --check-prefix=WITNESS < %t/out.ll
+// RUN: %FileCheck %s --check-prefix=HELPER < %t/out.ll
 
 // REQUIRES: swift_feature_NontransferableTypes
 
@@ -270,27 +271,31 @@ public enum Tree<T>: ~Transferable {
 public func copyTree<T>(_ t: Tree<T>) -> Tree<T> { t }
 
 // The metadata of a non-'Transferable' class and of a type that's laid out as
-// a reference to one don't use the value witnesses of 'Builtin.NativeObject'
-// or the standard witnesses for a single strong reference.
+// a reference to one don't use the value witnesses of 'Builtin.NativeObject',
+// but share non-atomic witnesses for a single strong reference.
 
-// METADATA: @"$s1m3NTCCWV" = internal constant %swift.vwtable { ptr @"$s1m3NTCCwCP", ptr @"$s1m3NTCCwxx", ptr @"$s1m3NTCCwcp", ptr @"$s1m3NTCCwca",
+// METADATA: @"$s1m3NTCCWV" = internal constant %swift.vwtable { ptr @__swift_initWithCopy_nonatomic_strong, ptr @__swift_destroy_nonatomic_strong, ptr @__swift_initWithCopy_nonatomic_strong, ptr @__swift_assignWithCopy_nonatomic_strong, ptr @__swift_memcpy8_8, ptr @__swift_assignWithTake_nonatomic_strong,
 // METADATA: @"$s1m3NTCCMf" = internal global {{.*}} @"$s1m3NTCCWV"
 // METADATA: @"$s1m1CCMf" = internal global {{.*}} @"$sBoWV"
-// METADATA: @"$s1m6SingleVWV" = internal constant %swift.vwtable { ptr @"$s1m6SingleVwCP", ptr @"$s1m6SingleVwxx", ptr @"$s1m6SingleVwcp", ptr @"$s1m6SingleVwca",
+// METADATA: @"$s1m6SingleVWV" = internal constant %swift.vwtable { ptr @__swift_initWithCopy_nonatomic_strong, ptr @__swift_destroy_nonatomic_strong, ptr @__swift_initWithCopy_nonatomic_strong, ptr @__swift_assignWithCopy_nonatomic_strong, ptr @__swift_memcpy8_8, ptr @__swift_assignWithTake_nonatomic_strong,
 // METADATA: @"$s1m6SingleVMf" = internal constant {{.*}} @"$s1m6SingleVWV"
 
-// WITNESS-LABEL: define {{.*}} @"$s1m3NTCCwxx"(
-// WITNESS:   call void @swift_nonatomic_release(
-// WITNESS: }
-// WITNESS-LABEL: define {{.*}} @"$s1m3NTCCwcp"(
-// WITNESS:   call ptr @swift_nonatomic_retain(
-// WITNESS: }
-// WITNESS-LABEL: define {{.*}} @"$s1m6SingleVwxx"(
-// WITNESS:   call void @swift_nonatomic_release(
-// WITNESS: }
-// WITNESS-LABEL: define {{.*}} @"$s1m6SingleVwcp"(
-// WITNESS:   call ptr @swift_nonatomic_retain(
-// WITNESS: }
+// HELPER-LABEL: define {{.*}} @__swift_initWithCopy_nonatomic_strong(
+// HELPER:   call ptr @swift_nonatomic_retain(
+// HELPER-NOT: call {{.*}} @swift_{{(retain|release)}}(
+// HELPER: }
+// HELPER-LABEL: define {{.*}} @__swift_destroy_nonatomic_strong(
+// HELPER:   call void @swift_nonatomic_release(
+// HELPER: }
+// HELPER-LABEL: define {{.*}} @__swift_assignWithCopy_nonatomic_strong(
+// HELPER:   call ptr @swift_nonatomic_retain(
+// HELPER:   call void @swift_nonatomic_release(
+// HELPER-NOT: call {{.*}} @swift_{{(retain|release)}}(
+// HELPER: }
+// HELPER-LABEL: define {{.*}} @__swift_assignWithTake_nonatomic_strong(
+// HELPER:   call void @swift_nonatomic_release(
+// HELPER-NOT: call {{.*}} @swift_{{(retain|release)}}(
+// HELPER: }
 
 // Only the reference to the non-'Transferable' class is non-atomic.
 // WITNESS-LABEL: define {{.*}} @"$s1m5MixedVwcp"(

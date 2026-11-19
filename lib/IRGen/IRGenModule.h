@@ -733,6 +733,7 @@ public:
   AvailabilityRange getAvailabilityRange() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
+  Atomicity getDefaultAtomicity() const;
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
   const SILAddressConventions silConv;
   ModuleDecl *ObjCModule = nullptr;
