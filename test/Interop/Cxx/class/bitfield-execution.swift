@@ -61,4 +61,21 @@ BitFieldsTestSuite.test("reading a field does not copy the record") {
   expectEqual(copies, copyCountingBitFieldsCopies)
 }
 
+BitFieldsTestSuite.test("bit-field in a base class at a nonzero offset") {
+  var s = BitFieldInSecondBase()
+  s.x = 10
+  s.b = 5
+  let copy = s
+  expectEqual(10, copy.x)
+  expectEqual(5, copy.b)
+}
+
+BitFieldsTestSuite.test("bit-field in a base class after the vtable pointer") {
+  var s = BitFieldBehindVTable()
+  s.b = 3
+  let copy = s
+  expectEqual(3, copy.b)
+  expectEqual(42, copy.virt())
+}
+
 runAllTests()
