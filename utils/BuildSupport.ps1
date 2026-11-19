@@ -178,9 +178,12 @@ $IsCrossCompiling = $HostArchName -ne $BuildArchName
 
 ## Helpers for logging and timing build steps.
 
-$TimingData = New-Object System.Collections.Generic.List[System.Object]
+# Avoid New-Object: enumerating its [psobject]-wrapped List[object] throws
+# "Argument types do not match", see https://github.com/PowerShell/PowerShell/issues/27558
+$TimingData = [System.Collections.Generic.List[System.Object]]::new()
 $CurrentOperation = $null
 $BuildStartTime = [DateTime]::UtcNow
+$ExternalTraceEvents = [System.Collections.Generic.List[System.Object]]::new()
 $BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
 $RecordTimings = $Summary -or $Trace
 
@@ -408,8 +411,13 @@ function Write-TimingTrace([string] $Path, [switch] $TrackPerStep) {
     Get-TraceEvents $Entry $Track
   }
 
+  $Metadata = @(
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 0; args = @{ name = "build" } },
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 1; args = @{ name = "lit" } }
+  )
+
   New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
-  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
+  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = $Metadata + @($Events) + @($ExternalTraceEvents) })
   [IO.File]::WriteAllText($Path, $Json)
   Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
@@ -433,7 +441,7 @@ function Export-TimingData([string] $Path) {
     if (-not $Entry.Parent) { ConvertTo-TimingRecord $Entry }
   })
   New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
-  $Json = ConvertTo-Json -Depth 100 -InputObject ([ordered]@{ Start = $BuildStartTime.Ticks; Steps = $Steps })
+  $Json = ConvertTo-Json -Depth 100 -InputObject ([ordered]@{ Start = $BuildStartTime.Ticks; Steps = $Steps; Events = @($ExternalTraceEvents) })
   [IO.File]::WriteAllText($Path, $Json)
 }
 
@@ -466,6 +474,73 @@ function Import-TimingData([PSCustomObject] $Parent, [string] $Path) {
 
   foreach ($Record in $Data.Steps) {
     Import-TimingRecord $Record $Parent
+  }
+
+  # The events of lit, also relative to the start of the script.
+  $OffsetUs = [long]($Offset.Ticks / 10)
+  foreach ($TraceEvent in @($Data.Events)) {
+    $ExternalTraceEvents.Add([ordered]@{
+      name = $TraceEvent.name
+      cat = $TraceEvent.cat
+      ph = $TraceEvent.ph
+      ts = $TraceEvent.ts + $OffsetUs
+      dur = $TraceEvent.dur
+      pid = $TraceEvent.pid
+      tid = $TraceEvent.tid
+    })
+  }
+}
+
+# lit makes the timestamps relative to the first test, so align each trace to end
+# when its file was written.
+function Import-LitTimeTraces([string] $Directory, [TimeSpan] $MinDuration = [TimeSpan]::FromSeconds(1)) {
+  $MinDurationUs = [long]($MinDuration.Ticks / 10)
+  foreach ($File in Get-ChildItem -Path $Directory -Filter "*.json" -File -ErrorAction Ignore) {
+    try {
+      $Events = @((Get-Content -Raw $File.FullName | ConvertFrom-Json).traceEvents)
+    } catch {
+      Write-Warning "Ignoring unreadable lit trace '$($File.FullName)': $_"
+      continue
+    }
+    if ($Events.Count -eq 0) { continue }
+
+    $TraceEnd = [long] 0
+    foreach ($TraceEvent in $Events) { $TraceEnd = [math]::Max($TraceEnd, $TraceEvent.ts + $TraceEvent.dur) }
+    $Offset = [long](($File.LastWriteTimeUtc - $BuildStartTime).Ticks / 10) - $TraceEnd
+
+    foreach ($TraceEvent in $Events) {
+      if ($TraceEvent.dur -lt $MinDurationUs) { continue }
+      $ExternalTraceEvents.Add([ordered]@{
+        name = $TraceEvent.name
+        cat = "lit"
+        ph = "X"
+        ts = $TraceEvent.ts + $Offset
+        dur = $TraceEvent.dur
+        pid = 1
+        tid = $TraceEvent.pid
+      })
+    }
+  }
+}
+
+function Invoke-WithLitTimeTraces([string] $Directory, [ScriptBlock] $ScriptBlock) {
+  # lit's --time-trace-output fails on the unset start time of excluded tests.
+  if (-not $Trace -or $env:LIT_FILTER) {
+    & $ScriptBlock
+    return
+  }
+
+  Remove-Item -Recurse -Force $Directory -ErrorAction Ignore
+  New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+  try {
+    Invoke-IsolatingEnvVars {
+      # lit parses LIT_OPTS with shlex, quote the path to preserve backslashes.
+      # Several lit invocations can run concurrently, have each write its own file.
+      $env:LIT_OPTS = "$env:LIT_OPTS --time-trace-output='$Directory\lit.json' --use-unique-output-file-name".Trim()
+      & $ScriptBlock
+    }
+  } finally {
+    Import-LitTimeTraces $Directory
   }
 }
 
