@@ -6989,8 +6989,10 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
 
     clang::CastKind Kind;
     clang::CXXCastPath Path;
+    // Swift access control already allowed this access, so bypass C++ base
+    // access, e.g., for fields inherited via private inheritance.
     clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
-                                     /*IgnoreBaseAccess=*/false,
+                                     /*IgnoreBaseAccess=*/true,
                                      /*Diagnose=*/true);
     auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
                                             clang::VK_PRValue, &Path);
