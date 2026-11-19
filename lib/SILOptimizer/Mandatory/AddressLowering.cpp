@@ -1181,6 +1181,10 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &move->getOperandRef();
   }
 
+  case ValueKind::UncheckedOwnershipInst:
+  case ValueKind::UncheckedOwnershipConversionInst:
+    return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
+
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
         cast<MultipleValueInstructionResult>(value)->getParent();
@@ -4327,6 +4331,21 @@ protected:
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
+  void visitEndLifetimeInst(EndLifetimeInst *end) {
+    end->setOperand(addrMat.materializeAddress(use->get()));
+  }
+
+  void visitMergeIsolationRegionInst(MergeIsolationRegionInst *merge) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    merge->setOperand(use->getOperandNumber(), addr);
+  }
+
+  void visitDeinitExistentialValueInst(DeinitExistentialValueInst *deinit) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    builder.createDeinitExistentialAddr(deinit->getLoc(), addr);
+    pass.deleter.forceDelete(deinit);
+  }
+
   // In Raw SIL, extend_lifetime marks the end of a variable's scope for values
   // that have no destroy_value. There is no address form of the instruction:
   // the value's storage is already scoped by its alloc_stack.
@@ -4343,9 +4362,31 @@ protected:
 
   void visitMakeBorrowInst(MakeBorrowInst *mbi) {
     SILValue addr = addrMat.materializeAddress(use->get());
+    if (mbi->getType().isAddressOnly(*mbi->getFunction())) {
+      AddressMaterialization resultMat(pass, mbi, builder);
+      SILValue borrowAddr = resultMat.materializeAddress(mbi);
+      builder.createInitBorrowAddr(mbi->getLoc(), borrowAddr, addr);
+      markRewritten(mbi, borrowAddr);
+      return;
+    }
     auto* makeAddrBorrow = builder.createMakeAddrBorrow(mbi->getLoc(), addr);
     mbi->replaceAllUsesWith(makeAddrBorrow);
     pass.deleter.forceDelete(mbi);
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    markRewritten(dbi,
+                  builder.createDereferenceBorrowAddr(dbi->getLoc(), borrowAddr));
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *dabi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    dabi->replaceAllUsesWith(
+        builder.createDereferenceBorrowAddr(dabi->getLoc(), borrowAddr));
+    pass.deleter.forceDelete(dabi);
   }
 
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
@@ -4467,6 +4508,19 @@ protected:
     auto *replacement = builder.createMarkUnresolvedNonCopyableValueInst(
         inst->getLoc(), address, inst->getCheckKind());
     markRewritten(inst, replacement);
+  }
+
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
+  }
+
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
   }
 
   void visitMoveValueInst(MoveValueInst *mvi);
@@ -4810,35 +4864,30 @@ protected:
   NO_OPAQUE_OPERAND(TupleAddrConstructor)
   NO_OPAQUE_OPERAND(Vector)
 
+  // Removed before this pass in the default pipeline.
+  NO_OPAQUE_OPERAND(Assign)
+  NO_OPAQUE_OPERAND(AssignOrInit)
+  NO_OPAQUE_OPERAND(Diagnose)
+  NO_OPAQUE_OPERAND(EndFormalScope)
+
   // Can see an opaque operand, but has no rewrite yet. This lists known gaps
   // only: a new instruction needs a rewrite, or a NO_OPAQUE_OPERAND entry
   // with a reason if none of its operands can be opaque.
-  UNIMPLEMENTED_OPAQUE_OPERAND(Assign)
-  UNIMPLEMENTED_OPAQUE_OPERAND(AssignOrInit)
   UNIMPLEMENTED_OPAQUE_OPERAND(AutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginCOWMutation)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginDeallocRef)
   UNIMPLEMENTED_OPAQUE_OPERAND(BorrowedFrom)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DeinitExistentialValue)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceAddrBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(Diagnose)
   UNIMPLEMENTED_OPAQUE_OPERAND(DropDeinit)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndCOWMutation)
-  UNIMPLEMENTED_OPAQUE_OPERAND(EndFormalScope)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndInitLetRef)
-  UNIMPLEMENTED_OPAQUE_OPERAND(EndLifetime)
   UNIMPLEMENTED_OPAQUE_OPERAND(ExtractExecutor)
   UNIMPLEMENTED_OPAQUE_OPERAND(HopToExecutor)
   UNIMPLEMENTED_OPAQUE_OPERAND(InitExistentialRef)
-  UNIMPLEMENTED_OPAQUE_OPERAND(MergeIsolationRegion)
   UNIMPLEMENTED_OPAQUE_OPERAND(RefToBridgeObject)
   UNIMPLEMENTED_OPAQUE_OPERAND(RefToRawPointer)
   UNIMPLEMENTED_OPAQUE_OPERAND(SelectEnumAddr)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreUnowned)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreWeak)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedAutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedReleaseValue)
@@ -5529,6 +5578,12 @@ protected:
     pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *mabi) {
+    SILValue destAddr = addrMat.materializeAddress(mabi);
+    builder.createInitBorrowAddr(mabi->getLoc(), destAddr, mabi->getOperand());
+    storage.markRewritten();
+  }
+
   // Rewrite the apply for an indirect result.
   void visitDestructureTupleInst(DestructureTupleInst *destructure) {
     SILValue srcVal = destructure->getOperand();
@@ -5788,6 +5843,7 @@ protected:
   REWRITTEN_BY_USE(CopyableToMoveOnlyWrapperValue)
   REWRITTEN_BY_USE(DestructureStruct)
   REWRITTEN_BY_USE(ExplicitCopyValue)
+  REWRITTEN_BY_USE(MakeBorrow)
   REWRITTEN_BY_USE(MarkDependence)
   REWRITTEN_BY_USE(MarkUnresolvedNonCopyableValue)
   REWRITTEN_BY_USE(MoveOnlyWrapperToCopyableValue)
@@ -5797,6 +5853,8 @@ protected:
   REWRITTEN_BY_USE(TupleExtract)
   REWRITTEN_BY_USE(TuplePackExtract)
   REWRITTEN_BY_USE(UncheckedEnumData)
+  REWRITTEN_BY_USE(UncheckedOwnership)
+  REWRITTEN_BY_USE(UncheckedOwnershipConversion)
 
   // Can define an opaque result, but has no rewrite yet. This lists known
   // gaps only: a new instruction needs a rewrite, or a NO_OPAQUE_RESULT or
@@ -5810,16 +5868,12 @@ protected:
   UNIMPLEMENTED_OPAQUE_RESULT(EndInitLetRef)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadUnowned)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadWeak)
-  UNIMPLEMENTED_OPAQUE_RESULT(MakeAddrBorrow)
-  UNIMPLEMENTED_OPAQUE_RESULT(MakeBorrow)
   UNIMPLEMENTED_OPAQUE_RESULT(RawPointerToRef)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnum)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnumAddr)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnmanagedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnownedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyWeakValue)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedTrivialBitCast)
 
