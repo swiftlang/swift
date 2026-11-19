@@ -1860,9 +1860,20 @@ namespace {
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
+      if (loweringStyle == TypeExpansionKind::None)
+        return emitDestroyValue(B, loc, aggValue);
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
+          emitDestroyValue(B, loc, aggValue);
+          return;
+        }
+      }
+      for (auto *field :
+           getLoweredType().getStructDecl()->getStoredProperties()) {
+        auto fieldTy = getLoweredType().getFieldType(
+            field, B.getModule(), B.getFunction().getTypeExpansionContext());
+        if (!B.getFunction().isTypeABIAccessible(fieldTy)) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
