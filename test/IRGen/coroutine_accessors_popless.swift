@@ -60,7 +60,7 @@
 // CHECK-SAME:      _swift_coro_task_dealloc
 // CHECK-SAME:  }
 
-// CHECK-LABEL: @_swift_coro_alloc(
+// CHECK-LABEL: @_swift_coro_alloc_corocc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      i64 [[SIZE:%[^,]+]]
@@ -96,7 +96,7 @@
 // CHECK:         ret ptr [[ALLOCATION]]
 // CHECK:       }
 
-// CHECK-LABEL: @_swift_coro_dealloc(
+// CHECK-LABEL: @_swift_coro_dealloc_corocc(
 // CHECK-SAME:      ptr [[FRAME:%[^,]+]]
 // CHECK-SAME:      ptr swiftcoro [[ALLOCATOR:%[^,]+]],
 // CHECK-SAME:      ptr [[ADDRESS:%[^)]+]]
