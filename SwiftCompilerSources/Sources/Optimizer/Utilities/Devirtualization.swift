@@ -127,6 +127,12 @@ private func devirtualizeFixedSizeArray(destroy: some DevirtualizableDestroy,
   }
   let elementType = destroy.type.builtinFixedArrayElementType(in: destroy.parentFunction)
 
+  // We cannot destroy elements which are not ABI accessible in the function, e.g.
+  // an internal type with a deinit from another module.
+  guard elementType.isABIAccessible(in: destroy.parentFunction) else {
+    return false
+  }
+
   let destroyAddr = destroy.materializeAsDestroyAddr(context)
 
   let builder = Builder(before: destroyAddr, context)
@@ -265,6 +271,12 @@ extension DestroyValueInst : DevirtualizableDestroy {
   fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let elements = type.tupleElements
 
+    // We cannot destroy elements which are not ABI accessible in the function, e.g.
+    // an internal type with a deinit from another module.
+    guard elements.allSatisfy({ $0.isABIAccessible(in: parentFunction) }) else {
+      return false
+    }
+
     defer {
       context.erase(instruction: self)
     }
@@ -376,6 +388,12 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
     let elements = type.tupleElements
+
+    // We cannot destroy elements which are not ABI accessible in the function, e.g.
+    // an internal type with a deinit from another module.
+    guard elements.allSatisfy({ $0.isABIAccessible(in: parentFunction) }) else {
+      return false
+    }
 
     defer {
       context.erase(instruction: self)
