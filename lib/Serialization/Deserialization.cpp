@@ -2260,6 +2260,99 @@ void ModuleFile::consumeHiddenTypeXRefPathPieces(
   }
 }
 
+/// Resolve the specialization USR stored as a C++ type cross-reference's
+/// discriminator, using the declarations found by ordinary name lookup.
+static void lookupClangClassTemplateSpecializations(
+    ASTContext &ctx, ArrayRef<ValueDecl *> candidates, Identifier usr,
+    SmallVectorImpl<ValueDecl *> &results) {
+  for (auto *candidate : candidates) {
+    auto *ctd =
+        dyn_cast_or_null<clang::ClassTemplateDecl>(candidate->getClangDecl());
+    if (!ctd)
+      continue;
+
+    for (const auto *spec : ctd->specializations()) {
+      llvm::SmallString<128> buffer;
+      clang::index::generateUSRForDecl(spec, buffer);
+      if (usr.str() != buffer)
+        continue;
+      if (auto *import = ctx.getClangModuleLoader()->importDeclDirectly(spec))
+        results.push_back(cast<ValueDecl>(import));
+    }
+  }
+}
+
+/// A C++ class template specialization can belong to a Clang module that only
+/// names it, for example in a typedef. That module can import the template
+/// without re-exporting it, so look for the template in the modules that
+/// \p module or its submodules import.
+static void lookupClangClassTemplateSpecializationsInImports(
+    ModuleDecl *module, DeclBaseName name, Identifier usr,
+    SmallVectorImpl<ValueDecl *> &results) {
+  auto *clangModule = module->findUnderlyingClangModule();
+  if (!clangModule)
+    return;
+
+  auto &ctx = module->getASTContext();
+  auto *loader = ctx.getClangModuleLoader();
+  llvm::SmallSetVector<ModuleDecl *, 4> importedModules;
+  SmallVector<const clang::Module *, 4> worklist = {clangModule};
+  while (!worklist.empty()) {
+    auto *current = worklist.pop_back_val();
+    for (clang::Module *imported : current->Imports) {
+      // The module and its submodules were already searched.
+      if (imported->getTopLevelModule() == clangModule)
+        continue;
+      // Lookup in a submodule only follows what it re-exports, and lookup in
+      // its top-level module does not follow the re-exports of explicit
+      // submodules, so search both.
+      importedModules.insert(loader->getWrapperForModule(imported));
+      importedModules.insert(
+          loader->getWrapperForModule(imported->getTopLevelModule()));
+    }
+    for (clang::Module *submodule : current->submodules())
+      worklist.push_back(submodule);
+  }
+
+  // Several imported modules can re-export the same template.
+  llvm::SmallSetVector<ValueDecl *, 4> templates;
+  for (auto *imported : importedModules) {
+    SmallVector<ValueDecl *, 4> found;
+    imported->lookupQualified(imported, DeclNameRef(name), SourceLoc(),
+                              NLFlags::RemoveOverridden, found);
+    templates.insert(found.begin(), found.end());
+  }
+  lookupClangClassTemplateSpecializations(ctx, templates.getArrayRef(), usr,
+                                          results);
+}
+
+static void lookupTopLevelXRef(ModuleDecl *module, DeclBaseName name,
+                               Identifier discriminator, bool importedFromClang,
+                               bool searchClangImports,
+                               SmallVectorImpl<ValueDecl *> &results) {
+  if (discriminator.empty()) {
+    module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                            NLFlags::RemoveOverridden, results);
+    return;
+  }
+
+  if (!importedFromClang) {
+    module->lookupMember(results, module, name, discriminator);
+    return;
+  }
+
+  // A Clang decl's discriminator is the USR of a class template
+  // specialization. Look up the template, then find the specialization.
+  SmallVector<ValueDecl *, 4> templates;
+  module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                          NLFlags::RemoveOverridden, templates);
+  lookupClangClassTemplateSpecializations(module->getASTContext(), templates,
+                                          discriminator, results);
+  if (results.empty() && searchClangImports)
+    lookupClangClassTemplateSpecializationsInImports(module, name,
+                                                     discriminator, results);
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -2326,14 +2419,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
-    if (privateDiscriminator) {
-      baseModule->lookupMember(values, baseModule, name,
-                               getIdentifier(privateDiscriminator));
-    } else {
-      baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NLFlags::RemoveOverridden,
-                                  values);
-    }
+    lookupTopLevelXRef(baseModule, name, getIdentifier(privateDiscriminator),
+                       importedFromClang, /*searchClangImports=*/true, values);
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
                  importedFromClang, isStatic, std::nullopt, values);
     if (values.empty() && importedFromClang && name.isOperator() && filterTy) {
@@ -2536,14 +2623,11 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         }
 
         values.clear();
-        if (privateDiscriminator) {
-          otherModule->lookupMember(values, otherModule, name,
-                                   getIdentifier(privateDiscriminator));
-        } else {
-          otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NLFlags::RemoveOverridden,
-                                       values);
-        }
+        // Searching the Clang imports of every loaded module would report a
+        // template as found in a module that only imports it.
+        lookupTopLevelXRef(
+            otherModule, name, getIdentifier(privateDiscriminator),
+            importedFromClang, /*searchClangImports=*/false, values);
 
         std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
         if (!values.empty()) {
@@ -2782,27 +2866,9 @@ giveUpFastPath:
 
       if (!privateDiscriminator.empty()) {
         if (importedFromClang) {
-          // This is a clang imported class template, that's
-          // serialized using original template name, and
-          // its USR that denotes the specific specialization.
           auto members = nominal->lookupDirect(memberName);
-          for (const auto &m : members) {
-            if (!m->hasClangNode())
-              continue;
-            if (auto *ctd =
-                    dyn_cast<clang::ClassTemplateDecl>(m->getClangDecl())) {
-              for (const auto *spec : ctd->specializations()) {
-                llvm::SmallString<128> buffer;
-                clang::index::generateUSRForDecl(spec, buffer);
-                if (privateDiscriminator.str() == buffer) {
-                  if (auto import = getContext()
-                                        .getClangModuleLoader()
-                                        ->importDeclDirectly(spec))
-                    values.push_back(cast<ValueDecl>(import));
-                }
-              }
-            }
-          }
+          lookupClangClassTemplateSpecializations(getContext(), members,
+                                                  privateDiscriminator, values);
         } else {
           ModuleDecl *searchModule = M;
           if (!searchModule)
