@@ -293,12 +293,14 @@ static llvm::SmallString<128> normalizePath(const llvm::StringRef path) {
 // into an ObjectiveC program. Modeled after collectModuleHeaderIncludes in the
 // Clang frontend (FrontendAction.cpp)
 // Augment requiredTextualIncludes with the set of headers required.
+// If foundHeaderOutsideIncludeDirs is non-null, it is set to true when a
+// header is not inside any of includeDirs.
 static void collectClangModuleHeaderIncludes(
     const clang::Module *clangModule, clang::FileManager &fileManager,
     llvm::SmallSet<llvm::SmallString<128>, 10> &requiredTextualIncludes,
     llvm::SmallSet<const clang::Module *, 10> &visitedModules,
     const llvm::SmallSet<llvm::SmallString<128>, 10> &includeDirs,
-    const llvm::StringRef cwd) {
+    const llvm::StringRef cwd, bool *foundHeaderOutsideIncludeDirs = nullptr) {
 
   if (!visitedModules.insert(clangModule).second)
     return;
@@ -326,6 +328,8 @@ static void collectClangModuleHeaderIncludes(
       // fallback to including the header using the provided path relative
       // to the module map
       textualInclude = pathRelativeToRootModuleDir;
+      if (foundHeaderOutsideIncludeDirs)
+        *foundHeaderOutsideIncludeDirs = true;
     }
 
     if (clangModule->getTopLevelModule()->IsFramework) {
@@ -394,11 +398,43 @@ static void collectClangModuleHeaderIncludes(
       if (submodule->IsExplicit)
         continue;
 
-      collectClangModuleHeaderIncludes(submodule, fileManager,
-                                       requiredTextualIncludes, visitedModules,
-                                       includeDirs, cwd);
+      collectClangModuleHeaderIncludes(
+          submodule, fileManager, requiredTextualIncludes, visitedModules,
+          includeDirs, cwd, foundHeaderOutsideIncludeDirs);
     }
   }
+}
+
+// Collect the headers of the Clang module underlying the given Swift module,
+// spelled relative to the longest matching directory in includeDirs, and
+// sorted for determinism. Returns an empty list if there is no underlying
+// Clang module or it has no headers, or, if requireIncludeDirs is set, if any
+// of its headers is not inside one of includeDirs.
+static SmallVector<llvm::SmallString<128>, 4>
+collectUnderlyingModuleHeaderIncludes(
+    ModuleDecl &M, clang::FileManager &fileManager,
+    const llvm::SmallSet<llvm::SmallString<128>, 10> &includeDirs,
+    const llvm::StringRef cwd, bool requireIncludeDirs) {
+  SmallVector<llvm::SmallString<128>, 4> sortedIncludes;
+  const clang::Module *underlyingClangModule = M.findUnderlyingClangModule();
+  if (!underlyingClangModule)
+    return sortedIncludes;
+
+  llvm::SmallSet<llvm::SmallString<128>, 10> includes;
+  llvm::SmallSet<const clang::Module *, 10> visitedModules;
+  bool foundHeaderOutsideIncludeDirs = false;
+  collectClangModuleHeaderIncludes(underlyingClangModule, fileManager, includes,
+                                   visitedModules, includeDirs, cwd,
+                                   &foundHeaderOutsideIncludeDirs);
+  if (requireIncludeDirs && foundHeaderOutsideIncludeDirs)
+    return sortedIncludes;
+
+  sortedIncludes.append(includes.begin(), includes.end());
+  llvm::sort(sortedIncludes, [](const llvm::SmallString<128> &lhs,
+                                const llvm::SmallString<128> &rhs) {
+    return lhs.str() < rhs.str();
+  });
+  return sortedIncludes;
 }
 
 static void
@@ -559,27 +595,41 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
       llvm::StringRef relativeToPath =
           frontendOpts.GeneratedHeaderUnderlyingModuleIncludeBase;
       if (relativeToPath.empty()) {
-        // Assume a framework-style umbrella header named after the module.
-        out << "#import <" << M.getName().str() << '/' << M.getName().str()
-            << ".h>\n\n";
-      } else {
-        const clang::Module *underlyingClangModule =
-            M.findUnderlyingClangModule();
+        // With non-modular includes, import the underlying module's own
+        // headers, spelled relative to the header search paths like the other
+        // non-modular includes above, rather than assuming the module has an
+        // umbrella header. Mixed modules that are not built as frameworks
+        // often do not have one. If any header cannot be spelled relative to
+        // a search path, fall back to the umbrella header.
+        SmallVector<llvm::SmallString<128>, 4> underlyingIncludes;
+        if (frontendOpts.EmitClangHeaderWithNonModularIncludes)
+          underlyingIncludes = collectUnderlyingModuleHeaderIncludes(
+              M, fileManager, includeDirs, cwd ? StringRef(*cwd) : StringRef(),
+              /*requireIncludeDirs=*/true);
 
+        if (underlyingIncludes.empty()) {
+          // Assume a framework-style umbrella header named after the module.
+          out << "#import <" << M.getName().str() << '/' << M.getName().str()
+              << ".h>\n\n";
+        } else {
+          for (const auto &header : underlyingIncludes) {
+            out << "#import <" << llvm::sys::path::convert_to_slash(header)
+                << ">\n";
+          }
+          out << "\n";
+        }
+      } else {
         llvm::SmallString<128> basePath = normalizePath(relativeToPath);
         if (!basePath.ends_with("/"))
           basePath.append("/");
         llvm::SmallSet<llvm::SmallString<128>, 10> baseSearchDir;
         baseSearchDir.insert(basePath);
 
-        llvm::SmallSet<llvm::SmallString<128>, 10> quotedIncludes;
-        if (underlyingClangModule) {
-          llvm::SmallSet<const clang::Module *, 10> visitedUnderlyingModules;
-          collectClangModuleHeaderIncludes(
-              underlyingClangModule, fileManager, quotedIncludes,
-              visitedUnderlyingModules, baseSearchDir,
-              cwd ? StringRef(*cwd) : StringRef());
-        }
+        SmallVector<llvm::SmallString<128>, 4> quotedIncludes =
+            collectUnderlyingModuleHeaderIncludes(M, fileManager, baseSearchDir,
+                                                  cwd ? StringRef(*cwd)
+                                                      : StringRef(),
+                                                  /*requireIncludeDirs=*/false);
 
         if (quotedIncludes.empty()) {
           M.getASTContext().Diags.diagnose(
@@ -587,13 +637,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
               diag::clang_header_underlying_module_headers_not_found,
               M.getName().str());
         } else {
-          SmallVector<llvm::SmallString<128>, 4> sortedIncludes{
-              quotedIncludes.begin(), quotedIncludes.end()};
-          llvm::sort(sortedIncludes, [](const llvm::SmallString<128> &lhs,
-                                        const llvm::SmallString<128> &rhs) {
-            return lhs.str() < rhs.str();
-          });
-          for (const auto &header : sortedIncludes) {
+          for (const auto &header : quotedIncludes) {
             out << "#import \"" << llvm::sys::path::convert_to_slash(header)
                 << "\"\n";
           }
