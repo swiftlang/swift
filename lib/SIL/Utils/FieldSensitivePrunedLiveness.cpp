@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILBasicBlock.h"
+#include "llvm/ADT/SmallSet.h"
 #define DEBUG_TYPE "sil-move-only-checker"
 
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
@@ -1387,8 +1389,31 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 bool FieldSensitiveMultiDefPrunedLiveRange::isUserBeforeDef(
     SILInstruction *user, unsigned element) const {
   auto *block = user->getParent();
-  if (!isDefBlock(block, element))
-    return false;
+  if (!isDefBlock(block, element)) {
+    // Check if any predecessor blocks are a def block for this element.
+    llvm::SmallSet<SILBasicBlock*, 4> seenPreds;
+    SmallVector<SILBasicBlock *, 4> workBlocks;
+    workBlocks.push_back(block);
+    
+    while (!workBlocks.empty()) {
+      auto workBlock = workBlocks.pop_back_val();
+      for (auto pred : workBlock->getPredecessorBlocks()) {
+        if (seenPreds.contains(pred)) {
+          continue;
+        }
+        
+        if (isDefBlock(pred, element)) {
+          return false;
+        }
+        
+        seenPreds.insert(pred);
+        workBlocks.push_back(pred);
+      }
+    }
+    // If the element has no defs before this block, then the use is definitely
+    // before any defs.
+    return true;
+  }
 
   if (llvm::any_of(block->getArguments(), [this, element](SILArgument *arg) {
         return isDef(arg, element);
