@@ -1197,6 +1197,17 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
+    // A missing conformance on a generic parameter might be satisfied by a
+    // more-concrete replacement. Ask the substitution for it.
+    if (kind == BuiltinConformanceKind::Missing &&
+        (origType->isTypeParameter() || origType->is<ArchetypeType>()) &&
+        !substType->isTypeParameter() &&
+        !substType->isTypeVariableOrMember()) {
+      if (auto found = IFS.lookupConformance(origType, getProtocol(),
+                                             /*level=*/0))
+        return found;
+    }
+
     auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
     return ProtocolConformanceRef(concrete);

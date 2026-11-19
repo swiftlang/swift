@@ -29,8 +29,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 1
+// CHECK-arm64e-SAME:        i64 8
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 24469 }
@@ -43,8 +42,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:        i64 16
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 40879 },
@@ -57,8 +55,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 3
+// CHECK-arm64e-SAME:        i64 24
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 53841 }
@@ -70,8 +67,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_malloc_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 4
+// CHECK-arm64e-SAME:        i64 32
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 23464 },
@@ -94,8 +90,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 1
+// CHECK-arm64e-SAME:        i64 8
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 24469 }
@@ -107,8 +102,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 2
+// CHECK-arm64e-SAME:        i64 16
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 40879 },
@@ -120,8 +114,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 3
+// CHECK-arm64e-SAME:        i64 24
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 53841 }
@@ -133,8 +126,7 @@
 // CHECK-arm64e-SAME:    i64 ptrtoint (
 // CHECK-arm64e-SAME:      ptr getelementptr inbounds (
 // CHECK-arm64e-SAME:        ptr @_swift_coro_async_allocator,
-// CHECK-arm64e-SAME:        i32 0,
-// CHECK-arm64e-SAME:        i32 4
+// CHECK-arm64e-SAME:        i64 32
 // CHECK-arm64e-SAME:      )
 // CHECK-arm64e-SAME:    )
 // CHECK-arm64e-SAME:    i64 23464 },
