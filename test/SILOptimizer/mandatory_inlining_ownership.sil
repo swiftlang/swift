@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-inlining  -enable-experimental-feature CoroutineFunctions | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline-always-inlining -enable-experimental-feature CoroutineFunctions | %FileCheck %s --check-prefix=INLINE-ALWAYS
 
 // REQUIRES: swift_feature_CoroutineFunctions
 
@@ -1007,6 +1008,39 @@ bb0(%0 : $Builtin.Int1, %1 : @owned $NoncopyableKlass, %2 : @guaranteed $Klass):
   %6 = function_ref @callAtMostOnceIfWithDebugValue : $@convention(thin) (Builtin.Int1, @owned @noescape @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
   %7 = apply %6(%0, %5) : $@convention(thin) (Builtin.Int1, @owned @noescape @callable(once) @callee_owned () -> Builtin.Int64) -> Builtin.Int64
   return %7 : $Builtin.Int64
+}
+
+// Inlining an always-inline callee keeps its debug_value. The closure is
+// deleted, so the debug_value of its conversion can't be salvaged into a debug
+// reconstruction block.
+//
+// INLINE-ALWAYS-LABEL: sil [ossa] @test_inline_call_of_exactly_once_closure_through_convert_function :
+// INLINE-ALWAYS-NOT:     partial_apply
+// INLINE-ALWAYS-NOT:     convert_function
+// INLINE-ALWAYS:         debug_value undef : $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>, let, name "f" // id:
+// INLINE-ALWAYS:       } // end sil function 'test_inline_call_of_exactly_once_closure_through_convert_function'
+sil [ossa] @test_inline_call_of_exactly_once_closure_through_convert_function : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64 {
+bb0(%0 : @owned $NoncopyableKlass):
+  %1 = function_ref @alwaysInlineConsumingClosure : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %2 = partial_apply [on_stack] [called_once] %1(%0) : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64
+  %3 = convert_function %2 : $@noescape @once @callee_owned () -> Builtin.Int64 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>
+  %4 = function_ref @callSubstitutedExactlyOnceWithDebugValue : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>) -> Builtin.Int64
+  %5 = apply %4(%3) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>) -> Builtin.Int64
+  return %5 : $Builtin.Int64
+}
+
+sil [always_inline] [ossa] @alwaysInlineConsumingClosure : $@convention(thin) (@owned NoncopyableKlass) -> Builtin.Int64 {
+bb0(%0 : @_eagerMove @owned $NoncopyableKlass):
+  destroy_value %0 : $NoncopyableKlass
+  %2 = integer_literal $Builtin.Int64, 1
+  return %2 : $Builtin.Int64
+}
+
+sil [always_inline] [ossa] @callSubstitutedExactlyOnceWithDebugValue : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>) -> Builtin.Int64 {
+bb0(%0 : @_eagerMove @owned $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>):
+  debug_value %0 : $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>, let, name "f"
+  %2 = apply %0() : $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int64>
+  return %2 : $Builtin.Int64
 }
 
 // The closure's context owns a noncopyable address-only capture.
