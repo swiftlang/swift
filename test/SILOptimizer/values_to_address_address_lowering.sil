@@ -92,6 +92,92 @@ bb0(%0 : @guaranteed $T):
   return %5 : $Builtin.RawPointer
 }
 
+// A loadable guaranteed argument has no storage in AddressLowering's map, so
+// its value_to_address resolves to the converted argument itself.
+//
+// CHECK-LABEL: sil [ossa] @loadable_argument : $@convention(thin) (@in_guaranteed Builtin.Int64) -> Builtin.RawPointer {
+// CHECK: bb0(%0 : $*Builtin.Int64):
+// CHECK-NOT:     value_to_address
+// CHECK:         [[PTR:%.*]] = address_to_pointer %0 : $*Builtin.Int64 to $Builtin.RawPointer
+// CHECK:         return [[PTR]] : $Builtin.RawPointer
+// CHECK-LABEL: } // end sil function 'loadable_argument'
+sil [ossa] @loadable_argument : $@convention(thin) (@in_guaranteed Builtin.Int64) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = address_to_pointer %1 : $*Builtin.Int64 to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// The same for a loadable argument that is not trivial.
+//
+// CHECK-LABEL: sil [ossa] @loadable_nontrivial_argument : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> Builtin.RawPointer {
+// CHECK: bb0(%0 : $*Builtin.NativeObject):
+// CHECK-NOT:     value_to_address
+// CHECK:         [[PTR:%.*]] = address_to_pointer %0 : $*Builtin.NativeObject to $Builtin.RawPointer
+// CHECK:         return [[PTR]] : $Builtin.RawPointer
+// CHECK-LABEL: } // end sil function 'loadable_nontrivial_argument'
+sil [ossa] @loadable_nontrivial_argument : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> Builtin.RawPointer {
+bb0(%0 : @guaranteed $Builtin.NativeObject):
+  %1 = value_to_address %0 : $Builtin.NativeObject
+  %2 = address_to_pointer %1 : $*Builtin.NativeObject to $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+sil @take_loadable : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+
+// SILGen reaches the callee of an addressable loadable parameter through the
+// move-only wrapper conversions of the argument's address, and the call takes
+// the loaded value. The callee is passed the argument's address, not the
+// address of a copy of the argument.
+//
+// CHECK-LABEL: sil [ossa] @loadable_argument_call : $@convention(thin) (@in_guaranteed Builtin.Int64) -> () {
+// CHECK: bb0(%0 : $*Builtin.Int64):
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr %0 : $*Builtin.Int64
+// CHECK:         [[CHECKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]]
+// CHECK:         [[ADDR:%.*]] = moveonlywrapper_to_copyable_addr [[CHECKED]]
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply {{%.*}}([[ADDR]])
+// CHECK-LABEL: } // end sil function 'loadable_argument_call'
+sil [ossa] @loadable_argument_call : $@convention(thin) (@in_guaranteed Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = copyable_to_moveonlywrapper_addr %1 : $*Builtin.Int64
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $*@moveOnly Builtin.Int64
+  %4 = load_borrow %3 : $*@moveOnly Builtin.Int64
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Builtin.Int64
+  %6 = function_ref @take_loadable : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  end_borrow %4 : $@moveOnly Builtin.Int64
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// AddressLowering inserts an indirect result argument ahead of the parameters.
+// That doesn't change which argument the call's address comes from.
+//
+// CHECK-LABEL: sil [ossa] @argument_call_with_indirect_result : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64 {
+// CHECK: bb0({{%.*}} : $*Builtin.Int64, [[ARG:%.*]] : $*Builtin.Int64):
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr [[ARG]] : $*Builtin.Int64
+// CHECK:         [[CHECKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]]
+// CHECK:         [[ADDR:%.*]] = moveonlywrapper_to_copyable_addr [[CHECKED]]
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply {{%.*}}([[ADDR]])
+// CHECK-LABEL: } // end sil function 'argument_call_with_indirect_result'
+sil [ossa] @argument_call_with_indirect_result : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = copyable_to_moveonlywrapper_addr %1 : $*Builtin.Int64
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $*@moveOnly Builtin.Int64
+  %4 = load_borrow %3 : $*@moveOnly Builtin.Int64
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Builtin.Int64
+  %6 = function_ref @take_loadable : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  end_borrow %4 : $@moveOnly Builtin.Int64
+  return %0 : $Builtin.Int64
+}
+
 sil [ossa] @borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T {
 bb0(%0 : @guaranteed $Box<T>):
   %1 = struct_extract %0 : $Box<T>, #Box.t

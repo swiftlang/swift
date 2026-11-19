@@ -843,6 +843,15 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       // case, generating the argument loads is sufficient.
       if (addrType.isAddressOnly(*pass.function)) {
         pass.valueStorageMap.insertValue(load, arg);
+      } else if (!param.isConsumedInCallee()) {
+        // A loadable value has no storage in the valueStorageMap, so resolve
+        // its value_to_address here: the address is the argument itself.
+        for (Operand *use : llvm::make_early_inc_range(load->getUses())) {
+          if (auto *vta = dyn_cast<ValueToAddressInst>(use->getUser())) {
+            vta->replaceAllUsesWith(arg);
+            pass.deleter.forceDelete(vta);
+          }
+        }
       }
     }
     ++argIdx;
@@ -2580,8 +2589,12 @@ static bool isRootScopeOpenBetween(SILInstruction *load, SILInstruction *user,
 /// \p user is the call that takes \p argValue. Only full calls qualify, since
 /// they are finished with their arguments when they return. A partial
 /// application or a coroutine could keep using the address.
-static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
-                                                        SILInstruction *user) {
+///
+/// \p guaranteedIndirectArgs are the address arguments that replaced the
+/// function's guaranteed object arguments.
+static SingleValueInstruction *
+getLoadFromStableAddress(SILValue argValue, SILInstruction *user,
+                         ArrayRef<SILValue> guaranteedIndirectArgs) {
   if (!isa<ApplyInst>(user) && !isa<TryApplyInst>(user))
     return nullptr;
 
@@ -2610,6 +2623,11 @@ static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
       root = mark->getOperand();
     } else if (auto *wrapper = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(root)) {
       root = wrapper->getOperand();
+    } else if (auto *wrapper =
+                   dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(root)) {
+      // SILGen wraps the address of a loadable argument for a no-implicit-copy
+      // parameter.
+      root = wrapper->getOperand();
     } else {
       break;
     }
@@ -2618,6 +2636,10 @@ static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
   if (auto *access = dyn_cast<BeginAccessInst>(root)) {
     isStable = access->getAccessKind() == SILAccessKind::Read;
   }
+  // A guaranteed indirect argument is immutable and outlives the call. This is
+  // the address that value_to_address of a loadable argument resolves to.
+  if (isa<SILFunctionArgument>(root))
+    isStable = llvm::is_contained(guaranteedIndirectArgs, root);
   if (!isStable)
     return nullptr;
   auto *load = cast<SingleValueInstruction>(argValue);
@@ -2702,8 +2724,8 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // addressable parameter's buffer, is passed by that same address rather than
   // by a copy.
   if (!apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
-    if (auto *load =
-            getLoadFromStableAddress(argValue, apply.getInstruction())) {
+    if (auto *load = getLoadFromStableAddress(argValue, apply.getInstruction(),
+                                              pass.guaranteedIndirectArgs)) {
       if (SILValue addr = getAddressForArgument(
               load->getOperand(0), argValue->getType(), argBuilder, callLoc)) {
         operand->set(addr);

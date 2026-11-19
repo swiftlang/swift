@@ -4657,11 +4657,12 @@ of `T`.
 sil-instruction ::= 'value_to_address' sil-operand
 
 %1 = value_to_address %0 : $T
-// %0 must be an object of address-only type $T
+// %0 must be an object of address-only type $T, or a guaranteed indirect
+// function argument of loadable type $T
 // %1 will be of type $*T
 ```
 
-Produces the address of the storage of an address-only value.
+Produces the address of the storage of an opaque value.
 
 With opaque values, an address-only value is an SSA object. It has no
 address in SIL until AddressLowering assigns it storage. Some operations

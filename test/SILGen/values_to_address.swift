@@ -34,3 +34,21 @@ func argument<T>(_ x: borrowing @_addressable T) {
 func rvalue<T>(_ make: () -> T) {
   take(make())
 }
+
+// A loadable parameter is passed by address too, so it takes the same path.
+// Without value_to_address the buffer is a store_borrow of the binding, which the
+// move-only checkers and the move-only type eliminator treat as an ordinary
+// value, so it is not the address that the caller passed.
+//
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s{{.*}}8loadable{{.*}} : $@convention(thin) (@in_guaranteed UInt64) -> () {
+// CHECK: bb0(%0 : @noImplicitCopy $UInt64):
+// CHECK-NOT:     store_borrow
+// CHECK:         [[ADDR:%.*]] = value_to_address %0 : $UInt64
+// CHECK:         [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr [[ADDR]] : $*UInt64
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]] : $*@moveOnly UInt64
+// CHECK-NOT:     store_borrow
+// CHECK-LABEL: } // end sil function '$s{{.*}}8loadable{{.*}}'
+func take64(_ x: borrowing @_addressable UInt64) {}
+func loadable(_ x: borrowing @_addressable UInt64) {
+  take64(x)
+}
