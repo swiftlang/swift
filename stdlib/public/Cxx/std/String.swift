@@ -170,8 +170,9 @@ extension std.string: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.string, rhs: std.string) {
+  public static func +=(lhs: inout std.string, rhs: @_addressable std.string) {
     lhs.append(rhs)
   }
 
@@ -257,8 +258,11 @@ extension std.wstring: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.wstring, rhs: std.wstring) {
+  public static func +=(
+    lhs: inout std.wstring, rhs: @_addressable std.wstring
+  ) {
     lhs.append(rhs)
   }
 
