@@ -433,6 +433,9 @@ public:
     for (Type arg : genericArgs) {
       if (cxx_translation::isNoncopyableValueTypeExposableToCxx(arg))
         return ClangRepresentation::unsupported;
+      // Only OpaquePointer has the C++ type traits a generic argument needs.
+      if (arg->getAnyPointerElementType())
+        return ClangRepresentation::unsupported;
     }
     os << '<';
     llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
