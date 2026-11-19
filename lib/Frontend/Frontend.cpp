@@ -65,6 +65,9 @@
 using namespace swift;
 
 CompilerInstance::CompilerInstance() = default;
+CompilerInstance::CompilerInstance(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
+    : SourceMgr(std::move(FS)) {}
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
@@ -208,7 +211,8 @@ std::string CompilerInvocation::getAPIDescriptorPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
+    const SupplementaryOutputPaths &outs, const ModuleDecl *module,
+    llvm::vfs::FileSystem &FS) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -232,8 +236,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
-  serializationOpts.SDKVersion = swift::getSDKBuildVersion(
-                                          getSearchPathOptions().getSDKPath());
+  serializationOpts.SDKVersion =
+      swift::getSDKBuildVersion(getSearchPathOptions().getSDKPath(), FS);
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 
@@ -527,7 +531,7 @@ bool CompilerInstance::setupCompileJobBaseKeyIfNeeded(
     return false;
 
   // create baseline key.
-  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args, *BaseFS);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                          "creating base cache key",
@@ -602,6 +606,7 @@ void CompilerInstance::setupCachingDiagnosticsProcessorIfNeeded() {
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
+  BaseFS = SourceMgr.getFileSystem();
 
   if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
@@ -683,6 +688,7 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
   // This is the fast path for setup an instance for replay but cannot run
   // regular compilation.
   Invocation = Invoke;
+  BaseFS = SourceMgr.getFileSystem();
 
   setSharedCASInstances(CAS, Cache);
   if (setupCASIfNeeded()) {
@@ -825,9 +831,9 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
            Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
         StringRef InputPath = Input.getFileName();
         // An input that is not on disk is provided by the CAS file system.
-        if (InputPath == "-" || !llvm::sys::fs::exists(InputPath))
+        if (InputPath == "-" || !BaseFS->exists(InputPath))
           continue;
-        auto Buffer = llvm::MemoryBuffer::getFile(InputPath);
+        auto Buffer = BaseFS->getBufferForFile(InputPath);
         if (!Buffer) {
           Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                                InputPath, Buffer.getError().message());
@@ -841,9 +847,11 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
+  // The files redirected by the overlays are read from the base file system,
+  // even when the CAS file system is used.
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
-          SourceMgr.getFileSystem());
+          SourceMgr.getFileSystem(), BaseFS);
   if (!ExpectedOverlay) {
     llvm::handleAllErrors(
         ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
@@ -876,7 +884,9 @@ void CompilerInstance::setUpLLVMArguments() {
            i != e; ++i)
         Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
       Args.push_back(nullptr);
-      llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+      llvm::cl::ParseCommandLineOptions(Args.size() - 1, Args.data(),
+                                        /*Overview=*/"", /*Errs=*/nullptr,
+                                        SourceMgr.getFileSystem().get());
     }
   }
 }

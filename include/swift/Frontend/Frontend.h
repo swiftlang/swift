@@ -26,6 +26,7 @@
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CASOptions.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
@@ -151,12 +152,16 @@ public:
   /// If non-empty, relative search paths are resolved relative to
   /// \p workingDirectory.
   ///
+  /// Files needed while parsing are read from \p FS, or from the real file
+  /// system if \p FS is null.
+  ///
   /// \returns true if there was an error, false on success.
   bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags,
                  SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
                      *ConfigurationFileBuffers = nullptr,
                  StringRef workingDirectory = {},
-                 StringRef mainExecutablePath = {});
+                 StringRef mainExecutablePath = {},
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
   /// Sets specific options based on the given serialized Swift binary data.
   ///
@@ -176,9 +181,8 @@ public:
   /// Serialize the command line arguments for emitting them
   /// to DWARF or CodeView and inject SDKPath if necessary.
   static void buildDebugFlags(std::string &Output,
-                              const llvm::opt::ArgList &Args,
-                              StringRef SDKPath,
-                              StringRef ResourceDir);
+                              const llvm::opt::ArgList &Args, StringRef SDKPath,
+                              StringRef ResourceDir, llvm::vfs::FileSystem &FS);
 
   /// Configures the diagnostic engine for the invocation's options. Files
   /// needed by the diagnostic engine are read from \p FS.
@@ -278,16 +282,19 @@ public:
   void updateImplicitSearchPaths();
 
   /// Compute the default prebuilt module cache path for a given resource path
-  /// and SDK version. This function is also used by LLDB.
-  static std::string
-  computePrebuiltCachePath(StringRef RuntimeResourcePath, llvm::Triple target,
-                           std::optional<llvm::VersionTuple> sdkVer);
+  /// and SDK version. This function is also used by LLDB. The SDK-versioned
+  /// cache is looked up in \p FS, or in the real file system if \p FS is null.
+  static std::string computePrebuiltCachePath(
+      StringRef RuntimeResourcePath, llvm::Triple target,
+      std::optional<llvm::VersionTuple> sdkVer,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
   /// If we haven't explicitly passed -prebuilt-module-cache-path, set it to
   /// the default value of <resource-dir>/<platform>/prebuilt-modules.
   /// @note This should be called once, after search path options and frontend
   ///       options have been parsed.
-  void setDefaultPrebuiltCacheIfNecessary();
+  void setDefaultPrebuiltCacheIfNecessary(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
   /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
   /// it as a default value.
@@ -297,7 +304,8 @@ public:
 
   /// Determine which C++ stdlib should be used for this compilation, and which
   /// C++ stdlib is the default for the specified target.
-  void computeCXXStdlibOptions();
+  void computeCXXStdlibOptions(
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
   /// Compute whether or not we support aarch64TBI
   void computeAArch64TBIOptions();
@@ -533,7 +541,8 @@ public:
   /// \c SerializeOptionsForDebugging hack.
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
-                              const ModuleDecl *module) const;
+                              const ModuleDecl *module,
+                              llvm::vfs::FileSystem &FS) const;
 };
 
 /// A class which manages the state and execution of the compiler.
@@ -557,6 +566,10 @@ class CompilerInstance {
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
+
+  /// The file system of the source manager before the CAS file system and the
+  /// VFS overlays are applied.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS;
   std::unique_ptr<ASTContext> Context;
   std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<DiagnosticVerifier> DiagVerifier;
@@ -613,6 +626,8 @@ class CompilerInstance {
 public:
   // Out of line to avoid having to import SILModule.h.
   CompilerInstance();
+  /// Creates an instance whose source manager reads files from \p FS.
+  explicit CompilerInstance(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS);
   ~CompilerInstance();
 
   CompilerInstance(const CompilerInstance &) = delete;
@@ -621,6 +636,14 @@ public:
   void operator=(CompilerInstance &&) = delete;
 
   SourceManager &getSourceMgr() { return SourceMgr; }
+
+  /// Returns the file system of the source manager before the CAS file system
+  /// and the VFS overlays are applied. Files that are not inputs of the
+  /// compilation, such as file lists and outputs, are read from it.
+  llvm::vfs::FileSystem &getBaseFileSystem() const {
+    ASSERT(BaseFS && "instance is not set up");
+    return *BaseFS;
+  }
   const SourceManager &getSourceMgr() const { return SourceMgr; }
 
   DiagnosticEngine &getDiags() { return Diagnostics; }

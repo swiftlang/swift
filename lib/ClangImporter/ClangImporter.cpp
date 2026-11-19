@@ -120,6 +120,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileCollector.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -522,16 +523,31 @@ static inline bool isPCHFilenameExtension(StringRef path) {
     .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
+/// Disables the IO sandbox for running the Clang driver, which is not
+/// sandboxed, as in clang. A direct cc1 module build only runs the driver to
+/// compute the code generation options for -clang-target.
+static llvm::sys::sandbox::ScopedSetting
+bypassSandboxForClangDriver(const ASTContext &ctx) {
+  ASSERT((!ctx.ClangImporterOpts.DirectClangCC1ModuleBuild ||
+          ctx.LangOpts.ClangTarget.has_value()) &&
+         "direct cc1 module build should not run the Clang driver");
+  return llvm::sys::sandbox::scopedDisable();
+}
+
 /// Returns the set of sanitizers Clang's driver considers supported for
 /// \p triple.
 static clang::SanitizerMask
-getClangSupportedSanitizers(const llvm::Triple &triple) {
+getClangSupportedSanitizers(const ASTContext &ctx, const llvm::Triple &triple) {
+  auto BypassSandbox = bypassSandboxForClangDriver(ctx);
+  auto VFS = ctx.SourceMgr.getFileSystem();
+
   clang::DiagnosticOptions diagOpts;
   auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
   clang::DiagnosticsEngine clangDiags(diagIDs, diagOpts,
                                       new clang::IgnoringDiagConsumer(),
                                       /*ShouldOwnClient=*/true);
-  clang::driver::Driver driver("clang", triple.str(), clangDiags);
+  clang::driver::Driver driver("clang", triple.str(), clangDiags,
+                               "clang LLVM compiler", std::move(VFS));
   driver.setCheckInputsExist(false);
   std::string targetArg = "--target=" + triple.str();
   llvm::SmallVector<const char *, 8> argv = {
@@ -600,7 +616,7 @@ void importer::getNormalInvocationArguments(
   // If there are no shims in the resource dir, add a search path in the SDK.
   SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
   llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
+  if (!ctx.SourceMgr.getFileSystem()->exists(shimsPath)) {
     shimsPath = searchPathOpts.getSDKPath();
     llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
     llvm::append_values(invocationArgStrs, "-isystem",
@@ -694,7 +710,8 @@ void importer::getNormalInvocationArguments(
   // already captured by the dependency scanner and command-line module map
   // files are dropped, so don't add the shim module map.
   if (LangOpts.EnableCXXInterop && !ctx.CASOpts.HasImmutableFileSystem) {
-    if (auto path = getCxxShimModuleMapPath(searchPathOpts, LangOpts, triple)) {
+    if (auto path = getCxxShimModuleMapPath(searchPathOpts, LangOpts, triple,
+                                            *ctx.SourceMgr.getFileSystem())) {
       invocationArgStrs.push_back((Twine("-fmodule-map-file=") + *path).str());
     }
   }
@@ -934,7 +951,8 @@ void importer::getNormalInvocationArguments(
   // would error out with "unsupported option '-fsanitize=...' for target ...".
   auto &enabledSanitizers = ctx.SILOpts.Sanitizers;
   if (enabledSanitizers) {
-    clang::SanitizerMask clangSupported = getClangSupportedSanitizers(triple);
+    clang::SanitizerMask clangSupported =
+        getClangSupportedSanitizers(ctx, triple);
     if ((enabledSanitizers & SanitizerKind::Address) &&
         (clangSupported & clang::SanitizerKind::Address))
       invocationArgStrs.push_back("-fsanitize=address");
@@ -1169,7 +1187,7 @@ void importer::addCommonInvocationArguments(
 }
 
 bool ClangImporter::canReadPCH(StringRef PCHFilename) {
-  if (!llvm::sys::fs::exists(PCHFilename))
+  if (!Impl.SwiftContext.SourceMgr.getFileSystem()->exists(PCHFilename))
     return false;
 
   // FIXME: The following attempts to do an initial ReadAST invocation to verify
@@ -1539,7 +1557,10 @@ std::unique_ptr<clang::CompilerInvocation> ClangImporter::createClangInvocation(
     CIOpts.Diags = clangDiags;
     CIOpts.RecoverOnError = false;
     CIOpts.ProbePrecompiled = true;
-    CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+    {
+      auto BypassSandbox = bypassSandboxForClangDriver(ctx);
+      CI = clang::createInvocation(invocationArgs, std::move(CIOpts));
+    }
     if (!CI)
       return nullptr;
 

@@ -462,7 +462,7 @@ private:
     auto sdkPath = instance.getASTContext().SearchPathOpts.getSDKPath();
     SwiftInterfaceModuleOutputPathResolution::setOutputPath(
         outputPath, moduleID.ModuleName, interfacePath, sdkPath, CI,
-        extraArgsList);
+        extraArgsList, *instance.getSourceMgr().getFileSystem());
 
     return;
   }
@@ -582,7 +582,8 @@ private:
       for (auto &c : ArrayRef<std::string>(commandLine).drop_front(1))
         Args.push_back(c.c_str());
 
-    auto base = createCompileJobBaseCacheKey(CAS, Args);
+    auto base = createCompileJobBaseCacheKey(
+        CAS, Args, *instance.getSourceMgr().getFileSystem());
     if (!base) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cache_key_creation,
                                    moduleID.ModuleName,
@@ -1455,7 +1456,8 @@ performModuleScanImpl(
     llvm::sys::TimePoint<> serializedCacheTimeStamp;
     bool loadFailure =
         module_dependency_cache_serialization::readInterModuleDependenciesCache(
-            cachePath, cache, serializedCacheTimeStamp);
+            cachePath, cache, serializedCacheTimeStamp,
+            *instance->getSourceMgr().getFileSystem());
     if (opts.EmitDependencyScannerCacheRemarks && loadFailure)
       ctx.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                          cachePath);

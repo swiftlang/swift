@@ -78,6 +78,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
@@ -706,7 +707,12 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
   if (OutputFilename.empty())
     return true;
 
-  auto BinaryOwner = object::createBinary(OutputFilename);
+  // The existing output file is not an input of the compilation, so it is not
+  // in the virtual file system.
+  auto BinaryOwner = [&] {
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    return object::createBinary(OutputFilename);
+  }();
   if (!BinaryOwner) {
     consumeError(BinaryOwner.takeError());
     return true;

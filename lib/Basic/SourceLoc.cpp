@@ -17,9 +17,11 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/Signals.h"
+#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -278,48 +280,54 @@ dumpBufferToFile(const llvm::MemoryBuffer *buffer,
                  CharSourceRange originalSourceRange) {
   // Create file in the system temporary directory.
   SmallString<128> outputFileName;
-  llvm::sys::path::system_temp_directory(true, outputFileName);
+  {
+    // On Windows, the temporary directory is made absolute against the current
+    // directory of the process.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    llvm::sys::path::system_temp_directory(true, outputFileName);
+  }
   llvm::sys::path::append(outputFileName, "swift-generated-sources");
-  if (llvm::sys::fs::create_directory(outputFileName))
-    return std::nullopt;
 
   // Finalize the name of the resulting file. This is unique based on name
   // mangling.
   llvm::sys::path::append(outputFileName, buffer->getBufferIdentifier());
 
-  std::error_code ec = atomicallyWritingToFile(outputFileName,
-     [&](llvm::raw_pwrite_stream &out) {
-       auto contents = buffer->getBuffer();
-       out << contents;
-
-        // Make sure we have a trailing newline.
-        if (contents.empty() || contents.back() != '\n')
-          out << "\n";
-
-        // If we know the source range this comes from, append it later in
-        // the file so one can trace.
-        if (originalSourceRange.isValid()) {
-          out << "\n";
-
-          auto originalFilename =
-            sourceMgr.getDisplayNameForLoc(originalSourceRange.getStart(),
-                                           true);
-          unsigned startLine, startColumn, endLine, endColumn;
-          std::tie(startLine, startColumn) =
-              sourceMgr.getPresumedLineAndColumnForLoc(
-                originalSourceRange.getStart());
-          std::tie(endLine, endColumn) =
-              sourceMgr.getPresumedLineAndColumnForLoc(
-                originalSourceRange.getEnd());
-          out << "// original-source-range: "
-              << originalFilename
-              << ":" << startLine << ":" << startColumn
-              << "-" << endLine << ":" << endColumn
-              << "\n";
-      }
-    });
-  if (ec)
+  // The file is for external clients; it is not an output of the compilation.
+  llvm::vfs::OnDiskOutputBackend backend;
+  auto outputFile = backend.createFile(outputFileName);
+  if (!outputFile) {
+    llvm::consumeError(outputFile.takeError());
     return std::nullopt;
+  }
+
+  llvm::raw_pwrite_stream &out = *outputFile;
+  auto contents = buffer->getBuffer();
+  out << contents;
+
+  // Make sure we have a trailing newline.
+  if (contents.empty() || contents.back() != '\n')
+    out << "\n";
+
+  // If we know the source range this comes from, append it later in
+  // the file so one can trace.
+  if (originalSourceRange.isValid()) {
+    out << "\n";
+
+    auto originalFilename =
+        sourceMgr.getDisplayNameForLoc(originalSourceRange.getStart(), true);
+    unsigned startLine, startColumn, endLine, endColumn;
+    std::tie(startLine, startColumn) = sourceMgr.getPresumedLineAndColumnForLoc(
+        originalSourceRange.getStart());
+    std::tie(endLine, endColumn) =
+        sourceMgr.getPresumedLineAndColumnForLoc(originalSourceRange.getEnd());
+    out << "// original-source-range: " << originalFilename << ":" << startLine
+        << ":" << startColumn << "-" << endLine << ":" << endColumn << "\n";
+  }
+
+  if (auto error = outputFile->keep()) {
+    llvm::consumeError(std::move(error));
+    return std::nullopt;
+  }
 
   return outputFileName.str().str();
 }

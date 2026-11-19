@@ -26,6 +26,7 @@
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
 #include "swift/Migrator/FixitFilter.h"
 #include "llvm/Support/PrefixMapper.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -92,7 +93,8 @@ private:
         new llvm::raw_fd_ostream(FixitsOutputPath, EC, llvm::sys::fs::OF_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
-      SourceManager dummyMgr;
+      SourceManager dummyMgr(
+          llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>());
       DiagnosticEngine DE(dummyMgr);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);
@@ -283,7 +285,9 @@ void DiagnosticHelper::Implementation::diagnoseFatalError(const char *reason,
   }
   recursiveFatalError = reason;
 
-  SourceManager dummyMgr;
+  // The diagnostics below have no source location, so no files are needed.
+  SourceManager dummyMgr(
+      llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>());
 
   DiagnosticInfo errorInfo(
       DiagID(0), SourceLoc(), DiagnosticKind::Error,
