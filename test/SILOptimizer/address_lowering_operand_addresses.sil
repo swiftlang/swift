@@ -1,0 +1,67 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -module-name Swift -sil-verify-all %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+protocol P {}
+
+class Klass {}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_arg : $@convention(thin) <T> (@in T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    end_lifetime %0 : $*T
+// CHECK-LABEL: } // end sil function 'end_lifetime_arg'
+sil [ossa] @end_lifetime_arg : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  end_lifetime %0 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @end_lifetime_local : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    [[A:%.*]] = alloc_stack $T
+// CHECK-NEXT:    copy_addr %0 to [init] [[A]] : $*T
+// CHECK-NEXT:    end_lifetime [[A]] : $*T
+// CHECK:         dealloc_stack [[A]] : $*T
+// CHECK-LABEL: } // end sil function 'end_lifetime_local'
+sil [ossa] @end_lifetime_local : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  end_lifetime %1 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) <T> (@in_guaranteed T, @guaranteed Klass) -> () {
+// CHECK:       bb0(%0 : $*T, %1 : @guaranteed $Klass):
+// CHECK:         [[A:%.*]] = alloc_stack $T
+// CHECK:         copy_addr %0 to [init] [[A]] : $*T
+// CHECK:         merge_isolation_region [[A]] : $*T, %1 : $Klass
+// CHECK:         destroy_addr [[A]] : $*T
+// CHECK-LABEL: } // end sil function 'merge_isolation_region'
+sil [ossa] @merge_isolation_region : $@convention(thin) <T> (@in_guaranteed T, @guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $Klass):
+  %2 = copy_value %0 : $T
+  merge_isolation_region %2 : $T, %1 : $Klass
+  destroy_value %2 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @deinit_existential_value : $@convention(thin) <T where T : P> (@in T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         [[E:%.*]] = alloc_stack $any P
+// CHECK:         [[PL:%.*]] = init_existential_addr [[E]] : $*any P, $T
+// CHECK:         copy_addr [take] %0 to [init] [[PL]] : $*T
+// CHECK:         deinit_existential_addr [[E]] : $*any P
+// CHECK:         dealloc_stack [[E]] : $*any P
+// CHECK-LABEL: } // end sil function 'deinit_existential_value'
+sil [ossa] @deinit_existential_value : $@convention(thin) <T where T : P> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %1 = init_existential_value %0 : $T, $T, $P
+  deinit_existential_value %1 : $P
+  %r = tuple ()
+  return %r : $()
+}

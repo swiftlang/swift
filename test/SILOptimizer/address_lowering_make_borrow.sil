@@ -1,0 +1,16 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -module-name Swift -sil-verify-all %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+// CHECK-LABEL: sil [ossa] @make_borrow_result : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+// CHECK:       bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
+// CHECK-NEXT:    init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'make_borrow_result'
+sil [ossa] @make_borrow_result : $@convention(thin) <T> (@in_guaranteed T) -> @out Builtin.Borrow<T> {
+bb0(%0 : @guaranteed $T):
+  %1 = make_borrow %0 : $T
+  return %1 : $Builtin.Borrow<T>
+}
