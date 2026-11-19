@@ -1002,8 +1002,8 @@ struct StructWithLayout {
 // CHECK: alloc_box ${ var StructWithLayout }, var, name "self"
 // CHECK: mark_uninitialized [rootself] %{{.*}} : ${ var StructWithLayout }
 // CHECK: [[PROJ:%.*]] = project_box %{{.*}} : ${ var StructWithLayout }, 0
-// CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
-// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+// CHECK: [[PA:%.*]] = partial_apply [called_at_most_once] %{{.*}}([[PROJ]]) : $@convention(thin) (@inout_aliasable StructWithLayout) -> Bool
+// CHECK: [[CLOSURE:%.*]] = convert_escape_to_noescape [[PA]] : $@callable(once) @callee_owned () -> Bool to $@noescape @callable(once) @callee_owned () -> Bool
 // call StaticString.init
 // CHECK: apply
 // call UInt.init(_builtinIntegerLiteral:)

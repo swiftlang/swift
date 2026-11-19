@@ -836,16 +836,15 @@ func keypath_chain(_ x: NS) async {
 ////////////////////////////////////////////////////////////////////////////////
 
 func taskgroup_chain_dropped(_ x: NS) async {
-  let y = x
-  let z = y
-  // FIXME: outer-frame chain notes ('y' reachable from 'x', 'z' reachable
-  // from 'y') don't fire for the addTask closure-send warning; same shape
-  // via Task.detached does emit them.
+  let y = x // expected-note {{'y' is connected to 'x' which is accessible to code in the current isolation context}}
+  let z = y // expected-note {{'z' is connected to 'y'}}
+  // The body of withTaskGroup is a once closure, which sends 'z' when addTask
+  // sends it, so the chain notes fire.
   await withTaskGroup(of: Void.self) { group in
-    // expected-note@+1 {{value was merged into code in the current isolation context region here}}
-    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
-      let w = z // expected-note {{closure captures 'z' which is accessible to code in the current isolation context}}
-      // expected-note @-1 {{'w' is connected to 'z' which is accessible to code in the current isolation context}}
+    group.addTask {
+      let w = z // expected-warning {{sending 'z' risks causing data races}}
+      // expected-note @-1 {{'z' is captured by a @concurrent closure. @concurrent uses in closure may race against code in the current isolation context}}
+      // expected-note @-2 {{'w' is connected to 'z' which is accessible to code in the current isolation context}}
       await transferToMain(w) // expected-warning {{sending 'w' risks causing data races}}
       // expected-note @-1 {{sending 'w' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
     }
