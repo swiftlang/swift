@@ -591,8 +591,15 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
               # Override test filter for known issues in downstream LLDB
               Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
               $env:SDKROOT = $SwiftSDK
+              # These runs exclude tests, which lit fails to write traces for.
+              Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target $TestPaths[$Suite]
+            } else {
+              # The suites of a build tree can run at the same time, so each one
+              # writes its traces to its own directory.
+              Invoke-WithLitTimeTraces "$CompilerCache\lit-time-traces\$Suite" {
+                Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target $TestPaths[$Suite]
+              }
             }
-            Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target $TestPaths[$Suite]
           }
         }
       }
