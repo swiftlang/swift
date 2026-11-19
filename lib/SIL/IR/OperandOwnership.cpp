@@ -593,6 +593,13 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
   if (getValue()->getType().isAddress()) {
     return OperandOwnership::TrivialUse;
   }
+  // The object self of a borrow or mutate accessor with an address result is
+  // an InteriorPointerOperand.
+  if (auto *ai = dyn_cast<ApplyInst>(apply.getInstruction())) {
+    if (ai->getSelfObjectOfAddressBorrowMutateAccessorResult() == &op) {
+      return OperandOwnership::AnyInteriorPointer;
+    }
+  }
   auto calleeTy = apply.getSubstCalleeType();
   SILArgumentConvention argConv = [&]() {
     if (apply.isCalleeOperand(op)) {
@@ -703,8 +710,12 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
 
 OperandOwnership
 OperandOwnershipClassifier::visitReturnBorrowInst(ReturnBorrowInst *rbi) {
-  return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
-                                : OperandOwnership::EndBorrow;
+  if (getOperandIndex() != 0) {
+    return OperandOwnership::EndBorrow;
+  }
+  return getValue()->getType().isAddress()
+             ? OperandOwnership::TrivialUse
+             : OperandOwnership::GuaranteedForwarding;
 }
 
 OperandOwnership OperandOwnershipClassifier::visitAssignInst(AssignInst *i) {

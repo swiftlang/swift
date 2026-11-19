@@ -151,14 +151,14 @@ OptionalBridgedValue BridgedPassContext::simplifyInstruction(BridgedInstruction 
   return {::simplifyInstruction(inst.unbridged())};
 }
 
-void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
+bool BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
   SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
   InstructionDeleter deleter;
-  SILInliner::inlineFullApply(FullApplySite(apply.unbridged()),
-                              mandatoryInline
-                                  ? SILInliner::InlineKind::MandatoryInline
-                                  : SILInliner::InlineKind::PerformanceInline,
-                              funcBuilder, deleter);
+  return SILInliner::inlineFullApply(
+             FullApplySite(apply.unbridged()),
+             mandatoryInline ? SILInliner::InlineKind::MandatoryInline
+                             : SILInliner::InlineKind::PerformanceInline,
+             funcBuilder, deleter) != nullptr;
 }
 
 void BridgedPassContext::eraseFunction(BridgedFunction function) const {

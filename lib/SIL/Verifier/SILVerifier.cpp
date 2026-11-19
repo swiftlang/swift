@@ -5963,7 +5963,7 @@ public:
         // from self.
         auto *apply = dyn_cast_or_null<ApplyInst>(root);
         auto *selfOp = apply
-            ? apply->getAddressSelfOfAddressBorrowMutateAccessorResult()
+            ? apply->getSelfAddressOfAddressBorrowMutateAccessorResult()
             : nullptr;
         if (!selfOp) {
           break;

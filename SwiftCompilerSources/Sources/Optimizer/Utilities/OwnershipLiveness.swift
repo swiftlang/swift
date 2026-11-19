@@ -489,6 +489,10 @@ extension OwnershipUseVisitor {
          is OpenExistentialBoxInst:
       let svi = operand.instruction as! SingleValueInstruction
       return interiorPointerUse(of: operand, into: svi)
+    case let apply as ApplyInst
+      where apply.selfObjectOfBorrowMutateAccessorAddressResult != nil && operand == apply.selfArgumentOperand:
+      // The object self of a borrow or mutate accessor with an address result.
+      return interiorPointerUse(of: operand, into: apply)
     default:
       return pointerEscapingUse(of: operand)
     }

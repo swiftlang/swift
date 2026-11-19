@@ -1234,3 +1234,25 @@ bb0(%0 : $*T, %1 : @guaranteed $Inner):
   %7 = tuple ()
   return %7
 }
+
+sil @borrow_outer_y : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+sil @borrow_outer_z : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address T
+
+// The result of an accessor is not a field of its self. It doesn't collide with
+// a projection of field #0 or with the result of another accessor.
+sil [ossa] @test_borrow_accessor_results_and_field_projection : $@convention(thin) (@in Outer) -> () {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0, #Outer.x
+  %2 = function_ref @use_guaranteed_T : $@convention(thin) (@in_guaranteed T) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@in_guaranteed T) -> ()
+  %4 = function_ref @borrow_outer_y : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %5 = apply %4(%0) : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %6 = struct_element_addr %5, #Inner.a
+  %7 = apply %2(%6) : $@convention(thin) (@in_guaranteed T) -> ()
+  %8 = function_ref @borrow_outer_z : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address T
+  %9 = apply %8(%0) : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address T
+  %10 = apply %2(%9) : $@convention(thin) (@in_guaranteed T) -> ()
+  destroy_addr %0
+  %12 = tuple ()
+  return %12
+}

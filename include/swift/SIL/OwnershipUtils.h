@@ -864,6 +864,8 @@ public:
     OpenExistentialBox,
     ProjectBox,
     MarkDependenceNonEscaping,
+    // The object self of a borrow or mutate accessor with an address result.
+    BorrowMutateAccessor,
   };
 
 private:
@@ -898,6 +900,12 @@ public:
                  ? Kind::MarkDependenceNonEscaping
                  : Kind::Invalid;
     }
+    case SILInstructionKind::ApplyInst: {
+      auto *ai = cast<ApplyInst>(use->getUser());
+      return ai->getSelfObjectOfAddressBorrowMutateAccessorResult() == use
+                 ? Kind::BorrowMutateAccessor
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -920,6 +928,12 @@ public:
       auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
       return mdi->isNonEscaping() && mdi->getType().isAddress()
                  ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
+    case ValueKind::ApplyInst: {
+      auto *ai = cast<ApplyInst>(value);
+      return ai->getSelfObjectOfAddressBorrowMutateAccessorResult()
+                 ? Kind::BorrowMutateAccessor
                  : Kind::Invalid;
     }
     }
@@ -988,6 +1002,11 @@ struct InteriorPointerOperand {
       return InteriorPointerOperand(
           &mdi->getAllOperands()[MarkDependenceInst::Base], kind);
     }
+    case InteriorPointerOperandKind::BorrowMutateAccessor: {
+      auto *ai = cast<ApplyInst>(resultValue);
+      return InteriorPointerOperand(
+          ai->getSelfObjectOfAddressBorrowMutateAccessorResult(), kind);
+    }
     }
     llvm_unreachable("covered switch");
   }
@@ -1027,6 +1046,8 @@ struct InteriorPointerOperand {
       return cast<ProjectBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::MarkDependenceNonEscaping:
       return cast<MarkDependenceInst>(operand->getUser());
+    case InteriorPointerOperandKind::BorrowMutateAccessor:
+      return cast<ApplyInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }

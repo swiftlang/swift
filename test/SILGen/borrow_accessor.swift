@@ -705,7 +705,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK-SIL:   [[REG3:%.*]] = load_borrow [[REG2]]
 // CHECK-SIL:   [[REG4:%.*]] = function_ref @$s15borrow_accessor1SV1kAA5KlassCvb : $@convention(method) (@guaranteed S) -> @guaranteed Klass
 // CHECK-SIL:   [[REG5:%.*]] = apply [[REG4]]([[REG3]]) : $@convention(method) (@guaranteed S) -> @guaranteed Klass
-// CHECK-SIL:   return_borrow [[REG5]] from_scopes ([[REG3]], [[REG5]])
+// CHECK-SIL:   return_borrow [[REG5]] from_scopes ([[REG5]], [[REG3]])
 // CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor10GenWrapperV9nested_k1AA5KlassCvz : $@convention(method) <T> (@inout GenWrapper<T>) -> @inout Klass {
@@ -926,7 +926,7 @@ public struct GenNCWrapper<T : ~Copyable> : ~Copyable {
 // CHECK-SIL:   [[REG7:%.*]] = copy_value [[REG6]]
 // CHECK-SIL:   [[REG8:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[REG7]]
 // CHECK-SIL:   destroy_value [[REG8]]
-// CHECK-SIL:   return_borrow [[REG6]] from_scopes ([[REG4]], [[REG6]])
+// CHECK-SIL:   return_borrow [[REG6]] from_scopes ([[REG6]], [[REG4]])
 // CHECK-SIL: }
 
 // CHECK: sil hidden [ossa] @$s15borrow_accessor12GenNCWrapperVAARi_zrlE10nested_nc1AA2NCVvz : $@convention(method) <T where T : ~Copyable> (@inout GenNCWrapper<T>) -> @inout NC {

@@ -230,3 +230,211 @@ bb1(%6 : @guaranteed $KlassPair):
   %12 = tuple ()
   return %12
 }
+
+sil @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+sil @mutate_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+
+// The address result of an accessor with an object self is an interior pointer
+// of self.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_use_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = begin_borrow %0 : $Wrapper
+// CHECK: Consuming User:   end_borrow %2 : $Wrapper
+// CHECK: Non Consuming User:   store %1 to [assign] %4 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_use_after_end_borrow'
+sil [ossa] @test_address_result_use_after_end_borrow : $@convention(thin) (@owned Wrapper, @owned Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : @owned $Klass):
+  %2 = begin_borrow %0
+  %3 = function_ref @mutate_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+  end_borrow %2
+  store %1 to [assign] %4
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_returned_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = load_borrow %0 : $*Wrapper
+// CHECK: Consuming User:   end_borrow %2 : $Wrapper
+// CHECK: Non Consuming User:   return %3 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_returned_after_end_borrow'
+sil [ossa] @test_address_result_returned_after_end_borrow : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  end_borrow %2
+  return %3
+}
+
+// CHECK-NOT: Function: 'test_address_result_return_borrow'
+// The address result may be returned from within the borrow scope of self.
+sil [ossa] @test_address_result_return_borrow : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  return_borrow %3 : $*Klass from_scopes (%2 : $Wrapper)
+}
+
+// An owned self may be passed directly to an accessor with an address result.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_use_after_destroy_owned_self'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Wrapper
+// CHECK: Consuming User:   destroy_value %0 : $Wrapper
+// CHECK: Non Consuming User:   %4 = load [copy] %2 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_use_after_destroy_owned_self'
+sil [ossa] @test_address_result_use_after_destroy_owned_self : $@convention(thin) (@owned Wrapper) -> @owned Klass {
+bb0(%0 : @owned $Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  destroy_value %0
+  %4 = load [copy] %2
+  return %4
+}
+
+// CHECK-NOT: Function: 'test_address_result_owned_self'
+sil [ossa] @test_address_result_owned_self : $@convention(thin) (@owned Wrapper) -> @owned Klass {
+bb0(%0 : @owned $Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %3 = load [copy] %2
+  destroy_value %0
+  return %3
+}
+
+class KlassHolder {
+  @_hasStorage let k: Klass
+}
+
+public struct HolderWrapper {
+  @_hasStorage var _h: KlassHolder { get set }
+}
+
+sil @borrow_holder : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+
+// The address result of a borrow accessor is an interior pointer of the scopes
+// it is projected from, which return_borrow must end.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_projection_returned_without_scope'
+// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK: Value:   %1 = load_borrow %0 : $*HolderWrapper
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_projection_returned_without_scope'
+sil [ossa] @test_projection_returned_without_scope : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = struct_extract %1, #HolderWrapper._h
+  %3 = ref_element_addr %2, #KlassHolder.k
+  return %3
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_projection_returned_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = load_borrow %0 : $*HolderWrapper
+// CHECK: Consuming User:   end_borrow %1 : $HolderWrapper
+// CHECK: Non Consuming User:   return %3 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_projection_returned_after_end_borrow'
+sil [ossa] @test_projection_returned_after_end_borrow : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = struct_extract %1, #HolderWrapper._h
+  %3 = ref_element_addr %2, #KlassHolder.k
+  end_borrow %1
+  return %3
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_projection_returned_from_other_scope'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %1 = load_borrow %0 : $*HolderWrapper
+// CHECK: Consuming User:   end_borrow %1 : $HolderWrapper
+// CHECK: Non Consuming User:   return_borrow %3 : $*Klass from_scopes (%5 : $HolderWrapper)
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_projection_returned_from_other_scope'
+sil [ossa] @test_projection_returned_from_other_scope : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = struct_extract %1, #HolderWrapper._h
+  %3 = ref_element_addr %2, #KlassHolder.k
+  end_borrow %1
+  %5 = load_borrow %0
+  return_borrow %3 from_scopes (%5)
+}
+
+// CHECK-NOT: Function: 'test_nested_projection_return_borrow'
+sil [ossa] @test_nested_projection_return_borrow : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #HolderWrapper._h
+  %4 = ref_element_addr %3, #KlassHolder.k
+  return_borrow %4 from_scopes (%2, %1)
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_nested_projection_returned_after_inner_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = begin_borrow %1 : $HolderWrapper
+// CHECK: Consuming User:   end_borrow %2 : $HolderWrapper
+// CHECK: Non Consuming User:   return_borrow %4 : $*Klass from_scopes (%1 : $HolderWrapper)
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_nested_projection_returned_after_inner_end_borrow'
+sil [ossa] @test_nested_projection_returned_after_inner_end_borrow : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #HolderWrapper._h
+  %4 = ref_element_addr %3, #KlassHolder.k
+  end_borrow %2
+  return_borrow %4 from_scopes (%1)
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_nested_projection_returned_without_outer_scope'
+// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK: Value:   %1 = load_borrow %0 : $*HolderWrapper
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_nested_projection_returned_without_outer_scope'
+sil [ossa] @test_nested_projection_returned_without_outer_scope : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #HolderWrapper._h
+  %4 = ref_element_addr %3, #KlassHolder.k
+  return_borrow %4 from_scopes (%2)
+}
+
+// The result of another borrow accessor is a borrow scope.
+// CHECK-NOT: Function: 'test_accessor_result_projection_return_borrow'
+sil [ossa] @test_accessor_result_projection_return_borrow : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = function_ref @borrow_holder : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %4 = ref_element_addr %3, #KlassHolder.k
+  return_borrow %4 from_scopes (%3, %1)
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_accessor_result_projection_returned_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %3 = apply %2(%1) : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+// CHECK: Consuming User:   end_borrow %3 : $KlassHolder
+// CHECK: Non Consuming User:   return_borrow %4 : $*Klass from_scopes (%1 : $HolderWrapper)
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_accessor_result_projection_returned_after_end_borrow'
+sil [ossa] @test_accessor_result_projection_returned_after_end_borrow : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = function_ref @borrow_holder : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %4 = ref_element_addr %3, #KlassHolder.k
+  end_borrow %3
+  return_borrow %4 from_scopes (%1)
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_accessor_result_projection_returned_without_scope'
+// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
+// CHECK: Value:   %3 = apply %2(%1) : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_accessor_result_projection_returned_without_scope'
+sil [ossa] @test_accessor_result_projection_returned_without_scope : $@convention(method) (@in_guaranteed HolderWrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*HolderWrapper):
+  %1 = load_borrow %0
+  %2 = function_ref @borrow_holder : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed HolderWrapper) -> @guaranteed KlassHolder
+  %4 = ref_element_addr %3, #KlassHolder.k
+  return_borrow %4 from_scopes (%1)
+}

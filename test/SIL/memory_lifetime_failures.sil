@@ -956,6 +956,23 @@ bb0(%0 : $*GenWrapper<T>):
   return %6
 }
 
+// CHECK: SIL memory lifetime failure in @test_use_after_free_with_field_projection: memory is not initialized, but should be
+// CHECK: memory location:   {{%.*}} = struct_element_addr {{%.*}} : $*InnerWrapper<T>, #InnerWrapper._prop
+// CHECK: at instruction:   {{%.*}} = apply {{%.*}}<T>({{%.*}}) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil [ossa] @test_use_after_free_with_field_projection : $@convention(thin) <T> (@in GenWrapper<T>) -> () {
+bb0(%0 : $*GenWrapper<T>):
+  %1 = struct_element_addr %0, #GenWrapper._prop
+  %2 = function_ref @use_T : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = function_ref @borrow_addressonly_nested_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address InnerWrapper<τ_0_0>
+  %4 = apply %3<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address InnerWrapper<τ_0_0>
+  %5 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %0
+  %6 = struct_element_addr %4, #InnerWrapper._prop
+  %7 = apply %2<T>(%6) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %8 = tuple ()
+  return %8
+}
+
 // currently inout is not verified
 // xCHECK: SIL memory lifetime failure in @test_use_after_free_address_only2: memory is not initialized, but should be
 // xCHECK: memory location:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@inout GenWrapper<τ_0_0>) -> @inout τ_0_0
@@ -994,6 +1011,37 @@ bb0(%0 : $*GenWrapper<T>):
   destroy_addr %3
   %4 = tuple ()
   return %4
+}
+
+sil @mutate_inner_a : $@convention(method) (@inout Inner) -> @inout T
+sil @borrow_outer_y : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+sil @borrow_inner_a : $@convention(method) (@in_guaranteed Inner) -> @guaranteed_address T
+
+// CHECK: SIL memory lifetime failure in @test_mutate_accessor_of_field_use_after_destroy: memory is not initialized, but should be
+// CHECK: memory location:   %3 = apply %2(%1) : $@convention(method) (@inout Inner) -> @inout T
+// CHECK: at instruction:   %5 = load [copy] %3 : $*T
+sil [ossa] @test_mutate_accessor_of_field_use_after_destroy : $@convention(thin) (@in Outer) -> @owned T {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0, #Outer.y
+  %2 = function_ref @mutate_inner_a : $@convention(method) (@inout Inner) -> @inout T
+  %3 = apply %2(%1) : $@convention(method) (@inout Inner) -> @inout T
+  destroy_addr %0
+  %5 = load [copy] %3
+  return %5
+}
+
+// CHECK: SIL memory lifetime failure in @test_nested_borrow_accessor_use_after_destroy: memory is not initialized, but should be
+// CHECK: memory location:   %4 = apply %3(%2) : $@convention(method) (@in_guaranteed Inner) -> @guaranteed_address T
+// CHECK: at instruction:   %6 = load [copy] %4 : $*T
+sil [ossa] @test_nested_borrow_accessor_use_after_destroy : $@convention(thin) (@in Outer) -> @owned T {
+bb0(%0 : $*Outer):
+  %1 = function_ref @borrow_outer_y : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %3 = function_ref @borrow_inner_a : $@convention(method) (@in_guaranteed Inner) -> @guaranteed_address T
+  %4 = apply %3(%2) : $@convention(method) (@in_guaranteed Inner) -> @guaranteed_address T
+  destroy_addr %0
+  %6 = load [copy] %4
+  return %6
 }
 
 sil [ossa] @read_int_pair_a : $@convention(thin) (@inout IntPair) -> () {

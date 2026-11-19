@@ -417,6 +417,25 @@ struct PointerBoxWrapper: ~Copyable {
   }
 }
 
+// The witness thunk returns the address result from a load_borrow of its
+// @in_guaranteed ~Escapable self.
+
+protocol ElementContainer: ~Copyable, ~Escapable {
+  associatedtype Element: ~Copyable
+  subscript(index: Int) -> Element { borrow }
+}
+
+struct ElementSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
+  let _start: UnsafeMutablePointer<Element>
+
+  subscript(index: Int) -> Element {
+    @_unsafeSelfDependentResult
+    borrow { return unsafe _start[index] }
+  }
+}
+
+extension ElementSpan: ElementContainer where Element: ~Copyable {}
+
 // MARK: - Rejected
 
 // The base is a local: the accessor's result is only valid while that local is,
