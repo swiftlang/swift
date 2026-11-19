@@ -594,4 +594,111 @@ extension OutputRawSpan: Iterable {
     .init(Span(viewing: self.bytes))
   }
 }
+
+extension OutputRawSpan {
+  /// Remove all bytes from this span, and return an input span that takes
+  /// ownership of the bytes.
+  ///
+  /// The `InputRawSpan` returned by this function represents a mutation of
+  /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
+  /// in use.
+  ///
+  /// The returned input span has a `capacity` equal to the number of bytes
+  /// held by this span, and has no free capacity for prepending.
+  ///
+  /// - Returns: An `InputRawSpan` containing the bytes that were in this span.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeAll() -> InputRawSpan {
+    consumeSuffix(maxByteCount: byteCount)
+  }
+
+  /// Remove all bytes from this span by passing all of them to a closure
+  /// through an input span.
+  ///
+  /// The input span has a capacity equal to this span's initialized byte
+  /// count.
+  ///
+  /// - Parameter consumer: A closure that receives an `InputRawSpan`
+  ///     containing the initialized bytes of this `OutputRawSpan`.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeAll<E: Error, R: ~Copyable>(
+    consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
+  ) throws(E) -> R {
+    try consumeSuffix(maxByteCount: byteCount, consumingWith: consumer)
+  }
+
+  /// Removes up to `maxByteCount` bytes from the end of this span,
+  /// and returns a new `InputRawSpan` that takes ownership of them.
+  ///
+  /// The `InputRawSpan` returned by this function represents a mutation of
+  /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
+  /// in use.
+  ///
+  /// The returned input span has a `capacity` equal to the number of bytes
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter maxByteCount: The maximum number of bytes to consume.
+  ///     `maxByteCount` must not be negative. If it exceeds `byteCount`,
+  ///     all bytes are consumed.
+  /// - Returns: An `InputRawSpan` containing the consumed bytes, in their
+  ///     original order.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeSuffix(
+    maxByteCount: Int
+  ) -> InputRawSpan {
+    _precondition(
+      maxByteCount >= 0, "Can't consume a negative number of bytes"
+    )
+    let c = Swift.min(maxByteCount, byteCount)
+    let start = unsafe _pointer?.advanced(by: byteCount &- c)
+    let buffer = unsafe UnsafeMutableRawBufferPointer(start: start, count: c)
+    let result = unsafe InputRawSpan(
+      _uncheckedBuffer: buffer, initializedCount: c
+    )
+    _count &-= c
+    return unsafe _overrideLifetime(result, mutating: &self)
+  }
+
+  /// Removes up to `maxByteCount` bytes from the end of this span
+  /// by passing them to a closure through an input span.
+  ///
+  /// The input span has a capacity equal to the number of bytes it holds.
+  ///
+  /// - Parameters:
+  ///   - maxByteCount: The maximum number of bytes to consume.
+  ///       `maxByteCount` must not be negative. If it exceeds `byteCount`,
+  ///       all bytes are consumed.
+  ///   - consumer: A closure that receives an `InputRawSpan` containing
+  ///       the consumed bytes, in their original order.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeSuffix<E: Error, R: ~Copyable>(
+    maxByteCount: Int,
+    consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
+  ) throws(E) -> R {
+    let suffix = consumeSuffix(maxByteCount: maxByteCount)
+    return try consumer(suffix)
+  }
+
+  /// Removes and returns the last byte of this span, if it exists.
+  ///
+  /// - Returns: The last byte of the span if the span isn't empty;
+  ///    otherwise, `nil`.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func popLast() -> UInt8? {
+    guard !isEmpty else { return nil }
+    return removeLast()
+  }
+}
 #endif
