@@ -156,7 +156,7 @@ extension AddressUseVisitor {
     // returned address should be structurally used as if it were a projected
     // use in the caller, even though there is no code here in the callee to
     // formally end the access.
-         is ReturnInst:
+         is ReturnInst, is ReturnBorrowInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction

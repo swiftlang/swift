@@ -3030,6 +3030,18 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
 static SILValue prepareGuaranteedResultForReturn(SILGenFunction &SGF,
                                                  SILLocation loc,
                                                  SILValue result) {
+  // The address result of an accessor with an object self is an interior
+  // pointer of self. Emit unchecked_ownership for self, which SILGenCleanup
+  // fixes up.
+  if (auto *apply = dyn_cast<ApplyInst>(result)) {
+    if (auto *selfOperand =
+            apply->getSelfObjectOfAddressBorrowMutateAccessorResult()) {
+      SILBuilderWithScope builder(apply);
+      selfOperand->set(
+          builder.createUncheckedOwnership(loc, selfOperand->get()));
+      return result;
+    }
+  }
   if (!result->isBorrowAccessorResult() ||
       result->getOwnershipKind() != OwnershipKind::Guaranteed) {
     return result;

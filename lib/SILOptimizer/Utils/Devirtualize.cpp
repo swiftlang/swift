@@ -546,9 +546,10 @@ static void replaceResultScope(SILLocation loc, BorrowedValue oldResult,
     auto *user = scopeEnd->getUser();
     if (auto *returnBorrow = dyn_cast<ReturnBorrowInst>(user)) {
       // The borrow of self encloses the result's borrow scope.
-      SmallVector<SILValue, 4> enclosingValues = {selfBorrow};
-      enclosingValues.append(returnBorrow->getEnclosingValues().begin(),
-                             returnBorrow->getEnclosingValues().end());
+      SmallVector<SILValue, 4> enclosingValues(
+          returnBorrow->getEnclosingValues().begin(),
+          returnBorrow->getEnclosingValues().end());
+      enclosingValues.push_back(selfBorrow);
       SILBuilderWithScope(returnBorrow)
           .createReturnBorrow(returnBorrow->getLoc(),
                               returnBorrow->getReturnValue(), enclosingValues);

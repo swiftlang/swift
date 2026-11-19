@@ -126,3 +126,16 @@ bb0(%0 : @guaranteed $Root):
   return %7
 }
 
+
+// A protocol witness thunk for a borrow accessor of a ~Escapable 'self' returns
+// the address result from the load_borrow scope of its @in_guaranteed 'self'.
+
+sil @span_element_addr : $@convention(method) (Int, @guaranteed Span<Int>) -> @guaranteed_address Int
+
+sil hidden [ossa] @return_borrow_address_of_nonescapable_self : $@convention(method) (Int, @in_guaranteed Span<Int>) -> @guaranteed_address Int {
+bb0(%0 : $Int, %1 : $*Span<Int>):
+  %2 = load_borrow %1
+  %3 = function_ref @span_element_addr : $@convention(method) (Int, @guaranteed Span<Int>) -> @guaranteed_address Int
+  %4 = apply %3(%0, %2) : $@convention(method) (Int, @guaranteed Span<Int>) -> @guaranteed_address Int
+  return_borrow %4 from_scopes (%2)
+}

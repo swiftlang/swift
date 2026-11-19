@@ -1527,9 +1527,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // unconditionally inline the function.
     //
     // If for whatever reason we can not inline this function, inlineFullApply
-    // will assert, so we are safe making this assumption.
-    SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder, deleter);
+    // will return nullptr.
+    if (!SILInliner::inlineFullApply(AI,
+                                     SILInliner::InlineKind::PerformanceInline,
+                                     FuncBuilder, deleter)) {
+      continue;
+    }
     // When inlining an OSSA function into a non-OSSA function, ownership of
     // nonescaping closures is lowered.  At that point, they are recognized as
     // stack users.  Since they weren't recognized as such before, they may not

@@ -17,6 +17,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -384,8 +385,13 @@ class SILInlineCloner
   // before the yield.
   llvm::SmallVector<SILValue, 16> valuesToComplete;
 
-  // The borrow scopes that enclose the inlined result of a borrow accessor.
+  // The borrow scopes that enclose the inlined result of a borrow accessor,
+  // ordered from inner to outer.
   SmallVector<SILValue, 4> resultEnclosingScopes;
+
+  // The caller's uses of the address result of a borrow or mutate accessor,
+  // after which the inliner ends resultEnclosingScopes.
+  SmallVector<Operand *, 8> addressResultUses;
 
   // Block in the original caller serving as the successor of the inlined
   // control path.
@@ -394,10 +400,14 @@ class SILInlineCloner
 public:
   SILInlineCloner(SILFunction *CalleeFunction, FullApplySite Apply,
                   SILOptFunctionBuilder &FuncBuilder, InlineKind IKind,
-                  SubstitutionMap ApplySubs,
-                  InstructionDeleter &deleter);
+                  SubstitutionMap ApplySubs, InstructionDeleter &deleter);
 
   SILFunction *getCalleeFunction() const { return &Original; }
+
+  /// Collects the uses of the address result after which the inliner ends the
+  /// scope of self or the callee's return_borrow scopes. Returns false if the
+  /// result escapes.
+  bool findScopedAddressResultUses();
 
   void cloneInline(ArrayRef<SILValue> AppliedArgs);
 
@@ -432,7 +442,11 @@ protected:
 
   /// Replace the borrow scope of an inlined borrow accessor's result with the
   /// scopes enclosing the callee's returned value.
-  void fixupBorrowAccessorResult();
+  void fixupBorrowAccessorGuaranteedResult();
+
+  /// End the scopes enclosing the address result of an inlined borrow or mutate
+  /// accessor after the caller's uses of the result.
+  void fixupBorrowMutateAccessorAddressResult();
 
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
@@ -474,6 +488,9 @@ SILInliner::inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
 
   SILInlineCloner cloner(calleeFunction, apply, FuncBuilder, IKind, ApplySubs,
                          deleter);
+  if (!cloner.findScopedAddressResultUses()) {
+    return nullptr;
+  }
   cloner.cloneInline(appliedArgs);
   return cloner.getLastClonedBB();
 }
@@ -506,16 +523,17 @@ static SILLocation selectLoc(bool mandatory, SILLocation orig) {
   }
 }
 
-SILInlineCloner::SILInlineCloner(
-    SILFunction *calleeFunction, FullApplySite apply,
-    SILOptFunctionBuilder &funcBuilder, InlineKind inlineKind,
-    SubstitutionMap applySubs,
-    InstructionDeleter &deleter)
+SILInlineCloner::SILInlineCloner(SILFunction *calleeFunction,
+                                 FullApplySite apply,
+                                 SILOptFunctionBuilder &funcBuilder,
+                                 InlineKind inlineKind,
+                                 SubstitutionMap applySubs,
+                                 InstructionDeleter &deleter)
     : SuperTy(*apply.getFunction(), *calleeFunction, applySubs,
               /*DT=*/nullptr, /*Inlining=*/true),
       FuncBuilder(funcBuilder), IKind(inlineKind), Apply(apply),
-      deleter(deleter),
-      Loc(selectLoc(inlineKind == InlineKind::MandatoryInline, apply.getLoc())) {
+      deleter(deleter), Loc(selectLoc(inlineKind == InlineKind::MandatoryInline,
+                                      apply.getLoc())) {
 
   SILFunction &F = getBuilder().getFunction();
   assert(apply.getFunction() && apply.getFunction() == &F
@@ -680,12 +698,11 @@ void SILInlineCloner::cloneInline(ArrayRef<SILValue> AppliedArgs) {
   if (borrowedArgs.any()) {
     // The scope of a borrow accessor's result is nested in the borrow scope of
     // its self argument, so self is ended with the result, as the outermost
-    // enclosing scope.
+    // enclosing scope. The address result of a borrow or mutate accessor is an
+    // interior pointer of its object self, so the same applies.
     std::optional<unsigned> selfIndex;
-    auto *ai = dyn_cast<ApplyInst>(Apply.getInstruction());
-    if (ai && BorrowedValue(ai)) {
-      if (auto *selfOperand =
-              ai->getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+    if (auto *ai = dyn_cast<ApplyInst>(Apply.getInstruction())) {
+      if (auto *selfOperand = ai->getSelfObjectOfBorrowMutateAccessorResult()) {
         selfIndex = Apply.getAppliedArgIndex(*selfOperand);
       }
     }
@@ -765,9 +782,12 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   if (auto *RBI = dyn_cast<ReturnBorrowInst>(Terminator)) {
     auto returnedValue = getMappedValue(RBI->getReturnValue());
     // Collect the mapped enclosing values.
+    SmallVector<SILValue, 4> calleeScopes;
     for (auto enclosingValue : RBI->getEnclosingValues()) {
-      resultEnclosingScopes.push_back(getMappedValue(enclosingValue));
+      calleeScopes.push_back(getMappedValue(enclosingValue));
     }
+    resultEnclosingScopes.insert(resultEnclosingScopes.begin(),
+                                 calleeScopes.begin(), calleeScopes.end());
     getBuilder().createBranch(getOpLocation(RBI->getLoc()), ReturnToBB,
                               returnedValue);
     return;
@@ -831,7 +851,9 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
 
   auto *ai = dyn_cast<ApplyInst>(Apply.getInstruction());
   if (ai && BorrowedValue(ai)) {
-    fixupBorrowAccessorResult();
+    fixupBorrowAccessorGuaranteedResult();
+  } else if (ai && ai->hasAddressResult() && !resultEnclosingScopes.empty()) {
+    fixupBorrowMutateAccessorAddressResult();
   }
 }
 
@@ -842,7 +864,7 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
 ///    return_borrow's enclosing scopes.
 ///    - If the caller uses the result in the enclosing scopes of a
 ///    return_borrow, replace the result with enclosing scopes.
-void SILInlineCloner::fixupBorrowAccessorResult() {
+void SILInlineCloner::fixupBorrowAccessorGuaranteedResult() {
   assert(ReturnToBB && "Expected ReturnToBB for borrow accessor inlining");
   auto *resultArg = cast<SILPhiArgument>(ReturnToBB->getArgument(0));
   if (ReturnToBB->pred_empty()) {
@@ -868,7 +890,7 @@ void SILInlineCloner::fixupBorrowAccessorResult() {
 
   // End the callee's enclosing scopes at the caller's end_borrows of the
   // result.
-  for (SILValue scope : llvm::reverse(resultEnclosingScopes)) {
+  for (SILValue scope : resultEnclosingScopes) {
     for (auto *endBorrow : callerEndBorrows) {
       SILBuilderWithScope(endBorrow, getBuilder())
           .createEndBorrow(endBorrow->getLoc(), scope);
@@ -905,6 +927,80 @@ void SILInlineCloner::fixupBorrowAccessorResult() {
 
   // Remove the result phi.
   resultArg->replaceAllUsesWith(calleeReturnValue);
+  erasePhiArgument(ReturnToBB, 0, /*cleanupDeadPhiOps=*/false);
+}
+
+/// After inlining a borrow or mutate accessor with an address result, end the
+/// scopes enclosing the result: the scopes of the callee's return_borrow and
+/// the borrow inserted for an owned object self.
+///    - If the caller returns the result in a return_borrow, add the scopes to
+///    the return_borrow's enclosing scopes.
+///    - If the caller returns the result in a return, replace it with a
+///    return_borrow from the scopes.
+///    - Otherwise, end the scopes after the last uses of the result.
+void SILInlineCloner::fixupBorrowMutateAccessorAddressResult() {
+  assert(ReturnToBB && "Expected ReturnToBB for accessor inlining");
+  auto *resultArg = cast<SILPhiArgument>(ReturnToBB->getArgument(0));
+  if (ReturnToBB->pred_empty()) {
+    // The callee does not return, so the uses of the result are unreachable.
+    return;
+  }
+  auto *returnBB = ReturnToBB->getSinglePredecessorBlock();
+  ASSERT(returnBB && "a function has a single return block");
+  auto *returnBranch = cast<BranchInst>(returnBB->getTerminator());
+  SILValue calleeResult = returnBranch->getArg(0);
+
+  ReturnBorrowInst *callerReturnBorrow = nullptr;
+  ReturnInst *callerReturn = nullptr;
+  for (auto *use : addressResultUses) {
+    if (auto *rbi = dyn_cast<ReturnBorrowInst>(use->getUser())) {
+      callerReturnBorrow = rbi;
+      break;
+    }
+    if (auto *ri = dyn_cast<ReturnInst>(use->getUser())) {
+      callerReturn = ri;
+      break;
+    }
+  }
+
+  if (callerReturnBorrow) {
+    // An address result is not an enclosing value. The callee's scopes are
+    // nested in the caller's scopes.
+    SmallVector<SILValue, 4> enclosingValues(resultEnclosingScopes);
+    llvm::append_range(enclosingValues,
+                       callerReturnBorrow->getEnclosingValues());
+    SILBuilderWithScope builder(callerReturnBorrow, getBuilder());
+    builder.createReturnBorrow(callerReturnBorrow->getLoc(),
+                               callerReturnBorrow->getReturnValue(),
+                               enclosingValues);
+    callerReturnBorrow->eraseFromParent();
+  } else if (callerReturn) {
+    SILBuilderWithScope builder(callerReturn, getBuilder());
+    builder.createReturnBorrow(callerReturn->getLoc(),
+                               callerReturn->getOperand(),
+                               resultEnclosingScopes);
+    callerReturn->eraseFromParent();
+  } else {
+    // End the scopes, inner first, at the liveness boundary.
+    SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+    SSAPrunedLiveness liveness(Apply.getFunction(), &discoveredBlocks);
+    liveness.initializeDef(resultArg);
+    for (auto *use : addressResultUses) {
+      liveness.updateForUse(use->getUser(), /*lifetimeEnding*/ false);
+    }
+    PrunedLivenessBoundary boundary;
+    liveness.computeBoundary(boundary);
+    boundary.visitInsertionPoints([&](SILBasicBlock::iterator insertPt) {
+      SILBuilderWithScope builder(insertPt, getBuilder());
+      for (SILValue scope : resultEnclosingScopes) {
+        builder.createEndBorrow(RegularLocation::getAutoGeneratedLocation(),
+                                scope);
+      }
+    });
+  }
+
+  // Remove the result phi.
+  resultArg->replaceAllUsesWith(calleeResult);
   erasePhiArgument(ReturnToBB, 0, /*cleanupDeadPhiOps=*/false);
 }
 
@@ -966,20 +1062,53 @@ Scope scopeForArgument(Scope nonlexicalScope, SILValue callArg, unsigned index,
   return Scope::Lexical;
 }
 
-} // anonymous namespace
-
-SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
-                                                 unsigned index) {
-  // The "minimal" borrow scope:  Guaranteed values are valid operands to some
-  // instructions that owned values are not.  If the caller's value is owned,
-  // it must be converted (via a "bare" begin_borrow) to a guaranteed value so
-  // that it can be used in place of the original guaranteed value in the
-  // instructions that are being inlined.
+/// The borrow scope which the inliner introduces for a guaranteed argument.
+///
+/// The "minimal" borrow scope:  Guaranteed values are valid operands to some
+/// instructions that owned values are not.  If the caller's value is owned, it
+/// must be converted (via a "bare" begin_borrow) to a guaranteed value so that
+/// it can be used in place of the original guaranteed value in the
+/// instructions that are being inlined.
+Scope borrowScopeForArgument(SILValue callArg, unsigned index,
+                             SILFunction *caller, SILFunction *callee) {
   auto scopeForOwnership = callArg->getOwnershipKind() == OwnershipKind::Owned
                                ? Scope::Bare
                                : Scope::None;
-  auto scope = scopeForArgument(scopeForOwnership, callArg, index,
-                                Apply.getFunction(), getCalleeFunction());
+  return scopeForArgument(scopeForOwnership, callArg, index, caller, callee);
+}
+
+} // anonymous namespace
+
+bool SILInlineCloner::findScopedAddressResultUses() {
+  auto *ai = dyn_cast<ApplyInst>(Apply.getInstruction());
+  if (!ai || !ai->hasAddressResult()) {
+    return true;
+  }
+  SILFunction *callee = getCalleeFunction();
+  bool hasSelfScope = false;
+  if (auto *self = ai->getSelfObjectOfAddressBorrowMutateAccessorResult()) {
+    hasSelfScope =
+        borrowScopeForArgument(self->get(), Apply.getAppliedArgIndex(*self),
+                               ai->getFunction(), callee) != Scope::None;
+  }
+  auto returnBB = callee->findReturnBB();
+  bool hasCalleeScopes = false;
+  if (returnBB != callee->end()) {
+    if (auto *rbi = dyn_cast<ReturnBorrowInst>(returnBB->getTerminator())) {
+      hasCalleeScopes = !rbi->getEnclosingValues().empty();
+    }
+  }
+  if (!hasSelfScope && !hasCalleeScopes) {
+    return true;
+  }
+  return findTransitiveUsesForAddress(ai, &addressResultUses) ==
+         AddressUseKind::NonEscaping;
+}
+
+SILValue SILInlineCloner::borrowFunctionArgument(SILValue callArg,
+                                                 unsigned index) {
+  auto scope = borrowScopeForArgument(callArg, index, Apply.getFunction(),
+                                      getCalleeFunction());
   IsLexical_t isLexical;
   switch (scope) {
   case Scope::None:

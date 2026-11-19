@@ -160,6 +160,7 @@ SILCombiner::optimizeBuiltinCOWBufferForReadingOSSA(BuiltinInst *bi) {
           case InteriorPointerOperandKind::OpenExistentialBox:
           case InteriorPointerOperandKind::ProjectBox:
           case InteriorPointerOperandKind::MarkDependenceNonEscaping:
+          case InteriorPointerOperandKind::BorrowMutateAccessor:
             // Can not mark this immutable.
             return;
           }
