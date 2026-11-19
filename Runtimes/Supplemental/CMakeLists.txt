@@ -136,3 +136,16 @@ if(SwiftRuntime_ENABLE_runtime)
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
+
+# PlatformExecutorsCore
+if(SwiftRuntime_ENABLE_platformexecutorscore)
+  ExternalProject_Add(PlatformExecutorsCore
+    PREFIX "PlatformExecutorsCore"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/_PlatformExecutorsCore"
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS})
+endif()

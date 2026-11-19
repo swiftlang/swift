@@ -129,6 +129,9 @@ copy_files("" "Supplemental/Volatile" FILES "Info.plist.in")
 message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/Runtime/Info.plist.in")
 copy_files("" "Supplemental/Runtime" FILES "Info.plist.in")
 
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Supplemental/_PlatformExecutorsCore/Info.plist.in")
+copy_files("" "Supplemental/_PlatformExecutorsCore" FILES "Info.plist.in")
+
 # Platform Overlays
 
 # Copy the shared static standard library linker argument template.
@@ -243,6 +246,13 @@ if(NOT DEFINED StringProcessing_ROOT_DIR)
 endif()
 message(STATUS "String Processing Root: ${StringProcessing_ROOT_DIR}")
 
+if(NOT DEFINED PlatformExecutors_ROOT_DIR)
+  find_path(PlatformExecutors_ROOT_DIR
+    "swift-platform-executors/Package.swift"
+    HINTS "${CMAKE_CURRENT_LIST_DIR}/../../")
+endif()
+message(STATUS "Platform Executors Root: ${PlatformExecutors_ROOT_DIR}")
+
 # Supplemental Libraries
 copy_library_sources(Differentiation "public" "Supplemental")
 copy_library_sources(Distributed "public" "Supplemental")
@@ -261,6 +271,13 @@ copy_library_sources(_CUnicode "Sources" "Supplemental/StringProcessing/_StringP
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
 copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
   ROOT "${StringProcessing_ROOT_DIR}/swift-experimental-string-processing")
+
+# The swift-platform-executors checkout is optional, and only versions that
+# have the `_PlatformExecutorsCore` target can be copied.
+if(IS_DIRECTORY "${PlatformExecutors_ROOT_DIR}/swift-platform-executors/Sources/_PlatformExecutorsCore")
+  copy_library_sources("" "Sources/_PlatformExecutorsCore" "Supplemental/_PlatformExecutorsCore"
+    ROOT "${PlatformExecutors_ROOT_DIR}/swift-platform-executors")
+endif()
 
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")

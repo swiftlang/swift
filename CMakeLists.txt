@@ -828,6 +828,24 @@ option(SWIFT_ENABLE_VOLATILE
   "Enable build of the Swift Volatile module"
   FALSE)
 
+option(SWIFT_ENABLE_PLATFORM_EXECUTORS
+  "Enable build of the platform executors modules"
+  FALSE)
+
+# The platform executors modules are built from the sources of the
+# swift-platform-executors checkout. Only `_PlatformExecutorsCore`, the
+# protocols and vocabulary types of the executor I/O interfaces, is built.
+set(SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR
+  "${CMAKE_CURRENT_SOURCE_DIR}/../swift-platform-executors"
+  CACHE PATH "Path to the swift-platform-executors checkout")
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS AND
+   NOT IS_DIRECTORY "${SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR}/Sources/_PlatformExecutorsCore")
+  message(STATUS "Not building the platform executors modules: "
+    "${SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR}/Sources/_PlatformExecutorsCore "
+    "does not exist")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS FALSE)
+endif()
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -1578,6 +1596,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
+  message(STATUS "Platform Executors Support:         ${SWIFT_ENABLE_PLATFORM_EXECUTORS}")
   message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
   message(STATUS "Runtime Support:                    ${SWIFT_ENABLE_RUNTIME_MODULE}")
   message(STATUS "C++ Interop Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP}")
@@ -1890,6 +1909,9 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
       set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
+      if(SWIFT_ENABLE_PLATFORM_EXECUTORS)
+        string(APPEND runtimes_to_enable |PlatformExecutorsCore)
+      endif()
       if(sdk STREQUAL "OSX")
         string(APPEND runtimes_to_enable |Runtime)
       endif()

@@ -1,0 +1,21 @@
+# This file maps the `SwiftPlatformExecutors` availability macros of the
+# `_PlatformExecutorsCore` module to the `SwiftStdlib` macros of
+# availability-macros.def.
+#
+# The sources of `_PlatformExecutorsCore` are in the swift-platform-executors
+# repository, which keys the macros by the package version that first includes
+# a declaration:
+#
+#     @available(SwiftPlatformExecutors 0.1.0, *)
+#
+# In the toolchain, a declaration is available from the Swift release that
+# first includes that package version. Each line maps a package version to the
+# `SwiftStdlib` macro of that release, and the build defines the
+# `SwiftPlatformExecutors` macro with the availability of that `SwiftStdlib`
+# macro.
+#
+# When update-checkout picks up a version of swift-platform-executors that uses
+# a new `SwiftPlatformExecutors` version, add a line for it. Otherwise the build
+# of `_PlatformExecutorsCore` fails with "reference to undefined version".
+
+SwiftPlatformExecutors 0.1.0:SwiftStdlib 6.5
