@@ -246,7 +246,7 @@ class LLVM(cmake_product.CMakeProduct):
             # override everything.
             build_targets = []
             build = False
-        elif self.args.lldb_link_against_compiler_dylib:
+        elif self.args.lldb_link_against_compiler_dylib_at_path:
             # LLDB gets LLVM and Clang from the Swift compiler dylib, so only
             # build what is needed to configure and build LLDB itself.
             build_targets = ['llvm-tblgen', 'clang-tblgen', 'clangTooling',
@@ -415,7 +415,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
 
-        if (not self.args.lldb_link_against_compiler_dylib
+        if (not self.args.lldb_link_against_compiler_dylib_at_path
             and "-DLLVM_INCLUDE_TESTS=NO" not in llvm_cmake_options
             and "-DLLVM_INCLUDE_TESTS:BOOL=FALSE" not in llvm_cmake_options):
             # This supports scenarios where tests are run

@@ -55,11 +55,6 @@ class BuildScriptInvocation(object):
 
         clear_log_time()
 
-        if args.lldb_link_against_compiler_dylib and \
-                not args.lldb_compiler_dylib_path:
-            fatal_error("--lldb-link-against-compiler-dylib requires "
-                        "--lldb-compiler-dylib-path")
-
         self.toolchain.ninja = get_ninja_path(self.toolchain,
                                               self.args,
                                               self.workspace)
@@ -271,10 +266,10 @@ class BuildScriptInvocation(object):
                 "--install-destdir", os.path.abspath(args.install_destdir)
             ]
 
-        if args.lldb_link_against_compiler_dylib:
-            impl_args += ["--lldb-link-against-compiler-dylib", "true"]
+        if args.lldb_link_against_compiler_dylib_at_path:
             impl_args += [
-                "--lldb-compiler-dylib-path", args.lldb_compiler_dylib_path
+                "--lldb-link-against-compiler-dylib-at-path",
+                args.lldb_link_against_compiler_dylib_at_path
             ]
 
         if args.skip_build:
