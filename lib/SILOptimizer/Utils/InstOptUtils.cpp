@@ -1462,6 +1462,8 @@ void swift::destroyUnconsumedCapturesAfterCall(PartialApplyInst *pai,
   });
 }
 
+static void killDebugUses(SILInstruction *inst);
+
 void swift::deleteClosureOfReplacedCalls(PartialApplyInst *pai,
                                          ArrayRef<SILInstruction *> closureUses,
                                          InstModCallbacks callbacks) {
@@ -1475,10 +1477,12 @@ void swift::deleteClosureOfReplacedCalls(PartialApplyInst *pai,
       emitDestroysOfCapturesOwnedByClosure(pai, builder, user->getLoc(),
                                            callbacks, isDeadEnd);
     }
-    salvageDebugInfo(user);
+    // A conversion of the closure can't be salvaged, because the closure is
+    // deleted too.
+    killDebugUses(user);
     callbacks.deleteInst(user);
   }
-  salvageDebugInfo(pai);
+  killDebugUses(pai);
   callbacks.deleteInst(pai);
 }
 
