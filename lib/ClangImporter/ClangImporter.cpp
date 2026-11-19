@@ -7453,8 +7453,11 @@ static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
 
 static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
                                       ValueDecl *decl, DeclContext *newContext,
-                                      ClangInheritanceInfo inheritance) {
-  AccessLevel access = inheritance.accessForBaseDecl(decl);
+                                      ClangInheritanceInfo inheritance,
+                                      std::optional<AccessLevel> memberAccess) {
+  AccessLevel access = memberAccess
+                           ? inheritance.accessForBaseMember(*memberAccess)
+                           : inheritance.accessForBaseDecl(decl);
   ASTContext &context = decl->getASTContext();
 
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
@@ -9248,7 +9251,7 @@ Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit,
-    CArrayProjection projection) {
+    CArrayProjection projection, std::optional<AccessLevel> memberAccess) {
   decl = getDeclForCArrayProjection(decl, projection);
   if (!decl)
     return nullptr;
@@ -9258,7 +9261,8 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
   auto known = clonedBaseMembers.find(key);
   if (known == clonedBaseMembers.end()) {
-    ValueDecl *cloned = cloneBaseMemberDecl(*this, decl, newContext, inherit);
+    ValueDecl *cloned =
+        cloneBaseMemberDecl(*this, decl, newContext, inherit, memberAccess);
     known = clonedBaseMembers.try_emplace(key, cloned).first;
     clonedMembers.try_emplace(cloned, decl);
   }
@@ -9268,6 +9272,15 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit) {
+  // If decl is itself a clone (e.g., of a base member redeclared by a
+  // using-declaration in an intermediate class), clone its original instead,
+  // keeping the access of the clone.
+  std::optional<AccessLevel> memberAccess;
+  if (auto *original = getOriginalForClonedMember(decl)) {
+    memberAccess = decl->getFormalAccess();
+    decl = original;
+  }
+
   // We don't need to clone a hidden storage projection because the modern
   // projection will forward to its base decl, not its counterpart. Fortunately,
   // this overload of `forEachCArrayProjection()` only asks for legacy
@@ -9275,7 +9288,8 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   auto *modernClone = forEachCArrayProjection(
       decl->getAttrs().hasAttribute<CArrayProjectionAttr>(),
       [&](CArrayProjection projection) {
-        return importBaseMemberDecl(decl, newContext, inherit, projection);
+        return importBaseMemberDecl(decl, newContext, inherit, projection,
+                                    memberAccess);
       },
       /*addAlternate=*/false);
 
@@ -10301,12 +10315,19 @@ AccessLevel
 ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
   if (!isInheriting())
     return AccessLevel::Public;
+  return accessForBaseMember(baseDecl->getFormalAccess());
+}
+
+AccessLevel
+ClangInheritanceInfo::accessForBaseMember(AccessLevel memberAccess) const {
+  if (!isInheriting())
+    return memberAccess;
 
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
   auto inherited =
       access ? importer::convertClangAccess(*access) : AccessLevel::Private;
-  return std::min(baseDecl->getFormalAccess(), inherited);
+  return std::min(memberAccess, inherited);
 }
 
 bool ClangInheritanceInfo::setUnavailableIfNecessary(
