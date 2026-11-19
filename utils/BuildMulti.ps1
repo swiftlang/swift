@@ -191,6 +191,16 @@ function ConvertTo-CommandLineArgument([string] $Argument) {
   return "`"$($Escaped.Replace("%", "%%"))`""
 }
 
+# The processors of the jobs at the lowest priority. They only use the
+# processors that the other jobs leave, but threads that share a core slow each
+# other down. So they leave the first two cores to the other jobs, whose
+# compilations of one Swift module at a time then do not share a core.
+$IdleAffinity = $null
+if ([Environment]::ProcessorCount -gt 8 -and [Environment]::ProcessorCount -le 64) {
+  $AllProcessors = if ([Environment]::ProcessorCount -eq 64) { [UInt64]::MaxValue } else { ([UInt64]1 -shl [Environment]::ProcessorCount) - 1 }
+  $IdleAffinity = "{0:X}" -f ($AllProcessors -band (-bnot [UInt64]15))
+}
+
 # Starts one of the build scripts in the background.
 function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal, [switch] $Idle) {
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
@@ -202,7 +212,7 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
   $Batch = "$JobLogs\$Name.cmd"
   [IO.File]::WriteAllLines($Batch, @(
     "@echo off",
-    "start `"`" /b /wait $(if ($BelowNormal) { "/belownormal" } elseif ($Idle) { "/low" }) $(($CommandLine | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " ") > `"$Log`" 2>&1",
+    "start `"`" /b /wait $(if ($BelowNormal) { "/belownormal" } elseif ($Idle) { "/low$(if ($IdleAffinity) { " /affinity $IdleAffinity" })" }) $(($CommandLine | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " ") > `"$Log`" 2>&1",
     "exit /b %errorlevel%"
   ))
   # The script writes its timings there, as with Invoke-BuildScript.
