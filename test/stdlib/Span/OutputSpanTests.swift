@@ -837,3 +837,81 @@ suite.test("OutputSpan.consumeAll(consumingWith:) throwing")
   expectTrue(output.isEmpty)
   expectEqual(output.freeCapacity, 8)
 }
+
+suite.test("OutputSpan.consumeSuffix(maxCount:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<6 {
+    output.append(NCTracked(i))
+  }
+
+  do {
+    var suffix = output.consumeSuffix(maxCount: 3)
+    expectEqual(suffix.count, 3)
+    expectEqual(suffix.capacity, 3)
+    expectEqual(suffix.removeFirst().value, 3)
+    expectEqual(suffix[0].value, 4)
+    expectEqual(LifetimeTracked.instances, 5)
+  }
+  expectEqual(LifetimeTracked.instances, 3)
+  expectEqual(output.count, 3)
+  expectEqual(output[0].value, 0)
+  expectEqual(output[2].value, 2)
+
+  do {
+    let rest = output.consumeSuffix(maxCount: .max)
+    expectEqual(rest.count, 3)
+    expectEqual(rest[0].value, 0)
+  }
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  var empty = OutputSpan<Int>()
+  let none = empty.consumeSuffix(maxCount: 4)
+  expectEqual(none.count, 0)
+}
+
+suite.test("OutputSpan.consumeSuffix(maxCount:) negative count")
+.require(.crashTesting)
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var output = OutputSpan<Int>()
+  expectCrashLater(withDebugMessage: "Can't consume a negative number")
+  _ = output.consumeSuffix(maxCount: -1)
+}
+
+suite.test("OutputSpan.consumeSuffix(maxCount:consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<6 {
+    output.append(NCTracked(i))
+  }
+
+  var calls = 0
+  let first = output.consumeSuffix(maxCount: 4) {
+    (input: consuming InputSpan<NCTracked>) -> NCTracked in
+    calls += 1
+    expectEqual(input.count, 4)
+    expectEqual(input[0].value, 2)
+    return input.removeFirst()
+  }
+  expectEqual(calls, 1)
+  expectEqual(first.value, 2)
+  expectEqual(LifetimeTracked.instances, 3)
+  expectEqual(output.count, 2)
+  _ = consume first
+  output.removeAll()
+  expectEqual(LifetimeTracked.instances, 0)
+}

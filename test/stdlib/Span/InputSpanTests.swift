@@ -622,6 +622,46 @@ suite.test("InlineArray.consumeAll for an empty array")
   expectEqual(LifetimeTracked.instances, 0)
 }
 
+suite.test("consumePrefix(maxCount:consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let capacity = 10
+  let initialized = 8
+  let b = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: capacity)
+  defer { b.deallocate() }
+  for i in 0..<initialized {
+    b.initializeElement(at: capacity - initialized + i, to: NCTracked(i))
+  }
+
+  var span = unsafe InputSpan(buffer: b, initializedCount: initialized)
+  var calls = 0
+  let first = span.consumePrefix(maxCount: 3) {
+    (prefix: consuming InputSpan<NCTracked>) -> NCTracked in
+    calls += 1
+    expectEqual(prefix.count, 3)
+    expectEqual(prefix.capacity, 3)
+    expectEqual(prefix[2].value, 2)
+    return prefix.removeFirst()
+  }
+  expectEqual(calls, 1)
+  expectEqual(first.value, 0)
+  expectEqual(LifetimeTracked.instances, initialized - 2)
+  expectEqual(span.count, initialized - 3)
+  expectEqual(span[0].value, 3)
+  _ = consume first
+
+  let total = span.consumePrefix(maxCount: .max) {
+    (rest: consuming InputSpan<NCTracked>) -> Int in
+    rest.count
+  }
+  expectEqual(total, initialized - 3)
+  expectTrue(span.isEmpty)
+  expectEqual(span.freeCapacity, capacity)
+  expectEqual(LifetimeTracked.instances, 0)
+  expectEqual(span.finalize(for: b), 0)
+}
+
 suite.test("Iterable conformance")
 .require(.stdlib_6_5).code {
   guard #available(SwiftStdlib 6.5, *) else { return }
