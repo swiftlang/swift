@@ -327,8 +327,34 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
   return M.isTypeMetadataAccessible(type.getASTType());
 }
 
+/// Returns true if the type metadata of \p type can be used for value
+/// operations in code which is compiled with \p forExpansion.
+///
+/// Code with minimal resilience expansion (i.e. serialized code) can be inlined
+/// into other modules. Therefore the metadata must not only be accessible in
+/// this module, but from any module.
+static bool isTypeMetadataAccessibleForExpansion(
+    SILModule &M, SILType type, TypeExpansionContext forExpansion) {
+  if (!isTypeMetadataForLayoutAccessible(M, type))
+    return false;
+  if (forExpansion.getResilienceExpansion() == ResilienceExpansion::Maximal)
+    return true;
+
+  switch (getTypeLinkage(type.getASTType())) {
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::PublicNonUnique:
+  case FormalLinkage::PackageUnique:
+    return true;
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::Private:
+    return false;
+  }
+  llvm_unreachable("bad linkage");
+}
+
 /// Returns true if a value of the fixed-ABI type \p type can be destroyed
-/// using only type metadata this module can access.
+/// using only type metadata which is accessible in code compiled with
+/// \p forExpansion.
 static bool canDestroyFixedABIValue(SILModule &M, SILType type,
                                     TypeExpansionContext forExpansion) {
   type = type.removingMoveOnlyWrapper();
@@ -340,7 +366,7 @@ static bool canDestroyFixedABIValue(SILModule &M, SILType type,
     return true;
 
   if (auto *nominal = type.getNominalDecl()) {
-    if (isTypeMetadataForLayoutAccessible(M, type))
+    if (isTypeMetadataAccessibleForExpansion(M, type, forExpansion))
       return true;
     if (nominal->hasValueTypeDestructor())
       return false;
