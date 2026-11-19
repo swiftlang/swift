@@ -400,21 +400,15 @@ bb3:
  return %9 : $()
 }
 
-// When a pack is homogeneous, we can specialize uses of the opened
-// @pack_element type without unrolling the loop, since every element is the
-// same type.
+// TODO: Avoid unrolling homogeneous pack loops that do not contain
+// tuple_pack_element_addr.
 //
-// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @dont_unroll_homogeneous_pack_loop :
-// CHECK:       bb0
-// CHECK:         br bb1
-// CHECK:       bb1
-// CHECK:         cond_br {{.*}}, bb3, bb2
-// CHECK:       bb2
-// CHECK:         br bb1
-// CHECK:       bb3
-// CHECK-NOT:     {{^bb}}
-// CHECK-LABEL: } // end sil function 'dont_unroll_homogeneous_pack_loop'
-sil [no_locks] [ossa] @dont_unroll_homogeneous_pack_loop : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_homogeneous_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_homogeneous_pack_loop'
+sil [no_locks] [ossa] @unroll_homogeneous_pack_loop : $@convention(thin) () -> () {
 bb0:
  %0 = integer_literal $Builtin.Word, 0
  %1 = integer_literal $Builtin.Word, 1

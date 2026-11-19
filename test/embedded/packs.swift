@@ -4,6 +4,9 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_Embedded
 
+// Fails in OV due to the tuplePackElements function.
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 
 public func printPackElements<each T: BinaryInteger>(s: repeat each T) {
   for elem in repeat each s {
@@ -85,6 +88,10 @@ public func zippedPackElements<each T: BinaryInteger, each U: BinaryInteger>(ts:
   }
 }
 
+public func tuplePackElements<each T: BinaryInteger>(ts: (repeat each T)) {
+  (repeat print(each ts))
+}
+
 @main
 struct Main {
   static func main() {
@@ -158,5 +165,13 @@ struct Main {
     // CHECK: 1 3
     // CHECK-NEXT: 2 4
     zippedPackElements(ts: Int8(1), Int16(2), us: Int32(3), UInt8(4))
+
+    // Pack expansion over tuple elements: this uses `tuple_pack_element_addr`,
+    // which must be eliminated in Embedded Swift, which is only possible if the
+    // pack loop is unrolled.
+    // CHECK: 1
+    // CHECK-NEXT: 2
+    // CHECK-NEXT: 3
+    tuplePackElements(ts: (Int8(1), Int16(2), Int32(3)))
   }
 }
