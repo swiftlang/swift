@@ -62,3 +62,18 @@ struct DerivedFromCallsPureMethod : CallsPureMethod {
 };
 
 struct DerivedFromDerivedFromCallsPureMethod : DerivedFromCallsPureMethod {};
+
+struct VirtualBaseWithData {
+  int v = 1;
+  virtual int getV() const { return v; }
+};
+
+struct LeftOfVirtualBase : virtual VirtualBaseWithData {
+  int l = 2;
+};
+
+struct RightOfVirtualBase : virtual VirtualBaseWithData {
+  int r = 3;
+};
+
+struct DiamondThroughVirtualBase : LeftOfVirtualBase, RightOfVirtualBase {};
