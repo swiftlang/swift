@@ -304,6 +304,20 @@ func testStringFoo(s: String) {
   s.printFoo()
 }
 
+// https://github.com/swiftlang/swift/issues/88400
+// Since this protocol already inherits from P1 and P2,
+// 'AddAllConformances' doesn't add anything here.
+@AddAllConformances
+protocol InheritsAllConformances: P1, P2 {}
+
+#if TEST_DIAGNOSTICS
+// 'P2' is not inherited, so 'AddAllConformances' tries to add it.
+@AddAllConformances
+protocol InheritsSomeConformances: P1 {}
+// expected-note@-2{{in expansion of macro 'AddAllConformances' on protocol 'InheritsSomeConformances' here}}
+// expected-expansion@-2:41{{expected-error@1:1{{extension of protocol 'InheritsSomeConformances' cannot declare inheritance relationship}}}}
+#endif
+
 @attached(extension, conformances: Sendable)
 macro AddSendable() = #externalMacro(module: "MacroDefinition", type: "SendableMacro")
 
