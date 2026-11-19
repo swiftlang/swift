@@ -48,17 +48,11 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
-// CHECK: inline const constexpr bool isUsableInGenericContext<void *> = true;
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: struct TypeMetadataTrait<void *> {
+// CHECK: struct TypeMetadataTrait<void *> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss13OpaquePointerVN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<swift::Int> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<swift::Int> {
@@ -66,9 +60,6 @@
 // CHECK-NEXT:     return &_impl::$sSiN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<swift::UInt> = true;
 // CHECK-EMPTY:
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<swift::UInt> {
