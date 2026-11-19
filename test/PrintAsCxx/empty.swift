@@ -51,6 +51,9 @@
 // CHECK-NEXT:  # ifndef __ptrauth_swift_class_method_pointer
 // CHECK-NEXT:  # define __ptrauth_swift_class_method_pointer(x)
 // CHECK-NEXT:  # endif
+// CHECK-NEXT:  # ifndef __ptrauth_swift_protocol_witness_function_pointer
+// CHECK-NEXT:  # define __ptrauth_swift_protocol_witness_function_pointer(x)
+// CHECK-NEXT:  # endif
 // CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #pragma clang diagnostic pop
