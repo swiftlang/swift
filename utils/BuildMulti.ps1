@@ -488,8 +488,10 @@ $TestJobs = @()
 $Failure = $null
 if ($Test -and -not $IsCrossCompiling) {
   # The package tests build in their own trees, with the toolchain of the image.
+  # They run at the same priority as the tests of the compilers, as the tests of
+  # SourceKit-LSP time out when they wait for processors.
   if ($PackageTests) {
-    $TestJobs += Start-BuildJob "TestToolchain-Packages" TestToolchain.ps1 -BelowNormal @{
+    $TestJobs += Start-BuildJob "TestToolchain-Packages" TestToolchain.ps1 @{
       Test = $PackageTests;
     }
   }
