@@ -243,13 +243,13 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:     void *ptr = ::swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &ptr, sizeof(ptr));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &ptr, sizeof(ptr));
 // CHECK-NEXT: } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
 // CHECK-NEXT:     alignas(T_0_0) unsigned char buffer[sizeof(T_0_0)];
 // CHECK-NEXT:     auto *valCopy = new(buffer) T_0_0(val);
-// CHECK-NEXT:     swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(result._getOpaquePointer(), swift::_impl::implClassFor<T_0_0>::type::getOpaquePointer(*valCopy));
+// CHECK-NEXT:     swift::_impl::implClassFor<T_0_0>::type::initializeWithTake(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), swift::_impl::implClassFor<T_0_0>::type::getOpaquePointer(*valCopy));
 // CHECK-NEXT: } else {
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 // CHECK-NEXT: }
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT:     result._destructiveInjectEnumTag(0);

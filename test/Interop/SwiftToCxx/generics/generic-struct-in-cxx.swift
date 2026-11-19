@@ -240,6 +240,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
+// CHECK-NEXT: friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -266,7 +267,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: template<class T>
 // CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER GenericPair<T_0_0, T_0_1> returnNewValue(T callable) {
 // CHECK-NEXT:   auto result = GenericPair<T_0_0, T_0_1>::_make();
-// CHECK-NEXT:   callable(result._getOpaquePointer());
+// CHECK-NEXT:   callable(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result));
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 

@@ -94,6 +94,7 @@ public func printStructOneI64_resilient(_ x : StructOneI64_resilient) {
 // RESILIENT:       class SWIFT_SYMBOL({{.*}}) StructOneI64_resilient final {
 // RESILIENT:         swift::_impl::OpaqueStorage _storage;
 // RESILIENT-NEXT:    friend class _impl::_impl_StructOneI64_resilient;
+// RESILIENT-NEXT:    friend struct ::swift::_impl::ValueTypeStorage;
 // RESILIENT-NEXT: #pragma clang diagnostic push
 // RESILIENT-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // RESILIENT-NEXT: #pragma clang diagnostic push

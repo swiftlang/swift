@@ -787,6 +787,8 @@ private:
             [&](auto &types) {
               auto *ED = elementDecl->getParentEnum();
               // Printing function body
+              StringRef resultStorage = "::swift::_impl::ValueTypeStorage::"
+                                        "getUninitializedStorage(result)";
               outOfLineOS << "    auto result = ";
               outOfLineSyntaxPrinter.printNominalTypeQualifier(
                   ED, ED->getModuleContext());
@@ -805,9 +807,8 @@ private:
                                     << cxx_synthesis::getCxxImplNamespaceName()
                                     << "::_impl_RefCountedClass::"
                                        "copyOpaquePointer(val);\n";
-                        outOfLineOS
-                            << "    memcpy(result._getOpaquePointer(), &ptr, "
-                               "sizeof(ptr));\n";
+                        outOfLineOS << "    memcpy(" << resultStorage
+                                    << ", &ptr, sizeof(ptr));\n";
                         outOfLineOS << "} else if constexpr (::swift::"
                                     << cxx_synthesis::getCxxImplNamespaceName()
                                     << "::isValueType<" << type << ">) {\n";
@@ -823,8 +824,8 @@ private:
                                     << "::";
                         outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
                         outOfLineOS << "::implClassFor<" << type;
-                        outOfLineOS << ">::type::initializeWithTake(result._"
-                                       "getOpaquePointer(), ";
+                        outOfLineOS << ">::type::initializeWithTake("
+                                    << resultStorage << ", ";
                         outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                     << "::";
                         outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();
@@ -832,9 +833,8 @@ private:
                         outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                         outOfLineOS << ");\n";
                         outOfLineOS << "} else {\n";
-                        outOfLineOS
-                            << "    memcpy(result._getOpaquePointer(), &val, "
-                               "sizeof(val));\n";
+                        outOfLineOS << "    memcpy(" << resultStorage
+                                    << ", &val, sizeof(val));\n";
                         outOfLineOS << "}\n";
                       });
                 } else {
@@ -849,16 +849,15 @@ private:
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
-                    outOfLineOS
-                        << "    memcpy(result._getOpaquePointer(), &val, "
-                           "sizeof(val));\n";
+                    outOfLineOS << "    memcpy(" << resultStorage
+                                << ", &val, sizeof(val));\n";
                   } else if (isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
                     outOfLineOS
                         << "    auto op = swift::"
                         << cxx_synthesis::getCxxImplNamespaceName()
                         << "::_impl_RefCountedClass::copyOpaquePointer(val);\n";
-                    outOfLineOS << "    memcpy(result._getOpaquePointer(), "
-                                   "&op, sizeof(op));\n";
+                    outOfLineOS << "    memcpy(" << resultStorage
+                                << ", &op, sizeof(op));\n";
                   } else {
                     objectTypeDecl =
                         paramType->getNominalDecl();
@@ -884,8 +883,8 @@ private:
                     owningPrinter.printTypeName(
                         outOfLineOS, paramType,
                         elementDecl->getParentEnum()->getModuleContext());
-                    outOfLineOS << ">::type::initializeWithTake(result._"
-                                   "getOpaquePointer(), ";
+                    outOfLineOS << ">::type::initializeWithTake("
+                                << resultStorage << ", ";
                     outOfLineOS << cxx_synthesis::getCxxSwiftNamespaceName()
                                 << "::";
                     outOfLineOS << cxx_synthesis::getCxxImplNamespaceName();

@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <stdlib.h>
+#include <string.h>
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
@@ -301,29 +302,65 @@ template <class T> struct implClassFor {
 /// True if the given type is a Swift value type.
 template <class T> static inline const constexpr bool isValueType = false;
 
-/// True if the given type is a Swift value type with opaque layout that can be
-/// boxed.
+/// True if the layout of the Swift value is opaque to C++.
 template <class T> static inline const constexpr bool isOpaqueLayout = false;
+
+/// True if the C++ wrapper owns a separate allocation for its Swift value.
+template <class T>
+static inline const constexpr bool usesBoxedStorage = isOpaqueLayout<T>;
 
 /// True if the given type is a C++ record that was bridged to Swift, giving
 /// Swift ability to work with it in a generic context.
 template <class T>
 static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 
+// The caller already named T, so its availability was checked there.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+
+struct ValueTypeStorage {
+  template <class T>
+  static SWIFT_INLINE_PRIVATE_HELPER char *_Nonnull getUninitializedStorage(
+      T &value) noexcept {
+    if constexpr (usesBoxedStorage<T>)
+      return value._storage.getOpaquePointer();
+    else
+      return value._storage;
+  }
+
+  template <bool bitwiseTakable, class T>
+  static SWIFT_INLINE_PRIVATE_HELPER void moveFrom(T &dest,
+                                                   T &source) noexcept {
+    if constexpr (bitwiseTakable) {
+      // Bytewise moves also transfer the sentinel from a moved-from source.
+      ::memcpy(dest._storage, source._storage, sizeof(dest._storage));
+    } else {
+      if (source._isMovedFrom()) {
+        dest._setMovedFrom();
+        return;
+      }
+      implClassFor<T>::type::initializeWithTake(dest._storage, source._storage);
+    }
+    source._setMovedFrom();
+  }
+};
+
 /// Returns the opaque pointer to the given value.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<const void *>(&value);
 }
 
 template <class T>
 SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<void *>(&value);
 }
+
+#pragma clang diagnostic pop
 
 /// Helper struct that destroys any additional storage allocated (e.g. for
 /// resilient value types) for a Swift value owned by C++ code after the Swift
@@ -333,7 +370,7 @@ public:
   SWIFT_INLINE_THUNK ConsumedValueStorageDestroyer(T &val) noexcept
       : value(val) {}
   SWIFT_INLINE_THUNK ~ConsumedValueStorageDestroyer() noexcept {
-    if constexpr (isOpaqueLayout<T>)
+    if constexpr (usesBoxedStorage<T>)
       reinterpret_cast<OpaqueStorage &>(value).~OpaqueStorage();
   }
 
