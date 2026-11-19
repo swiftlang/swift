@@ -392,6 +392,8 @@ public:
         os << " * _Nonnull";
       return ClangRepresentation::representable;
     }
+    if (!declPrinter.shouldInclude(cd))
+      return ClangRepresentation::unsupported;
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {

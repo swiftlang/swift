@@ -89,3 +89,23 @@ extension AudioFileType {
 public func getFiles() -> [RecordConfig.File] {
     []
 }
+
+// Zero-sized types are not emitted, so neither are the types nested in them.
+public enum ZeroSizedEnum {
+    case a
+
+    public final class NestedClass { public init() {} }
+    public struct NestedStruct { public var x: Int }
+}
+
+public struct ZeroSizedStruct {
+    public final class NestedClass { public init() {} }
+}
+
+public struct UsesNestedInZeroSized {
+    public var c: ZeroSizedStruct.NestedClass
+    public var s: ZeroSizedEnum.NestedStruct
+}
+
+public func takesNestedInZeroSized(_ c: ZeroSizedEnum.NestedClass) {}
+public func consumesNestedInZeroSized(_ c: consuming ZeroSizedEnum.NestedClass) {}
