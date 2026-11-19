@@ -218,13 +218,23 @@ public:
     /// long". Escapable types have immortal scope.
     Immortal,
 
-    /// A scope parameter of an enclosing type.
+    /// A scope parameter of an enclosing function or type.
     Param,
 
     /// The scope for the body of a call to a given function. Represents the
     /// access scope of a parameter which isn't bound or referred to. Only known
     /// to live for the body of the call.
-    Body
+    Body,
+
+    /// A local access scope in the current function *other* than a parameter.
+    /// Note that lifetime analysis can sometimes unify one of these local
+    /// scopes with a parameter scope or even the immortal scope; other
+    /// code should not assume that they cannot outlast such scopes.
+    Local,
+
+    /// A scope variable introduced within a constraint system.
+    /// Should be eliminated after solving.
+    UnresolvedVariable,
   };
 
 private:
@@ -234,6 +244,8 @@ private:
   enum class StorageKind : BitsType {
     Singleton,
     Param,
+    Local,
+    UnresolvedVariable,
     Last_Kind = Param
   };
 
@@ -264,6 +276,8 @@ private:
   /// Singleton           | one of the singleton Kinds (2...31)
   /// Param               | Index (2...17)          | Depth (18...31)
   ///                     |   (index 0 is Body)     |
+  /// Local               | Data (2...31)
+  /// Variable            | Data (2...31)
   BitsType Bits;
 
   StorageKind getStorageKind() const {
@@ -311,6 +325,14 @@ public:
   /// parameter.
   static ScopeRef forCallBody() { return forBody(ScopeDepth::zero()); }
 
+  static ScopeRef forLocal(unsigned index) {
+    return {StorageKind::Local, index};
+  }
+
+  static ScopeRef forUnresolvedVariable(unsigned index) {
+    return {StorageKind::UnresolvedVariable, index};
+  }
+
   Kind getKind() const {
     switch (getStorageKind()) {
     case StorageKind::Singleton:
@@ -319,6 +341,12 @@ public:
 
     case StorageKind::Param:
       return getRawIndex() == 0 ? Kind::Body : Kind::Param;
+
+    case StorageKind::Local:
+      return Kind::Local;
+
+    case StorageKind::UnresolvedVariable:
+      return Kind::UnresolvedVariable;
     }
     llvm_unreachable("bad kind");
   }
@@ -358,12 +386,26 @@ public:
     return getRawIndex() - 1;
   }
 
+  unsigned getLocalIndex() const {
+    ASSERT(getKind() == Kind::Local);
+    return getRawData();
+  }
+
+  unsigned getUnresolvedVariableIndex() const {
+    ASSERT(getKind() == Kind::UnresolvedVariable);
+    return getRawData();
+  }
+
   /// Reference the same scope from \p by more function types in.
   ///
-  /// Immortal scopes are not shifted, since they are global.
+  /// Singleton scopes are not shifted, since they are global.
+  /// Local scopes might need to deal with this?
+  /// Unresolved scope variables in the constraint system never should.
   ScopeRef shifted(ScopeDepth by) const {
     switch (getStorageKind()) {
     case StorageKind::Singleton:
+    case StorageKind::Local:
+    case StorageKind::UnresolvedVariable:
       return *this;
     case StorageKind::Param:
       return {StorageKind::Param,
@@ -375,8 +417,18 @@ public:
   /// Return the recursive properties that would apply to a type
   /// with this scope reference as a component.
   RecursiveTypeProperties getRecursiveProperties() const {
-    if (isError()) return RecursiveTypeProperties::HasError;
-    return {};
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+      if (isError()) return RecursiveTypeProperties::HasError;
+      return {};
+    case StorageKind::Local:
+    case StorageKind::Param:
+      return {};
+    case StorageKind::UnresolvedVariable:
+      return (RecursiveTypeProperties::HasTypeVariable |
+              RecursiveTypeProperties::SolverAllocated);
+    }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Prints `^depth.index`, `^depth.body`, or `immortal`.
