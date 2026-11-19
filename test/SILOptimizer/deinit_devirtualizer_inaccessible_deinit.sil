@@ -4,8 +4,8 @@
 // RUN: %target-sil-opt -I %t -enable-sil-verify-all -deinit-devirtualizer %t/main.sil | %FileCheck %s
 
 // Check that the DeinitDevirtualizer does not split the destroy of a non-copyable value
-// into destroys of its fields when a field's type has a deinit and metadata the client
-// cannot access.
+// into destroys of its fields or elements when a field or element contains a value whose
+// type has a deinit and metadata the client cannot access.
 
 //--- Lib.swift
 
@@ -112,6 +112,28 @@ bb0(%0 : @owned $BoxManager):
 sil [ossa] @destroyBoxManagerAddr : $@convention(thin) (@in BoxManager) -> () {
 bb0(%0 : $*BoxManager):
   destroy_addr %0 : $*BoxManager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyTuple :
+// CHECK-NOT:     destructure_tuple
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyTuple'
+sil [ossa] @destroyTuple : $@convention(thin) (@owned (Inner, Int)) -> () {
+bb0(%0 : @owned $(Inner, Int)):
+  destroy_value %0 : $(Inner, Int)
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyFixedArray :
+// CHECK-NOT:     destroy_addr
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyFixedArray'
+sil [ossa] @destroyFixedArray : $@convention(thin) (@owned Builtin.FixedArray<2, Inner>) -> () {
+bb0(%0 : @owned $Builtin.FixedArray<2, Inner>):
+  destroy_value %0 : $Builtin.FixedArray<2, Inner>
   %r = tuple ()
   return %r : $()
 }
