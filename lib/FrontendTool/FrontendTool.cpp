@@ -250,7 +250,11 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   auto &C = Stats.getFrontendCounters();
   auto &SM = Instance.getSourceMgr();
   C.NumDecls += SF->getTopLevelDecls().size();
-  C.NumLocalTypeDecls += SF->getLocalTypeDecls().size();
+  // Computing local type declarations walks the AST with macro expansion
+  // enabled, so avoid querying it on source files that have not been
+  // type-checked (such as in parse-only actions).
+  if (SF->ASTStage >= SourceFile::TypeChecked)
+    C.NumLocalTypeDecls += SF->getLocalTypeDecls().size();
   C.NumObjCMethods += SF->ObjCMethods.size();
 
   SmallVector<OperatorDecl *, 2> operators;
