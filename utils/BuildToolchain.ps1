@@ -478,13 +478,18 @@ function Get-CompilersDefines([Hashtable] $Platform,
     @{}
   }
 
+  # The C and C++ compilations use as many jobs as there are processors, and
+  # ninja runs a few more jobs, so that the long chains of Swift modules, which
+  # build with custom commands and link rules, start as soon as they can.
+  $PoolDefines = @{ LLVM_PARALLEL_COMPILE_JOBS = "$([Environment]::ProcessorCount)" }
+
   $DispatchDefines = if ($DispatchPackage) {
     @{ dispatch_DIR = $DispatchPackage }
   } else {
     @{}
   }
 
-  return $TestDefines + $DebugDefines + $DispatchDefines + @{
+  return $TestDefines + $DebugDefines + $PoolDefines + $DispatchDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -570,19 +575,22 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
-  Build-CMakeProject `
-    -Src $SourceCache\llvm-project\llvm `
-    -Bin (Get-ProjectBinaryCache $Platform $Project) `
-    -InstallTo "$ToolchainRoot\usr" `
-    -Platform $Platform `
-    -Assembler $Assembler `
-    -CCompiler $CCompiler `
-    -CXXCompiler $CXXCompiler `
-    -SwiftCompiler $SwiftCompiler `
-    -SwiftSDK $SwiftSDK `
-    -BuildTargets @("install-distribution") `
-    -CacheScript $CacheScript `
-    -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  Invoke-IsolatingEnvVars {
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = [Environment]::ProcessorCount + 4
+    Build-CMakeProject `
+      -Src $SourceCache\llvm-project\llvm `
+      -Bin (Get-ProjectBinaryCache $Platform $Project) `
+      -InstallTo "$ToolchainRoot\usr" `
+      -Platform $Platform `
+      -Assembler $Assembler `
+      -CCompiler $CCompiler `
+      -CXXCompiler $CXXCompiler `
+      -SwiftCompiler $SwiftCompiler `
+      -SwiftSDK $SwiftSDK `
+      -BuildTargets @("install-distribution") `
+      -CacheScript $CacheScript `
+      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  }
 
   if ($CMakeMode -eq "Configure") { return }
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
