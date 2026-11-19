@@ -2447,9 +2447,11 @@ private:
           !BaseTy->castTo<TupleType>()->containsPackExpansionType())
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
-      else
-        return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                  AlignInBits, Flags, MangledName);
+      // The element types are only described by the mangled name, so emit the
+      // typealiases they refer to, for the debugger to resolve them.
+      anchorTypeAliasesIn(BaseTy);
+      return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
+                                AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::InOut:
@@ -2510,6 +2512,9 @@ private:
       auto L = getFileAndLocation(DbgTy.getDecl());
       unsigned FwdDeclLine = 0;
 
+      // The instance type is only described by the mangled name, so emit the
+      // typealiases it refers to, for the debugger to resolve them.
+      anchorTypeAliasesIn(BaseTy);
       return DBuilder.createStructType(
           Scope, MangledName, L.File, FwdDeclLine, SizeInBits, AlignInBits,
           Flags, nullptr, nullptr, llvm::dwarf::DW_LANG_Swift, nullptr,
