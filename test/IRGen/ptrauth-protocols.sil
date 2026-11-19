@@ -41,7 +41,7 @@ bb0(%0 : $@thick A.Type):
 sil_witness_table A : P module test {
   method #P.foo: @A_foo
 }
-// CHECK: @A_foo.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @A_foo, i32 0, i64 ptrtoint (ptr getelementptr inbounds ([2 x ptr], ptr @"$s4test1AVAA1PAAWP", i32 0, i32 1) to i64), i64 53700 }, section "llvm.ptrauth"
+// CHECK: @A_foo.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @A_foo, i32 0, i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s4test1AVAA1PAAWP", i64 8) to i64), i64 53700 }, section "llvm.ptrauth"
 
 // CHECK: @"$s4test1AVAA1PAAWP" = hidden constant [2 x ptr] [ptr @"$s4test1AVAA1PAAMc", ptr @A_foo.ptrauth], align 8
 
@@ -55,7 +55,7 @@ sil_witness_table B : Q module test {
   associated_type Assoc: A
   method #Q.init!allocator: @B_init
 }
-// CHECK: @B_init.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @B_init, i32 0, i64 ptrtoint (ptr getelementptr inbounds ([4 x ptr], ptr @"$s4test1BVAA1QAAWP", i32 0, i32 3) to i64), i64 33208 }, section "llvm.ptrauth"
+// CHECK: @B_init.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @B_init, i32 0, i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @"$s4test1BVAA1QAAWP", i64 24) to i64), i64 33208 }, section "llvm.ptrauth"
 // CHECK: @"$s4test1BVAA1QAAWP" = hidden global [4 x ptr] [
 // CHECK-SAME: ptr @"$s4test1BVAA1QAAMc",
 // CHECK-SAME: @"{{.*}}.ptrauth",
