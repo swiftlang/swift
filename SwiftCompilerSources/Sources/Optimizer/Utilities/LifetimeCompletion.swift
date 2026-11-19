@@ -164,11 +164,14 @@ func completeLifetime(of value: Value,
   }
 }
 
-func completeLifetime(ofOwned value: Value, createEnd: (Builder) -> (), _ context: FunctionPassContext) {
+func completeLifetime(ofOwned value: Value,
+                      createEnd: (Builder) -> (),
+                      getDeadEnd: (BasicBlock) -> Instruction? = { $0.terminator as? UnreachableInst },
+                      _ context: FunctionPassContext) {
   complete(value: value,
            isEnd: { $0.endsLifetime },
            createEnd: createEnd,
-           getDeadEnd: { $0.terminator as? UnreachableInst },
+           getDeadEnd: getDeadEnd,
            context)
 }
 
