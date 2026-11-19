@@ -986,7 +986,8 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 }
 
 void IRGenFunction::emitAwaitSplitContinuation(
-    llvm::Value *continuation, Address resumeBuffer, SILType resumeTy,
+    llvm::Value *continuation, ArrayRef<llvm::Value *> handlers,
+    Address resumeBuffer, SILType resumeTy,
     llvm::BasicBlock *normalBB, llvm::PHINode *optionalErrorResult,
     llvm::BasicBlock *optionalErrorBB) {
   // This continuation was created separately (in another frame) via
@@ -1046,6 +1047,11 @@ void IRGenFunction::emitAwaitSplitContinuation(
     arguments.push_back(
         Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(continuationAsTask, IGM.Int8PtrTy));
+    assert(handlers.size() == 5 &&
+           "a function and context for each handler, and the handler flags");
+    for (auto *handler : handlers.drop_back())
+      arguments.push_back(Builder.CreateBitOrPointerCast(handler, IGM.Int8PtrTy));
+    arguments.push_back(handlers.back());
 
     auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
                                            false /*packed*/);

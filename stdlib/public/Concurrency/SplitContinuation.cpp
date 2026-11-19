@@ -40,9 +40,9 @@ using namespace swift;
 //     both.
 //   * await (swift_continuation_awaitSplit): binds the resume-point to the
 //     *current* task, records the awaiting task on the context, and performs
-//     the Pending->Awaited transition. Cancellation and escalation handlers
-//     are not part of this: ContinuationWaiter installs them beforehand with
-//     the regular per-handler entry points.
+//     the Pending->Awaited transition. The cancellation and escalation
+//     handlers it is passed are published in the same status update that
+//     suspends the task, and the task removes them when it resumes.
 //   * resume: the regular swift_continuation_resume* entry points, and
 //     swift_continuation_resumeOnExecutors, which read the marker word and
 //     route to the split implementation. The resume works *by context* (the
@@ -53,6 +53,41 @@ using namespace swift;
 //     resumes on.
 
 namespace {
+
+/// The cancellation and escalation handlers installed at `wait`. Their records
+/// live in the continuation's storage, so installing them doesn't require a
+/// task allocation.
+struct SplitContinuationHandlers {
+  enum : uint8_t {
+    HasCancellation = 1 << 0,
+    HasEscalation = 1 << 1,
+    CancellationPublished = 1 << 2,
+    EscalationPublished = 1 << 3,
+  };
+
+  uint8_t Flags;
+
+  alignas(CancellationNotificationStatusRecord) char
+      CancellationStorage[sizeof(CancellationNotificationStatusRecord)];
+  alignas(EscalationNotificationStatusRecord) char
+      EscalationStorage[sizeof(EscalationNotificationStatusRecord)];
+
+  bool any() const { return Flags & (HasCancellation | HasEscalation); }
+
+  CancellationNotificationStatusRecord *cancellation() {
+    if (!(Flags & HasCancellation))
+      return nullptr;
+    return reinterpret_cast<CancellationNotificationStatusRecord *>(
+        CancellationStorage);
+  }
+
+  EscalationNotificationStatusRecord *escalation() {
+    if (!(Flags & HasEscalation))
+      return nullptr;
+    return reinterpret_cast<EscalationNotificationStatusRecord *>(
+        EscalationStorage);
+  }
+};
 
 /// The storage backing a split continuation. A raw continuation referring to a
 /// split continuation is the address of one of these.
@@ -80,6 +115,9 @@ struct SplitContinuationStorage {
   /// resume-by-context can make it runnable. Null until then, which is also how
   /// a resume that races ahead of the await is recognised.
   AsyncTask *AwaitingTask;
+
+  /// The handlers installed when `wait` was called.
+  SplitContinuationHandlers Handlers;
 };
 
 /// Written into `SplitContinuationStorage::Marker`, where a task keeps its
@@ -226,6 +264,8 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   auto *storage = static_cast<SplitContinuationStorage *>(allocation);
   storage->Marker = SplitContinuationMarker;
   storage->AwaitingTask = nullptr;
+  // We set the handlers to 0 when we create the continuation.
+  storage->Handlers.Flags = 0;
 
   // Relaxed is fine: resumption must happen-after this call returns and the
   // continuation is handed to the executor.
@@ -239,11 +279,103 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   return static_cast<SplitContinuation *>(allocation);
 }
 
+/// Construct the records of the handlers in `handlers` in `h`.
+static void prepareSplitContinuationHandlers(
+    SplitContinuationHandlers &h,
+    CancellationNotificationStatusRecord::FunctionTypeWithReason
+        *cancellationHandler,
+    void *cancellationContext,
+    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
+    void *escalationContext, size_t handlers) {
+  assert(h.Flags == 0 && "the split continuation was already awaited");
+
+  if (handlers & SplitContinuationCancellationHandler) {
+    ::new (h.CancellationStorage) CancellationNotificationStatusRecord(
+        swift_auth_code(cancellationHandler,
+                        SpecialPointerAuthDiscriminators::
+                            CancellationNotificationWithReasonFunction),
+        cancellationContext);
+    h.Flags |= SplitContinuationHandlers::HasCancellation;
+  }
+  if (handlers & SplitContinuationEscalationHandler) {
+    ::new (h.EscalationStorage) EscalationNotificationStatusRecord(
+        swift_auth_code(
+            escalationHandler,
+            SpecialPointerAuthDiscriminators::EscalationNotificationFunction),
+        escalationContext);
+    h.Flags |= SplitContinuationHandlers::HasEscalation;
+  }
+}
+
+/// Remove the records that a wait published from `task`.
+static void removeSplitContinuationHandlers(AsyncTask *task,
+                                SplitContinuationHandlers &handlers) {
+  auto *cancellation =
+      handlers.Flags & SplitContinuationHandlers::CancellationPublished
+          ? handlers.cancellation()
+          : nullptr;
+  auto *escalation =
+      handlers.Flags & SplitContinuationHandlers::EscalationPublished
+          ? handlers.escalation()
+          : nullptr;
+  handlers.Flags &= ~(SplitContinuationHandlers::CancellationPublished |
+                      SplitContinuationHandlers::EscalationPublished);
+
+  TaskStatusRecord *innermost = escalation;
+  if (!innermost)
+    innermost = cancellation;
+  if (!innermost)
+    return;
+  TaskStatusRecord *outermost = cancellation;
+  if (!outermost)
+    outermost = escalation;
+
+  // The task pushed nothing while it was suspended, so the records are
+  // usually still the innermost ones and come off in a single update.
+  auto status = task->_private()._status().load(std::memory_order_relaxed);
+  while (!status.isStatusRecordLocked() &&
+         status.getInnermostRecord() == innermost) {
+    auto newStatus = status.withInnermostRecord(outermost->getParent());
+    if (task->_private()._status().compare_exchange_weak(
+            status, newStatus,
+            /*success*/ std::memory_order_relaxed,
+            /*failure*/ std::memory_order_relaxed)) {
+      newStatus.traceStatusChanged(task, status, false);
+      return;
+    }
+  }
+
+  // Someone holds the lock, for example to run a handler. Wait for them.
+  if (escalation)
+    removeStatusRecord(task, escalation);
+  if (cancellation)
+    removeStatusRecord(task, cancellation);
+}
+
+/// The resume function of a task that waits with handlers: removes them before
+/// the wait returns.
+SWIFT_CC(swiftasync)
+static void split_continuation_remove_handlers_resume_adapter(
+    SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+  auto *context = static_cast<ContinuationAsyncContext *>(_context);
+  removeSplitContinuationHandlers(swift_task_getCurrent(),
+                      storageOfContext(context)->Handlers);
+  return context->ResumeParent(context);
+}
 
 SWIFT_CC(swiftasync)
-void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
+void swift::swift_continuation_awaitSplit(
+    SplitContinuation *continuation,
+    CancellationNotificationStatusRecord::FunctionTypeWithReason
+        *cancellationHandler,
+    void *cancellationContext,
+    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
+    void *escalationContext, size_t handlers) {
   auto *storage =
       reinterpret_cast<SplitContinuationStorage *>(continuation);
+  prepareSplitContinuationHandlers(storage->Handlers, cancellationHandler,
+                                   cancellationContext, escalationHandler,
+                                   escalationContext, handlers);
   auto *context = contextOfStorage(storage);
   auto task = swift_task_getCurrent();
   assert(task && "awaiting a split continuation without a task");
@@ -274,23 +406,138 @@ void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
          "awaiting a corrupt or already-awaited continuation");
 
   // If the status is already Resumed (resume raced ahead), continue inline
-  // without suspending. Any handlers were already installed by the caller, so
-  // they may have run regardless: a cancellation handler runs immediately if
-  // the task was already cancelled, and an escalation handler is always called
-  // once when it is installed.
-  if (oldStatus == ContinuationStatus::Resumed) {
+  // without suspending. The handlers don't run, because the wait doesn't
+  // suspend.
+  if (oldStatus == ContinuationStatus::Resumed)
     return context->ResumeParent(context);
-  }
+
+  auto &splitHandlers = storage->Handlers;
+
+  // The handlers run inline for what happened before their records are
+  // published: the cancellation handler if the task is already cancelled, and
+  // the escalation handler with the current priority. The records are then
+  // published.
+  //
+  // The inline calls don't hold the status record lock. If the task is
+  // escalated before its records are published, publishing fails and the
+  // escalation handler runs inline again, so it can see `(p, p)` and then
+  // `(p, p2)`. This avoids us needing to run the handlers while holding the
+  // lock.
+  auto *cancellation = splitHandlers.cancellation();
+  auto *escalation = splitHandlers.escalation();
+  std::optional<JobPriority> reportedPriority;
+
+  auto runHandlersInline = [&] {
+    if (cancellation) {
+      if (auto reason = getObservedCancellationReason(task)) {
+        cancellation->run(*reason);
+        // Cancelled is a final state so we don't have to publish a handler
+        // record if we already ran the handler.
+        cancellation = nullptr;
+      }
+    }
+    if (escalation) {
+      auto priority = task->_private()
+                          ._status()
+                          .load(std::memory_order_relaxed)
+                          .getStoredPriority();
+      if (!reportedPriority) {
+        escalation->run(priority, priority);
+        reportedPriority = priority;
+      } else if (*reportedPriority != priority) {
+        escalation->run(*reportedPriority, priority);
+        reportedPriority = priority;
+      }
+    }
+  };
+
+  // Link the records to publish between `above` and the innermost record of
+  // `status`, or return false if `status` doesn't match with what the handlers
+  // were told. Called inside the status update, so it must not run them.
+  auto linkRecords = [&](const ActiveTaskStatus &status,
+                         TaskStatusRecord *above) {
+    if (cancellation && getObservedCancellationReason(status))
+      return false;
+    if (escalation && status.getStoredPriority() != *reportedPriority)
+      return false;
+
+    TaskStatusRecord *parent = status.getInnermostRecord();
+    if (cancellation) {
+      cancellation->resetParent(parent);
+      parent = cancellation;
+    }
+    if (escalation) {
+      escalation->resetParent(parent);
+      parent = escalation;
+    }
+    if (above)
+      above->resetParent(parent);
+    return true;
+  };
+
+  // Publishing takes the status record lock if the cancellation record is still
+  // to be published and the task has a cancellation scope, because a scope can
+  // be cancelled concurrently without a change to the task's status.
+  auto publishNeedsLock = [&] {
+    return cancellation && task->_private()
+                               ._status()
+                               .load(std::memory_order_relaxed)
+                               .hasTaskCancellationScope();
+  };
+
+  auto markPublished = [&] {
+    if (cancellation)
+      splitHandlers.Flags |= SplitContinuationHandlers::CancellationPublished;
+    if (escalation)
+      splitHandlers.Flags |= SplitContinuationHandlers::EscalationPublished;
+  };
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
+  if (splitHandlers.any()) {
+    while (true) {
+      runHandlersInline();
+      TaskStatusRecord *innermost = escalation;
+      if (!innermost)
+        innermost = cancellation;
+      if (!innermost)
+        break;
+      // addStatusRecord already made `innermost` the innermost record.
+      auto link = [&](ActiveTaskStatus status, ActiveTaskStatus &) {
+        return linkRecords(status, nullptr);
+      };
+      auto status = task->_private()._status().load(std::memory_order_relaxed);
+      if (publishNeedsLock()
+              ? addStatusRecordWithLock(task, innermost, status, link)
+              : addStatusRecord(task, innermost, status, link)) {
+        markPublished();
+        break;
+      }
+    }
+  }
+
   do {
   ConditionVariable Cond;
   context->Cond = &Cond;
 #else
-  // Flag the task as suspended on the continuation. Any cancellation or
-  // priority-escalation handlers were installed before we got here, by the
-  // regular per-handler entry points.
-  task->flagAsSuspendedOnContinuation(context);
+  // Flag the task as suspended on the continuation. Any handlers are published
+  // in the same status update, and removed again when the task resumes.
+  if (splitHandlers.any()) {
+    while (true) {
+      runHandlersInline();
+      if (!cancellation && !escalation) {
+        task->flagAsSuspendedOnContinuation(context);
+        break;
+      }
+      if (task->flagAsSuspendedOnContinuation(context, publishNeedsLock(),
+                                              linkRecords)) {
+        markPublished();
+        task->ResumeTask = split_continuation_remove_handlers_resume_adapter;
+        break;
+      }
+    }
+  } else {
+    task->flagAsSuspendedOnContinuation(context);
+  }
 #endif
 
   // Try to transition to Awaited.
@@ -325,6 +572,7 @@ void swift::swift_continuation_awaitSplit(SplitContinuation *continuation) {
   task->resumeRunningAfterFailedSuspend();
 #endif
 
+  removeSplitContinuationHandlers(task, splitHandlers);
   return context->ResumeParent(context);
 }
 

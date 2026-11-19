@@ -6768,14 +6768,19 @@ public:
     auto &C = AACI->getFunction()->getASTContext();
 
     if (splitGet) {
-      require(splitGet->getArguments().size() == 2,
-              "getSplitContinuationAddr takes two operands");
+      require(splitGet->getArguments().size() == 5,
+              "getSplitContinuationAddr takes five operands");
       require(splitGet->getArguments()[0]->getType()
                   .is<BuiltinRawUnsafeContinuationType>(),
               "getSplitContinuationAddr's first operand must be a "
               "Builtin.RawUnsafeContinuation");
       require(splitGet->getArguments()[1]->getType().isAddress(),
               "getSplitContinuationAddr's resume buffer must be an address");
+      require(splitGet->getArguments()[2]->getType().is<SILFunctionType>() &&
+                  splitGet->getArguments()[3]->getType().is<SILFunctionType>(),
+              "getSplitContinuationAddr's handlers must be functions");
+      require(splitGet->getArguments()[4]->getType().is<BuiltinIntegerType>(),
+              "getSplitContinuationAddr's handler flags must be a word");
     }
 
     // The shape of the successors depends on the continuation instruction being

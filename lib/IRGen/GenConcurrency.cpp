@@ -560,10 +560,12 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
   if (llvm::GlobalValue *F = Module.getNamedValue(name))
     return cast<llvm::Function>(F);
 
-  // The parameter here matches the extra argument passed to
+  // The parameters here match the extra arguments passed to
   // @llvm.coro.suspend.async by emitAwaitSplitContinuation: the split
-  // continuation itself.
-  llvm::Type *argTys[] = { Int8PtrTy };
+  // continuation, the function and context of each handler, and the handler
+  // flags.
+  llvm::Type *argTys[] = {Int8PtrTy, Int8PtrTy, Int8PtrTy,
+                          Int8PtrTy, Int8PtrTy, SizeTy};
   auto *suspendFnTy =
     llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
 
@@ -577,9 +579,11 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
     DebugInfo->emitArtificialFunction(suspendIGF, suspendFn);
   auto &Builder = suspendIGF.Builder;
 
-  llvm::Value *continuation = suspendFn->getArg(0);
+  SmallVector<llvm::Value *, 6> args;
+  for (auto &arg : suspendFn->args())
+    args.push_back(&arg);
   auto *call = Builder.CreateCall(
-      getContinuationAwaitSplitFunctionPointer(), {continuation});
+      getContinuationAwaitSplitFunctionPointer(), args);
   call->setCallingConv(SwiftAsyncCC);
   call->setDoesNotThrow();
   call->setTailCallKind(AsyncTailCallKind);

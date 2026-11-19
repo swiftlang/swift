@@ -9470,6 +9470,15 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
     SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
 
+    // The handlers, as the function and context of each closure followed by
+    // the word that selects which of them are used.
+    SmallVector<llvm::Value *, 5> handlers;
+    for (unsigned i = 2; i <= 4; ++i) {
+      Explosion handler = getLoweredExplosion(splitGet->getArguments()[i]);
+      while (!handler.empty())
+        handlers.push_back(handler.claimNext());
+    }
+
     auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
     bool hasError = i->getErrorBB() != nullptr;
     auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
@@ -9479,7 +9488,7 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
 
     // The value is delivered into the resume buffer, so the resume successor
     // takes no arguments and there is nothing to add to its PHI nodes.
-    emitAwaitSplitContinuation(continuation, resumeBuffer, resumeTy,
+    emitAwaitSplitContinuation(continuation, handlers, resumeBuffer, resumeTy,
                                   normalDestBB, errorPhi, errorDestBB);
     return;
   }

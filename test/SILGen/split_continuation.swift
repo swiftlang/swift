@@ -16,14 +16,18 @@ func createAndDestroy() {
   Builtin.destroySplitContinuation(continuation)
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s4test13awaitThrowingyBi32_BcYaKF
+// CHECK-LABEL: sil hidden [ossa] @$s4test13awaitThrowing{{.*}} : $@convention(thin) @async
 // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
-// CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32)
+// CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>({{%.*}} : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32, {{%.*}} : $@noescape @callee_guaranteed (UInt8) -> (), {{%.*}} : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), {{%.*}} : $Builtin.Word)
 // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
 // CHECK: [[ERROR]]([[ERR:%.*]] : @owned $any Error):
 // CHECK: throw [[ERR]]
 func awaitThrowing(
-  _ continuation: Builtin.RawUnsafeContinuation
+  _ continuation: Builtin.RawUnsafeContinuation,
+  onCancel: (UInt8) -> Void,
+  onPriorityEscalated: (UInt8, UInt8) -> Void,
+  handlers: Builtin.Word
 ) async throws -> Builtin.Int32 {
-  return try await Builtin.awaitSplitThrowingContinuation(continuation)
+  return try await Builtin.awaitSplitThrowingContinuation(
+    continuation, onCancel, onPriorityEscalated, handlers)
 }

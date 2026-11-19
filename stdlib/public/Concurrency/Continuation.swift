@@ -249,7 +249,12 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// call does not suspend at all and returns the value immediately.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait() async throws(Failure) -> sending Success {
-    try await Self._wait(context: _takeContext())
+    try await Self._wait(
+      context: _takeContext(),
+      onCancel: { _ in },
+      onPriorityEscalated: { _, _ in },
+      handlers: 0
+    )
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a cancellation
@@ -257,12 +262,13 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// the suspension.
   ///
   /// If the continuation was already resumed before `wait` is called, this call
-  /// does not suspend at all and returns the value immediately.
+  /// does not suspend at all and returns the value immediately, and neither
+  /// handler runs.
   ///
   /// If the current task is already cancelled, `onCancel` runs before this
   /// function suspends.
   ///
-  /// `onPriorityEscalated` is always called once when `wait` is called, with
+  /// `onPriorityEscalated` is called once before the task suspends, with
   /// the task's current priority as both arguments, so that an escalation that
   /// happened before the handler was installed is not missed. It may therefore
   /// be called with a priority the work already runs at. Compare against the
@@ -283,11 +289,11 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   ///   - onCancel: Run with the reason the task was cancelled with when it is
   ///     cancelled while suspended here. It may run concurrently with the
   ///     resumption, and on any thread.
-  ///   - onPriorityEscalated: Run once when `wait` is called, and then when the
-  ///     task's priority is escalated while suspended here. The first argument
-  ///     is the old priority (before escalation), and the second argument is
-  ///     the new escalated priority. It may run concurrently with the
-  ///     resumption, and on any thread.
+  ///   - onPriorityEscalated: Run once before the task suspends, and then when
+  ///     the task's priority is escalated while suspended here. The first
+  ///     argument is the old priority (before escalation), and the second
+  ///     argument is the new escalated priority. It may run concurrently with
+  ///     the resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
     onCancel handleCancellation: sending (CancellationError.Reason) -> Void,
@@ -304,14 +310,17 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
       onPriorityEscalated: {
         handlePriorityEscalation(
           TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
-      })
+      },
+      handlers: 3
+    )
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
   /// cancellation handler installed for the duration of the suspension.
   ///
   /// If the continuation was already resumed before `wait` is called, this
-  /// call does not suspend at all and returns the value immediately.
+  /// call does not suspend at all and returns the value immediately, and the
+  /// handler doesn't run.
   ///
   /// If the current task is already cancelled, `onCancel` runs before this
   /// function suspends.
@@ -329,16 +338,20 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
       context: _takeContext(),
       onCancel: {
         handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
-      })
+      },
+      onPriorityEscalated: { _, _ in },
+      handlers: 1
+    )
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
   /// priority-escalation handler installed for the duration of the suspension.
   ///
   /// If the continuation was already resumed before `wait` is called, this
-  /// call does not suspend at all and returns the value immediately.
+  /// call does not suspend at all and returns the value immediately, and the
+  /// handler doesn't run.
   ///
-  /// `onPriorityEscalated` is always called once when `wait` is called, with
+  /// `onPriorityEscalated` is called once before the task suspends, with
   /// the task's current priority as both arguments, so that an escalation that
   /// happened before the handler was installed is not missed. It may therefore
   /// be called with a priority the work already runs at. Compare against the
@@ -354,11 +367,11 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// ```
   ///
   /// - Parameters:
-  ///   - onPriorityEscalated: Run once when `wait` is called, and then when the
-  ///     task's priority is escalated while suspended here. The first argument
-  ///     is the old priority (before escalation), and the second argument is
-  ///     the new escalated priority. It may run concurrently with the
-  ///     resumption, and on any thread.
+  ///   - onPriorityEscalated: Run once before the task suspends, and then when
+  ///     the task's priority is escalated while suspended here. The first
+  ///     argument is the old priority (before escalation), and the second
+  ///     argument is the new escalated priority. It may run concurrently with
+  ///     the resumption, and on any thread.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait(
     onPriorityEscalated handlePriorityEscalation:
@@ -368,82 +381,36 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     // priorities.
     try await Self._wait(
       context: _takeContext(),
+      onCancel: { _ in },
       onPriorityEscalated: {
         handlePriorityEscalation(
           TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
-      })
+      },
+      handlers: 2
+    )
   }
 
-  @export(implementation)
-  nonisolated(nonsending) static func _wait(
-    context: Builtin.RawUnsafeContinuation
-  ) async throws(Failure) -> sending Success {
-    #if $BuiltinSplitContinuations
-    do {
-      return try await Builtin.awaitSplitThrowingContinuation(context)
-    } catch {
-      // Matches the cast Continuation.resume uses.
-      throw error as! Failure
-    }
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
-  }
-
+  // TODO: Pass optional handlers and remove `handlers` once Optional can hold
+  // a non-escaping closure. Right now `handlers: UInt` tells the runtime which
+  // handlers are actually set. Its bits have to match
+  // SplitContinuationAwaitHandlers in Concurrency.h.
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
     onCancel handleCancellation: sending (UInt8) -> Void,
     onPriorityEscalated handlePriorityEscalation:
-      @Sendable (UInt8, UInt8) -> Void
+      @Sendable (UInt8, UInt8) -> Void,
+    handlers: UInt
   ) async throws(Failure) -> sending Success {
-    #if $BuiltinCancellationHandlerWithReason && $BuiltinConcurrencyStackNesting
-    let cancellationRecord = unsafe Builtin.taskAddCancellationHandlerWithReason(
-      handler: handleCancellation)
-    defer { unsafe Builtin.taskRemoveCancellationHandler(record: cancellationRecord) }
-
-    let escalationRecord = unsafe Builtin.taskAddPriorityEscalationHandler(
-      handler: handlePriorityEscalation)
-    defer {
-      unsafe Builtin.taskRemovePriorityEscalationHandler(record: escalationRecord)
+    #if $BuiltinSplitContinuations
+    do {
+      return try await Builtin.awaitSplitThrowingContinuation(
+        context, handleCancellation, handlePriorityEscalation,
+        handlers._builtinWordValue)
+    } catch {
+      // Matches the cast Continuation.resume uses.
+      throw error as! Failure
     }
-
-    return try await _wait(context: context)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
-  }
-
-  @export(implementation)
-  nonisolated(nonsending) static func _wait(
-    context: Builtin.RawUnsafeContinuation,
-    onCancel handleCancellation: sending (UInt8) -> Void
-  ) async throws(Failure) -> sending Success {
-    #if $BuiltinCancellationHandlerWithReason
-    let cancellationRecord = unsafe Builtin.taskAddCancellationHandlerWithReason(
-      handler: handleCancellation)
-    defer { unsafe Builtin.taskRemoveCancellationHandler(record: cancellationRecord) }
-
-    return try await _wait(context: context)
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
-  }
-
-  @export(implementation)
-  nonisolated(nonsending) static func _wait(
-    context: Builtin.RawUnsafeContinuation,
-    onPriorityEscalated handlePriorityEscalation:
-      @Sendable (UInt8, UInt8) -> Void
-  ) async throws(Failure) -> sending Success {
-    #if $BuiltinConcurrencyStackNesting
-    let escalationRecord = unsafe Builtin.taskAddPriorityEscalationHandler(
-      handler: handlePriorityEscalation)
-    defer {
-      unsafe Builtin.taskRemovePriorityEscalationHandler(record: escalationRecord)
-    }
-
-    return try await _wait(context: context)
     #else
     fatalError("Swift compiler is incompatible with this SDK version")
     #endif

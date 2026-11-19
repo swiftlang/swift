@@ -273,7 +273,7 @@ actor Elsewhere {
 
     // MARK: - Handlers installed on the await.
 
-    tests.test("only the inline escalation call runs when nothing happens") {
+    tests.test("no handler runs when the continuation was already resumed") {
       let cancelled = Box(false)
       let escalations = Box<[[TaskPriority]]>([])
       let value = await withContinuation(of: Int.self, throwing: Never.self) {
@@ -285,11 +285,9 @@ actor Elsewhere {
           onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
       }
       expectEqual(5, value)
+      // The wait doesn't suspend, so neither handler runs.
       expectFalse(cancelled.value)
-      // The escalation handler is always called once, with the current
-      // priority, even if the continuation was already resumed.
-      let current = Task.currentPriority
-      expectEqual([[current, current]], escalations.value)
+      expectEqual([], escalations.value)
     }
 
     tests.test("cancellation handler runs once while suspended and can resume") {
@@ -387,12 +385,15 @@ actor Elsewhere {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
            waiter: consuming ContinuationWaiter<Int, Never>) in
-          continuation.resume(returning: 22)
-          return await waiter.wait(onCancel: { reason.value = $0 })
+          let holder = ContinuationHolder(continuation)
+          return await waiter.wait(onCancel: {
+            reason.value = $0
+            holder.resumeFromDetachedTask(returning: 22, executorPreference: executor)
+          })
         }
       }
       task.cancel(reason: .deadlineExpired)
-      executor.runNextJob()
+      executor.runNextJobs(count: 3)
       expectEqual(22, await task.value)
       expectEqual(.deadlineExpired, reason.value)
     }
@@ -649,14 +650,17 @@ actor Elsewhere {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
            waiter: consuming ContinuationWaiter<Int, Never>) in
-          continuation.resume(returning: 1)
+          let holder = ContinuationHolder(continuation)
           return await waiter.wait(
             onCancel: { _ in },
-            onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
+            onPriorityEscalated: { old, new in
+              escalations.modify { $0.append([old, new]) }
+              holder.resumeFromDetachedTask(returning: 1, executorPreference: executor)
+            })
         }
       }
       task.escalatePriority(to: .medium)
-      executor.runNextJob()
+      executor.runNextJobs(count: 3)
       expectEqual(1, await task.value)
       expectEqual(1, escalations.value.count)
       expectEqual(escalations.value.first?[0], escalations.value.first?[1])
@@ -669,13 +673,16 @@ actor Elsewhere {
         await withContinuation(of: Int.self, throwing: Never.self) {
           (continuation: consuming Continuation<Int, Never>,
            waiter: consuming ContinuationWaiter<Int, Never>) in
-          continuation.resume(returning: 2)
+          let holder = ContinuationHolder(continuation)
           return await waiter.wait(
-            onPriorityEscalated: { old, new in escalations.modify { $0.append([old, new]) } })
+            onPriorityEscalated: { old, new in
+              escalations.modify { $0.append([old, new]) }
+              holder.resumeFromDetachedTask(returning: 2, executorPreference: executor)
+            })
         }
       }
       task.escalatePriority(to: .medium)
-      executor.runNextJob()
+      executor.runNextJobs(count: 3)
       expectEqual(2, await task.value)
       expectEqual(1, escalations.value.count)
       expectEqual(escalations.value.first?[0], escalations.value.first?[1])

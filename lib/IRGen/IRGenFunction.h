@@ -236,6 +236,7 @@ public:
                                            llvm::Value *error);
 
   void emitAwaitSplitContinuation(llvm::Value *continuation,
+                                     ArrayRef<llvm::Value *> handlers,
                                      Address resumeBuffer,
                                      SILType resumeTy,
                                      llvm::BasicBlock *normalBB,

@@ -576,12 +576,18 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
 /// awaitSplitThrowingContinuation<T> :
-///   (Builtin.RawUnsafeContinuation) async throws -> sending T
+///   (Builtin.RawUnsafeContinuation, (UInt8) -> (), (UInt8, UInt8) -> (),
+///    Builtin.Word) async throws -> sending T
 ///
 /// Await a *split* continuation (created by createSplitContinuation and
 /// possibly resumed from another function/thread), binding the resume-point to
 /// the current function. Returns a value of type T, or throws an error, when the
 /// continuation is resumed.
+///
+/// The cancellation and priority escalation handlers are installed for the
+/// duration of the suspension. The word parameter selects which of them are
+/// used, with the bits of SplitContinuationAwaitHandlers in Concurrency.h. This
+/// word is needed since we can't express optional non-escaping closures.
 BUILTIN_SIL_OPERATION(AwaitSplitThrowingContinuation, "awaitSplitThrowingContinuation", Special)
 
 /// Force the current task to be rescheduled on the specified actor.
