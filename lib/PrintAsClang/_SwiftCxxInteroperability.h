@@ -113,6 +113,11 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
+// A bridge object is not necessarily a valid pointer, e.g. a small String.
+extern "C" void *_Nullable swift_bridgeObjectRetain(void *_Nullable) noexcept;
+
+extern "C" void swift_bridgeObjectRelease(void *_Nullable) noexcept;
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
 
