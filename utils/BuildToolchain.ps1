@@ -54,6 +54,9 @@ With -Mode Bootstrap:
 - Stage1: the Stage1 compilers and the bootstrap macros.
 Otherwise:
 - CMark: CMark, which the compilers and the documentation tools use.
+- LLVM: lld, LTO and dsymutil, with most of the LLVM libraries, in the build
+  tree of the Stage2 compilers. Unlike the rest of the compilers, they do not
+  need the SDK. This step only runs when requested, before Compilers.
 - Compilers: the Stage2 compilers.
 - CompilerRuntime: compiler-rt for the SDK architectures.
 - Macros: the Foundation and Testing macros.
@@ -185,7 +188,7 @@ if ($ConfigureSteps.Length -eq 1) { $ConfigureSteps = $ConfigureSteps[0].Split("
 $KnownSteps = if ($Mode -eq "Bootstrap") {
   @("BuildTools", "EarlySwiftDriver", "Stage1")
 } else {
-  @("CMark", "Compilers", "CompilerRuntime", "Macros", "Tools", "Format", "PackageManager", "Finish")
+  @("CMark", "LLVM", "Compilers", "CompilerRuntime", "Macros", "Tools", "Format", "PackageManager", "Finish")
 }
 foreach ($Step in $Steps) {
   if ($Step -notin $KnownSteps) {
@@ -572,7 +575,8 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $ToolchainRoot    = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant",
                          [string]    $RuntimeLocation  = $null,
                          [string]    $DispatchPackage  = $null,
-                         [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
+                         [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake",
+                         [string[]]  $BuildTargets     = @("install-distribution")) {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
   Invoke-IsolatingEnvVars {
@@ -587,12 +591,12 @@ function Build-Compilers([Hashtable] $Platform,
       -CXXCompiler $CXXCompiler `
       -SwiftCompiler $SwiftCompiler `
       -SwiftSDK $SwiftSDK `
-      -BuildTargets @("install-distribution") `
+      -BuildTargets $BuildTargets `
       -CacheScript $CacheScript `
       -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
   }
 
-  if ($CMakeMode -eq "Configure") { return }
+  if ($CMakeMode -eq "Configure" -or $BuildTargets -notcontains "install-distribution") { return }
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
     Copy-WindowsRuntimeToToolchain $Platform $ToolchainRoot $RuntimeLocation
@@ -1839,11 +1843,27 @@ function Invoke-Steps {
     # Stage2 build tree.
     $HostSwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS
     $Stage2SwiftSyntax = Get-ProjectCMakeModules $HostPlatform Stage2Compilers
+    $Stage2Args = @{
+      Assembler       = $Assemblers.Stage1;
+      CCompiler       = $Compilers.Stage1.C;
+      CXXCompiler     = $Compilers.Stage1.CXX;
+      SwiftCompiler   = $Compilers.Stage1.Swift;
+      SwiftSDK        = $HostSwiftSDK;
+      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
+    }
 
     # ── CMark ───────────────────────────────────────────────────────────────
     # The compilers and the documentation tools use it.
     if (Test-Step "CMark") {
       Invoke-BuildStep Build-CMark $HostPlatform
+    }
+
+    # ── Stage2 LLVM ─────────────────────────────────────────────────────────
+    # What the compilers build without the SDK, in their build tree.
+    if (Test-Step "LLVM") {
+      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/LLVM" ($Stage2Args + @{
+        BuildTargets = @("lld", "LTO", "dsymutil");
+      })
     }
 
     # ── Stage2 Compiler ─────────────────────────────────────────────────────
@@ -1854,14 +1874,7 @@ function Invoke-Steps {
       Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
       $script:CMakeMode = $CompilersMode
 
-      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
-        Assembler       = $Assemblers.Stage1;
-        CCompiler       = $Compilers.Stage1.C;
-        CXXCompiler     = $Compilers.Stage1.CXX;
-        SwiftCompiler   = $Compilers.Stage1.Swift;
-        SwiftSDK        = $HostSwiftSDK;
-        DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
-      }
+      Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" $Stage2Args
       if ($CMakeMode -ne "Configure") {
         Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
       }
@@ -1994,7 +2007,7 @@ if ($ConfigureSteps) {
   Invoke-Steps
 }
 if ($Steps -or -not $ConfigureSteps) {
-  $ActiveSteps = if ($Steps) { $Steps } else { $KnownSteps }
+  $ActiveSteps = if ($Steps) { $Steps } else { $KnownSteps | Where-Object { $_ -ne "LLVM" } }
   $CMakeMode = if ($Configured) { "Build" } else { "All" }
   Invoke-Steps
 }

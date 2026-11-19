@@ -192,7 +192,7 @@ function ConvertTo-CommandLineArgument([string] $Argument) {
 }
 
 # Starts one of the build scripts in the background.
-function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal) {
+function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal, [switch] $Idle) {
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Starting $Name in the background: $Script $Arguments"
 
@@ -202,7 +202,7 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
   $Batch = "$JobLogs\$Name.cmd"
   [IO.File]::WriteAllLines($Batch, @(
     "@echo off",
-    "start `"`" /b /wait $(if ($BelowNormal) { "/belownormal" }) $(($CommandLine | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " ") > `"$Log`" 2>&1",
+    "start `"`" /b /wait $(if ($BelowNormal) { "/belownormal" } elseif ($Idle) { "/low" }) $(($CommandLine | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " ") > `"$Log`" 2>&1",
     "exit /b %errorlevel%"
   ))
   # The script writes its timings there, as with Invoke-BuildScript.
@@ -300,7 +300,7 @@ $ToolchainOverrides = @{
 # -Background. The projects of -ConfigureSteps are configured first, and with
 # -Configured, the projects of -Steps that are configured are not configured
 # again.
-function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $ConfigureSteps = @(), [switch] $Configured, [switch] $Background) {
+function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $ConfigureSteps = @(), [switch] $Configured, [switch] $Background, [switch] $Idle) {
   $Name = "BuildToolchain$(if ($Mode) { "-$Mode" })$(if ($ConfigureSteps -and -not $Steps) { "-Configure-$($ConfigureSteps -join "-")" })$(if ($Steps) { "-$($Steps -join "-")" })"
   $Overrides = $ToolchainOverrides + @{
     Mode = $Mode;
@@ -309,7 +309,7 @@ function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $Co
     Configured = $Configured;
   }
   if ($Background) {
-    return Start-BuildJob $Name BuildToolchain.ps1 $Overrides
+    return Start-BuildJob $Name BuildToolchain.ps1 $Overrides -Idle:$Idle
   }
   Invoke-BuildScript $Name BuildToolchain.ps1 $Parameters $Overrides
 }
@@ -404,8 +404,11 @@ if ($SelectedWindowsSDKArchitectures -contains $HostSDKArchitecture) {
 }
 
 # The Stage2 compilers only need the C libdispatch of the SDK of the host to be
-# configured, so they are configured while the rest of the SDK builds.
+# configured, so they are configured while the rest of the SDK builds. Then
+# what they build without the SDK builds at the lowest priority, with the
+# processors that the SDKs leave when they compile one Swift module at a time.
 $Stage2ConfigureJob = $null
+$LLVMJob = $null
 if ($HostSDKOverrides) {
   if ($Toolchain) {
     Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture-CDispatch" BuildSDK.ps1 $Parameters ($HostSDKOverrides + @{
@@ -413,8 +416,13 @@ if ($HostSDKOverrides) {
     })
     Invoke-ToolchainSteps "" CMark
     $Stage2ConfigureJob = Invoke-ToolchainSteps "" -ConfigureSteps Compilers -Background
+    $HostSDKJob = Start-BuildJob "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $HostSDKOverrides
+    Wait-BuildJobs @($Stage2ConfigureJob)
+    $LLVMJob = Invoke-ToolchainSteps "" LLVM -Configured -Background -Idle
+    Wait-BuildJobs @($HostSDKJob)
+  } else {
+    Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters $HostSDKOverrides
   }
-  Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters $HostSDKOverrides
 }
 
 if ($Toolchain) {
@@ -427,13 +435,15 @@ if ($Toolchain) {
   # configured. They then build without being configured again. The other
   # tools need the projects that they use to be built: CMake checks that their
   # module directories exist.
-  if ($Stage2ConfigureJob) {
-    Wait-BuildJobs @($Stage2ConfigureJob)
-  } else {
+  if (-not $Stage2ConfigureJob) {
     Invoke-ToolchainSteps "" CMark
     Invoke-ToolchainSteps "" -ConfigureSteps Compilers
   }
   $ToolsJob = Invoke-ToolchainSteps "" Tools -ConfigureSteps Macros -Configured -Background
+  # The rest of the Stage2 compilers builds in the build tree of the LLVM job.
+  if ($LLVMJob) {
+    Wait-BuildJobs @($LLVMJob)
+  }
 
   # The Stage2 compilers have enough work to use all the processors, so they
   # build at the lowest priority. Otherwise the tools and the SDKs, which build
