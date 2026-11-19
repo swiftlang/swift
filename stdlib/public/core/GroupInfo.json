@@ -208,6 +208,7 @@
     "UnsafeRawBufferPointer.swift"
   ],
   "Span": [
+    "InputRawSpan.swift",
     "InputSpan.swift",
     "MutableRawSpan.swift",
     "MutableSpan.swift",
