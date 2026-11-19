@@ -142,16 +142,16 @@ public struct WrapOverloadedInits {
 // CHECK-NOT: WrapOverloadedInits init(
 
 // CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) noexcept {
-// CHECK-NEXT: return _impl::_impl_BaseClass::makeRetained(Init::_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_BaseClass::makeRetained(Init::_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
 
 // CHECK: DerivedClass DerivedClass::init(swift::Int x, swift::Int y) noexcept {
 // CHECK-NEXT: _impl::_impl_DerivedClass::makeRetained(Init::_impl::$s4Init12DerivedClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClass>::getTypeMetadata()));
 
 // CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) noexcept {
-// CHECK-NEXT: return _impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
 
 // CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) noexcept {
-// CHECK-NEXT: return _impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
 
 
 // CHECK:      SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const noexcept {
