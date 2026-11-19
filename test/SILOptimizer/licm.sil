@@ -1850,6 +1850,35 @@ bb3:
   return %r : $()
 }
 
+// Don't hoist a `load_borrow` over the scope of another `load_borrow` of the same memory location.
+// This would create a borrow scope which spans the whole loop.
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow_over_other_load_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    fix_lifetime
+// CHECK-NEXT:    end_borrow
+// CHECK:       } // end sil function 'dont_hoist_load_borrow_over_other_load_borrow'
+sil [ossa] @dont_hoist_load_borrow_over_other_load_borrow : $@convention(thin) (@inout Builtin.NativeObject) -> () {
+bb0(%0 : $*Builtin.NativeObject):
+  br bb1
+bb1:
+  %2 = load_borrow %0
+  fix_lifetime %2
+  end_borrow %2
+  %5 = load_borrow %0
+  fix_lifetime %5
+  end_borrow %5
+  cond_br undef, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow :
 // CHECK:       bb1:
 // CHECK-NEXT:    copy_addr
@@ -1875,6 +1904,132 @@ bb2:
 bb3:
   dealloc_stack %1
   %r = tuple()
+  return %r : $()
+}
+
+class ClassWithObjects {
+  var o1: Builtin.NativeObject
+  var o2: Builtin.NativeObject
+}
+
+// The end_borrows of the load_borrows must not prevent hoisting the access scopes.
+// CHECK-LABEL: sil [ossa] @hoist_access_with_load_borrow_ending_after_end_access :
+// CHECK:       bb0(%0 : @guaranteed $ClassWithObjects):
+// CHECK:         [[R1:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+// CHECK:         [[R2:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o2
+// CHECK:         [[A1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R1]]
+// CHECK-NEXT:    [[B1:%.*]] = load_borrow [[A1]]
+// CHECK-NEXT:    [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[R2]]
+// CHECK-NEXT:    [[B2:%.*]] = load_borrow [[A2]]
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime [[B1]]
+// CHECK-NEXT:    fix_lifetime [[B2]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B2]]
+// CHECK-NEXT:    end_access [[A2]]
+// CHECK-NEXT:    end_borrow [[B1]]
+// CHECK-NEXT:    end_access [[A1]]
+// CHECK:       } // end sil function 'hoist_access_with_load_borrow_ending_after_end_access'
+sil [ossa] @hoist_access_with_load_borrow_ending_after_end_access : $@convention(thin) (@guaranteed ClassWithObjects) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects):
+  %1 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  %2 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o2
+  br bb1
+
+bb1:
+  %4 = begin_access [read] [dynamic] [no_nested_conflict] %1
+  %5 = load_borrow %4
+  end_access %4
+  fix_lifetime %5
+  end_borrow %5
+  %8 = begin_access [read] [dynamic] [no_nested_conflict] %2
+  %9 = load_borrow %8
+  end_access %8
+  fix_lifetime %9
+  end_borrow %9
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Same for a modify access scope.
+// CHECK-LABEL: sil [ossa] @hoist_modify_access_with_load_borrow_ending_after_end_access :
+// CHECK:       bb0(%0 : @guaranteed $ClassWithObjects):
+// CHECK:         [[R:%.*]] = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+// CHECK:         [[A:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[R]]
+// CHECK-NEXT:    [[B:%.*]] = load_borrow [[A]]
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'hoist_modify_access_with_load_borrow_ending_after_end_access'
+sil [ossa] @hoist_modify_access_with_load_borrow_ending_after_end_access : $@convention(thin) (@guaranteed ClassWithObjects) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects):
+  %1 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  br bb1
+
+bb1:
+  %3 = begin_access [modify] [dynamic] [no_nested_conflict] %1
+  %4 = load_borrow %3
+  end_access %3
+  fix_lifetime %4
+  end_borrow %4
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The end_borrow of a (non-hoistable) load_borrow which begins before the access scope doesn't prevent
+// hoisting the scope, because the whole borrow scope is then inside the extended access scope.
+// CHECK-LABEL: sil [ossa] @hoist_access_with_load_borrow_beginning_before_begin_access :
+// CHECK:       bb0(%0 : @guaranteed $ClassWithObjects, %1 : $Builtin.RawPointer):
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] [no_nested_conflict]
+// CHECK:       bb1(%{{.*}} : $Builtin.RawPointer):
+// CHECK-NEXT:    pointer_to_address
+// CHECK-NEXT:    [[OB:%.*]] = load_borrow
+// CHECK-NEXT:    [[B:%.*]] = load_borrow [[A]]
+// CHECK-NEXT:    fix_lifetime [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    fix_lifetime [[OB]]
+// CHECK-NEXT:    end_borrow [[OB]]
+// CHECK:       bb3:
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'hoist_access_with_load_borrow_beginning_before_begin_access'
+sil [ossa] @hoist_access_with_load_borrow_beginning_before_begin_access : $@convention(thin) (@guaranteed ClassWithObjects, Builtin.RawPointer) -> () {
+bb0(%0 : @guaranteed $ClassWithObjects, %1 : $Builtin.RawPointer):
+  %2 = ref_element_addr %0 : $ClassWithObjects, #ClassWithObjects.o1
+  br bb1(%1)
+
+bb1(%4 : $Builtin.RawPointer):
+  %5 = pointer_to_address %4 to $*Builtin.NativeObject
+  %6 = load_borrow %5
+  %7 = begin_access [read] [dynamic] [no_nested_conflict] %2
+  %8 = load_borrow %7
+  end_access %7
+  fix_lifetime %8
+  end_borrow %8
+  fix_lifetime %6
+  end_borrow %6
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%4)
+
+bb3:
+  %r = tuple ()
   return %r : $()
 }
 
@@ -2148,10 +2303,19 @@ bb3:
   return %r
 }
 
+// A load of a trivial field after a split `load [take]` gets the field from the re-constructed value.
 // CHECK-LABEL: sil [ossa] @projected_load_take :
-// CHECK:       bb1:
-// CHECK:         load [take]
-// CHECK:         store
+// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
+// CHECK:         ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[V]]
+// CHECK:         ([[I:%.*]], [[STR:%.*]]) = destructure_struct [[T0]]
+// CHECK:         [[RS:%.*]] = struct $S ([[I]] : $Int, undef : $String)
+// CHECK:         [[RT:%.*]] = tuple ([[RS]] : $S, [[T1]] : $Int)
+// CHECK:         [[B:%.*]] = begin_borrow [[RT]]
+// CHECK:         [[TE:%.*]] = tuple_extract [[B]] : $(S, Int), 0
+// CHECK:         [[SE:%.*]] = struct_extract [[TE]] : $S, #S.i
+// CHECK:         struct $S ([[SE]] : $Int, [[STR]] : $String)
+// CHECK:       bb3:
+// CHECK:         store {{%.*}} to [init] %0
 // CHECK-LABEL: } // end sil function 'projected_load_take'
 sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
 bb0(%0 : $*(S, Int), %1 : $Int):
@@ -2203,9 +2367,17 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
-// CHECK:       bb1:
-// CHECK:         load [copy]
-// CHECK:         load [take]
+// CHECK:       bb0(%0 : $*S, %1 : $Int):
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         br bb1([[L]] : $S)
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK:         [[B:%.*]] = begin_borrow [[V]]
+// CHECK:         [[E:%.*]] = struct_extract [[B]] : $S, #S.s
+// CHECK:         copy_value [[E]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         destructure_struct [[V]]
+// CHECK:       bb3:
+// CHECK:         store {{%.*}} to [init] %0
 // CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
 sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
 bb0(%0 : $*S, %1 : $Int):
@@ -2228,10 +2400,114 @@ bb3:
   return %r
 }
 
-// Just check that LICM doesn't produce invalid SIL.
-// CHECK-LABEL: sil [ossa] @partial_load_take_is_not_supported :
-// CHECK-LABEL: } // end sil function 'partial_load_take_is_not_supported'
-sil [ossa] @partial_load_take_is_not_supported : $@convention(thin) (@inout S2, Int) -> () {
+// CHECK-LABEL: sil [ossa] @load_borrow_and_store :
+// CHECK:       bb0(%0 : $*S):
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         br bb1([[L]] : $S)
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NOT:     load_borrow
+// CHECK:         [[B:%.*]] = begin_borrow [[V]]
+// CHECK:         fix_lifetime [[B]]
+// CHECK:         end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:       bb3:
+// CHECK:         store {{%.*}} to [init] %0
+// CHECK-LABEL: } // end sil function 'load_borrow_and_store'
+sil [ossa] @load_borrow_and_store : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %1 = load_borrow %0
+  fix_lifetime %1
+  end_borrow %1
+  %3 = load [take] %0
+  %4 = move_value %3
+  store %4 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// The pattern of a `Array` stored in a class property and modified in a loop.
+// CHECK-LABEL: sil [ossa] @projected_load_borrow_and_split_take :
+// CHECK:       bb0(%0 : $*S, %1 : $Int):
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         br bb1([[L]] : $S)
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK-NOT:     load_borrow
+// CHECK:         [[B:%.*]] = begin_borrow [[V]]
+// CHECK:         [[E:%.*]] = struct_extract [[B]] : $S, #S.s
+// CHECK:         fix_lifetime [[E]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         ({{%.*}}, [[F:%.*]]) = destructure_struct [[V]]
+// CHECK:         struct $S (%1 : $Int, [[F]] : $String)
+// CHECK:       bb3:
+// CHECK:         store {{%.*}} to [init] %0
+// CHECK-LABEL: } // end sil function 'projected_load_borrow_and_split_take'
+sil [ossa] @projected_load_borrow_and_split_take : $@convention(thin) (@inout S, Int) -> () {
+bb0(%0 : $*S, %1 : $Int):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S.s
+  %3 = load_borrow %2
+  fix_lifetime %3
+  end_borrow %3
+  %6 = load [take] %2
+  %7 = struct $S (%1, %6)
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_scope_ends_outside_loop :
+// CHECK:       bb1:
+// CHECK:         load [take]
+// CHECK:         store
+// CHECK:         load_borrow
+// CHECK-LABEL: } // end sil function 'load_borrow_scope_ends_outside_loop'
+sil [ossa] @load_borrow_scope_ends_outside_loop : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  br bb1
+
+bb1:
+  %1 = load [take] %0
+  %2 = move_value %1
+  store %2 to [init] %0
+  %4 = load_borrow %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  end_borrow %4
+  br bb1
+
+bb3:
+  fix_lifetime %4
+  end_borrow %4
+  %r = tuple ()
+  return %r
+}
+
+// Split `load [take]`s of different fields are not supported.
+// CHECK-LABEL: sil [ossa] @two_split_load_takes :
+// CHECK:       bb1:
+// CHECK:         load [take]
+// CHECK:         load [take]
+// CHECK:         store
+// CHECK-LABEL: } // end sil function 'two_split_load_takes'
+sil [ossa] @two_split_load_takes : $@convention(thin) (@inout S2, Int) -> () {
 bb0(%0 : $*S2, %1 : $Int):
   br bb1
 
@@ -2248,6 +2524,83 @@ bb2:
   br bb1
 
 bb3:
+  %r = tuple ()
+  return %r
+}
+
+// A `load [take]` of the whole value on one path and a split `load [take]` on another path.
+// CHECK-LABEL: sil [ossa] @full_and_split_load_take :
+// CHECK:       bb1([[V:%.*]] : @owned $S):
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK-NEXT:    br bb4
+// CHECK:       bb3:
+// CHECK:         ({{%.*}}, [[STR:%.*]]) = destructure_struct [[V]]
+// CHECK:         destroy_value [[STR]]
+// CHECK-NEXT:    br bb4
+// CHECK:       bb4:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %1
+// CHECK:       bb6:
+// CHECK-NEXT:    store [[C]] to [init] %0
+// CHECK-LABEL: } // end sil function 'full_and_split_load_take'
+sil [ossa] @full_and_split_load_take : $@convention(thin) (@inout S, @guaranteed S) -> () {
+bb0(%0 : $*S, %1 : @guaranteed $S):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %3 = load [take] %0
+  destroy_value %3
+  br bb4
+
+bb3:
+  %6 = struct_element_addr %0, #S.s
+  %7 = load [take] %6
+  destroy_value %7
+  br bb4
+
+bb4:
+  %10 = copy_value %1
+  store %10 to [init] %0
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %r = tuple ()
+  return %r
+}
+
+// Load-store promotion bails because the `alloc_stack` destination is not cloned to the pre-header.
+// Check that no placeholders for the `load [take]` are left over.
+// CHECK-LABEL: sil [ossa] @load_take_from_alloc_stack :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[L:%.*]] = load [take] %1
+// CHECK-NEXT:    [[M:%.*]] = move_value [[L]]
+// CHECK-NEXT:    store [[M]] to [init] %1
+// CHECK-NOT:     mark_dependence
+// CHECK-LABEL: } // end sil function 'load_take_from_alloc_stack'
+sil [ossa] @load_take_from_alloc_stack : $@convention(thin) (@owned S) -> () {
+bb0(%0 : @owned $S):
+  %1 = alloc_stack $S
+  store %0 to [init] %1
+  br bb1
+
+bb1:
+  %3 = load [take] %1
+  %4 = move_value %3
+  store %4 to [init] %1
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_addr %1
+  dealloc_stack %1
   %r = tuple ()
   return %r
 }
