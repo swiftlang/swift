@@ -355,7 +355,7 @@ public:
     return getValueWitnesses()->getTypeLayout();
   }
 
-  void setValueWitnesses(const ValueWitnessTable *table) {
+  void setValueWitnesses(const TargetValueWitnessTable<Runtime> *table) {
     asFullMetadata(this)->ValueWitnesses = table;
   }
 
@@ -657,8 +657,9 @@ template<typename Runtime> struct TargetMethodDescriptor;
 
 template<typename Runtime>
 using TargetRelativeMethodDescriptorPointer =
-  RelativeIndirectablePointer<const TargetMethodDescriptor<Runtime>,
-                              /*nullable*/ true>;
+  TargetRelativeIndirectablePointer<Runtime,
+                                    const TargetMethodDescriptor<Runtime>,
+                                    /*nullable*/ true>;
 
 using RelativeMethodDescriptorPointer =
   TargetRelativeMethodDescriptorPointer<InProcess>;
@@ -667,8 +668,9 @@ template<typename Runtime> struct TargetProtocolRequirement;
 
 template<typename Runtime>
 using TargetRelativeProtocolRequirementPointer =
-  RelativeIndirectablePointer<const TargetProtocolRequirement<Runtime>,
-                              /*nullable*/ true>;
+  TargetRelativeIndirectablePointer<Runtime,
+                                    const TargetProtocolRequirement<Runtime>,
+                                    /*nullable*/ true>;
 
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
@@ -1922,8 +1924,9 @@ using AssociatedWitnessTableAccessFunction =
 
 template<typename Runtime>
 using TargetRelativeProtocolConformanceDescriptorPointer =
-  RelativeIndirectablePointer<const TargetProtocolConformanceDescriptor<Runtime>,
-                              /*nullable*/ false>;
+  TargetRelativeIndirectablePointer<
+      Runtime, const TargetProtocolConformanceDescriptor<Runtime>,
+      /*nullable*/ false>;
 
 /// A relative witness table for a protocol.
 ///
@@ -2756,7 +2759,7 @@ struct TargetGenericWitnessTable {
   /// Private data for the instantiator.  Out-of-line so that the rest
   /// of this structure can be constant. Might be null when building with
   /// -disable-preallocated-instantiation-caches.
-  RelativeDirectPointer<PrivateDataType> PrivateData;
+  TargetRelativeDirectPointer<Runtime, PrivateDataType> PrivateData;
 
   uint16_t getWitnessTablePrivateSizeInWords() const {
     return WitnessTablePrivateSizeInWordsAndRequiresInstantiation >> 1;
@@ -2779,14 +2782,17 @@ struct TargetTypeMetadataRecord {
 private:
   union {
     /// A direct reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetContextDescriptor<Runtime>,
-                                 TypeReferenceKind>
-      DirectNominalTypeDescriptor;
+    TargetRelativeDirectPointerIntPair<
+        Runtime, TargetContextDescriptor<Runtime>, TypeReferenceKind>
+        DirectNominalTypeDescriptor;
 
     /// An indirect reference to a nominal type descriptor.
-    RelativeDirectPointerIntPair<TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>,
-                                 TypeReferenceKind>
-      IndirectNominalTypeDescriptor;
+    TargetRelativeDirectPointerIntPair<
+        Runtime,
+        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> *
+                                         __ptrauth_swift_type_descriptor>,
+        TypeReferenceKind>
+        IndirectNominalTypeDescriptor;
 
     // We only allow a subset of the TypeReferenceKinds here.
     // Should we just acknowledge that this is a different enum?
@@ -2852,11 +2858,11 @@ private:
 
 public:
   /// The type of the global actor.
-  RelativeDirectPointer<const char, /*nullable*/ false> type;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> type;
 
   /// The conformance of the global actor to the GlobalActor protocol.
-  RelativeIndirectablePointer<
-      const TargetProtocolConformanceDescriptor<Runtime>,
+  TargetRelativeIndirectablePointer<
+      Runtime, const TargetProtocolConformanceDescriptor<Runtime>,
       /*nullable*/ false,
       /*offset*/ int32_t,
       /*indirect type*/ SignedDescriptorPointer>
@@ -2913,7 +2919,8 @@ private:
   TargetTypeReference<Runtime> TypeRef;
 
   /// The witness table pattern, which may also serve as the witness table.
-  RelativeDirectPointer<const TargetWitnessTable<Runtime>> WitnessTablePattern;
+  TargetRelativeDirectPointer<Runtime, const TargetWitnessTable<Runtime>>
+      WitnessTablePattern;
 
   /// Various flags, including the kind of conformance.
   ConformanceFlags Flags;
@@ -3024,8 +3031,7 @@ public:
         numTrailingObjects(OverloadToken<ResilientWitness>()));
   }
 
-  ConstTargetPointer<Runtime, GenericWitnessTable>
-  getGenericWitnessTable() const {
+  const GenericWitnessTable *getGenericWitnessTable() const {
     if (!Flags.hasGenericWitnessTable())
       return nullptr;
 
@@ -3433,7 +3439,8 @@ public:
 
   /// Associated type names, as a space-separated list in the same order
   /// as the requirements.
-  RelativeDirectPointer<const char, /*Nullable=*/true> AssociatedTypeNames;
+  TargetRelativeDirectPointer<Runtime, const char, /*Nullable=*/true>
+      AssociatedTypeNames;
 
   ProtocolContextDescriptorFlags getProtocolContextDescriptorFlags() const {
     return ProtocolContextDescriptorFlags(this->Flags.getKindSpecificFlags());
@@ -3498,17 +3505,18 @@ template <typename Runtime>
 struct swift_ptrauth_struct_context_descriptor(OpaqueTypeDescriptor)
     TargetOpaqueTypeDescriptor final
     : TargetContextDescriptor<Runtime>,
-    TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                  TargetGenericContextDescriptorHeader,
-                                  RelativeDirectPointer<const char>,
-                                  InvertibleProtocolSet>
-{
+      TrailingGenericContextObjects<
+          TargetOpaqueTypeDescriptor<Runtime>,
+          TargetGenericContextDescriptorHeader,
+          TargetRelativeDirectPointer<Runtime, const char>,
+          InvertibleProtocolSet> {
 private:
   using TrailingGenericContextObjects =
-      swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
-                                           TargetGenericContextDescriptorHeader,
-                                           RelativeDirectPointer<const char>,
-                                           InvertibleProtocolSet>;
+      swift::TrailingGenericContextObjects<
+            TargetOpaqueTypeDescriptor<Runtime>,
+            TargetGenericContextDescriptorHeader,
+            TargetRelativeDirectPointer<Runtime, const char>,
+            InvertibleProtocolSet>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3529,15 +3537,16 @@ public:
   }
   
   using TrailingGenericContextObjects::numTrailingObjects;
-  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char>>) const {
+  size_t numTrailingObjects(
+      OverloadToken<TargetRelativeDirectPointer<Runtime, const char>>) const {
     return getNumUnderlyingTypeArguments();
   }
-  
-  const RelativeDirectPointer<const char> &
+
+  const TargetRelativeDirectPointer<Runtime, const char> &
   getUnderlyingTypeArgumentMangledName(unsigned i) const {
     assert(i < getNumUnderlyingTypeArguments());
-    return (this
-         ->template getTrailingObjects<RelativeDirectPointer<const char>>())[i];
+    return (this->template getTrailingObjects<
+            TargetRelativeDirectPointer<Runtime, const char>>())[i];
   }
 
   llvm::StringRef getUnderlyingTypeArgument(unsigned i) const {
@@ -3752,6 +3761,8 @@ struct TargetGenericClassMetadataPattern final :
   friend TrailingObjects;
 
   using TargetGenericMetadataPattern<Runtime>::PatternFlags;
+  using GenericMetadataPartialPattern =
+      TargetGenericMetadataPartialPattern<Runtime>;
 
   /// The heap-destructor function.
   TargetCompactFunctionPointer<Runtime, HeapObjectDestroyer> Destroy;
@@ -4819,11 +4830,11 @@ public:
   }
 
   TargetMetadata<Runtime> *getSingletonMetadata() const {
-    if (!this->hasSingletonMetadataInitialization())
+    if (!this->hasSingletonMetadataPointer())
       return nullptr;
 
     auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
-    return box->token.get();
+    return box->metadata.get();
   }
 
   /// Retrieve the set of protocols that are inverted by this type's
@@ -4992,11 +5003,11 @@ public:
   }
 
   TargetMetadata<Runtime> *getSingletonMetadata() const {
-    if (!this->hasSingletonMetadataInitialization())
+    if (!this->hasSingletonMetadataPointer())
       return nullptr;
 
     auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
-    return box->token.get();
+    return box->metadata.get();
   }
 
   /// Retrieve the set of protocols that are inverted by this type's
@@ -5168,11 +5179,11 @@ public:
   }
 
   TargetMetadata<Runtime> *getSingletonMetadata() const {
-    if (!this->hasSingletonMetadataInitialization())
+    if (!this->hasSingletonMetadataPointer())
       return nullptr;
 
     auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
-    return box->token.get();
+    return box->metadata.get();
   }
 
   /// Retrieve the set of protocols that are inverted by this type's
@@ -5495,19 +5506,21 @@ struct TargetAccessibleFunctionRecord {
 public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
-  RelativeDirectPointer<const char, /*nullable*/ false> Name;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
 
   /// The generic environment associated with this accessor function.
-  RelativeDirectPointer<GenericEnvironmentDescriptor, /*nullable*/ true>
+  TargetRelativeDirectPointer<Runtime, GenericEnvironmentDescriptor,
+                              /*nullable*/ true>
       GenericEnvironment;
 
   /// The Swift function type, encoded as a mangled name.
-  RelativeDirectPointer<const char, /*nullable*/ false> FunctionType;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false>
+      FunctionType;
 
   /// The fully-abstracted function to call.
   ///
   /// Could be a sync or async function pointer depending on flags.
-  RelativeDirectPointer<void *, /*nullable*/ false> Function;
+  TargetRelativeDirectPointer<Runtime, void *, /*nullable*/ false> Function;
 
   /// Flags providing more information about the function.
   AccessibleFunctionFlags Flags;

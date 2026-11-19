@@ -140,9 +140,11 @@ public:
     /// The conformance the param is constrained to use.
     ///
     /// Only valid if the requirement has SameConformance kind.
-    RelativeIndirectablePointer<TargetProtocolConformanceDescriptor<Runtime>,
-                                /*nullable*/ false> Conformance;
-    
+    TargetRelativeIndirectablePointer<
+        Runtime, TargetProtocolConformanceDescriptor<Runtime>,
+        /*nullable*/ false>
+        Conformance;
+
     /// The kind of layout constraint.
     ///
     /// Only valid if the requirement has Layout kind.
