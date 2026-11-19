@@ -2798,10 +2798,9 @@ namespace {
     // lifetime-dependence inference from running for it.
     void cacheImmortalLifetime(AbstractFunctionDecl *fd) {
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, fd->getLifetimeDependenceResultIndex(),
-          LifetimeFlags().withImmortalSpecifier().withAnnotated());
-      lifetimeDependencies.push_back(immortalLifetime);
+      lifetimeDependencies.push_back(LifetimeDependenceInfo::getImmortal(
+          fd->getLifetimeDependenceResultIndex(),
+          LifetimeFlags().withAnnotated()));
       Impl.SwiftContext.evaluator.cacheOutput(
           LifetimeDependenceInfoRequest{fd},
           Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
@@ -4959,7 +4958,8 @@ namespace {
 
       auto returnIdx = result->getLifetimeDependenceResultIndex();
 
-      if (inferSelfDependence(decl, result, returnIdx))
+      if (inferSelfDependence(decl, result, returnIdx) ||
+          inferStdOptionalConstructorDependence(Impl, decl, result, returnIdx))
         return;
 
       auto &ASTContext = result->getASTContext();
@@ -4978,9 +4978,8 @@ namespace {
       bool hasThisParam = method && method->isImplicitObjectMemberFunction();
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
-      LifetimeDependenceInfo immortalLifetime(
-          nullptr, nullptr, returnIdx,
-          LifetimeFlags().withImmortalSpecifier().withAnnotated());
+      auto immortalLifetime = LifetimeDependenceInfo::getImmortal(
+          returnIdx, LifetimeFlags().withAnnotated());
       // An independent result ignores 'lifetimebound' and is immortal unless a
       // constructor captures into the object it produces.
       bool resultIsIndependent =
