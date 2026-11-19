@@ -23,6 +23,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace swift;
 using namespace llvm::opt;
@@ -34,7 +35,7 @@ bool ArgsToFrontendOutputsConverter::convert(
 
   std::optional<OutputFilesComputer> ofc = OutputFilesComputer::create(
       Args, Diags, InputsAndOutputs,
-      {"output", options::OPT_o, options::OPT_output_filelist, "-o"});
+      {"output", options::OPT_o, options::OPT_output_filelist, "-o"}, FS);
   if (!ofc)
     return true;
   std::optional<std::vector<std::string>> mains = ofc->computeOutputFiles();
@@ -48,7 +49,8 @@ bool ArgsToFrontendOutputsConverter::convert(
         Args, Diags, InputsAndOutputs,
         {"index unit output path", options::OPT_index_unit_output_path,
          options::OPT_index_unit_output_path_filelist,
-         "-index-unit-output-path"});
+         "-index-unit-output-path"},
+        FS);
     if (!iuofc)
       return true;
     indexMains = iuofc->computeOutputFiles();
@@ -59,8 +61,8 @@ bool ArgsToFrontendOutputsConverter::convert(
   }
 
   std::optional<std::vector<SupplementaryOutputPaths>> supplementaries =
-      SupplementaryOutputPathsComputer(Args, Diags, InputsAndOutputs, *mains,
-                                       ModuleName)
+      SupplementaryOutputPathsComputer(Args, Diags, FS, InputsAndOutputs,
+                                       *mains, ModuleName)
           .computeOutputPaths();
   if (!supplementaries)
     return true;
@@ -74,9 +76,10 @@ bool ArgsToFrontendOutputsConverter::convert(
 
 std::optional<std::vector<std::string>>
 ArgsToFrontendOutputsConverter::readOutputFileList(const StringRef filelistPath,
-                                                   DiagnosticEngine &diags) {
+                                                   DiagnosticEngine &diags,
+                                                   llvm::vfs::FileSystem &fs) {
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer =
-      llvm::MemoryBuffer::getFile(filelistPath);
+      fs.getBufferForFile(filelistPath);
   if (!buffer) {
     diags.diagnose(SourceLoc(), diag::cannot_open_file, filelistPath,
                    buffer.getError().message());
@@ -92,28 +95,33 @@ ArgsToFrontendOutputsConverter::readOutputFileList(const StringRef filelistPath,
 std::optional<std::vector<std::string>>
 OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
     const ArgList &args, DiagnosticEngine &diags, options::ID singleOpt,
-    options::ID filelistOpt) {
+    options::ID filelistOpt, llvm::vfs::FileSystem &fs) {
   if (const Arg *A = args.getLastArg(filelistOpt)) {
     assert(!args.hasArg(singleOpt) &&
            "don't use -o with -output-filelist or -index-unit-output-path with "
            " -index-unit-output-filelist");
     return ArgsToFrontendOutputsConverter::readOutputFileList(A->getValue(),
-                                                              diags);
+                                                              diags, fs);
   }
   return args.getAllArgValues(singleOpt);
 }
 
-std::optional<OutputFilesComputer> OutputFilesComputer::create(
-    const llvm::opt::ArgList &args, DiagnosticEngine &diags,
-    const FrontendInputsAndOutputs &inputsAndOutputs, OutputOptInfo optInfo) {
+std::optional<OutputFilesComputer>
+OutputFilesComputer::create(const llvm::opt::ArgList &args,
+                            DiagnosticEngine &diags,
+                            const FrontendInputsAndOutputs &inputsAndOutputs,
+                            OutputOptInfo optInfo, llvm::vfs::FileSystem &fs) {
   std::optional<std::vector<std::string>> outputArguments =
       getOutputFilenamesFromCommandLineOrFilelist(args, diags, optInfo.SingleID,
-                                                  optInfo.FilelistID);
+                                                  optInfo.FilelistID, fs);
   if (!outputArguments)
     return std::nullopt;
+  auto isDirectory = [&](StringRef path) {
+    auto status = fs.status(path);
+    return status && status->isDirectory();
+  };
   const StringRef outputDirectoryArgument =
-      outputArguments->size() == 1 &&
-              llvm::sys::fs::is_directory(outputArguments->front())
+      outputArguments->size() == 1 && isDirectory(outputArguments->front())
           ? StringRef(outputArguments->front())
           : StringRef();
   ArrayRef<std::string> outputFileArguments =
@@ -250,10 +258,10 @@ OutputFilesComputer::deriveOutputFileFromParts(StringRef dir,
 }
 
 SupplementaryOutputPathsComputer::SupplementaryOutputPathsComputer(
-    const ArgList &args, DiagnosticEngine &diags,
+    const ArgList &args, DiagnosticEngine &diags, llvm::vfs::FileSystem &fs,
     const FrontendInputsAndOutputs &inputsAndOutputs,
     ArrayRef<std::string> outputFiles, StringRef moduleName)
-    : Args(args), Diags(diags), InputsAndOutputs(inputsAndOutputs),
+    : Args(args), Diags(diags), FS(fs), InputsAndOutputs(inputsAndOutputs),
       OutputFiles(outputFiles), ModuleName(moduleName),
       RequestedAction(
           ArgsToFrontendOptionsConverter::determineRequestedAction(Args)) {}
@@ -880,7 +888,7 @@ SupplementaryOutputPathsComputer::readSupplementaryOutputFileMap() const {
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> buffer = nullptr;
   for (unsigned I = 0; I < BadFileDescriptorRetryCount + 1; ++I) {
-    buffer = llvm::MemoryBuffer::getFile(supplementaryFileMapPath);
+    buffer = FS.getBufferForFile(supplementaryFileMapPath);
     if (buffer)
       break;
     if (buffer.getError().value() != EBADF)

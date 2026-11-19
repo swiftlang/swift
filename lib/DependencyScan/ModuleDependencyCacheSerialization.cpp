@@ -1055,12 +1055,13 @@ bool swift::dependencies::module_dependency_cache_serialization::
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
-    readInterModuleDependenciesCache(StringRef path,
-                                     ModuleDependenciesCache &cache,
-                                     llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
+    readInterModuleDependenciesCache(
+        StringRef path, ModuleDependenciesCache &cache,
+        llvm::sys::TimePoint<> &serializedCacheTimeStamp,
+        llvm::vfs::FileSystem &FS) {
   PrettyStackTraceStringAction stackTrace(
       "loading inter-module dependency graph", path);
-  auto buffer = llvm::MemoryBuffer::getFile(path);
+  auto buffer = FS.getBufferForFile(path);
   if (!buffer)
     return true;
 

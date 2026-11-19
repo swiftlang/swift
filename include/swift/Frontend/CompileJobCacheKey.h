@@ -25,6 +25,10 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
 
+namespace llvm::vfs {
+class FileSystem;
+}
+
 namespace swift {
 
 /// The indices of the references at the fixed positions in CompileJobBaseKey.
@@ -52,7 +56,8 @@ enum class CompileJobBaseKeyRef : unsigned {
 // arguments.
 llvm::Expected<llvm::cas::ObjectRef>
 createCompileJobBaseCacheKey(llvm::cas::ObjectStore &CAS,
-                             ArrayRef<const char *> Args);
+                             ArrayRef<const char *> Args,
+                             llvm::vfs::FileSystem &FS);
 
 /// Compute CompileJobKey for the compiler outputs. The key for the output
 /// is computed from the base key for the compilation and the input file index

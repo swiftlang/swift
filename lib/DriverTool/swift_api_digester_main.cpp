@@ -2432,7 +2432,8 @@ public:
     for(auto spi: ParsedArgs.getAllArgValues(OPT_ignore_spi_groups_new_api))
       CheckerOpts.SPIGroupNamesToIgnoreNewAPI.insert(spi);
     if (!SDK.empty()) {
-      auto Ver = getSDKBuildVersion(SDK);
+      auto Ver =
+          getSDKBuildVersion(SDK, *llvm::vfs::createPhysicalFileSystem());
       if (!Ver.empty()) {
         CheckerOpts.ToolArgs.push_back("-sdk-version");
         CheckerOpts.ToolArgs.push_back(Ver);

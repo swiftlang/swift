@@ -650,7 +650,8 @@ using ArgListTy = std::vector<std::string>;
 
 void setOutputPath(ResultTy &outputPath, const StringRef &moduleName,
                    const StringRef &interfacePath, const StringRef &sdkPath,
-                   const CompilerInvocation &CI, const ArgListTy &extraArgs);
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs,
+                   llvm::vfs::FileSystem &FS);
 } // namespace SwiftInterfaceModuleOutputPathResolution
 
 struct InterfaceSubContextDelegateImpl : InterfaceSubContextDelegate {

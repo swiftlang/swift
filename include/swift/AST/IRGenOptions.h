@@ -293,6 +293,9 @@ public:
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
+  /// The compilation directory for the coverage mapping.
+  std::string CoverageCompilationDir;
+
   /// The DWARF version of debug info. The driver always passes the target's
   /// default explicitly via -dwarf-version.
   uint8_t DWARFVersion = 5;

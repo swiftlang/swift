@@ -320,9 +320,10 @@ bool readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
-bool readInterModuleDependenciesCache(llvm::StringRef path,
-                                      ModuleDependenciesCache &cache,
-                                      llvm::sys::TimePoint<> &serializedCacheTimeStamp);
+bool readInterModuleDependenciesCache(
+    llvm::StringRef path, ModuleDependenciesCache &cache,
+    llvm::sys::TimePoint<> &serializedCacheTimeStamp,
+    llvm::vfs::FileSystem &FS);
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
