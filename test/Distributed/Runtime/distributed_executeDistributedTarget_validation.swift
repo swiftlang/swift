@@ -21,6 +21,8 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 
 struct S<T: Codable>: Codable { var data: T }
 
+struct NonCodable {}
+
 distributed actor Greeter {
   // Four key generic parameters, eight protocol requirements.
   distributed func generic5<A: Codable, B: Codable, C: Codable, D: Codable>(
@@ -42,11 +44,14 @@ struct Main {
     let handler = FakeRoundtripResultHandler({ _ in }, onError: { _ in })
 
     // ==== -------------------------------------------------------------------
-    // Check that wrong count of substitutions is rejected properly:
+    // Check that substitutions not fulfilling the generic requirements are
+    // rejected properly. Use a correct substitution count: only SwiftStdlib
+    // 6.5+ runtimes diagnose a wrong count precisely, older ones would read
+    // past the substitutions buffer.
 
     var decoder = FakeInvocationDecoder(
       args: [],
-      substitutions: [Int.self, String.self])
+      substitutions: [Int.self, String.self, NonCodable.self, Int.self])
     do {
       try await system.executeDistributedTarget(
         on: greeter,
