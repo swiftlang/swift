@@ -312,21 +312,42 @@ class ForeignReferenceTypeInfo {
     FlagIsRef = 1 << 1,
     /// This reference type is immortal (has no custom retain/release)
     FlagIsImmortal = 1 << 2,
+    /// This is libkern's OSMetaClassBase or one of its subclasses
+    FlagIsLibkernObject = 1 << 3,
   };
 
-  llvm::PointerIntPair<const clang::RecordDecl *, 3> BaseAndFlags;
+  static constexpr unsigned NumBaseAndFlagsBits = 3;
+  static constexpr unsigned NumSuperclassAndFlagsBits = 1;
+  static constexpr unsigned BaseAndFlagsMask =
+      llvm::maskTrailingOnes<unsigned>(NumBaseAndFlagsBits);
 
-  const clang::CXXRecordDecl *primarySuperclass = nullptr;
+  llvm::PointerIntPair<const clang::RecordDecl *, NumBaseAndFlagsBits>
+      BaseAndFlags;
+
+  llvm::PointerIntPair<const clang::CXXRecordDecl *, NumSuperclassAndFlagsBits>
+      SuperclassAndFlags;
+
+  unsigned getFlags() const {
+    return BaseAndFlags.getInt() |
+           (SuperclassAndFlags.getInt() << NumBaseAndFlagsBits);
+  }
+
+  void setFlags(unsigned flags) {
+    BaseAndFlags.setInt(flags & BaseAndFlagsMask);
+    SuperclassAndFlags.setInt(flags >> NumBaseAndFlagsBits);
+  }
 
   ForeignReferenceTypeInfo(const clang::RecordDecl *decl,
                            const clang::CXXRecordDecl *primarySuperclass,
-                           bool isValid, bool isRef, bool isImmortal)
-      : BaseAndFlags{decl}, primarySuperclass(primarySuperclass) {
+                           bool isValid, bool isRef, bool isImmortal,
+                           bool isLibkernObject = false)
+      : BaseAndFlags{decl}, SuperclassAndFlags{primarySuperclass} {
     unsigned int flags = 0;
     flags |= isValid ? FlagIsValid : 0;
     flags |= isRef ? FlagIsRef : 0;
     flags |= isImmortal ? FlagIsImmortal : 0;
-    BaseAndFlags.setInt(flags);
+    flags |= isLibkernObject ? FlagIsLibkernObject : 0;
+    setFlags(flags);
   }
 
 public:
@@ -341,10 +362,15 @@ public:
   /// A shared reference type using the retain/release functions from \a decl.
   static ForeignReferenceTypeInfo
   Shared(const clang::RecordDecl *decl,
-         const clang::CXXRecordDecl *primarySuperclass, bool isValid = true) {
+         const clang::CXXRecordDecl *primarySuperclass, bool isLibkernObject,
+         bool isValid = true) {
     ASSERT(decl && "shared reference must have a non-null base decl");
-    return {decl, primarySuperclass, isValid, /*isRef=*/true,
-            /*isImmortal=*/false};
+    return {decl,
+            primarySuperclass,
+            isValid,
+            /*isRef=*/true,
+            /*isImmortal=*/false,
+            isLibkernObject};
   }
 
   /// An immortal reference type, which has no custom retain/release. \a decl
@@ -372,24 +398,28 @@ public:
   ///
   /// This is independent of whether this foreign type should be actually be
   /// imported with reference semantics.
-  bool isValid() const { return BaseAndFlags.getInt() & FlagIsValid; }
+  bool isValid() const { return getFlags() & FlagIsValid; }
 
   /// Whether this type or its bases have attributes that ask for it to be
   /// imported as a reference type.
   ///
   /// This is independent of whether those attributes are actually valid.
-  bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+  bool isReference() const { return getFlags() & FlagIsRef; }
 
   /// Whether this is an immortal reference type: a reference type with no
   /// custom retain/release operations (all of its ops are "immortal").
-  bool isImmortal() const { return BaseAndFlags.getInt() & FlagIsImmortal; }
+  bool isImmortal() const { return getFlags() & FlagIsImmortal; }
+
+  /// Whether this is libkern's OSMetaClassBase or one of its subclasses, which
+  /// follow libkern's ownership convention for returned objects.
+  bool isLibkernObject() const { return getFlags() & FlagIsLibkernObject; }
 
   /// The single FRT base that is the primary (first) direct base of this
   /// type, suitable for use as the Swift superclass. Returns nullptr if there
   /// is no single primary FRT base (e.g., multiple FRT bases, or the FRT
   /// base is not the first direct base).
   const clang::CXXRecordDecl *getPrimarySuperclass() const {
-    return primarySuperclass;
+    return SuperclassAndFlags.getPointer();
   }
 };
 
