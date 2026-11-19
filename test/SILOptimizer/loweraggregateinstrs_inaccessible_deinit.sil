@@ -1,0 +1,69 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-module -O -wmo -parse-as-library -module-name Lib -emit-module-path %t/Lib.swiftmodule %t/Lib.swift
+// RUN: %target-sil-opt -I %t -enable-sil-verify-all -lower-aggregate-instrs %t/main.sil | %FileCheck %s
+
+// Check that LowerAggregateInstrs does not destroy a field directly when the field's type
+// has a deinit and metadata the client cannot access.
+
+//--- Lib.swift
+
+struct Inner: ~Copyable {
+  let p: UnsafeMutablePointer<Int>
+  init() { p = .allocate(capacity: 1) }
+  deinit { p.deallocate() }
+}
+
+public struct Manager: ~Copyable {
+  var inner: Inner
+  public init() { inner = Inner() }
+}
+
+//--- main.sil
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Lib
+
+struct Wrapper: ~Copyable {
+  var m: Manager
+  var n: Int
+}
+
+// CHECK-LABEL: sil @releaseManager :
+// CHECK-NOT:     struct_extract
+// CHECK:         release_value %0
+// CHECK:       } // end sil function 'releaseManager'
+sil @releaseManager : $@convention(thin) (@owned Manager) -> () {
+bb0(%0 : $Manager):
+  release_value %0 : $Manager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @releaseWrapper :
+// CHECK:         [[M:%.*]] = struct_extract %0, #Wrapper.m
+// CHECK-NOT:     struct_extract
+// CHECK:         release_value [[M]]
+// CHECK:       } // end sil function 'releaseWrapper'
+sil @releaseWrapper : $@convention(thin) (@owned Wrapper) -> () {
+bb0(%0 : $Wrapper):
+  release_value %0 : $Wrapper
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @destroyWrapperAddr :
+// CHECK:         [[W:%.*]] = load %0
+// CHECK:         [[M:%.*]] = struct_extract [[W]], #Wrapper.m
+// CHECK-NOT:     struct_extract
+// CHECK:         release_value [[M]]
+// CHECK:       } // end sil function 'destroyWrapperAddr'
+sil @destroyWrapperAddr : $@convention(thin) (@in Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  destroy_addr %0 : $*Wrapper
+  %r = tuple ()
+  return %r : $()
+}

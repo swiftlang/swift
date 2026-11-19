@@ -66,8 +66,12 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
   }
 
   /// Returns true if value operations (e.g. destroys) can be done on this type in `function`.
-  /// This is not the case if the type is not fixed-size in the function's resilience domain
-  /// and its type metadata is not accessible, e.g. an internal type from another module.
+  /// This is not the case if they need type metadata which is not accessible, e.g. the metadata of
+  /// an internal type from another module. Such metadata is needed if the type is not fixed-size in
+  /// the function's resilience domain, or if destroying a value requires calling a deinit of an
+  /// inaccessible type.
+  /// Metadata accessibility is decided by the function's module. But if the function is serialized,
+  /// i.e. it can be inlined into other modules, the metadata must be accessible from any module.
   public func isABIAccessible(in function: Function) -> Bool {
     return bridged.isABIAccessible(function.bridged)
   }

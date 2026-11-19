@@ -1,0 +1,139 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-module -O -wmo -parse-as-library -module-name Lib -emit-module-path %t/Lib.swiftmodule %t/Lib.swift
+// RUN: %target-sil-opt -I %t -enable-sil-verify-all -deinit-devirtualizer %t/main.sil | %FileCheck %s
+
+// Check that the DeinitDevirtualizer does not split the destroy of a non-copyable value
+// into destroys of its fields or elements when a field or element contains a value whose
+// type has a deinit and metadata the client cannot access.
+
+//--- Lib.swift
+
+struct Inner: ~Copyable {
+  let p: UnsafeMutablePointer<Int>
+  init() { p = .allocate(capacity: 1) }
+  deinit { p.deallocate() }
+}
+
+public struct Manager: ~Copyable {
+  var inner: Inner
+  public init() { inner = Inner() }
+}
+
+public struct DBox<T: ~Copyable>: ~Copyable {
+  var value: T
+  init(_ v: consuming T) { value = v }
+  deinit {}
+}
+
+enum PairE: ~Copyable {
+  case empty
+  case pair(Inner, Int)
+}
+
+public struct PairManager: ~Copyable {
+  var e: PairE
+  public init() { e = .pair(Inner(), 0) }
+}
+
+// The unspecialized DBox deinit needs Inner's metadata.
+public struct BoxManager: ~Copyable {
+  var box: DBox<Inner>
+  public init() { box = DBox(Inner()) }
+}
+
+//--- main.sil
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import Lib
+
+// CHECK-LABEL: sil [ossa] @destroyManager :
+// CHECK-NOT:     destructure_struct
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyManager'
+sil [ossa] @destroyManager : $@convention(thin) (@owned Manager) -> () {
+bb0(%0 : @owned $Manager):
+  destroy_value %0 : $Manager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyManagerAddr :
+// CHECK-NOT:     struct_element_addr
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'destroyManagerAddr'
+sil [ossa] @destroyManagerAddr : $@convention(thin) (@in Manager) -> () {
+bb0(%0 : $*Manager):
+  destroy_addr %0 : $*Manager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyPairManager :
+// CHECK-NOT:     destructure_struct
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyPairManager'
+sil [ossa] @destroyPairManager : $@convention(thin) (@owned PairManager) -> () {
+bb0(%0 : @owned $PairManager):
+  destroy_value %0 : $PairManager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyPairManagerAddr :
+// CHECK-NOT:     struct_element_addr
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'destroyPairManagerAddr'
+sil [ossa] @destroyPairManagerAddr : $@convention(thin) (@in PairManager) -> () {
+bb0(%0 : $*PairManager):
+  destroy_addr %0 : $*PairManager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyBoxManager :
+// CHECK-NOT:     apply
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyBoxManager'
+sil [ossa] @destroyBoxManager : $@convention(thin) (@owned BoxManager) -> () {
+bb0(%0 : @owned $BoxManager):
+  destroy_value %0 : $BoxManager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyBoxManagerAddr :
+// CHECK-NOT:     apply
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'destroyBoxManagerAddr'
+sil [ossa] @destroyBoxManagerAddr : $@convention(thin) (@in BoxManager) -> () {
+bb0(%0 : $*BoxManager):
+  destroy_addr %0 : $*BoxManager
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyTuple :
+// CHECK-NOT:     destructure_tuple
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyTuple'
+sil [ossa] @destroyTuple : $@convention(thin) (@owned (Inner, Int)) -> () {
+bb0(%0 : @owned $(Inner, Int)):
+  destroy_value %0 : $(Inner, Int)
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroyFixedArray :
+// CHECK-NOT:     destroy_addr
+// CHECK:         destroy_value %0
+// CHECK:       } // end sil function 'destroyFixedArray'
+sil [ossa] @destroyFixedArray : $@convention(thin) (@owned Builtin.FixedArray<2, Inner>) -> () {
+bb0(%0 : @owned $Builtin.FixedArray<2, Inner>):
+  destroy_value %0 : $Builtin.FixedArray<2, Inner>
+  %r = tuple ()
+  return %r : $()
+}
