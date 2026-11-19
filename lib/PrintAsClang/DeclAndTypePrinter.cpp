@@ -689,7 +689,7 @@ private:
                              "sizeof(result));\n";
               outOfLineOS << "    return result;\n  ";
             } else {
-              bool isOptional = false;
+              bool isOptional = optKind != OTK_None;
               if (!objectTypeDecl) {
                 objectTypeDecl = paramType->getNominalDecl();
                 isOptional = true;
@@ -851,7 +851,8 @@ private:
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
                     outOfLineOS << "    memcpy(" << resultStorage
                                 << ", &val, sizeof(val));\n";
-                  } else if (isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
+                  } else if (optKind == OTK_None &&
+                             isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
                     outOfLineOS
                         << "    auto op = swift::"
                         << cxx_synthesis::getCxxImplNamespaceName()
