@@ -146,10 +146,11 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     if (auto *archetypeType = firstType->getAs<ArchetypeType>()) {
-      auto layout = archetypeType->getLayoutConstraint();
-      if (layout && layout.merge(getLayoutConstraint()))
-        return CheckRequirementResult::Success;
-
+      if (auto layout = archetypeType->getLayoutConstraint()) {
+        auto merged = layout.merge(getLayoutConstraint());
+        if (merged->isKnownLayout() && merged == layout)
+          return CheckRequirementResult::Success;
+      }
       return CheckRequirementResult::RequirementFailure;
     }
 
@@ -159,6 +160,11 @@ CheckRequirementResult Requirement::checkRequirement(
 
       return CheckRequirementResult::RequirementFailure;
     }
+
+    if (getLayoutConstraint()->isObjectReference())
+      return firstType->satisfiesObjectReferenceConstraint()
+                 ? CheckRequirementResult::Success
+                 : CheckRequirementResult::RequirementFailure;
 
     // TODO: Statically check other layout constraints, once they can
     // be spelled in Swift.

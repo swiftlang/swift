@@ -2661,6 +2661,16 @@ bool TypeBase::satisfiesClassConstraint() {
   return mayHaveSuperclass() || isObjCExistentialType();
 }
 
+bool TypeBase::satisfiesObjectReferenceConstraint() {
+  if (getClassDecl() || satisfiesClassConstraint())
+    return true;
+
+  auto archetype = getAs<ArchetypeType>();
+  auto layout =
+      archetype ? archetype->getLayoutConstraint() : LayoutConstraint();
+  return layout && (layout->isObjectReference() || layout->isClass());
+}
+
 Type TypeBase::getSuperclass(bool useArchetypes) {
   auto *nominalDecl = getAnyNominal();
   auto *classDecl = dyn_cast_or_null<ClassDecl>(nominalDecl);
