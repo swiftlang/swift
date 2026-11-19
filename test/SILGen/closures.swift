@@ -612,9 +612,9 @@ class SuperSub : SuperBase {
     // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1fyyFyycfU_yyKXEfu_]] :
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-    // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]]
-    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$ss2qqoiyxxSgn_xyKXKtKRi_zlF :
+    // CHECK:   [[PA:%.*]] = partial_apply [called_at_most_once] [[INNER]]([[ARG_COPY]])
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]]
+    // CHECK:   [[TRY_APPLY_AUTOCLOSURE:%.*]] = function_ref @$ss2qqoiyxxSgn_xyKXKntKRi_zlF :
     // CHECK:   try_apply [[TRY_APPLY_AUTOCLOSURE]]<()>({{.*}}, {{.*}}, [[CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
@@ -641,9 +641,9 @@ class SuperSub : SuperBase {
     // CHECK: bb0([[ARG:%.*]] : @closureCapture @guaranteed $SuperSub):
     // CHECK:   [[INNER:%.*]] = function_ref @[[INNER_FUNC_2:\$s8closures8SuperSubC1g.*]] :
     // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-    // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[INNER]]([[ARG_COPY]])
-    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[PA]] :
-    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$ss2qqoiyxxSgn_xyKXKtKRi_zlF :
+    // CHECK:   [[PA:%.*]] = partial_apply [called_at_most_once] [[INNER]]([[ARG_COPY]])
+    // CHECK:   [[CVT:%.*]] = convert_escape_to_noescape [[PA]] :
+    // CHECK:   [[TRY_APPLY_FUNC:%.*]] = function_ref @$ss2qqoiyxxSgn_xyKXKntKRi_zlF :
     // CHECK:   try_apply [[TRY_APPLY_FUNC]]<()>({{.*}}, {{.*}}, [[CVT]]) : {{.*}}, normal [[NORMAL_BB:bb1]], error [[ERROR_BB:bb2]]
     // CHECK: [[NORMAL_BB]]{{.*}}
     // CHECK: } // end sil function '[[INNER_FUNC_1]]'
