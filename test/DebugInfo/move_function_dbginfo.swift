@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library -g -emit-ir -o - %s | %FileCheck %s
-// RUN: %target-swift-frontend -parse-as-library -g -c %s -o %t/out.o
+// The DWARF checks below use DWARF 4 location list syntax.
+// RUN: %target-swift-frontend -parse-as-library -g -dwarf-version=4 -c %s -o %t/out.o
 // RUN: %llvm-dwarfdump --show-children %t/out.o | %FileCheck -check-prefix=DWARF %s
 
 // This test checks that:

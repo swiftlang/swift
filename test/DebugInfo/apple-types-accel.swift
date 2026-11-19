@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -c -g -o %t.o
+// Apple accelerator tables are only emitted for DWARF 4 and earlier.
+// RUN: %target-swift-frontend %s -c -g -dwarf-version=4 -o %t.o
 // RUN: %llvm-dwarfdump --apple-types %t.o \
 // RUN:    | %FileCheck --check-prefix=CHECK-ACCEL %s
 // RUN: %llvm-dwarfdump --debug-info %t.o  \

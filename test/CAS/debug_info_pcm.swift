@@ -11,7 +11,7 @@
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:A modulePath > %t/A.path
 // RUN: dwarfdump --debug-info @%t/A.path | %FileCheck %s
 
-// CHECK: DW_AT_GNU_dwo_name ("llvmcas://{{.*}}")
+// CHECK: DW_AT_{{(GNU_)?}}dwo_name ("llvmcas://{{.*}}")
 
 // RUN: %target-swift-frontend-plain -emit-module-path %t/Test.swiftmodule  \
 // RUN:   -emit-module-interface-path %t/Test.swiftinterface \
