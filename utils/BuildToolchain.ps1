@@ -54,10 +54,9 @@ With -Mode Bootstrap:
 - Stage1: the Stage1 compilers and the bootstrap macros.
 Otherwise:
 - CMark: CMark, which the compilers and the documentation tools use.
-- LLVM: Clang, lld and the other tools of the compilers that only use LLVM and
-  Clang, in the build tree of the Stage2 compilers. Unlike the rest of the
-  compilers, they do not need the SDK. This step only runs when requested,
-  before Compilers.
+- LLVM: Clang, lld, LTO and dsymutil, with the LLVM libraries, in the build
+  tree of the Stage2 compilers. Unlike the rest of the compilers, they do not
+  need the SDK. This step only runs when requested, before Compilers.
 - Compilers: the Stage2 compilers.
 - CompilerRuntime: compiler-rt for the SDK architectures.
 - Macros: the Foundation and Testing macros.
@@ -1863,7 +1862,7 @@ function Invoke-Steps {
     # What the compilers build without the SDK, in their build tree.
     if (Test-Step "LLVM") {
       Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/LLVM" ($Stage2Args + @{
-        BuildTargets = @("clang", "clangd", "clang-format", "clang-scan-deps", "clang-tidy", "dsymutil", "IndexStore", "libclang", "lld", "LTO");
+        BuildTargets = @("clang", "dsymutil", "lld", "LTO");
       })
     }
 

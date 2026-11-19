@@ -391,8 +391,8 @@ function Start-SDKJobs([switch] $Idle) {
 }
 
 # Without the installer, only the end of the build needs the SDKs of the other
-# architectures. So when the tests run, these SDKs build after the Stage2
-# compilers, with the processors that the tests leave, and merge at the end.
+# architectures. So when the tests run, these SDKs build after the SDK of the
+# host, at the priority of the Stage2 compilers, and merge at the end.
 $DeferSDKJobs = $Toolchain -and $CompilerTests -and -not $Package
 if (-not $DeferSDKJobs) {
   Start-SDKJobs
@@ -440,6 +440,9 @@ if ($HostSDKOverrides) {
     Wait-BuildJobs @($Stage2ConfigureJob)
     $LLVMJob = Invoke-ToolchainSteps "" LLVM -Configured -Background -Idle
     Wait-BuildJobs @($HostSDKJob)
+    if ($DeferSDKJobs) {
+      Start-SDKJobs -Idle
+    }
   } else {
     Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters $HostSDKOverrides
   }
@@ -475,9 +478,6 @@ if ($Toolchain) {
     Invoke-ToolchainSteps "" Compilers -Configured
   } finally {
     $ThisProcess.PriorityClass = $ThisPriority
-  }
-  if ($DeferSDKJobs) {
-    Start-SDKJobs -Idle
   }
 
   # Then, what uses the Stage2 build tree, with the longest chain of
