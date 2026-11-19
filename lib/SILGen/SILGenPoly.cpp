@@ -7394,9 +7394,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token, allocation);
-
-    result = B.createTuple(loc, {});
+    result = emitEndApplyWithRethrow(loc, token, allocation,
+                                     SILType::getEmptyTupleType(getASTContext()));
     break;
   }
 
@@ -7910,9 +7909,8 @@ void SILGenFunction::emitProtocolWitness(
     }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token, allocation);
-
-    reqtResultValue = B.createTuple(loc, {});
+    reqtResultValue = emitEndApplyWithRethrow(loc, token, allocation,
+                                             SILType::getEmptyTupleType(getASTContext()));
     break;
   }
 
