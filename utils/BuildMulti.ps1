@@ -515,8 +515,13 @@ if ($Test -and -not $IsCrossCompiling) {
     }
   }
 
-  # Run check-swift, the longest suite, here, and report all the failures.
+  # Run check-swift, the longest suite, here, and report all the failures. It
+  # runs many tests at the same time, so it runs at a lower priority than the
+  # package tests, which time out when they wait for processors.
   if ($CompilerTests -contains "swift") {
+    $ThisProcess = Get-Process -Id $PID
+    $ThisPriority = $ThisProcess.PriorityClass
+    $ThisProcess.PriorityClass = [Diagnostics.ProcessPriorityClass]::BelowNormal
     try {
       Invoke-BuildScript "TestToolchain-swift" TestToolchain.ps1 $Parameters @{
         Test = @("swift");
@@ -524,6 +529,8 @@ if ($Test -and -not $IsCrossCompiling) {
       }
     } catch {
       $Failure = $_
+    } finally {
+      $ThisProcess.PriorityClass = $ThisPriority
     }
   }
 
