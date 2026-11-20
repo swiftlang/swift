@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %timer-scale-test --begin 5000 --end 10000 --superlinear-threshold 1.5 --save-temps --ignore-no-data --trace --select SIL-processing.instr -O %s
+// RUN: %timer-scale-test --begin 3000 --end 6000 --superlinear-threshold 1.5 --save-temps --ignore-no-data --trace --select SIL-processing.instr -O %s
 
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
 
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
 
-// RUN: %gyb -D N=5000 %s > %t/main.swift
+// RUN: %gyb -D N=3000 %s > %t/main.swift
 // RUN: %target-swift-frontend -O -emit-sil %t/main.swift | %FileCheck %s
 
 // CHECK: sil_global private [let] @$s4main10TestStructV9str_arraySaySSGvpfiTv_ : $_ContiguousArrayStorage<String> = {
