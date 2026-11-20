@@ -748,7 +748,11 @@ extension MutableSpan where Element: ~Copyable {
   mutating public func _mutatingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in _mutatingExtracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
@@ -794,7 +798,11 @@ extension MutableSpan where Element: ~Copyable {
   consuming public func _consumingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in _consumingExtracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
