@@ -2441,8 +2441,10 @@ private:
 
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
-      // (not nominal) they don't have a source location.
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      // (not nominal) they don't have a source location. A tuple containing a
+      // pack expansion has no static element layout, so it stays opaque.
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes &&
+          !BaseTy->castTo<TupleType>()->containsPackExpansionType())
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
       else

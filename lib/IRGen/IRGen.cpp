@@ -48,6 +48,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Driver/CommonArgs.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
@@ -172,6 +173,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
+
+  // Follow Clang's policy so that Swift and C objects linked together agree on
+  // whether cross-section DWARF references are relocated.
+  TargetOpts.MCOptions.MachORelocatableDwarf =
+      clang::driver::tools::useMachORelocatableDwarf(Ctx.LangOpts.Target,
+                                                     Opts.DWARFVersion);
 
 #if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
