@@ -6387,7 +6387,7 @@ getConditionalAttrParams(clang::SwiftAttrAttr *swiftAttr, StringRef attrName) {
 
 static ConditionalAttrParams
 getConditionalAttrParams(const clang::NamedDecl *decl, StringRef attrName) {
-  for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+  for (auto *swiftAttr : getSwiftAttrs(decl)) {
     if (swiftAttr->getAttribute().starts_with(attrName))
       return getConditionalAttrParams(swiftAttr, attrName);
   }
@@ -9613,11 +9613,10 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
 
 bool importer::hasSwiftAttribute(const clang::Decl *decl,
                                  ArrayRef<StringRef> attrs) {
-  if (llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
-                   [&](const clang::SwiftAttrAttr *swiftAttr) {
-                     return llvm::is_contained(attrs,
-                                               swiftAttr->getAttribute());
-                   }))
+  if (llvm::any_of(
+          getSwiftAttrs(decl), [&](const clang::SwiftAttrAttr *swiftAttr) {
+            return llvm::is_contained(attrs, swiftAttr->getAttribute());
+          }))
     return true;
 
   if (auto *P = dyn_cast<clang::ParmVarDecl>(decl)) {
@@ -10421,7 +10420,7 @@ importer::getPrivateFileIDAttrs(const clang::CXXRecordDecl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
   constexpr llvm::StringLiteral prefix = "private_fileid:";
 
-  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+  for (const auto *swiftAttr : getSwiftAttrs(decl)) {
     StringRef attribute = swiftAttr->getAttribute();
     if (attribute.consume_front(prefix))
       files.push_back({attribute, swiftAttr->getLocation()});
