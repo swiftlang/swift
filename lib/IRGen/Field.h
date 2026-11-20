@@ -101,6 +101,9 @@ public:
   /// Return the name of this field.
   llvm::StringRef getName() const;
 
+  /// Return the declaration context of a non-artificial field.
+  DeclContext *getDeclContext() const;
+
   bool operator==(Field other) const { return declOrKind == other.declOrKind; }
   bool operator!=(Field other) const { return declOrKind != other.declOrKind; }
 };

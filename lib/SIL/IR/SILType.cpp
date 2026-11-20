@@ -547,8 +547,8 @@ SILType SILType::getFieldType(MissingMemberDecl *field, TypeConverter &TC,
   layout = layout->getWithSubstitutions(field->getASTContext(),
                                         substitutions);
   Type memberType = HiddenType::get(field->getASTContext(), layout, CanType());
-  field->getASTContext().recordRecoveredHiddenType(
-      memberType->getCanonicalType());
+  field->getASTContext().recordRecoveredAbstractMemberTypeLayout(
+      field, memberType->getCanonicalType());
 
   auto loweredType = TC.getLoweredRValueType(context, memberType);
   return formLoweredFieldType(*this, loweredType);

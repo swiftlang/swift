@@ -7738,8 +7738,8 @@ void Serializer::writeAbstractTypeLayout(const AbstractTypeLayout &layout) {
 
 void Serializer::writeAbstractMemberTypeLayout(const Decl *decl) {
   auto *var = cast<VarDecl>(decl);
-  auto layout =
-      getLayoutProvider().getAbstractTypeLayout(var->getInterfaceType());
+  auto layout = getLayoutProvider().getAbstractTypeLayout(
+      var->getInterfaceType(), var);
   writeAbstractTypeLayout(layout);
 }
 

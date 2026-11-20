@@ -746,3 +746,16 @@ StringRef Field::getName() const {
   llvm_unreachable("bad field kind");
 }
 
+DeclContext *Field::getDeclContext() const {
+  switch (getKind()) {
+  case Field::Var:
+    assert(getVarDecl() && "physical field has no declaration context");
+    return getVarDecl()->getDeclContext();
+  case Field::MissingMember:
+    return getMissingMemberDecl()->getDeclContext();
+  case Field::DefaultActorStorage:
+  case Field::NonDefaultDistributedActorStorage:
+    llvm_unreachable("artificial field has no declaration context");
+  }
+  llvm_unreachable("bad field kind");
+}
