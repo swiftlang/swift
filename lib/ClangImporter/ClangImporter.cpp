@@ -7484,6 +7484,7 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
         fn->getGenericParams(), ParameterList::create(context, params),
         fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
+    out->setImplicitlyUnwrappedOptional(fn->isImplicitlyUnwrappedOptional());
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     auto markedUnavailable = inheritance.setUnavailableIfNecessary(decl, out);
@@ -7500,6 +7501,9 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
         subscript->getIndices(), subscript->getNameLoc(), subscript->getElementInterfaceType(),
         newContext, subscript->getGenericParams());
+    out->setImplicitlyUnwrappedOptional(
+        subscript->isImplicitlyUnwrappedOptional());
+    cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
     auto accessors = makeBaseClassMemberAccessors(newContext, out, subscript);
@@ -7523,8 +7527,10 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         new (rawMemory) VarDecl(var->isStatic(), var->getIntroducer(),
                                 var->getLoc(), var->getName(), newContext);
     out->setInterfaceType(var->getInterfaceType());
+    out->setImplicitlyUnwrappedOptional(var->isImplicitlyUnwrappedOptional());
     out->setIsObjC(var->isObjC());
     out->setIsDynamic(var->isDynamic());
+    cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
     out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
