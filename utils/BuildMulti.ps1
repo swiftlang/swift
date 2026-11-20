@@ -33,7 +33,8 @@ that it waits for as the step writes it, and the logs of the background
 processes in one piece once they end, between lines of the other logs, so that
 they do not interleave. When nothing was printed for a minute, it prints the
 last line that the processes that it waits for logged. After a failure, it
-also prints the logs of the processes that it stops.
+also prints the logs of the processes that it stops, then, before the error,
+the lines of the logs of the processes that failed that report their failures.
 
 See BuildSequential.ps1 for the parameters.
 #>
@@ -186,6 +187,7 @@ $SelectedAndroidSDKArchitectures = @(if ($Android) { $AndroidSDKArchitectures })
 
 $JobLogs = "$BinaryCache\BuildMulti"
 $Jobs = New-Object System.Collections.ArrayList
+$FailedJobs = New-Object System.Collections.ArrayList
 # The logs are printed as the jobs wrote them, without decoding them.
 $StandardOutput = [Console]::OpenStandardOutput()
 
@@ -386,6 +388,7 @@ function Wait-BuildJobs([Object[]] $Wait, [PSCustomObject] $Follow = $null) {
     Complete-BuildJob $Job
     if ($Job.Process.ExitCode -ne 0) {
       $Failed += $Job.Name
+      [void]$FailedJobs.Add($Job)
     }
   }
   if ($Failed) {
@@ -412,7 +415,50 @@ function Stop-BuildJobs {
         Write-Host -ForegroundColor Red "Could not print $($Job.Log): $_"
       }
     }
+    if (-not $Job.Stopped -and $Job.Process.HasExited -and $Job.Process.ExitCode -ne 0) {
+      [void]$FailedJobs.Add($Job)
+    }
     Complete-BuildJob $Job
+  }
+}
+
+# What the build and test tools print about failures.
+$FailurePattern = "recorded an issue|failed after .* with \d+ issues?|^error: |: (fatal )?error: |\berror (LNK|C)\d+:|^FAILED: |^(FAIL|XPASS|UNRESOLVED|TIMEOUT): |^(Failed|Timed Out|Unresolved) Tests \(|^Test Case .* failed|^Error: |CMake Error"
+
+# Prints the lines of the logs of the jobs that failed that report failures,
+# with the lines that follow them, as these logs may be far above the error
+# that ends the output. Without such lines, it prints the end of the log.
+function Write-BuildJobFailures {
+  foreach ($Job in $FailedJobs) {
+    $Name = "$($Job.Name) ($($Job.Process.StartTime.ToString("HH:mm:ss")) to $($Job.Process.ExitTime.ToString("HH:mm:ss")))"
+    try {
+      # Some tools end lines with \r\r\n.
+      $Lines = [regex]::Split([IO.File]::ReadAllText($Job.Log, [Text.Encoding]::UTF8).TrimEnd("`r", "`n"), "\r*\n")
+    } catch {
+      Write-Host -ForegroundColor Red "===== $Name exited with code $($Job.Process.ExitCode), and its log could not be read: $_"
+      continue
+    }
+    $Shown = New-Object System.Collections.Generic.List[string]
+    $Next = 0
+    $Found = 0
+    for ($Index = 0; $Index -lt $Lines.Count -and $Found -lt 50; $Index++) {
+      if ($Lines[$Index] -cmatch $FailurePattern) {
+        $Found++
+        for ($Line = [Math]::Max($Index, $Next); $Line -le [Math]::Min($Index + 3, $Lines.Count - 1); $Line++) {
+          $Shown.Add($Lines[$Line])
+        }
+        $Next = [Math]::Max($Next, $Index + 4)
+      }
+    }
+    if ($Found) {
+      Write-Host -ForegroundColor Red "===== $Name exited with code $($Job.Process.ExitCode), with these failures in its log above ====="
+    } else {
+      Write-Host -ForegroundColor Red "===== $Name exited with code $($Job.Process.ExitCode), at the end of its log above ====="
+      $Shown.AddRange([string[]]@($Lines | Select-Object -Last 20))
+    }
+    $Bytes = [Text.Encoding]::UTF8.GetBytes(($Shown -join "`r`n") + "`r`n")
+    $StandardOutput.Write($Bytes, 0, $Bytes.Length)
+    $StandardOutput.Flush()
   }
 }
 
@@ -704,6 +750,7 @@ if ($Failure) {
 
 } catch {
   Stop-BuildJobs
+  Write-BuildJobFailures
   Write-BuildError $_
   exit 1
 } finally {
