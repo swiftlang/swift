@@ -520,9 +520,37 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// ### Interaction with task cancellation shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// Unlike `Task.isCancelled`, this property behaves differently depending on the scope
+  /// in which the task cancellation shield was installed and how the task was cancelled.
+  ///
+  /// Regardless of whether a task cancellation shield is present,
+  /// this property always returns the _actual_ cancellation status
+  /// if the `TaskGroup` itself was cancelled by calling ``cancelAll()``.
+  ///
+  /// This property respects task cancellation shields if `withTaskGroup` is within
+  /// a task cancellation shield scope:
+  /// ```swift
+  /// withUnsafeCurrentTask { $0?.cancel() } // Cancel the current task.
+  ///
+  /// await withTaskCancellationShield {
+  ///   await withTaskGroup { group in
+  ///     group.isCancelled // Returns `false`.
+  ///     group.addTaskUnlessCancelled { ... } // Task added to group.
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// Otherwise, this property ignores task cancellation shields within the `withTaskGroup` scope:
+  /// ```swift
+  /// withUnsafeCurrentTask { $0?.cancel() } // Cancel the current task.
+  ///
+  /// await withTaskGroup { group in
+  ///   withTaskCancellationShield {
+  ///     group.isCancelled // Returns `true`.
+  ///     group.addTaskUnlessCancelled { ... } // Task NOT added to group.
+  ///   }
+  /// }
+  /// ```
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
@@ -888,9 +916,37 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// ### Interaction with task cancellation shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// Unlike `Task.isCancelled`, this property behaves differently depending on the scope
+  /// in which the task cancellation shield was installed and how the task was cancelled.
+  ///
+  /// Regardless of whether a task cancellation shield is present,
+  /// this property always returns the _actual_ cancellation status
+  /// if the `ThrowingTaskGroup` itself was cancelled by calling ``cancelAll()``.
+  ///
+  /// This property respects task cancellation shields if `withThrowingTaskGroup` is within
+  /// a task cancellation shield scope:
+  /// ```swift
+  /// withUnsafeCurrentTask { $0?.cancel() } // Cancel the current task.
+  ///
+  /// try await withTaskCancellationShield {
+  ///   try await withThrowingTaskGroup { group in
+  ///     group.isCancelled // Returns `false`.
+  ///     group.addTaskUnlessCancelled { ... } // Task added to group.
+  ///   }
+  /// }
+  /// ```
+  ///
+  /// Otherwise, this property ignores task cancellation shields within the `withThrowingTaskGroup` scope:
+  /// ```swift
+  /// withUnsafeCurrentTask { $0?.cancel() } // Cancel the current task.
+  ///
+  /// try await withThrowingTaskGroup { group in
+  ///   withTaskCancellationShield {
+  ///     group.isCancelled // Returns `true`.
+  ///     group.addTaskUnlessCancelled { ... } // Task NOT added to group.
+  ///   }
+  /// }
+  /// ```
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public var isCancelled: Bool {
