@@ -13,12 +13,13 @@ function(includeSwiftSyntax)
   set(CMAKE_C_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
-  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
-    # Statically link swift-syntax for faster compiler startup
-    set(BUILD_SHARED_LIBS OFF)
-  else()
-    # Dynamically link for smaller overall code size
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
+    # Dynamic linking for smaller code size.
+    # This was the old approach; keep it on Windows for now
     set(BUILD_SHARED_LIBS ON)
+  else()
+    # Everywhere else, use static swift-syntax for faster compiler startup
+    set(BUILD_SHARED_LIBS OFF)
   endif()
   set(SWIFT_COMPILER_SWIFT_SYNTAX_SHARED ${BUILD_SHARED_LIBS} PARENT_SCOPE)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}/compiler")
