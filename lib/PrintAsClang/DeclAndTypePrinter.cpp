@@ -623,7 +623,7 @@ private:
       auto associatedValueList = elementDecl->getParameterList();
       // TODO: add tuple type support
       if (!elementDecl->hasAssociatedValues() ||
-          associatedValueList->size() > 1) {
+          associatedValueList->size() != 1) {
         return;
       }
       // Projecting the payload out of a borrowed enum needs a copy of it.
