@@ -1260,6 +1260,15 @@ forEachNominalHeldByValue(Type type,
   type->getCanonicalType().walk(Walker(fn));
 }
 
+bool importer::hasExposedStorage(const NominalTypeDecl *nominal) {
+  // Copying a class reference doesn't copy the object, and the storage of a
+  // resilient type is not visible to clients.
+  if (!isa<StructDecl, EnumDecl>(nominal) || nominal->isResilient())
+    return false;
+  auto *structDecl = dyn_cast<StructDecl>(nominal);
+  return !structDecl || !isCopiedAndDestroyedByCxx(structDecl);
+}
+
 namespace {
 /// Finds the unusable foreign types exposed by nominal types, caching results.
 ///
@@ -1293,17 +1302,6 @@ public:
   }
 
 private:
-  /// Whether Swift copies and destroys values of \p nominal by copying and
-  /// destroying its storage.
-  static bool hasExposedStorage(const NominalTypeDecl *nominal) {
-    // Copying a class reference doesn't copy the object, and the storage of a
-    // resilient type is not visible to clients.
-    if (!isa<StructDecl, EnumDecl>(nominal) || nominal->isResilient())
-      return false;
-    auto *structDecl = dyn_cast<StructDecl>(nominal);
-    return !structDecl || !isCopiedAndDestroyedByCxx(structDecl);
-  }
-
   /// Visits a type \p held that the type being visited holds by value.
   ///
   /// Lowers \p lowLink if \p held is in a component that isn't complete yet,

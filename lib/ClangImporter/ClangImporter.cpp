@@ -5000,12 +5000,11 @@ void CArrayProjectionVerifier::verifyCache() {
     abort();
   };
 
-  for (const auto &entry : impl.ImportedDecls) {
-    const clang::Decl *clangDecl = entry.first.first;
-    auto version = entry.first.second;
-    Decl *D = entry.second;
-    if (!D || version.withoutCArrayProjection() != impl.CurrentVersion)
-      continue;
+  impl.forEachImportedDecl([&](auto key, Decl *D) {
+    const clang::Decl *clangDecl = key.first;
+    auto version = key.second;
+    if (version.withoutCArrayProjection() != impl.CurrentVersion)
+      return;
 
     auto *attr = D->getAttrs().getAttribute<CArrayProjectionAttr>();
 
@@ -5017,26 +5016,25 @@ void CArrayProjectionVerifier::verifyCache() {
           fail("ImportedDecls entry for a C array projection holds a "
                "declaration that isn't that projection", clangDecl, D);
       } else {
-        auto modern = impl.ImportedDecls.find(
+        auto modern = impl.findImportedDecl(
             {clangDecl, version.withCArrayProjection(CArrayProjection::Modern)});
-        if (modern == impl.ImportedDecls.end() || modern->second != D)
+        if (!modern || *modern != D)
           fail("ImportedDecls entry for a C array projection holds a "
                "declaration without C array projections that isn't the "
                "modern entry's", clangDecl, D);
       }
-      continue;
+      return;
     }
 
     // A modern projection's entry comes with entries for its counterpart
     // projections, which are null if it doesn't have them.
     if (!attr)
-      continue;
+      return;
     for (auto projection :
          {CArrayProjection::Legacy, CArrayProjection::HiddenStorage}) {
-      auto key = std::make_pair(clangDecl,
-                                version.withCArrayProjection(projection));
-      auto found = impl.ImportedDecls.find(key);
-      if (found == impl.ImportedDecls.end()) {
+      auto found = impl.findImportedDecl(
+          {clangDecl, version.withCArrayProjection(projection)});
+      if (!found) {
         // Accessors are registered along with their storage, which can be
         // after they were cached, so the cache never learns of their
         // counterparts. Accessors are only found through their storage.
@@ -5045,11 +5043,11 @@ void CArrayProjectionVerifier::verifyCache() {
         fail("ImportedDecls has no entry for a counterpart C array "
              "projection", clangDecl, D);
       }
-      if (found->second != importer::getDeclForCArrayProjection(D, projection))
+      if (*found != importer::getDeclForCArrayProjection(D, projection))
         fail("ImportedDecls entry for a C array projection doesn't match "
              "its counterpart", clangDecl, D);
     }
-  }
+  });
 }
 
 static bool doesInterfaceTypeMention(ValueDecl *D,
@@ -5357,19 +5355,19 @@ void CArrayProjectionVerifier::verifyCounterpartConsistency(
 
 void ClangImporter::verifyAllModules() {
 #ifndef NDEBUG
-  if (Impl.VerifiedDeclsCounter == Impl.ImportedDecls.size())
+  if (Impl.VerifiedDeclsCounter == Impl.getNumImportedDecls())
     return;
 
   // Collect the Decls before verifying them; the act of verifying may cause
   // more decls to be imported and modify the map while we are iterating it.
   // (Counterintutively, `withoutCArrayProjection()` here ensures that we see
   // all projections, not just Modern.)
-  size_t verifiedCounter = Impl.ImportedDecls.size();
+  size_t verifiedCounter = Impl.getNumImportedDecls();
   llvm::SetVector<Decl *> Decls;
-  for (const auto &I : Impl.ImportedDecls)
-    if (I.first.second.withoutCArrayProjection() == Impl.CurrentVersion)
-      if (Decl *D = I.second)
-        Decls.insert(D);
+  Impl.forEachImportedDecl([&](auto key, Decl *D) {
+    if (key.second.withoutCArrayProjection() == Impl.CurrentVersion)
+      Decls.insert(D);
+  });
 
   CArrayProjectionVerifier cArrayVerifier(Impl);
   cArrayVerifier.verifyCache();
