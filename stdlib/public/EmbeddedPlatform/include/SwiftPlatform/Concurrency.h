@@ -43,8 +43,7 @@ void _swift_concurrency_enqueueMainExecutor(
  * Returns nonzero when the executor runs every job on the main thread, which
  * makes `swift_executor_main()` return `swift_executor_generic()`.
  *
- * Optional, and treated as zero when undefined. Not called on `os(none)`
- * targets, where `swift_executor_main()` always returns the generic executor.
+ * Optional, and treated as zero when undefined.
  */
 __swift_ptrdiff_t _swift_concurrency_mainExecutorIsGlobal(void);
 

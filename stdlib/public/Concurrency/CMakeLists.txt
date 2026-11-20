@@ -397,13 +397,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       )
     endif()
 
-    if(NOT "${triple}" MATCHES "-none-")
-      list(APPEND extra_c_compile_flags
-        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
-      list(APPEND SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        EmbeddedMainExecutor.swift)
-    endif()
-
     # Restrict each call below to the current triple by temporarily narrowing
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
@@ -424,6 +417,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
+      EmbeddedMainExecutor.swift
 
       GYB_SOURCES
         ${SWIFT_CONCURRENCY_GYB_SOURCES}
