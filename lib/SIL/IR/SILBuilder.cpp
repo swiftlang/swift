@@ -278,7 +278,7 @@ SILBuilder::substituteAnonymousArgs(llvm::SmallString<4> Name,
   if (!Var || !Var->ArgNo || !Var->Name.empty())
     return Var;
 
-  auto *VD = Loc.getAsASTNode<VarDecl>();
+  auto *VD = Var->Loc ? Var->getDecl() : Loc.getAsASTNode<VarDecl>();
   if (VD && !VD->getName().empty())
     return Var;
 

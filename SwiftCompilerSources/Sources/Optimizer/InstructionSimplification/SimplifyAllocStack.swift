@@ -428,7 +428,8 @@ private extension AllocStackInst {
           isCopy: ucca.isCopy)
         context.erase(instruction: ucca)
       case let dv as DebugValueInst:
-        if self.type.isExistential || dv.location.isInlined || dv.debugReconstructionBlock != nil {
+        if self.type.isExistential || dv.debugVariable?.scope?.inlinedCallSite != nil
+            || dv.debugReconstructionBlock != nil {
           // We cannot retype the debug_value of an existential: all debug_values of a variable
           // must have the same type, and there may be other debug_values of the variable in the
           // function, e.g. an `undef` marker which SILGen emits when a variable is consumed.

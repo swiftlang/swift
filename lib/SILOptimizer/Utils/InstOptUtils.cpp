@@ -2265,10 +2265,7 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (srcDVI && srcDVI->getAllOperands().size() > 1)
     return;
 
-  // Note: The instruction should logically be in the SI's scope.
-  // However, LLVM does not support variables and stores in different scopes,
-  // so we use the variable's scope.
-  auto *newDVI = SILBuilder(SI, DefiningInst->getDebugScope())
+  auto *newDVI = SILBuilderWithScope(SI)
       .createDebugValue(SI->getLoc(), original, *VarInfo);
 
   if (srcDVI)
@@ -2344,8 +2341,8 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
           tupleType, SPII->getComponentIndex());
       VarInfo.DIExpr.append(FragDIExpr);
     }
-    SILBuilder(PESI, DbgInst->getDebugScope())
-        .createDebugValue(DbgInst->getLoc(), PESI->getValue(), VarInfo);
+    SILBuilderWithScope(PESI)
+        .createDebugValue(PESI->getLoc(), PESI->getValue(), VarInfo);
   }
 }
 
