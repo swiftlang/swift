@@ -1928,14 +1928,13 @@ getUnownedContextFields(ArrayRef<ParameterConvention> conventions,
 /// call when the parameter convention is `Direct_Owned`.
 void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            HeapLayout const *layout, llvm::Value *rawContextPtr,
-                           Address contextPtr,
+                           Address contextPtr, Atomicity contextAtomicity,
                            const llvm::BitVector &consumedFields,
                            const llvm::BitVector &unownedFields,
                            bool contextIsOnStack, bool trapsOnDestroy) {
   if (!layout) {
     assert(!trapsOnDestroy && "trapping contexts always have a layout");
-    forwarder.emitNativeStrongRelease(rawContextPtr,
-                                      forwarder.getDefaultAtomicity());
+    forwarder.emitNativeStrongRelease(rawContextPtr, contextAtomicity);
     return;
   }
 
@@ -1946,8 +1945,7 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
   // uninitialized instead of releasing it in that case.
   if (!trapsOnDestroy && (consumedFields.empty() || consumedFields.none())) {
     if (!contextIsOnStack) {
-      forwarder.emitNativeStrongRelease(rawContextPtr,
-                                        forwarder.getDefaultAtomicity());
+      forwarder.emitNativeStrongRelease(rawContextPtr, contextAtomicity);
       return;
     }
 
@@ -2017,7 +2015,7 @@ static llvm::Value *emitPartialApplicationForwarder(
     bool calleeHasContext, const Signature &origSig,
     CanSILFunctionType origType, CanSILFunctionType substType,
     CanSILFunctionType outType, SubstitutionMap subs, HeapLayout const *layout,
-    ArrayRef<ParameterConvention> conventions,
+    Atomicity contextAtomicity, ArrayRef<ParameterConvention> conventions,
     ArrayRef<unsigned> borrowedFields) {
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
@@ -2215,7 +2213,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Direct_Owned:
-      if (!consumesContext) subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
+      if (!consumesContext)
+        subIGF.emitNativeStrongRetain(rawData, contextAtomicity);
       break;
 
     case ParameterConvention::Indirect_In_Guaranteed:
@@ -2223,7 +2222,7 @@ static llvm::Value *emitPartialApplicationForwarder(
       dependsOnContextLifetime = true;
       if (outType->getCalleeConvention() ==
             ParameterConvention::Direct_Unowned) {
-        subIGF.emitNativeStrongRetain(rawData, subIGF.getDefaultAtomicity());
+        subIGF.emitNativeStrongRetain(rawData, contextAtomicity);
         consumesContext = true;
       }
       break;
@@ -2452,9 +2451,9 @@ static llvm::Value *emitPartialApplicationForwarder(
     if (consumesContext && !dependsOnContextLifetime && rawData) {
       assert(!outType->isTrivialNoEscape() &&
              "Trivial closure context must not be released");
-      destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                            unownedFields, outType->isNoEscape(),
-                            outType->isNondeinitable());
+      destroyClosureContext(IGM, subIGF, layout, rawData, data,
+                            contextAtomicity, consumedFields, unownedFields,
+                            outType->isNoEscape(), outType->isNondeinitable());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2576,8 +2575,8 @@ static llvm::Value *emitPartialApplicationForwarder(
   if (rawData && consumesContext && dependsOnContextLifetime) {
     assert(!outType->isTrivialNoEscape() &&
            "Trivial closure context must not be released");
-    destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
-                          unownedFields, outType->isNoEscape(),
+    destroyClosureContext(IGM, subIGF, layout, rawData, data, contextAtomicity,
+                          consumedFields, unownedFields, outType->isNoEscape(),
                           outType->isNondeinitable());
   }
 
@@ -2769,8 +2768,11 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     args.add(fnContext);
     argValTypes.push_back(SILType::getNativeObjectType(IGF.IGM.Context));
     argConventions.push_back(origType->getCalleeConvention());
+    // The context of a @nontransferable function is confined.
     argTypeInfos.push_back(
-         &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheNativeObjectType));
+        origType->isNonTransferable()
+            ? &IGF.IGM.getNonTransferableNativeObjectTypeInfo()
+            : &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheNativeObjectType));
     // If this is the only context argument we end up with, we can just share
     // it.
     if (args.size() == 1) {
@@ -2837,6 +2839,13 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     hasSingleSwiftRefcountedContext = No;
   }
 
+  // @nontransferable closures can't cross an isolation boundary, and neither
+  // can their contexts (see the single ref-counted context check above), so
+  // operations on the context can use non-atomic reference counting.
+  auto contextAtomicity = outType->isNonTransferable()
+                              ? Atomicity::NonAtomic
+                              : IGF.getDefaultAtomicity();
+
   // If we only need to capture a single Swift-refcounted object, we
   // still need to build a thunk, but we don't need to allocate anything.
   if ((hasSingleSwiftRefcountedContext == Yes ||
@@ -2853,7 +2862,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     llvm::Value *forwarder = emitPartialApplicationForwarder(
         IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
-        outType, subs, nullptr, argConventions, borrowedFields);
+        outType, subs, nullptr, contextAtomicity, argConventions,
+        borrowedFields);
     forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
     forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
@@ -3026,7 +3036,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   llvm::Value *forwarder = emitPartialApplicationForwarder(
       IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
-      outType, subs, &layout, argConventions, borrowedFields);
+      outType, subs, &layout, contextAtomicity, argConventions, borrowedFields);
   forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
