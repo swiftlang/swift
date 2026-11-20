@@ -175,6 +175,9 @@ class AndroidPlatform(Platform):
                        args.android_arch == 'armv7'
                        else 'armv7-a')
         options.define('CMAKE_ANDROID_NDK:PATH', args.android_ndk)
+        # Use the shared C++ runtime, like the Swift runtime libraries do,
+        # so that libraries like _FoundationICU don't carry their own copy.
+        options.define('CMAKE_ANDROID_STL_TYPE', 'c++_shared')
         return options
 
     def ndk_toolchain_path(self, args):
