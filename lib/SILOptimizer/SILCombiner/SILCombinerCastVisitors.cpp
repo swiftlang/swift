@@ -753,13 +753,24 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
     if (hasOneNonDebugUse(CFI)) {
       if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getOperand())) {
         if (TTTFI->getSingleUse()) {
+          // A thin function has no execution semantics. The new
+          // `thin_to_thick_function` adds them instead.
           auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
-          auto convertedThinType = convertedThickType->getWithRepresentation(
-            SILFunctionTypeRepresentation::Thin);
+          auto convertedThinType = convertedThickType->getWithExtInfo(
+              convertedThickType->getExtInfo()
+                  .intoBuilder()
+                  .withRepresentation(SILFunctionTypeRepresentation::Thin)
+                  .withExecutionSemantics(std::nullopt)
+                  .build());
+          // A thin function has no context to deinit, so a conversion without
+          // actually deiniting it is an ordinary conversion.
+          auto conversionKind = CFI->withoutActuallyDeiniting()
+                                    ? ConvertFunctionInst::Kind::Ordinary
+                                    : CFI->getConversionKind();
           auto *newCFI = Builder.createConvertFunction(
               CFI->getLoc(), TTTFI->getOperand(),
               SILType::getPrimitiveObjectType(convertedThinType),
-              CFI->getConversionKind());
+              conversionKind);
           auto *newTTTFI = Builder.createThinToThickFunction(
             TTTFI->getLoc(), newCFI, CFI->getType());
           replaceInstUsesWith(*CFI, newTTTFI);
