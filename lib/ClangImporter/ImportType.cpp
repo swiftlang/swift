@@ -3004,8 +3004,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
       classifyCxxReferenceParameter(param->getType()) &&
       !swiftParamTy->isForeignReferenceType() &&
-      !(isa<clang::FunctionDecl>(paramContext) &&
-        cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
       !isa<clang::ObjCMethodDecl, clang::ObjCContainerDecl>(paramContext)) {
     paramInfo->setAddressable();
   }
