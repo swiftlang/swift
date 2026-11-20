@@ -1888,6 +1888,23 @@ thickenMetatypes(TypeRefBuilder &Builder, const TypeRef *TR) {
   return ThickenMetatype(Builder).visit(TR);
 }
 
+/// Returns true if the metatype of \p InstanceTR has an empty representation no
+/// matter how its type parameters are substituted. Like HasSingletonMetatype in
+/// SIL type lowering, only a type parameter, or a metatype of one, can have a
+/// non-empty representation that substitution must preserve. The metatype of a
+/// class is also non-empty, but TypeConverter handles it independently of the
+/// representation recorded in the MetatypeTypeRef.
+static bool
+hasSubstitutionIndependentSingletonMetatype(const TypeRef *InstanceTR) {
+  if (isa<GenericTypeParameterTypeRef>(InstanceTR) ||
+      isa<DependentMemberTypeRef>(InstanceTR))
+    return false;
+  if (auto *Metatype = dyn_cast<MetatypeTypeRef>(InstanceTR))
+    return hasSubstitutionIndependentSingletonMetatype(
+        Metatype->getInstanceType());
+  return true;
+}
+
 class TypeRefSubstitution
   : public TypeRefVisitor<TypeRefSubstitution, const TypeRef *> {
   TypeRefBuilder &Builder;
@@ -2068,12 +2085,16 @@ public:
     if (M->isConcrete())
       return M;
 
-    // When substituting a concrete type into a type parameter inside
-    // of a metatype's instance type, (eg; T.Type, T := C), we must
-    // represent the metatype at runtime as a value, even if the
-    // metatype naturally has an empty representation.
+    // When substituting a concrete type into a type parameter that is the
+    // metatype's instance type, (eg; T.Type, T := C), we must represent the
+    // metatype at runtime as a value, even if the metatype naturally has an
+    // empty representation. Other metatypes, like Box<T>.Type, keep the empty
+    // representation the compiler chose for the unsubstituted type.
+    bool WasAbstract =
+        M->wasAbstract() ||
+        !hasSubstitutionIndependentSingletonMetatype(M->getInstanceType());
     return MetatypeTypeRef::create(Builder, visit(M->getInstanceType()),
-                                   /*WasAbstract=*/true);
+                                   WasAbstract);
   }
 
   const TypeRef *
