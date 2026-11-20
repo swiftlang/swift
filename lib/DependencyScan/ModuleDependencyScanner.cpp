@@ -1867,18 +1867,18 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier,
                lookupResult.foundDependencyInfo->getKind()});
-          ScanDiagnosticReporter.warnOnIncompatibleCandidates(
-              moduleImport.importIdentifier,
-              lookupResult.incompatibleCandidates);
+          ScanDiagnosticReporter.diagnoseIncompatibleCandidates(
+              moduleImport, lookupResult.incompatibleCandidates,
+              /*moduleResolved=*/true, DependencyCache, std::nullopt);
           // Module was resolved from a cache
         } else if (auto cachedInfo = DependencyCache.findSwiftDependency(
                        moduleImport.importIdentifier))
           importedSwiftDependencies.insert(
               {moduleImport.importIdentifier, cachedInfo.value()->getKind()});
         else {
-          ScanDiagnosticReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
-                     moduleImport, lookupResult.incompatibleCandidates,
-                     DependencyCache, std::nullopt);
+          ScanDiagnosticReporter.diagnoseIncompatibleCandidates(
+              moduleImport, lookupResult.incompatibleCandidates,
+              /*moduleResolved=*/false, DependencyCache, std::nullopt);
           DependencyCache
             .recordFailedSwiftDependencyLookup(moduleImport.importIdentifier);
         }
@@ -2069,18 +2069,20 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
                                          *(lookupResult.foundDependencyInfo));
         swiftOverlayDependencies.insert(
             {moduleName, lookupResult.foundDependencyInfo->getKind()});
-        ScanDiagnosticReporter.warnOnIncompatibleCandidates(
-            moduleName, lookupResult.incompatibleCandidates);
+        ScanDiagnosticReporter.diagnoseIncompatibleCandidates(
+            ScannerImportStatementInfo(moduleName),
+            lookupResult.incompatibleCandidates, /*moduleResolved=*/true,
+            DependencyCache, std::nullopt);
         // Module was resolved from a cache
       } else if (auto cachedInfo =
                      DependencyCache.findSwiftDependency(moduleName))
         swiftOverlayDependencies.insert(
             {moduleName, cachedInfo.value()->getKind()});
       else
-        ScanDiagnosticReporter.diagnoseFailureOnOnlyIncompatibleCandidates(
+        ScanDiagnosticReporter.diagnoseIncompatibleCandidates(
             ScannerImportStatementInfo(moduleName),
-            lookupResult.incompatibleCandidates, DependencyCache,
-            std::nullopt);
+            lookupResult.incompatibleCandidates, /*moduleResolved=*/false,
+            DependencyCache, std::nullopt);
     }
   };
   for (const auto &clangDep : visibleClangDependencies)
@@ -2748,30 +2750,52 @@ void DependencyScannerDiagnosticReporter::diagnoseModuleNotFoundFailure(
   ReportedMissing.insert(moduleImport.importIdentifier);
 }
 
-void DependencyScannerDiagnosticReporter::diagnoseFailureOnOnlyIncompatibleCandidates(
+void DependencyScannerDiagnosticReporter::diagnoseIncompatibleCandidates(
     const ScannerImportStatementInfo &moduleImport,
     const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
         &candidates,
-    const ModuleDependenciesCache &cache,
+    bool moduleResolved, const ModuleDependenciesCache &cache,
     std::optional<ModuleDependencyID> dependencyOf) {
-  // If no incompatible candidates were discovered,
-  // the dependency scanning failure will be caught downstream.
+  // No incompatible candidates: nothing to diagnose here. If the query
+  // also failed, the failure is diagnosed downstream.
   if (candidates.empty())
     return;
 
+  auto isForOtherTarget = [](const auto &candidate) {
+    return candidate.incompatibilityReason ==
+           SwiftModuleScannerQueryResult::BUILT_FOR_INCOMPATIBLE_TARGET;
+  };
+  auto warn = [&](const auto &candidate) {
+    Diagnostics.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
+                         candidate.path, candidate.incompatibilityReason);
+  };
+
+  // 1. The module was resolved, e.g. on a later search path. A
+  // '.swiftmodule' directory lacking a variant for the current target is
+  // expected on an earlier one, e.g. a macOS-only twin when building for
+  // Mac Catalyst, so only warn about the other candidates.
+  if (moduleResolved) {
+    for (const auto &candidate : candidates)
+      if (!isForOtherTarget(candidate))
+        warn(candidate);
+    return;
+  }
+
+  // 2. The query failed and every candidate only lacks a variant for the
+  // current target. Warn to explain why no Swift module was used.
   // FIXME: There are known cases where clients are relying on
   // loading the underlying Clang module in the presence of a Swift
   // module which is lacking the required target-specific variant,
   // such as MacCatalyst. Eventually, we should pursue making this
   // an error as well.
-  if (llvm::all_of(candidates, [](auto &incompatibleCandidate) {
-        return incompatibleCandidate.incompatibilityReason ==
-            SwiftModuleScannerQueryResult::BUILT_FOR_INCOMPATIBLE_TARGET;
-      })) {
-    warnOnIncompatibleCandidates(moduleImport.importIdentifier, candidates);
+  if (llvm::all_of(candidates, isForOtherTarget)) {
+    for (const auto &candidate : candidates)
+      warn(candidate);
     return;
   }
 
+  // 3. The query failed and some candidate is incompatible for another
+  // reason, e.g. malformed or built by a different compiler: an error.
   diagnoseModuleNotFoundFailure(moduleImport, cache, dependencyOf,
                                 /* resolvingSerializedSearchPath */ std::nullopt,
                                 candidates);
@@ -2782,18 +2806,6 @@ DependencyScannerDiagnosticReporter::DependencyScannerDiagnosticReporter(
     : Diagnostics(Diagnostics), EmitScanRemarks(EmitScanRemarks) {
   if (EmitScanRemarks)
     ScanMetrics = std::make_unique<ScannerMetrics>();
-}
-
-void DependencyScannerDiagnosticReporter::warnOnIncompatibleCandidates(
-    StringRef moduleName,
-    const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
-        &candidates) {
-  // If the dependency was ultimately resolved to a different
-  // binary module or a textual module, emit warnings about
-  // having encountered incompatible binary modules.
-  for (const auto &candidate : candidates)
-    Diagnostics.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
-                         candidate.path, candidate.incompatibilityReason);
 }
 
 void DependencyScannerDiagnosticReporter::registerSwiftModuleQuery() {

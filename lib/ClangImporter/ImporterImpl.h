@@ -591,8 +591,64 @@ public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
-  /// Mapping of already-imported declarations.
-  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+  using ImportedDeclsKey = std::pair<const clang::Decl *, Version>;
+
+private:
+  /// Mapping of already-imported declarations, and whether each import is
+  /// complete. An importer may cache a declaration before it is completely
+  /// imported, so that recursive imports find it instead of looping.
+  llvm::DenseMap<ImportedDeclsKey, llvm::PointerIntPair<Decl *, 1, bool>>
+      ImportedDecls;
+
+public:
+  /// Returns the cached import of \p key, which is null if the declaration
+  /// could not be imported, or std::nullopt if nothing is cached (or if
+  /// \p requireCompletelyImported and the cached import is not complete).
+  std::optional<Decl *>
+  findImportedDecl(ImportedDeclsKey key,
+                   bool requireCompletelyImported = false) const {
+    auto it = ImportedDecls.find(key);
+    if (it == ImportedDecls.end())
+      return std::nullopt;
+    if (requireCompletelyImported && !it->second.getInt())
+      return std::nullopt;
+    return it->second.getPointer();
+  }
+
+  /// Caches \p decl as the import of \p key, replacing any cached import.
+  ///
+  /// Pass \p isComplete false to cache \p decl before it is completely
+  /// imported, then call \c markImportedDeclComplete once it is.
+  void cacheImportedDecl(ImportedDeclsKey key, Decl *decl,
+                         bool isComplete = true) {
+    ImportedDecls[key] = {decl, isComplete};
+  }
+
+  /// Marks the import cached for \p key complete, if any.
+  void markImportedDeclComplete(ImportedDeclsKey key) {
+    auto it = ImportedDecls.find(key);
+    if (it != ImportedDecls.end())
+      it->second.setInt(true);
+  }
+
+  /// Caches \p decl as the complete import of \p key, unless another import
+  /// is already cached. Returns the cached import.
+  Decl *cacheImportedDeclIfAbsent(ImportedDeclsKey key, Decl *decl) {
+    auto it = ImportedDecls.try_emplace(key, decl, true).first;
+    return it->second.getPointer();
+  }
+
+  void eraseImportedDecl(ImportedDeclsKey key) { ImportedDecls.erase(key); }
+
+  size_t getNumImportedDecls() const { return ImportedDecls.size(); }
+
+  /// Calls \p fn on each non-null imported declaration and its key.
+  void forEachImportedDecl(
+      llvm::function_ref<void(ImportedDeclsKey, Decl *)> fn) const {
+    for (auto &entry : ImportedDecls)
+      if (auto *decl = entry.second.getPointer())
+        fn(entry.first, decl);
+  }
 
   /// Maps a canonical declaration and a type that only appears \em elsewhere
   /// in its redeclaration chain to the declaration that should be used as part
@@ -1462,9 +1518,9 @@ public:
   /// Determines the key that should be used to store or look up \p ClangDecl
   /// in \c ImportedDecls . This will usually canonicalize the decl, although
   /// there are rare exceptions.
-  std::pair<const clang::Decl *, Version>
-  getImportedDeclsKey(const clang::NamedDecl *ClangDecl, Version version,
-                      bool UseCanonicalDecl = true);
+  ImportedDeclsKey getImportedDeclsKey(const clang::NamedDecl *ClangDecl,
+                                       Version version,
+                                       bool UseCanonicalDecl = true);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -2905,6 +2961,10 @@ void checkRetainReleaseFunctions(ClassDecl *classDecl,
 bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
                                      StringRef swiftBaseName,
                                      Evaluator &evaluator);
+
+/// Whether Swift copies and destroys values of \p nominal by copying and
+/// destroying its storage.
+bool hasExposedStorage(const NominalTypeDecl *nominal);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
