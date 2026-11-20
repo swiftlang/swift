@@ -398,6 +398,17 @@ class IRGenSILFunction :
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
+
+  /// The storage and the result buffer of a split continuation, which the
+  /// createSplitContinuation builtin allocates in this frame and the paired
+  /// destroySplitContinuation builtin releases.
+  struct SplitContinuationAllocation {
+    Address storage;
+    StackAddress result;
+    SILType resultType;
+  };
+  llvm::DenseMap<SILValue, SplitContinuationAllocation>
+      SplitContinuationAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
 
   /// All alloc_ref instructions which allocate the object on the stack.
@@ -4024,6 +4035,55 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
   }
 }
 
+static void emitBuiltinCreateSplitContinuation(IRGenSILFunction &IGF,
+                                               swift::BuiltinInst *i) {
+  // The storage of the continuation has a fixed size, so it doesn't depend on
+  // the runtime's layout.
+  auto storageTy =
+      llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_SplitContinuation);
+  Address storage = IGF.createAlloca(
+      storageTy, Alignment(Alignment_SplitContinuation), "split.continuation");
+  IGF.Builder.CreateLifetimeStart(storage);
+
+  // The result buffer is an ordinary stack allocation of the result type, at
+  // the abstraction the resumers and the await use for it.
+  auto resultType =
+      i->getSubstitutions().getReplacementTypes()[0]->getCanonicalType();
+  SILType resultSILType =
+      IGF.IGM.getLoweredType(AbstractionPattern::getOpaque(), resultType);
+  StackAddress result = IGF.getTypeInfo(resultSILType)
+                            .allocateStack(IGF, resultSILType, "split.result");
+
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getContinuationInitSplitFunctionPointer(),
+      {storage.getAddress(),
+       IGF.Builder.CreateBitOrPointerCast(result.getAddress().getAddress(),
+                                          IGF.IGM.OpaquePtrTy)});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.SplitContinuationAllocations[i] = {storage, result, resultSILType};
+
+  auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
+  Explosion out;
+  out.add(IGF.Builder.CreateBitOrPointerCast(storage.getAddress(),
+                                             rawContTI.getStorageType()));
+  IGF.setLoweredExplosion(i, out);
+}
+
+static void emitBuiltinDestroySplitContinuation(IRGenSILFunction &IGF,
+                                                swift::BuiltinInst *i) {
+  // The SIL verifier pairs the deallocation with its allocation, so the
+  // operand is the createSplitContinuation builtin itself.
+  auto found = IGF.SplitContinuationAllocations.find(i->getOperand(0));
+  assert(found != IGF.SplitContinuationAllocations.end() &&
+         "destroySplitContinuation without its createSplitContinuation");
+  auto &allocation = found->second;
+  IGF.getTypeInfo(allocation.resultType)
+      .deallocateStack(IGF, allocation.result, allocation.resultType);
+  IGF.Builder.CreateLifetimeEnd(allocation.storage);
+}
+
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
   assert(i->getOperandValues().size() == 7 &&
@@ -4061,6 +4121,12 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 
   case BuiltinValueKind::CreateAsyncTask:
     return emitBuiltinCreateAsyncTask(*this, i);
+
+  case BuiltinValueKind::CreateSplitContinuation:
+    return emitBuiltinCreateSplitContinuation(*this, i);
+
+  case BuiltinValueKind::DestroySplitContinuation:
+    return emitBuiltinDestroySplitContinuation(*this, i);
 
   default:
     break;
@@ -9470,14 +9536,17 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
     SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
 
-    // The handlers, as the function and context of each closure followed by
-    // the word that selects which of them are used.
-    SmallVector<llvm::Value *, 5> handlers;
-    for (unsigned i = 2; i <= 4; ++i) {
-      Explosion handler = getLoweredExplosion(splitGet->getArguments()[i]);
-      while (!handler.empty())
-        handlers.push_back(handler.claimNext());
-    }
+    // Each handler is a closure, so it explodes into a function and a context.
+    Explosion cancellation = getLoweredExplosion(splitGet->getArguments()[2]);
+    Explosion escalation = getLoweredExplosion(splitGet->getArguments()[3]);
+    SplitContinuationHandlers handlers;
+    handlers.cancellationFunction = cancellation.claimNext();
+    handlers.cancellationContext = cancellation.claimNext();
+    handlers.escalationFunction = escalation.claimNext();
+    handlers.escalationContext = escalation.claimNext();
+    handlers.flags = getLoweredSingletonExplosion(splitGet->getArguments()[4]);
+    assert(cancellation.empty() && escalation.empty() &&
+           "a closure explodes into a function and a context");
 
     auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
     bool hasError = i->getErrorBB() != nullptr;

@@ -16,8 +16,9 @@
 // Cancels and escalates a task while it installs the handlers of a wait, and
 // then resumes it. If the wait doesn't suspend, no handler runs. Otherwise the
 // cancellation handler must run exactly once, and the last call of the
-// escalation handler must report the priority the task ended up with. The
-// escalation handler must never run concurrently with itself.
+// escalation handler must report the priority the task had when it was resumed.
+// The escalation handler must never run concurrently with itself, and no
+// handler runs after the wait returned.
 
 import Dispatch
 import Synchronization
@@ -38,9 +39,11 @@ func run() {
     let box = ContinuationBox()
     let observations = Observations()
     let started = DispatchSemaphore(value: 0)
+    let waited = DispatchSemaphore(value: 0)
+    let proceed = DispatchSemaphore(value: 0)
 
     let task = Task.detached(priority: .background) {
-      await withContinuation(of: Int.self, throwing: Never.self) {
+      let value = await withContinuation(of: Int.self, throwing: Never.self) {
         continuation, waiter in
         box.continuation = consume continuation
         started.signal()
@@ -57,12 +60,22 @@ func run() {
             observations.inEscalationHandler.store(false, ordering: .releasing)
           })
       }
+      // Let the main thread escalate the task after the wait returned.
+      waited.signal()
+      proceed.wait()
+      return value
     }
 
     started.wait()
     task.escalatePriority(to: .medium)
     task.cancel()
     box.continuation.take()!.resume(returning: i)
+
+    // The handlers are gone once the wait returned, so this escalation must not
+    // reach them.
+    waited.wait()
+    task.escalatePriority(to: .high)
+    proceed.signal()
 
     let done = DispatchSemaphore(value: 0)
     Task.detached {

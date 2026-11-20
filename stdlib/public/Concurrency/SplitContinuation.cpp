@@ -32,17 +32,19 @@ using namespace swift;
 // threads. Unlike swift_continuation_init/await/resume, which assume create and
 // await are adjacent on one task with nothing in between, a split continuation:
 //
-//   * create (swift_continuation_createSplit): allocates the continuation's
-//     storage, its context, and the result storage, state Pending; does NOT
-//     bind a resume-point and does NOT touch task execution state. Returns
-//     the continuation. Its storage is shaped like the front of a task, so
-//     one Continuation type can carry either flavour and a resume works for
-//     both.
+//   * create (swift_continuation_initSplit): initializes the storage and the
+//     context in the NumWords_SplitContinuation words the compiler allocated,
+//     points the context at the result buffer the compiler also allocated, and
+//     sets the state to Pending; does NOT bind a resume-point and does NOT
+//     touch task execution state. The storage is shaped like the front of a
+//     task, so one Continuation type can carry either flavour and a resume
+//     works for both.
 //   * await (swift_continuation_awaitSplit): binds the resume-point to the
 //     *current* task, records the awaiting task on the context, and performs
 //     the Pending->Awaited transition. The cancellation and escalation
-//     handlers it is passed are published in the same status update that
-//     suspends the task, and the task removes them when it resumes.
+//     handlers it is passed are built in buffers in the waiting frame,
+//     published in the same status update that suspends the task, and removed
+//     by the task when it resumes.
 //   * resume: the regular swift_continuation_resume* entry points, and
 //     swift_continuation_resumeOnExecutors, which read the marker word and
 //     route to the split implementation. The resume works *by context* (the
@@ -54,43 +56,18 @@ using namespace swift;
 
 namespace {
 
-/// The cancellation and escalation handlers installed at `wait`. Their records
-/// live in the continuation's storage, so installing them doesn't require a
-/// task allocation.
+/// The handler records that a wait published, which the task removes again
+/// when it resumes. Null for a handler that isn't published. The records live
+/// in buffers in the frame of the waiting function, which outlive the wait.
 struct SplitContinuationHandlers {
-  enum : uint8_t {
-    HasCancellation = 1 << 0,
-    HasEscalation = 1 << 1,
-    CancellationPublished = 1 << 2,
-    EscalationPublished = 1 << 3,
-  };
-
-  uint8_t Flags;
-
-  alignas(CancellationNotificationStatusRecord) char
-      CancellationStorage[sizeof(CancellationNotificationStatusRecord)];
-  alignas(EscalationNotificationStatusRecord) char
-      EscalationStorage[sizeof(EscalationNotificationStatusRecord)];
-
-  bool any() const { return Flags & (HasCancellation | HasEscalation); }
-
-  CancellationNotificationStatusRecord *cancellation() {
-    if (!(Flags & HasCancellation))
-      return nullptr;
-    return reinterpret_cast<CancellationNotificationStatusRecord *>(
-        CancellationStorage);
-  }
-
-  EscalationNotificationStatusRecord *escalation() {
-    if (!(Flags & HasEscalation))
-      return nullptr;
-    return reinterpret_cast<EscalationNotificationStatusRecord *>(
-        EscalationStorage);
-  }
+  CancellationNotificationStatusRecord *Cancellation;
+  EscalationNotificationStatusRecord *Escalation;
 };
 
 /// The storage backing a split continuation. A raw continuation referring to a
-/// split continuation is the address of one of these.
+/// split continuation is the address of one of these. The compiler allocates
+/// NumWords_SplitContinuation words for it in the frame of the function that
+/// creates the continuation, followed by the context.
 ///
 /// The layout makes a split continuation resumable by *any* code that can
 /// resume a regular one, including code compiled before split continuations
@@ -108,7 +85,7 @@ struct SplitContinuationStorage {
   /// Padding placing `ResumeContext` where a task keeps its own.
   char TaskPrefixPadding[offsetof(AsyncTask, ResumeContext) - sizeof(uintptr_t)];
 
-  /// Points at the ContinuationAsyncContext that follows in this allocation.
+  /// Points at the ContinuationAsyncContext that follows in this storage.
   AsyncContext * __ptrauth_swift_task_resume_context ResumeContext;
 
   /// The task awaiting the continuation, recorded at await time so that a
@@ -116,8 +93,8 @@ struct SplitContinuationStorage {
   /// a resume that races ahead of the await is recognised.
   AsyncTask *AwaitingTask;
 
-  /// The handlers installed when `wait` was called.
-  SplitContinuationHandlers Handlers;
+  /// The handler records the wait published.
+  SplitContinuationHandlers PublishedHandlers;
 };
 
 /// Written into `SplitContinuationStorage::Marker`, where a task keeps its
@@ -133,10 +110,36 @@ static_assert(offsetof(SplitContinuationStorage, ResumeContext) ==
 #pragma clang diagnostic pop
 
 /// The context follows the storage, at the context's alignment.
-static size_t splitContextOffset() {
-  return llvm::alignTo(sizeof(SplitContinuationStorage),
-                       alignof(ContinuationAsyncContext));
+static constexpr size_t splitContextOffset() {
+  return (sizeof(SplitContinuationStorage) + alignof(ContinuationAsyncContext) -
+          1) /
+         alignof(ContinuationAsyncContext) * alignof(ContinuationAsyncContext);
 }
+
+// The compiler allocates these sizes in the frames of clients, so they must not
+// grow once shipped.
+static_assert(splitContextOffset() + sizeof(ContinuationAsyncContext) <=
+                  NumWords_SplitContinuation * sizeof(void *),
+              "a split continuation doesn't fit NumWords_SplitContinuation");
+static_assert(alignof(ContinuationAsyncContext) <= Alignment_SplitContinuation,
+              "a split continuation needs more than "
+              "Alignment_SplitContinuation");
+static_assert(sizeof(CancellationNotificationStatusRecord) <=
+                  NumWords_TaskCancellationHandler * sizeof(void *),
+              "a cancellation handler record doesn't fit "
+              "NumWords_TaskCancellationHandler");
+static_assert(sizeof(EscalationNotificationStatusRecord) <=
+                  NumWords_TaskEscalationHandler * sizeof(void *),
+              "an escalation handler record doesn't fit "
+              "NumWords_TaskEscalationHandler");
+static_assert(alignof(CancellationNotificationStatusRecord) <=
+                  Alignment_TaskCancellationHandler,
+              "a cancellation handler record needs more than "
+              "Alignment_TaskCancellationHandler");
+static_assert(alignof(EscalationNotificationStatusRecord) <=
+                  Alignment_TaskEscalationHandler,
+              "an escalation handler record needs more than "
+              "Alignment_TaskEscalationHandler");
 
 /// Whether `continuation` is a split continuation rather than a task.
 static bool isSplitContinuation(const void *continuation) {
@@ -218,28 +221,18 @@ void swift::resumeSplitContinuation(
 
 
 SWIFT_CC(swift)
-SplitContinuation *
-swift::swift_continuation_createSplit(const Metadata *resultType) {
-  // Task-allocate the continuation's storage, the context and trailing storage
-  // for the result value. The result storage has to live here rather than in
-  // the awaiting frame because a resume can arrive before the await does and
-  // needs somewhere to write the value.
+void swift::swift_continuation_initSplit(SplitContinuation *continuation,
+                                         OpaqueValue *result) {
+  // The compiler allocated the storage and the result buffer in the frame of
+  // the function that creates the continuation. The result buffer has to exist
+  // from now on rather than only in the awaiting frame, because a resume can
+  // arrive before the await does and needs somewhere to write the value.
   auto *task = swift_task_getCurrent();
   assert(task && "creating a split continuation outside of a task");
 
-  size_t contextOffset = splitContextOffset();
-  size_t resultAlign = resultType->vw_alignment();
-  size_t resultSize = resultType->vw_size();
-  size_t resultOffset =
-      llvm::alignTo(contextOffset + sizeof(ContinuationAsyncContext),
-                    resultAlign);
-  // swift_task_alloc only guarantees MaximumAlignment, so an over-aligned
-  // result needs slack to align its storage within the allocation.
-  size_t slack = resultAlign > MaximumAlignment ? resultAlign - 1 : 0;
-
-  void *allocation = swift_task_alloc(resultOffset + slack + resultSize);
+  auto *storage = reinterpret_cast<SplitContinuationStorage *>(continuation);
   auto *context = reinterpret_cast<ContinuationAsyncContext *>(
-      static_cast<char *>(allocation) + contextOffset);
+      reinterpret_cast<char *>(storage) + splitContextOffset());
 
   // Initialize the fields we own. We deliberately do *not* run a constructor
   // (the base AsyncContext's Parent/ResumeParent are bound later, at await) and
@@ -253,19 +246,16 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   context->Flags = ContinuationAsyncContext::FlagsType();
   context->Flags.setCanThrow(true);
   context->ErrorResult = nullptr;
-  context->NormalResult = reinterpret_cast<OpaqueValue *>(llvm::alignTo(
-      reinterpret_cast<uintptr_t>(allocation) + resultOffset, resultAlign));
+  context->NormalResult = result;
   // Overwritten by the await.
   context->ResumeToExecutor = SerialExecutorRef::generic();
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   context->Cond = nullptr;
 #endif
 
-  auto *storage = static_cast<SplitContinuationStorage *>(allocation);
   storage->Marker = SplitContinuationMarker;
   storage->AwaitingTask = nullptr;
-  // We set the handlers to 0 when we create the continuation.
-  storage->Handlers.Flags = 0;
+  storage->PublishedHandlers = {};
 
   // Relaxed is fine: resumption must happen-after this call returns and the
   // continuation is handed to the executor.
@@ -275,51 +265,14 @@ swift::swift_continuation_createSplit(const Metadata *resultType) {
   storage->ResumeContext = context;
 
   concurrency::trace::task_continuation_init(task, context);
-
-  return static_cast<SplitContinuation *>(allocation);
-}
-
-/// Construct the records of the handlers in `handlers` in `h`.
-static void prepareSplitContinuationHandlers(
-    SplitContinuationHandlers &h,
-    CancellationNotificationStatusRecord::FunctionTypeWithReason
-        *cancellationHandler,
-    void *cancellationContext,
-    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
-    void *escalationContext, size_t handlers) {
-  assert(h.Flags == 0 && "the split continuation was already awaited");
-
-  if (handlers & SplitContinuationCancellationHandler) {
-    ::new (h.CancellationStorage) CancellationNotificationStatusRecord(
-        swift_auth_code(cancellationHandler,
-                        SpecialPointerAuthDiscriminators::
-                            CancellationNotificationWithReasonFunction),
-        cancellationContext);
-    h.Flags |= SplitContinuationHandlers::HasCancellation;
-  }
-  if (handlers & SplitContinuationEscalationHandler) {
-    ::new (h.EscalationStorage) EscalationNotificationStatusRecord(
-        swift_auth_code(
-            escalationHandler,
-            SpecialPointerAuthDiscriminators::EscalationNotificationFunction),
-        escalationContext);
-    h.Flags |= SplitContinuationHandlers::HasEscalation;
-  }
 }
 
 /// Remove the records that a wait published from `task`.
-static void removeSplitContinuationHandlers(AsyncTask *task,
-                                SplitContinuationHandlers &handlers) {
-  auto *cancellation =
-      handlers.Flags & SplitContinuationHandlers::CancellationPublished
-          ? handlers.cancellation()
-          : nullptr;
-  auto *escalation =
-      handlers.Flags & SplitContinuationHandlers::EscalationPublished
-          ? handlers.escalation()
-          : nullptr;
-  handlers.Flags &= ~(SplitContinuationHandlers::CancellationPublished |
-                      SplitContinuationHandlers::EscalationPublished);
+static void removeSplitContinuationHandlers(
+    AsyncTask *task, SplitContinuationHandlers &published) {
+  auto *cancellation = published.Cancellation;
+  auto *escalation = published.Escalation;
+  published = {};
 
   TaskStatusRecord *innermost = escalation;
   if (!innermost)
@@ -359,23 +312,20 @@ static void split_continuation_remove_handlers_resume_adapter(
     SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   auto *context = static_cast<ContinuationAsyncContext *>(_context);
   removeSplitContinuationHandlers(swift_task_getCurrent(),
-                      storageOfContext(context)->Handlers);
+                                  storageOfContext(context)->PublishedHandlers);
   return context->ResumeParent(context);
 }
 
 SWIFT_CC(swiftasync)
 void swift::swift_continuation_awaitSplit(
-    SplitContinuation *continuation,
+    SplitContinuation *continuation, void *cancellationRecord,
     CancellationNotificationStatusRecord::FunctionTypeWithReason
         *cancellationHandler,
-    void *cancellationContext,
+    void *cancellationContext, void *escalationRecord,
     EscalationNotificationStatusRecord::FunctionType *escalationHandler,
     void *escalationContext, size_t handlers) {
   auto *storage =
       reinterpret_cast<SplitContinuationStorage *>(continuation);
-  prepareSplitContinuationHandlers(storage->Handlers, cancellationHandler,
-                                   cancellationContext, escalationHandler,
-                                   escalationContext, handlers);
   auto *context = contextOfStorage(storage);
   auto task = swift_task_getCurrent();
   assert(task && "awaiting a split continuation without a task");
@@ -411,7 +361,24 @@ void swift::swift_continuation_awaitSplit(
   if (oldStatus == ContinuationStatus::Resumed)
     return context->ResumeParent(context);
 
-  auto &splitHandlers = storage->Handlers;
+  // Build the records of the handlers in the buffers the compiler allocated
+  // for them in the waiting frame.
+  CancellationNotificationStatusRecord *cancellation = nullptr;
+  if (handlers & SplitContinuationCancellationHandler)
+    cancellation = ::new (cancellationRecord)
+        CancellationNotificationStatusRecord(
+            swift_auth_code(cancellationHandler,
+                            SpecialPointerAuthDiscriminators::
+                                CancellationNotificationWithReasonFunction),
+            cancellationContext);
+  EscalationNotificationStatusRecord *escalation = nullptr;
+  if (handlers & SplitContinuationEscalationHandler)
+    escalation = ::new (escalationRecord) EscalationNotificationStatusRecord(
+        swift_auth_code(
+            escalationHandler,
+            SpecialPointerAuthDiscriminators::EscalationNotificationFunction),
+        escalationContext);
+  bool hasHandlers = cancellation || escalation;
 
   // The handlers run inline for what happened before their records are
   // published: the cancellation handler if the task is already cancelled, and
@@ -423,8 +390,6 @@ void swift::swift_continuation_awaitSplit(
   // escalation handler runs inline again, so it can see `(p, p)` and then
   // `(p, p2)`. This avoids us needing to run the handlers while holding the
   // lock.
-  auto *cancellation = splitHandlers.cancellation();
-  auto *escalation = splitHandlers.escalation();
   std::optional<JobPriority> reportedPriority;
 
   auto runHandlersInline = [&] {
@@ -486,14 +451,11 @@ void swift::swift_continuation_awaitSplit(
   };
 
   auto markPublished = [&] {
-    if (cancellation)
-      splitHandlers.Flags |= SplitContinuationHandlers::CancellationPublished;
-    if (escalation)
-      splitHandlers.Flags |= SplitContinuationHandlers::EscalationPublished;
+    storage->PublishedHandlers = {cancellation, escalation};
   };
 
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
-  if (splitHandlers.any()) {
+  if (hasHandlers) {
     while (true) {
       runHandlersInline();
       TaskStatusRecord *innermost = escalation;
@@ -521,7 +483,7 @@ void swift::swift_continuation_awaitSplit(
 #else
   // Flag the task as suspended on the continuation. Any handlers are published
   // in the same status update, and removed again when the task resumes.
-  if (splitHandlers.any()) {
+  if (hasHandlers) {
     while (true) {
       runHandlersInline();
       if (!cancellation && !escalation) {
@@ -572,7 +534,7 @@ void swift::swift_continuation_awaitSplit(
   task->resumeRunningAfterFailedSuspend();
 #endif
 
-  removeSplitContinuationHandlers(task, splitHandlers);
+  removeSplitContinuationHandlers(task, storage->PublishedHandlers);
   return context->ResumeParent(context);
 }
 
@@ -580,13 +542,5 @@ ContinuationAsyncContext *swift::getSplitContinuationContext(void *continuation)
   if (!isSplitContinuation(continuation))
     return nullptr;
   return contextOfStorage(storageOfContinuation(continuation));
-}
-
-SWIFT_CC(swift)
-void swift::swift_continuation_destroySplit(SplitContinuation *continuation) {
-  // The await has resolved and taken the result out of the context, and the
-  // resume-exactly-once contract guarantees the resume side is finished with the
-  // context before the awaiting task runs again, so it is safe to free.
-  swift_task_dealloc(continuation);
 }
 

@@ -311,7 +311,7 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
         handlePriorityEscalation(
           TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
       },
-      handlers: 3
+      handlers: Self._cancellationHandler() | Self._escalationHandler()
     )
   }
 
@@ -340,7 +340,7 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
         handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
       },
       onPriorityEscalated: { _, _ in },
-      handlers: 1
+      handlers: Self._cancellationHandler()
     )
   }
 
@@ -386,14 +386,23 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
         handlePriorityEscalation(
           TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
       },
-      handlers: 2
+      handlers: Self._escalationHandler()
     )
   }
 
+  // The bits of SplitContinuationAwaitHandlers in Concurrency.h, for the
+  // `handlers` argument of `_wait`. They are functions so they add no
+  // symbols to the ABI.
+  @export(implementation)
+  static func _cancellationHandler() -> UInt { 1 << 0 }
+
+  @export(implementation)
+  static func _escalationHandler() -> UInt { 1 << 1 }
+
   // TODO: Pass optional handlers and remove `handlers` once Optional can hold
-  // a non-escaping closure. Right now `handlers: UInt` tells the runtime which
-  // handlers are actually set. Its bits have to match
-  // SplitContinuationAwaitHandlers in Concurrency.h.
+  // a non-escaping closure. Right now `handlers` tells the runtime which
+  // handlers are actually set, with `_cancellationHandler()` and
+  // `_escalationHandler()`.
   @export(implementation)
   nonisolated(nonsending) static func _wait(
     context: Builtin.RawUnsafeContinuation,
@@ -462,9 +471,8 @@ public nonisolated(nonsending) func withContinuation<
   // `body`). The continuation is destroyed when this scope exits, after the
   // wait has resolved and moved the value out.
   //
-  // The continuation's storage comes from the task allocator, which is a
-  // stack, so it must be destroyed after everything allocated after it, such
-  // as the buffers for `body`'s result and error.
+  // The compiler allocates the continuation's storage and its result buffer in
+  // this frame.
   let rawContinuation = Builtin.createSplitContinuation(Success.self)
   defer { Builtin.destroySplitContinuation(rawContinuation) }
   let continuation = Continuation<Success, Failure>(rawContinuation)

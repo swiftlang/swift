@@ -911,6 +911,10 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 /// returns is shared by both halves of a split continuation and must be
 /// awaited (awaitSplitThrowingContinuation) and resumed exactly once, then
 /// destroyed when the creating scope returns.
+///
+/// IRGen allocates NumWords_SplitContinuation words for the continuation and a
+/// buffer for its result in the current frame, and has the runtime initialize
+/// them.
 BUILTIN_MISC_OPERATION(CreateSplitContinuation,
                        "createSplitContinuation", "", Special)
 
@@ -922,8 +926,8 @@ BUILTIN_MISC_OPERATION(GetSplitContinuationAddr,
                        "getSplitContinuationAddr", "", Special)
 
 /// Destroy a split continuation created by createSplitContinuation,
-/// after its result has been consumed by the await.
-///
+/// after its result has been consumed by the await. IRGen releases the result
+/// buffer and ends the storage's lifetime.
 /// destroySplitContinuation : (Builtin.RawUnsafeContinuation) -> ()
 BUILTIN_MISC_OPERATION(DestroySplitContinuation,
                        "destroySplitContinuation", "", Special)

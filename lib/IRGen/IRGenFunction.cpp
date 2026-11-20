@@ -986,7 +986,7 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 }
 
 void IRGenFunction::emitAwaitSplitContinuation(
-    llvm::Value *continuation, ArrayRef<llvm::Value *> handlers,
+    llvm::Value *continuation, const SplitContinuationHandlers &handlers,
     Address resumeBuffer, SILType resumeTy,
     llvm::BasicBlock *normalBB, llvm::PHINode *optionalErrorResult,
     llvm::BasicBlock *optionalErrorBB) {
@@ -1033,10 +1033,28 @@ void IRGenFunction::emitAwaitSplitContinuation(
          "Don't support nested await_split_continuation");
   AsyncCoroutineCurrentResume = coroResume;
 
+  // The records of the handlers live in this frame, in buffers of a fixed size
+  // that the runtime builds them in. The task removes them again when it
+  // resumes, before the code below runs.
+  auto makeRecordBuffer = [&](unsigned numWords, size_t alignment,
+                              const llvm::Twine &name) {
+    Address buffer =
+        createAlloca(llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
+                     Alignment(alignment), name);
+    Builder.CreateLifetimeStart(buffer);
+    return buffer;
+  };
+  Address cancellationRecord = makeRecordBuffer(
+      NumWords_TaskCancellationHandler, Alignment_TaskCancellationHandler,
+      "split.cancellation.record");
+  Address escalationRecord = makeRecordBuffer(
+      NumWords_TaskEscalationHandler, Alignment_TaskEscalationHandler,
+      "split.escalation.record");
+
   {
     // Set up the suspend point, using swift_continuation_awaitSplit as the
     // await function.
-    SmallVector<llvm::Value *, 8> arguments;
+    SmallVector<llvm::Value *, 12> arguments;
     unsigned swiftAsyncContextIndex = 0;
     arguments.push_back(IGM.getInt32(swiftAsyncContextIndex));
     arguments.push_back(AsyncCoroutineCurrentResume);
@@ -1047,16 +1065,22 @@ void IRGenFunction::emitAwaitSplitContinuation(
     arguments.push_back(
         Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
     arguments.push_back(Builder.CreateBitOrPointerCast(continuationAsTask, IGM.Int8PtrTy));
-    assert(handlers.size() == 5 &&
-           "a function and context for each handler, and the handler flags");
-    for (auto *handler : handlers.drop_back())
-      arguments.push_back(Builder.CreateBitOrPointerCast(handler, IGM.Int8PtrTy));
-    arguments.push_back(handlers.back());
+    for (auto *value : {cancellationRecord.getAddress(),
+                        handlers.cancellationFunction,
+                        handlers.cancellationContext,
+                        escalationRecord.getAddress(),
+                        handlers.escalationFunction,
+                        handlers.escalationContext})
+      arguments.push_back(Builder.CreateBitOrPointerCast(value, IGM.Int8PtrTy));
+    arguments.push_back(handlers.flags);
 
     auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
                                            false /*packed*/);
     emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
   }
+
+  Builder.CreateLifetimeEnd(cancellationRecord);
+  Builder.CreateLifetimeEnd(escalationRecord);
 
   // If the continuation is throwing, load the error and branch on it.
   if (optionalErrorBB) {
@@ -1095,14 +1119,6 @@ void IRGenFunction::emitAwaitSplitContinuation(
   Builder.CreateBr(normalBB);
   AsyncCoroutineCurrentResume = nullptr;
   AsyncCoroutineCurrentContinuationContext = nullptr;
-}
-
-void IRGenFunction::emitDestroySplitContinuation(llvm::Value *continuation) {
-  // The continuation is where the allocation starts.
-  auto call = Builder.CreateCall(
-      IGM.getContinuationDestroySplitFunctionPointer(),
-      {Builder.CreateBitOrPointerCast(continuation, IGM.Int8PtrTy)});
-  call->setCallingConv(IGM.SwiftCC);
 }
 
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {

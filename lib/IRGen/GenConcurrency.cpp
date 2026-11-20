@@ -562,10 +562,10 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
 
   // The parameters here match the extra arguments passed to
   // @llvm.coro.suspend.async by emitAwaitSplitContinuation: the split
-  // continuation, the function and context of each handler, and the handler
-  // flags.
-  llvm::Type *argTys[] = {Int8PtrTy, Int8PtrTy, Int8PtrTy,
-                          Int8PtrTy, Int8PtrTy, SizeTy};
+  // continuation, the record buffer, function and context of each handler, and
+  // the handler flags.
+  llvm::Type *argTys[] = {Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy,
+                          Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy};
   auto *suspendFnTy =
     llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
 

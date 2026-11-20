@@ -6776,9 +6776,12 @@ public:
               "Builtin.RawUnsafeContinuation");
       require(splitGet->getArguments()[1]->getType().isAddress(),
               "getSplitContinuationAddr's resume buffer must be an address");
-      require(splitGet->getArguments()[2]->getType().is<SILFunctionType>() &&
-                  splitGet->getArguments()[3]->getType().is<SILFunctionType>(),
-              "getSplitContinuationAddr's handlers must be functions");
+      require(splitGet->getArguments()[2]->getType().is<SILFunctionType>(),
+              "getSplitContinuationAddr's cancellation handler must be a "
+              "function");
+      require(splitGet->getArguments()[3]->getType().is<SILFunctionType>(),
+              "getSplitContinuationAddr's escalation handler must be a "
+              "function");
       require(splitGet->getArguments()[4]->getType().is<BuiltinIntegerType>(),
               "getSplitContinuationAddr's handler flags must be a word");
     }
