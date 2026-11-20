@@ -78,10 +78,23 @@ public:
     return reinterpret_cast<MissingMemberDecl*>(declOrKind & ~KindMask);
   }
 
+  StoredPropertyLayoutMemberView getStoredPropertyLayoutMember() const {
+    if (getKind() == Var)
+      return StoredPropertyLayoutMemberView(getVarDecl());
+    assert(getKind() == MissingMember &&
+           "artificial fields have no declaration view");
+    return StoredPropertyLayoutMemberView(getMissingMemberDecl());
+  }
+
   /// Is this a concrete field?  When we're emitting a type, all the
   /// fields should be concrete; non-concrete fields occur only with
   /// imported declarations.
   bool isConcrete() const { return getKind() != MissingMember; }
+
+  /// Whether the field's storage layout is known.
+  bool hasKnownLayout() const {
+    return isConcrete() || getMissingMemberDecl()->StorageLayout;
+  }
 
   /// Return the type of this concrete field.
   SILType getType(IRGenModule &IGM, SILType baseType) const;
