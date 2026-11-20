@@ -2761,10 +2761,9 @@ namespace decls_block {
   constexpr uint8_t NoReferenceCounting =
       static_cast<uint8_t>(ReferenceCounting::Error) + 1;
 
-  using HiddenTypeLayoutInfoLayout = BCRecordLayout<
-    HIDDEN_TYPE_LAYOUT_INFO,
-    IdentifierIDField, // mangled identity of the hidden type
-    DeclIDField,       // parent type declaration, if any
+  using AbstractTypeLayoutInfoLayout = BCRecordLayout<
+    ABSTRACT_TYPE_LAYOUT_INFO,
+    IdentifierIDField, // mangled identity of the abstract type
     BCFixed<4>         // ReferenceCounting, or NoReferenceCounting
   >;
 
@@ -2938,9 +2937,7 @@ namespace index_block {
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
     ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS,
-    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
-    HIDDEN_TYPE_FALLBACK_TABLE,
-    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
+    LastRecordKind = ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

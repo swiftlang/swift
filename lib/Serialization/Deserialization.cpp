@@ -2249,35 +2249,6 @@ findNestedTypeDeclInModule(ModuleDecl *extensionModule,
   return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
 }
 
-void ModuleFile::consumeHiddenTypeXRefPathPieces(
-    llvm::BitstreamCursor &cursor, uint32_t pathLen,
-    SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces) {
-  using namespace decls_block;
-  for (uint32_t index = 0; index < pathLen; ++index) {
-    auto entry = fatalIfUnexpected(
-        cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      fatal(diagnoseFatal());
-
-    SmallVector<uint64_t, 8> scratch;
-    StringRef blobData;
-    unsigned recordID = fatalIfUnexpected(
-        cursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != XREF_TYPE_PATH_PIECE)
-      fatal(diagnoseFatal());
-
-    IdentifierID nameID, privateDiscriminator;
-    bool inProtocolExtension, importedFromClang;
-    XRefTypePathPieceLayout::readRecord(
-        scratch, nameID, privateDiscriminator, inProtocolExtension,
-        importedFromClang);
-    if (privateDiscriminator)
-      fatal(diagnoseFatal());
-    pieces.push_back({getIdentifier(nameID), inProtocolExtension,
-                      importedFromClang});
-  }
-}
-
 /// Appends to \p results the imported clang class template specialization with
 /// the given \p usr, searching the specializations of the clang class templates
 /// among \p candidates.
@@ -6348,34 +6319,8 @@ public:
 };
 } // namespace
 
-llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
-  if (!DID)
-    return nullptr;
-
-  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
-         "invalid hidden type layout decl ID");
-  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
-  if (declOrOffset.isComplete())
-    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
-
-  DeclID parentDeclID;
-  auto layout = deserializeAbstractTypeLayout(declOrOffset, parentDeclID);
-  if (!layout)
-    return layout.takeError();
-
-  auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
-                                                 getAssociatedModule());
-  if (parentDeclID)
-    decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
-  decl->Layout = layout.get();
-  declOrOffset = decl;
-  return decl;
-}
-
 llvm::Expected<AbstractTypeLayout *>
-ModuleFile::deserializeAbstractTypeLayout(BitOffset offset,
-                                          DeclID &parentDeclID) {
+ModuleFile::deserializeAbstractTypeLayout(BitOffset offset) {
   using namespace decls_block;
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   if (auto error = diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(offset)))
@@ -6389,13 +6334,13 @@ ModuleFile::deserializeAbstractTypeLayout(BitOffset offset,
     return diagnoseFatal();
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-  if (recordID != HIDDEN_TYPE_LAYOUT_INFO)
+  if (recordID != ABSTRACT_TYPE_LAYOUT_INFO)
     return diagnoseFatal();
 
   IdentifierID mangledNameID;
   uint64_t rawReferenceCounting;
-  HiddenTypeLayoutInfoLayout::readRecord(
-      scratch, mangledNameID, parentDeclID, rawReferenceCounting);
+  AbstractTypeLayoutInfoLayout::readRecord(scratch, mangledNameID,
+                                           rawReferenceCounting);
 
   std::optional<ReferenceCounting> referenceCounting;
   if (!decodeReferenceCounting(rawReferenceCounting, referenceCounting))
@@ -6415,7 +6360,7 @@ ModuleFile::deserializeAbstractTypeLayout(BitOffset offset,
   layout->referenceCountingSystem = referenceCounting;
   layout->typeInfoRepresentation = std::move(representation);
   auto *result = layout.get();
-  DeserializedHiddenTypeLayouts.push_back(std::move(layout));
+  DeserializedAbstractTypeLayouts.push_back(std::move(layout));
   return result;
 }
 
@@ -6430,12 +6375,9 @@ ModuleFile::getAbstractMemberTypeLayout(MemberAbstractTypeLayoutID ID) {
   if (declOrOffset.isComplete())
     return declOrOffset.get();
 
-  DeclID parentDeclID;
-  auto layout = deserializeAbstractTypeLayout(declOrOffset, parentDeclID);
+  auto layout = deserializeAbstractTypeLayout(declOrOffset);
   if (!layout)
     return layout.takeError();
-  if (parentDeclID)
-    return diagnoseFatal();
   declOrOffset = layout.get();
   return layout;
 }
@@ -7673,44 +7615,6 @@ DeclDeserializer::getDeclCheckedImpl(
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
 
-    auto fallback = MF.HiddenTypeFallbackMap.find(thisDeclID);
-    bool canUseHiddenTypeFallback =
-        fallback != MF.HiddenTypeFallbackMap.end() &&
-        MF.getContext().LangOpts.hasFeature(
-            Feature::SerializeAbstractTypeLayoutForHiddenTypes);
-    if (canUseHiddenTypeFallback) {
-      SmallVector<HiddenTypeLayoutInfoDecl::XRefPathPiece, 2> originalPath;
-      auto pathCursor = MF.DeclTypeCursor;
-      MF.consumeHiddenTypeXRefPathPieces(pathCursor, pathLen, originalPath);
-
-      auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-      if (resolved) {
-        declOrOffset = resolved.get();
-        break;
-      }
-
-      auto hidden = MF.getHiddenTypeLayoutInfoDecl(fallback->second);
-      if (!hidden) {
-        llvm::consumeError(resolved.takeError());
-        return hidden.takeError();
-      }
-      if (!hidden.get())
-        return resolved;
-
-      if (baseModuleID == OBJC_HEADER_MODULE_ID) {
-        hidden.get()->OriginalModuleIsObjCHeader = true;
-      } else {
-        assert(baseModuleID >= NUM_SPECIAL_IDS &&
-               "unexpected special module in hidden type XREF");
-        hidden.get()->OriginalModuleName = MF.getIdentifier(baseModuleID);
-      }
-      hidden.get()->OriginalXRefPath =
-          MF.getContext().AllocateCopy(originalPath);
-      declOrOffset = hidden.get();
-      llvm::consumeError(resolved.takeError());
-      break;
-    }
-
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)
       return resolved;
@@ -8116,16 +8020,6 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   auto declOrError = MF.getDeclChecked(declID);
   if (!declOrError)
     return declOrError.takeError();
-
-  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
-    CanType parent = parentTy.get()
-                         ? parentTy.get()->getCanonicalType()
-                         : CanType();
-    CanType type = CanType(HiddenType::get(MF.getContext(), hidden->Layout,
-                                           parent, hidden));
-    MF.getContext().recordRecoveredHiddenType(type);
-    return type;
-  }
 
   // Look through compatibility aliases.
   if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {

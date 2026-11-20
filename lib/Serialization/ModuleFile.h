@@ -304,10 +304,8 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
-  MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
   MutableArrayRef<Serialized<AbstractTypeLayout *>> AbstractMemberTypeLayouts;
-  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
-  std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
+  std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedAbstractTypeLayouts;
 
   using SerializedDeclMembersTable =
       ModuleFileSharedCore::SerializedDeclMembersTable;
@@ -371,8 +369,7 @@ private:
       ClassDecl *containingClass) const;
 
   llvm::Expected<AbstractTypeLayout *>
-  deserializeAbstractTypeLayout(serialization::BitOffset offset,
-                                serialization::DeclID &parentDeclID);
+  deserializeAbstractTypeLayout(serialization::BitOffset offset);
 
 public:
   /// Change the status of the current module.
@@ -1082,9 +1079,6 @@ public:
     serialization::DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
-  llvm::Expected<HiddenTypeLayoutInfoDecl *>
-  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
-
   llvm::Expected<AbstractTypeLayout *>
   getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
 
@@ -1093,10 +1087,6 @@ public:
   serialization::BitOffset
   getSerializedDeclOffset(serialization::DeclID ID) const;
   llvm::BitstreamCursor getDeclTypeCursorForReplay() const;
-
-  void consumeHiddenTypeXRefPathPieces(
-      llvm::BitstreamCursor &cursor, uint32_t pathLen,
-      SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);

@@ -375,8 +375,6 @@ final public class PostfixOperatorDecl: OperatorDecl {}
 
 final public class MacroExpansionDecl: Decl {}
 
-final public class HiddenTypeLayoutInfoDecl: TypeDecl {}
-
 // Bridging utilities
 
 extension BridgedDeclObj {

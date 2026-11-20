@@ -245,17 +245,9 @@ class Serializer : public SerializerBase {
                        index_block::DECL_OFFSETS>
   DeclsToSerialize;
 
-  /// Declarations whose layout must be serialized because they contribute to
-  /// the ABI of a client-visible type but may not be available to clients.
-  ASTBlockRecordKeeper<const Decl *, DeclID,
-                       index_block::HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS>
-      HiddenTypeLayoutsToSerialize;
-
   ASTBlockRecordKeeper<const Decl *, MemberAbstractTypeLayoutID,
                        index_block::ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS>
       AbstractMemberTypeLayoutsToSerialize;
-
-  SmallVector<std::pair<DeclID, DeclID>, 16> HiddenTypeFallbackTable;
 
   ASTBlockRecordKeeper<TypeToSerialize, TypeID,
                        index_block::TYPE_OFFSETS>
@@ -397,8 +389,6 @@ private:
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
 
-  void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
-
   /// Handle a member layout requirement discovered by AST analysis.
   void handleAbstractMemberTypeLayoutRequirement(
       const AbstractMemberTypeLayoutRequirement &requirement);
@@ -491,7 +481,6 @@ private:
   template <typename SpecificASTBlockRecordKeeper>
   bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
 
-  bool scheduleHiddenTypeLayoutSerialization(const Decl *decl);
   bool scheduleAbstractMemberTypeLayoutSerialization(const Decl *decl);
   IRABIDetailsProvider &getLayoutProvider();
   void writeSerializableLLVMType(
@@ -509,9 +498,7 @@ private:
           &representation);
   void writeSerializableTypeInfo(
       const SerializableHiddenTypeInfoRepresentation &representation);
-  void writeAbstractTypeLayout(DeclID parentDeclID,
-                               const AbstractTypeLayout &layout);
-  void writeHiddenTypeLayout(const Decl *decl);
+  void writeAbstractTypeLayout(const AbstractTypeLayout &layout);
   void writeAbstractMemberTypeLayout(const Decl *decl);
 
   /// Writes all decls and types in the DeclsToWrite queue.
@@ -520,8 +507,6 @@ private:
   /// in the queue trigger the serialization of additional decls and/or types.
   void writeAllDeclsAndTypes();
 
-  /// Writes placeholder records for scheduled hidden type layouts.
-  bool writeHiddenTypeLayoutInformationIfNeeded();
   bool writeAbstractMemberTypeLayoutsIfNeeded();
 
   /// Writes all identifiers in the IdentifiersToWrite queue.
