@@ -3363,6 +3363,8 @@ namespace {
               "default initializer for this C++ struct.",
               "");
           defaultCtor->addAttribute(attr);
+          defaultCtor->addAttribute(new (Impl.SwiftContext)
+                                        UnsafeAttr(/*implicit=*/true));
         }
         ctors.push_back(defaultCtor);
       }
