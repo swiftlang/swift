@@ -86,23 +86,21 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(DeclRefTypeRepr, TypeRepr, 1+32,
     /// Whether this instance has a valid angle bracket source range.
     HasAngleBrackets: 1,
-    : NumPadBits,
 
     NumGenericArgs : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
-    : NumPadBits,
     NumTypes : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILBoxTypeRepr, TypeRepr, 32,
-    NumGenericArgs : NumPadBits,
+  SWIFT_INLINE_BITFIELD_FULL(SILBoxTypeRepr, TypeRepr,
+                             32 + (32 - NumberOfTypeReprBits),
+    NumGenericArgs : 32 - NumberOfTypeReprBits,
     NumFields : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(AttributedTypeRepr, TypeRepr, 32,
-    : NumPadBits,
     NumAttributes : 32
   );
 

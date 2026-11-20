@@ -186,7 +186,6 @@ protected:
       /// Whether there is an explicit global actor specified for this
       /// conformance.
       HasExplicitGlobalActor : 1,
-      : NumPadBits,
 
       /// Options.
       Options : bitmax(NumProtocolConformanceOptions, 8),

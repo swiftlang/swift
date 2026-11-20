@@ -464,15 +464,11 @@ protected:
     /// Whether 'static' or 'class' was used.
     StaticSpelling : 2,
 
-    : NumPadBits,
-
     /// The number of pattern binding declarations.
     NumPatternEntries : 16
   );
   
   SWIFT_INLINE_BITFIELD_FULL(EnumCaseDecl, Decl, 32,
-    : NumPadBits,
-
     /// The number of tail-allocated element pointers.
     NumElements : 32
   );
@@ -637,15 +633,16 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+3+1,
-    Depth : 16,
-    Index : 16,
     ParamKind : 3,
 
     /// Whether this generic parameter represents an opaque type.
-    IsOpaqueType : 1
+    IsOpaqueType : 1,
+
+    Depth : 16,
+    Index : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, TypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, TypeDecl, 1,
     /// Whether we have computed the default type.
     IsDefaultDefinitionTypeComputed : 1
   );
@@ -727,8 +724,6 @@ protected:
 
     /// Whether we've computed the protocol requirements list yet.
     ProtocolRequirementsValid : 1,
-
-    : NumPadBits,
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
