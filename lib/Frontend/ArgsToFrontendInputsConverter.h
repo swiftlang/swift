@@ -44,6 +44,7 @@ namespace swift {
 class ArgsToFrontendInputsConverter {
   DiagnosticEngine &Diags;
   const llvm::opt::ArgList &Args;
+  llvm::vfs::FileSystem &FS;
 
   llvm::opt::Arg const *const FilelistPathArg;
   llvm::opt::Arg const *const PrimaryFilelistPathArg;
@@ -57,7 +58,8 @@ class ArgsToFrontendInputsConverter {
 
 public:
   ArgsToFrontendInputsConverter(DiagnosticEngine &diags,
-                                const llvm::opt::ArgList &args);
+                                const llvm::opt::ArgList &args,
+                                llvm::vfs::FileSystem &fs);
 
   /// Produces a FrontendInputsAndOutputs object with the inputs populated from
   /// the arguments the converter was initialized with.

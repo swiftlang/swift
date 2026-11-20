@@ -22,7 +22,7 @@
 #include "swift/Frontend/FrontendOptions.h"
 
 #include "llvm/Support/Path.h"
-
+#include "llvm/Support/VirtualFileSystem.h"
 
 // This file holds the definitions for the fine-grained dependency system
 // that are likely to be stable as it moves away from the status quo.
@@ -37,11 +37,12 @@ using namespace fine_grained_dependencies;
 //==============================================================================
 
 std::optional<SourceFileDepGraph>
-SourceFileDepGraph::loadFromPath(StringRef path, const bool allowSwiftModule) {
+SourceFileDepGraph::loadFromPath(StringRef path, llvm::vfs::FileSystem &fs,
+                                 const bool allowSwiftModule) {
   const bool treatAsModule =
       allowSwiftModule &&
       path.ends_with(file_types::getExtension(file_types::TY_SwiftModuleFile));
-  auto bufferOrError = llvm::MemoryBuffer::getFile(path);
+  auto bufferOrError = fs.getBufferForFile(path);
   if (!bufferOrError)
     return std::nullopt;
   return treatAsModule ? loadFromSwiftModuleBuffer(*bufferOrError.get())
@@ -224,8 +225,9 @@ bool SourceFileDepGraph::verify() const {
   return true;
 }
 
-bool SourceFileDepGraph::verifyReadsWhatIsWritten(StringRef path) const {
-  auto loadedGraph = SourceFileDepGraph::loadFromPath(path);
+bool SourceFileDepGraph::verifyReadsWhatIsWritten(
+    StringRef path, llvm::vfs::FileSystem &fs) const {
+  auto loadedGraph = SourceFileDepGraph::loadFromPath(path, fs);
   assert(loadedGraph.has_value() &&
          "Should be able to read the exported graph.");
   verifySame(loadedGraph.value());

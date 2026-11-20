@@ -282,10 +282,11 @@ static int compareImportModulesByName(const ImportModuleTy *left,
 
 // Makes the provided path absolute and removes any "." or ".." segments from
 // the path
-static llvm::SmallString<128> normalizePath(const llvm::StringRef path) {
+static llvm::SmallString<128> normalizePath(const llvm::StringRef path,
+                                            llvm::vfs::FileSystem &fs) {
   llvm::SmallString<128> result = path;
   llvm::sys::path::remove_dots(result, /* remove_dot_dot */ true);
-  llvm::sys::fs::make_absolute(result);
+  (void)fs.makeAbsolute(result);
   return result;
 }
 
@@ -308,7 +309,8 @@ static void collectClangModuleHeaderIncludes(
     if (!clangModule->Directory)
       return;
 
-    llvm::SmallString<128> textualInclude = normalizePath(headerPath);
+    llvm::SmallString<128> textualInclude =
+        normalizePath(headerPath, fileManager.getVirtualFileSystem());
     llvm::SmallString<128> containingSearchDirPath;
 
     for (auto &includeDir : includeDirs) {
@@ -436,7 +438,8 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
   };
 
   clang::FileSystemOptions fileSystemOptions;
-  clang::FileManager fileManager{fileSystemOptions};
+  clang::FileManager fileManager{fileSystemOptions,
+                                 M.getASTContext().SourceMgr.getFileSystem()};
 
   llvm::SmallSet<llvm::SmallString<128>, 10>
       requiredTextualIncludes; // Only included without modules.
@@ -459,7 +462,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
 
       // Ensure search directories end in / so that we don't prefix match
       // against a folder that starts with the same substring.
-      auto path = normalizePath(searchDir->getName());
+      auto path = normalizePath(searchDir->getName(), fileSystem);
       if (!path.ends_with("/"))
           path.append("/");
 
@@ -566,7 +569,8 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
         const clang::Module *underlyingClangModule =
             M.findUnderlyingClangModule();
 
-        llvm::SmallString<128> basePath = normalizePath(relativeToPath);
+        llvm::SmallString<128> basePath =
+            normalizePath(relativeToPath, fileSystem);
         if (!basePath.ends_with("/"))
           basePath.append("/");
         llvm::SmallSet<llvm::SmallString<128>, 10> baseSearchDir;

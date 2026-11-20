@@ -23,17 +23,18 @@
 #include "llvm/Option/Option.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/LineIterator.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace swift;
 using namespace llvm::opt;
 
 ArgsToFrontendInputsConverter::ArgsToFrontendInputsConverter(
-    DiagnosticEngine &diags, const ArgList &args)
-    : Diags(diags), Args(args),
+    DiagnosticEngine &diags, const ArgList &args, llvm::vfs::FileSystem &fs)
+    : Diags(diags), Args(args), FS(fs),
       FilelistPathArg(args.getLastArg(options::OPT_filelist)),
       PrimaryFilelistPathArg(args.getLastArg(options::OPT_primary_filelist)),
       BadFileDescriptorRetryCountArg(
-        args.getLastArg(options::OPT_bad_file_descriptor_retry_count)) {}
+          args.getLastArg(options::OPT_bad_file_descriptor_retry_count)) {}
 
 std::optional<FrontendInputsAndOutputs> ArgsToFrontendInputsConverter::convert(
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
@@ -131,7 +132,7 @@ bool ArgsToFrontendInputsConverter::forAllFilesInFilelist(
 
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> filelistBufferOrError = nullptr;
   for (unsigned I = 0; I < RetryCount + 1; ++I) {
-    filelistBufferOrError = llvm::MemoryBuffer::getFile(path);
+    filelistBufferOrError = FS.getBufferForFile(path);
     if (filelistBufferOrError)
       break;
     if (filelistBufferOrError.getError().value() != EBADF)
@@ -185,7 +186,7 @@ ArgsToFrontendInputsConverter::createInputFilesConsumingPrimaries(
   if (!Files.empty() && !hasAnyPrimaryFiles) {
     std::optional<std::vector<std::string>> userSuppliedNamesOrErr =
         OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
-            Args, Diags, options::OPT_o, options::OPT_output_filelist);
+            Args, Diags, options::OPT_o, options::OPT_output_filelist, FS);
     if (userSuppliedNamesOrErr && userSuppliedNamesOrErr->size() == 1)
       result.setIsSingleThreadedWMO(true);
   }

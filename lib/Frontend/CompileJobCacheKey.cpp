@@ -22,6 +22,7 @@
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/ADT/SmallString.h>
@@ -82,8 +83,10 @@ static void assertNoCASID(llvm::cas::ObjectStore &CAS,
 }
 #endif
 
-llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
-    llvm::cas::ObjectStore &CAS, ArrayRef<const char *> Args) {
+llvm::Expected<llvm::cas::ObjectRef>
+swift::createCompileJobBaseCacheKey(llvm::cas::ObjectStore &CAS,
+                                    ArrayRef<const char *> Args,
+                                    llvm::vfs::FileSystem &FS) {
   // Don't count the `-frontend` in the first location since only frontend
   // invocation can have a cache key.
   if (Args.size() > 1 && StringRef(Args.front()) == "-frontend")
@@ -110,7 +113,7 @@ llvm::Expected<llvm::cas::ObjectRef> swift::createCompileJobBaseCacheKey(
   auto addFileList =
       [&](const llvm::opt::Arg *A, SmallVectorImpl<char> &Out,
           SmallVectorImpl<llvm::cas::ObjectRef> &Refs) -> llvm::Error {
-    auto FileList = llvm::MemoryBuffer::getFile(A->getValue());
+    auto FileList = FS.getBufferForFile(A->getValue());
     if (!FileList)
       return llvm::errorCodeToError(FileList.getError());
     auto Ref = CAS.storeFromString(/*Refs*/ {}, (*FileList)->getBuffer());
