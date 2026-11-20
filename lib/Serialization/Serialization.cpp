@@ -7396,6 +7396,13 @@ public:
   }
 
   void visitHiddenType(const HiddenType *hidden) {
+    auto *layout = hidden->getLayout();
+    if (layout && layout->serializedType) {
+      auto source = layout->serializedType;
+      S.writeTranscribedType(*source.moduleFile, source.typeID);
+      return;
+    }
+
     using namespace decls_block;
     auto *layoutDecl = hidden->getLegacyLayoutInfoDecl();
     assert(layoutDecl && "cannot serialize a hidden type without a legacy XREF");
@@ -7689,9 +7696,16 @@ void Serializer::writeSerializableRecordTypeInfo(
       Out, ScratchRecord, abbrCode, representation.fieldsAreABIAccessible,
       representation.explosionSize, representation.fields.size());
   for (const auto &field : representation.fields) {
+    TypeID fieldTypeID;
+    if (field.resolvedType)
+      fieldTypeID = addTypeRef(field.resolvedType);
+    else if (field.serializedType)
+      fieldTypeID = addTranscribedTypeRef(*field.serializedType.moduleFile,
+                                          field.serializedType.typeID);
+
     abbrCode = DeclTypeAbbrCodes[SerializableRecordFieldLayout::Code];
     SerializableRecordFieldLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(field.type),
+        Out, ScratchRecord, abbrCode, fieldTypeID,
         field.layout.ByteOffset, field.layout.ByteOffsetForLayout,
         field.layout.Index, field.layout.IsTriviallyDestroyable,
         field.layout.TheKind, field.storage.Begin, field.storage.End);

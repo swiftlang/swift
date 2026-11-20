@@ -61,6 +61,10 @@ public:
 
   Type getInterfaceTypeForSerialization() const { return {}; }
 
+  AbstractTypeLayout *getAbstractTypeLayoutForSerialization() const {
+    return nullptr;
+  }
+
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
   }
@@ -148,10 +152,26 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
-      fieldRepresentation.type = field.getInterfaceTypeForSerialization();
-      fieldRepresentation.typeInfo = field.getTypeInfo()
-                                         .createSerializableHiddenTypeInfoRepresentation(
-                                             IGM);
+      if (auto *layout = field.getAbstractTypeLayoutForSerialization()) {
+        assert(layout->typeInfoRepresentation &&
+               "abstract field layout must carry a TypeInfo representation");
+        fieldRepresentation.serializedType = layout->serializedType;
+        fieldRepresentation.typeInfo = layout->typeInfoRepresentation;
+      } else {
+        auto fieldType = field.getInterfaceTypeForSerialization();
+        fieldRepresentation.resolvedType = fieldType;
+        if (auto *hiddenType =
+                fieldType ? fieldType->template getAs<HiddenType>() : nullptr) {
+          auto *layout = hiddenType->getLayout();
+          assert(layout && layout->typeInfoRepresentation &&
+                 "hidden field type must carry a TypeInfo representation");
+          fieldRepresentation.typeInfo = layout->typeInfoRepresentation;
+        } else {
+          fieldRepresentation.typeInfo =
+              field.getTypeInfo()
+                  .createSerializableHiddenTypeInfoRepresentation(IGM);
+        }
+      }
       fieldRepresentation.layout = field.getLayoutStorage();
       auto projectionRange = field.getProjectionRange();
       fieldRepresentation.storage.Begin = projectionRange.first;

@@ -170,18 +170,24 @@ public:
   }
 
   AbstractTypeLayout getAbstractTypeLayout(Type type) {
-    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     auto canonicalType = type->getCanonicalType();
     auto mangledName =
         Mangle::ASTMangler(type->getASTContext())
             .mangleTypeWithPrefix(canonicalType);
-
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
       IGM.dumpAbstractTypeLayoutInfo(canonicalType, mangledName,
                                      "serialization");
     }
 
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      auto *layout = hiddenType->getLayout();
+      assert(layout && layout->typeInfoRepresentation &&
+             "HiddenType must carry an abstract layout");
+      return *layout;
+    }
+
+    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     AbstractTypeLayout layout;
     layout.mangledName = std::move(mangledName);
     auto properties = typeConverter.getTypeProperties(

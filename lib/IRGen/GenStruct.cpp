@@ -139,6 +139,30 @@ namespace {
     Type getInterfaceTypeForSerialization() const {
       return Field ? Field->getInterfaceType() : Type();
     }
+    AbstractTypeLayout *getAbstractTypeLayoutForSerialization() const {
+      return MissingMember ? MissingMember->StorageLayout : nullptr;
+    }
+
+    bool matches(swift::irgen::Field field) const {
+      switch (field.getKind()) {
+      case swift::irgen::Field::Var:
+        return Field == field.getVarDecl();
+      case swift::irgen::Field::MissingMember:
+        return MissingMember == field.getMissingMemberDecl();
+      case swift::irgen::Field::DefaultActorStorage:
+      case swift::irgen::Field::NonDefaultDistributedActorStorage:
+        return false;
+      }
+      llvm_unreachable("bad field kind");
+    }
+
+    std::optional<swift::irgen::Field> getMetadataField() const {
+      if (Field)
+        return swift::irgen::Field(Field);
+      if (MissingMember)
+        return swift::irgen::Field(MissingMember);
+      return std::nullopt;
+    }
   };
 
   /// A field-info implementation for fields of Clang types.
@@ -2114,8 +2138,9 @@ namespace {
   createRecordFieldTypeInfoFromSerializableRepresentation(
       IRGenModule &IGM,
       const SerializableRecordFieldRepresentation &field) {
-    if (field.type) {
-      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
+    if (field.resolvedType) {
+      auto loweredType =
+          IGM.getLoweredType(field.resolvedType->getCanonicalType());
       return IGM.getTypeInfo(loweredType);
     }
     if (!field.typeInfo)

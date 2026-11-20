@@ -4262,7 +4262,7 @@ public:
 
       return llvm::make_error<OverrideError>(
           name, getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     }
 
     // Extract the accessor IDs.
@@ -4281,7 +4281,7 @@ public:
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
             getErrorFlags(), numVTableEntries,
-            memberAbstractTypeLayoutID);
+            memberAbstractTypeLayoutID, interfaceTypeID);
       }
     }
 
@@ -4307,7 +4307,7 @@ public:
       return llvm::make_error<TypeError>(
           name, takeErrorInfo(interfaceTypeOrError.takeError()),
           getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -6212,9 +6212,10 @@ class SerializableTypeInfoReader {
               field.storage.Begin, field.storage.End))
         return false;
       if (fieldTypeID) {
+        field.serializedType = {&MF, fieldTypeID};
         auto fieldType = MF.getTypeChecked(fieldTypeID);
         if (fieldType)
-          field.type = *fieldType;
+          field.resolvedType = *fieldType;
         else
           llvm::consumeError(fieldType.takeError());
       }
@@ -9525,6 +9526,8 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
         auto layout = getAbstractMemberTypeLayout(layoutID);
         if (!layout)
           fatal(layout.takeError());
+        if (auto typeID = declError->getMemberInterfaceTypeID())
+          layout.get()->serializedType = {this, typeID};
         auto *missing = MissingMemberDecl::create(
             context, containingStruct, declError->getName(), 0,
             declError->needsFieldOffsetVectorEntry(), layout.get());
