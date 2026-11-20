@@ -7,28 +7,28 @@
 // contains a value whose type has a deinit and metadata the client cannot access.
 
 // CHECK-LABEL: define {{.*}} @"$s4main13destroyNestedyy3Lib0C7ManagerVnF"(
-// CHECK:   call void %Destroy(ptr noalias %m, ptr @"$s3Lib13NestedManagerVN")
+// CHECK:   call void %Destroy(ptr noalias %{{.*}}, ptr @"$s3Lib13NestedManagerVN")
 // CHECK:   ret void
 
 // CHECK-LABEL: define {{.*}} @"$s4main11destroyEnumyy3Lib0C7ManagerVnF"(
-// CHECK:   call void %Destroy(ptr noalias %m, ptr @"$s3Lib11EnumManagerVN")
+// CHECK:   call void %Destroy(ptr noalias %{{.*}}, ptr @"$s3Lib11EnumManagerVN")
 // CHECK:   ret void
 
 // CHECK-LABEL: define {{.*}} @"$s4main11destroyPairyy3Lib0C7ManagerVnF"(
-// CHECK:   call void %Destroy(ptr noalias %m, ptr @"$s3Lib11PairManagerVN")
+// CHECK:   call void %Destroy(ptr noalias %{{.*}}, ptr @"$s3Lib11PairManagerVN")
 // CHECK:   ret void
 
 // CHECK-LABEL: define {{.*}} @"$s4main14destroyGenericyy3Lib0C7ManagerVnF"(
-// CHECK:   call void %Destroy(ptr noalias %m, ptr @"$s3Lib14GenericManagerVN")
+// CHECK:   call void %Destroy(ptr noalias %{{.*}}, ptr @"$s3Lib14GenericManagerVN")
 // CHECK:   ret void
 
 // CHECK-LABEL: define {{.*}} @"$s4main12destroyArrayyy3Lib0C7ManagerVnF"(
-// CHECK:   call void %Destroy(ptr noalias %m, ptr @"$s3Lib12ArrayManagerVN")
+// CHECK:   call void %Destroy(ptr noalias %{{.*}}, ptr @"$s3Lib12ArrayManagerVN")
 // CHECK:   ret void
 
 // The payload of an indirect case is a box, which the client can release itself.
 // CHECK-LABEL: define {{.*}} @"$s4main11destroyTreeyy3Lib0C7ManagerVnF"(
-// CHECK:   call ptr @"$s3Lib11TreeManagerVWOh"(ptr %m)
+// CHECK:   call ptr @"$s3Lib11TreeManagerVWOh"(ptr %{{.*}})
 // CHECK:   ret void
 
 //--- Lib.swift
