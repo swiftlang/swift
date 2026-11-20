@@ -4233,7 +4233,7 @@ public:
 
       return llvm::make_error<OverrideError>(
           name, getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     }
 
     // Extract the accessor IDs.
@@ -4252,7 +4252,7 @@ public:
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
             getErrorFlags(), numVTableEntries,
-            memberAbstractTypeLayoutID);
+            memberAbstractTypeLayoutID, interfaceTypeID);
       }
     }
 
@@ -4278,7 +4278,7 @@ public:
       return llvm::make_error<TypeError>(
           name, takeErrorInfo(interfaceTypeOrError.takeError()),
           getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -9390,6 +9390,8 @@ Decl *ModuleFile::handleErrorAndSupplyMissingStructMember(
       auto layout = getAbstractMemberTypeLayout(layoutID);
       if (!layout)
         fatal(layout.takeError());
+      if (auto typeID = declError->getMemberInterfaceTypeID())
+        layout.get()->serializedType = {this, typeID};
       suppliedMissingMember = MissingMemberDecl::create(
           context, containingStruct, declError->getName(), 0,
           declError->needsFieldOffsetVectorEntry(), layout.get());

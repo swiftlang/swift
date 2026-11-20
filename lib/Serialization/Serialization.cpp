@@ -7346,8 +7346,15 @@ public:
   }
 
   void visitHiddenType(const HiddenType *hidden) {
+    auto *layout = hidden->getLayout();
+    if (layout && layout->serializedType) {
+      auto source = layout->serializedType;
+      S.writeTranscribedType(*source.moduleFile, source.typeID);
+      return;
+    }
+
     llvm::report_fatal_error(
-        "serialization of recovered hidden types is not implemented");
+        "cannot serialize a hidden type without its source type record");
   }
 };
 
