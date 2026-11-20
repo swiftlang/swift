@@ -1858,7 +1858,7 @@ private:
 
     // Round up to an even number of bytes.
     assert(bitBegin % 8 == 0);
-    Size offset = Size(bitBegin / 8);
+    Size offset = SubobjectAdjustment + Size(bitBegin / 8);
     Size byteLength = Size((bitEnd - bitBegin + 7) / 8);
 
     addOpaqueField(offset, byteLength);

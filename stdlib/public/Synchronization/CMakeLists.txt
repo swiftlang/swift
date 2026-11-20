@@ -214,6 +214,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
     GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
     SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
+    DEPENDS copy_embedded_swift_platform_header
     SKIP_ARCH_REGEX "^wasm32$" "^avr$"
     INSTALL_IN_COMPONENT stdlib
   )
