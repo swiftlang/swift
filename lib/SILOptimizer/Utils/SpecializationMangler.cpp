@@ -67,6 +67,19 @@ void FunctionSignatureSpecializationMangler::setArgumentClosurePropPreviousArg(
   Info.otherArgIdx = otherArgIdx;
 }
 
+void FunctionSignatureSpecializationMangler::
+    setArgumentDifferentiableFunctionProp(
+        unsigned OrigArgIdx, SILInstruction *DifferentiableFunction,
+        SILInstruction *OriginalRoot, SILInstruction *JVPRoot,
+        SILInstruction *VJPRoot) {
+  ASSERT(isa<DifferentiableFunctionInst>(DifferentiableFunction));
+  auto &Info = OrigArgs[OrigArgIdx];
+  Info.kind = ArgumentModifier::DifferentiableFunctionProp;
+  Info.differentiableFunctionIdx = DifferentiableFunctions.size();
+  DifferentiableFunctions.push_back(
+      {DifferentiableFunction, OriginalRoot, JVPRoot, VJPRoot});
+}
+
 void FunctionSignatureSpecializationMangler::setArgumentConstantProp(
     unsigned OrigArgIdx, SILInstruction *constInst) {
   auto &Info = OrigArgs[OrigArgIdx];
@@ -267,6 +280,24 @@ FunctionSignatureSpecializationMangler::mangleClosureProp(SILInstruction *Inst) 
   }
 }
 
+void FunctionSignatureSpecializationMangler::mangleDifferentiableFunctionProp(
+    const DifferentiableFunctionInfo &Info) {
+  auto *DFI = cast<DifferentiableFunctionInst>(Info.inst);
+  auto MangleComponent =
+      [&](SILInstruction *Root,
+          NormalDifferentiableFunctionTypeComponent Component) {
+        auto *TTTFI = cast<ThinToThickFunctionInst>(Root);
+        auto *FRI = cast<FunctionRefInst>(TTTFI->getCallee());
+        appendIdentifier(FRI->getReferencedFunction()->getName());
+        appendType(DFI->getExtractee(Component)->getType().getASTType(),
+                   nullptr);
+      };
+  MangleComponent(Info.originalRoot,
+                  NormalDifferentiableFunctionTypeComponent::Original);
+  MangleComponent(Info.jvpRoot, NormalDifferentiableFunctionTypeComponent::JVP);
+  MangleComponent(Info.vjpRoot, NormalDifferentiableFunctionTypeComponent::VJP);
+}
+
 void FunctionSignatureSpecializationMangler::mangleArgument(ArgInfo argInfo) {
   switch (argInfo.kind) {
   case ArgumentModifier::ConstantProp:
@@ -297,6 +328,12 @@ void FunctionSignatureSpecializationMangler::mangleArgument(ArgInfo argInfo) {
 
   case ArgumentModifier::ClosurePropPreviousArg:
     ArgOpBuffer << 'C' << argInfo.otherArgIdx;
+    return;
+
+  case ArgumentModifier::DifferentiableFunctionProp:
+    ArgOpBuffer << 'a';
+    mangleDifferentiableFunctionProp(
+        DifferentiableFunctions[argInfo.differentiableFunctionIdx]);
     return;
 
   default:

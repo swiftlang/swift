@@ -1,0 +1,158 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -parse-as-library -module-name PairModule -o %t/PairModule.swiftmodule %S/Inputs/opaque_values_pair.swift
+// RUN: %target-sil-opt -I %t -sil-print-types -enable-sil-opaque-values -differentiation -sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+
+// Differentiation of opaque-values SIL that builds and takes apart aggregates
+// (`Optional`, a class, a struct), run directly with `sil-opt`, so the results
+// do not depend on where AddressLowering sits in the pipeline.
+//
+// With opaque values the tangent of a generic `T` is an object. The pullbacks
+// are generated in that form, and Differentiation lowers them as soon as it has
+// generated them: the checks are for the lowered pullbacks. The inputs are the
+// SIL that Differentiation receives when AddressLowering runs after it.
+//
+// `Pair` comes from a helper module: a generic struct with differentiable
+// fields, which a `.sil` file cannot declare.
+//
+// The array literal is in `opaque_values_array_literal.sil`, because its input
+// depends on the platform.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+import PairModule
+
+// Taking a field out of a struct: the pullback builds the adjoint of the struct
+// from the adjoint of its field, and zero for the other field.
+// CHECK-LABEL: sil private [ossa] @firstOf{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> @out Pair<τ_0_0>.TangentVector {
+// CHECK:       bb0([[PAIR_RESULT:%.*]] : $*Pair<τ_0_0>.TangentVector, [[FIELD_SEED:%.*]] : $*τ_0_0.TangentVector):
+// CHECK:         struct_element_addr {{%.*}} : $*Pair<τ_0_0>.TangentVector, #Pair.TangentVector.a
+// CHECK:         copy_addr [[FIELD_SEED]] to [init] {{%.*}} : $*τ_0_0.TangentVector
+// CHECK:         copy_addr {{.*}} to [init] [[PAIR_RESULT]] : $*Pair<τ_0_0>.TangentVector
+sil [ossa] @firstOf : $@convention(thin) <T where T : Differentiable> (@in_guaranteed Pair<T>) -> @out T {
+bb0(%0 : @guaranteed $Pair<T>):
+  %1 = struct_extract %0 : $Pair<T>, #Pair.a
+  %2 = copy_value %1 : $T
+  return %2 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @firstOf : $@convention(thin) <T where T : Differentiable> (@in_guaranteed Pair<T>) -> @out T {
+}
+
+// The result does not depend on the differentiated parameter, so its pullback
+// is zero. It takes a shortcut that does not go through the usual pullback
+// generation, but it is lowered all the same: nothing else would lower it.
+// CHECK-LABEL: sil private [ossa] @ignoresX{{.*}}TJpSUpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[ZERO_RESULT:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : $*τ_0_0.TangentVector):
+// CHECK:         witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[ZERO_RESULT]] : $*τ_0_0.TangentVector
+sil [ossa] @ignoresX : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  debug_value %1 : $T, let, name "d", argno 2
+  %4 = copy_value %1 : $T
+  return %4 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @ignoresX : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+}
+
+// Building a struct: the pullback splits the adjoint of the struct into the
+// adjoints of its fields.
+// CHECK-LABEL: sil private [ossa] @makePair{{.*}}TJpSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed Pair<τ_0_0>.TangentVector) -> (@out τ_0_0.TangentVector, @out τ_0_0.TangentVector) {
+// CHECK:       bb0([[A_RESULT:%.*]] : $*τ_0_0.TangentVector, [[B_RESULT:%.*]] : $*τ_0_0.TangentVector, [[PAIR_SEED:%.*]] : $*Pair<τ_0_0>.TangentVector):
+// CHECK:         [[A:%.*]] = struct_element_addr [[PAIR_SEED]] : $*Pair<τ_0_0>.TangentVector, #Pair.TangentVector.a
+// CHECK:         copy_addr [[A]] to [init] [[A_RESULT]] : $*τ_0_0.TangentVector
+// CHECK:         [[B:%.*]] = struct_element_addr [[PAIR_SEED]] : $*Pair<τ_0_0>.TangentVector, #Pair.TangentVector.b
+// CHECK:         copy_addr [[B]] to [init] [[B_RESULT]] : $*τ_0_0.TangentVector
+sil [ossa] @makePair : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out Pair<T> {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T):
+  %2 = copy_value %0 : $T
+  %3 = copy_value %1 : $T
+  %4 = struct $Pair<T> (%2 : $T, %3 : $T)
+  return %4 : $Pair<T>
+}
+
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] <T where T : Differentiable> @makePair : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out Pair<T> {
+}
+
+// Reading a stored property of a class: the pullback builds the adjoint of the
+// class, a `Box.TangentVector`, from the adjoint of the property, and returns it.
+// CHECK-LABEL: sil private [ossa] @readX{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> @out Box<τ_0_0>.TangentVector {
+// CHECK:       bb0([[BOX_RESULT:%.*]] : $*Box<τ_0_0>.TangentVector, [[PROPERTY_SEED:%.*]] : $*τ_0_0.TangentVector):
+// CHECK:         #AdditiveArithmetic."+="
+// CHECK-NOT:     #AdditiveArithmetic."+="
+// CHECK:         [[FIELD:%[0-9]+]] = struct_element_addr [[BOX_TANGENT:%[0-9]+]] : $*Box<τ_0_0>.TangentVector, #Box.TangentVector.x
+// CHECK-NEXT:    copy_addr {{%.*}} to [init] [[FIELD]] : $*τ_0_0.TangentVector
+// CHECK:         copy_addr [[BOX_TANGENT]] to [init] [[BOX_RESULT]] : $*Box<τ_0_0>.TangentVector
+sil [ossa] @readX : $@convention(thin) <T where T : Differentiable> (@guaranteed Box<T>) -> @out T {
+bb0(%0 : @guaranteed $Box<T>):
+  debug_value %0 : $Box<T>, let, name "b", argno 1
+  %2 = ref_element_addr %0 : $Box<T>, #Box.x
+  %3 = begin_access [read] [dynamic] %2 : $*T
+  %4 = load [copy] %3 : $*T
+  end_access %3 : $*T
+  return %4 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @readX : $@convention(thin) <T where T : Differentiable> (@guaranteed Box<T>) -> @out T {
+}
+
+// Taking an `Optional` apart with `switch_enum`: the adjoint of the optional is
+// built from the adjoint of the payload by `Optional.TangentVector.init`, which
+// takes the payload as a value and returns the result directly in opaque-value
+// form, and through memory once it is lowered.
+// CHECK-LABEL: sil private [ossa] @unwrap{{.*}}TJpSSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> (@out Optional<τ_0_0>.TangentVector, @out τ_0_0.TangentVector) {
+// CHECK:         #AdditiveArithmetic."+" :
+// CHECK:         init_enum_data_addr {{%.*}} : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK:         inject_enum_addr {{%.*}} : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK:         apply {{%.*}}<τ_0_0>([[OPTIONAL_TANGENT:%.*]], {{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in Optional<τ_0_0.TangentVector>, @thin Optional<τ_0_0>.TangentVector.Type) -> @out Optional<τ_0_0>.TangentVector
+sil [ossa] @unwrap : $@convention(thin) <T where T : Differentiable> (@in_guaranteed Optional<T>, @in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $Optional<T>, %1 : @guaranteed $T):
+  debug_value %0 : $Optional<T>, let, name "x", argno 1
+  debug_value %1 : $T, let, name "d", argno 2
+  %4 = copy_value %0 : $Optional<T>
+  switch_enum %4 : $Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%6 : @owned $T):
+  %7 = move_value [lexical] [var_decl] %6 : $T
+  debug_value %7 : $T, let, name "v"
+  %9 = copy_value %7 : $T
+  destroy_value %7 : $T
+  br bb3(%9 : $T)
+
+bb2:
+  %12 = copy_value %1 : $T
+  br bb3(%12 : $T)
+
+bb3(%14 : @owned $T):
+  return %14 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] <T where T : Differentiable> @unwrap : $@convention(thin) <T where T : Differentiable> (@in_guaranteed Optional<T>, @in_guaranteed T) -> @out T {
+}
+
+// Wrapping a value in an `Optional` with `enum`: the pullback projects the
+// payload out of the adjoint of the optional. The adjoint is a guaranteed
+// argument, so the projection must be done on a copy of it: an address-only
+// value cannot be forwarded through a projection.
+// CHECK-LABEL: sil private [ossa] @wrap{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed Optional<τ_0_0>.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[WRAP_RESULT:%.*]] : $*τ_0_0.TangentVector, [[OPTIONAL_SEED:%.*]] : $*Optional<τ_0_0>.TangentVector):
+// CHECK:         copy_addr [[OPTIONAL_SEED]] to [init] [[SEED_COPY:%[0-9]+]] : $*Optional<τ_0_0>.TangentVector
+// CHECK:         [[VALUE:%.*]] = struct_element_addr [[SEED_COPY]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
+// CHECK:         [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[VALUE]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK:         copy_addr [[PAYLOAD]] to [init] [[WRAP_RESULT]] : $*τ_0_0.TangentVector
+sil [ossa] @wrap : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out Optional<T> {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %2 : $T
+  return %3 : $Optional<T>
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @wrap : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out Optional<T> {
+}

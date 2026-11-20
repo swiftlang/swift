@@ -2715,8 +2715,6 @@ WARNING(spi_preferred_over_spi_available,none,
         "'@_spi' instead", ())
 
 // @once and @callable(once)
-ERROR(execution_semantics_attr_cannot_be_used_with_borrowing,none,
-      "'%0' cannot be used together with 'borrowing'", (StringRef))
 ERROR(execution_semantics_function_type_mismatch,none,
       "invalid conversion from '%0' function of type %1 "
       "to function type %2", (StringRef, Type, Type))
@@ -4639,6 +4637,26 @@ ERROR(final_not_allowed_here,none,
 ERROR(attr_incompatible_with_attr,none,
       "%0 cannot be used with %1",
       (DeclAttribute, DeclAttribute))
+
+ERROR(attr_tail_allocated_requires_embedded,none,
+      "'@_tailAllocated' is only supported in Embedded Swift", ())
+ERROR(tail_allocated_init_allocation,none,
+      "%0 has '@_tailAllocated' and must be allocated with "
+      "'Builtin.allocWithTailElems', not an initializer", (Type))
+ERROR(attr_tail_allocated_actor,none,
+      "'@_tailAllocated' cannot be used on an actor", ())
+ERROR(attr_tail_allocated_inherited,none,
+      "'@_tailAllocated' cannot be used on %0 because its superclass %1 "
+      "already has it", (const ClassDecl *, const ClassDecl *))
+ERROR(attr_tail_allocated_counts_property,none,
+      "'@_tailAllocated' counts property %0 must be a 'final' instance property "
+      "of %1 of type %2 (one 'Int' per element type), not 'async' or 'throws'",
+      (Identifier, const ClassDecl *, Type))
+ERROR(attr_tail_allocated_counts_not_visible,none,
+      "'@_tailAllocated' counts property %0 must be %select{'public' or "
+      "'@usableFromInline'|'package', 'public' or '@usableFromInline'}2 "
+      "because %1 is %select{public|package}2",
+      (Identifier, const ClassDecl *, bool))
 
 ERROR(attr_target_empty_string,none,
       "'@_target' requires a non-empty target string", ())
@@ -8812,15 +8830,6 @@ ERROR(back_deployed_type_nested_requires_frozen,none,
       "%kind0 nested in back-deployed %kind1 must be '@frozen'",
       (const ValueDecl *, const ValueDecl *))
 
-ERROR(conformance_back_deployed_type_availability,none,
-      "conformance of back-deployed type %0 to protocol %1 must "
-      "not be available before %2 %3",
-      (Type, const ProtocolDecl *, AvailabilityDomain, AvailabilityRange))
-NOTE(conformance_back_deployed_type_availability_note,none,
-      "this module uses its own copy of %0 before %1 %2, and the conformance "
-      "would not apply to %0 from %3",
-      (Type, AvailabilityDomain, AvailabilityRange, const ModuleDecl *))
-
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types
 //------------------------------------------------------------------------------
@@ -9252,15 +9261,13 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 
 // TODO: support these cases!
 ERROR(scoped_unsupported_position, none,
-      "'@_scoped' is not supported here", ())
+      "'@%0' is not supported here", (StringRef))
 ERROR(scoped_applied_repeatedly, none,
       "scope restrictions cannot be specified more than once", ())
 ERROR(scoped_labeled, none,
       "labeled scope restrictions are not supported", ())
 ERROR(scoped_multiple, none,
       "multiple scope restrictions are not supported", ())
-ERROR(scoped_nonescapable_self, none,
-      "the scope of a non-escapable 'self' is not supported", ())
 ERROR(scoped_function_type_param, none,
       "scopes named by function type parameters are not supported", ())
 ERROR(scoped_nonescapable_in_param_position, none,
@@ -9275,18 +9282,29 @@ ERROR(scoped_nonescapable_in_typealias, none,
 ERROR(scoped_nonescapable_in_generic_argument, none,
       "non-escapable type in a generic argument is not supported when scope "
       "restrictions are enabled", ())
-ERROR(scoped_elided_result, none,
-      "non-escapable result of a function with scope restrictions must have "
-      "its scope written with '@_scoped'", ())
+ERROR(scoped_elided, none,
+      "non-escapable type in a function signature must have its scope "
+      "written with '@_scoped'", ())
 ERROR(scoped_param_scope_unsupported, none,
-      "the scope of %0 is not supported", (Identifier))
+      "depending on the scope of the type of parameter %0 is not supported",
+      (Identifier))
 ERROR(scope_params_unsupported, none,
-      "explicit scope parameters are not supported", ())
-ERROR(access_scope_unsupported, none,
-      "binding the access scope of a parameter is not supported", ())
+      "explicit scope parameters are not supported on types", ())
+ERROR(access_scope_immortal_unsupported, none,
+      "binding an access scope to 'immortal' is not supported", ())
+ERROR(access_scope_bound_to_param_unsupported, none,
+      "binding an access scope to a parameter's access is not supported", ())
+ERROR(access_scope_bound_repeatedly, none,
+      "a parameter's access scope cannot be bound more than once", ())
 
 ERROR(scoped_unknown_param, none,
-      "cannot find parameter %0 for scope restriction", (Identifier))
+      "cannot find parameter %0", (Identifier))
+ERROR(scope_unknown, none,
+      "cannot find scope %0", (Identifier))
+ERROR(scope_param_redeclared, none,
+      "invalid redeclaration of scope parameter %0", (Identifier))
+ERROR(scope_param_unused, none,
+      "scope parameter %0 is not used in function signature", (Identifier))
 ERROR(scoped_consuming_param, none,
       "consumed parameters have no access scope", ())
 NOTE(scoped_consuming_param_here, none,
@@ -9295,8 +9313,6 @@ NOTE(scoped_init_param_consuming_by_default, none,
      "initializer parameters are 'consuming' by default", ())
 ERROR(scoped_self_no_access, none,
       "'self' has no access scope here", ())
-ERROR(scoped_escapable_param, none,
-      "%0 has an escapable type, so it has no scope", (Identifier))
 
 
 //------------------------------------------------------------------------------
@@ -9937,10 +9953,17 @@ NOTE(file_default_invalid_attribute_note,none,
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute
 //===----------------------------------------------------------------------===//
+ERROR(attr_semantics_unknown_osversion_kind,none,
+      "unknown OS version query kind '%0' in '@_semantics' attribute", (StringRef))
 ERROR(attr_inline_always_experimental,none,
       "'@inline(always)' is an experimental feature", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,
-      "'@inline(always)' implies '@usableFromInline'; do not use both", ())
+      "'@inline(always)' cannot be combined with '@usableFromInline'; use "
+      "'@inlinable' to allow the function body to be inlined "
+      "into other modules", ())
+NOTE(attr_inline_always_mark_inlinable,none,
+     "%kind0 is marked '@inline(always)'; mark it '@inlinable' to make it "
+     "usable from other '@inlinable' code", (const ValueDecl *))
 ERROR(attr_inline_always_requires_final_method,none,
       "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
       "marked 'final'", (DeclName, bool))

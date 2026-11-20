@@ -178,3 +178,15 @@ struct UnnamedParams {
 };
 
 struct DerivedFromUnnamedParams : UnnamedParams {};
+
+struct __attribute__((swift_attr("~Copyable"))) NonCopyableArg {
+  NonCopyableArg(int x) : x(x) {}
+  NonCopyableArg(NonCopyableArg &&) = default;
+  int x;
+};
+
+struct RvalueRefParams {
+  int takesRvalueRef(NonCopyableArg &&p, int a) const { return p.x + a; }
+};
+
+struct DerivedFromRvalueRefParams : RvalueRefParams {};

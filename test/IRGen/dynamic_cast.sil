@@ -21,7 +21,7 @@ struct S {
 sil @testUnconditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
-  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMD"
+  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMd"
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr [[T0]], ptr {{%.*}}, ptr [[T4]], ptr {{.*}}, [[INT]] 7)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr P in %0 : $*P to S in %1 : $*S
@@ -35,7 +35,7 @@ bb0(%0 : $*P):
 sil @testUnconditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
-  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMD"
+  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMd"
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr [[T0]], ptr {{%.*}}, ptr [[T4]], ptr {{.*}}, [[INT]] 7)
   %1 = alloc_stack $S
   unconditional_checked_cast_addr P in %0 : $*P to S in %1 : $*S
@@ -49,7 +49,7 @@ bb0(%0 : $*P):
 sil @testConditional0 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
-  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMD"
+  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMd"
   // CHECK: [[T5:%.*]] = call zeroext i1 @swift_dynamicCast(ptr [[T0]], ptr {{%.*}}, ptr [[T4]], ptr {{.*}}, [[INT]] 6)
   // CHECK: br i1 [[T5]],
   %1 = alloc_stack $S
@@ -69,7 +69,7 @@ bb3:
 sil @testConditional1 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
-  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMD"
+  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMd"
   // CHECK: [[T5:%.*]] = call zeroext i1 @swift_dynamicCast(ptr [[T0]], ptr {{%.*}}, ptr [[T4]], ptr {{.*}}, [[INT]] 2)
   // CHECK: br i1 [[T5]],
   %1 = alloc_stack $S
@@ -89,7 +89,7 @@ bb3:
 sil @testConditional2 : $@convention(thin) (@in P) -> () {
 bb0(%0 : $*P):
   // CHECK: [[T0:%.*]] = alloca [[S:%.*]], align
-  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMD"
+  // CHECK: [[T4:%.*]] = call {{.*}}@"$s12dynamic_cast1P_pMd"
   // CHECK: [[T5:%.*]] = call zeroext i1 @swift_dynamicCast(ptr [[T0]], ptr {{%.*}}, ptr [[T4]], ptr {{.*}}, [[INT]] 0)
   // CHECK: br i1 [[T5]],
   %1 = alloc_stack $S

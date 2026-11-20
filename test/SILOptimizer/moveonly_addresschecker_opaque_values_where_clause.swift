@@ -55,3 +55,19 @@ func testBorrowed(_ x: borrowing any P & ~Copyable) -> Int { // expected-error {
     return 0
   }
 }
+
+// Under opaque values, the move-only object checker sees the subject of an
+// address-only `switch consume`, as it does for a loadable value with or
+// without opaque values. The `where` clause borrows the pattern variable
+// while the condition is evaluated, which is not a consume of the subject.
+func testLoadable() -> Int {
+  let x = Payload(tag: 1)
+  switch consume x {
+  case let y where cond():
+    _ = y
+    return 1
+  case let z:
+    _ = z
+    return 0
+  }
+}

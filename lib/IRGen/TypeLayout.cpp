@@ -421,6 +421,7 @@ ScalarKind swift::irgen::refcountingToScalarKind(ReferenceCounting refCounting) 
   case ReferenceCounting::Custom:
     return ScalarKind::CustomReference;
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool isNullableRefCounted(ScalarKind kind) {
@@ -460,6 +461,7 @@ static std::string scalarToString(ScalarKind kind) {
   case ScalarKind::ExistentialReference: return "ExistentialReference";
   case ScalarKind::CustomReference: return "Custom";
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::Function *createMetatypeAccessorFunction(IRGenModule &IGM, SILType ty,
@@ -1389,6 +1391,13 @@ bool ScalarTypeLayoutEntry::computeLayoutSemantics(
     }
     break;
   case ScalarKind::Immovable:
+    // Builtin.UnsafeValueBuffer, the only fixed-size immovable type: a
+    // ValueBuffer of pointer-sized words (e.g. an exclusivity access record).
+    for (Size offset; offset < size; offset += IGM.getPointerSize())
+      layoutProperties.push_back(
+          {currentOffset + offset.getValue(), IGM.getPointerSize().getValue(),
+           TypedMemoryLayoutSemantics::AnonymousPointer});
+    break;
   case ScalarKind::BlockStorage:
     return false;
   }
@@ -2556,6 +2565,7 @@ EnumTypeLayoutEntry::layoutString(IRGenModule &IGM,
     return createConstant(B);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
@@ -2593,6 +2603,7 @@ bool EnumTypeLayoutEntry::refCountString(IRGenModule &IGM,
     return true;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 bool EnumTypeLayoutEntry::computeLayoutSemantics(
@@ -2623,6 +2634,7 @@ bool EnumTypeLayoutEntry::computeLayoutSemantics(
     return true;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 void EnumTypeLayoutEntry::computeProperties() {

@@ -36,7 +36,8 @@ SourceRange MacroExpansionInfo::getSourceRange() const {
     return cast<MacroExpansionExpr>(this)->NAME();                             \
   case FreestandingMacroKind::Decl:                                            \
     return cast<MacroExpansionDecl>(this)->NAME();                             \
-  }
+  }                                                                            \
+  llvm_unreachable("covered switch");
 
 DeclContext *FreestandingMacroExpansion::getDeclContext() const {
   FORWARD_VARIANT(getDeclContext);
@@ -72,4 +73,5 @@ ASTNode FreestandingMacroExpansion::getASTNode() {
   case FreestandingMacroKind::Decl:
     return cast<MacroExpansionDecl>(this);
   }
+  llvm_unreachable("covered switch");
 }

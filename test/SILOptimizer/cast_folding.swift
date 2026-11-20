@@ -580,9 +580,10 @@ func test20_1() -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test20_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef {{.*}}, let, name "t", argno 1
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: debug_value (), let, name "t", argno 1, transform
+// CHECK-NEXT: %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %3 = struct $Bool
+// CHECK-NEXT: return %3
 @inline(never)
 func test20_2() -> Bool {
     return cast20(U())

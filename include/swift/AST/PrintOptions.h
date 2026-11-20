@@ -192,6 +192,14 @@ public:
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print the 'unsafe' of implicit 'unsafe' expressions.
+  ///
+  /// This compensates for codegen that defensively wraps with UnsafeExpr, so
+  /// that 'unsafe' isn't printed into files that don't check strict memory
+  /// safety. Avoid introducing more uses of this; we need to compute where
+  /// UnsafeExpr is actually needed.
+  bool PrintImplicitUnsafe = true;
+
   /// Whether to print expressions.
   bool PrintExprs = false;
   
@@ -466,6 +474,10 @@ public:
 
   /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
   bool SuppressUnsafeAlways = false;
+
+  /// Suppress the kind in `@_semantics("availability.osversion(<kind>)")` and
+  /// emit `@_semantics("availability.osversion")` instead.
+  bool SuppressOSVersionQueryKind = false;
 
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;

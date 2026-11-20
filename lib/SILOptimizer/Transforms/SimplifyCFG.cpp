@@ -56,6 +56,7 @@
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -689,7 +690,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     return nullptr;
 
   // Handle the obvious case.
-  if (auto *EI = dyn_cast<EnumInst>(Val))
+  if (auto *EI = dyn_cast<EnumInst>(lookThroughOwnershipInsts(Val)))
     return EI->getElement();
 
   // Check if the value is dominated by a switch_enum, e.g.
@@ -1204,6 +1205,101 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
   destBB = destBlock;
 }
 
+/// Clones the debug_values of a bypassed \p trampolineBB before \p insertPt.
+static void forwardTrampolineDebugValues(SILBasicBlock *trampolineBB,
+                                         SILInstruction *insertPt) {
+  for (SILInstruction &inst : *trampolineBB) {
+    if (isa<DebugValueInst>(inst))
+      inst.clone(insertPt);
+  }
+}
+
+/// Identifies the variable described by \p dvi. Fragments are separate
+/// variables.
+static SILDebugVariable getVariableKey(DebugValueInst *dvi) {
+  SILDebugVariable var = *dvi->getVarInfo();
+  var.Type = std::nullopt;
+  var.DIExpr = var.DIExpr.getFragmentPart();
+  return var;
+}
+
+/// Whether \p a and \p b describe the same value of a variable.
+static bool isSameDebugValue(DebugValueInst *a, DebugValueInst *b) {
+  // Debug reconstruction blocks are not compared.
+  if (a->getDebugReconstructionBlock() || b->getDebugReconstructionBlock())
+    return false;
+  return a->getSingleOperand() == b->getSingleOperand() &&
+         a->getCompleteVarInfo() == b->getCompleteVarInfo() &&
+         a->usesMoveableValueDebugInfo() == b->usesMoveableValueDebugInfo() &&
+         a->hasTrace() == b->hasTrace();
+}
+
+/// Creates a debug_value before \p insertPt which describes the variable of
+/// \p dvi as optimized out.
+static void createKilledDebugValue(DebugValueInst *dvi,
+                                   SILInstruction *insertPt) {
+  SILFunction *f = dvi->getFunction();
+  // When fragments are removed, this could just use the vartype.
+  SILValue described;
+  if (auto *debugBB = dvi->getDebugReconstructionBlock())
+    described = cast<ReturnInst>(debugBB->getTerminator())->getOperand();
+  else
+    described = dvi->getSingleOperand();
+  SILType type = described->getType().getObjectType();
+  SILDebugVariable var = dvi->getCompleteVarInfo();
+  // Like killOperand: address-only types keep the address and deref.
+  if (!type.isLoadableOrOpaque(*f)) {
+    type = type.getAddressType();
+  } else if (var.DIExpr.startsWithDeref()) {
+    var.DIExpr.eraseElement(var.DIExpr.element_begin());
+  }
+  SILBuilder builder(insertPt, dvi->getDebugScope());
+  builder.createDebugValue(dvi->getLoc(), SILUndef::get(f, type), var,
+                           dvi->usesMoveableValueDebugInfo(), dvi->hasTrace());
+}
+
+/// Joins the debug_values of \p trampolineBBs, the paths to a common
+/// destination, before \p insertPt. The last debug_value of a variable in each
+/// path is kept if it is the same on all paths, and killed otherwise.
+static void joinTrampolineDebugValues(ArrayRef<SILBasicBlock *> trampolineBBs,
+                                      SILInstruction *insertPt) {
+  size_t trampolineCount = trampolineBBs.size();
+  // Map of each debug variable to the debug_values defining them in each
+  // trampoline. The SmallVector stores one debug_value per trampoline.
+  llvm::MapVector<SILDebugVariable, SmallVector<DebugValueInst *, 2>>
+      lastDebugValues;
+  for (size_t i = 0; i != trampolineCount; ++i) {
+    for (SILInstruction &inst : *trampolineBBs[i]) {
+      auto *dvi = dyn_cast<DebugValueInst>(&inst);
+      if (!dvi)
+        continue;
+      auto &debugValues = lastDebugValues[getVariableKey(dvi)];
+      debugValues.resize(trampolineCount);
+      // Set this debug_value as defining the variable for the current
+      // trampoline. Only the last definition is kept.
+      debugValues[i] = dvi;
+    }
+  }
+  for (auto &entry : lastDebugValues) {
+    ArrayRef<DebugValueInst *> debugValues = entry.second;
+    // Find the first nonnull debug_value, and check if the debug_value is the
+    // same in all trampolines.
+    DebugValueInst *first =
+        *llvm::find_if(debugValues, [](DebugValueInst *dvi) { return dvi; });
+    bool allSame = llvm::all_of(debugValues, [&](DebugValueInst *dvi) {
+      return dvi && isSameDebugValue(dvi, first);
+    });
+    // The debug_value is cloned if they are all the same, otherwise it is
+    // killed. Debug reconstruction block comparison is not supported.
+    // Moving the debug_value up is safe: as critical edges don't exist in
+    // SIL, all values that exist in the trampoline exist at insertPt.
+    if (allSame)
+      first->clone(insertPt);
+    else
+      createKilledDebugValue(first, insertPt);
+  }
+}
+
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
@@ -1354,6 +1450,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     LLVM_DEBUG(llvm::dbgs()
                << "jump to trampoline from bb" << BB->getDebugID() << " to bb"
                << trampolineDest.destBB->getDebugID() << '\n');
+    // Debug values from the bypassed trampoline are forwarded before the `br`.
+    forwardTrampolineDebugValues(DestBB, BI);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), trampolineDest.destBB,
                                          trampolineDest.newSourceBranchArgs);
     // Eliminating the trampoline can expose opportunities to improve the
@@ -1578,6 +1676,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << trueTrampolineDest.destBB->getDebugID() << '\n');
 
     eraseTrampolineDestArgs(trueTrampolineDest);
+    // Debug values from the bypassed trampoline are forwarded to its
+    // destination, as the destination has exactly one predecessor.
+    forwardTrampolineDebugValues(TrueSide,
+                                 &*trueTrampolineDest.destBB->begin());
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), trueTrampolineDest.destBB,
         FalseSide, BI->getTrueBBCount(), BI->getFalseBBCount());
@@ -1599,6 +1701,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << falseTrampolineDest.destBB->getDebugID() << '\n');
 
     eraseTrampolineDestArgs(falseTrampolineDest);
+    forwardTrampolineDebugValues(FalseSide,
+                                 &*falseTrampolineDest.destBB->begin());
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide,
         falseTrampolineDest.destBB, BI->getTrueBBCount(),
@@ -1613,28 +1717,16 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  auto condBrToBr = [&](ArrayRef<SILValue> branchArgs, SILBasicBlock *newDest) {
+  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
     LLVM_DEBUG(llvm::dbgs()
                << "replace cond_br with same dests with br: " << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
+    joinTrampolineDebugValues({TrueSide, FalseSide}, BI);
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
+                                         trueTrampolineDest.destBB,
+                                         trueTrampolineDest.newSourceBranchArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     ++NumConstantFolded;
-  };
-  if (trueTrampolineDest.destBB == FalseSide
-      && trueTrampolineDest.newSourceBranchArgs.empty()) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
-    removeIfDead(TrueSide);
-    return true;
-  }
-  if (falseTrampolineDest.destBB == TrueSide) {
-    condBrToBr(falseTrampolineDest.newSourceBranchArgs, TrueSide);
-    removeIfDead(FalseSide);
-    return true;
-  }
-  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs,
-               trueTrampolineDest.destBB);
     removeIfDead(TrueSide);
     removeIfDead(FalseSide);
     return true;
@@ -2749,6 +2841,9 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   }
   TermInst *Term = BB->getTerminator();
   LLVM_DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
+  SmallVector<SILBasicBlock *, 8> trampolineBBs(
+      BB->getSuccessorBlocks().begin(), BB->getSuccessorBlocks().end());
+  joinTrampolineDebugValues(trampolineBBs, Term);
   SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest.destBB,
                                          commonDest.newSourceBranchArgs);
   Term->eraseFromParent();

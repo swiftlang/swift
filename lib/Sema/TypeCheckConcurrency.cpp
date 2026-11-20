@@ -149,7 +149,8 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
     return !ctor->hasAsync(); // need flow-isolation for non-async.
-  };
+  }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl *fn) {
@@ -625,6 +626,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
     // If it's actor-isolated but in the same module, then it's OK too.
     return accessWithinModule;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
@@ -842,6 +844,7 @@ bool SendableCheckContext::warnInMinimalChecking() const {
   case SendableCheck::ImplicitForExternallyVisible:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
@@ -874,6 +877,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
   case StrictConcurrency::Complete:
     return defaultDiagnosticBehavior();
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Determine the diagnostic behavior for a Sendable reference to the given
@@ -937,6 +941,7 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   case SourceFileKind::SyntheticMacro:
       return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::diagnoseSendabilityErrorBasedOn(
@@ -1172,6 +1177,7 @@ getSendableParamDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_param_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 static
@@ -1194,6 +1200,7 @@ getSendableResultDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_result_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 static
@@ -1216,6 +1223,7 @@ getSendablePropertyDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_property_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
@@ -1762,6 +1770,7 @@ bool ReferencedActor::isKnownToBeLocal() const {
   case Isolated:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 const AbstractFunctionDecl *
@@ -2091,6 +2100,7 @@ static ActorIsolation getInnermostIsolatedContext(
         dc->mapTypeIntoEnvironment(isolation.getGlobalActor()))
           .withPreconcurrency(isolation.preconcurrency());
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
@@ -2361,6 +2371,30 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   if (fn->isDeferBody())
     return findAnnotatableFunction(fn->getDeclContext());
   return fn;
+}
+
+/// If the given expression is the resolved form of a call to
+/// `withoutActuallyEscaping(_:do:)` or `withoutActuallyDeiniting(_:do:)` with
+/// a closure literal as its body, returns that closure.
+static ClosureExpr *getWithoutActuallyEscapingOrDeinitingBody(Expr *expr) {
+  // `withoutActuallyEscaping(f) { ... }` resolves to a
+  // `MakeTemporarilyEscapableExpr` that calls the body.
+  if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
+    if (auto *call = dyn_cast<CallExpr>(MTEE->getSubExpr()))
+      return dyn_cast<ClosureExpr>(call->getFn());
+    return nullptr;
+  }
+
+  // `withoutActuallyDeiniting(f) { ... }` resolves to a call to the body with
+  // a marked conversion of `f` as its argument.
+  if (auto *call = dyn_cast<CallExpr>(expr)) {
+    auto *conversion = dyn_cast_or_null<FunctionConversionExpr>(
+        call->getArgs()->getUnaryExpr());
+    if (conversion && conversion->isWithoutActuallyDeiniting())
+      return dyn_cast<ClosureExpr>(call->getFn());
+  }
+
+  return nullptr;
 }
 
 namespace {
@@ -3545,24 +3579,20 @@ namespace {
       if (auto isolationExpr = dyn_cast<CurrentContextIsolationExpr>(expr))
         recordCurrentContextIsolation(isolationExpr);
 
-      // `withoutActuallyEscaping` parameter types are set to be
-      // `nonisolated(nonsending)` when the `NonisolatedNonsendingByDefault`
-      // feature is enabled, which means that we need to make the argument
-      // as `nonisolated(nonsending)` if it's a closure. This cannot be done
-      // sooner because we need to make sure that closure is definitely
-      // nonisolated and due to how AST is structured we cannot do this in
-      // `determineClosureIsolation`.
+      // The body parameter types of `withoutActuallyEscaping` and
+      // `withoutActuallyDeiniting` are set to be `nonisolated(nonsending)`
+      // when the `NonisolatedNonsendingByDefault` feature is enabled, which
+      // means that we need to make the argument as `nonisolated(nonsending)`
+      // if it's a closure. This cannot be done sooner because we need to make
+      // sure that closure is definitely nonisolated and due to how AST is
+      // structured we cannot do this in `determineClosureIsolation`.
       if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
-        if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
-          if (auto *call = dyn_cast<CallExpr>(MTEE->getSubExpr())) {
-            if (auto *closure = dyn_cast<ClosureExpr>(call->getFn())) {
-              if (auto closureTy = closure->getType()->getAs<FunctionType>()) {
-                if (closureTy->isAsync() &&
-                    closure->getActorIsolation().isNonisolatedOrConcurrent())
-                  closure->setActorIsolation(
-                      ActorIsolation::forNonisolatedNonsending());
-              }
-            }
+        if (auto *closure = getWithoutActuallyEscapingOrDeinitingBody(expr)) {
+          if (auto closureTy = closure->getType()->getAs<FunctionType>()) {
+            if (closureTy->isAsync() &&
+                closure->getActorIsolation().isNonisolatedOrConcurrent())
+              closure->setActorIsolation(
+                  ActorIsolation::forNonisolatedNonsending());
           }
         }
       }
@@ -4940,6 +4970,7 @@ namespace {
 
         return true;
       }
+      llvm_unreachable("covered switch");
     }
 
     // Attempt to resolve the global actor type of a closure.
@@ -5087,6 +5118,7 @@ computeClosureIsolationFromParent(DeclContext *closure,
     return getNonisolatedIsolation(/*inherited=*/false);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 ActorIsolation
@@ -5529,7 +5561,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
   if (dc->getSelfProtocolDecl())
     return std::nullopt;
 
-  if (explicitNonisolatedIsSpecial(dc)) {
+  if (getDefaultIsolationForContext(dc) == DefaultIsolation::Nonisolated) {
     // Prevent isolation inference from requirements if the conforming type
     // has an explicit `nonisolated` attribute.
     if (auto *NTD = dc->getSelfNominalTypeDecl()) {
@@ -5656,6 +5688,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         return false;
       }
       }
+      llvm_unreachable("covered switch");
       }),
       isolatedRequirements.end());
 
@@ -5938,6 +5971,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a property, determine the isolation when it part of a wrapped
@@ -6189,6 +6223,7 @@ static OverrideIsolationResult validOverrideIsolation(
 
     return OverrideIsolationResult::Disallowed;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Retrieve the index of the first isolated parameter of the given
@@ -6715,6 +6750,7 @@ static bool shouldSelfIsolationOverrideDefault(
     /// treated as special.
     return explicitNonisolatedIsSpecial(dc);
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool isDeferBody(const Decl *D) {
@@ -8823,6 +8859,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::isAccessibleAcrossActors(
@@ -9417,6 +9454,21 @@ ActorIsolation swift::inferConformanceIsolation(
     return ActorIsolation::forNonisolated(false);
   }
 
+  // An isolated conformance can never satisfy a 'Self: P' requirement of a
+  // protocol whose 'Self' conforms to SendableMetatype. So if the type also
+  // conforms to such a protocol that inherits from this one, there is no
+  // isolation we could infer that would be usable; leave it nonisolated and
+  // let witness checking diagnose any isolated witness directly.
+  if (auto *sendableMetatypeProto =
+          ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+    auto *proto = conformance->getProtocol();
+    for (auto *other : nominal->getAllProtocols()) {
+      if (other->inheritsFrom(proto) &&
+          other->inheritsFrom(sendableMetatypeProto))
+        return ActorIsolation::forNonisolated(false);
+    }
+  }
+
   // If we are inferring isolated conformances and the conforming type is
   // isolated to a global actor, we may use the conforming type's isolation.
   auto nominalIsolation = getActorIsolation(nominal);
@@ -9489,10 +9541,19 @@ ActorIsolation swift::inferConformanceIsolation(
       continue;
 
     auto witnessIsolation = getActorIsolation(witness);
-    if (witnessIsolation.isActorIsolated()) {
-      anyIsolatedWitness = true;
-      break;
-    }
+    auto requirementIsolation = getActorIsolation(valueReq);
+
+    // This witness doesn't force the conformance to be isolated if it isn't
+    // isolated to begin with, if it can be referenced from any isolation
+    // domain, or if the requirement is already isolated to the witness's
+    // domain (in which case every caller is necessarily in that domain).
+    if (!witnessIsolation.isActorIsolated() ||
+        isAccessibleAcrossActors(witness, witnessIsolation, dc) ||
+        equivalentIsolationContexts(witnessIsolation, requirementIsolation))
+      continue;
+
+    anyIsolatedWitness = true;
+    break;
   }
 
   if (!anyIsolatedWitness) {

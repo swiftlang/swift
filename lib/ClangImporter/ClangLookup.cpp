@@ -581,6 +581,49 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   return result;
 }
 
+TinyPtrVector<ValueDecl *>
+importer::lookupDirectWithoutExtensions(NominalTypeDecl *decl, DeclName name) {
+  ASTContext &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  TinyPtrVector<ValueDecl *> result;
+
+  if (name.getBaseName().isOperator()) {
+    auto underlyingId = getOperatorName(ctx, name.getBaseIdentifier());
+    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
+    for (auto it : underlyingFuncs) {
+      if (auto synthesizedFunc =
+              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
+        result.push_back(synthesizedFunc);
+    }
+  } else {
+    // See if there is a Clang decl with the given name.
+    result = evaluateOrDefault(ctx.evaluator,
+                               ClangRecordMemberLookup({decl, name}), {});
+  }
+
+  // Check if there are any synthesized Swift members that match the name.
+  for (auto member : decl->getCurrentMembersWithoutLoading()) {
+    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+      if (namedMember->hasName() && namedMember->getName().matchesRef(name) &&
+          // Make sure we don't add duplicate entries, as that would wrongly
+          // imply that lookup is ambiguous.
+          !llvm::is_contained(result, namedMember)) {
+        result.push_back(namedMember);
+      }
+    }
+  }
+
+  // ClangRecordMemberLookup matches by base name only.
+  if (name.isCompoundName())
+    llvm::erase_if(result, [&](ValueDecl *found) {
+      return !found->getName().matchesRef(name);
+    });
+
+  return result;
+}
+
 namespace {
 /// Essentially a pair<CXXMethodDecl *, AccessSpecifier>, from qualified lookup.
 ///
@@ -993,7 +1036,7 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
 
   llvm::SmallVector<SubscriptDecl *, 1> subscripts;
   for (auto &[_, pair] : CXXSubscripts) {
-    auto [CXXGetter, CXXSetter] = pair;
+    auto CXXGetter = pair.first, CXXSetter = pair.second;
     ASSERT((CXXGetter || CXXSetter) &&
            "subscript should have at least getter or setter");
 
@@ -1253,4 +1296,37 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   // the look up again:
   importedOperatorBoolCache[Struct] = func;
   return func;
+}
+
+const clang::CXXMethodDecl *
+ClangImporter::lookupCXXAssignmentOperator(const clang::CXXRecordDecl *decl,
+                                           bool isMove) {
+  if (decl->isAnonymousStructOrUnion())
+    return nullptr;
+
+  auto &sema = Impl.getClangSema();
+  auto *record = const_cast<clang::CXXRecordDecl *>(decl);
+
+  clang::CXXMethodDecl *assignOp =
+      isMove ? sema.LookupMovingAssignment(record, /*Quals=*/0,
+                                           /*RValueThis=*/false,
+                                           /*ThisQuals=*/0)
+             : sema.LookupCopyingAssignment(record, clang::Qualifiers::Const,
+                                            /*RValueThis=*/false,
+                                            /*ThisQuals=*/0);
+
+  if (!assignOp)
+    return nullptr;
+
+  if (!assignOp->isCopyAssignmentOperator() &&
+      !assignOp->isMoveAssignmentOperator())
+    return nullptr;
+
+  if (assignOp->isDeleted())
+    return nullptr;
+
+  if (assignOp->getAccess() != clang::AS_public)
+    return nullptr;
+
+  return assignOp;
 }

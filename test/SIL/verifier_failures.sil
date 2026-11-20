@@ -187,6 +187,31 @@ bb2:
   unwind
 }
 
+// An ordinary closure that isn't on the stack owns its captures, even the ones
+// that its function borrows, so it can't capture an exactly-once value.
+// CHECK-LABEL: Begin Error in function escaping_closure_borrows_called_exactly_once
+// CHECK:       SIL verification failed: only a nondeinitable closure can capture a nondeinitable function value
+// CHECK-LABEL: End Error in function escaping_closure_borrows_called_exactly_once
+sil [ossa] @escaping_closure_borrows_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  return %pa : $@callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: Begin Error in function escaping_closure_consumes_called_exactly_once
+// CHECK:       SIL verification failed: only a nondeinitable closure can capture a nondeinitable function value
+// CHECK-LABEL: End Error in function escaping_closure_consumes_called_exactly_once
+sil [ossa] @escaping_closure_consumes_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @consume_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  return %pa : $@callee_guaranteed () -> ()
+}
+
+sil @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+sil @consume_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+
 // CHECK-LABEL: Begin Error in function private_without_body
 // CHECK: SIL verification failed: internal/private function must have a body
 // CHECK: End Error in function private_without_body

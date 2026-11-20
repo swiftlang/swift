@@ -65,7 +65,7 @@ public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
-public func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
+public func lifetimeDependentBorrow(_ p: borrowing @_addressable UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), count: Int(len2)), copying: ())
 }

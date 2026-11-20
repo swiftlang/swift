@@ -53,6 +53,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -339,10 +340,7 @@ void AvailabilityBoundaryVisitor::computeRegion(
       // the block does _not_ must not exits the function normally; in other
       // words its terminator must be an UnreachableInst.
       if (!isa<UnreachableInst>(block->getTerminator()) &&
-          block->getFunction()
-              ->getModule()
-              .getASTContext()
-              .SILOpts.VerifySILOwnership) {
+          !disableOwnershipVerification(block->getFunction()->getModule())) {
         llvm::errs() << "Invalid SIL provided to OSSACompleteLifetime?! {{\n";
         llvm::errs() << "OSSACompleteLifetime is visiting the availability "
                         "boundary of ";
@@ -364,11 +362,11 @@ void AvailabilityBoundaryVisitor::computeRegion(
                "value.\n"
             << "Please rerun the crashing swift-frontend command with the "
                "following flags added and file a bug with the output:\n"
-            << "-sil-ownership-verify-all -Xllvm '-sil-print-function="
+            << "-sil-verify-all -Xllvm '-sil-print-function="
             << block->getFunction()->getName()
             << "' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error\n";
-        llvm::errs() << "Use the -disable-sil-ownership-verifier frontend flag "
-                        "to disable this check.\n";
+        llvm::errs() << "Use the -Xllvm -disable-sil-ownership-verification "
+                        "frontend flags to disable this check.\n";
         llvm::report_fatal_error("Invalid lifetime of value whose availability "
                                  "boundary is being visited.");
       }
@@ -442,10 +440,7 @@ void AvailabilityBoundaryVisitor::visitAvailabilityBoundary(
     }
     assert(hasUnavailableSuccessor() ||
            isa<UnreachableInst>(block->getTerminator()) ||
-           !block->getFunction()
-                ->getModule()
-                .getASTContext()
-                .SILOpts.VerifySILOwnership);
+           disableOwnershipVerification(block->getFunction()->getModule()));
     visit(block->getTerminator(), OSSACompleteLifetime::LifetimeEnd::Boundary);
   }
 }

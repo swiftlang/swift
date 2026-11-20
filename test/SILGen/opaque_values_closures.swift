@@ -137,12 +137,36 @@ func captureImmutableOwned_callee(_ cl: () -> ()) {}
 // CHECK:         destroy_value [[CONTEXT]]
 // CHECK-NOT:     destroy_value [[COPY]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF'
+// CHECK-LABEL: sil private [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_ : {{.*}} {
+// CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $MOAny):
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_'
 struct MOAny : ~Copyable { var a: Any }
 func captureImmutableOwnedNoncopyable() {
   let mo = MOAny(a: 1)
   captureImmutableOwned_callee {
     _ = mo.a
   }
+}
+
+// CaptureKind::Immutable, settable: an autoclosure reads a `let` initialized
+// after its declaration as an lvalue, an owned read that copies the capture.
+// CHECK-LABEL: sil private [transparent] [ossa] [opaque] @$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_ : {{.*}} {
+// CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $T,
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]
+// CHECK:         apply {{%[^,]+}}<T>([[COPY]],
+// CHECK:         destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_'
+func captureImmutableInitializedAfterDecl<T: Comparable>(_ a: T, _ b: T, _ c: Bool) -> Bool {
+  let n: T
+  if c {
+    n = a
+  } else {
+    n = b
+  }
+  return c && n > b
 }
 
 // CaptureKind::StorageAddress, isMoveOnlyWrapped=false, isPack=false

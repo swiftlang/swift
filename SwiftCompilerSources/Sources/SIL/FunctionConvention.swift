@@ -222,6 +222,10 @@ public struct ResultInfo : CustomStringConvertible {
                                  in function: Function) -> CanonicalType {
     CanonicalType(bridged: self._bridged.getReturnValueType(functionType.bridged, function.bridged))
   }
+
+  public func getReturnValueType(of function: Function) -> CanonicalType {
+    return getReturnValueType(ofFunctionType: function.convention.functionType, in: function)
+  }
 }
 
 extension FunctionConvention {

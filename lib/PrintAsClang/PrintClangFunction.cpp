@@ -392,6 +392,8 @@ public:
         os << " * _Nonnull";
       return ClangRepresentation::representable;
     }
+    if (!declPrinter.shouldInclude(cd))
+      return ClangRepresentation::unsupported;
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
@@ -430,6 +432,9 @@ public:
     // noncopyable.
     for (Type arg : genericArgs) {
       if (cxx_translation::isNoncopyableValueTypeExposableToCxx(arg))
+        return ClangRepresentation::unsupported;
+      // Only OpaquePointer has the C++ type traits a generic argument needs.
+      if (arg->getAnyPointerElementType())
         return ClangRepresentation::unsupported;
     }
     os << '<';

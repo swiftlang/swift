@@ -5900,3 +5900,90 @@ bb0:
   destroy_value %1
   unreachable
 }
+
+struct BridgeObjectWrapper {
+  var o: Builtin.BridgeObject
+}
+
+sil @barrier : $@convention(thin) () -> ()
+sil @fail : $@convention(thin) () -> Never
+
+// Make sure that the lifetime extending copy, which is created when replacing the
+// upcast-operand of the unchecked_ref_cast, gets a `dead_end` destroy in bb2.
+// Otherwise the object would be released on the path to the infinite loop.
+//
+// CHECK-LABEL: sil [ossa] @no_destroy_for_lifetime_extending_copy_in_dead_end :
+// CHECK-NOT:     destroy_value {{%[0-9]+}} : $E
+// CHECK:       } // end sil function 'no_destroy_for_lifetime_extending_copy_in_dead_end'
+// CHECK_COPYPROP-LABEL: sil [ossa] @no_destroy_for_lifetime_extending_copy_in_dead_end :
+// CHECK_COPYPROP-NOT:     destroy_value {{%[0-9]+}} : $E
+// CHECK_COPYPROP:       } // end sil function 'no_destroy_for_lifetime_extending_copy_in_dead_end'
+sil [ossa] @no_destroy_for_lifetime_extending_copy_in_dead_end : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = alloc_ref $E
+  %2 = upcast %1 to $B
+  cond_br %0, bb1, bb2
+
+bb1:
+  %4 = unchecked_ref_cast %2 to $Builtin.BridgeObject
+  %5 = struct $BridgeObjectWrapper (%4)
+  destroy_value [dead_end] %5
+  %7 = function_ref @barrier : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  destroy_value [dead_end] %2
+  %10 = function_ref @fail : $@convention(thin) () -> Never
+  %11 = apply %10() : $@convention(thin) () -> Never
+  unreachable
+
+bb3:
+  %13 = apply %7() : $@convention(thin) () -> ()
+  %14 = builtin "infinite_loop_true_condition"() : $Builtin.Int1
+  cond_br %14, bb4, bb5
+
+bb4:
+  br bb3
+
+bb5:
+  unreachable
+}
+
+// Same as above, but in a loop: the leaky block bb3 is in a dead-end region, but the
+// lifetime extending copy can be re-executed. Therefore the destroy must not be `dead_end`.
+//
+// CHECK-LABEL: sil [ossa] @destroy_for_lifetime_extending_copy_in_dead_end_loop :
+// CHECK:       bb1:
+// CHECK:         [[A:%.*]] = alloc_ref $E
+// CHECK-NEXT:    destroy_value [[A]] : $E
+// CHECK-NOT:     dead_end
+// CHECK:       } // end sil function 'destroy_for_lifetime_extending_copy_in_dead_end_loop'
+sil [ossa] @destroy_for_lifetime_extending_copy_in_dead_end_loop : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = alloc_ref $E
+  %2 = upcast %1 to $B
+  cond_br %0, bb2, bb3
+
+bb2:
+  %4 = unchecked_ref_cast %2 to $Builtin.BridgeObject
+  %5 = struct $BridgeObjectWrapper (%4)
+  destroy_value %5
+  br bb4
+
+bb3:
+  destroy_value %2
+  br bb4
+
+bb4:
+  %10 = builtin "infinite_loop_true_condition"() : $Builtin.Int1
+  cond_br %10, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  unreachable
+}

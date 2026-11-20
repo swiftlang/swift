@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -sil-verify-all -emit-sil %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -sil-verify-all -emit-sil -verify %s
 
 // Regression test for the following cases:
 
@@ -105,4 +105,54 @@ func borrowMe<T: ~Copyable>(_ n: borrowing T) {}
 
 func caller(_ h: Holder) {
   borrowMe(h.inner)
+}
+
+// A generic `~Copyable` `let` captured by a closure is an object under opaque
+// values. The closure may borrow it but not consume it.
+
+func take<T: ~Copyable>(_ n: consuming T) -> Bool { true }
+
+func readInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {
+  let n: T
+  n = a
+  return { checkGeneric(n) }()
+}
+
+func readInDefer<T: ~Copyable>(_ a: consuming T) {
+  let n: T
+  defer { _ = checkGeneric(n) }
+  n = a
+}
+
+func consumeInAutoclosure<T: ~Copyable>(_ a: consuming T, _ c: Bool) -> Bool {
+  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  n = a
+  return c && take(n) // expected-note {{consumed here}}
+}
+
+func consumeInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {
+  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  n = a
+  return { take(n) }() // expected-note {{consumed here}}
+}
+
+// A captured `var` stays in memory under opaque values and is borrowed and
+// consumed in place.
+
+func run(_ f: () -> ()) { f() }
+
+func borrowVarInClosure<T: ~Copyable>(_ a: consuming T, _ make: () -> T) {
+  var x = a
+  x = make()
+  run { _ = checkGeneric(x) }
+  _ = take(x)
+}
+
+func consumeVarInClosure<T: ~Copyable>(_ a: consuming T, _ make: () -> T) {
+  var x = a
+  run {
+    _ = take(x)
+    x = make()
+  }
+  _ = checkGeneric(x)
 }

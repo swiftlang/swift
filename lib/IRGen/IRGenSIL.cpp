@@ -749,8 +749,7 @@ public:
       return;
 
     llvm::IRBuilder<> ZeroInitBuilder(AI->getNextNode());
-    ZeroInitBuilder.SetInsertPoint(getEarliestInsertionPoint()->getParent(),
-                                   getEarliestInsertionPoint()->getIterator());
+    ZeroInitBuilder.SetInsertPoint(getEarliestInsertionPoint()->getIterator());
     // No debug location is how LLVM marks prologue instructions.
     ZeroInitBuilder.SetCurrentDebugLocation(nullptr);
     // note that this memset is before lifetime.start which is Undefined
@@ -1250,21 +1249,20 @@ public:
   template <typename StorageType>
   void emitDebugVariableDeclaration(
       StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
-      const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      bool InCoroContext = false,
+      SILDebugVariable VarInfo, bool InCoroContext = false,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+          Builder, Storage, Ty, VarInfo, InCoroContext,
           ArtificialKind::RealValue, DbgInstrKind);
       return;
     }
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+        Builder, Storage, Ty, VarInfo, InCoroContext,
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
@@ -4252,7 +4250,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     if (IGM.getOptions().UseProfilingMarkerThunks &&
         isa<FunctionRefInst>(site.getCallee()) &&
         !site.getOrigCalleeType()->isAsync() &&
-        subMap.hasAnySubstitutableParams() &&
+        subMap.isEffectivelyGeneric() &&
         !subMap.getRecursiveProperties().hasPrimaryArchetype()) {
       emission->useProfilingThunk();
     }
@@ -6318,8 +6316,15 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   // swifterror in a register.
   if (IGM.ShouldUseSwiftError)
     return;
-  auto ErrorResultSlot = getCalleeErrorResultSlot(IGM.silConv.getSILType(
-      ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()), false);
+  // The shadow variable describes the thrown value as two dereferences of the
+  // error result slot, which is only correct for an 'any Error' pointer. A
+  // typed error is never stored behind that pointer, so don't describe one.
+  SILFunctionConventions fnConv(FnTy, IGM.silConv);
+  if (fnConv.isTypedError())
+    return;
+  auto ErrorResultSlot = getCalleeErrorResultSlot(
+      fnConv.getSILType(ErrorInfo, IGM.getMaximalTypeExpansionContext()),
+      fnConv.isTypedError());
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
   auto Storage =
@@ -6337,8 +6342,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
                                    IGM.getMaximalTypeExpansionContext()),IGM);
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
-                                         getDebugScope(), {}, *Var,
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy, *Var,
                                          /*InCoroContext=*/false, ArtificialValue);
 }
 
@@ -6521,8 +6525,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(
-      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), VarInfo,
-      IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+      Copy, DbgTy, SILTy, VarInfo, IsInCoro,
+      AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 
   // Erase any LLVM instructions emitted by the debug BB. They were only needed
   // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
@@ -7062,7 +7066,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
     }
 
     emitDebugVariableDeclaration(
-        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, IsInCoro,
+        addr, DbgTy, SILTy, *VarInfo, IsInCoro,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
@@ -7117,9 +7121,7 @@ void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
-                AllocRefInstBase *ARI) {
-  auto Types = ARI->getTailAllocatedTypes();
-  auto Counts = ARI->getTailAllocatedCounts();
+                ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
   for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
     Explosion ElemCount = IGF.getLoweredExplosion(Counts[Idx].get());
     TailArrays.push_back({Types[Idx], ElemCount.claimNext()});
@@ -7139,7 +7141,8 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
@@ -7169,7 +7172,8 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   }
 
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   Explosion metadata = getLoweredExplosion(i->getMetatypeOperand());
   auto metadataValue = metadata.claimNext();
@@ -7254,10 +7258,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
   // Lower the operand.
   Explosion self = getLoweredExplosion(i->getOperand());
   auto selfValue = self.claimNext();
-  SILValue op = i->getOperand();
-  if (auto *beginDealloc = dyn_cast<BeginDeallocRefInst>(op))
-    op = beginDealloc->getAllocation();
-  auto *ARI = dyn_cast<AllocRefInstBase>(op);
+  // The operand may reach the allocation through begin_dealloc_ref, casts or
+  // phis. StripObjectHeaders looks through these when it marks an object as
+  // [bare], so a bare stack object must not get to emitClassDeallocation.
+  auto *ARI = dyn_cast<AllocRefInstBase>(findReferenceRoot(i->getOperand()));
   if (ARI && StackAllocs.count(ARI)) {
     // We can ignore dealloc_refs for stack allocated objects.
     //
@@ -7269,7 +7273,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     return;
   }
   auto classType = i->getOperand()->getType();
-  emitClassDeallocation(*this, classType, selfValue);
+  SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
+  emitClassDeallocation(*this, classType, selfValue, TailArrays);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
@@ -7358,8 +7365,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
   IGM.DebugInfo->emitVariableDeclaration(
-      Builder, Storage, DbgTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      InCoroContext(*CurSILFn, *i));
+      Builder, Storage, DbgTy, *VarInfo, InCoroContext(*CurSILFn, *i));
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
@@ -9453,6 +9459,31 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
 
 void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
+  // getSplitContinuationAddr binds a continuation created in another frame
+  // to this one, so the suspension is set up from its operands rather than from
+  // a get_async_continuation in this frame.
+  auto *splitGet = dyn_cast<BuiltinInst>(i->getOperand());
+  if (splitGet && splitGet->getBuiltinInfo().ID ==
+                      BuiltinValueKind::GetSplitContinuationAddr) {
+    llvm::Value *continuation =
+        getLoweredSingletonExplosion(splitGet->getArguments()[0]);
+    Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
+    SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
+
+    auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
+    bool hasError = i->getErrorBB() != nullptr;
+    auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
+    auto *errorPhi = hasError ? getLoweredBB(i->getErrorBB()).phis[0] : nullptr;
+    assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
+                            "error basic block should only expect one value");
+
+    // The value is delivered into the resume buffer, so the resume successor
+    // takes no arguments and there is nothing to add to its PHI nodes.
+    emitAwaitSplitContinuation(continuation, resumeBuffer, resumeTy,
+                                  normalDestBB, errorPhi, errorDestBB);
+    return;
+  }
+
   Explosion resumeResult;
 
   bool isIndirect = i->getResumeBB()->args_empty();

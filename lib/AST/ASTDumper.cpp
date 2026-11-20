@@ -656,6 +656,7 @@ static StringRef getDumpString(OptimizationMode mode) {
   case OptimizationMode::ForSize:
     return "ForSize";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(NonSendableKind kind) {
   switch (kind) {
@@ -664,6 +665,7 @@ static StringRef getDumpString(NonSendableKind kind) {
   case NonSendableKind::Specific:
     return "Specific";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
   switch (applyLevel) {
@@ -674,6 +676,7 @@ static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
   case FunctionRefInfo::ApplyLevel::DoubleApply:
     return "double_apply";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ExplicitSafety safety) {
   switch (safety) {
@@ -684,6 +687,7 @@ static StringRef getDumpString(ExplicitSafety safety) {
   case ExplicitSafety::Unsafe:
     return "unsafe";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
@@ -692,6 +696,7 @@ static StringRef getDumpString(ExecutionSemantics semantics) {
   case ExecutionSemantics::Once:
     return "exactly_once";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
   switch (kind) {
@@ -3485,17 +3490,15 @@ public:
         
         if (auto *CasePattern = LabelItem.getPattern()) {
           switch (CasePattern->getOwnership()) {
-          case ValueOwnership::Default:
-            break;
-          case ValueOwnership::Shared:
+          case LoweredOwnership::Shared:
             printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
                           Label::always("ownership"));
             break;
-          case ValueOwnership::InOut:
+          case LoweredOwnership::InOut:
             printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
                           Label::always("ownership"));
             break;
-          case ValueOwnership::Owned:
+          case LoweredOwnership::Owned:
             printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
                           Label::always("ownership"));
             break;
@@ -5668,6 +5671,13 @@ public:
     printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }
+  void visitTailAllocatedAttr(TailAllocatedAttr *Attr, Label label) {
+    printCommon(Attr, "tail_allocated_attr", label);
+    printFieldQuoted(Attr->getCountsName().str(), Label::always("counts"));
+    for (auto *tyR : Attr->getTypeReprs())
+      printRec(tyR, Label::optional("type_repr"));
+    printFoot();
+  }
   void visitTargetAttr(TargetAttr *Attr, Label label) {
     printCommon(Attr, "target_attr", label);
     printFieldQuoted(Attr->Value, Label::always("value"));
@@ -5984,11 +5994,12 @@ public:
                                 VisitedConformances &visited, Label label) {
     // A recursive conformance shouldn't have its contents printed, or there's
     // infinite recursion. (This also avoids printing things that occur multiple
-    // times in a conformance hierarchy.) We also don't print the details in the
-    // parsable (JSON) output because it is far too much information when it is
-    // rendered as part of every declref that contains such a conformance.
-    auto shouldPrintDetails =
-        visited.insert(conformance).second && !Writer.isParsable();
+    // times in a conformance hierarchy.) For normal conformances, we also don't
+    // print witness details in the parsable (JSON) output because it is far too
+    // much information when rendered as part of every declref that contains
+    // such a conformance.
+    auto isFirstVisit = visited.insert(conformance).second;
+    auto shouldPrintDetails = isFirstVisit && !Writer.isParsable();
 
     auto printCommon = [&](StringRef kind) {
       printHead(kind, ASTNodeColor, label);
@@ -6015,8 +6026,8 @@ public:
                      Label::always("module"));
           printFoot();
         }, Label::always("context"));
-      } else {
-        printFlag(!shouldPrintDetails, "<details printed above>");
+      } else if (!Writer.isParsable()) {
+        printFlag(!isFirstVisit, "<details printed above>");
       }
     };
 
@@ -6113,7 +6124,7 @@ public:
       case ProtocolConformanceKind::Inherited: {
         auto conf = cast<InheritedProtocolConformance>(conformance);
         printCommon("inherited_conformance");
-        if (!shouldPrintDetails)
+        if (!isFirstVisit)
           break;
 
         printRec(conf->getInheritedConformance(), visited,
@@ -6124,22 +6135,24 @@ public:
       case ProtocolConformanceKind::Specialized: {
         auto conf = cast<SpecializedProtocolConformance>(conformance);
         printCommon("specialized_conformance");
-        if (!shouldPrintDetails)
+        if (!isFirstVisit)
           break;
 
         printRec(conf->getSubstitutionMap(),
                  SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
-        if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
-          printList(*condReqs, [&](auto subReq, Label label) {
-            printRec(subReq, label);
-          }, Label::optional("conditional_reqs"));
-        } else {
-          printRecArbitrary([&](Label label) {
-            printHead("<conditional requirements unable to be computed>",
-                      ASTNodeColor, label);
-            printFoot();
-          }, Label::optional("conditional_reqs"));
+        if (!Writer.isParsable()) {
+          if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
+            printList(*condReqs, [&](auto subReq, Label label) {
+              printRec(subReq, label);
+            }, Label::optional("conditional_reqs"));
+          } else {
+            printRecArbitrary([&](Label label) {
+              printHead("<conditional requirements unable to be computed>",
+                        ASTNodeColor, label);
+              printFoot();
+            }, Label::optional("conditional_reqs"));
+          }
         }
         printRec(conf->getGenericConformance(), visited,
                  Label::optional("generic_conformance"));
@@ -6739,6 +6752,10 @@ namespace {
               printFieldQuoted(param.getInternalLabel().str(),
                                Label::always("internal_name"));
             dumpParameterFlags(param.getParameterFlags());
+            if (!param.hasBodyAccess())
+              printFieldRaw(
+                  [&](raw_ostream &OS) { param.getAccessScope().print(OS); },
+                  Label::always("access_scope"));
 
             printRec(param.getPlainType(), Label::optional("plain_type"));
 
@@ -6873,6 +6890,9 @@ namespace {
           printFieldQuoted(str, Label::always("lifetime"));
         }
       }
+
+      if (auto numScopeParams = T->getScopeSignature().getNumParams())
+        printField(numScopeParams, Label::always("num_scope_params"));
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));

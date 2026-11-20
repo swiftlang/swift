@@ -37,6 +37,30 @@ bb0(%0 : @guaranteed $String):
   return %28 : $String
 }
 
+// CHECK-LABEL: sil [ossa] @ossa_append_to_empty_string_with_destroy_addr
+// CHECK:       [[S:%[0-9]+]] = alloc_stack $String
+// CHECK:       [[F:%[0-9]+]] = function_ref @empty_string
+// CHECK:       [[A:%[0-9]+]] = apply [[F]]
+// CHECK-NEXT:  store [[A]] to [init] [[S]]
+// CHECK-NEXT:  [[COPY:%[0-9]+]] = copy_value %0
+// CHECK-NEXT:  store [[COPY]] to [assign] [[S]]
+// CHECK-NEXT:  destroy_addr [[S]]
+// CHECK:     } // end sil function 'ossa_append_to_empty_string_with_destroy_addr'
+sil [ossa] @ossa_append_to_empty_string_with_destroy_addr : $@convention(thin) (@guaranteed String) -> () {
+bb0(%0 : @guaranteed $String):
+  %2 = alloc_stack $String
+  %5 = metatype $@thin String.Type
+  %6 = function_ref @empty_string : $@convention(method) (@thin String.Type) -> @owned String
+  %7 = apply %6(%5) : $@convention(method) (@thin String.Type) -> @owned String
+  store %7 to [init] %2 : $*String
+  %14 = function_ref @string_append : $@convention(method) (@guaranteed String, @inout String) -> ()
+  %15 = apply %14(%0, %2) : $@convention(method) (@guaranteed String, @inout String) -> ()
+  destroy_addr %2 : $*String
+  dealloc_stack %2 : $*String
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @append_empty_string
 // CHECK:       [[S:%[0-9]+]] = alloc_stack $String
 // CHECK-NEXT:  store %0 to [init] [[S]]

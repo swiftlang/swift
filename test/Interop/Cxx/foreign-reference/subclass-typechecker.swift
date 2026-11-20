@@ -22,6 +22,10 @@ final class SubOfFinal: FinalShared {} // expected-error {{inheritance from a fi
 final class SubOfPrivateDtor: PrivateDtorShared {} // expected-error {{cannot inherit from non-open class 'PrivateDtorShared' outside of its defining module}}
 final class SubOfDeletedDtor: DeletedDtorShared {} // expected-error {{cannot inherit from non-open class 'DeletedDtorShared' outside of its defining module}}
 final class SubOfProtectedDtor: ProtectedDtorShared {}
+final class SubOfMultiplyInherited: MultiplyInheritedShared {}
+final class SubOfVirtualBase: VirtualBaseShared {} // expected-error {{cannot inherit from non-open class 'VirtualBaseShared' outside of its defining module}}
+final class SubOfDerivedFromVirtualBase: DerivedFromVirtualBaseShared {} // expected-error {{cannot inherit from non-open class 'DerivedFromVirtualBaseShared' outside of its defining module}}
+final class SubOfImmortal: ImmortalWithVirtualDtor {} // expected-error {{cannot inherit from non-open class 'ImmortalWithVirtualDtor' outside of its defining module}}
 
 final class WithMembers: SubclassableShared {
   var computed: Int { 0 }

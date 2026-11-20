@@ -56,6 +56,74 @@ extension Context {
   var moduleDecl: ModuleDecl {
     bridgedPassContext.getModuleDecl().getAs(ModuleDecl.self)
   }
+
+  func mangle(withSignatureSpecializedArguments: [ArgumentSpecialization],
+              resultOwnedToGuaranteed: Bool = false,
+              from function: Function) -> String {
+    let bridgedArgSpecs = withSignatureSpecializedArguments.map {
+      let bridgedKind: BridgedPassContext.SignatureSpecializedArgMangling.Kind
+      switch $0.kind {
+        case .ownedToGuaranteed: bridgedKind = .ownedToGuaranteed
+        case .guaranteedToOwned: bridgedKind = .guaranteedToOwned
+        case .dead:              bridgedKind = .dead
+        case .explode:           bridgedKind = .explode
+      }
+      return BridgedPassContext.SignatureSpecializedArgMangling(argIdx: $0.argumentIndex, kind: bridgedKind)
+    }
+    return bridgedArgSpecs.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: bridgedPassContext.mangleWithSignatureSpecializedArgs(bridgedArgIndices,
+                                                                          resultOwnedToGuaranteed,
+                                                                          function.bridged))
+    }
+  }
+
+  func createSpecializedFunctionDeclaration(
+    from original: Function, withName specializedFunctionName: String,
+    withParams specializedParameters: [ParameterInfo],
+    withResults specializedResults: [ResultInfo]? = nil,
+    withRepresentation: FunctionTypeRepresentation? = nil,
+    makeBare: Bool = false,
+    preserveGenericSignature: Bool = true
+  ) -> Function {
+    return specializedFunctionName._withBridgedStringRef { nameRef in
+      let bridgedParamInfos = specializedParameters.map { $0._bridged }
+      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
+
+      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
+
+        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
+
+          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
+            return bridgedPassContext.createSpecializedFunctionDeclaration(
+              nameRef, paramBuf.baseAddress, paramBuf.count,
+              resultBuf.baseAddress, resultBuf.count,
+              original.bridged, repr.bridged, makeBare,
+              preserveGenericSignature
+            ).function
+          }
+        } else {
+          return bridgedPassContext.createSpecializedFunctionDeclaration(
+            nameRef, paramBuf.baseAddress, paramBuf.count,
+            nil, 0,
+            original.bridged, repr.bridged, makeBare,
+            preserveGenericSignature
+          ).function
+        }
+      }
+    }
+  }
+
+  func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(specializedFunction.bridged)
+    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
+    defer { bridgedPassContext.deinitializedNestedPassContext() }
+
+    return buildFn(specializedFunction, nestedContext)
+  }
+
+  func notifyNewFunction(function: Function, derivedFrom: Function) {
+    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
+  }
 }
 
 extension MutatingContext {
@@ -108,7 +176,9 @@ extension MutatingContext {
     return false
   }
 
-  func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
+  /// Returns false if the apply isn't inlined.
+  @discardableResult
+  func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) -> Bool {
     // This is only a best-effort attempt to notify the new cloned instructions as changed.
     // TODO: get a list of cloned instructions from the `inlineFunction`
     let instBeforeInlining = apply.previous
@@ -125,7 +195,9 @@ extension MutatingContext {
       instAfterInlining = nil
     }
 
-    bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
+    if !bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline) {
+      return false
+    }
 
     if let instBeforeInlining = instBeforeInlining?.next,
        let instAfterInlining = instAfterInlining,
@@ -134,6 +206,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
     notifyBranchesChanged()
+    return true
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {

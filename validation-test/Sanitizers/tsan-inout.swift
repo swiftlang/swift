@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: cd %t
+// RUN: %target-clang -x c %S/../../test/Sanitizers/tsan/Inputs/tsan_invisible_barrier.c -c -o %t/tsan_invisible_barrier.o
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -module-name TSanUninstrumented -emit-module -emit-module-path %t/TSanUninstrumented.swiftmodule -parse-as-library
 // RUN: %target-build-swift %S/Inputs/tsan-uninstrumented.swift -c -module-name TSanUninstrumented -parse-as-library -o %t/TSanUninstrumented.o
-// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
+// RUN: %target-swiftc_driver %s %t/TSanUninstrumented.o %t/tsan_invisible_barrier.o -import-objc-header %S/../../test/Sanitizers/tsan/Inputs/tsan_invisible_barrier.h -I%t -L%t -g -sanitize=thread %import-libdispatch -o %t/tsan-binary
 // RUN: not env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t/tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: stress_test
@@ -45,14 +46,17 @@ func testRace(name: String, thread inThread1: @escaping () -> (), thread inThrea
 
   // Store these in globals so the closure passed to pthread_create
   // can be turned into a C function pointer.
+  swift_tsan_invisible_barrier_init(2)
   gInThread1 = inThread1
   gInThread2 = inThread2
   pthread_create(&thread1, nil, { _ in
     gInThread1()
+    swift_tsan_invisible_barrier_wait()
     return nil
   }, nil)
 
   pthread_create(&thread2, nil, { _ in
+    swift_tsan_invisible_barrier_wait()
     gInThread2()
     return nil
   }, nil)

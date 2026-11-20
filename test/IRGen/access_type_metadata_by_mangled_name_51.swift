@@ -14,7 +14,7 @@ dynamic func foo() -> some P { return X() }
 
 // CHECK-LABEL: define{{.*}}3bar
 public func bar() {
-  // SWIFT_52: @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s39access_type_metadata_by_mangled_name_513fooQryFQOyQo_1AAA1PPQxMD")
+  // SWIFT_52: @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s39access_type_metadata_by_mangled_name_513fooQryFQOyQo_1AAA1PPQxMd", ptr @"$s39access_type_metadata_by_mangled_name_513fooQryFQOyQo_1AAA1PPQxMR")
   // SWIFT_PRE_52: @"$s39access_type_metadata_by_mangled_name_513fooQryFQOyQo_1AAA1PPQxMa"(
   useMetadata(foo().a)
 }

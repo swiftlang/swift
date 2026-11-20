@@ -138,7 +138,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
 
   // If SIL parsing succeeded, verify the generated SIL.
   if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
-    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
+    silMod->verify(/*checkLinearLifetime=*/!ParseIncompleteOSSA);
   }
 
   return silMod;
@@ -738,6 +738,7 @@ struct DeclSILOptional {
     bool *isCanonical = nullptr;
     bool *hasOwnershipSSA = nullptr;
     bool *hasLoweredAddresses = nullptr;
+    bool *hasUnresolvedLifetimes = nullptr;
     IsThunk_t *isThunk = nullptr;
     IsDynamicallyReplaceable_t *isDynamic = nullptr;
     IsDistributed_t *isDistributed = nullptr;
@@ -818,6 +819,8 @@ static bool parseDeclSILOptional(
       *options.hasOwnershipForTrivial = true;
     else if (options.hasLoweredAddresses && SP.P.Tok.getText() == "opaque")
       *options.hasLoweredAddresses = false;
+    else if (options.hasUnresolvedLifetimes && SP.P.Tok.getText() == "unresolved")
+      *options.hasUnresolvedLifetimes = true;
     else if (options.needStackProtection && SP.P.Tok.getText() == "stack_protection")
       *options.needStackProtection = true;
     else if (options.isSpecialized && SP.P.Tok.getText() == "specialized")
@@ -1514,6 +1517,8 @@ static std::optional<AccessorKind> getAccessorKind(StringRef ident) {
       .Case("modify", AccessorKind::Modify)
       .Case("modify2", AccessorKind::YieldingMutate)
       .Case("yielding_mutate", AccessorKind::YieldingMutate)
+      .Case("borrow", AccessorKind::Borrow)
+      .Case("mutate", AccessorKind::Mutate)
       .Default(std::nullopt);
 }
 
@@ -2289,6 +2294,23 @@ bool SILParser::parseForwardingOwnershipKind(
   return false;
 }
 
+bool SILParser::parseTailElems(SmallVectorImpl<SILType> &ElementTypes,
+                               SmallVectorImpl<SILValue> &ElementCounts,
+                               SILBuilder &B) {
+  SILType ElemTy;
+  if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() || P.Tok.getText() != "*")
+    return true;
+  P.consumeToken();
+
+  SILValue ElemCount;
+  if (parseTypedValueRef(ElemCount, B))
+    return true;
+
+  ElementTypes.push_back(ElemTy);
+  ElementCounts.push_back(ElemCount);
+  return false;
+}
+
 ///  (',' sil-loc)? (',' sil-scope-ref)?
 bool SILParser::parseSILDebugLocation(SILLocation &L, SILBuilder &B) {
   // Parse the debug information, if any.
@@ -2555,7 +2577,17 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Member, bool FnTypeRequired) {
       auto lookupTy =
         decl->getInterfaceType()
             ->removeArgumentLabels(decl->getNumCurryLevels());
-      if (declTy == lookupTy->getCanonicalType()) {
+      // The type of a mutate accessor has an inout result, which its printed
+      // type does not spell.
+      CanType candidateTy = declTy;
+      auto *accessor = dyn_cast<AccessorDecl>(decl);
+      if (accessor && accessor->isMutateAccessor()) {
+        if (auto fnTy = dyn_cast<AnyFunctionType>(declTy)) {
+          candidateTy = fnTy.withExtInfo(
+              fnTy->getExtInfo().intoBuilder().withHasInOutResult().build());
+        }
+      }
+      if (candidateTy == lookupTy->getCanonicalType()) {
         TheDecl = decl;
         // Update SILDeclRef to point to the right Decl.
         Member.loc = decl;
@@ -4043,6 +4075,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                             .Case("unpermitted_copy",
                                   DiagnoseKind::UnpermittedCopy)
                             .Case("let_reinit", DiagnoseKind::LetReinit)
+                            .Case("missing_super_init",
+                                  DiagnoseKind::MissingSuperInit)
                             .Default(DiagnoseKind::Invalid);
 
     if (Kind == DiagnoseKind::Invalid) {
@@ -4184,9 +4218,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UncheckedOwnershipInst: {
     if (parseTypedValueRef(Val, B))
       return true;
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership))
+      return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createUncheckedOwnership(InstLoc, Val);
+    ResultVal = B.createUncheckedOwnership(InstLoc, Val, forwardingOwnership);
     break;
   }
 
@@ -4228,11 +4265,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     }
 
-    if (parseTypedValueRef(Val, AddrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    if (parseTypedValueRef(Val, AddrLoc, B))
       return true;
 
-    auto LB = B.createLoadBorrow(InstLoc, Val);
+    SILValue valueHint;
+    if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
+      P.consumeToken(tok::comma);
+      if (parseVerbatim("value_hint") ||
+          parseTypedValueRef(valueHint, AddrLoc, B)) {
+        return true;
+      }
+    }
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto LB = B.createLoadBorrow(InstLoc, Val, valueHint);
     LB->setUnchecked(IsUnchecked);
     ResultVal = LB;
     break;
@@ -5447,18 +5495,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (Optional == "non_nested") {
         isNested = StackAllocationIsNotNested;
       } else if (Optional == "tail_elems") {
-        SILType ElemTy;
-        if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
-            P.Tok.getText() != "*")
+        if (parseTailElems(ElementTypes, ElementCounts, B))
           return true;
-        P.consumeToken();
-
-        SILValue ElemCount;
-        if (parseTypedValueRef(ElemCount, B))
-          return true;
-
-        ElementTypes.push_back(ElemTy);
-        ElementCounts.push_back(ElemCount);
       } else {
         return true;
       }
@@ -5519,9 +5557,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDeallocPackMetadata(InstLoc, Val);
     break;
   case SILInstructionKind::DeallocRefInst: {
+    SmallVector<SILType, 2> ElementTypes;
+    SmallVector<SILValue, 2> ElementCounts;
+    while (P.consumeIf(tok::l_square)) {
+      Identifier Id;
+      parseSILIdentifier(Id, diag::expected_in_attribute_list);
+      StringRef Optional = Id.str();
+      if (Optional == "tail_elems") {
+        if (parseTailElems(ElementTypes, ElementCounts, B))
+          return true;
+      } else {
+        return true;
+      }
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    }
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDeallocRef(InstLoc, Val);
+    ResultVal = B.createDeallocRef(InstLoc, Val, ElementTypes, ElementCounts);
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {
@@ -7843,6 +7895,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   bool hasLoweredAddresses = false;
+  bool hasUnresolvedLifetimes = false;
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
@@ -7870,8 +7923,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional({
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &hasLoweredAddresses, &isThunk, &isDynamic, &isDistributed,
-          &isRuntimeAccessible, &forceEnableLexicalLifetimes,
+          &hasLoweredAddresses, &hasUnresolvedLifetimes, &isThunk, &isDynamic,
+          &isDistributed, &isRuntimeAccessible, &forceEnableLexicalLifetimes,
           &useStackForPackMetadata, &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
@@ -7912,6 +7965,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setHasLoweredAddresses(hasLoweredAddresses);
+    FunctionState.F->setHasUnresolvedLifetimes(hasUnresolvedLifetimes);
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
     FunctionState.F->setIsDistributed(isDistributed);

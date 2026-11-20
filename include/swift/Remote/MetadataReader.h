@@ -1621,9 +1621,20 @@ public:
     if (!demangledSymbol)
       return nullptr;
     if (demangledSymbol->getKind() == Demangle::Node::Kind::Global) {
-      demangledSymbol = demangledSymbol->getChild(0);
+      auto *global = demangledSymbol;
+      demangledSymbol = global->getChild(0);
       if (!demangledSymbol)
         return nullptr;
+
+      // A module's copy of a back-deployed type's descriptor is prefixed with
+      // a marker node. It describes the same type as the descriptor it
+      // copies.
+      if (demangledSymbol->getKind() ==
+          Demangle::Node::Kind::BackDeploymentCopy) {
+        demangledSymbol = global->getChild(1);
+        if (!demangledSymbol)
+          return nullptr;
+      }
     }
 
     switch (demangledSymbol->getKind()) {

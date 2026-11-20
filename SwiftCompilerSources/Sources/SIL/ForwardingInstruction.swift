@@ -27,6 +27,8 @@ public protocol ForwardingInstruction : Instruction {
   var preservesIdentity: Bool { get }
 
   /// Return true if the forwarded value has the same representation. If true, then the result can be mapped to the same storage without a move or copy.
+  ///
+  /// This mirrors `ForwardingOperation::hasSameRepresentation` and is conservatively false.
   var preservesRepresentation: Bool { get }
 
   var canForwardGuaranteedValues: Bool { get }
@@ -175,7 +177,7 @@ extension StructInst : ForwardingInstruction {
   public var singleForwardedOperand: Operand? { nil }
 
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -184,7 +186,7 @@ extension TupleInst : ForwardingInstruction {
   public var singleForwardedOperand: Operand? { nil }
 
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -193,7 +195,7 @@ extension LinearFunctionInst : ForwardingInstruction {
   public var singleForwardedOperand: Operand? { nil }
 
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -202,7 +204,7 @@ extension DifferentiableFunctionInst : ForwardingInstruction {
   public var singleForwardedOperand: Operand? { nil }
 
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -216,7 +218,7 @@ extension MarkDependenceInst : ForwardingInstruction {
   }
 
   public var preservesIdentity: Bool { true }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -227,7 +229,7 @@ extension RefToBridgeObjectInst : ForwardingInstruction {
   }
 
   public var preservesIdentity: Bool { true }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -283,7 +285,7 @@ extension ConvertFunctionInst : ConversionInstruction {
 }
 
 extension ThinToThickFunctionInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -301,7 +303,7 @@ extension MoveOnlyWrapperToCopyableValueInst : ConversionInstruction {
 }
 
 extension MoveOnlyWrapperToCopyableBoxInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -313,37 +315,37 @@ extension UncheckedOwnershipInst : ConversionInstruction {
 }
 
 extension UpcastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension UncheckedRefCastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension UnconditionalCheckedCastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { preservesReferenceCounts }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { preservesReferenceCounts }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension BridgeObjectToRefInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension UncheckedValueCastInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension DropDeinitInst : ConversionInstruction {
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { false }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -357,7 +359,7 @@ extension EnumInst : ForwardingInstruction {
   }
 
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -378,7 +380,7 @@ extension DestructureStructInst : ForwardingInstruction {
 
 extension FunctionExtractIsolationInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
 }
@@ -434,21 +436,21 @@ extension TupleExtractInst : ForwardingInstruction {
 
 extension DifferentiableFunctionExtractInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
 }
 
 extension CheckedCastBranchInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension UncheckedEnumDataInst : ForwardingInstruction {
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -462,14 +464,14 @@ extension SwitchEnumInst : ForwardingInstruction {
 
 extension MarkUnresolvedReferenceBindingInst : ForwardingInstruction {
   public var preservesIdentity: Bool { true }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
 
 extension LinearFunctionExtractInst: ForwardingInstruction {
   public var preservesIdentity: Bool { false }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { true }
 }
@@ -477,7 +479,7 @@ extension LinearFunctionExtractInst: ForwardingInstruction {
 extension BorrowedFromInst: ForwardingInstruction {
   public var singleForwardedOperand: Operand? { operands[0] }
   public var preservesIdentity: Bool { true }
-  public var preservesRepresentation: Bool { true }
+  public var preservesRepresentation: Bool { false }
   public var canForwardGuaranteedValues: Bool { true }
   public var canForwardOwnedValues: Bool { false }
 }

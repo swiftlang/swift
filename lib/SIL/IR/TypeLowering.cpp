@@ -32,6 +32,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -1860,9 +1861,20 @@ namespace {
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
+      if (loweringStyle == TypeExpansionKind::None)
+        return emitDestroyValue(B, loc, aggValue);
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
+          emitDestroyValue(B, loc, aggValue);
+          return;
+        }
+      }
+      for (auto *field :
+           getLoweredType().getStructDecl()->getStoredProperties()) {
+        auto fieldTy = getLoweredType().getFieldType(
+            field, B.getModule(), B.getFunction().getTypeExpansionContext());
+        if (!B.getFunction().isTypeABIAccessible(fieldTy)) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -2973,6 +2985,10 @@ namespace {
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        auto *importer =
+            static_cast<ClangImporter *>(TC.Context.getClangModuleLoader());
+        if (importer->hasNonTrivialAssignmentOperator(D))
+          properties.setCustomAssign();
       }
 
       if (auto *clangDecl = D->getClangDecl()) {
@@ -4417,7 +4433,7 @@ getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
 
 static CanGenericSignature
 getCanonicalSignatureOrNull(GenericSignature sig) {
-  if (!sig || sig->areAllParamsConcrete())
+  if (!sig.isEffectivelyGeneric())
     return nullptr;
   return sig.getCanonicalSignature();
 }
@@ -4525,7 +4541,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   GenericSignature sig = TC.getGenericSignatureWithCapturedEnvironments(c)
       .genericSig;
 
-  AnyFunctionType::Param param(
+  auto param = AnyFunctionType::Param::bodyAccess(
       inputType, Identifier(),
       ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
   // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -4548,9 +4564,10 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
   SmallVector<FunctionType::Param, 2> params;
 
   // Create the wrappedValue param
-  params.emplace_back(
+  params.push_back(FunctionType::Param::bodyAccess(
       wrappedValueType, Identifier(),
-      ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
+      ParameterTypeFlags().withOwnershipSpecifier(
+          ParamSpecifier::LegacyOwned)));
 
   if (!isLocalContext) {
     CanType selfType = wrappedProperty->getDeclContext()
@@ -4558,9 +4575,9 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
                            ->getCanonicalType();
     selfType = sig.getReducedType(selfType);
     // Create the self param
-    params.emplace_back(
+    params.push_back(FunctionType::Param::bodyAccess(
         selfType, Identifier(),
-        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::InOut));
+        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::InOut)));
   }
 
   CanType resultType = TupleType::getEmpty(TC.Context)->getCanonicalType();
@@ -4599,7 +4616,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   CanType methodTy = CanFunctionType::get({}, {}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
-  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  FunctionType::Param args[] = {FunctionType::Param::bodyAccess(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
                                  llvm::ArrayRef(args), /* yields */ {},
                                  methodTy, extInfo);
@@ -4627,7 +4644,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 
   resultType = CanFunctionType::get({}, {}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
-  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  FunctionType::Param args[] = {FunctionType::Param::bodyAccess(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
                                  llvm::ArrayRef(args), /* yields */ {},
                                  resultType, extInfo);
@@ -4723,7 +4740,8 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
   }
 
   using Param = FunctionType::Param;
-  Param params[] = {Param(Int32Ty), Param(PtrPtrInt8Ty)};
+  Param params[] = {Param::bodyAccess(Int32Ty),
+                    Param::bodyAccess(PtrPtrInt8Ty)};
 
   auto rep = FunctionTypeRepresentation::CFunctionPointer;
   auto *clangTy = C.getClangFunctionType(params, Int32Ty, rep);
@@ -5580,12 +5598,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
     return ABIDifference::NeedsThunk;
 
-  // A nondeinitable value needs a context of its own, so forming one from any
-  // other thick function value needs a thunk, even from a noncopyable value
-  // with the same ABI. A thin function has no context, so thin-to-thick can
-  // form the value directly.
-  if (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable() &&
-      fnTy1->getExtInfo().hasContext())
+  // A noncopyable value needs a context of its own, which only it refers to,
+  // so forming one from a copyable thick function value needs a thunk. So
+  // does forming a nondeinitable value from any other thick function value,
+  // even from a noncopyable value with the same ABI. A thin function has no
+  // context, so thin-to-thick can form the value directly.
+  if (fnTy1->getExtInfo().hasContext() &&
+      ((fnTy2->isNoncopyable() && !fnTy1->isNoncopyable()) ||
+       (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable())))
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())

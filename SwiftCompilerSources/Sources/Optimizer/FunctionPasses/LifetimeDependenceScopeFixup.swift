@@ -545,7 +545,9 @@ extension ScopeExtension {
     case let .borrowed(beginBorrow):
       if let beginInst = beginBorrow.value.definingInstruction {
         if let extScope = ExtendableScope(scope, beginInst: beginInst) {
-          gatherExtensions(valueOrAddress: beginBorrow.baseOperand!.value)
+          if let baseOperand = beginBorrow.baseOperand {
+            gatherExtensions(valueOrAddress: baseOperand.value)
+          }
           scopes.push(extScope)
           return
         }

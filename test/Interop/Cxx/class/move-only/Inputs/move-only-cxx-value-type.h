@@ -94,4 +94,21 @@ struct DerivesEmptyBaseNoAttr : public EmptyBase {
         third(other.third) {}
 };
 
+struct NonCopyableParamBase {
+  inline int takesNonCopyable(NonCopyable p) const { return p.x; }
+  inline int mutTakesNonCopyable(NonCopyable p, int y) {
+    x = p.x * y;
+    return x;
+  }
+  inline int takesNonCopyableConstRef(const NonCopyable &p) const {
+    return p.x;
+  }
+
+  int x = 0;
+};
+
+struct NonCopyableParamDerived : NonCopyableParamBase {};
+
+struct NonCopyableParamDerivedDerived : NonCopyableParamDerived {};
+
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H

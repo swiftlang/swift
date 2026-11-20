@@ -1,4 +1,6 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
+// RUN: %empty-directory(%t)
+// RUN: %target-clang -x c %S/Inputs/tsan_invisible_barrier.c -c -o %t/tsan_invisible_barrier.o
+// RUN: %target-swiftc_driver %s %t/tsan_invisible_barrier.o -import-objc-header %S/Inputs/tsan_invisible_barrier.h -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
 // RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
@@ -51,35 +53,38 @@ public func call_foobar() {
 
 // Test ThreadSanitizer execution end-to-end.
 
-var threads: [pthread_t] = []
 var racey_x: Int;
 
-// TSan %deflake as part of the test.
-for _ in 1...5 {
-#if os(macOS) || os(iOS) || os(FreeBSD)
-  var t : pthread_t?
-#else
-  var t : pthread_t = 0
-#endif
-  pthread_create(&t, nil, { _ in
-    print("pthread ran")
-    racey_x = 5;
+swift_tsan_invisible_barrier_init(2)
 
-    return nil
-  }, nil)
 #if os(macOS) || os(iOS) || os(FreeBSD)
-  threads.append(t!)
+var t1: pthread_t?
+var t2: pthread_t?
 #else
-  threads.append(t)
+var t1: pthread_t = 0
+var t2: pthread_t = 0
 #endif
-}
 
-for t in threads {
-  if t == nil {
-    print("nil thread")
-    continue
-  }
-  pthread_join(t, nil)
-}
+pthread_create(&t1, nil, { _ in
+  print("pthread ran")
+  racey_x = 5
+  swift_tsan_invisible_barrier_wait()
+  return nil
+}, nil)
+
+pthread_create(&t2, nil, { _ in
+  swift_tsan_invisible_barrier_wait()
+  print("pthread ran")
+  racey_x = 6
+  return nil
+}, nil)
+
+#if os(macOS) || os(iOS)
+pthread_join(t1!, nil)
+pthread_join(t2!, nil)
+#else
+pthread_join(t1, nil)
+pthread_join(t2, nil)
+#endif
 
 // CHECK: ThreadSanitizer: data race

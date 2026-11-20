@@ -898,6 +898,16 @@ EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+EnableLibraryEvolution("enable-library-evolution",
+                       llvm::cl::desc("Build the module to allow binary-compatible library evolution"),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+LazyTypecheck("experimental-lazy-typecheck",
+              llvm::cl::desc("Type-check lazily as needed instead of eagerly; requires -enable-library-evolution"),
+              llvm::cl::cat(Category), llvm::cl::init(false));
+
 static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     "enable-bare-slash-regex",
     llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
@@ -4689,6 +4699,13 @@ int main(int argc, char *argv[]) {
   }
   if (options::DisableImplicitStringProcessingImport) {
     InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
+  }
+
+  if (options::EnableLibraryEvolution) {
+    InitInvok.getLangOptions().enableFeature(Feature::LibraryEvolution);
+    // Mirror the frontend, which ignores this without library evolution.
+    InitInvok.getTypeCheckerOptions().EnableLazyTypecheck =
+        options::LazyTypecheck;
   }
 
   if (options::EnableExperimentalNamedOpaqueTypes) {

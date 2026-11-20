@@ -132,6 +132,7 @@ static bool isColdTerminator(const TermInst *term) {
     // ApplySite::isCalleeKnownProgramTerminationPoint.
     return term->getModule().getOptions().EnableNoReturnCold;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Peek through an extract of Bool.value.

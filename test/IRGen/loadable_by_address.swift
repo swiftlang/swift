@@ -1,7 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -c %s
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-experimental-feature BuiltinModule -I %t -c %s
+// RUN: %target-swift-frontend -target %target-swift-6.2-abi-triple -enable-experimental-feature BuiltinModule -I %t -c %s -O
 
+// REQUIRES: swift_feature_BuiltinModule
+
+import Builtin
 import resilient_struct
 
 public struct LargeValue {
@@ -56,4 +60,19 @@ class C2<T>: P {
   var v: E = .a
 
   var v2: (t: Int, i: S)?
+}
+
+// rdar://180755649
+// This used to crash at -O with "Unimplemented user" on the struct instruction
+// in UUID.uuid.modify.
+public typealias uuid_t = (UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8,
+                           UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+
+public struct UUID {
+  var _storage: InlineArray<2, UInt64>
+
+  public var uuid: uuid_t {
+    get { Builtin.reinterpretCast(_storage) }
+    set { _storage = Builtin.reinterpretCast(newValue) }
+  }
 }

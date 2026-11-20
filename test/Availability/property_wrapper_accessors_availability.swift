@@ -72,6 +72,20 @@ struct ModifyMoreAvailable<T> {
 }
 
 @propertyWrapper
+struct ProjectedValueMoreAvailable<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+
+    @available(macOS 49, *)
+    var projectedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+}
+
+@propertyWrapper
 struct UnrestrictedProjection<T> {
     var wrappedValue: T {
         get { fatalError() }
@@ -267,6 +281,59 @@ func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'Les
     _ = x.nested.$unrestricted_projection
     x.nested.$unrestricted_projection = 0
   }
+}
+
+@available(anyAppleOS 51, *)
+struct LessAvailableInAnyAppleOS { // expected-note {{enclosing scope requires availability of macOS 51 or newer}}
+  // The synthesized accessors must not be more available than the struct,
+  // even though the wrapper setters are only annotated with macOS availability.
+  @SetterMoreAvailable
+  var wrapped_setter_more_available: Int
+
+  @ModifyMoreAvailable
+  var wrapped_modify_more_available: Int
+
+  // Neither must the projection.
+  @ProjectedValueMoreAvailable
+  var wrapped_projected_value_more_available: Int
+
+  // The synthesized backing storage is not diagnosed in addition to the
+  // property.
+  @available(macOS 50.5, *) // expected-error {{property cannot be more available than enclosing scope}}
+  @UnrestrictedProjection
+  var wrapped_more_available: Int
+}
+
+@available(anyAppleOS 51, *)
+struct LessAvailableInAnyAppleOSWithMacOSMembers {
+  // The macOS attributes of the properties don't override the anyAppleOS
+  // availability of the struct.
+  @available(macOS, deprecated: 52)
+  @SetterMoreAvailable
+  var wrapped_setter_more_available: Int
+
+  @available(macOS, deprecated: 52)
+  @ModifyMoreAvailable
+  var wrapped_modify_more_available: Int
+}
+
+@available(anyAppleOS 52, macOS 51, *)
+struct LessAvailableInAnyAppleOSAndMacOS {
+  @SetterMoreAvailable
+  var wrapped_setter_more_available: Int
+
+  @ModifyMoreAvailable
+  var wrapped_modify_more_available: Int
+}
+
+@available(macOS 51, *)
+func testInferredAvailabilityInMacOS(x: inout LessAvailableInAnyAppleOSAndMacOS) {
+  // The explicit macOS availability of the struct takes precedence over its
+  // anyAppleOS availability.
+  x.wrapped_setter_more_available = 0
+  x.wrapped_modify_more_available = 0
+  x.$wrapped_setter_more_available = 0
+  x.$wrapped_modify_more_available = 0
 }
 
 @propertyWrapper

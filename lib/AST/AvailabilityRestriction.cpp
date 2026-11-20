@@ -34,6 +34,7 @@ AvailabilityRestriction::getDomainAndRange(const ASTContext &ctx) const {
   case Reason::Deprecated:
     return getAttr().getDeprecatedDomainAndRange(ctx).value();
   }
+  llvm_unreachable("covered switch");
 }
 
 AvailabilityDomainAndRange
@@ -168,6 +169,7 @@ bool AvailabilityRestriction::shouldHideDomainNameInDiagnostics() const {
       return true;
     }
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef AvailabilityRestriction::getDiagnosticDescription(
@@ -309,6 +311,7 @@ static bool canIgnoreRestrictionInUnavailableContexts(
     // getDeprecationRestrictionForAttr().
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Returns the domain for the target platform if \p restriction may be narrowed
@@ -506,6 +509,7 @@ domainCanBeUnconditionallyUnavailableAtRuntime(AvailabilityDomain domain,
       return false;
     }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Returns true if unsatisfied introduction restrictions for \p domain make
@@ -534,6 +538,7 @@ domainIsUnavailableAtRuntimeIfUnintroduced(AvailabilityDomain domain,
       return true;
     }
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool restrictionIndicatesRuntimeUnavailability(
@@ -549,6 +554,7 @@ static bool restrictionIndicatesRuntimeUnavailability(
   case AvailabilityRestriction::Reason::Unintroduced:
     return domainIsUnavailableAtRuntimeIfUnintroduced(domain, ctx);
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::getRuntimeUnavailableDomains(

@@ -37,7 +37,7 @@ private struct C {}
 
 // CHECK-LABEL: define{{.*}} @"$s26existential_shape_metadata12testConcrete
 public func testConcrete() -> Any.Type {
-  // CHECK: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s26existential_shape_metadata2Q0_pSi1TAaBPRts_XPMD")
+  // CHECK: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s26existential_shape_metadata2Q0_pSi1TAaBPRts_XPMd", ptr @"$s26existential_shape_metadata2Q0_pSi1TAaBPRts_XPMR")
   // CHECK: ret ptr [[METADATA]]
   return (any Q0<Int>).self
 }
@@ -82,7 +82,7 @@ public func test_private<T>(t: T.Type) -> Any.Type {
 //   change anything: the shape is still public.
 // CHECK-LABEL: define{{.*}} @"$s26existential_shape_metadata23test_privateApplication
 public func test_privateApplication<T>(t: T.Type) -> Any.Type {
-  // CHECK: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s26existential_shape_metadata2Q0_pAA1C33_881A0B6978EB4286E7CFF1E27030ACACLLV1TAaBPRts_XPMD")
+  // CHECK: [[METADATA:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s26existential_shape_metadata2Q0_pAA1C33_881A0B6978EB4286E7CFF1E27030ACACLLV1TAaBPRts_XPMd", ptr @"$s26existential_shape_metadata2Q0_pAA1C33_881A0B6978EB4286E7CFF1E27030ACACLLV1TAaBPRts_XPMR")
   // CHECK: ret ptr [[METADATA]]
   return (any Q0<C>).self
 }

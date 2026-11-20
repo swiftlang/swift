@@ -79,6 +79,11 @@ module FunctionsAndMethodsReturningFRT {
   requires cplusplus
 }
 
+module BorrowAccessorOptionalClosure {
+  header "borrow-accessor-optional-closure.h"
+  requires cplusplus
+}
+
 module PassAsParameter {
   header "pass-as-parameter.h"
   requires cplusplus
@@ -163,4 +168,14 @@ module LibkernOwnership {
 
 module CDeclFRT {
   header "cdecl.h"
+}
+
+module CFReturnsAttributesFRT {
+  header "frt-cf-returns-attributes.h"
+  requires cplusplus
+}
+
+module MultiPayloadEnum {
+  header "multi-payload-enum.h"
+  requires cplusplus
 }

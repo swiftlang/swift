@@ -198,6 +198,7 @@ static inline bool isBorrowAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline bool isReadAccess(SGFAccessKind kind) {
@@ -218,6 +219,7 @@ static inline bool isConsumeAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a read access kind, does it require an owned result?
@@ -990,6 +992,10 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
+  /// Enter the debug scope at the closing brace of the block that \p Loc
+  /// ends. Code emitted when falling off the end of a block runs there.
+  void enterBlockEndDebugScope(CleanupLocation Loc);
+
   InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
@@ -1033,6 +1039,22 @@ public:
   /// Generates code for a class (isolated-)deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
+
+  /// The `@_tailAllocated` element types of \p classType's class, substituted
+  /// for it, as formal types and lowered with the owner's generic abstraction
+  /// (which the SIL verifier requires of `alloc_ref` and `dealloc_ref`).
+  /// Returns false if the class has none or this isn't Embedded Swift.
+  bool getTailAllocatedElementTypes(CanType classType,
+                                    SmallVectorImpl<CanType> &formalTypes,
+                                    SmallVectorImpl<SILType> &loweredTypes);
+
+  /// The tail elements of a `@_tailAllocated` class instance, for its
+  /// `dealloc_ref`: the attribute's element types and the counts read from its
+  /// counts property. Empty if the class has none or this isn't Embedded
+  /// Swift.
+  void emitTailAllocatedElements(SILLocation loc, SILValue selfValue,
+                                 SmallVectorImpl<SILType> &tailTypes,
+                                 SmallVectorImpl<SILValue> &tailCounts);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
@@ -2453,9 +2475,10 @@ public:
                             bool canUnwind, SubstitutionMap subs,
                             ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token,
-                               SILValue allocation);
+  SILValue emitEndApplyWithRethrow(SILLocation loc,
+                                   MultipleValueInstructionResult *token,
+                                   SILValue allocation,
+                                   SILType resultType);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);

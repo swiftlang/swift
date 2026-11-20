@@ -41,7 +41,8 @@ public class M {
 // CHECK:   destroy_addr %0 : $*any WithDelegate, loc {{.*}}:26:5, scope [[SCOPE1:[0-9]+]]
 // CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope [[SCOPE1]]
 
-// CHECK:   destroy_addr %0 : $*any WithDelegate, loc {{.*}}:26:5, scope [[SCOPE1]]
-// CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope [[SCOPE1]]
-// CHECK-NEXT:   throw %{{.*}} : $any Error, loc {{.*}}:26:5, scope [[SCOPE1]]
+// The throw is shared with the guard's else branch, so it has its own scope.
+// CHECK:   destroy_addr %0 : $*any WithDelegate, loc {{.*}}:26:5, scope [[SCOPE2:[0-9]+]]
+// CHECK-NEXT:   dealloc_stack %2 : $*Builtin.Int2, loc {{.*}}:20:12, scope [[SCOPE2]]
+// CHECK-NEXT:   throw %{{.*}} : $any Error, loc {{.*}}:26:5, scope [[SCOPE2]]
 // CHECK: end sil function '$s3del1MC4fromAcA12WithDelegate_p_tKcfc'

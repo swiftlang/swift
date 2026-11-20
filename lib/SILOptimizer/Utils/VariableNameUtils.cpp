@@ -391,6 +391,18 @@ struct VariableNameInferrer::CallResultNamer {
     return v;
   }
 
+  /// The variable (or parameter) holding the function value that \p call
+  /// invokes in source, if one exists. This is recovered from the call
+  /// expression since the compiler may have already rewritten a call through a
+  /// closure value into a direct call of the closure's function.
+  static VarDecl *getCalledVariable(FullApplySite call) {
+    if (auto *apply = call.getLoc().getAsASTNode<ApplyExpr>())
+      return dyn_cast_or_null<VarDecl>(
+          apply->getCalledValue(/*skipFunctionConversions=*/true));
+
+    return nullptr;
+  }
+
   /// User-facing name of the function/method invoked by \p call. Returns
   /// the name's textual rendering and (when one can be determined) the
   /// invoked \c ValueDecl, so callers can push the decl directly through
@@ -404,6 +416,11 @@ struct VariableNameInferrer::CallResultNamer {
     ValueDecl *decl = nullptr;
   };
   CalleeNameAndDecl getCalleeNameAndDecl(FullApplySite call) const {
+    // A call through a function value (e.g. a 'let'-bound closure or a parameter):
+    // use the variable's name, since it's what the user wrote at the call site.
+    if (auto *var = getCalledVariable(call))
+      return {getNameFromDecl(var), var};
+
     SILValue callee = stripCalleeConversions(call.getCallee());
     while (auto *pai = dyn_cast<PartialApplyInst>(callee))
       callee = stripCalleeConversions(pai->getCallee());
@@ -420,9 +437,12 @@ struct VariableNameInferrer::CallResultNamer {
     // A direct call: prefer the referenced function's own decl name.
     if (auto *f = dyn_cast<FunctionRefBaseInst>(callee)) {
       auto *fn = f->getInitiallyReferencedFunction();
-      if (auto declRef = fn->getDeclRef())
-        if (auto *decl = declRef.getDecl())
+      auto declRef = fn->getDeclRef();
+
+      // If there's a corresponding declaration, we'll get its name.
+      if (auto *decl = declRef.getDecl())
           return {getNameFromDecl(decl), decl};
+
       // A specialization of a function, such as the one that
       // MandatoryAllocBoxToStack creates for a closure or local function whose
       // box it promotes, has no SILDeclRef. It keeps the original function's
@@ -430,8 +450,14 @@ struct VariableNameInferrer::CallResultNamer {
       if (fn->hasLocation())
         if (auto *decl = fn->getLocation().getAsASTNode<ValueDecl>())
           return {getNameFromDecl(decl), decl};
-      // Fall back to the SILFunction's name (e.g. for SIL-only declarations
-      // that carry no AST decl).
+
+      // Immediately-invoked closures and thunks do not have a
+      // user-facing name, so we shouldn't leak their mangled SIL name.
+      if (declRef.getAbstractClosureExpr() || fn->isThunk())
+        return {};
+
+      // SIL-only tests will otherwise fallback to the name from the SILFunction
+      // to maintain easier to work with diagnostics in those tests.
       return {fn->getName(), nullptr};
     }
 

@@ -42,6 +42,7 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -349,7 +350,8 @@ expandSwiftInvocation(int argc, const char **argv, llvm::StringSaver &Saver,
 static llvm::Expected<std::string>
 computeCacheKey(llvm::cas::ObjectStore &CAS, llvm::ArrayRef<const char *> Args,
                 llvm::StringRef InputPath) {
-  auto BaseKey = swift::createCompileJobBaseCacheKey(CAS, Args);
+  auto BaseKey = swift::createCompileJobBaseCacheKey(
+      CAS, Args, *llvm::vfs::createPhysicalFileSystem());
   if (!BaseKey)
     return BaseKey.takeError();
 
@@ -394,7 +396,8 @@ static llvm::Expected<std::vector<std::string>>
 computeCacheKeysFromIndices(llvm::cas::ObjectStore &CAS,
                             llvm::ArrayRef<const char *> Args,
                             llvm::ArrayRef<unsigned> InputIndices) {
-  auto BaseKey = swift::createCompileJobBaseCacheKey(CAS, Args);
+  auto BaseKey = swift::createCompileJobBaseCacheKey(
+      CAS, Args, *llvm::vfs::createPhysicalFileSystem());
   if (!BaseKey)
     return BaseKey.takeError();
 

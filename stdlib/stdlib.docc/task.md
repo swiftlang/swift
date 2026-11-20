@@ -32,8 +32,9 @@
 - ``Swift/Task/value-40dtq``
 - ``Swift/Task/result``
 
-### Accessing the Current Task's Name
+### Accessing Task Names
 
+- ``Swift/Task/name-swift.property``
 - ``Swift/Task/name-swift.type.property``
 
 ### Canceling Tasks
@@ -46,6 +47,8 @@
 - ``Swift/withTaskCancellationHandler(operation:onCancel:)-1dnzh``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:)-85m2g``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
+- ``Swift/Task/cancel(reason:)``
+- ``Swift/Task/cancellationReason``
 
 ### Shielding Tasks from Cancellation
 
@@ -63,6 +66,18 @@
 ### Escalating Tasks
 
 - ``Swift/Task/escalatePriority(to:)``
+
+### Working with Task Deadlines
+
+- ``Swift/Task/activeDeadline(for:)``
+- ``Swift/Task/hasActiveDeadline``
+
+### Identifying Tasks
+
+- ``Swift/Task/id``
+- ``Swift/Task/currentID``
+- ``Swift/TaskID``
+- ``Swift/Task/ID``
 
 ### Comparing Tasks
 

@@ -17,6 +17,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -24,6 +25,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -573,29 +575,40 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
   case Kind::Deallocator:
   case Kind::IsolatedDeallocator:
   case Kind::Destroyer: {
-    // Always-emit-into-client declarations are like the default arguments of
-    // public functions; they are roots for dead code elimination and have
-    // serialized bodies, but no public symbol in the generated binary.
-    if (d->isAlwaysEmittedIntoClient())
-      return Limit::AlwaysEmitIntoClient;
-    if (auto accessor = dyn_cast<AccessorDecl>(d)) {
-      auto *storage = accessor->getStorage();
-      if (storage->isAlwaysEmittedIntoClient())
-        return Limit::AlwaysEmitIntoClient;
-    }
-
-    // A transparent member of a type that is back-deployed into the client
-    // doesn't inherit back deployment.
-    if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (nominal->isBackDeployedIntoClient()) {
-        const Decl *owner = d;
-        if (auto accessor = dyn_cast<AccessorDecl>(d))
-          owner = accessor->getStorage();
-        if (d->getAttrs().hasAttribute<TransparentAttr>() ||
-            owner->getAttrs().hasAttribute<TransparentAttr>())
-          return Limit::AlwaysEmitIntoClient;
+    auto isEmittedIntoClient = [&]() -> bool {
+      // Always-emit-into-client declarations are like the default arguments
+      // of public functions; they are roots for dead code elimination and
+      // have serialized bodies, but no public symbol in the generated binary.
+      if (d->isAlwaysEmittedIntoClient())
+        return true;
+      if (auto accessor = dyn_cast<AccessorDecl>(d)) {
+        auto *storage = accessor->getStorage();
+        if (storage->isAlwaysEmittedIntoClient())
+          return true;
       }
-    }
+
+      // A transparent member of a type that is back-deployed into the client
+      // doesn't inherit back deployment.
+      if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (nominal->isBackDeployedIntoClient()) {
+          const Decl *owner = d;
+          if (auto accessor = dyn_cast<AccessorDecl>(d))
+            owner = accessor->getStorage();
+          if (d->getAttrs().hasAttribute<TransparentAttr>() ||
+              owner->getAttrs().hasAttribute<TransparentAttr>())
+            return true;
+        }
+      }
+      return false;
+    };
+
+    // The body of an always-emit-into-client declaration is only serialized
+    // if the declaration is formally public. Otherwise, it can't be emitted
+    // into clients, so ignore the limit. This actually means that the
+    // declaration *can be ABI public* if the effective access level is public,
+    // which happens under `-enable-testing` with a member of an internal type.
+    if (isEmittedIntoClient() && constant.isSerialized())
+      return Limit::AlwaysEmitIntoClient;
     break;
   }
   case Kind::EnumElement:
@@ -766,11 +779,7 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     case Limit::None:
       return SILLinkage::Package;
     case Limit::AlwaysEmitIntoClient:
-      // Drop the AEIC if the enclosing decl is not effectively public.
-      // This matches what we do in the `internal` case.
-      if (isSerialized())
-        return SILLinkage::PackageNonABI;
-      else return SILLinkage::Package;
+      return SILLinkage::PackageNonABI;
     case Limit::OnDemand:
       return SILLinkage::Shared;
     case Limit::NeverPublic:
@@ -1140,13 +1149,15 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (isClangImported())
     return IsSerialized;
 
-  // Handle back deployed functions. The original back deployed function
-  // should not be serialized, but the thunk and fallback should be since they
-  // need to be emitted into the client.
+  // Handle back deployed functions. The thunk and fallback are always
+  // emitted into the client. The original back-deployed function is only
+  // serialized when it explicitly has an attribute that implies inlinability.
   if (isBackDeployed()) {
     switch (backDeploymentKind) {
       case BackDeploymentKind::None:
-        return IsNotSerialized;
+        // Accessors inherit this from their storage declaration.
+        return d->hasAttributeWithInlinableSemantics() ? IsSerialized
+                                                       : IsNotSerialized;
       case BackDeploymentKind::Fallback:
       case BackDeploymentKind::Thunk:
         return IsSerialized;
@@ -1295,6 +1306,43 @@ bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
   return false;
 }
 
+bool SILDeclRef::declMayBePrintedInCxxHeader(const ValueDecl *decl,
+                                             const SILModule &M) {
+  const auto &options = M.getOptions();
+  if (!options.CxxHeaderMinAccess ||
+      decl->getModuleContext() != M.getSwiftModule())
+    return false;
+  return cxx_translation::mayBePrintedInCxxHeader(
+      decl, *options.CxxHeaderMinAccess, options.CxxHeaderRequiresExposeAttr);
+}
+
+bool SILDeclRef::mayBeCalledFromCxxHeader(const SILModule &M) const {
+  // Check the option first, as this is on the hot path of
+  // SILFunction::isPossiblyUsedExternally.
+  if (!M.getOptions().CxxHeaderMinAccess)
+    return false;
+  auto *decl = getDecl();
+  if (!decl || isForeign || isThunk() || isAutoDiffDerivativeFunction())
+    return false;
+
+  // The header calls methods, allocating initializers, and the getters and
+  // setters of properties and subscripts.
+  switch (kind) {
+  case Kind::Func:
+    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+      if (accessor->getAccessorKind() != AccessorKind::Get &&
+          accessor->getAccessorKind() != AccessorKind::Set)
+        return false;
+    }
+    break;
+  case Kind::Allocator:
+    break;
+  default:
+    return false;
+  }
+  return declMayBePrintedInCxxHeader(decl, M);
+}
+
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   return decl->hasNonUniqueDefinition();
 }
@@ -1324,11 +1372,11 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   return false;
 }
 
-bool SILDeclRef::isForeignReferenceInitializer() const {
-  if (!isForeign || kind != Kind::Initializer || !hasDecl())
+bool SILDeclRef::isCXXForeignReferenceInitializer() const {
+  if (!isForeign || kind != Kind::Initializer)
     return false;
-  auto ctor = dyn_cast<ConstructorDecl>(getDecl());
-  if (!ctor || !ctor->hasClangNode())
+  auto ctor = cast<ConstructorDecl>(getDecl());
+  if (!ctor->hasClangNode())
     return false;
   auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->isForeignReferenceType())
@@ -1605,10 +1653,20 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
   if (isAutoDiffDerivativeFunction())
     return std::nullopt;
 
-  // The Clang decl of a C++ foreign reference type's initializer is the static
-  // factory it was imported from, which is not the initializing entry point.
-  if (isForeignReferenceInitializer())
-    return std::nullopt;
+  // The initializing entry point of a constructor of a C++ foreign reference
+  // type is the base-object variant of the C++ constructor. Mangle that rather
+  // than the Clang decl of the Swift initializer, which is the static factory
+  // that the initializer was imported from.
+  if (isCXXForeignReferenceInitializer()) {
+    auto &ctx = getASTContext();
+    auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+    auto cxxCtorDecl = importer->getOriginalForeignReferenceConstructor(
+        cast<ConstructorDecl>(getDecl()));
+    std::string storage;
+    llvm::raw_string_ostream SS(storage);
+    importer->getMangledBaseObjectConstructorName(SS, cxxCtorDecl);
+    return storage;
+  }
 
   if (hasDecl() && !isDefaultArgGenerator() &&
       (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {

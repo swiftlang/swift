@@ -93,6 +93,7 @@ convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
   case SILOptStrictConcurrency::Minimal:
     return StrictConcurrency::Minimal;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace llvm {
@@ -218,12 +219,6 @@ struct SILOptOptions {
   StrictImplicitModuleContext = llvm::cl::opt<bool>("strict-implicit-module-context",
                               llvm::cl::desc("Enable the strict forwarding of compilation "
                                              "context to downstream implicit module dependencies"));
-
-  llvm::cl::opt<bool>
-  DisableSILOwnershipVerifier = llvm::cl::opt<bool>(
-      "disable-sil-ownership-verifier",
-      llvm::cl::desc(
-          "Do not verify SIL ownership invariants during SIL verification"));
 
   llvm::cl::opt<bool>
   EnableSILOpaqueValues = llvm::cl::opt<bool>("enable-sil-opaque-values",
@@ -632,9 +627,11 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll) {
-    Module->verify();
+    // If no passes were run, the module was already verified after parsing.
+    if (!options.Passes.empty())
+      Module->verify();
     SILPassManager pm(Module, isMandatory, IRGenMod);
-    pm.runSwiftModuleVerification();
+    pm.runMandatoryModuleVerification();
   }
 }
 
@@ -863,7 +860,6 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.VerifyNone = options.SILVerifyNone;
   SILOpts.RemoveRuntimeAsserts = options.RemoveRuntimeAsserts;
   SILOpts.AssertConfig = options.AssertConfId;
-  SILOpts.VerifySILOwnership = !options.DisableSILOwnershipVerifier;
   SILOpts.OptRecordFile = options.RemarksFilename;
   SILOpts.OptRecordPasses = options.RemarksPasses;
   SILOpts.EnableStackProtection = true;

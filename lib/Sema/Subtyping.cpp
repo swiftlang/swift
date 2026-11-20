@@ -400,6 +400,7 @@ swift::constraints::getConversionBehavior(Type type) {
       canType->dump(out);
     });
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::constraints::hasProperSubtypes(Type type) {
@@ -432,6 +433,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Unknown:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::constraints::hasProperSupertypes(Type type) {
@@ -476,6 +478,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Unknown:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {
@@ -1451,7 +1454,8 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
         auto lhsParam = lhsFunc->getParams()[i];
         auto rhsParam = rhsFunc->getParams()[i];
 
-        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags())
+        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags() ||
+            lhsParam.getAccessScope() != rhsParam.getAccessScope())
           return fail();
 
         Type paramType;

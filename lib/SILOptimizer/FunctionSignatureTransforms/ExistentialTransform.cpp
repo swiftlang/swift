@@ -628,7 +628,7 @@ void ExistentialTransform::populateThunkBody() {
   if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
-    Builder.createReturn(Loc, ReturnValue);
+    createThunkReturn(Builder, Loc, ReturnValue);
   }
 }
 

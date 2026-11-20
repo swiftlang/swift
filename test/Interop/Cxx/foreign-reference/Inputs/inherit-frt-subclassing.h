@@ -258,6 +258,48 @@ inline void releaseSharedWithFactoryOnly(SharedWithFactoryOnly *t) {
     delete t;
 }
 
+struct SecondaryPolymorphic {
+  int secondary = 7;
+
+  virtual int getSecondary() const { return secondary; }
+  virtual ~SecondaryPolymorphic() {}
+};
+
+// A base with two v-table pointers: the one at offset 0, which it shares with
+// its primary base `SubclassableShared`, and the one of its
+// `SecondaryPolymorphic` subobject.
+struct MultiplyInheritedShared : SubclassableShared, SecondaryPolymorphic {
+} SWIFT_SHARED_REFERENCE(retainMultiplyInheritedShared,
+                         releaseMultiplyInheritedShared);
+
+inline void retainMultiplyInheritedShared(MultiplyInheritedShared *t) {
+  ++t->refcount;
+}
+inline void releaseMultiplyInheritedShared(MultiplyInheritedShared *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+// Dispatches through the v-table pointer of the `SecondaryPolymorphic`
+// subobject.
+inline int callSecondary(const MultiplyInheritedShared *t) {
+  return static_cast<const SecondaryPolymorphic *>(t)->getSecondary();
+}
+
+struct VirtualBaseShared : virtual SecondaryPolymorphic {
+  int refcount = 1;
+
+  virtual ~VirtualBaseShared() {}
+} SWIFT_SHARED_REFERENCE(retainVirtualBaseShared, releaseVirtualBaseShared);
+
+inline void retainVirtualBaseShared(VirtualBaseShared *t) { ++t->refcount; }
+inline void releaseVirtualBaseShared(VirtualBaseShared *t) {
+  if (--t->refcount <= 0)
+    delete t;
+}
+
+struct DerivedFromVirtualBaseShared : VirtualBaseShared {};
+
 // A type with an initializer imported from a global function rather than from a
 // C++ constructor.
 struct SharedWithFunctionInit {
@@ -311,6 +353,14 @@ makeSharedWithFunctionDefaultInit()
 inline SharedWithFunctionDefaultInit *makeSharedWithFunctionDefaultInit() {
   return new SharedWithFunctionDefaultInit(0);
 }
+
+struct ImmortalWithVirtualDtor {
+  int value = 7;
+
+  virtual ~ImmortalWithVirtualDtor() {}
+} __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal")));
 
 #if __has_feature(nullability)
 _Pragma("clang assume_nonnull end")

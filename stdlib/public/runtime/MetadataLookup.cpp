@@ -1059,11 +1059,18 @@ SWIFT_CC(swift) bool (* __ptrauth_swift_is_global_actor_function
         swift::_swift_task_isCurrentGlobalActorHook)(
     const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
+/// Function that determines whether a distributed actor instance is a remote
+/// proxy.
+SWIFT_CC(swift) bool (* __ptrauth_swift_concurrency_hook
+        swift::_swift_distributedActorIsRemoteHook)(HeapObject *);
+
 void swift::_swift_registerConcurrencyRuntime(
     const ConcurrencyStandardTypeDescriptors *descriptors,
-    IsCurrentGlobalActor isCurrentGlobalActor) {
+    IsCurrentGlobalActor isCurrentGlobalActor,
+    IsDistributedActorRemote isDistributedActorRemote) {
   concurrencyDescriptors = descriptors;
   _swift_task_isCurrentGlobalActorHook = isCurrentGlobalActor;
+  _swift_distributedActorIsRemoteHook = isDistributedActorRemote;
 }
 
 #pragma mark Protocol descriptor cache

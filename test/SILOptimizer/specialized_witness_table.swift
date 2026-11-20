@@ -208,3 +208,10 @@ public func makeHBox() -> any HasD {
 }
 
 // NEG-NOT: [specialized] Plain: D
+
+// Witness tables are not specialized for existentials which are created in non-optimized functions.
+// NEG-NOT: [specialized] Box<UInt8>: specialize <UInt8>
+@_optimize(none)
+public func makeBoxNotOptimized() -> any P {
+  return Box(t: UInt8(1))
+}

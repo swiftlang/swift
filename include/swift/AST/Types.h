@@ -30,6 +30,7 @@
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/AST/RecursiveTypeProperties.h"
 #include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Type.h"
@@ -128,216 +129,6 @@ enum : unsigned {
 };
 
 enum class BuiltinTypeKind : std::underlying_type<TypeKind>::type;
-
-/// Various properties of types that are primarily defined recursively
-/// on structural types.
-class RecursiveTypeProperties {
-public:
-  /// A single property.
-  ///
-  /// Note that the property polarities should be chosen so that 0 is
-  /// the correct default value and bitwise-or correctly merges things.
-  enum Property : unsigned {
-    /// This type expression contains a TypeVariableType.
-    HasTypeVariable      = 0x01,
-
-    /// This type expression contains a PrimaryArchetypeType
-    /// or PackArchetypeType.
-    HasPrimaryArchetype  = 0x02,
-
-    /// This type expression contains a GenericTypeParamType.
-    HasTypeParameter     = 0x04,
-
-    /// Whether this type expression contains an unbound generic type.
-    HasUnboundGeneric    = 0x08,
-
-    /// This type expression contains an LValueType other than as a
-    /// function input, and can be loaded to convert to an rvalue.
-    IsLValue             = 0x10,
-
-    /// This type expression contains an opened existential ArchetypeType.
-    HasOpenedExistential = 0x20,
-
-    /// This type expression contains a DynamicSelf type.
-    HasDynamicSelf       = 0x40,
-
-    /// This type contains an Error type.
-    HasError             = 0x80,
-
-    /// This type contains an Error type without an underlying original type.
-    HasBareError         = 0x100,
-
-    /// Whether this type contains a JoinType or MeetType.
-    HasJoinOrMeet        = 0x200,
-
-    /// This type contains an OpaqueTypeArchetype.
-    HasOpaqueArchetype   = 0x400,
-
-    /// This type contains a type placeholder.
-    HasPlaceholder       = 0x800,
-
-    /// This type contains a generic type parameter that is declared as a
-    /// parameter pack.
-    HasParameterPack = 0x1000,
-
-    /// This type contains a parameterized existential type \c any P<T>.
-    HasParameterizedExistential = 0x2000,
-
-    /// This type contains an ElementArchetypeType.
-    HasElementArchetype = 0x4000,
-
-    /// Whether the type is allocated in the constraint solver arena. This can
-    /// differ from \c HasTypeVariable for types such as holes, which do
-    /// not have type variables, but we still want to allocate in the solver if
-    /// they have a type variable originator.
-    SolverAllocated = 0x8000,
-
-    /// Contains a PackType.
-    HasPack = 0x10000,
-
-    /// Contains a PackArchetypeType. Also implies HasPrimaryArchetype.
-    HasPackArchetype = 0x20000,
-
-    /// Whether this type contains an unsafe type.
-    IsUnsafe = 0x040000,
-
-    /// This type contains a type hole.
-    HasHole = 0x080000,
-
-    Last_Property = HasHole
-  };
-  enum { BitWidth = countBitsUsed(Property::Last_Property) };
-
-private:
-  unsigned Bits;
-
-public:
-  RecursiveTypeProperties() : Bits(0) {}
-  RecursiveTypeProperties(Property prop) : Bits(prop) {}
-  explicit RecursiveTypeProperties(unsigned bits) : Bits(bits) {}
-
-  /// Return these properties as a bitfield.
-  unsigned getBits() const { return Bits; }
-
-  /// Does a type with these properties structurally contain a type
-  /// variable?
-  bool hasTypeVariable() const { return Bits & HasTypeVariable; }
-
-  /// Does a type with these properties structurally contain a primary
-  /// or pack archetype? These are the archetypes instantiated from a
-  /// primary generic environment.
-  bool hasPrimaryArchetype() const { return Bits & HasPrimaryArchetype; }
-
-  /// Does a type with these properties structurally contain an
-  /// archetype from an opaque type declaration?
-  bool hasOpaqueArchetype() const { return Bits & HasOpaqueArchetype; }
-  
-  /// Does a type with these properties have a type parameter somewhere in it?
-  bool hasTypeParameter() const { return Bits & HasTypeParameter; }
-
-  /// Is a type with these properties an lvalue?
-  bool isLValue() const { return Bits & IsLValue; }
-
-  /// Does this type contain an error?
-  bool hasError() const { return Bits & HasError; }
-
-  /// Does this type contain an error without an original type?
-  bool hasBareError() const { return Bits & HasBareError; }
-
-  /// Does a type with these properties structurally contain an
-  /// opened existential archetype?
-  bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
-
-  /// Does a type with these properties structurally contain an
-  /// opened element archetype?
-  bool hasElementArchetype() const { return Bits & HasElementArchetype; }
-
-  /// Whether the type is allocated in the constraint solver arena. This can
-  /// differ from \c hasTypeVariable() for types such as holes, which
-  /// do not have type variables, but we still want to allocate in the solver if
-  /// they have a type variable originator.
-  bool isSolverAllocated() const { return Bits & SolverAllocated; }
-
-  /// Determine whether the type involves a primary, pack or local archetype.
-  bool hasArchetype() const {
-    return hasPrimaryArchetype() || hasLocalArchetype();
-  }
-
-  /// Does a type with these properties structurally contain a local
-  /// archetype?
-  bool hasLocalArchetype() const {
-    return hasOpenedExistential() || hasElementArchetype();
-  }
-
-  /// Does a type with these properties structurally contain a
-  /// reference to DynamicSelf?
-  bool hasDynamicSelf() const { return Bits & HasDynamicSelf; }
-
-  /// Does a type with these properties structurally contain an unbound
-  /// generic type?
-  bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
-
-  /// Does a type with these properties structurally contain a placeholder?
-  bool hasPlaceholder() const { return Bits & HasPlaceholder; }
-
-  /// Does a type with these properties structurally contain a hole?
-  bool hasHole() const { return Bits & HasHole; }
-
-  bool hasParameterPack() const { return Bits & HasParameterPack; }
-
-  bool hasPack() const { return Bits & HasPack; }
-
-  bool hasPackArchetype() const { return Bits & HasPackArchetype; }
-
-  bool isUnsafe() const { return Bits & IsUnsafe; }
-
-  bool hasJoinOrMeet() const { return Bits & HasJoinOrMeet; }
-
-  /// Does a type with these properties structurally contain a
-  /// parameterized existential type?
-  bool hasParameterizedExistential() const {
-    return Bits & HasParameterizedExistential;
-  }
-
-  /// Returns the set of properties present in either set.
-  friend RecursiveTypeProperties operator|(Property lhs, Property rhs) {
-    return RecursiveTypeProperties(unsigned(lhs) | unsigned(rhs));
-  }
-  friend RecursiveTypeProperties operator|(RecursiveTypeProperties lhs,
-                                           RecursiveTypeProperties rhs) {
-    return RecursiveTypeProperties(lhs.Bits | rhs.Bits);
-  }
-
-  /// Add any properties in the right-hand set to this set.
-  RecursiveTypeProperties &operator|=(RecursiveTypeProperties other) {
-    Bits |= other.Bits;
-    return *this;
-  }
-  /// Restrict this to only the properties in the right-hand set.
-  RecursiveTypeProperties &operator&=(RecursiveTypeProperties other) {
-    Bits &= other.Bits;
-    return *this;
-  }
-
-  /// Remove the HasTypeParameter property from this set.
-  void removeHasTypeParameter() {
-    Bits &= ~HasTypeParameter;
-  }
-
-  /// Remove the IsUnsafe property from this set.
-  void removeIsUnsafe() {
-    Bits &= ~IsUnsafe;
-  }
-  
-  /// Test for a particular property in this set.
-  bool operator&(Property prop) const {
-    return Bits & prop;
-  }
-};
-
-inline RecursiveTypeProperties operator~(RecursiveTypeProperties::Property P) {
-  return RecursiveTypeProperties(~unsigned(P));
-}
   
 /// The result of a type trait check.
 enum class TypeTraitResult {
@@ -462,7 +253,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -470,7 +261,8 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    HasTypeDependencies : 1
+    HasTypeDependencies : 1,
+    HasScopeSignature : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3113,6 +2905,12 @@ public:
     return Bits.NominalType.ScopeArgCount != 0;
   }
 
+  /// The same type without the arguments for its declaration's scope
+  /// parameters.
+  NominalType *withoutScopeArgs() const {
+    return get(getDecl(), getParent(), getGenericArgs(), getASTContext());
+  }
+
   static NominalType *get(NominalTypeDecl *D, Type parent, const ASTContext &C) {
     return get(D, parent, {}, C);
   }
@@ -3512,13 +3310,26 @@ public:
 
   class Param {
   public:
-    explicit Param(Type t,
-                   Identifier l = Identifier(),
-                   ParameterTypeFlags f = ParameterTypeFlags(),
-                   Identifier internalLabel = Identifier())
-        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f) {
+    explicit Param(Type t, Identifier l, ParameterTypeFlags f,
+                   Identifier internalLabel, ScopeRef accessScope)
+        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f),
+          AccessScope(accessScope) {
       assert(t && "param type must be non-null");
       assert(!t->is<InOutType>() && "set flags instead");
+      ASSERT(accessScope.getKind() != ScopeRef::Kind::Immortal &&
+             "an access can't be immortal");
+      ASSERT(((accessScope == ScopeRef::forCallBody() ||
+               accessScope.isError()) ||
+              f.getValueOwnership() != ValueOwnership::Owned) &&
+             "consumed parameters have no access");
+    }
+
+    /// A parameter whose access scope isn't referenced, and can be treated as
+    /// lasting for the call's body.
+    static Param bodyAccess(Type t, Identifier l = Identifier(),
+                            ParameterTypeFlags f = ParameterTypeFlags(),
+                            Identifier internalLabel = Identifier()) {
+      return Param(t, l, f, internalLabel, ScopeRef::forCallBody());
     }
 
   private:
@@ -3541,7 +3352,11 @@ public:
     
     /// Parameter specific flags.
     ParameterTypeFlags Flags = {};
-    
+
+    /// The scope of the parameter's access for the call, which is the call's
+    /// body unless the signature refers to or binds the access scope.
+    ScopeRef AccessScope;
+
   public:
     /// FIXME: Remove this. Return the formal type of the parameter in the
     /// function type, including the InOutType if there is one.
@@ -3587,6 +3402,18 @@ public:
     Param getCanonical(CanGenericSignature genericSig) const;
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
+
+    /// The scope of the parameter's access, which is the call's body unless the
+    /// signature refers to or binds it.
+    ///
+    /// Consumed parameters can't be depended on in the signature, but still
+    /// have a body access scope.
+    ScopeRef getAccessScope() const { return AccessScope; }
+
+    /// Whether the scope of the parameter's access is the call's body.
+    bool hasBodyAccess() const {
+      return AccessScope == ScopeRef::forCallBody();
+    }
 
     /// Whether the parameter is varargs
     bool isVariadic() const { return Flags.isVariadic(); }
@@ -3635,32 +3462,40 @@ public:
 
     /// Returns \c true if the two \c Params are equal in their canonicalized
     /// form.
-    /// Two \c Params are equal if their external label, flags and
+    /// Two \c Params are equal if their external label, flags, access scope and
     /// *canonicalized* types match. The internal label and sugar types are
     /// *not* considered for type equality.
     bool operator==(Param const &b) const {
       return (Label == b.Label &&
               getPlainType()->isEqual(b.getPlainType()) &&
-              Flags == b.Flags);
+              Flags == b.Flags && AccessScope == b.AccessScope);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     /// Return the parameter without external and internal labels.
     Param getWithoutLabels() const {
       return Param(Ty, /*Label=*/Identifier(), Flags,
-                   /*InternalLabel=*/Identifier());
+                   /*InternalLabel=*/Identifier(), AccessScope);
     }
 
     Param withLabel(Identifier newLabel) const {
-      return Param(Ty, newLabel, Flags, InternalLabel);
+      return Param(Ty, newLabel, Flags, InternalLabel, AccessScope);
     }
 
     Param withType(Type newType) const {
-      return Param(newType, Label, Flags, InternalLabel);
+      return Param(newType, Label, Flags, InternalLabel, AccessScope);
     }
 
     Param withFlags(ParameterTypeFlags flags) const {
-      return Param(Ty, Label, flags, InternalLabel);
+      return Param(Ty, Label, flags, InternalLabel, AccessScope);
+    }
+
+    Param withAccessScope(ScopeRef scope) const {
+      return Param(Ty, Label, Flags, InternalLabel, scope);
+    }
+
+    Param withBodyAccess() const {
+      return withAccessScope(ScopeRef::forCallBody());
     }
   };
 
@@ -3703,7 +3538,8 @@ public:
     /// the call machinery, processing yields as if they were
     /// parameters of a call.  Return this reinterpreted as a parameter.
     Param asParam() const {
-      return Param(getType(), Identifier(), getFlags().asParamFlags());
+      return Param::bodyAccess(getType(), Identifier(),
+                               getFlags().asParamFlags());
     }
 
     Yield subst(SubstitutionMap subs,
@@ -3765,6 +3601,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasTypeDependencies =
           !Info->getTypeDependencies().empty();
+      Bits.AnyFunctionType.HasScopeSignature =
+          !Info->getScopeSignature().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3778,6 +3616,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasTypeDependencies = false;
+      Bits.AnyFunctionType.HasScopeSignature = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3862,6 +3701,10 @@ public:
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
 
+  bool hasScopeSignature() const {
+    return Bits.AnyFunctionType.HasScopeSignature;
+  }
+
   /// Type has lifetime dependencies derived from explicit @_lifetime
   /// attributes.
   bool hasExplicitLifetimeDependencies() const;
@@ -3933,8 +3776,10 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(), getTypeDependencies(),
-                   getLifetimeDependencies());
+                   getLifetimeDependencies(), getScopeSignature());
   }
+
+  ScopeSignature getScopeSignature() const;
 
   /// Get the canonical ExtInfo for the function type.
   ///
@@ -4217,7 +4062,7 @@ class FunctionType final
           FunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
           ClangTypeInfo, Type, uint8_t /*NumTypeDependencies*/,
           ASTExtInfoBuilder::TypeDependency, size_t /*NumLifetimeDependencies*/,
-          LifetimeDependenceInfo> {
+          LifetimeDependenceInfo, ScopeSignature> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
@@ -4251,6 +4096,10 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
     return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ScopeSignature>) const {
+    return hasScopeSignature() ? 1 : 0;
   }
 
 public:
@@ -4333,6 +4182,12 @@ public:
 
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParams());
+  }
+
+  ScopeSignature getScopeSignature() const {
+    if (!hasScopeSignature())
+      return ScopeSignature();
+    return *getTrailingObjects<ScopeSignature>();
   }
 
   uint16_t
@@ -4455,7 +4310,8 @@ class GenericFunctionType final
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<
           GenericFunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
-          Type, size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo> {
+          Type, size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo,
+          ScopeSignature> {
   friend TrailingObjects;
       
   GenericSignature Signature;
@@ -4478,6 +4334,10 @@ class GenericFunctionType final
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
     return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ScopeSignature>) const {
+    return hasScopeSignature() ? 1 : 0;
   }
 
   /// Construct a new generic function type.
@@ -4535,6 +4395,12 @@ public:
       }
     }
     return std::nullopt;
+  }
+
+  ScopeSignature getScopeSignature() const {
+    if (!hasScopeSignature())
+      return ScopeSignature();
+    return *getTrailingObjects<ScopeSignature>();
   }
 
   /// Retrieve the generic signature of this function type.
@@ -5663,6 +5529,7 @@ public:
     case SILCoroutineKind::YieldOnce2:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isSendable() const { return getExtInfo().isSendable(); }

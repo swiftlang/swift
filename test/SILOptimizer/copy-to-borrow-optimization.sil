@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-to-borrow-optimization %s | %FileCheck %s --check-prefix=EFFECTS
 
 sil_stage canonical
 
@@ -2930,4 +2931,160 @@ bb0(%0 : $*MultiPayload, %1 : $MyInt):
   store %3 to [assign] %0 : $*MultiPayload
   %5 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
   return %5 : $MyInt
+}
+
+// Check that a callee which takes its @in argument (with copy_addr [take] or load [take])
+// is considered to write to the argument's memory. Otherwise a `load [copy]` from the argument
+// is wrongly converted to a `load_borrow` with a lifetime overlapping the call.
+
+sil [ossa] @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  copy_addr [take] %0 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = load [take] %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_copy_addr_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_copy_addr_take_in_callee'
+sil [ossa] @load_copy_before_copy_addr_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_load_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_load_take_in_callee'
+sil [ossa] @load_copy_before_load_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// The load_borrow stays within the access scope it loads from.
+// CHECK-LABEL: sil [ossa] @load_copy_within_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load_borrow [[A]]
+// CHECK:         apply {{%.*}}([[L]])
+// CHECK-NEXT:    end_borrow [[L]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_within_access_scope'
+sil [ossa] @load_copy_within_access_scope : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  %3 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %2
+  end_access %1
+  %7 = tuple ()
+  return %7
+}
+
+// A load_borrow would outlive the access scope it loads from.
+// CHECK-LABEL: sil [ossa] @load_copy_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_outlives_access_scope'
+sil [ossa] @load_copy_outlives_access_scope : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  %3 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// The lifetime of the load ends without a destroy, after the access scope ends.
+// CHECK-LABEL: sil [ossa] @load_copy_nondestroying_end_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK-NEXT:    unchecked_enum_data [[L]]
+// CHECK:       } // end sil function 'load_copy_nondestroying_end_outlives_access_scope'
+sil [ossa] @load_copy_nondestroying_end_outlives_access_scope : $@convention(thin) (@inout MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  %4 = unchecked_enum_data %2, #MultiPayload.b!enumelt
+  return %4
+}
+
+// The access scope must be found through a mark_dependence.
+// CHECK-LABEL: sil [ossa] @load_copy_through_mark_dependence_outlives_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [nonescaping] [[A]]
+// CHECK-NEXT:    load [copy] [[MD]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'load_copy_through_mark_dependence_outlives_access_scope'
+sil [ossa] @load_copy_through_mark_dependence_outlives_access_scope : $@convention(thin) (@inout C, @guaranteed C) -> () {
+bb0(%0 : $*C, %1 : @guaranteed $C):
+  %2 = begin_access [read] [static] %0
+  %3 = mark_dependence [nonescaping] %2 on %1
+  %4 = load [copy] %3
+  end_access %2
+  %6 = function_ref @useC : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %4
+  %9 = tuple ()
+  return %9
+}
+
+struct AccessorNT {
+  var c: C
+}
+
+sil @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+
+// The store through the nonmutating mutate accessor result writes the alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @nonmutating_mutate_accessor_result_written :
+// CHECK:         load [copy] %0
+// CHECK-NOT:     store_borrow
+// CHECK-LABEL: } // end sil function 'nonmutating_mutate_accessor_result_written'
+sil [ossa] @nonmutating_mutate_accessor_result_written : $@convention(thin) (@in_guaranteed AccessorNT, @owned C) -> () {
+bb0(%0 : $*AccessorNT, %1 : @owned $C):
+  %2 = load [copy] %0
+  %3 = alloc_stack $AccessorNT
+  store %2 to [init] %3
+  %5 = function_ref @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  store %1 to [assign] %6
+  destroy_addr %3
+  dealloc_stack %3
+  %10 = tuple ()
+  return %10
 }

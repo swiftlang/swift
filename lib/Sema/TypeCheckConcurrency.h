@@ -394,6 +394,7 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
   case SendableCheck::ImplicitForExternallyVisible:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Describes the context in which a \c Sendable check occurs.

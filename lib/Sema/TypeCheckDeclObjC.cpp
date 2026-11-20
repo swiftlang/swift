@@ -555,6 +555,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   case ActorIsolation::Unspecified:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {
@@ -928,7 +929,8 @@ bool swift::isRepresentableInLanguage(
         type = OptionalType::get(type);
       }
 
-      completionHandlerParams.push_back(AnyFunctionType::Param(type));
+      completionHandlerParams.push_back(
+          AnyFunctionType::Param::bodyAccess(type));
 
       // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {

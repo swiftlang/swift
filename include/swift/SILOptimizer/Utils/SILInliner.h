@@ -105,7 +105,8 @@ public:
   /// must be corrected after inlining. See invalidatesStackNesting().
   ///
   /// Returns the last block in function order containing inlined instructions
-  /// (the original caller block for single-block functions).
+  /// (the original caller block for single-block functions). Returns nullptr
+  /// when the apply isn't inlined.
   SILBasicBlock *
   inlineFunction(SILFunction *calleeFunction, FullApplySite apply,
                  ArrayRef<SILValue> appliedArgs);
@@ -126,7 +127,8 @@ public:
   /// must be corrected after inlining. See invalidatesStackNesting().
   ///
   /// Returns the last block in function order containing inlined instructions
-  /// (the original caller block for single-block functions).
+  /// (the original caller block for single-block functions), or nullptr if the
+  /// apply isn't inlined.
   static SILBasicBlock *
   inlineFullApply(FullApplySite apply, SILInliner::InlineKind inlineKind,
                   SILOptFunctionBuilder &funcBuilder,

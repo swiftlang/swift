@@ -7,6 +7,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -895,6 +896,12 @@ resolveRefCountOperation(const ClassDecl *classDecl,
   }
 
   checkRefCountOperation(classDecl, op, isRetain, name, &Impl, loc);
+
+  // The compiler already takes care of reference counting, so explicitly
+  // calling retain/release operations in Swift unbalances the reference count
+  // and is likely a bug. Mark them as @unsafe(always), so that every use must
+  // be acknowledged with 'unsafe'.
+  Impl.markUnsafe(op, /*always=*/true);
   return op;
 }
 
@@ -1073,9 +1080,13 @@ void importer::checkRetainReleaseFunctions(
   // (A directly-annotated FRT may be forward-declared.)
   if (baseCxxRecordDecl &&
       (!isReachable(cxxRecordDecl) || !isReachable(baseCxxRecordDecl))) {
-    Impl.diagnose(HeaderLoc(recordDecl->getLocation()),
-                  diag::foreign_reference_type_unreachable,
-                  classDecl->getNameStr());
+    Impl.markUnavailable(classDecl,
+                         "foreign reference type '" +
+                             classDecl->getNameStr().str() +
+                             "' has unreachable definition");
+    Impl.UnusableForeignTypes[classDecl] = UnusableForeignType(
+        classDecl,
+        UnusableForeignType::Reason::UnreachableForeignReferenceType);
     return;
   }
 
@@ -1136,6 +1147,276 @@ void importer::checkRetainReleaseFunctions(
     }
   }
   Impl.setForeignReferenceTypeOperations(recordDecl, retainFn, releaseFn);
+}
+
+bool importer::isOverrideOfRetainReleaseMethod(
+    const clang::CXXMethodDecl *method, StringRef swiftBaseName,
+    Evaluator &evaluator) {
+  // Member retain/release operations take no arguments.
+  if (method->size_overridden_methods() == 0 || method->getNumParams() != 0)
+    return false;
+
+  const clang::CXXRecordDecl *record = method->getParent();
+  auto recordFRTInfo = evaluateOrDefault(
+      evaluator, ForeignReferenceTypeInfoRequest({record}), {});
+  if (!recordFRTInfo.isReference() || !recordFRTInfo.isValid() ||
+      recordFRTInfo.isImmortal())
+    return false;
+
+  const auto *annotated =
+      dyn_cast_or_null<clang::CXXRecordDecl>(recordFRTInfo.getDecl());
+  if (!annotated || !annotated->getDefinition())
+    return false;
+  annotated = annotated->getDefinition();
+
+  RetainReleaseInfo rrInfo(annotated);
+  if (!rrInfo.isValid())
+    return false;
+
+  auto isRetainOrRelease = [&](StringRef op) {
+    return op.consume_front(".") && op == swiftBaseName;
+  };
+
+  if (!isRetainOrRelease(rrInfo.getRetain()) &&
+      !isRetainOrRelease(rrInfo.getRelease()))
+    return false;
+
+  // 'method' must override a method declared in the annotated record or one of
+  // its bases; otherwise it overrides a method of some other base.
+  llvm::SmallVector<const clang::CXXMethodDecl *, 4> worklist(
+      method->overridden_methods());
+  llvm::SmallPtrSet<const clang::CXXMethodDecl *, 4> visited;
+
+  while (!worklist.empty()) {
+    auto *currentMethod = worklist.pop_back_val();
+    if (!visited.insert(currentMethod).second)
+      continue;
+
+    auto *currentRecord = currentMethod->getParent();
+
+    if (currentRecord->getCanonicalDecl() == annotated->getCanonicalDecl() ||
+        annotated->isDerivedFrom(currentRecord))
+      return true;
+
+    worklist.append(currentMethod->begin_overridden_methods(),
+                    currentMethod->end_overridden_methods());
+  }
+
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Unusable foreign types
+//===----------------------------------------------------------------------===//
+
+/// Whether Swift copies and destroys the imported C++ record \p structDecl only
+/// through its C++ copy constructor and destructor, rather than field-wise.
+/// Uses the same rules as \c AddressOnlyCXXClangRecordTypeInfo in IRGen.
+static bool isCopiedAndDestroyedByCxx(const StructDecl *structDecl) {
+  auto *cxxRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  return cxxRecord && structDecl->isCxxNonTrivial() &&
+         importer::findCopyConstructor(cxxRecord) &&
+         importer::findNonTrivialDestructor(cxxRecord);
+}
+
+/// Whether \p nominal is an unsafe pointer type.
+static bool isUnsafePointer(const NominalTypeDecl *nominal) {
+  auto &ctx = nominal->getASTContext();
+  return nominal == ctx.getUnsafePointerDecl() ||
+         nominal == ctx.getUnsafeMutablePointerDecl() ||
+         nominal == ctx.getUnsafeBufferPointerDecl() ||
+         nominal == ctx.getUnsafeMutableBufferPointerDecl();
+}
+
+/// Calls \p fn on each nominal type that values of \p type hold by value, i.e.,
+/// each nominal type in \p type except pointees of unsafe pointers, and
+/// parameter and result types of C function pointers. Stops when \p fn returns
+/// true.
+static void
+forEachNominalHeldByValue(Type type,
+                          llvm::function_ref<bool(NominalTypeDecl *)> fn) {
+  class Walker : public TypeWalker {
+    llvm::function_ref<bool(NominalTypeDecl *)> Fn;
+  public:
+    explicit Walker(llvm::function_ref<bool(NominalTypeDecl *)> fn) : Fn(fn) {}
+    Action walkToTypePre(Type ty) override {
+      // Copying a C function pointer doesn't copy any values of its parameter
+      // or result types.
+      if (auto *fnTy = ty->getAs<AnyFunctionType>())
+        if (fnTy->getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer)
+          return Action::SkipNode;
+
+      auto *nominal = ty->getAnyNominal();
+      if (!nominal)
+        return Action::Continue;
+      if (Fn(nominal))
+        return Action::Stop;
+      return isUnsafePointer(nominal) ? Action::SkipNode : Action::Continue;
+    }
+  };
+
+  type->getCanonicalType().walk(Walker(fn));
+}
+
+bool importer::hasExposedStorage(const NominalTypeDecl *nominal) {
+  // Copying a class reference doesn't copy the object, and the storage of a
+  // resilient type is not visible to clients.
+  if (!isa<StructDecl, EnumDecl>(nominal) || nominal->isResilient())
+    return false;
+  auto *structDecl = dyn_cast<StructDecl>(nominal);
+  return !structDecl || !isCopiedAndDestroyedByCxx(structDecl);
+}
+
+namespace {
+/// Finds the unusable foreign types exposed by nominal types, caching results.
+///
+/// Storage can be recursive (e.g. `struct S { var kids: [S] }`), so this uses
+/// Tarjan's strongly connected components algorithm where every type in
+/// a component exposes every other.
+class UnusableForeignTypeFinder {
+  ClangImporter::Implementation &Impl;
+
+  struct Node {
+    unsigned Index;
+    unsigned LowLink;
+    UnusableForeignType Found;
+  };
+
+  /// The types on \c Stack, i.e., types whose component is not complete yet.
+  llvm::DenseMap<NominalTypeDecl *, Node> Nodes;
+  SmallVector<NominalTypeDecl *, 8> Stack;
+  unsigned NextIndex = 0;
+
+public:
+  explicit UnusableForeignTypeFinder(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
+
+  UnusableForeignType find(NominalTypeDecl *nominal) {
+    unsigned lowLink = 0;
+    UnusableForeignType found;
+    visitHeldType(nominal, lowLink, found);
+    ASSERT(Nodes.empty() && Stack.empty());
+    return found;
+  }
+
+private:
+  /// Visits a type \p held that the type being visited holds by value.
+  ///
+  /// Lowers \p lowLink if \p held is in a component that isn't complete yet,
+  /// and sets \p found if \p held exposes an unusable type.
+  void visitHeldType(NominalTypeDecl *held, unsigned &lowLink,
+                     UnusableForeignType &found) {
+    if (held->hasNoExposedUnusableForeignTypes())
+      return;
+
+    auto cached = Impl.UnusableForeignTypes.find(held);
+    if (cached != Impl.UnusableForeignTypes.end()) {
+      if (!found)
+        found = cached->second;
+      return;
+    }
+
+    if (!hasExposedStorage(held)) {
+      held->setNoExposedUnusableForeignTypes();
+      return;
+    }
+
+    if (!Nodes.count(held))
+      visitStorage(held);
+
+    // If the type is still on the stack, it's in the same component as a type
+    // being visited. Its result is combined when that component is complete.
+    auto node = Nodes.find(held);
+    if (node != Nodes.end()) {
+      lowLink = std::min(lowLink, node->second.LowLink);
+      return;
+    }
+
+    if (held->hasNoExposedUnusableForeignTypes())
+      return;
+    if (!found)
+      found = Impl.UnusableForeignTypes.lookup(held);
+  }
+
+  void visitStorage(NominalTypeDecl *nominal) {
+    unsigned index = NextIndex++;
+    Nodes[nominal] = {index, index, UnusableForeignType()};
+    Stack.push_back(nominal);
+
+    unsigned lowLink = index;
+    UnusableForeignType found;
+    auto visitType = [&](Type type) {
+      forEachNominalHeldByValue(type, [&](NominalTypeDecl *held) {
+        visitHeldType(held, lowLink, found);
+        return false;
+      });
+    };
+
+    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+      for (auto *field : structDecl->getStoredProperties())
+        visitType(field->getInterfaceType());
+
+      // Fields of C++ base classes count as fields of the derived record.
+      auto *cxxRecord =
+          dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+      if (cxxRecord && cxxRecord->hasDefinition()) {
+        for (auto &base : cxxRecord->bases()) {
+          auto *baseRecord = base.getType()->getAsCXXRecordDecl();
+          if (!baseRecord)
+            continue;
+          if (auto *baseDecl = dyn_cast_or_null<NominalTypeDecl>(
+                  Impl.importDecl(baseRecord, Impl.CurrentVersion)))
+            visitHeldType(baseDecl, lowLink, found);
+        }
+      }
+    } else {
+      for (auto *element : cast<EnumDecl>(nominal)->getAllElements())
+        if (element->hasAssociatedValues())
+          visitType(element->getPayloadInterfaceType());
+    }
+
+    auto &node = Nodes[nominal];
+    node.LowLink = lowLink;
+    node.Found = found;
+    if (lowLink != index)
+      return;
+
+    // This type is the root of a complete component, which consists of the
+    // types above it on the stack.
+    auto members = ArrayRef<NominalTypeDecl *>(Stack).drop_front(
+        llvm::find(Stack, nominal) - Stack.begin());
+    for (auto *member : members)
+      if (!found)
+        found = Nodes[member].Found;
+    for (auto *member : members) {
+      Nodes.erase(member);
+      if (found)
+        Impl.UnusableForeignTypes[member] = found;
+      else
+        member->setNoExposedUnusableForeignTypes();
+    }
+    Stack.truncate(Stack.size() - members.size());
+  }
+};
+} // end anonymous namespace
+
+UnusableForeignType
+ClangImporter::Implementation::exposesUnusableForeignType(Type type) {
+  if (UnusableForeignTypes.empty() || !type || type->hasError())
+    return UnusableForeignType();
+
+  UnusableForeignType found;
+  forEachNominalHeldByValue(type, [&](NominalTypeDecl *nominal) {
+    found = UnusableForeignTypeFinder(*this).find(nominal);
+    return bool(found);
+  });
+  return found;
+}
+
+UnusableForeignType ClangImporter::exposesUnusableForeignType(Type type) {
+  return Impl.exposesUnusableForeignType(type);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1223,7 +1504,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   auto unsafe = [](CxxUnsafetyReason reason)
       -> std::optional<CxxUnsafetyReason> { return reason; };
 
-  // The user explicitly explicitly acknowledged this method's unsafety
+  // The user explicitly acknowledged this method's unsafety
   // and asked us to import it as is anyway. No renaming needed.
   if (hasUnsafeAPIAttr(method))
     return safe();
@@ -1284,8 +1565,9 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     if (isSwiftClassType(cxxRecordReturnType))
       return safe();
 
+    clang::Sema &sema = ctx.getClangModuleLoader()->getClangSema();
     if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-        hasIteratorCategoryOrIteratorConcept(cxxRecordReturnType))
+        hasIteratorCategoryOrIteratorConcept(sema, cxxRecordReturnType))
       return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
     // Mark this as safe to help our diganostics down the road.
@@ -1296,7 +1578,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     // A projection of a view type (such as a string_view) from a self
     // contained parent is a proejction (unsafe).
     if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-        isViewType(cxxRecordReturnType)) {
+        isViewType(sema, cxxRecordReturnType)) {
         return parentIsSelfContained ? unsafe(CxxUnsafetyReason::ViewProjection)
                                      : safe();
     }

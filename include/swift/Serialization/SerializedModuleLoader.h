@@ -594,8 +594,11 @@ bool extractCompilerFlagsFromInterface(
     std::optional<llvm::Triple> PreferredTarget = std::nullopt,
     DiagnosticEngine *diagEngine = nullptr);
 
-/// Extract the user module version number from an interface file.
-llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+/// Extract the user module version number from an interface file read from
+/// \p FS.
+llvm::VersionTuple
+extractUserModuleVersionFromInterface(StringRef moduleInterfacePath,
+                                      llvm::vfs::FileSystem &FS);
 
 /// Extract embedded bridging header from binary module.
 std::unique_ptr<llvm::MemoryBuffer>

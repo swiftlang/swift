@@ -519,7 +519,7 @@ public:
 
 std::unique_ptr<FieldDescriptorBase>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldDescriptor(
-    const TypeRef *TR) {
+    const TypeRef *TR, Mangle::ManglingFlavor Flavor) {
   if (auto FDI = getFieldTypeInfo(TR))
     return std::make_unique<FieldDescriptorImpl>(FDI, Builder);
   return nullptr;
@@ -528,7 +528,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldDescriptor(
 std::unique_ptr<FieldDescriptorBase>
 TypeRefBuilder::getFieldDescriptor(const TypeRef *TR) {
   for (auto DF : getDescriptorFinders())
-    if (auto descriptor = DF->getFieldDescriptor(TR))
+    if (auto descriptor = DF->getFieldDescriptor(TR, getManglingFlavor()))
       return descriptor;
   return nullptr;
 }
@@ -657,7 +657,7 @@ public:
 
 std::unique_ptr<BuiltinTypeDescriptorBase>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeDescriptor(
-    const TypeRef *TR) {
+    const TypeRef *TR, Mangle::ManglingFlavor Flavor) {
   if (auto BTI = getBuiltinTypeInfo(TR))
     return std::make_unique<BuiltinTypeDescriptorImpl>(BTI, Builder);
   return nullptr;
@@ -666,7 +666,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeDescriptor(
 std::unique_ptr<BuiltinTypeDescriptorBase>
 TypeRefBuilder::getBuiltinTypeDescriptor(const TypeRef *TR) {
   for (auto *DF : getDescriptorFinders())
-    if (auto descriptor = DF->getBuiltinTypeDescriptor(TR))
+    if (auto descriptor = DF->getBuiltinTypeDescriptor(TR, getManglingFlavor()))
       return descriptor;
 
   return nullptr;

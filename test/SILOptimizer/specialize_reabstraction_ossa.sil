@@ -244,6 +244,90 @@ bb0:
   return %15 : $@callee_guaranteed (@in_guaranteed NonLoadableErr) -> (@out Int, @error_indirect NonLoadableErr)
 }
 
+sil [ossa] @generic_closure_fun : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to [init] %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// Specializing a partial_apply changes its type, which a debug reconstruction
+// block that takes the old type can't take.
+// CHECK-LABEL: sil [ossa] @test_debug_value_of_specialized_partial_apply :
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] {{%.*}}() : $@convention(thin) (Int) -> Int
+// CHECK-NEXT:    debug_value undef : $@callee_guaranteed (@in_guaranteed Int) -> @out Int, let, name "body"
+// CHECK:         apply [[C]]({{%.*}}) : $@callee_guaranteed (Int) -> Int
+// CHECK:       } // end sil function 'test_debug_value_of_specialized_partial_apply'
+sil [ossa] @test_debug_value_of_specialized_partial_apply : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @generic_closure_fun : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %2 = partial_apply [callee_guaranteed] %1<Int>() : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  debug_value %2, let, name "body", transform {
+  bb0(%a : $@callee_guaranteed (@in_guaranteed Int) -> @out Int):
+    %b = convert_function %a to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0 for <Int>
+    return %b
+  }
+  %3 = alloc_stack $Int
+  store %0 to [trivial] %3 : $*Int
+  %5 = alloc_stack $Int
+  %6 = apply %2(%5, %3) : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  %7 = load [trivial] %5 : $*Int
+  dealloc_stack %5 : $*Int
+  dealloc_stack %3 : $*Int
+  destroy_value %2 : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  return %7 : $Int
+}
+
+// A plain debug_value follows the type of the specialized partial_apply.
+// CHECK-LABEL: sil [ossa] @test_plain_debug_value_of_specialized_partial_apply :
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] {{%.*}}() : $@convention(thin) (Int) -> Int
+// CHECK-NEXT:    debug_value [[C]] : $@callee_guaranteed (Int) -> Int, let, name "body"
+// CHECK:       } // end sil function 'test_plain_debug_value_of_specialized_partial_apply'
+sil [ossa] @test_plain_debug_value_of_specialized_partial_apply : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @generic_closure_fun : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %2 = partial_apply [callee_guaranteed] %1<Int>() : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  debug_value %2, let, name "body"
+  %3 = alloc_stack $Int
+  store %0 to [trivial] %3 : $*Int
+  %5 = alloc_stack $Int
+  %6 = apply %2(%5, %3) : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  %7 = load [trivial] %5 : $*Int
+  dealloc_stack %5 : $*Int
+  dealloc_stack %3 : $*Int
+  destroy_value %2 : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  return %7 : $Int
+}
+
+// A copy of the specialized partial_apply gets its new type.
+// CHECK-LABEL: sil [ossa] @test_debug_value_of_copy_of_specialized_partial_apply :
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] {{%.*}}() : $@convention(thin) (Int) -> Int
+// CHECK-NEXT:    [[COPY:%.*]] = copy_value [[C]] : $@callee_guaranteed (Int) -> Int
+// CHECK-NEXT:    debug_value undef : $@callee_guaranteed (@in_guaranteed Int) -> @out Int, let, name "body"
+// CHECK:         destroy_value [[COPY]] : $@callee_guaranteed (Int) -> Int
+// CHECK:       } // end sil function 'test_debug_value_of_copy_of_specialized_partial_apply'
+sil [ossa] @test_debug_value_of_copy_of_specialized_partial_apply : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = function_ref @generic_closure_fun : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %2 = partial_apply [callee_guaranteed] %1<Int>() : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+  %3 = copy_value %2 : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  debug_value %3, let, name "body", transform {
+  bb0(%a : $@callee_guaranteed (@in_guaranteed Int) -> @out Int):
+    %b = convert_function %a to $@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> @out τ_0_0 for <Int>
+    return %b
+  }
+  destroy_value %3 : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  %5 = alloc_stack $Int
+  store %0 to [trivial] %5 : $*Int
+  %7 = alloc_stack $Int
+  %8 = apply %2(%7, %5) : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  %9 = load [trivial] %7 : $*Int
+  dealloc_stack %7 : $*Int
+  dealloc_stack %5 : $*Int
+  destroy_value %2 : $@callee_guaranteed (@in_guaranteed Int) -> @out Int
+  return %9 : $Int
+}
+
 // CHECK-LABEL: sil shared [transparent] [thunk] [ossa] @$s14indirect_error4main3ErrV_TG5 : $@convention(thin) (@in_guaranteed Err) -> (@out Int, @error_indirect Err) {
 // CHECK:         [[F:%.*]] = function_ref @$s14indirect_error4main3ErrV_Tg5 : $@convention(thin) (Err) -> (Int, @error Err)
 // CHECK:         try_apply [[F]]({{%[0-9]+}}) : $@convention(thin) (Err) -> (Int, @error Err), normal bb1, error bb2

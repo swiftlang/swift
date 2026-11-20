@@ -126,6 +126,30 @@ extension Clock {
 }
 #endif
 
+@available(StdlibDeploymentTarget 5.7, *)
+extension Duration {
+  /// The duration as whole seconds and nanoseconds, rather than trapping if
+  /// the seconds don't fit in an `Int64`.
+  ///
+  /// Durations beyond the range of `Int64` seconds saturate at the
+  /// corresponding limit, `Int64.max` or `Int64.min`.
+  internal var _saturatedSecondsAndNanoseconds:
+    (seconds: Int64, nanoseconds: Int64)
+  {
+    // The duration is a 128-bit count of attoseconds, so its whole seconds
+    // only fit in an Int64 when the high word is within +/- (2^63 * 1e18) / 2^64.
+    let limit: Int64 = 500_000_000_000_000_000
+    if _high >= limit {
+      return (seconds: Int64.max, nanoseconds: 999_999_999)
+    }
+    if _high < -limit {
+      return (seconds: Int64.min, nanoseconds: -999_999_999)
+    }
+    let (seconds, attoseconds) = components
+    return (seconds: seconds, nanoseconds: attoseconds / 1_000_000_000)
+  }
+}
+
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2

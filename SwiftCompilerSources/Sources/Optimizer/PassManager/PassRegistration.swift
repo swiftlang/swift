@@ -71,6 +71,7 @@ private func registerSwiftPasses() {
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
   registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
+  registerPass(functionSignatureOptimization, { functionSignatureOptimization.run($0) })
 
   // Function passes
   registerPass(allocBoxToStack, { allocBoxToStack.run($0) })
@@ -120,7 +121,7 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
   registerPass(removeSILGenLifetimesPass, { removeSILGenLifetimesPass.run($0) })
   registerPass(lifetimeResolutionPass, { lifetimeResolutionPass.run($0) })
-  registerPass(lifetimeResolutionDiagnosePass, { lifetimeResolutionDiagnosePass.run($0) })
+  registerPass(diagnoseResolvedLifetimesPass, { diagnoseResolvedLifetimesPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
@@ -134,6 +135,8 @@ private func registerSwiftPasses() {
   registerPass(packTypeElimination, { packTypeElimination.run($0) })
   registerPass(packSpecialization, { packSpecialization.run($0) })
   registerPass(trivialOwnershipElimination, { trivialOwnershipElimination.run($0) })
+  registerPass(lowerAddressInstructions, { lowerAddressInstructions.run($0) })
+  registerPass(verifierPass, { verifierPass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
@@ -147,6 +150,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
   registerForSILCombine(StructInst.self,           { run(StructInst.self, $0) })
   registerForSILCombine(TupleInst.self,            { run(TupleInst.self, $0) })
+  registerForSILCombine(TuplePackElementAddrInst.self, { run(TuplePackElementAddrInst.self, $0) })
   registerForSILCombine(StoreBorrowInst.self,      { run(StoreBorrowInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
   registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
@@ -171,6 +175,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(RawPointerToRefInst.self,   { run(RawPointerToRefInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
+  registerForSILCombine(UncheckedOwnershipInst.self, { run(UncheckedOwnershipInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
   registerForSILCombine(UncheckedAddrCastInst.self, { run(UncheckedAddrCastInst.self, $0) })
   registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
@@ -202,4 +207,5 @@ private func registerOptimizerUtilities() {
   registerControlFlowUtils()
   registerLifetimeCompletion()
   registerDebugReconstructionSimplification()
+  registerBorrowAccessorFixup()
 }

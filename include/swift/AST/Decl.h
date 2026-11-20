@@ -659,7 +659,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -674,7 +674,10 @@ protected:
     HasDestructorComputed : 1,
 
     /// Whether we have a user-defined deinit.
-    HasDestructor : 1
+    HasDestructor : 1,
+
+    /// Whether this type exposes a foreign type that Swift code must not use.
+    NoExposedUnusableForeignTypes : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -896,6 +899,11 @@ protected:
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
     NumberOfFieldOffsetVectorEntries : 1,
     NumberOfVTableEntries : 2
+  );
+
+  SWIFT_INLINE_BITFIELD(TopLevelCodeDecl, Decl, 1,
+    /// Whether we've assigned discriminators for the body.
+    HasBodyDiscriminators : 1
   );
 
   } Bits;
@@ -3010,14 +3018,29 @@ class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return Bits.TopLevelCodeDecl.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = value;
+  }
+
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
-      Decl(DeclKind::TopLevelCode, Parent),
-      Body(Body) {}
+      : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+        Decl(DeclKind::TopLevelCode, Parent), Body(Body) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = false;
+  }
 
   BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
+  void setBody(BraceStmt *b, bool resetDiscriminators = false) {
+    Body = b;
+    if (resetDiscriminators)
+      setBodyHasDiscriminators(false);
+  }
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -4720,6 +4743,7 @@ protected:
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
     Bits.NominalTypeDecl.HasDestructorComputed = false;
     Bits.NominalTypeDecl.HasDestructor = false;
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = false;
     ExtensionGeneration = 0;
   }
 
@@ -4809,6 +4833,15 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Whether this type is known not to expose an unusable foreign type.
+  bool hasNoExposedUnusableForeignTypes() const {
+    return Bits.NominalTypeDecl.NoExposedUnusableForeignTypes;
+  }
+
+  void setNoExposedUnusableForeignTypes() {
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -5553,6 +5586,10 @@ public:
   /// Retrieve the ClassDecl for the superclass of this class, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
+
+  /// The `@_tailAllocated` attribute of this class or of its nearest superclass
+  /// that has one, and the class it is attached to; {nullptr, nullptr} if none.
+  std::pair<TailAllocatedAttr *, ClassDecl *> getTailAllocatedAttr() const;
 
   /// Check if this class is a superclass or equal to the given class.
   bool isSuperclassOf(const ClassDecl *other) const;
@@ -6515,6 +6552,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine the mutability of this storage declaration when
@@ -6548,6 +6586,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Does this storage declaration have explicitly-defined accessors
@@ -6883,6 +6922,7 @@ public:
     case VarDecl::Introducer::Borrowing:
       return "_borrowing";
     }
+    llvm_unreachable("covered switch");
   }
 
 protected:
@@ -7118,6 +7158,12 @@ public:
   StringRef getIntroducerStringRef() const {
     return getIntroducerStringRef(getIntroducer());
   }
+
+  /// Returns the ownership that binding this variable requires of the value
+  /// that its pattern matches, or \c std::nullopt if the binding works with
+  /// whatever ownership the match as a whole has, as a `let` binding does.
+  /// See \c Pattern::getOwnership().
+  std::optional<LoweredOwnership> getBindingOwnership() const;
 
   CaptureListExpr *getParentCaptureList() const {
     if (!Parent)
@@ -7636,6 +7682,10 @@ public:
   /// Whether this parameter has a caller-side default argument expression
   /// such as the magic literal \c #function.
   bool hasCallerSideDefaultExpr() const;
+
+  /// Whether this parameter's default argument is evaluated by a generator
+  /// function, rather than at the call site or by an overridden declaration.
+  bool hasDefaultArgumentGenerator() const;
 
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.
@@ -8315,7 +8365,21 @@ protected:
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
     unsigned NoLifetimeDependenceInfo : 1;
+
+    /// Whether we've assigned discriminators for a function body.
+    /// NOTE: This should really be a bit on AbstractFunctionDecl, but that
+    /// bitfield is full.
+    unsigned HasBodyDiscriminators : 1;
   } LazySemanticInfo = { };
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return LazySemanticInfo.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    LazySemanticInfo.HasBodyDiscriminators = value;
+  }
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,

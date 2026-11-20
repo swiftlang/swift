@@ -448,6 +448,8 @@ isStringStoreToIdentifyableObject(SILInstruction *inst) {
         break;
       case SILInstructionKind::LoadBorrowInst:
         break;
+      case SILInstructionKind::DestroyAddrInst:
+        break;
       case SILInstructionKind::DebugValueInst:
         break;
       default:

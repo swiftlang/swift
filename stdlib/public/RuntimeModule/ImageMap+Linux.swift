@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import Swift
 
@@ -22,16 +22,19 @@ import Swift
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
+#if !os(Android)
 fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
   let len = lseek(fd, 0, SEEK_END)
   guard len >= 0 else {
     return nil
   }
-  return withUnsafeTemporaryAllocation(byteCount: len, alignment: 16) {
+  return withUnsafeTemporaryAllocation(byteCount: Int(len), alignment: 16) {
     (buffer: UnsafeMutableRawBufferPointer) -> [String:String]? in
 
     _ = lseek(fd, 0, SEEK_SET)
@@ -60,9 +63,13 @@ fileprivate func readOSRelease() -> [String:String]? {
 
   return readOSRelease(fd: fd)
 }
+#endif
 
 extension ImageMap {
 
+  #if os(Android)
+  private static var platform = "Android (API \(android_get_device_api_level()))"
+  #else
   private static var platform = {
     guard let info = readOSRelease(),
           let pretty = info["PRETTY_NAME"] else {
@@ -71,6 +78,7 @@ extension ImageMap {
 
     return "Linux (\(pretty))"
   }()
+  #endif
 
   private struct AddressRange {
     var low: Address = 0
@@ -109,7 +117,7 @@ extension ImageMap {
     // Find all the mapped files and get high/low ranges
     var mappedFiles: [Substring:AddressRange] = [:]
     for match in ProcMapsScanner(procMaps) {
-      let path = stripWhitespace(match.pathname)
+      var path = stripWhitespace(match.pathname)
       if match.inode == "0" || path == "" {
         continue
       }
@@ -117,6 +125,17 @@ extension ImageMap {
             let end = Address(match.end, radix: 16) else {
         continue
       }
+
+      #if os(Android)
+      // A library loaded from an APK is mapped from the APK itself, so tell
+      // the libraries apart by the APK entry that holds the mapped offset.
+      if path.hasSuffix(".apk"), let offset = Int(match.offset, radix: 16) {
+        let apk = ElfImageCache.threadLocal.apk(path: String(path))
+        if let entry = apk.entry(containing: offset) {
+          path = Substring("\(path)!/\(entry.name)")
+        }
+      }
+      #endif
 
       if let range = mappedFiles[path] {
         mappedFiles[path] = AddressRange(low: Swift.min(start, range.low),
@@ -166,4 +185,4 @@ extension ImageMap {
 
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

@@ -64,3 +64,34 @@ bb0:
   %t = tuple ()
   return %t : $()
 }
+
+// Test that a generic parameter as a variable type from a debug reconstruction
+// block is detected.
+
+struct S1<T> {}
+
+// CHECK-LABEL: sil shared @$s10empty_selfTf4d_n : $@convention(thin) () -> () {
+// CHECK-NEXT:  bb0:
+// CHECK-NEXT:    debug_value undef : $(), let, name "self", argno 1
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function '$s10empty_selfTf4d_n'
+sil @empty_self : $@convention(method) <T> (S1<T>) -> () {
+bb0(%0 : $S1<T>):
+  debug_value (), let, name "self", argno 1, transform {
+  bb0:
+    %1 = struct $S1<T> ()
+    return %1 : $S1<T>
+  }
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @call_empty_self : $@convention(thin) () -> () {
+bb0:
+  %0 = struct $S1<Int> ()
+  %1 = function_ref @empty_self : $@convention(method) <T> (S1<T>) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(method) <T> (S1<T>) -> ()
+  %t = tuple ()
+  return %t : $()
+}

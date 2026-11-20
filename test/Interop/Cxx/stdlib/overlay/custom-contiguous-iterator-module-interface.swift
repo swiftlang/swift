@@ -33,6 +33,15 @@
 // CHECK:   var pointee: CInt
 // CHECK: }
 
+// CHECK: struct InheritedFromBaseWithIteratorConcept : UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct ReturnsInheritedFromBaseWithIteratorConcept {
+// CHECK:   @available(*, deprecated, renamed: "get()")
+// CHECK:   func __getUnsafe() -> InheritedFromBaseWithIteratorConcept
+// CHECK:   func get() -> InheritedFromBaseWithIteratorConcept
+// CHECK: }
+
 // CHECK: struct HasOnlyIteratorConcept : UnsafeCxxInputIterator {
 // CHECK:   func __operatorStar() -> UnsafePointer<CInt>
 // CHECK:   func successor() -> HasOnlyIteratorConcept

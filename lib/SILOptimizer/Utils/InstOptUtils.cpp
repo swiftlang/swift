@@ -921,7 +921,8 @@ static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
 }
 
 void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
-                                 SILValue operand, InstModCallbacks callbacks) {
+                                 SILValue operand, InstModCallbacks callbacks,
+                                 IsDeadEnd_t isDeadEnd) {
   // If we have an address, we insert a destroy_addr and return. Any live range
   // issues must have been dealt with by our caller.
   if (operand->getType().isAddress()) {
@@ -938,7 +939,8 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 
   // If we have qualified ownership, we should just emit a destroy value.
   if (builder.getFunction().hasOwnership()) {
-    callbacks.createdNewInst(builder.createDestroyValue(loc, operand));
+    callbacks.createdNewInst(
+        builder.createDestroyValue(loc, operand, isDeadEnd));
     return;
   }
 
@@ -986,12 +988,13 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILValue arg,
                                            SILParameterInfo paramInfo,
-                                           InstModCallbacks callbacks) {
+                                           InstModCallbacks callbacks,
+                                           IsDeadEnd_t isDeadEnd) {
   if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
                                             builder.getFunction()))
     return;
 
-  emitDestroyOperation(builder, loc, arg, callbacks);
+  emitDestroyOperation(builder, loc, arg, callbacks, isDeadEnd);
 }
 
 /// Returns true if \p user is a user of an on-stack closure which can be
@@ -1004,6 +1007,27 @@ static bool isDeadOnStackClosureUser(SILInstruction *user) {
          // has been lowered from its function, e.g. when closure
          // specialization folds `apply(partial_apply())` into a direct call.
          isa<StrongReleaseInst>(user);
+}
+
+bool swift::isCaptureOwnedByOnStackClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
+    return false;
+  ApplySite site(pai);
+  if (!site.isArgumentOperand(argOp))
+    return false;
+  if (site.hasContextOwnedAddressArgument(argOp))
+    return true;
+  SILValue arg = argOp.get();
+  SILFunction *function = pai->getFunction();
+  if (function->hasOwnership())
+    return argOp.isConsuming();
+
+  // Without ownership, follow IRGen: the context owns each nontrivial value
+  // that it captures, unless it borrows the value.
+  if (arg->getType().isAddress() || arg->getType().isTrivial(*function))
+    return false;
+  return !pai->contextBorrowsArgument(argOp);
 }
 
 static bool
@@ -1214,8 +1238,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     if (pa->isNoncopyable()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
-        if (!argOp.isConsuming() &&
-            !ApplySite(pa).hasContextOwnedAddressArgument(argOp))
+        // A capture that was transferred to a combined apply is undef.
+        if (!isCaptureOwnedByOnStackClosure(argOp) ||
+            isa<SILUndef>(argOp.get()))
           continue;
 
         SILBuilderWithScope builder(pa, builderCtxt);
@@ -1582,7 +1607,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
 void swift::insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<SILValue(SILValue)> getValueToDestroy,
-    SILLocation origLoc) {
+    SILLocation origLoc, IsDeadEnd_t isDeadEnd) {
   assert(pai->isOnStack());
 
   ApplySite site(pai);
@@ -1597,7 +1622,8 @@ void swift::insertDestroyOfCapturedArguments(
                  OwnershipKind::Owned)));
 
     auto paramInfo = site.getParamInfoForOperand(arg);
-    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo);
+    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo,
+                                   InstModCallbacks(), isDeadEnd);
   }
 }
 
@@ -2248,7 +2274,10 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (srcDVI)
     newDVI->cloneReconstructionBlockFrom(srcDVI);
 
-  newDVI->stripDeref(0);
+  // For a store or store_borrow, the load must be removed.
+  // A copy_addr has an address on both sides, so no rewrite is necessary.
+  if (!isa<CopyAddrInst>(SI))
+    newDVI->stripDeref(0);
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
@@ -2298,7 +2327,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
     }
     tupleType = swift::TupleType::get(tupleElements, packType->getASTContext());
 
-    silType = PESI->getFunction()->getLoweredType(tupleType);
+    silType = PESI->getFunction()->getLoweredType(tupleType).getObjectType();
   }
 
   for (Operand *U : getDebugUses(API)) {
@@ -2320,6 +2349,65 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
   }
 }
 
+/// Build the value of the empty type \p type. This can be an empty struct,
+/// tuple, or inline array, or any combination of those.
+static SILValue createEmptyValue(SILBuilder &builder, SILLocation loc,
+                                 SILType type) {
+  SILFunction &f = builder.getFunction();
+  SmallVector<SILValue, 4> elements;
+  if (auto tupleTy = type.getAs<TupleType>()) {
+    for (unsigned idx : indices(tupleTy->getElements()))
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getTupleElementType(idx)));
+    return builder.createTuple(loc, type, elements);
+  }
+  if (StructDecl *structDecl = type.getStructDecl()) {
+    for (VarDecl *field : structDecl->getStoredProperties())
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getFieldType(field, &f)));
+    return builder.createStruct(loc, type, elements);
+  }
+  // Fallback for zero-length InlineArrays.
+  return builder.createZeroInitValue(loc, type);
+}
+
+/// Replaces the loads of the address-category operand \p operandIdx of
+/// \p debugValue by a constant empty value, and kills its other uses.
+static void replaceOperandWithEmptyValue(DebugValueInst *debugValue,
+                                  unsigned operandIdx) {
+  SILBasicBlock *debugBB = debugValue->getOrCreateDebugReconstructionBlock();
+  SILArgument *argument = debugBB->getArgument(operandIdx);
+  for (Operand *use : llvm::make_early_inc_range(argument->getUses())) {
+    auto *load = dyn_cast<LoadInst>(use->getUser());
+    if (!load)
+      continue;
+    SILBuilder builder(load);
+    load->replaceAllUsesWith(
+        createEmptyValue(builder, load->getLoc(), load->getType()));
+    load->eraseFromParent();
+  }
+  debugValue->killOperand(operandIdx);
+  // Remove the dead operand.
+  addOperandsToDebugValue(debugValue, {});
+}
+
+/// Salvage an `alloc_stack` if its content is empty and can be reconstructed.
+static void salvageEmptyAllocStack(AllocStackInst *asi) {
+  SILFunction &f = *asi->getFunction();
+  SILType type = asi->getElementType();
+  if (type.hasLocalArchetype() || type.isMoveOnly() || !type.isEmpty(f))
+    return;
+
+  // Give the variable of the allocation a debug use, rewritten below.
+  if (auto varInfo = asi->getVarInfo())
+    SILBuilder(asi, asi->getDebugScope())
+      .createDebugValue(asi->getLoc(), asi, *varInfo);
+
+  while (Operand *use = getAnyDebugUse(asi))
+    replaceOperandWithEmptyValue(cast<DebugValueInst>(use->getUser()),
+                                 use->getOperandNumber());
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
@@ -2332,6 +2420,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   // Stores to an allocation are salvaged: debug values are cloned at each
   // store. The debug values on the allocation itself are deleted rather than
   // killed, as the clones describe the variable now.
+  // Empty alloc_stacks have no stores and need to be salvaged.
+  if (auto *asi = dyn_cast<AllocStackInst>(I))
+    salvageEmptyAllocStack(asi);
   if (isa<AllocStackInst>(I) || isa<AllocPackInst>(I))
     return deleteAllDebugUses(I, /*salvage=*/false);
 

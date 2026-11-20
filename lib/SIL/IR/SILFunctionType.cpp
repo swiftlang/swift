@@ -350,6 +350,7 @@ CanSILFunctionType SILFunctionType::getLinearComponentType(
         getDifferentiabilityParameterIndices(), module.Types,
         LookUpConformanceInModule());
   }
+  llvm_unreachable("covered switch");
 }
 
 CanSILFunctionType
@@ -882,10 +883,9 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
     CanGenericSignature constrainedInvocationGenSig) {
   auto originalInvocationGenSig = original->getInvocationGenericSignature();
   if (!originalInvocationGenSig) {
-    assert(!constrainedInvocationGenSig ||
-           constrainedInvocationGenSig->areAllParamsConcrete() &&
-               "derivative function cannot have invocation generic signature "
-               "when original function doesn't");
+    assert(!constrainedInvocationGenSig.isEffectivelyGeneric() &&
+           "derivative function cannot have invocation generic signature "
+           "when original function doesn't");
     if (auto patternSig = original->getPatternGenericSignature()) {
       auto constrainedPatternSig =
         autodiff::getConstrainedDerivativeGenericSignature(
@@ -936,9 +936,9 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
             constrainedInvocationGenSig)));
   }
   return SILFunctionType::get(
-      constrainedInvocationGenSig->areAllParamsConcrete()
-          ? GenericSignature()
-          : constrainedInvocationGenSig,
+      constrainedInvocationGenSig->isEffectivelyGeneric()
+          ? constrainedInvocationGenSig
+          : GenericSignature(),
       original->getExtInfo(), original->getCoroutineKind(),
       original->getCalleeConvention(), newParameters, original->getYields(),
       newResults, original->getOptionalErrorResult(),
@@ -2641,16 +2641,15 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
          "iterating over loweredCaptures.getCaptures().");
 }
 
-static AccessorDecl *
-getAsCoroutineAccessor(std::optional<SILDeclRef> constant) {
+static FuncDecl *getAsCoroutine(std::optional<SILDeclRef> constant) {
   if (!constant || !constant->hasDecl())
     return nullptr;;
 
-  auto accessor = dyn_cast<AccessorDecl>(constant->getDecl());
-  if (!accessor || !accessor->isCoroutine())
+  auto fd = dyn_cast<FuncDecl>(constant->getDecl());
+  if (!fd || !fd->isCoroutine())
     return nullptr;
 
-  return accessor;
+  return fd;
 }
 
 static void destructureYieldsForReadAccessor(TypeConverter &TC,
@@ -2687,19 +2686,13 @@ static void destructureYieldsForReadAccessor(TypeConverter &TC,
                                 convention));
 }
 
-static void destructureYieldsForCoroutine(TypeConverter &TC,
-                                          TypeExpansionContext expansion,
-                                          std::optional<SILDeclRef> constant,
-                                          AbstractionPattern origType,
-                                          CanType canValueType,
-                                          SmallVectorImpl<SILYieldInfo> &yields,
-                                          SILCoroutineKind &coroutineKind) {
-  auto accessor = getAsCoroutineAccessor(constant);
-  if (!accessor)
-    return;
-
+static void
+destructureYieldsForCoroutine(TypeConverter &TC, TypeExpansionContext expansion,
+                              AbstractionPattern origType, CanType canValueType,
+                              bool isInOutYield,
+                              SmallVectorImpl<SILYieldInfo> &yields) {
   // 'modify' yields an inout of the target type.
-  if (isYieldingMutableAccessor(accessor->getAccessorKind())) {
+  if (isInOutYield) {
     auto loweredValueTy =
         TC.getLoweredType(origType, canValueType, expansion);
     yields.push_back(SILYieldInfo(loweredValueTy.getASTType(),
@@ -2707,7 +2700,6 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
   } else {
     // 'read' yields a borrowed value of the target type, destructuring
     // tuples as necessary.
-    assert(isYieldingImmutableAccessor(accessor->getAccessorKind()));
     destructureYieldsForReadAccessor(TC, expansion, origType, canValueType,
                                      yields);
   }
@@ -2835,38 +2827,71 @@ static CanSILFunctionType getSILFunctionType(
 
   bool hasSendingResult = substFnInterfaceType->getExtInfo().hasSendingResult();
 
-  // Get the yield type for an accessor coroutine.
+  // Get the yield type for coroutine.
   SILCoroutineKind coroutineKind = SILCoroutineKind::None;
   AbstractionPattern coroutineOrigYieldType = AbstractionPattern::getInvalid();
   CanType coroutineSubstYieldType;
-  
-  if (auto accessor = getAsCoroutineAccessor(constant)) {
-    auto origAccessor = cast<AccessorDecl>(origConstant->getDecl());
-    auto &ctx = origAccessor->getASTContext();
-    coroutineKind =
-        (requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
-         ctx.SILOpts.CoroutineAccessorsUseYieldOnce2)
-            ? SILCoroutineKind::YieldOnce2
-            : SILCoroutineKind::YieldOnce;
 
-    // Coroutine accessors are always native, so fetch the native
-    // abstraction pattern.
-    auto origStorage = origAccessor->getStorage();
-    coroutineOrigYieldType = TC.getAbstractionPattern(origStorage,
-                                                      /*nonobjc*/ true)
-                               .getReferenceStorageReferentType();
+  bool isInOutYield = false;
+  if (auto fd = getAsCoroutine(constant)) { // Derive yield type for declaration
+    auto origFd = cast<FuncDecl>(origConstant->getDecl());
+    auto &ctx = origFd->getASTContext();
+    if (auto accessor = dyn_cast<AccessorDecl>(origFd)) {
+      coroutineKind =
+          (requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+           ctx.SILOpts.CoroutineAccessorsUseYieldOnce2)
+              ? SILCoroutineKind::YieldOnce2
+              : SILCoroutineKind::YieldOnce;
+    } else {
+      coroutineKind = SILCoroutineKind::YieldOnce2;
+    }
 
-    auto storage = accessor->getStorage();
-    auto valueType = storage->getValueInterfaceType();
+    // Coroutines are always native, so fetch the native abstraction pattern.
+    auto sig = origFd->getGenericSignatureOfContext().getCanonicalSignature();
+    const auto *origYL = origFd->getYields();
+    assert(origYL->size() == 1 && "only support a single yield type");
+    
+    auto origYieldType = origYL->front().getInterfaceType(origFd);
+    if (auto inoutTy = origYieldType->getAs<InOutType>()) {
+      isInOutYield = true;
+      origYieldType = inoutTy->getObjectType();
+    }
+    auto reducedYieldType = sig.getReducedType(origYieldType);
+    coroutineOrigYieldType = AbstractionPattern(sig, reducedYieldType);
+
+    Type valueType = fd->getYields()->front().getInterfaceType(fd);
+    if (isInOutYield)
+      valueType = valueType->castTo<InOutType>()->getObjectType();
 
     if (reqtSubs) {
       valueType = valueType.subst(*reqtSubs);
       coroutineSubstYieldType = valueType->getReducedType(
           genericSig);
     } else {
-      coroutineSubstYieldType = valueType->getReducedType(
-          accessor->getGenericSignature());
+      coroutineSubstYieldType =
+          valueType->getReducedType(fd->getGenericSignature());
     }
+  } else if (substFnInterfaceType
+                 ->isCoroutine()) { // Derive yield type for function type
+    coroutineKind = SILCoroutineKind::YieldOnce2;
+    assert(substFnInterfaceType->getYields().size() == 1 &&
+           "only support a single yield type");
+
+    auto sig = origType.hasGenericSignature() ? origType.getGenericSignature()
+                                              : genericSig;
+    auto origYieldType = origType.getFunctionYieldType(0);
+    auto reducedYieldType = sig.getReducedType(origYieldType.getType());
+    coroutineOrigYieldType = AbstractionPattern(sig, reducedYieldType);
+
+    auto yieldType = substFnInterfaceType->getYields().front();
+    auto valueType = yieldType.getType();
+    isInOutYield = yieldType.isInOut();
+    assert(isInOutYield == origType.getFunctionYieldFlags(0).isInOut());
+
+    if (reqtSubs)
+      valueType = valueType.subst(*reqtSubs);
+
+    coroutineSubstYieldType = valueType->getReducedType(genericSig);
   }
 
   bool shouldBuildSubstFunctionType = [&]{
@@ -2890,7 +2915,7 @@ static CanSILFunctionType getSILFunctionType(
     // for class override thunks.  This is required to make the yields
     // match in abstraction to the base method's yields, which is necessary
     // to make the extracted continuation-function signatures match.
-    if (constant != origConstant && getAsCoroutineAccessor(constant))
+    if (constant != origConstant && getAsCoroutine(constant))
       return true;
 
     // We don't currently use substituted function types for generic function
@@ -3006,9 +3031,11 @@ static CanSILFunctionType getSILFunctionType(
 
   // Destructure the coroutine yields.
   SmallVector<SILYieldInfo, 8> yields;
-  destructureYieldsForCoroutine(TC, expansionContext, constant,
-                                coroutineOrigYieldType, coroutineSubstYieldType,
-                                yields, coroutineKind);
+  if (coroutineKind != SILCoroutineKind::None) {
+    destructureYieldsForCoroutine(TC, expansionContext, coroutineOrigYieldType,
+                                  coroutineSubstYieldType, isInOutYield,
+                                  yields);
+  }
 
   // Destructure the result tuple type.
   SmallVector<SILResultInfo, 8> results;
@@ -4135,7 +4162,10 @@ public:
     if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
       return ResultConvention::Owned;
     if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
-      return ResultConvention::Autoreleased;
+      // Foreign reference types are never autoreleased.
+      return tl.getLoweredType().isForeignReferenceType()
+                 ? ResultConvention::Unowned
+                 : ResultConvention::Autoreleased;
 
     // Otherwise, infer based on the method family.
     if (isImplicitPlusOneCFResult())
@@ -4766,7 +4796,7 @@ getSILFunctionTypeForForeignReferenceInitializer(TypeConverter &TC,
 static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     TypeConverter &TC, TypeExpansionContext context, SILDeclRef constant,
     TypeConverter::LoweredFormalTypes bridgedTypes) {
-  if (constant.isForeignReferenceInitializer())
+  if (constant.isCXXForeignReferenceInitializer())
     return getSILFunctionTypeForForeignReferenceInitializer(TC, context,
                                                             constant);
 
@@ -4938,7 +4968,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
     // A C++ constructor applied to a subclass's storage takes it as `this`.
-    if (c.isForeignReferenceInitializer())
+    if (c.isCXXForeignReferenceInitializer())
       return SILFunctionTypeRepresentation::CXXMethod;
 
     if (const auto *method = getImplementedCXXMethod(c.getDecl())) {
@@ -5253,12 +5283,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
             baseDecl,
             baseParam.getParameterFlags().getOwnershipSpecifier(),
             derivedParam.getParameterFlags().getOwnershipSpecifier()));
-        params.emplace_back(
+        params.push_back(baseParam.getWithoutLabels().withType(
             copyOptionalityFromDerivedToBase(tc,
                                              nullptr,
                                              derivedParam.getPlainType(),
-                                             baseParam.getPlainType()),
-            Identifier(), baseParam.getParameterFlags());
+                                             baseParam.getPlainType())));
       }
 
       SmallVector<FunctionType::Yield, 1> yields;
@@ -5345,7 +5374,7 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
     overrideInterfaceTy = derivedInfo.FormalType;
   }
 
-  if (genericSig && !genericSig->areAllParamsConcrete()) {
+  if (genericSig.isEffectivelyGeneric()) {
     overrideInterfaceTy = cast<AnyFunctionType>(
         GenericFunctionType::get(genericSig, overrideInterfaceTy->getParams(),
                                  overrideInterfaceTy->getYields(),
@@ -5456,7 +5485,7 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
   // The initializing entry point of a C++ foreign reference type's constructor
   // is bridged like that constructor applied to `this`, rather than like the
   // static factory that the initializer was imported from.
-  if (constant.isForeignReferenceInitializer()) {
+  if (constant.isCXXForeignReferenceInitializer()) {
     auto cxxCtor =
         ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
             cast<ConstructorDecl>(bridgedFn));
@@ -5670,6 +5699,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.hasSendingResult())
     extInfo = extInfo.withSendingResult();
 
+  // FIXME: Bring the scopes bound by the curried function types, like
+  // `self`'s access, into the uncurried one.
   auto uncurried = CanAnyFunctionType::get(
       genericSig, llvm::ArrayRef(bridgedParams), llvm::ArrayRef(bridgedYields),
       bridgedResultType, extInfo);

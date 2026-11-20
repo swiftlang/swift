@@ -1657,6 +1657,7 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
     case IsBitwiseTakableAndBorrowable:
       return "_bt";
     }
+    llvm_unreachable("covered switch");
   };
 
   auto layoutVar

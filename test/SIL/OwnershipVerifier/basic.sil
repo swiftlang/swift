@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt %s
-// REQUIRES: asserts
 // XFAIL: *
 
 // Make sure that the ownership verifier is turned on by default

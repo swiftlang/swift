@@ -2572,12 +2572,9 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
           std::optional<uint64_t> maybeDescriptor;
           bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
           if (useMallocTypeDescriptor) {
-            auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
             llvm::SmallVector<SILType> fieldTypes;
-            fieldTypes.push_back(rawPointerType); // metadata pointer
-            fieldTypes.push_back(rawPointerType); // refcount word
-            maybeDescriptor =
-                computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+            maybeDescriptor = computeTypedMallocTypeDescriptor(
+                IGF.IGM, HeapHeaderKind::Swift, fieldTypes);
           }
           IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
           addressInBox =
@@ -2625,12 +2622,10 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
       bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
       std::optional<uint64_t> maybeDescriptor;
       if (useMallocTypeDescriptor) {
-        auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
         llvm::SmallVector<SILType> fieldTypes;
-        fieldTypes.push_back(rawPointerType); // metadata pointer
-        fieldTypes.push_back(rawPointerType); // refcount word
         fieldTypes.push_back(valueType);
-        maybeDescriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+        maybeDescriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, HeapHeaderKind::Swift, fieldTypes);
       }
       IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
       llvm::Value *addressInBox =
@@ -3297,6 +3292,16 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
         Builder.emitBlock(outlineBB);
         {
           ConditionalDominanceScope domScope(IGF);
+
+          // Embedded Swift with -no-allocations never allocates a box, so this
+          // can't be reached, and must not refer to the box release functions,
+          // which are not available in this mode.
+          if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+              IGM.getSILModule().getOptions().NoAllocations) {
+            IGF.emitTrap("destroying a boxed existential with -no-allocations",
+                         /*EmitUnreachable*/ true);
+            return;
+          }
 
           // swift_release(buffer[0])
           auto *referenceAddr =

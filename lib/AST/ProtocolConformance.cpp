@@ -439,10 +439,8 @@ NormalProtocolConformance::getRequiredCodeGenerationModel() const {
 
   // A conformance in a generic context must be @export(implementation) in
   // Embedded Swift.
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (!sig->areAllParamsConcrete() && isEmbedded)
-      return CodeGenerationModel::Implementation;
-  }
+  if (isEmbedded && isEffectivelyGeneric())
+    return CodeGenerationModel::Implementation;
 
   // Synthesized conformances are always @export(implementation).
   if (isSynthesized())
@@ -467,6 +465,10 @@ NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
 
   // Otherwise, apply the module-level default.
   return getDeclContext()->getParentModule()->codeGenerationModel();
+}
+
+bool NormalProtocolConformance::isEffectivelyGeneric() const {
+  return getDeclContext()->isEffectivelyGenericContext();
 }
 
 bool NormalProtocolConformance::isConformanceOfProtocol() const {
@@ -1195,6 +1197,17 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
+    // A missing conformance on a generic parameter might be satisfied by a
+    // more-concrete replacement. Ask the substitution for it.
+    if (kind == BuiltinConformanceKind::Missing &&
+        (origType->isTypeParameter() || origType->is<ArchetypeType>()) &&
+        !substType->isTypeParameter() &&
+        !substType->isTypeVariableOrMember()) {
+      if (auto found = IFS.lookupConformance(origType, getProtocol(),
+                                             /*level=*/0))
+        return found;
+    }
+
     auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
     return ProtocolConformanceRef(concrete);
@@ -1678,6 +1691,7 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
          case ConformanceLookupKind::NonStructural:
            return true;
          }
+         llvm_unreachable("covered switch");
       });
 
   // If we want to add structural conformances, do so now.

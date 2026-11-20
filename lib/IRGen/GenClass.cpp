@@ -881,6 +881,35 @@ irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
+/// The `@_tailAllocated` element types of \p selfType's class, substituted
+/// for \p selfType and lowered like stored properties, with the class's
+/// generic abstraction (the SIL verifier checks that `alloc_ref`'s tail types
+/// agree). Empty if the class has no attribute.
+static SmallVector<SILType, 4> getTailAllocatedElementTypes(IRGenModule &IGM,
+                                                            SILType selfType) {
+  SmallVector<SILType, 4> result;
+  auto *classDecl = selfType.getClassDecl();
+  if (!classDecl)
+    return result;
+  auto [attr, owner] = classDecl->getTailAllocatedAttr();
+  if (!attr || attr->isInvalid())
+    return result;
+  auto subs = selfType.getASTType()
+                  ->getSuperclassForDecl(owner)
+                  ->getContextSubstitutionMap();
+  // Lowered with the class's generic abstraction, as the SIL verifier
+  // requires of the alloc_ref.
+  auto sig = owner->getGenericSignature().getCanonicalSignature();
+  for (Type type : attr->getResolvedTypes(owner)) {
+    if (type->hasError())
+      return {};
+    result.push_back(
+        IGM.getLoweredType(AbstractionPattern(sig, type->getCanonicalType()),
+                           type.subst(subs))
+            .getObjectType());
+  }
+  return result;
+}
 
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
@@ -938,8 +967,14 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     std::tie(size, alignMask)
       = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
-    auto maybeDescriptor =
-        classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+    auto tailElementTypes = getTailAllocatedElementTypes(IGF.IGM, selfType);
+    ASSERT(
+        (tailElementTypes.empty() || TailArrays.empty() ||
+         llvm::equal(tailElementTypes, llvm::make_first_range(TailArrays))) &&
+        "alloc_ref of a class with @_tailAllocated must use its element "
+        "types");
+    auto maybeDescriptor = classLayout.computeTypedMallocTypeDescriptor(
+        IGF.IGM, selfType, tailElementTypes);
 
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
                                   "reference.new");
@@ -1025,9 +1060,9 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
   return IGF.Builder.CreateBitCast(value, IGF.IGM.RefCountedPtrTy);
 }
 
-void irgen::emitClassDeallocation(IRGenFunction &IGF,
-                                  SILType selfType,
-                                  llvm::Value *selfValue) {
+void irgen::emitClassDeallocation(IRGenFunction &IGF, SILType selfType,
+                                  llvm::Value *selfValue,
+                                  TailArraysRef TailArrays) {
   auto *theClass = selfType.getClassDecl();
 
   // We want to deallocate default actors or potential default
@@ -1062,12 +1097,20 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
+  std::tie(size, alignMask) =
+      appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
+
+  auto tailElementTypes = getTailAllocatedElementTypes(IGF.IGM, selfType);
+  ASSERT((tailElementTypes.empty() || !TailArrays.empty()) &&
+         "dealloc_ref of a class with @_tailAllocated must name its tail "
+         "elements");
+
   selfValue = emitCastToHeapObject(IGF, selfValue);
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                              /*forBackwardDeployment=*/false);
-  auto maybeDescriptor =
-      classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+  auto maybeDescriptor = classLayout.computeTypedMallocTypeDescriptor(
+      IGF.IGM, selfType, tailElementTypes);
   emitDeallocateClassInstance(IGF, selfValue, size, alignMask, maybeDescriptor);
 }
 
@@ -3131,7 +3174,13 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
-  assert(!method.getOverridden() && "must always be base method");
+  // The type ID is that of the method that introduces the vtable slot. Usually
+  // that is a method that doesn't override anything, but an override can also
+  // introduce a slot of its own. For example, a public override of an internal
+  // method needs a new slot because clients outside the module can't see the
+  // overridden method's slot (an ABI-incompatible override is another case).
+  assert((!method.getOverridden() || method.requiresNewVTableEntry()) &&
+         "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
   auto mangled = entity.mangleAsString(IGM.Context);

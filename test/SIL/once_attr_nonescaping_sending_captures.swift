@@ -16,6 +16,8 @@ struct NCS: ~Copyable, ~Sendable {
 
 func useValue(_ ns: NS) {}
 
+func sendValue(_ ns: sending NS) {}
+
 func useGeneric<T>(_ t: T) {}
 
 func calledExactlyOnce(_ f: @once () -> Void) { f() }
@@ -53,7 +55,7 @@ func calledExactlyOnceAsync(_ f: @once () async -> Void) async { await f() }
 
 func testSentInsideBodyRemainsSent() async {
   let ns = NS()
-  await calledExactlyOnceAsync { [ns] in // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  await calledExactlyOnceAsync { // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
     await take(ns) // crosses an isolation boundary
   }
   useValue(ns) // expected-note {{access can happen concurrently}}
@@ -71,7 +73,7 @@ func testIndependentCapturesDoNotEntangle() async {
   let ns1 = NS()
   let ns2 = NS()
 
-  await calledExactlyOnceAsync { [ns1, ns2] in // expected-error {{sending 'ns1' risks causing data races}} expected-note {{'ns1' used after being passed as a 'sending' parameter; Later uses could race}}
+  await calledExactlyOnceAsync { // expected-error {{sending 'ns1' risks causing data races}} expected-note {{'ns1' used after being passed as a 'sending' parameter; Later uses could race}}
     await take(ns1)
     useValue(ns2)
   }
@@ -100,11 +102,77 @@ actor A {
 
 func testIsolationCrossingCallAlwaysSends(_ a: A) async {
   let ns = NS()
-  await a.run { [ns] in // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
+  await a.run { // expected-error {{sending 'ns' risks causing data races}} expected-note {{'ns' used after being passed as a 'sending' parameter; Later uses could race}}
     useValue(ns) // never sent
   }
 
   // but `a.run(...)` crosses isolation which also sends `ns`
+  useValue(ns) // expected-note {{access can happen concurrently}}
+}
+
+// A capture that's listed without `sending` isn't inferred to be `sending`,
+// just like in a regular closure.
+func testExplicitCaptureIsNotSent() {
+  let ns = NS()
+  calledExactlyOnce { [ns] in
+    sendValue(ns) // expected-error {{sending 'ns' risks causing data races}}
+    // expected-note@-1 {{'ns' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  }
+
+  calledExactlyOnce { [x = NS()] in
+    sendValue(x) // expected-error {{sending 'x' risks causing data races}}
+    // expected-note@-1 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  }
+}
+
+func testExplicitAndImplicitCaptures() {
+  let ns1 = NS()
+  let ns2 = NS()
+  calledExactlyOnce { [ns1] in // expected-error {{sending 'ns2' risks causing data races}}
+    // expected-note@-1 {{'ns2' used after being passed as a 'sending' parameter; Later uses could race}}
+    sendValue(ns2)
+    useValue(ns1)
+  }
+
+  useValue(ns1) // Ok
+  useValue(ns2) // expected-note {{access can happen concurrently}}
+}
+
+func testExplicitCaptureOfParameter(_ ns: NS) {
+  calledExactlyOnce { [ns] in
+    useValue(ns)
+  }
+
+  useValue(ns) // Ok
+}
+
+// An entry in an outer closure's capture list isn't inferred to be `sending`
+// by an inner closure that captures it implicitly either.
+func testOuterClosureCaptureListEntry() {
+  let ns = NS()
+  calledExactlyOnce { [ns] in
+    calledExactlyOnce {
+      useValue(ns)
+    }
+    useValue(ns)
+  }
+
+  calledExactlyOnce { [ns] in
+    calledExactlyOnce {
+      sendValue(ns) // expected-error {{sending 'ns' risks causing data races}}
+      // expected-note@-1 {{'ns' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+    }
+  }
+}
+
+func testExplicitCaptureIsolationCrossingCall(_ a: A) async {
+  let ns = NS()
+  await a.run { [ns] in // expected-error {{sending value of non-Sendable type}}
+    // expected-note@-1 {{to actor-isolated instance method 'run' risks causing data races between actor-isolated and local nonisolated uses}}
+    useValue(ns)
+  }
+
+  // The send of `ns` with the closure isn't undone after the call.
   useValue(ns) // expected-note {{access can happen concurrently}}
 }
 

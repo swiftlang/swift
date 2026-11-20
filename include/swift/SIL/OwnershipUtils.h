@@ -261,6 +261,7 @@ public:
     PartialApplyStack,
     MarkDependenceNonEscaping,
     BeginAsyncLet,
+    BorrowAccessor,
   };
 
 private:
@@ -286,6 +287,9 @@ public:
     case SILInstructionKind::BranchInst:
       return Kind::Branch;
     case SILInstructionKind::ApplyInst:
+      if (cast<ApplyInst>(i)->hasGuaranteedResult()) {
+        return Kind::BorrowAccessor;
+      }
       return Kind::Apply;
     case SILInstructionKind::TryApplyInst:
       return Kind::TryApply;
@@ -416,6 +420,7 @@ struct BorrowingOperand {
     case BorrowingOperandKind::PartialApplyStack:
     case BorrowingOperandKind::MarkDependenceNonEscaping:
     case BorrowingOperandKind::BeginAsyncLet:
+    case BorrowingOperandKind::BorrowAccessor:
       return false;
     case BorrowingOperandKind::Branch:
       return true;
@@ -484,6 +489,7 @@ public:
     Phi,
     BeginApplyToken,
     DereferenceBorrow,
+    BorrowAccessor,
   };
 
 private:
@@ -523,6 +529,8 @@ public:
       return Kind::Invalid;
     case ValueKind::DereferenceBorrowInst:
       return Kind::DereferenceBorrow;
+    case ValueKind::ApplyInst:
+      return Kind::BorrowAccessor;
     }
        
   }
@@ -546,6 +554,7 @@ public:
     case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::Phi:
     case BorrowedValueKind::BeginApplyToken:
+    case BorrowedValueKind::BorrowAccessor:
       return true;
     case BorrowedValueKind::SILFunctionArgument:
       return false;
@@ -570,7 +579,8 @@ struct InteriorPointerOperand;
 /// introducers.
 ///
 /// Some examples of borrow introducers: guaranteed SILFunctionArgument,
-/// LoadBorrow, BeginBorrow, guaranteed BeginApply results.
+/// LoadBorrow, BeginBorrow, guaranteed BeginApply results, guaranteed borrow
+/// accessor results.
 ///
 /// NOTE: It is assumed that if a borrow introducer is a value of a
 /// SILInstruction with multiple results, that the all of the SILInstruction's
@@ -807,6 +817,18 @@ inline AddressUseKind findTransitiveUsesForAddress(
         return true;
       }
 
+      // Like a load_borrow, a borrow accessor borrows the memory location of
+      // an @in_guaranteed self over the scope of its result.
+      if (auto *ai = dyn_cast<ApplyInst>(use->getUser())) {
+        if (use == ai->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+          foundUses->push_back(use);
+          if (!findInnerTransitiveGuaranteedUses(ai, foundUses)) {
+            meet(AddressUseKind::PointerEscape);
+          }
+          return true;
+        }
+      }
+
       // If we have a begin_apply, we want to use the token results if we have
       // any. If it doesn't have any token results, we just make our use the
       // begin_apply use itself below.
@@ -842,6 +864,8 @@ public:
     OpenExistentialBox,
     ProjectBox,
     MarkDependenceNonEscaping,
+    // The object self of a borrow or mutate accessor with an address result.
+    BorrowMutateAccessor,
   };
 
 private:
@@ -876,6 +900,12 @@ public:
                  ? Kind::MarkDependenceNonEscaping
                  : Kind::Invalid;
     }
+    case SILInstructionKind::ApplyInst: {
+      auto *ai = cast<ApplyInst>(use->getUser());
+      return ai->getSelfObjectOfAddressBorrowMutateAccessorResult() == use
+                 ? Kind::BorrowMutateAccessor
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -898,6 +928,12 @@ public:
       auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
       return mdi->isNonEscaping() && mdi->getType().isAddress()
                  ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
+    case ValueKind::ApplyInst: {
+      auto *ai = cast<ApplyInst>(value);
+      return ai->getSelfObjectOfAddressBorrowMutateAccessorResult()
+                 ? Kind::BorrowMutateAccessor
                  : Kind::Invalid;
     }
     }
@@ -966,6 +1002,11 @@ struct InteriorPointerOperand {
       return InteriorPointerOperand(
           &mdi->getAllOperands()[MarkDependenceInst::Base], kind);
     }
+    case InteriorPointerOperandKind::BorrowMutateAccessor: {
+      auto *ai = cast<ApplyInst>(resultValue);
+      return InteriorPointerOperand(
+          ai->getSelfObjectOfAddressBorrowMutateAccessorResult(), kind);
+    }
     }
     llvm_unreachable("covered switch");
   }
@@ -1005,6 +1046,8 @@ struct InteriorPointerOperand {
       return cast<ProjectBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::MarkDependenceNonEscaping:
       return cast<MarkDependenceInst>(operand->getUser());
+    case InteriorPointerOperandKind::BorrowMutateAccessor:
+      return cast<ApplyInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }

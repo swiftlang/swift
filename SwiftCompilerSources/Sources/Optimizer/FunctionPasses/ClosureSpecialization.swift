@@ -71,6 +71,17 @@ func runClosureSpecialization(function: Function, isRootInvocation: Bool, contex
   repeat {
     var changed = false
 
+    // Keep differentiable_function specialization logic in closure-specialization pass rather than in autodiff-closure-specialization
+    // pass since ordering of the latter pass does not allow for full specialization in some cases. See test8 in
+    // test/AutoDiff/validation-test/differentiable_function_specialization.swift
+    for inst in function.instructions {
+      if let apply = inst as? FullApplySite {
+        if trySpecializeDifferentiableFunction(apply: apply, isRootInvocation: isRootInvocation, context) {
+          changed = true
+        }
+      }
+    }
+
     for inst in function.instructions {
       if let apply = inst as? FullApplySite {
         if trySpecialize(apply: apply, isRootInvocation: isRootInvocation, context) {
@@ -251,9 +262,11 @@ private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: 
 
   specialization.unUniqueCaptureArguments(context)
 
+  let closureArgumentValues = specialization.closureArguments.map { $0.0.value }
+
   specialization.rewriteApply(for: specializedFunction, context)
 
-  specialization.deleteDeadClosures(context)
+  specialization.deleteDeadClosures(passedAs: closureArgumentValues, context)
 
   if isNewFunction && isRootInvocation {
     /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
@@ -328,6 +341,31 @@ private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: 
   return true
 }
 
+private func trySpecializeDifferentiableFunction(apply: ApplySite, isRootInvocation: Bool, _ context: FunctionPassContext) -> Bool {
+  guard isCalleeSpecializable(of: apply),
+        let (specialization, argumentManglings) = analyzeDifferentiableFunctionArguments(of: apply, context)
+  else {
+    return false
+  }
+
+  let specializedParameters = specialization.getSpecializedParameters()
+  let name = context.mangle(withDifferentiableFunctionArguments: argumentManglings,
+                            from: apply.referencedFunction!)
+  let (specializedFunction, isNewFunction) = specialization.getOrCreateSpecializedFunction(
+    specializedParameters, context, named: name)
+
+  specialization.rewriteApply(for: specializedFunction, context)
+
+  if isNewFunction && isRootInvocation {
+    context.buildSpecializedFunction(specializedFunction: specializedFunction) {
+      (specializedFunction, specializedContext) in
+      runClosureSpecialization(function: specializedFunction, isRootInvocation: false, context: specializedContext)
+    }
+  }
+
+  return true
+}
+
 private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
   if let callee = apply.referencedFunction,
      callee.isDefinition,
@@ -353,7 +391,21 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
      !callee.mayBindDynamicSelf,
 
      // Don't support self-recursive functions because that would result in duplicate mapping of values when cloning.
-     callee != apply.parentFunction
+     callee != apply.parentFunction,
+
+     // Avoid an infinite specialization loop: if a closure is called and also captured in another
+     // closure which is passed to a recursive call, each specialization of the callee contains a call
+     // which can be specialized again, with even more propagated closures. E.g.
+     //
+     //   func foo(_ c: @escaping () -> ()) {
+     //     c()
+     //     foo({ c() })
+     //   }
+     //
+     // Note that specializing nested closures in multiple rounds legitimately creates closure
+     // specializations of closure specializations, e.g. three levels in closure_specialization_nested.sil.
+     // A limit of 2 for the callee is good enough and will not be exceeded in "regular" optimization scenarios.
+     callee.closureSpecializationLevel <= 2
   {
     return true
   }
@@ -375,7 +427,10 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
        // Ok, we know that we can perform the optimization but not whether or not the optimization
        // is profitable. Check if the closure is actually called in the callee (or in a function
        // called by the callee). This opens optimization opportunities, like inlining.
-       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
+       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!),
+       // Specializing must not leave a trapping destroy behind, or move a capture that
+       // another use still needs.
+       isOnlyForwarded(to: argOp, from: closure)
     {
       argumentsToSpecialize.append((argOp, closure))
       capturedDependencies.append(contentsOf: argumentDependencies)
@@ -393,6 +448,28 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
                             capturedDependencies: capturedDependencies)
 }
 
+private func analyzeDifferentiableFunctionArguments(of apply: ApplySite, _ context: FunctionPassContext)
+  -> (SpecializationInfo, [FunctionPassContext.DifferentiableFunctionArgumentMangling])? {
+  var argumentsToSpecialize = [(Operand, Closure)]()
+  var argumentManglings = [FunctionPassContext.DifferentiableFunctionArgumentMangling]()
+
+  for argOp in apply.argumentOperands {
+    if let functionInfo = findSpecializableDifferentiableFunction(of: argOp.value, context),
+       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
+    {
+      argumentsToSpecialize.append((argOp, functionInfo.function))
+      argumentManglings.append((apply.calleeArgumentIndex(of: argOp)!, functionInfo.function,
+                                functionInfo.originalRoot, functionInfo.jvpRoot, functionInfo.vjpRoot))
+    }
+  }
+  if argumentsToSpecialize.isEmpty {
+    return nil
+  }
+
+  return (SpecializationInfo(apply: apply, closureArguments: argumentsToSpecialize,
+                             rootClosures: [], capturedDependencies: []), argumentManglings)
+}
+
 // Walks down the use-def chain of a function argument, recursively, to find a rootClosure.
 private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet,
                                       _ capturedDependencies: inout [CapturedDependency]) -> Closure? {
@@ -401,12 +478,6 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
   let specializationLevelLimit = 2
 
   switch value {
-  case is ConvertFunctionInst,
-       is ConvertEscapeToNoEscapeInst,
-       is MoveValueInst,
-       is CopyValueInst:
-    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited, &capturedDependencies)
-
   case let mdi as MarkDependenceInst:
     guard mdi.value.type.isNoEscapeFunction, mdi.value.type.isThickFunction else {
       return nil
@@ -491,6 +562,43 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     return tttfi
 
   default:
+    // A conversion of a closure.
+    guard let operand = forwardedClosureOperand(of: value) else {
+      return nil
+    }
+    return findSpecializableClosure(of: operand.value, &visited, &capturedDependencies)
+  }
+}
+
+private func findSpecializableDifferentiableFunction(of value: Value, _ context: FunctionPassContext)
+  -> (function: DifferentiableFunctionInst, originalRoot: ThinToThickFunctionInst,
+      jvpRoot: ThinToThickFunctionInst, vjpRoot: ThinToThickFunctionInst)? {
+  switch value {
+  case is ConvertFunctionInst,
+       is ConvertEscapeToNoEscapeInst,
+       is MoveValueInst,
+       is CopyValueInst:
+    return findSpecializableDifferentiableFunction(of: (value as! UnaryInstruction).operand.value, context)
+
+  case let differentiableFunction as DifferentiableFunctionInst:
+    func findComponentRoot(_ component: DifferentiableFunctionTypeComponent) -> ThinToThickFunctionInst? {
+      guard let value = differentiableFunction.getExtractee(extractee: component) else {
+        return nil
+      }
+      var visited = ValueSet(context)
+      defer { visited.deinitialize() }
+      var capturedDependencies = [CapturedDependency]()
+      return findSpecializableClosure(of: value, &visited, &capturedDependencies) as? ThinToThickFunctionInst
+    }
+    guard let originalRoot = findComponentRoot(.original),
+          let jvpRoot = findComponentRoot(.jvp),
+          let vjpRoot = findComponentRoot(.vjp)
+    else {
+      return nil
+    }
+    return (differentiableFunction, originalRoot, jvpRoot, vjpRoot)
+
+  default:
     return nil
   }
 }
@@ -535,8 +643,14 @@ private struct SpecializationInfo {
   func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
                                       _ context: FunctionPassContext
   ) -> (Function, isNewFunction: Bool) {
-    let specializedFunctionName = getSpecializedFunctionName(context)
+    return getOrCreateSpecializedFunction(
+      specializedParameters, context, named: getSpecializedFunctionName(context))
+  }
 
+  func getOrCreateSpecializedFunction(_ specializedParameters: [ParameterInfo],
+                                      _ context: FunctionPassContext,
+                                      named specializedFunctionName: String
+  ) -> (Function, isNewFunction: Bool) {
     if let existingSpecializedFunction = context.lookupFunction(name: specializedFunctionName) {
       return (existingSpecializedFunction, false)
     }
@@ -836,8 +950,12 @@ private struct SpecializationInfo {
     }
   }
 
-  func deleteDeadClosures(_ context: FunctionPassContext) {
-    for  (_, closure) in closureArguments where !closure.isDeleted {
+  /// `argumentValues` are the values that were passed for `closureArguments`.
+  func deleteDeadClosures(passedAs argumentValues: [Value], _ context: FunctionPassContext) {
+    for ((_, closure), argumentValue) in zip(closureArguments, argumentValues) where !closure.isDeleted {
+      // A nondeinitable closure traps when it's destroyed, so the compensating destroy of the argument
+      // must not survive: move it up to the root closure, which can then be deleted.
+      foldDeadForwardingChain(from: argumentValue, to: closure, context)
       if context.tryDeleteDeadClosure(closure: closure) {
         context.notifyInvalidatedStackNesting()
       }
@@ -866,7 +984,9 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
     case is ConvertFunctionInst,
          is ConvertEscapeToNoEscapeInst,
          is MoveValueInst,
-         is CopyValueInst:
+         is CopyValueInst,
+         is BeginBorrowInst,
+         is DifferentiableFunctionExtractInst:
       if checkRecursivelyIfClosureIsApplied(use.instruction as! SingleValueInstruction, &handledFuncs) {
         return true
       }
@@ -876,7 +996,10 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
         // `pai.isPartialApplyOfThunk` implies that the captured closure (`closure` here) is applied in the thunk.
         // If the thunk closure (`pai` here) is applied by itself as well, the closure captured by
         // the thunk closure also becomes effectively applied transitively.
-        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+        if checkRecursivelyIfClosureIsApplied(pai, &handledFuncs) {
+          return true
+        }
+        continue
       }
 
       guard let callee = pai.referencedFunction,
@@ -898,7 +1021,9 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
         //     %closure2 = partial_apply @wrapper(%closure1)
         //     apply %closure2(%arg1, %arg2)
         //   }
-        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+        if checkRecursivelyIfClosureIsApplied(pai, &handledFuncs) {
+          return true
+        }
       }
 
     case let apply as FullApplySite:
@@ -917,6 +1042,10 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
           return true
         }
       }
+
+    // Assume the closure is applied if its set as a differentiable_function component.
+    case is DifferentiableFunctionInst:
+      return true
 
     default:
       break
@@ -951,12 +1080,7 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
   defer { needDestroy.deinitialize() }
 
   for clonedArg in clonedArguments {
-    if let beginBorrow = clonedArg as? BeginBorrowInst {
-      Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
-        builder.createEndBorrow(of: beginBorrow)
-      }
-      completeLifetime(of: beginBorrow, context)
-    }
+    addMissingEndBorrowsRecursively(value: clonedArg, context)
     findValuesWhichNeedDestroyRecursively(value: clonedArg, needDestroy: &needDestroy)
   }
 
@@ -965,6 +1089,33 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
       builder.createDestroyValue(operand: valueToDestroy)
     }
     completeLifetime(of: valueToDestroy, context)
+  }
+}
+
+/// Adds end_borrows for the begin_borrow which is created for an owned closure argument, but also
+/// for begin_borrows inside the cloned closure value chain. The latter can come from a previous
+/// round of closure specialization, e.g.
+/// ```
+///   %1 = partial_apply %closure
+///   %2 = begin_borrow %1           // created by the previous specialization round
+///   %3 = convert_function %2
+///   apply %function(%3) : (@guaranteed () -> ()) -> ()
+/// ```
+/// The cloner only clones the value chain and not the end_borrows of the begin_borrow.
+///
+/// Inner borrow scopes are visited first so that their end_borrows are inserted before the end_borrows
+/// of outer scopes.
+private func addMissingEndBorrowsRecursively(value: Value, _ context: FunctionPassContext) {
+  if let beginBorrow = value as? BeginBorrowInst, beginBorrow.scopeEndingOperands.isEmpty {
+    Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
+      builder.createEndBorrow(of: beginBorrow)
+    }
+    completeLifetime(of: beginBorrow, context)
+  }
+  if let svi = value as? SingleValueInstruction {
+    for op in svi.operands {
+      addMissingEndBorrowsRecursively(value: op.value, context)
+    }
   }
 }
 
@@ -1042,6 +1193,119 @@ private extension PartialApplyInst {
 
   var allArgumentsCanBeCopied: Bool {
     arguments.allSatisfy { !$0.type.isMoveOnly }
+  }
+}
+
+/// Returns the operand from which `value` forwards a closure, if `value` is a conversion or a
+/// re-abstraction thunk of a closure. `findSpecializableClosure` uses this to look through
+/// conversions, and adds checks of its own for `mark_dependence` and thunks. `isOnlyForwarded` and
+/// `foldDeadForwardingChain` use it to walk the chain that `findSpecializableClosure` found.
+private func forwardedClosureOperand(of value: Value) -> Operand? {
+  switch value {
+  case let conversion as ConvertFunctionInst:
+    return conversion.operand
+  case let conversion as ConvertEscapeToNoEscapeInst:
+    return conversion.operand
+  case let move as MoveValueInst:
+    return move.operand
+  case let copy as CopyValueInst:
+    return copy.operand
+  // In OSSA a closure can be wrapped in a `begin_borrow` before it is passed as a `@guaranteed`
+  // argument to an apply. This is e.g. the case for a closure which is re-created in a
+  // previously specialized function.
+  case let borrow as BeginBorrowInst:
+    return borrow.operand
+  case let mdi as MarkDependenceInst:
+    return mdi.valueOperand
+  case let thunk as PartialApplyInst where thunk.isPartialApplyOfThunk:
+    return thunk.argumentOperands[0]
+  default:
+    return nil
+  }
+}
+
+/// Specializing for a closure argument replaces the argument with a destroy of it, which
+/// `foldDeadForwardingChain` then moves up the chain of conversions and re-abstraction thunks from
+/// `closure` to `argOp`. If the chain contains a nondeinitable closure, or `closure` has a move-only
+/// capture, each noncopyable value in the chain must not have any other use, and the fold must be
+/// able to reach `closure`. Otherwise a nondeinitable closure would be destroyed on the path to the
+/// specialized apply, which traps, or deleted together with a destroy on another path, which skips
+/// a trap. And a move-only capture would be transferred to the specialized apply while another use
+/// still needs it.
+private func isOnlyForwarded(to argOp: Operand, from closure: Closure) -> Bool {
+  var hasNondeinitableClosure = false
+  // True if each noncopyable value in the chain has no other use and the fold can reach `closure`.
+  var canFold = true
+  var use = argOp
+  while true {
+    let value = use.value
+    // The context of a nondeinitable closure traps when it's destroyed.
+    if value is PartialApplyInst, !value.type.isImplicitlyDestroyable(in: value.parentFunction) {
+      hasNondeinitableClosure = true
+    }
+    // A value without ownership is never destroyed.
+    if value.type.isMoveOnly, value.ownership != .none,
+       !use.endsLifetime || !value.uses.ignoreDebugUses.allSatisfy({ $0 == use || $0.isDeadEndDestroy })
+    {
+      canFold = false
+    }
+    if value == closure {
+      break
+    }
+    guard let operand = forwardedClosureOperand(of: value) else {
+      return false
+    }
+    if value.type.isMoveOnly, !canMoveDestroys(to: operand) {
+      canFold = false
+    }
+    use = operand
+  }
+  let hasMoveOnlyCapture = (closure as? PartialApplyInst).map { !$0.allArgumentsCanBeCopied } ?? false
+  return canFold || !(hasNondeinitableClosure || hasMoveOnlyCapture)
+}
+
+/// True if the destroys of the value that `operand`'s instruction forwards can be replaced with
+/// destroys of `operand`'s value, because the instruction consumes it or it has no ownership.
+private func canMoveDestroys(to operand: Operand) -> Bool {
+  operand.endsLifetime || operand.value.ownership == .none
+}
+
+/// Replaces the destroys of each noncopyable value in the chain of conversions and re-abstraction
+/// thunks from `closure` to `value` with destroys of the value it forwards, and deletes it, so that
+/// `closure` can be deleted.
+///
+/// FIXME: This works around `tryDeleteDeadClosure`, which can't look through a `convert_function`
+/// or delete a thunk that captures a noncopyable closure. Teach it to, and remove this
+/// (rdar://192503315).
+///
+/// FIXME: The steps for conversions repeat `tryRemoveForwardingInstruction` in
+/// SimplifyDestroyValue.swift. Share it once it works in any pass and with these instructions.
+private func foldDeadForwardingChain(from value: Value, to closure: Closure, _ context: FunctionPassContext) {
+  var value = value
+  while value != closure, value.type.isMoveOnly,
+        let operand = forwardedClosureOperand(of: value),
+        canMoveDestroys(to: operand),
+        value.uses.ignoreDebugUses.allSatisfy({ $0.instruction is DestroyValueInst })
+  {
+    let forwardedValue = operand.value
+    for destroy in value.uses.users(ofType: DestroyValueInst.self) {
+      // A value without ownership is never destroyed.
+      if forwardedValue.ownership != .none {
+        Builder(before: destroy, context).createDestroyValue(operand: forwardedValue, isDeadEnd: destroy.isDeadEnd)
+      }
+      context.erase(instruction: destroy)
+    }
+    if let thunk = value as? PartialApplyInst, thunk.isOnStack {
+      context.notifyInvalidatedStackNesting()
+    }
+    context.erase(instruction: value.definingInstruction!)
+    value = forwardedValue
+  }
+}
+
+private extension Operand {
+  var isDeadEndDestroy: Bool {
+    (instruction as? DestroyValueInst)?.isDeadEnd ?? false
   }
 }
 

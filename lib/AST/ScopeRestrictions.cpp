@@ -12,20 +12,35 @@
 
 #include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
 void ScopeRef::print(llvm::raw_ostream &os) const {
   switch (getKind()) {
+  case Kind::Error:
+    os << "<<error scope>>";
+    return;
   case Kind::Immortal:
     os << "immortal";
     return;
   case Kind::Param:
     os << "^" << getDepth().Value << "." << getIndex();
+    return;
+  case Kind::Body:
+    os << "^" << getDepth().Value << ".body";
+    return;
+  case Kind::Local:
+    os << "local " << getLocalIndex();
+    return;
+  case Kind::UnresolvedVariable:
+    os << "scopevar " << getUnresolvedVariableIndex();
     return;
   }
   llvm_unreachable("unhandled kind");
@@ -83,11 +98,31 @@ bool swift::hasScopeUnsaturatedType(Type ty) {
 
 Type swift::eraseScopes(Type ty) {
   return ty.transformRec([](TypeBase *t) -> std::optional<Type> {
+    if (auto *fnTy = dyn_cast<AnyFunctionType>(t)) {
+      auto params = fnTy->getParams();
+      if (fnTy->getScopeSignature().empty() &&
+          llvm::all_of(params,
+                       std::mem_fn(&AnyFunctionType::Param::hasBodyAccess)))
+        return std::nullopt;
+      auto erased = llvm::map_to_vector<4>(
+          params, &AnyFunctionType::Param::withBodyAccess);
+      std::optional<AnyFunctionType::ExtInfo> info;
+      if (fnTy->hasExtInfo())
+        info = fnTy->getExtInfo().withScopeSignature(ScopeSignature());
+      Type withoutScopeParams;
+      if (auto *genericFnTy = dyn_cast<GenericFunctionType>(fnTy))
+        withoutScopeParams = GenericFunctionType::get(
+            genericFnTy->getGenericSignature(), erased, fnTy->getYields(),
+            fnTy->getResult(), info);
+      else
+        withoutScopeParams = FunctionType::get(erased, fnTy->getYields(),
+                                               fnTy->getResult(), info);
+      // Erase the scopes within its parameters and result too.
+      return eraseScopes(withoutScopeParams);
+    }
     auto *nominal = dyn_cast<NominalType>(t);
     if (!nominal || !nominal->hasScopeArgs())
       return std::nullopt;
-    return Type(NominalType::get(nominal->getDecl(), nominal->getParent(),
-                                 nominal->getGenericArgs(),
-                                 nominal->getASTContext()));
+    return Type(nominal->withoutScopeArgs());
   });
 }

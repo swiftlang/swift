@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix legacy-
+// RUN: %target-typecheck-verify-swift -enable-lifetime-resolution
 
 struct NC: ~Copyable {}
 
@@ -139,4 +140,60 @@ struct NonCopyable: ~Copyable {
 }
 func f() {
     _ = (Optional<NonCopyable>.none)?.shared
+}
+
+// Conversions of temporaries are not confusing consumes of storage.
+struct Holder: ~Copyable {
+  var stored: NC
+  var storedCarrot: Carrot
+  var computed: NC { NC() }
+  var computedCarrot: Carrot { Carrot() }
+  subscript(_ i: Int) -> NC { NC() }
+
+  consuming func take() -> NC { NC() }
+  borrowing func peek() -> NC { NC() }
+}
+func makeNC() -> NC { NC() }
+func makeCarrot() -> Carrot { Carrot() }
+
+func testTemporaries(_ h: borrowing Holder, _ oh: consuming Holder?) {
+  testBorrowing(makeNC())
+  restockBorrow(makeCarrot())
+
+  testBorrowing(h.computed)
+  restockBorrow(h.computedCarrot)
+  testBorrowing(h[0])
+  testBorrowing(h.peek())
+
+  switch oh?.take() { default: break }
+
+  let orig: Holder? = Holder(stored: NC(), storedCarrot: Carrot())
+  var x = orig?.peek()
+  _ = x
+  x = nil
+}
+
+func testStoredProperties(_ h: consuming Holder) {
+  testBorrowing(h.stored) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                          // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+  restockBorrow(h.storedCarrot) // expected-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                                // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+}
+
+var globalStoredNC = NC()
+var globalComputedNC: NC { NC() }
+
+func testVarDeclRefs() {
+  testBorrowing(globalStoredNC) // expected-error {{implicit conversion to 'NC?' is consuming}}
+                                // expected-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+
+  testBorrowing(globalComputedNC) // expected-legacy-error {{implicit conversion to 'NC?' is consuming}}
+                                  // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+
+  var localComputedNC: NC { NC() }
+  var localComputedCarrot: Carrot { Carrot() }
+  testBorrowing(localComputedNC) // expected-legacy-error {{implicit conversion to 'NC?' is consuming}}
+                                 // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
+  restockBorrow(localComputedCarrot) // expected-legacy-error {{implicit conversion to 'any Veggie & ~Copyable' is consuming}}
+                                     // expected-legacy-note@-1 {{add 'consume' to make consumption explicit}} {{17-17=consume }}
 }

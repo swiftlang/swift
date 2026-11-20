@@ -106,3 +106,17 @@ bb3:
   %8 = tuple ()
   return %8 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership :
+// CHECK:         %2 = unchecked_ownership %1, forwarding: @none
+// CHECK-LABEL: } // end sil function 'unchecked_ownership'
+sil [ossa] @unchecked_ownership : $@convention(thin) (@inout Klass, @owned NonTrivialStruct) -> () {
+bb0(%0 : $*Klass, %1 : @owned $NonTrivialStruct):
+  %2 = unchecked_ownership %1, forwarding: @none
+  %3 = struct_extract %2, #NonTrivialStruct.id
+  destroy_value %1
+  %5 = load_borrow %0, value_hint %3
+  end_borrow %5
+  %r = tuple ()
+  return %r
+}

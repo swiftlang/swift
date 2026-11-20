@@ -27,6 +27,7 @@
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/InstrumentsSupport.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "swift/shims/GlobalObjects.h"
 #include "swift/shims/RuntimeShims.h"
 #include <algorithm>
@@ -671,6 +672,14 @@ HeapObject *swift::swift_nonatomic_retain_n(HeapObject *object, uint32_t n) {
   return object;
 }
 
+/// Publish a release edge to TSan; this allows it to understand
+/// synchronization when CoW occurs, or deinit runs on another thread
+SWIFT_ALWAYS_INLINE
+static void tsanPublishRelease(HeapObject *object) {
+  if (isValidPointerForNativeRetain(object))
+    tsan::release(object);
+}
+
 SWIFT_ALWAYS_INLINE
 static void _swift_release_impl(HeapObject *object, uint32_t *count) {
   if (isValidPointerForNativeRetain(object))
@@ -686,6 +695,7 @@ static void _swift_release_(HeapObject *object) {
 #ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
 SWIFT_REFCOUNT_CC SWIFT_NOINLINE
 static void _swift_release_adapter(HeapObject *object) {
+  tsanPublishRelease(object);
   _swift_release(object);
 }
 #endif
@@ -721,11 +731,25 @@ static void _swift_release_n_(HeapObject *object, uint32_t n) {
     object->refCounts.decrementAndMaybeDeinit(n, nullptr);
 }
 
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+SWIFT_NOINLINE
+static void _swift_release_n_adapter(HeapObject *object, uint32_t n) {
+  tsanPublishRelease(object);
+  _swift_release_n(object, n);
+}
+#endif
+
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
 #ifdef SWIFT_THREADING_NONE
   swift_nonatomic_release_n(object, n);
 #else
-  CALL_IMPL(swift_release_n, (object, n));
+#ifdef SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+  if (SWIFT_UNLIKELY(
+          _swift_enableSwizzlingOfAllocationAndRefCountingFunctions_forInstrumentsOnly
+              .load(std::memory_order_relaxed)))
+    return _swift_release_n_adapter(object, n);
+#endif
+  return _swift_release_n_(object, n);
 #endif
 }
 
@@ -995,10 +1019,9 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 
     swift::fatalError(0,
                       "Object %p of class %s deallocated with non-zero retain "
-                      "count %zd. This object's deinit, or something called "
-                      "from it, may have created a strong reference to self "
-                      "which outlived deinit, resulting in a dangling "
-                      "reference.\n",
+                      "count %zd. Possible unsafe concurrent access to stored "
+                      "property containing this object, or escape of self from "
+                      "its deinit.\n",
                       object,
                       descriptor ? descriptor->Name.get() : "<unknown>",
                       retainCount);

@@ -50,3 +50,22 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %r = tuple ()
   return %r : $()
 }
+
+class Base {}
+class Derived : Base {}
+
+// CHECK-LABEL: sil [ossa] @diagnose_missing_super_init : $@convention(thin) (@owned Derived) -> () {
+// CHECK: [[SELF:%.*]] = mark_uninitialized [derivedself]
+// CHECK: diagnose [missing_super_init] [[SELF]] : $*Derived
+// CHECK: } // end sil function 'diagnose_missing_super_init'
+sil [ossa] @diagnose_missing_super_init : $@convention(thin) (@owned Derived) -> () {
+bb0(%0 : @owned $Derived):
+  %1 = alloc_stack $Derived
+  %2 = mark_uninitialized [derivedself] %1 : $*Derived
+  store %0 to [init] %2 : $*Derived
+  diagnose [missing_super_init] %2 : $*Derived
+  destroy_addr %2 : $*Derived
+  dealloc_stack %1 : $*Derived
+  %r = tuple ()
+  return %r : $()
+}

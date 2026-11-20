@@ -118,7 +118,7 @@ PASS(RemoveSILGenLifetimes, "remove-silgen-lifetimes",
      "Remove SILGen's lifetimes in preparation for LifetimeResolution")
 PASS(LifetimeResolution, "lifetime-resolution",
      "Resolve lifetimes based on uses")
-PASS(LifetimeResolutionDiagnose, "lifetime-resolution-diagnose",
+PASS(DiagnoseResolvedLifetimes, "diagnose-resolved-lifetimes",
      "Diagnose lifetime violations based on resolved lifetimes")
 PASS(MergeBorrowScopes, "merge-borrow-scopes",
      "Merge borrow scopes")
@@ -179,11 +179,14 @@ PASS(MandatoryDeadObjectElimination, "mandatory-dead-object-elimination",
      "Removes dead stack allocations")
 PASS(TrivialOwnershipElimination, "trivial-ownership-elimination",
      "Eliminates ownership markers from trivial values")
-
+PASS(LowerAddressInstructions, "lower-address-instructions",
+     "Lowers address instructions")
 PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
+PASS(Verifier, "verifier",
+     "Run the mandatory verification on all OSSA functions, even without assertions")
 
 MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
      "Mandatory stack promotion of box objects")
@@ -205,6 +208,8 @@ MODULE_PASS(WitnessTableSpecialization, "witness-table-specialization",
      "Creates specialized witness tables for existentials of specialized generic types")
 MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
      "Diagnose violations of Embedded Swift language restrictions")
+MODULE_PASS(FunctionSignatureOptimization, "function-signature-optimization",
+     "Change parameter conventions of functions")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
@@ -448,8 +453,6 @@ LEGACY_PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 LEGACY_PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
-LEGACY_PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
-     "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
 LEGACY_PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 LEGACY_PASS(SerializeSILPass, "serialize-sil",

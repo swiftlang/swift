@@ -93,6 +93,7 @@ DependencyKey::Builder DependencyKey::Builder::fromReference(
     return Builder{kind, aspect, nullptr, ref.name.userFacingName()}
         .withContext(ref.subject->getAsDecl());
   }
+  llvm_unreachable("covered switch");
 }
 
 DependencyKey::Builder DependencyKey::Builder::withContext(const Decl *D) && {
@@ -117,6 +118,7 @@ DependencyKey::Builder DependencyKey::Builder::withContext(const Decl *D) && {
   case NodeKind::kindCount:
     llvm_unreachable("saw count!");
   }
+  llvm_unreachable("covered switch");
 }
 
 DependencyKey::Builder DependencyKey::Builder::withContext(
@@ -150,6 +152,7 @@ DependencyKey::Builder DependencyKey::Builder::withName(const Decl *decl) && {
   case NodeKind::kindCount:
     llvm_unreachable("saw count!");
   }
+  llvm_unreachable("covered switch");
 }
 
 DependencyKey::Builder DependencyKey::Builder::withName(
@@ -515,6 +518,7 @@ private:
     case ReferenceKind::Tombstone:
       llvm_unreachable("Found invalid reference kind!");
     }
+    llvm_unreachable("covered switch");
   }
 };
 } // end namespace

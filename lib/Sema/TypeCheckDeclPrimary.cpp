@@ -1954,78 +1954,6 @@ static void checkBackDeployedType(NominalTypeDecl *NTD) {
   }
 }
 
-/// Diagnose conformances of a back-deployed type, declared outside of the
-/// type's defining module, that are available where this module emits its
-/// own copy of the type.
-///
-/// When the type's defining module provides the type at runtime, its metadata
-/// is canonical, and the runtime does not consider conformances declared for
-/// a copy of the type to apply to it.
-static void diagnoseBackDeployedTypeConformances(ExtensionDecl *ext) {
-  auto *nominal = ext->getExtendedNominal();
-  if (!nominal || !(isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)))
-    return;
-
-  if (nominal->getParentModule() == ext->getParentModule() ||
-      !nominal->isBackDeployed())
-    return;
-
-  auto &ctx = ext->getASTContext();
-  if (ctx.LangOpts.DisableAvailabilityChecking)
-    return;
-
-  // Conformances that are only available once the defining module provides
-  // the type are fine, on the primary target and on any target variant.
-  std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
-      attrAndRange;
-  for (bool forTargetVariant : {false, true}) {
-    if (forTargetVariant && !ctx.LangOpts.TargetVariant)
-      continue;
-
-    auto targetAttrAndRange =
-        nominal->getBackDeployedAttrAndRange(forTargetVariant);
-    if (!targetAttrAndRange)
-      continue;
-
-    auto deploymentRange =
-        forTargetVariant
-            ? AvailabilityRange(getVersionForTriple(*ctx.LangOpts.TargetVariant))
-            : AvailabilityRange::forDeploymentTarget(ctx);
-    if (deploymentRange.isContainedIn(targetAttrAndRange->second) ||
-        ext->isOnlyAvailableWithinBackDeployedRange(targetAttrAndRange->second,
-                                                    forTargetVariant))
-      continue;
-
-    attrAndRange = targetAttrAndRange;
-    break;
-  }
-  if (!attrAndRange)
-    return;
-
-  auto *attr = attrAndRange->first;
-  auto domainAndRange = attr->getAvailabilityDomain().getRemappedDomainAndRange(
-      attr->getVersion(), AvailabilityVersionKind::Introduced, ctx);
-  auto type = nominal->getDeclaredInterfaceType();
-  for (auto *conformance : ext->getLocalConformances()) {
-    // An implied conformance is diagnosed with the one that implies it.
-    if (conformance->getSourceKind() == ConformanceEntryKind::Implied)
-      continue;
-
-    // Marker protocols have no conformance records, and non-resilient
-    // protocols cannot be used by clients deploying to older OSes.
-    auto *proto = conformance->getProtocol();
-    if (proto->isMarkerProtocol() || !proto->isResilient())
-      continue;
-
-    ext->diagnose(diag::conformance_back_deployed_type_availability, type,
-                  proto, domainAndRange.getDomain(), domainAndRange.getRange());
-    ext->diagnose(diag::conformance_back_deployed_type_availability_note, type,
-                  domainAndRange.getDomain(), domainAndRange.getRange(),
-                  nominal->getParentModule());
-    fixAvailability(ext->getSourceRange(), ext, domainAndRange, ctx);
-  }
-}
-
 static void diagnoseRetroactiveConformances(
     ExtensionDecl *ext, DiagnosticEngine &diags) {
   ModuleDecl *module = ext->getParentModule();
@@ -2492,6 +2420,7 @@ public:
     DeclVisitor<DeclChecker>::visit(decl);
 
     TypeChecker::checkExistentialTypes(decl);
+    diagnoseUnusableForeignTypesInDecl(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       TypeChecker::checkForForbiddenPrefix(Ctx, VD->getBaseName());
@@ -2550,13 +2479,8 @@ public:
             ExpandExtensionMacros{nominal},
             { });
 
-        // If strict memory safety checking is enabled, check the storage
-        // of the nominal type.
-        if (Ctx.LangOpts.hasFeature(
-                Feature::StrictMemorySafety, /*allowMigration=*/true) &&
-            !isa<ProtocolDecl>(nominal)) {
+        if (!isa<ProtocolDecl>(nominal))
           checkUnsafeStorage(nominal);
-        }
       }
     }
   }
@@ -2638,7 +2562,6 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
         ID->getExplicitSafety() != ExplicitSafety::Unsafe) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
@@ -2850,8 +2773,7 @@ public:
         // occur once per instantiation, which we don't yet handle.
         if (DC->getExtendedProtocolDecl()) {
           unimplementedStatic(ProtocolExtensions);
-        } else if (DC->isGenericContext()
-               && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
+        } else if (DC->isEffectivelyGenericContext()) {
           unimplementedStatic(GenericTypes);
         } else if (DC->getSelfClassDecl()) {
           auto StaticSpelling = PBD->getStaticSpelling();
@@ -3761,6 +3683,8 @@ public:
       visit(Member);
     }
 
+    TypeChecker::checkTailAllocatedCounts(CD);
+
     // If this class requires all of its stored properties to have
     // in-class initializers, diagnose this now.
     if (CD->requiresStoredPropertyInits())
@@ -4016,6 +3940,8 @@ public:
       TypeChecker::checkParameterList(FD->getParameters(), FD);
       TypeChecker::checkYieldList(FD->getYields(), FD);
     }
+
+    checkScopedSignature(FD);
 
     checkDeclCommon(FD);
 
@@ -4396,7 +4322,6 @@ public:
     checkInheritanceClause(ED);
 
     diagnoseRetroactiveConformances(ED, Ctx.Diags);
-    diagnoseBackDeployedTypeConformances(ED);
 
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
@@ -4470,6 +4395,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+    checkScopedSignature(CD);
 
     checkEmbeddedRestrictionsInSignature(CD);
 

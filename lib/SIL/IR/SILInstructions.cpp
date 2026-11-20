@@ -227,8 +227,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(0,
-                                 Var ? Var->Type.has_value() : false,
+      SILDebugVariableSupplement(0, false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
       // Initialize VarInfo with a temporary raw value of 0. The real
@@ -246,7 +245,7 @@ AllocStackInst::AllocStackInst(
   // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
   // addresses are wrong.
   VarInfo = TailAllocatedDebugVariable(
-      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      Var, getTrailingObjects<char>(), nullptr,
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
       nullptr);
@@ -271,8 +270,9 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Loc = {};
     if (Var->Scope == Loc.getScope())
       Var->Scope = nullptr;
-    if (Var->Type == elementType)
-      Var->Type = {};
+    ASSERT((!Var->Type || Var->Type == elementType.getObjectType()) &&
+           "alloc_stack cannot have a vartype != element type");
+    Var->Type = {};
     if (Var->DIExpr) {
       // alloc_stack cannot carry a DIExpression.
       // Strip a single implied op_deref. Anything else is an error.
@@ -380,6 +380,21 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
   return ::new (Buffer)
       AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, isNested,
                           ElementTypes, AllOperands);
+}
+
+DeallocRefInst *
+DeallocRefInst::create(SILDebugLocation DebugLoc, SILFunction &F,
+                       SILValue Operand, ArrayRef<SILType> ElementTypes,
+                       ArrayRef<SILValue> ElementCountOperands) {
+  assert(ElementTypes.size() == ElementCountOperands.size());
+  SmallVector<SILValue, 8> AllOperands;
+  AllOperands.push_back(Operand);
+  AllOperands.append(ElementCountOperands.begin(), ElementCountOperands.end());
+  collectTypeDependentOperands(AllOperands, F, ElementTypes);
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(DeallocRefInst));
+  return ::new (Buffer) DeallocRefInst(DebugLoc, AllOperands, ElementTypes);
 }
 
 bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
@@ -1115,6 +1130,16 @@ PartialApplyInst::PartialApplyInst(
                       TypeDependentOperands, ArgLocs, SpecializationInfo,
                       ClosureType) {
   sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
+}
+
+bool PartialApplyInst::contextBorrowsArgument(const Operand &argOp) const {
+  if (!isOnStack() || argOp.get()->getType().isAddress())
+    return false;
+  if (!isNoncopyable())
+    return true;
+  return !ApplySite(const_cast<PartialApplyInst *>(this))
+              .getArgumentConvention(argOp)
+              .isOwnedConventionInCaller();
 }
 
 PartialApplyInst *PartialApplyInst::create(
@@ -4112,7 +4137,8 @@ ReturnBorrowInst *ReturnBorrowInst::create(SILDebugLocation DebugLoc,
 ReturnBorrowInst::ReturnBorrowInst(SILDebugLocation DebugLoc,
                                    ArrayRef<SILValue> operands)
     : InstructionBaseWithTrailingOperands(operands, DebugLoc) {
-  assert(operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(operands[0]->getType().isAddress() ||
+         operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
 }
 
 // This may be called in an invalid SIL state. SILCombine creates new

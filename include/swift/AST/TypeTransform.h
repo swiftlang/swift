@@ -792,6 +792,7 @@ case TypeKind::Id:
         auto label = param.getLabel();
         auto flags = param.getParameterFlags();
         auto internalLabel = param.getInternalLabel();
+        auto accessScope = param.getAccessScope();
 
         TypePosition paramPos = pos.flipped();
         if (param.isInOut())
@@ -819,15 +820,16 @@ case TypeKind::Id:
           for (auto substEltType : substPack->getElementTypes()) {
             if (first) {
               substParams.emplace_back(substEltType, label, flags,
-                                       internalLabel);
+                                       internalLabel, accessScope);
               first = false;
             } else {
               substParams.emplace_back(substEltType, Identifier(), flags,
-                                       Identifier());
+                                       Identifier(), accessScope);
             }
           }
         } else {
-          substParams.emplace_back(substType, label, flags, internalLabel);
+          substParams.emplace_back(substType, label, flags, internalLabel,
+                                   accessScope);
         }
       }
 

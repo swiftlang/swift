@@ -28,6 +28,7 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -372,7 +373,7 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   }
 
 
-  if (Subs.hasAnySubstitutableParams() &&
+  if (Subs.isEffectivelyGeneric() &&
       Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
     return true;
 
@@ -381,15 +382,17 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
-  // The `self` parameter of a borrow accessor with an indirect return
-  // cannot be promoted, since the returned address might point into the
-  // parameter.
+  // The `self` parameter of a borrow accessor cannot be promoted, since the
+  // returned address might point into the parameter, or the returned value
+  // might borrow from the parameter's memory location.
   //
   // TODO: It may be possible to promote `self` and the result if and only
   // if both the parameter and result do or do not get promoted in unison.
   if (substType->getNumResults() == 1
-      && substType->getSingleResult().getConvention()
-           == ResultConvention::GuaranteedAddress
+      && (substType->getSingleResult().getConvention()
+            == ResultConvention::GuaranteedAddress
+          || substType->getSingleResult().getConvention()
+            == ResultConvention::Guaranteed)
       && substType->getSelfParameterIndex() == paramIdx) {
     return false;
   }
@@ -481,7 +484,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         bool isMandatory,
                                         OptRemark::Emitter *ORE) {
-  assert(ParamSubs.hasAnySubstitutableParams());
+  assert(ParamSubs.isEffectivelyGeneric());
 
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
@@ -891,8 +894,7 @@ CanSILFunctionType
 ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
-  if ((SpecializedGenericSig &&
-       SpecializedGenericSig->areAllParamsConcrete()) ||
+  if (!SpecializedGenericSig.isEffectivelyGeneric() ||
       !HasUnboundGenericParams) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
@@ -1953,8 +1955,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
     CalleeParamSubMap = CallerParamSubMap;
   }
 
-  HasUnboundGenericParams =
-      SpecializedGenericSig && !SpecializedGenericSig->areAllParamsConcrete();
+  HasUnboundGenericParams = SpecializedGenericSig.isEffectivelyGeneric();
 
   createSubstitutedAndSpecializedTypes();
 
@@ -2378,7 +2379,7 @@ static SILFunction *specializeAccessorThunk(SILFunction *thunk,
 
 bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
   SubstitutionMap subs = kpi->getSubstitutions();
-  if (!subs.hasAnySubstitutableParams())
+  if (!subs.isEffectivelyGeneric())
     return false;
   // Partial specialization would leave generic thunks behind, which is exactly
   // what we're trying to avoid.
@@ -2627,6 +2628,34 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   return true;
 }
 
+/// Fixes up the uses of \p closure, which replaced a closure of type
+/// \p oldType, and of its copies: kills the operands of debug uses whose
+/// variable type can't follow the new type, and replaces each copy, which still
+/// has the old type, with a copy that has the new type.
+///
+/// No other uses need fixing up. trySpecializeApplyOfGeneric only lets a
+/// partial_apply change type if each use, through copies, is an apply of the
+/// partial_apply itself or a re-abstraction, which the caller replaces, or a
+/// use that doesn't depend on the type, such as a destroy_value. Any other use,
+/// such as a return or an apply that takes a copy, gets a thunk that keeps the
+/// old type instead.
+static void fixUpUsesOfRetypedClosure(SILValue closure, SILType oldType) {
+  SmallVector<Operand *, 8> uses(closure->getUses());
+  for (Operand *use : uses) {
+    SILInstruction *user = use->getUser();
+    if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
+      if (!dvi->varTypeFollowsOperand())
+        dvi->killOperand(use->getOperandNumber(), oldType);
+    } else if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+      auto *newCVI =
+          SILBuilderWithScope(cvi).createCopyValue(cvi->getLoc(), closure);
+      cvi->replaceAllUsesWith(newCVI);
+      cvi->eraseFromParent();
+      fixUpUsesOfRetypedClosure(newCVI, oldType);
+    }
+  }
+}
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite
@@ -2800,6 +2829,10 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
         pai->getResultIsolation(), pai->getExecutionSemantics(),
         pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
+    // The specialized closure can have different conventions, such as a direct
+    // result instead of an indirect one.
+    if (newPAI->getType() != pai->getType())
+      fixUpUsesOfRetypedClosure(newPAI, pai->getType());
     return newPAI;
   }
   }
@@ -2993,7 +3026,7 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
     assert(VoidTy.isVoid());
     returnValue = Builder.createTuple(Loc, VoidTy, {});
   }
-  Builder.createReturn(Loc, returnValue);
+  createThunkReturn(Builder, Loc, returnValue);
 
   return as;
 }
@@ -3600,6 +3633,9 @@ void swift::trySpecializeApplyOfGeneric(
       if (FAS && FAS.getCallee() == PAI)
         continue;
 
+      // FIXME: Only a re-abstraction of the partial_apply itself is replaced
+      // below, not a re-abstraction of a copy, which then captures a closure of
+      // the new type.
       auto *PAIUser = dyn_cast<PartialApplyInst>(User);
       if (PAIUser && isPartialApplyOfReabstractionThunk(PAIUser)) {
         CanSILFunctionType NewPAType =

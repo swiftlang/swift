@@ -49,16 +49,16 @@ import CxxStdlib
 
 func use() {
   let cw = CWrapper()
-  _ = cw.items.__beginUnsafe()
-  _ = cw.items.__endUnsafe()
+  _ = cw.items.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+  _ = cw.items.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
   _ = cw.items.begin() // expected-error {{must be marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
   _ = cw.items.end() // expected-error {{must be marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'end()'}}
 
   let vw = VWrapper()
-  _ = vw.items.__beginUnsafe()
-  _ = vw.items.__endUnsafe()
+  _ = vw.items.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+  _ = vw.items.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
   _ = vw.items.begin() // expected-error {{must be marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
   _ = vw.items.end() // expected-error {{must be marked with 'unsafe'}}

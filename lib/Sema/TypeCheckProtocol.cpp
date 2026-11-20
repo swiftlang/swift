@@ -1712,15 +1712,24 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
       contextMayExpandOperator(DC, req->getName().getBaseName());
 
   if (doUnqualifiedLookup) {
-    auto lookup = TypeChecker::lookupUnqualified(DC->getModuleScopeContext(),
-                                                 reqBaseName, SourceLoc(),
-                                                 defaultUnqualifiedLookupOptions);
+    // Filter out operators that can't witness the requirement for the
+    // conforming type during lookup, which avoids computing shadowing across
+    // every visible overload of the operator. Protocol members can't be
+    // witnesses, but they can shadow other candidates, so they are only
+    // dropped after lookup.
+    auto selfTy = DC->getSelfInterfaceType();
+    auto lookup = TypeChecker::lookupUnqualified(
+        DC->getModuleScopeContext(), reqBaseName, SourceLoc(),
+        defaultUnqualifiedLookupOptions, [selfTy](ValueDecl *decl) {
+          if (isa<ProtocolDecl>(decl->getDeclContext()))
+            return true;
+          auto *func = dyn_cast<FuncDecl>(decl);
+          return func && swift::isMemberOperator(func, selfTy);
+        });
     for (auto candidate : lookup) {
       auto decl = candidate.getValueDecl();
-      if (!isa<ProtocolDecl>(decl->getDeclContext()) &&
-          swift::isMemberOperator(cast<FuncDecl>(decl), DC->getSelfInterfaceType())) {
+      if (!isa<ProtocolDecl>(decl->getDeclContext()))
         witnesses.push_back(decl);
-      }
     }
   }
 
@@ -2895,11 +2904,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     conformance->resolveValueWitnesses();
   }
 
-  // If we're enforcing strict memory safety and this conformance hasn't
-  // opted out, look for safe/unsafe witness mismatches.
-  if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified &&
-      Context.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                                  /*allowMigration=*/true)) {
+  // If this conformance hasn't opted out, look for safe/unsafe witness
+  // mismatches.
+  if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified) {
     // Collect all of the unsafe uses for this conformance.
     SmallVector<UnsafeUse, 2> unsafeUses;
     for (auto requirement: Proto->getMembers()) {

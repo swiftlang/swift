@@ -416,4 +416,72 @@ bb3(%8 : @owned $C):
   return %8
 }
 
+// CHECK-LABEL: sil [ossa] @sink_load_over_enum_within_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load_borrow [[A]]
+// CHECK-NEXT:    switch_enum [[L]]
+// CHECK:       } // end sil function 'sink_load_over_enum_within_access_scope'
+sil [ossa] @sink_load_over_enum_within_access_scope : $@convention(thin) (@inout Optional<C>) -> @owned C {
+bb0(%0 : $*Optional<C>):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 
+bb1:
+  end_access %1
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  end_access %1
+  return %7
+}
+
+// A load_borrow would outlive the access scope it loads from.
+// CHECK-LABEL: sil [ossa] @sink_load_over_enum_after_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       bb2([[P:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[P]]
+// CHECK:       } // end sil function 'sink_load_over_enum_after_access_scope'
+sil [ossa] @sink_load_over_enum_after_access_scope : $@convention(thin) (@inout Optional<C>) -> @owned C {
+bb0(%0 : $*Optional<C>):
+  %1 = begin_access [read] [static] %0
+  %2 = load [copy] %1
+  end_access %1
+  switch_enum %2, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %4 = integer_literal $Builtin.Int1, -1
+  cond_fail %4, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%7 : @owned $C):
+  return %7
+}
+
+// The access scope must be found through a mark_dependence.
+// CHECK-LABEL: sil [ossa] @sink_load_through_mark_dependence_after_access_scope :
+// CHECK:         [[A:%.*]] = begin_access [read] [static] %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [nonescaping] [[A]]
+// CHECK-NEXT:    load [copy] [[MD]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:       } // end sil function 'sink_load_through_mark_dependence_after_access_scope'
+sil [ossa] @sink_load_through_mark_dependence_after_access_scope : $@convention(thin) (@inout Optional<C>, @guaranteed C) -> @owned C {
+bb0(%0 : $*Optional<C>, %1 : @guaranteed $C):
+  %2 = begin_access [read] [static] %0
+  %3 = mark_dependence [nonescaping] %2 on %1
+  %4 = load [copy] %3
+  end_access %2
+  switch_enum %4, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  %7 = integer_literal $Builtin.Int1, -1
+  cond_fail %7, "Unexpectedly found nil while unwrapping an Optional value"
+  unreachable
+
+bb2(%10 : @owned $C):
+  return %10
+}

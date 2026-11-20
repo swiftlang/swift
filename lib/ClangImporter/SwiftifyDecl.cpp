@@ -94,18 +94,75 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+static clang::QualType getStdSpanElementType(clang::QualType clangType) {
+  ASSERT(isStdSpanType(clangType));
+  auto *decl = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+      clangType->getAsCXXRecordDecl());
+  return decl ? decl->getTemplateArgs()[0].getAsType() : clang::QualType();
+}
+
+/// Returns the index of the Swift parameter that the clang parameter at
+/// \p clangIndex was imported as, or std::nullopt if it was imported as `self`.
+static std::optional<size_t>
+getSwiftParamIndex(const AbstractFunctionDecl *MappedDecl, size_t clangIndex) {
+  if (!MappedDecl->isImportAsInstanceMember())
+    return clangIndex;
+  size_t selfIndex = MappedDecl->getSelfIndex();
+  if (clangIndex == selfIndex)
+    return std::nullopt;
+  return clangIndex < selfIndex ? clangIndex : clangIndex - 1;
+}
+
+/// Returns the Swift type that \p clangParam was imported as, which is the type
+/// of `self` if it was imported as `self`.
+static Type getImportedParamType(const AbstractFunctionDecl *MappedDecl,
+                                 const clang::ParmVarDecl *clangParam) {
+  std::optional<size_t> index =
+      getSwiftParamIndex(MappedDecl, clangParam->getFunctionScopeIndex());
+  if (!index)
+    return MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true)
+        ->getInterfaceType();
+  const auto *params = MappedDecl->getParameters();
+  if (*index >= params->size())
+    return Type();
+  return params->get(*index)->getInterfaceType();
+}
+
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
-// `Visit(expr)` returns true on success and the result can be retrieved via
-// `str()`.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
-  const clang::ASTContext &ctx;
+  ClangImporter::Implementation &CI;
+  /// The imported function whose count expression is being emitted.
+  const AbstractFunctionDecl *MappedDecl;
+  /// Whether the count expression is just a reference to a declaration, such as
+  /// a parameter name, ignoring parentheses and casts that don't change the
+  /// type (see stripValuePreservingCasts).
+  bool isSimpleDeclRef = false;
+  /// Whether the count expression refers to a value whose type is a
+  /// `swift_newtype` typedef, which isn't supported yet.
+  bool usesSwiftNewtype = false;
   llvm::SmallString<128> result;
   llvm::raw_svector_ostream out;
 
-  explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
-      : ctx(ctx), out(result) {}
+  SwiftCountExprEmitter(ClangImporter::Implementation &Impl,
+                        const AbstractFunctionDecl *MappedDecl)
+      : CI(Impl), MappedDecl(MappedDecl), out(result) {}
+
+  /// Computes Swift representation of \p countExpr as a string.
+  /// Use `str()` to get access to the computed string.
+  /// \return true iff a string was successfully computed
+  bool computeSwiftCountExpr(const clang::Expr *countExpr) {
+    // Detect if the count expression is just a use of a DeclRefExpr.
+    // This is used later in VisitDeclRefExpr.
+    isSimpleDeclRef =
+        isa<clang::DeclRefExpr>(stripValuePreservingCasts(countExpr));
+    bool success = Visit(countExpr);
+    // If we failed make the string empty to leave it in a well defined state.
+    if (!success)
+      result.clear();
+    return success;
+  }
 
   StringRef str() const { return result; }
 
@@ -116,6 +173,42 @@ struct SwiftCountExprEmitter
       DLOG("Unsupported decl name in count expr\n");
       return false;
     }
+    Type swiftTypeForDecl = getImportedType(e->getDecl());
+    // FIXME: A `swift_newtype` typedef is imported as a struct that wraps the
+    // underlying value, which count expressions don't support yet.
+    // (https://github.com/swiftlang/swift/issues/94222)
+    if (isSwiftNewtype(swiftTypeForDecl)) {
+      DLOG("Unsupported swift_newtype value in count expr\n");
+      usesSwiftNewtype = true;
+      return false;
+    }
+    // Literals and casts are emitted using the Swift name of their canonical
+    // C type, but parameters and global variables are referenced by name and
+    // so have the type they were imported as. When those differ (e.g. `size_t`
+    // is imported as `Int`, but `size_t`'s canonical type `unsigned long` is
+    // imported into Swift as `CUnsignedLong`), convert the used declaration so
+    // that it can be combined with the rest of the expression without type
+    // errors. Like other implicit conversions (see visitCastImpl) this uses a
+    // plain `T(x)`, which traps if the value doesn't fit, e.g. a negative
+    // `Int`.
+    //
+    // We avoid adding the explicit cast if the count expression is a simple
+    // decl ref because adding the cast would break how _SwiftifyImport handles
+    // this case. In this case _SwiftifyImport removes the count parameter from
+    // the function entirely because the count can come directly from the Span
+    // or UnsafeMutableBufferPointer. _SwiftifyImport currently relies on seeing
+    // just a simple decl to make this decision.
+    //
+    // FIXME: This also skips the conversion for counts on return values, where
+    // the parameter is never removed.
+    // (https://github.com/swiftlang/swift/issues/94221)
+    if (!isSimpleDeclRef)
+      if (std::optional<StringRef> swiftTypeNameForCanonicalCType =
+              getCanonicalTypeNameIfImportedDifferently(e, swiftTypeForDecl)) {
+        out << *swiftTypeNameForCanonicalCType << '(' << e->getDecl()->getName()
+            << ')';
+        return true;
+      }
     out << e->getDecl()->getName();
     return true;
   }
@@ -212,6 +305,107 @@ struct SwiftCountExprEmitter
   }
 
 private:
+  // Clients must use computeSwiftCountExpr(), which sets up state for the whole
+  // count expression. Visit() is only for subexpressions.
+  using clang::ConstStmtVisitor<SwiftCountExprEmitter, bool>::Visit;
+
+  /// Strips parentheses, and casts that don't change the type apart from
+  /// typedefs and qualifiers, such as an implicit lvalue-to-rvalue conversion,
+  /// or `(size_t)n` when `n` is already a `size_t`.
+  static const clang::Expr *stripValuePreservingCasts(const clang::Expr *e) {
+    while (e) {
+      if (const auto *p = dyn_cast<clang::ParenExpr>(e)) {
+        e = p->getSubExpr();
+        continue;
+      }
+      const auto *c = dyn_cast<clang::CastExpr>(e);
+      if (!c || (c->getCastKind() != clang::CK_LValueToRValue &&
+                 c->getCastKind() != clang::CK_NoOp))
+        break;
+      e = c->getSubExpr();
+    }
+    return e;
+  }
+
+  /// Returns the Swift type of \p decl, if it is a parameter of the function
+  /// being swiftified or a global variable, or a null type otherwise.
+  Type getImportedType(const clang::ValueDecl *decl) {
+    if (const auto *param = dyn_cast<clang::ParmVarDecl>(decl))
+      return getImportedParamType(MappedDecl, param);
+    // Get the type of a global without importing it. We're in the middle of
+    // importing the function, and importing the global here can import it
+    // twice: for a static data member, importing it first imports its class,
+    // which imports the member too.
+    if (const auto *var = dyn_cast<clang::VarDecl>(decl))
+      if (ClangModuleUnit *module = CI.getClangModuleForDecl(var))
+        return CI.importClangVarType(var, isInSystemModule(module)).getType();
+    return Type();
+  }
+
+  /// Returns true if \p type is the struct that a `swift_newtype` typedef was
+  /// imported as. For example, this C typedef:
+  ///
+  /// \code
+  /// typedef size_t MySize __attribute__((swift_newtype(struct)));
+  /// \endcode
+  ///
+  /// is imported into Swift as:
+  ///
+  /// \code
+  /// struct MySize : Hashable, Equatable, _SwiftNewtypeWrapper,
+  ///                 RawRepresentable, @unchecked Sendable {
+  ///   init(_ rawValue: Int)
+  ///   init(rawValue: Int)
+  ///   let rawValue: Int
+  ///   typealias RawValue = Int
+  /// }
+  /// \endcode
+  bool isSwiftNewtype(Type type) {
+    if (!type)
+      return false;
+    const auto *structDecl =
+        dyn_cast_or_null<StructDecl>(type->getAnyNominal());
+    if (!structDecl)
+      return false;
+    const auto *typedefDecl =
+        dyn_cast_or_null<clang::TypedefNameDecl>(structDecl->getClangDecl());
+    return typedefDecl && getSwiftNewtypeAttr(typedefDecl, CI.CurrentVersion);
+  }
+
+  /// If \p e refers to a parameter or global variable whose imported Swift
+  /// type, \p swiftTypeForDecl (see getImportedType), differs from the Swift
+  /// type of its canonical C type, returns the name of the latter.
+  std::optional<StringRef>
+  getCanonicalTypeNameIfImportedDifferently(const clang::DeclRefExpr *e,
+                                            Type swiftTypeForDecl) {
+    const clang::ValueDecl *decl = e->getDecl();
+    // Only support integer types for now.
+    if (!swiftTypeForDecl || !swiftTypeForDecl->isStdlibInteger())
+      return std::nullopt;
+    // Use the type of `e`, the reference in the count expression, rather than
+    // `decl->getType()`. They differ for C++ references: for a parameter
+    // `const size_t &n`, `decl->getType()` is `const size_t &`, which isn't a
+    // builtin type, but `n` in the count has type `const size_t`. That's also
+    // the type the parameter is imported as, since the importer imports a
+    // reference parameter as the type it refers to.
+    std::optional<StringRef> swiftTypeNameForCanonicalCType =
+        getBuiltinTypeSwiftName(e->getType());
+    if (!swiftTypeNameForCanonicalCType)
+      return std::nullopt;
+
+    Type swiftTypeForCanonicalCType = CI.getNamedSwiftType(
+        CI.getStdlibModule(), *swiftTypeNameForCanonicalCType);
+    if (!swiftTypeForCanonicalCType ||
+        !swiftTypeForCanonicalCType->isStdlibInteger() ||
+        swiftTypeForDecl->isEqual(swiftTypeForCanonicalCType))
+      return std::nullopt;
+    DLOG("Converting reference to '"
+         << decl->getName() << "' imported as '"
+         << swiftTypeForDecl->getString() << "' to '"
+         << *swiftTypeNameForCanonicalCType << "'\n");
+    return swiftTypeNameForCanonicalCType;
+  }
+
   bool visitCastImpl(const clang::CastExpr *c) {
     ASSERT(isa<clang::CStyleCastExpr>(c) || isa<clang::ImplicitCastExpr>(c));
     using CK = clang::CastKind;
@@ -327,18 +521,25 @@ public:
     out << "]";
   }
 
-  void printAvailability() {
-    if (!hasMacroParameter("spanAvailability"))
+  // Prints the availability of the stdlib type `DeclName` as the macro
+  // parameter `ParamName`, so that wrappers using that type are not more
+  // available than it is. With `PrintIfEmpty`, the parameter is printed even
+  // when there is no availability info.
+  void printAvailability(StringRef DeclName, StringRef ParamName,
+                         bool PrintIfEmpty = false) {
+    if (!hasMacroParameter(ParamName))
       return;
 
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, "Span");
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, DeclName);
+    if (!D)
+      return;
     const SemanticAvailableAttributes availabilityAttrs =
         D->getSemanticAvailableAttrs(/*includingInactive=*/true);
-    if (availabilityAttrs.empty())
+    if (availabilityAttrs.empty() && !PrintIfEmpty)
       return; // don't print availability when targeting embedded
 
     printSeparator();
-    out << "spanAvailability: ";
+    out << ParamName << ": ";
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
@@ -347,7 +548,9 @@ public:
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(*platform) << " " << introducedOpt.value();
+      // Use the spelling that is valid in source: prettyPlatformString would
+      // give e.g. `any Apple OS` or `Mac Catalyst`.
+      out << platformString(*platform) << " " << introducedOpt.value();
     }
     out << "\"";
   }
@@ -370,25 +573,51 @@ protected:
 };
 
 struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
+  ClangImporter::Implementation &Impl;
+  const AbstractFunctionDecl *MappedDecl;
+  /// Whether a count expression refers to a value whose type is a
+  /// `swift_newtype` typedef, which isn't supported yet.
+  bool hasSwiftNewtypeCount = false;
+
   SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                               llvm::raw_svector_ostream &out,
                               MacroDecl &SwiftifyImportDecl,
                               llvm::StringMap<std::string> &typeMapping,
-                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+                              bool &DiagnosedMissingNullableAsEmptySpanParam,
+                              ClangImporter::Implementation &Impl,
+                              const AbstractFunctionDecl *MappedDecl)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
                             typeMapping,
-                            DiagnosedMissingNullableAsEmptySpanParam) {}
+                            DiagnosedMissingNullableAsEmptySpanParam),
+        Impl(Impl), MappedDecl(MappedDecl) {}
+
+  // Whether printCountedBy supports the type of this attribute's pointer.
+  bool isSupportedCountedByPointer(const clang::CountAttributedType *CAT,
+                                   Type swiftType) {
+    return CAT->isCountInBytes()
+               ? SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+               : !ConcretePointeeType(swiftType).isNull();
+  }
+
+  // Whether printCountedBy supports this attribute.
+  bool canPrintCountedBy(const clang::CountAttributedType *CAT,
+                         Type swiftType) {
+    return isSupportedCountedByPointer(CAT, swiftType) &&
+           SwiftCountExprEmitter(Impl, MappedDecl)
+               .computeSwiftCountExpr(CAT->getCountExpr());
+  }
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
     // Step 1: check if we support this attribute
+    if (!isSupportedCountedByPointer(CAT, swiftType))
+      return false;
     bool isSizedBy = CAT->isCountInBytes();
-    if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-                  : ConcretePointeeType(swiftType).isNull())
+    SwiftCountExprEmitter emitter(Impl, MappedDecl);
+    if (!emitter.computeSwiftCountExpr(CAT->getCountExpr())) {
+      hasSwiftNewtypeCount |= emitter.usesSwiftNewtype;
       return false;
-    SwiftCountExprEmitter emitter(ctx);
-    if (!emitter.Visit(CAT->getCountExpr()))
-      return false;
+    }
 
     // Step 2: print - any early exit must occur before this point
     printSeparator();
@@ -425,10 +654,44 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << ")";
   }
 
+  void printReferenceReturn(Type swiftReturnType) {
+    printSeparator();
+    out << ".reference(pointer: .return)";
+    refAvailabilityDecl = "Ref";
+    // The macro needs to see the pointer type behind typedefs like
+    // `using reference = value_type &`.
+    if (swiftReturnType.getPointer() != swiftReturnType->getDesugaredType())
+      registerTypeMapping(swiftReturnType);
+  }
+
+  // Makes printRefAvailability pass refAvailability, which makes the macro
+  // expose a returned span as Span<[Const]Cell<T>>.
+  void requestCellSpanReturn() { refAvailabilityDecl = "Cell"; }
+
+  // Whether the macro can wrap C++ references in Ref<Cell<T>>.
+  bool hasReferenceSupport() {
+    return hasSwiftifyInfoCase("reference") &&
+           hasMacroParameter("refAvailability");
+  }
+
+  // Whether the macro can expose returned spans as Span<[Const]Cell<T>>.
+  bool hasCellSpanSupport() {
+    return hasMacroParameter("refAvailability") &&
+           getKnownSingleDecl(SwiftContext, "Cell");
+  }
+
+  // Ref is newer than Cell, ConstCell and Span, and Cell's availability is
+  // equivalent to Span's, so this covers the whole wrapper. It is printed even
+  // without availability info, since it also selects the Cell-based wrapper.
+  void printRefAvailability() {
+    if (!refAvailabilityDecl.empty())
+      printAvailability(refAvailabilityDecl, "refAvailability",
+                        /*PrintIfEmpty=*/true);
+  }
+
   bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
     if (isStdSpanType(clangType)) {
-      typeMapping.try_emplace(swiftType->getString(),
-                              swiftType->getDesugaredType()->getString());
+      registerTypeMapping(swiftType);
       return true;
     }
     return false;
@@ -450,6 +713,12 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   }
 
 private:
+  // Lets the macro see through the type alias that `swiftType` is spelled with.
+  void registerTypeMapping(Type swiftType) {
+    typeMapping.try_emplace(swiftType->getString(),
+                            swiftType->getDesugaredType()->getString());
+  }
+
   void printParamOrReturn(ssize_t pointerIndex) {
     if (pointerIndex == SELF_PARAM_INDEX)
       out << ".self";
@@ -461,23 +730,26 @@ private:
 
   std::optional<bool> hasOrNullSupportCached = std::nullopt;
   bool hasOrNullSupport() {
-    if (hasOrNullSupportCached.has_value())
-      return hasOrNullSupportCached.value();
+    if (!hasOrNullSupportCached.has_value())
+      hasOrNullSupportCached = hasSwiftifyInfoCase("countedByOrNull");
+    return hasOrNullSupportCached.value();
+  }
 
+  bool hasSwiftifyInfoCase(StringRef CaseName) {
     auto *D = getKnownSingleDecl(SwiftContext, "_SwiftifyInfo");
     auto *Enum = dyn_cast_or_null<EnumDecl>(D);
     if (!Enum)
       return false;
     for (auto *Element :
-         Enum->lookupDirect(SwiftContext.getIdentifier("countedByOrNull"))) {
-      if (isa<EnumElementDecl>(Element)) {
-        hasOrNullSupportCached = true;
+         Enum->lookupDirect(SwiftContext.getIdentifier(CaseName))) {
+      if (isa<EnumElementDecl>(Element))
         return true;
-      }
     }
-    hasOrNullSupportCached = false;
     return false;
   }
+
+  // The stdlib type whose availability is passed as refAvailability, if any.
+  StringRef refAvailabilityDecl;
 };
 
 // Searches for template instantiations that are not behind type aliases.
@@ -647,6 +919,7 @@ static StringRef getAttributeName(const clang::CountAttributedType *CAT) {
     case clang::CountAttributedType::EndedBy:
       llvm_unreachable("CountAttributedType cannot be ended_by");
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool wouldBeIllegalInitializer(const AbstractFunctionDecl *MappedDecl) {
@@ -738,12 +1011,74 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
     bool returnHasBoundsInfo = returnIsStdSpan || CAT != nullptr;
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
-    bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
+
+    Type swiftReturnTy;
+    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
+      swiftReturnTy = funcDecl->getResultInterfaceType();
+    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
+      swiftReturnTy = ctorDecl->getResultInterfaceType();
+    else
+      ABORT("Unexpected AbstractFunctionDecl subclass.");
+
+    // A C++ lvalue reference imported as Unsafe[Mutable]Pointer<T> can be
+    // wrapped in Ref<[Const]Cell<T>> if it has lifetime info. Functions
+    // returning a reference that are imported as initializers return a copy,
+    // so only plain functions qualify.
+    bool returnIsReference = false;
+    if (isa<FuncDecl>(MappedDecl) && clangReturnTy->isLValueReferenceType()) {
+      if (!Self.SwiftContext.LangOpts.hasFeature(Feature::Cells))
+        DLOG("Reference return value needs the Cells feature\n");
+      else if (ConcretePointeeType(swiftReturnTy).isNull())
+        DLOG("Reference return value not imported as a pointer\n");
+      else if (isNonEscapable(clangReturnTy->getPointeeType()))
+        DLOG("Reference to ~Escapable type cannot be stored in a Cell\n");
+      else if (cast<clang::FunctionDecl>(ClangDecl)->isOverloadedOperator())
+        // The operator functions are hidden behind subscripts and operators.
+        DLOG("Reference returned by an overloaded operator\n");
+      else if (!printer.hasReferenceSupport())
+        DLOG("_SwiftifyImport does not support references\n");
+      else
+        returnIsReference = true;
+      // Clang rejects nullability on references, and API notes cannot add it.
+      ASSERT(!returnIsReference || !swiftReturnTy->getOptionalObjectType());
+    }
+    bool returnValueCanBeNonEscapable =
+        returnValueIsNonEscapable || returnHasBoundsInfo || returnIsReference;
+
+    const bool LegacyLifetimebound =
+        Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers);
+    // Outside the legacy SafeInteropWrappers mode, a returned std::span or
+    // __counted_by pointer is exposed as Span<[Const]Cell<T>>, since C++ may
+    // mutate the elements through aliases while the span is alive. Functions
+    // imported as initializers cannot bind the result to a variable.
+    bool returnIsCellSpan = false;
+    if (!LegacyLifetimebound && isa<FuncDecl>(MappedDecl) &&
+        Self.SwiftContext.LangOpts.hasFeature(Feature::Cells) &&
+        (returnIsStdSpan || (CAT && !CAT->isCountInBytes()))) {
+      clang::QualType elementTy;
+      if (returnIsStdSpan)
+        elementTy = getStdSpanElementType(clangReturnTy);
+      else if (printer.canPrintCountedBy(CAT, swiftReturnTy))
+        elementTy = clangReturnTy->getPointeeType();
+      if (elementTy.isNull())
+        DLOG("Returned span cannot be wrapped\n");
+      else if (isNonEscapable(elementTy))
+        DLOG("~Escapable elements cannot be stored in a Cell\n");
+      else if (!printer.hasCellSpanSupport())
+        DLOG("_SwiftifyImport does not support Cell spans\n");
+      else
+        returnIsCellSpan = true;
+    }
+    // Outside the legacy mode, lifetimebound is only supported for return
+    // values wrapped in cells.
+    const bool LifetimeboundSupported =
+        LegacyLifetimebound || returnIsCellSpan || returnIsReference;
+
     bool returnHasLifetimeInfo = false;
     if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
             ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
-      if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
+      if (LifetimeboundSupported) {
         if (!dependsOnClass(
                 MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
           if (returnValueCanBeNonEscapable) {
@@ -753,9 +1088,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           } else {
             DLOG("lifetimebound ignored because return value is escapable");
           }
+        } else if (!LegacyLifetimebound) {
+          DLOG("lifetimebound on a class - skipping\n");
+          return false;
         } else {
-          DLOG("lifetimebound ignored because it depends on class with "
-               "refcount\n");
+          DLOG("lifetimebound ignored because it depends on a class\n");
         }
       } else {
         DLOG("lifetimebound not yet supported by stable feature-set - "
@@ -787,16 +1124,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     }
 
-    size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
-                                ? MappedDecl->getSelfIndex()
-                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
                                         << clangParamTy << "'\n");
-      int mappedIndex = index < selfParamIndex ? index :
-        index > selfParamIndex ? index - 1 :
-        SwiftifyInfoPrinter::SELF_PARAM_INDEX;
+      std::optional<size_t> swiftIndex = getSwiftParamIndex(MappedDecl, index);
+      int mappedIndex = swiftIndex ? static_cast<int>(*swiftIndex)
+                                   : SwiftifyInfoPrinter::SELF_PARAM_INDEX;
       const ParamDecl *swiftParam = nullptr;
       if (mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
         swiftParam = MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/true);
@@ -836,30 +1170,31 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
         paramHasLifetimeInfo = true;
       }
       if (clangParam->template hasAttr<clang::LifetimeBoundAttr>()) {
-        if (Self.SwiftContext.LangOpts.hasFeature(
-                Feature::SafeInteropWrappers)) {
-          DLOG("Found lifetimebound attribute\n");
-          if (!dependsOnClass(swiftParam)) {
-            if (returnValueCanBeNonEscapable) {
-              // If this parameter has bounds info we will tranform it into a
-              // Span, so then it will no longer be Escapable.
-              bool willBeEscapable =
-                  !isNonEscapable(clangParamTy) &&
-                  (!paramHasBoundsInfo ||
-                   mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
-              printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
-              paramHasLifetimeInfo = true;
-              returnHasLifetimeInfo = true;
-            } else {
-              DLOG("lifetimebound ignored because return value is escapable\n");
-            }
-          } else {
-            DLOG("lifetimebound ignored because it depends on class with "
-                 "refcount\n");
-          }
-        } else {
-          DLOG("lifetimebound not yet supported by stable feature-set - skipping\n");
+        if (!LifetimeboundSupported) {
+          DLOG("lifetimebound not yet supported by stable feature-set - "
+               "skipping\n");
           return false;
+        }
+        DLOG("Found lifetimebound attribute\n");
+        if (!dependsOnClass(swiftParam)) {
+          if (returnValueCanBeNonEscapable) {
+            // If this parameter has bounds info we will tranform it into a
+            // Span, so then it will no longer be Escapable.
+            bool willBeEscapable =
+                !isNonEscapable(clangParamTy) &&
+                (!paramHasBoundsInfo ||
+                 mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX);
+            printer.printLifetimeboundReturn(mappedIndex, willBeEscapable);
+            paramHasLifetimeInfo = true;
+            returnHasLifetimeInfo = true;
+          } else {
+            DLOG("lifetimebound ignored because return value is escapable\n");
+          }
+        } else if (!LegacyLifetimebound) {
+          DLOG("lifetimebound on a class - skipping\n");
+          return false;
+        } else {
+          DLOG("lifetimebound ignored because it depends on a class\n");
         }
       }
       if (UnaliasedInstantiationVisitor::checkTemplates(
@@ -884,14 +1219,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       DLOG("Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
-
-    Type swiftReturnTy;
-    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
-      swiftReturnTy = funcDecl->getResultInterfaceType();
-    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
-      swiftReturnTy = ctorDecl->getResultInterfaceType();
-    else
-      ABORT("Unexpected AbstractFunctionDecl subclass.");
+    if (returnIsReference && returnHasLifetimeInfo) {
+      DLOG("Found both reference and lifetime info for return value\n");
+      printer.printReferenceReturn(swiftReturnTy);
+      attachMacro = true;
+    }
+    if (returnIsCellSpan && returnHasLifetimeInfo)
+      printer.requestCellSpanReturn();
 
     if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
       return false;
@@ -904,6 +1238,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                                  << "' on return value\n");
       attachMacro = true;
     }
+  }
+  // Don't generate a wrapper at all if a count expression refers to a
+  // `swift_newtype` value. A wrapper without that count would expose the
+  // pointer unsafely, and adding the count once `swift_newtype` is supported
+  // would change the wrapper's signature, which would be source breaking.
+  if (printer.hasSwiftNewtypeCount) {
+    DLOG("Count expression refers to a swift_newtype value\n");
+    return false;
   }
   return attachMacro;
 }
@@ -933,6 +1275,10 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
+    return;
+  // Functions imported as property accessors (`swift_name("getter:...")`)
+  // cannot get a peer overload.
+  if (isa<AccessorDecl>(MappedDecl))
     return;
   const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
 
@@ -1008,16 +1354,18 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     llvm::StringMap<std::string> typeMapping;
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
-        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam, *this,
+        MappedDecl);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
-    printer.printAvailability();
+    printer.printAvailability("Span", "spanAvailability");
     printer.printTypeMapping();
     if (!LegacyOptionalRequested) {
       printer.printNullableAsEmptySpan();
     }
+    printer.printRefAvailability();
     out << ")";
   }
 

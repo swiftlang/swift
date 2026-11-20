@@ -447,7 +447,7 @@ public:
     if (NoEscape)
       Flags |= CapturedValue::IsNoEscape;
 
-    if (IsCallConsuming && ConsumedValues.count(D))
+    if (IsCallConsuming && ConsumedValues.count(D) && canOwnCapture(D))
       Flags |= CapturedValue::IsConsumed;
 
     addCapture(CapturedValue(D, Flags, DRE->getStartLoc()));
@@ -774,6 +774,58 @@ public:
     }
 
     return V;
+  }
+
+  /// Returns true if this closure can own the noncopyable value \p D that it
+  /// captures, and so consume it.
+  bool canOwnCapture(ValueDecl *D) const {
+    auto *var = dyn_cast<VarDecl>(D);
+    if (!var)
+      return true;
+
+    // A binding of a noncopyable value that only needs a borrow of the match
+    // is a borrow of the value.
+    if (var->getBindingOwnership() == LoweredOwnership::Shared)
+      return false;
+
+    return var->supportsMutation() ||
+           getOwningContext(var) == var->getDeclContext();
+  }
+
+  /// Returns the context that owns \p var for the purposes of capturing it in
+  /// the current closure. If there is a closure or function between this
+  /// closure and the declaration of \p var that can run more than once, it
+  /// owns the capture. Otherwise, the original context that declares \p var
+  /// owns it. For example:
+  ///
+  /// \code
+  ///   func f() {
+  ///     let x = NC()
+  ///     let g = {
+  ///       let _ = { @callable(once) in x } // owner of `x`: `g`
+  ///     }
+  ///     let h = { @callable(once) in
+  ///       let _ = { @callable(once) in x } // owner of `x`: `f`
+  ///     }
+  ///   }
+  /// \endcode
+  DeclContext *getOwningContext(VarDecl *var) const {
+    auto *varDC = var->getDeclContext();
+    if (!varDC->isLocalContext())
+      return varDC;
+
+    for (auto *dc = CurDC->getParent(); dc && dc != varDC;
+         dc = dc->getParent()) {
+      // A closure whose call consumes it owns its captures and can give them
+      // away. Any other closure or function can run more than once.
+      if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
+        if (!closure->isCallConsuming())
+          return closure;
+      } else if (isa<AbstractFunctionDecl>(dc)) {
+        return dc;
+      }
+    }
+    return varDC;
   }
 
   /// Returns true if the representation of a value of \p type depends on

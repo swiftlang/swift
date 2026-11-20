@@ -30,7 +30,6 @@ repeating the contents of another string.
 - ``Swift/String/init(validating:as:)-(Sequence<Encoding.CodeUnit>,_)``
 - ``Swift/String/init(validating:as:)-(Sequence<Int8>,_)``
 - ``Swift/String/init(decoding:as:)``
-- ``Swift/String/init(_:)-3rgu``
 - ``Swift/String/init(copying:)``
 
 ### Converting Numeric Values
@@ -114,7 +113,8 @@ repeating the contents of another string.
 - ``Swift/String/removeSubrange(_:)-8y51u``
 - ``Swift/String/removeSubrange(_:)-8maxn``
 - ``Swift/String/removeSubrange(_:)-9twng``
-- ``Swift/String/filter(_:)``
+- ``Swift/String/filter(_:)->Self``
+- ``Swift/String/filter(_:)->[Self.Element]``
 - ``Swift/String/drop(while:)``
 - ``Swift/String/dropFirst(_:)``
 - ``Swift/String/dropLast(_:)``
@@ -144,6 +144,10 @@ that different representations of a string compare as being equal.
 - ``Swift/String/>=(_:_:)-8lyim``
 - ``Swift/String/>=(_:_:)-nd86``
 - ``Swift/String/~=(_:_:)``
+
+### Comparing Strings Using Methods
+
+- ``Swift/String/isTriviallyIdentical(to:)``
 
 ### Comparing Characters
 
@@ -184,8 +188,6 @@ that different representations of a string compare as being equal.
 - ``Swift/String/min()``
 - ``Swift/String/min(_:_:)``
 - ``Swift/String/min(by:)``
-- ``Swift/String/characterMap()``
-- ``Swift/String/scalarMap()``
 
 ### Getting Substrings
 
@@ -273,8 +275,6 @@ that different representations of a string compare as being equal.
 
 - ``Swift/String/startIndex``
 - ``Swift/String/endIndex``
-- ``Swift/String/allIndices(includingEnd:)``
-- ``Swift/String/dumpIndices()``
 - ``Swift/String/index(after:)``
 - ``Swift/String/formIndex(after:)``
 - ``Swift/String/index(before:)``
@@ -284,7 +284,6 @@ that different representations of a string compare as being equal.
 - ``Swift/String/formIndex(_:offsetBy:)``
 - ``Swift/String/formIndex(_:offsetBy:limitedBy:)``
 - ``Swift/String/distance(from:to:)``
-- ``Swift/String/isOnGraphemeClusterBoundary(_:)``
 - ``Swift/String/indices-swift.property``
 
 ### Creating a Range Expression

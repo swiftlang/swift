@@ -225,3 +225,189 @@ void releaseAmbiguousFreeReleaseAndRetainMethods(
 void releaseAmbiguousFreeReleaseAndRetainMethods(
     AmbiguousFreeReleaseAndRetainMethods *v,
     int argument); // wrong arity: 2
+
+struct OnlyViaFunctionBox {
+  int refCount = 1;
+} SWIFT_SHARED_REFERENCE(retainOnlyViaFunctionBox, releaseOnlyViaFunctionBox);
+
+inline void retainOnlyViaFunctionBox(OnlyViaFunctionBox *v) { v->refCount++; }
+inline void releaseOnlyViaFunctionBox(OnlyViaFunctionBox *v) {
+  v->refCount--;
+}
+
+// MARK: Derived types whose own annotation replaces the base's.
+
+struct BaseOfReannotated {
+  mutable int refCount = 1;
+  void baseRetain() const { refCount++; }
+  void baseRelease() const { refCount--; }
+} SWIFT_SHARED_REFERENCE(.baseRetain, .baseRelease);
+
+struct ImmortalDerivedFromShared : BaseOfReannotated {
+} SWIFT_IMMORTAL_REFERENCE;
+
+struct UnsafeDerivedFromShared : BaseOfReannotated {} SWIFT_UNSAFE_REFERENCE;
+
+struct OwnOpsDerivedFromShared : BaseOfReannotated {
+  void ownRetain() const { refCount++; }
+  void ownRelease() const { refCount--; }
+} SWIFT_SHARED_REFERENCE(.ownRetain, .ownRelease);
+
+// MARK: Overrides of virtual retain/release operations
+
+struct VirtualOps {
+  mutable int refCount = 1;
+  virtual void virtualRetain() const { refCount++; }
+  virtual void virtualRelease() const { refCount--; }
+  virtual int unrelatedVirtual() const { return 0; }
+  __attribute__((swift_attr("unsafe(always)")))
+  virtual int explicitlyUnsafeVirtual() const { return 0; }
+  virtual ~VirtualOps() = default;
+} SWIFT_SHARED_REFERENCE(.virtualRetain, .virtualRelease);
+
+struct OverridesVirtualOps : VirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+  int unrelatedVirtual() const override { return 1; }
+  int explicitlyUnsafeVirtual() const override { return 1; }
+};
+
+struct DoesNotOverrideVirtualOps : VirtualOps {};
+
+struct OverridesSkippingMiddle : DoesNotOverrideVirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+struct NonFRTPolymorphicBase {
+  int value = 0;
+  virtual ~NonFRTPolymorphicBase() = default;
+};
+
+// The FRT base is not at offset 0, so there is no Swift superclass.
+struct OverridesWithNonPrimaryFRTBase : NonFRTPolymorphicBase, VirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+struct SameNamedVirtual {
+  virtual void virtualRetain() const {}
+  virtual ~SameNamedVirtual() = default;
+};
+
+struct OverridesInBothBases : VirtualOps, SameNamedVirtual {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+struct OverridesThroughVirtualBase : virtual VirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+template <typename T>
+struct TemplatedOverride : VirtualOps {
+  T value;
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+using TemplatedOverrideInt = TemplatedOverride<int>;
+
+struct ReannotatedOverride : VirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+  void ownRetain() const { refCount++; }
+  void ownRelease() const { refCount--; }
+} SWIFT_SHARED_REFERENCE(.ownRetain, .ownRelease);
+
+struct ImmortalReannotatedOverride : VirtualOps {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+} SWIFT_IMMORTAL_REFERENCE;
+
+// The operations are declared in a base that is not a foreign reference type.
+struct NonFRTWithVirtualOps {
+  mutable int refCount = 1;
+  virtual void inheritedRetain() const { refCount++; }
+  virtual void inheritedRelease() const { refCount--; }
+  virtual ~NonFRTWithVirtualOps() = default;
+};
+
+struct AnnotatedOverNonFRTBase : NonFRTWithVirtualOps {
+} SWIFT_SHARED_REFERENCE(.inheritedRetain, .inheritedRelease);
+
+struct OverridesOpsOfNonFRTBase : AnnotatedOverNonFRTBase {
+  void inheritedRetain() const override { refCount++; }
+  void inheritedRelease() const override { refCount--; }
+};
+
+// The annotation names the operations by their Swift names.
+struct SwiftNamedVirtualOps {
+  mutable int refCount = 1;
+  SWIFT_NAME(swiftRetain()) virtual void cxxRetain() const { refCount++; }
+  SWIFT_NAME(swiftRelease()) virtual void cxxRelease() const { refCount--; }
+  virtual ~SwiftNamedVirtualOps() = default;
+} SWIFT_SHARED_REFERENCE(.swiftRetain, .swiftRelease);
+
+struct OverridesSwiftNamedOps : SwiftNamedVirtualOps {
+  void cxxRetain() const override { refCount++; }
+  void cxxRelease() const override { refCount--; }
+};
+
+// Only the derived type is ever named in Swift.
+struct OnlyDerivedNamedBase {
+  mutable int refCount = 1;
+  virtual void onlyRetain() const { refCount++; }
+  virtual void onlyRelease() const { refCount--; }
+  virtual ~OnlyDerivedNamedBase() = default;
+} SWIFT_SHARED_REFERENCE(.onlyRetain, .onlyRelease);
+
+struct OnlyDerivedNamed : OnlyDerivedNamedBase {
+  void onlyRetain() const override { refCount++; }
+  void onlyRelease() const override { refCount--; }
+};
+
+struct DiamondLeft : virtual VirtualOps {};
+struct DiamondRight : virtual VirtualOps {};
+
+struct DiamondBottom : DiamondLeft, DiamondRight {
+  void virtualRetain() const override { refCount++; }
+  void virtualRelease() const override { refCount--; }
+};
+
+// MARK: Methods that hide non-virtual retain/release operations
+
+struct NonVirtualOps {
+  mutable int refCount = 1;
+  void plainRetain() const { refCount++; }
+  void plainRelease() const { refCount--; }
+} SWIFT_SHARED_REFERENCE(.plainRetain, .plainRelease);
+
+struct HidesNonVirtualOps : NonVirtualOps {
+  void plainRetain() const { refCount += 2; }
+  void plainRelease() const { refCount -= 2; }
+};
+
+struct HidesNonVirtualOpsWithVirtual : NonVirtualOps {
+  virtual void plainRetain() const { refCount += 2; }
+  virtual void plainRelease() const { refCount -= 2; }
+  virtual ~HidesNonVirtualOpsWithVirtual() = default;
+};
+
+// Overrides the virtual methods introduced by HidesNonVirtualOpsWithVirtual,
+// not the non-virtual operations.
+struct OverridesVirtualHidingNonVirtualOps : HidesNonVirtualOpsWithVirtual {
+  void plainRetain() const override { refCount += 3; }
+  void plainRelease() const override { refCount -= 3; }
+};
+
+struct OtherPlainRetain {
+  virtual void plainRetain() const {}
+  virtual ~OtherPlainRetain() = default;
+};
+
+// Overrides the other base's virtual, not the non-virtual operation.
+struct OverridesOnlyOtherBase : NonVirtualOps, OtherPlainRetain {
+  void plainRetain() const override {}
+};

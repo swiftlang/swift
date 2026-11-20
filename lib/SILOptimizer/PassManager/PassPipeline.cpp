@@ -91,10 +91,18 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
 static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
   P.addClosureLifetimeFixup();
 
+  // Eliminate SILGen's copies of borrowed values that are only used as borrows.
+  P.addMergeBorrowScopes();
+  P.addCopyToBorrowOptimization();
+  P.addCopySinking();
+
   // Main sequence for LifetimeResolution
   P.addRemoveSILGenLifetimes();
   P.addLifetimeResolution();
-  P.addLifetimeResolutionDiagnose();
+  P.addDiagnoseResolvedLifetimes();
+
+  // Run the verifier in non-asserts builds to double-check LifetimeResolution.
+  P.addVerifier();
 
   // Remaining pieces of DefiniteInitialization we still rely-on.
   P.addLetPropertyLowering();
@@ -417,7 +425,6 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
 /// Perform semantic annotation/loop base optimizations.
 void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Perform classic SSA optimizations for cleanup.
-  P.addLowerAggregateInstrs();
   P.addSILCombine();
   P.addEarlySROA();
   P.addDeadObjectElimination();
@@ -501,6 +508,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
+
+  P.addLowerAddressInstructions();
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
   if (OpLevel == OptimizationLevelKind::HighLevel) {
@@ -667,6 +676,11 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+
+  // Add verification checkpoints within the pipeline. This is especially
+  // important to verify OSSA ownership within the pipeline and not only
+  // at the end of the OSSA pipeline (in OwnershipModelEliminator).
+  P.addVerifier();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -1058,6 +1072,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+
+  // Remove dynamic access enforcement before serialization: after
+  // serialization, functions which can be inlined into client modules may be
+  // removed. Then AccessEnforcementWMO would not see all accesses of non-public
+  // declarations anymore (which matters with aggressive CMO and in Embedded
+  // Swift). This also lets client modules benefit from the optimization.
+  P.addAccessEnforcementWMO();
 
   P.addCrossModuleOptimization();
   P.addConformanceCheckOptimization();

@@ -759,14 +759,8 @@ lookupVarDeclForCodingKeysCase(DeclContext *conformanceDC,
   llvm_unreachable("Should have found at least 1 var decl");
 }
 
-/// If strict memory safety checking is enabled, wrap the expression in an
-/// implicit "unsafe".
-static Expr *wrapInUnsafeIfNeeded(ASTContext &ctx, Expr *expr) {
-  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                              /*allowMigration=*/true))
-    return UnsafeExpr::createImplicit(ctx, expr->getStartLoc(), expr);
-
-  return expr;
+static Expr *wrapInUnsafe(ASTContext &ctx, Expr *expr) {
+  return UnsafeExpr::createImplicit(ctx, expr->getStartLoc(), expr);
 }
 
 static Expr *createEncodeCall(ASTContext &C, Type codingKeysType,
@@ -791,7 +785,7 @@ static Expr *createEncodeCall(ASTContext &C, Type codingKeysType,
   // try container.encode(x, forKey: CodingKeys.x)
   auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                   /*Implicit=*/true);
-  return wrapInUnsafeIfNeeded(C, tryExpr);
+  return wrapInUnsafe(C, tryExpr);
 }
 
 /// Synthesizes the body for `func encode(to encoder: Encoder) throws`.
@@ -926,7 +920,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
     // try super.encode(to: container.superEncoder())
     auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                     /*Implicit=*/true);
-    statements.push_back(wrapInUnsafeIfNeeded(C, tryExpr));
+    statements.push_back(wrapInUnsafe(C, tryExpr));
   }
 
   auto *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc(),
@@ -1088,11 +1082,9 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto *selfRef = encodeDecl->getImplicitSelfDecl();
 
   // generate: switch self { }
-  auto enumRef =
-      wrapInUnsafeIfNeeded(
-        C,
-        new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(),
-                            /*implicit*/ true, AccessSemantics::Ordinary));
+  auto enumRef = wrapInUnsafe(
+      C, new (C) DeclRefExpr(ConcreteDeclRef(selfRef), DeclNameLoc(),
+                             /*implicit*/ true, AccessSemantics::Ordinary));
   auto switchStmt = createEnumSwitch(
       C, funcDC, enumRef, enumDecl, codingKeysEnum,
       /*createSubpattern*/ true,
@@ -1449,7 +1441,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
                                                         varDecl->getName());
       auto *assignExpr = new (C) AssignExpr(varExpr, SourceLoc(), tryExpr,
                                             /*Implicit=*/true);
-      statements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
+      statements.push_back(wrapInUnsafe(C, assignExpr));
     }
   }
 
@@ -1485,7 +1477,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         // try super.init(from: container.superDecoder())
         auto *tryExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                         /*Implicit=*/true);
-        statements.push_back(wrapInUnsafeIfNeeded(C, tryExpr));
+        statements.push_back(wrapInUnsafe(C, tryExpr));
       } else {
         // The explicit constructor name is a compound name taking no arguments.
         DeclName initName(C, DeclBaseName::createConstructor(),
@@ -1517,7 +1509,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
           callExpr = new (C) TryExpr(SourceLoc(), callExpr, Type(),
                                      /*Implicit=*/true);
 
-        statements.push_back(wrapInUnsafeIfNeeded(C, callExpr));
+        statements.push_back(wrapInUnsafe(C, callExpr));
       }
     }
   }
@@ -1800,7 +1792,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                 new (C) AssignExpr(selfRef, SourceLoc(), selfCaseExpr,
                                    /*Implicit=*/true);
 
-            caseStatements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
+            caseStatements.push_back(wrapInUnsafe(C, assignExpr));
           } else {
             // Foo.bar(x:)
             SmallVector<Identifier, 3> scratch;
@@ -1818,7 +1810,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
                 new (C) AssignExpr(selfRef, SourceLoc(), caseCallExpr,
                                    /*Implicit=*/true);
 
-            caseStatements.push_back(wrapInUnsafeIfNeeded(C, assignExpr));
+            caseStatements.push_back(wrapInUnsafe(C, assignExpr));
           }
 
           auto body =

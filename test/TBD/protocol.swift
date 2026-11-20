@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s
 // RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s -enable-testing
+// RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s -enable-relative-protocol-witness-tables
 // RUN: %target-swift-frontend -enable-library-evolution -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=all %s -enable-testing
 
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -disable-objc-attr-requires-foundation-module -validate-tbd-against-ir=missing %s -O
@@ -32,6 +33,9 @@ private protocol Private {
     var privateVarGet: Int { get }
     var privateVarGetSet: Int { get set }
 }
+
+public protocol PublicNoRequirements {}
+public protocol PublicRefinesNoRequirements: PublicNoRequirements {}
 
 @_marker public protocol PublicMarker {}
 @_marker internal protocol InternalMarker {}
@@ -137,4 +141,25 @@ private struct PrivatePrivateFileprivateStruct: Private {
     fileprivate typealias PrivateAT = Int
     fileprivate let privateVarGet: Int = 0
     fileprivate var privateVarGetSet: Int = 0
+}
+
+public struct PublicPublicPublicGenericStruct<T>: Public {
+    public func publicMethod() {}
+    public typealias PublicAT = T
+    public let publicVarGet: Int = 0
+    public var publicVarGetSet: Int = 0
+}
+
+public struct PublicPublicPublicGenericNonDependentStruct<T>: Public {
+    public func publicMethod() {}
+    public typealias PublicAT = Int
+    public let publicVarGet: Int = 0
+    public var publicVarGetSet: Int = 0
+}
+
+extension Array: Public {
+    public func publicMethod() {}
+    public typealias PublicAT = Element
+    public var publicVarGet: Int { 0 }
+    public var publicVarGetSet: Int { get { 0 } set {} }
 }

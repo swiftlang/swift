@@ -35,6 +35,10 @@
 #include <utility>
 #include <vector>
 
+namespace llvm::vfs {
+class FileSystem;
+}
+
 namespace swift {
 enum class DiagID : uint32_t;
 
@@ -170,9 +174,11 @@ public:
   /// \returns a `SerializedLocalizationProducer` pointer if the serialized
   /// diagnostics file available, otherwise returns a
   /// `StringsLocalizationProducer` if the `.strings` file is available. If both
-  /// files aren't available returns a `nullptr`.
+  /// files aren't available returns a `nullptr`. The files are read from
+  /// \p fs.
   static std::unique_ptr<LocalizationProducer>
-  producerFor(llvm::StringRef locale, llvm::StringRef path);
+  producerFor(llvm::StringRef locale, llvm::StringRef path,
+              llvm::vfs::FileSystem &fs);
 
   virtual ~LocalizationProducer() {}
 
@@ -191,13 +197,14 @@ protected:
 };
 
 class StringsLocalizationProducer final : public LocalizationProducer {
-  std::string filePath;
+  std::unique_ptr<llvm::MemoryBuffer> buffer;
 
   std::vector<std::string> diagnostics;
 
 public:
-  explicit StringsLocalizationProducer(llvm::StringRef filePath)
-      : LocalizationProducer(), filePath(filePath) {}
+  explicit StringsLocalizationProducer(
+      std::unique_ptr<llvm::MemoryBuffer> buffer)
+      : LocalizationProducer(), buffer(std::move(buffer)) {}
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation

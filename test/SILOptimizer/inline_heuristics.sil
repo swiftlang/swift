@@ -65,6 +65,95 @@ bb0(%0 : $@callee_guaranteed (Int32) -> Int32):
 }
 
 
+// In OSSA the closure is borrowed before it's passed to the callee. Make sure
+// the partial_apply is still found through the begin_borrow, so that the
+// closure benefit is applied.
+
+// CHECK-LABEL: sil [ossa] @testBorrowedClosure
+// CHECK:         partial_apply
+// The closure is now applied directly in this function, i.e. the body of
+// takeBorrowedClosure was inlined. The trailing end-of-function CHECK is
+// needed so that this doesn't match the apply in takeBorrowedClosure itself.
+// CHECK:         apply {{%[0-9]+}}({{.*}}) : $@callee_guaranteed (Int32) -> Int32
+// CHECK:         return
+// CHECK:       } // end sil function 'testBorrowedClosure'
+
+// CHECK-LOG-LABEL: Inline into caller: testBorrowedClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
+sil [ossa] @testBorrowedClosure : $@convention(thin) (Int32) -> Int32 {
+bb0(%x : $Int32):
+  %0 = function_ref @takeBorrowedClosure : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32
+  %1 = function_ref @closure2 : $@convention(thin) (Int32, Int32) -> Int32
+  %2 = partial_apply [callee_guaranteed] %1(%x) : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = begin_borrow %2 : $@callee_guaranteed (Int32) -> Int32
+  %4 = apply %0(%3) : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32
+  end_borrow %3 : $@callee_guaranteed (Int32) -> Int32
+  destroy_value %2 : $@callee_guaranteed (Int32) -> Int32
+  return %4 : $Int32
+}
+
+sil [ossa] @takeBorrowedClosure : $@convention(thin) (@guaranteed @callee_guaranteed (Int32) -> Int32) -> Int32 {
+bb0(%0 : @guaranteed $@callee_guaranteed (Int32) -> Int32):
+  // increase the scope length
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = integer_literal $Builtin.Int32, 27
+  %2 = struct $Int32 (%1 : $Builtin.Int32)
+  %3 = apply %0(%2) : $@callee_guaranteed (Int32) -> Int32
+  return %3 : $Int32
+}
+
+sil shared [ossa] @closure2 : $@convention(thin) (Int32, Int32) -> Int32 {
+bb0(%0 : $Int32, %1 : $Int32):
+  return %0 : $Int32
+}
+
+
+// If RLE cannot eliminate a redundant `load_borrow`, it only records the loaded value in the
+// value hint. Make sure the closure is found through the value hint, so that the closure benefit
+// is applied.
+
+// CHECK-LABEL: sil [ossa] @testValueHintClosure
+// CHECK:         partial_apply
+// The closure is now applied directly in this function, i.e. the body of
+// takeGuaranteedStructClosure was inlined.
+// CHECK:         apply {{%[0-9]+}}({{.*}}) : $@callee_guaranteed (Int32) -> Int32
+// CHECK:         return
+// CHECK:       } // end sil function 'testValueHintClosure'
+
+// CHECK-LOG-LABEL: Inline into caller: testValueHintClosure
+// CHECK-LOG-NEXT: decision {{.*}}, b=70,
+
+sil [ossa] @testValueHintClosure : $@convention(thin) (@inout Cont, Int32) -> Int32 {
+bb0(%0 : $*Cont, %x : $Int32):
+  %1 = function_ref @takeGuaranteedStructClosure : $@convention(thin) (@guaranteed Cont) -> Int32
+  %2 = function_ref @closure2 : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = partial_apply [callee_guaranteed] %2(%x) : $@convention(thin) (Int32, Int32) -> Int32
+  %4 = struct $Cont (%3 : $@callee_guaranteed (Int32) -> Int32)
+  %5 = unchecked_ownership %4, forwarding: @none
+  store %4 to [assign] %0 : $*Cont
+  %7 = load_borrow %0 : $*Cont, value_hint %5 : $Cont
+  %8 = apply %1(%7) : $@convention(thin) (@guaranteed Cont) -> Int32
+  end_borrow %7 : $Cont
+  return %8 : $Int32
+}
+
+sil [ossa] @takeGuaranteedStructClosure : $@convention(thin) (@guaranteed Cont) -> Int32 {
+bb0(%0 : @guaranteed $Cont):
+  // increase the scope length
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+
+  %1 = struct_extract %0 : $Cont, #Cont.cl
+  %2 = integer_literal $Builtin.Int32, 27
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  %4 = apply %1(%3) : $@callee_guaranteed (Int32) -> Int32
+  return %4 : $Int32
+}
+
+
 // CHECK-LABEL: sil @testStructClosure
 // CHECK: [[C:%[0-9]+]] = struct_extract
 // CHECK: apply [[C]](
@@ -134,6 +223,77 @@ bb0(%0 : $*Cont):
   strong_retain %2 : $@callee_guaranteed (Int32) -> Int32
   %6 = apply %2(%4) : $@callee_guaranteed (Int32) -> Int32
   return %6 : $Int32
+}
+
+
+// In OSSA a non-trivial value is loaded from memory with a `load_borrow`.
+// Make sure the load-benefit is also granted for a `load_borrow` from a stack
+// location in the caller.
+
+// CHECK-LABEL: sil [ossa] @testLoadBorrowFromCallerStack
+// CHECK:         [[C:%[0-9]+]] = load_borrow
+// CHECK:         apply [[C]](
+// CHECK:         return
+// CHECK:       } // end sil function 'testLoadBorrowFromCallerStack'
+
+// CHECK-LOG-LABEL: Inline into caller: testLoadBorrowFromCallerStack
+// CHECK-LOG-NEXT: decision
+// CHECK-LOG-NEXT: "takeStructAddrClosureOSSA" inlined into "testLoadBorrowFromCallerStack"
+
+sil [ossa] @testLoadBorrowFromCallerStack : $@convention(thin) (Int32, Builtin.Int1) -> Int32 {
+bb0(%x : $Int32, %cond : $Builtin.Int1):
+  %0 = alloc_stack $Cont
+  %1 = function_ref @closure2 : $@convention(thin) (Int32, Int32) -> Int32
+  %2 = partial_apply [callee_guaranteed] %1(%x) : $@convention(thin) (Int32, Int32) -> Int32
+  %3 = struct $Cont (%2 : $@callee_guaranteed (Int32) -> Int32)
+  store %3 to [init] %0 : $*Cont
+  %5 = function_ref @takeStructAddrClosureOSSA : $@convention(thin) (@inout Cont, Builtin.Int1) -> Int32
+  %6 = apply %5(%0, %cond) : $@convention(thin) (@inout Cont, Builtin.Int1) -> Int32
+  destroy_addr %0 : $*Cont
+  dealloc_stack %0 : $*Cont
+  return %6 : $Int32
+}
+
+sil [ossa] @takeStructAddrClosureOSSA : $@convention(thin) (@inout Cont, Builtin.Int1) -> Int32 {
+bb0(%0 : $*Cont, %cond : $Builtin.Int1):
+  // increase the cost above the base benefit, so that the load-benefit is
+  // needed to make inlining profitable
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  br bb1
+
+bb1:
+  %1 = struct_element_addr %0 : $*Cont, #Cont.cl
+  %2 = load_borrow %1 : $*@callee_guaranteed (Int32) -> Int32
+  %3 = integer_literal $Builtin.Int32, 27
+  %4 = struct $Int32 (%3 : $Builtin.Int32)
+  %5 = apply %2(%4) : $@callee_guaranteed (Int32) -> Int32
+  end_borrow %2 : $@callee_guaranteed (Int32) -> Int32
+  cond_br %cond, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %5 : $Int32
 }
 
 

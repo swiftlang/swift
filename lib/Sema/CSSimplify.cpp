@@ -1527,7 +1527,8 @@ static ConstraintSystem::SolutionKind matchCallArguments(
           label = params[0].getLabel();
         }
 
-        AnyFunctionType::Param argument(elt.getType(), label);
+        auto argument =
+            AnyFunctionType::Param::bodyAccess(elt.getType(), label);
         synthesizedArgs.push_back(SynthesizedArg{i, argument});
         argsWithLabels.push_back(argument);
       }
@@ -2050,6 +2051,7 @@ public:
     case MatchKind::Conversion:
       return matchConversion();
     }
+    llvm_unreachable("covered switch");
   }
 
 private:
@@ -2704,7 +2706,8 @@ static bool fixMissingArguments(ConstraintSystem &cs, ASTNode anchor,
     if (auto *tuple = argType->getAs<TupleType>()) {
       args.pop_back();
       for (const auto &elt : tuple->getElements())
-        args.emplace_back(elt.getType(), elt.getName());
+        args.push_back(
+            AnyFunctionType::Param::bodyAccess(elt.getType(), elt.getName()));
 
       // If unpacking a tuple results in more arguments than parameters
       // it would be diagnosed as a general mismatch because it's unclear
@@ -2906,6 +2909,7 @@ matchFunctionThrowing(ConstraintSystem &cs,
     return ConstraintSystem::SolutionKind::Solved;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Determines the types that \p kind of \p func1 and \p func2 depend on, with
@@ -2974,6 +2978,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionExecutionSemantics(
     FunctionType *func1, FunctionType *func2, ConstraintKind kind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  if (Options.contains(ConstraintSystemFlags::IgnoreExecutionSemanticsMismatch))
+    return SolutionKind::Solved;
+
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
@@ -3001,24 +3008,16 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   auto inverses1 = getInverses(func1, dep1);
   auto inverses2 = getInverses(func2, dep2);
 
-  if (inverses1 != inverses2) {
-    // A conversion can suppress more invertible protocols, but never fewer.
-    if (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty()) {
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
+  // A conversion can suppress more invertible protocols, but never fewer.
+  if (inverses1 != inverses2 &&
+      (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty())) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
 
-      auto *fix = ExecutionSemanticsMismatch::create(
-          *this, func1, func2, getConstraintLocator(locator));
-      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
-        return SolutionKind::Error;
-    }
-
-    // Score each invertible protocol that differs, so that overload
-    // resolution prefers the closest execution semantics.
-    auto difference = (inverses1 - inverses2);
-    difference.insertAll(inverses2 - inverses1);
-    increaseScore(SK_FunctionConversion, locator,
-                  std::distance(difference.begin(), difference.end()));
+    auto *fix = ExecutionSemanticsMismatch::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+      return SolutionKind::Error;
   }
 
   return SolutionKind::Solved;
@@ -3487,7 +3486,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // If fixes are disabled let's do an easy thing and implode
     // tuple directly into parameters list.
     if (!shouldAttemptFixes()) {
-      params.emplace_back(input);
+      params.push_back(AnyFunctionType::Param::bodyAccess(input));
       return;
     }
 
@@ -3498,7 +3497,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         LocatorPathElt::SynthesizedArgument(0));
     auto *typeVar = createTypeVariable(getConstraintLocator(argLoc),
                                        TVO_CanBindToNoEscape);
-    params.emplace_back(typeVar);
+    params.push_back(AnyFunctionType::Param::bodyAccess(typeVar));
     assignFixedType(typeVar, input);
   };
 
@@ -3551,8 +3550,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
           auto param = func1Params.front();
           auto label = func2Params.front().getLabel();
 
-          auto labeledParam = FunctionType::Param(param.getPlainType(), label,
-                                                  param.getParameterFlags());
+          auto labeledParam = param.getWithoutLabels().withLabel(label);
 
           func1Params.clear();
           func1Params.push_back(labeledParam);
@@ -3627,7 +3625,8 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
         if (isSingleTupleParam(func1Params) &&
             func1Params[0].getOldType()->isVoid()) {
           if (func2Params.empty()) {
-            func2Params.emplace_back(getASTContext().TheEmptyTupleType);
+            func2Params.push_back(AnyFunctionType::Param::bodyAccess(
+                getASTContext().TheEmptyTupleType));
           }
         }
       }
@@ -6437,7 +6436,9 @@ bool ConstraintSystem::repairFailures(
         // closure arguments).
         if (closureTy->getNumParams() == 0) {
           conversionsOrFixes.push_back(AddMissingArguments::create(
-              *this, {SynthesizedArg{0, AnyFunctionType::Param(lhs)}}, loc));
+              *this,
+              {SynthesizedArg{0, AnyFunctionType::Param::bodyAccess(lhs)}},
+              loc));
           break;
         }
 
@@ -9683,6 +9684,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
       case PTK_AutoreleasingUnsafeMutablePointer:
         llvm_unreachable("no implicit conversion");
       }
+      llvm_unreachable("covered switch");
     };
 
     // String -> UnsafePointer<Void>
@@ -10849,6 +10851,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       case ExistentialMemberAccessLimitation::None:
         return false;
       }
+      llvm_unreachable("covered switch");
     };
 
     // Metatype extension members are only accessible on the protocol
@@ -12440,9 +12443,10 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         //   ...
         // }
         if (tuple->getNumElements() == inferredClosureType->getNumParams() &&
-            param.getParameterFlags().isNone()) {
+            param.getParameterFlags().isNone() && param.hasBodyAccess()) {
           const auto &elt = tuple->getElement(index);
-          return AnyFunctionType::Param(elt.getType(), elt.getName());
+          return AnyFunctionType::Param::bodyAccess(elt.getType(),
+                                                    elt.getName());
         }
 
         return std::nullopt;
@@ -13328,7 +13332,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // later form from this key path an implicit closure of the form
       // `{ root in root[keyPath: kp] }` so any conversions that are valid with
       // a source type of `(Root) -> Value` should be valid here too.
-      auto rootParam = AnyFunctionType::Param(rootTy);
+      auto rootParam = AnyFunctionType::Param::bodyAccess(rootTy);
       auto kpFnTy = FunctionType::get(rootParam, /* yields */ {}, valueTy,
                                       fnTy->getExtInfo());
 
@@ -13339,7 +13343,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       // let countKeyPath: (String...) -> Int = \.count
       // ```
       auto paramTy = fnTy->getParams()[0].getParameterType();
-      auto paramParam = AnyFunctionType::Param(paramTy);
+      auto paramParam = AnyFunctionType::Param::bodyAccess(paramTy);
       auto paramFnTy = FunctionType::get(paramParam, /* yields */ {},
                                          fnTy->getResult(), fnTy->getExtInfo());
 
@@ -13406,7 +13410,7 @@ ConstraintSystem::simplifyKeyPathConstraint(
       recordAnyTypeVarAsPotentialHole(valueTy);
 
       auto *expectedTy = FunctionType::get(
-          AnyFunctionType::Param(rootTy), /* yields */ {}, valueTy,
+          AnyFunctionType::Param::bodyAccess(rootTy), /* yields */ {}, valueTy,
           AnyFunctionType::ExtInfo());
       auto *fix = AllowMultiArgFuncKeyPathMismatch::create(
           *this, fnTy, expectedTy, getConstraintLocator(locator));
@@ -14290,7 +14294,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Create a type variable for the argument to the `dynamicallyCall` method.
   auto tvParam = createTypeVariable(loc, TVO_CanBindToNoEscape);
   AnyFunctionType *funcType = FunctionType::get(
-      {AnyFunctionType::Param(tvParam)}, /* yields */ {}, func1->getResult());
+      {AnyFunctionType::Param::bodyAccess(tvParam)}, /* yields */ {},
+      func1->getResult());
   addConstraint(ConstraintKind::DynamicCallableApplicableFunction,
                 funcType, tv, locator);
 
@@ -14519,8 +14524,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
           SmallVector<SynthesizedArg> synthesizedArgs;
           for (unsigned i = 0, n = numParams - numArgs; i != n; ++i) {
             auto eltTy = shape2->castTo<PackType>()->getElementType(i);
-            synthesizedArgs.push_back(SynthesizedArg{
-                argLoc.getParamIdx(), AnyFunctionType::Param(eltTy)});
+            synthesizedArgs.push_back(
+                SynthesizedArg{argLoc.getParamIdx(),
+                               AnyFunctionType::Param::bodyAccess(eltTy)});
           }
 
           return recordShapeFix(
@@ -14533,7 +14539,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifySameShapeConstraint(
 
           for (unsigned i = 0, n = numArgs - numParams; i != n; ++i) {
             extraneousArgs.push_back(
-                {argIdx + i, AnyFunctionType::Param(ctx.TheEmptyTupleType)});
+                {argIdx + i,
+                 AnyFunctionType::Param::bodyAccess(ctx.TheEmptyTupleType)});
           }
 
           auto overload = findSelectedOverloadFor(getCalleeLocator(argListLoc));

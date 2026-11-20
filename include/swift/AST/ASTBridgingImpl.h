@@ -256,6 +256,14 @@ OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() cons
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
 }
 
+SwiftInt BridgedDeclObj::NominalType_getNumStoredProperties() const {
+  return (SwiftInt)getAs<swift::NominalTypeDecl>()->getStoredProperties().size();
+}
+
+BridgedDeclObj BridgedDeclObj::NominalType_getStoredProperty(SwiftInt index) const {
+  return {getAs<swift::NominalTypeDecl>()->getStoredProperties()[index]};
+}
+
 BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   swift::Type rawTy = getAs<swift::EnumDecl>()->getRawType();
   if (rawTy)
@@ -281,6 +289,10 @@ OptionalBridgedDeclObj BridgedDeclObj::Class_getSuperclassDecl() const {
 
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+BridgedDeclObj BridgedDeclObj::Accessor_getStorage() const {
+  return {getAs<swift::AccessorDecl>()->getStorage()};
 }
 
 bool BridgedDeclObj::Class_isForeign() const {
@@ -421,6 +433,7 @@ swift::ASTNode BridgedASTNode::unbridged() const {
   case BridgedASTNodeKindDecl:
     return castToDecl().unbridged();
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -495,6 +508,7 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
     CASE(ImplicitlyCopyableConsuming)
 #undef CASE
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedParamDecl BridgedParamDecl_cloneWithoutType(BridgedParamDecl cDecl) {
@@ -598,6 +612,10 @@ bool BridgedASTType::hasOpaqueArchetype() const {
 
 bool BridgedASTType::hasExistentialArchetype() const {
   return unbridged()->hasOpenedExistential();
+}
+
+bool BridgedASTType::hasPrimaryArchetype() const {
+  return unbridged()->hasPrimaryArchetype();
 }
 
 bool BridgedASTType::hasDynamicSelf() const {
@@ -913,6 +931,10 @@ BridgedASTTypeArray BridgedASTType::PackType_getElementTypes() const {
   return {llvm::cast<swift::PackType>(type)->getElementTypes()};
 }
 
+BridgedASTType BridgedASTType::getTypeOfMember(BridgedDeclObj varDecl) const {
+  return {unbridged()->getTypeOfMember(varDecl.getAs<swift::VarDecl>()).getPointer()};
+}
+
 static_assert((int)BridgedASTType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
 static_assert((int)BridgedASTType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
 static_assert((int)BridgedASTType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
@@ -1085,6 +1107,7 @@ unbridge(BridgedMacroIntroducedDeclNameKind kind) {
     CASE(Arbitrary)
 #undef CASE
   }
+  llvm_unreachable("covered switch");
 }
 
 bool BridgedMacroRole_isAttached(BridgedMacroRole role) {
@@ -1120,8 +1143,8 @@ bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
   return unbridged() == rhs.unbridged();
 }
 
-bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
-  return unbridged().hasAnySubstitutableParams();
+bool BridgedSubstitutionMap::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 BridgedSubstitutionMap
@@ -1162,8 +1185,8 @@ BridgedGenericSignature::getCanonicalSignature() const {
   return BridgedCanGenericSignature{impl};
 }
 
-bool BridgedGenericSignature::areAllParamsConcrete() const {
-  return unbridged()->areAllParamsConcrete();
+bool BridgedGenericSignature::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 bool BridgedGenericSignature::canBeEmittedInEmbeddedSwift() const {

@@ -304,16 +304,43 @@ func exactlyOnceArgumentConversions(fn: @escaping () -> Void, exactlyOnce: @once
 }
 
 func exactlyOnceOwnership(
-  _: borrowing @once () -> Void,
-  // expected-error@-1 {{'@once' cannot be used together with 'borrowing'}}
+  _: borrowing @once () -> Void, // Ok
   _: consuming @once () -> Void, // Ok
   _: inout @once () -> Void // Ok
 ) {}
 
 func exactlyOnceTupleOwnership(
-  _: (borrowing @once () -> Void) -> Void
-  // expected-error@-1 {{'@once' cannot be used together with 'borrowing'}}
+  _: (borrowing @once () -> Void) -> Void // Ok
 ) {}
+
+func atMostOnceOwnership(
+  _: borrowing @callable(once) () -> Void, // Ok
+  _: borrowing @escaping @callable(once) () -> Void, // Ok
+  _: (borrowing @callable(once) () -> Void) -> Void // Ok
+) {}
+
+// A borrowed function value can't be called, but its type and isolation can
+// be queried, and it can be passed to another borrowing parameter.
+func borrowedQueries(
+  _ exactlyOnce: borrowing @escaping @once () -> Void,
+  _ atMostOnce: borrowing @escaping @isolated(any) @callable(once) () -> Void
+) {
+  let _: (@once () -> Void).Type = type(of: exactlyOnce)
+  let _: (@isolated(any) @callable(once) () -> Void).Type = type(of: atMostOnce)
+  let _: (any Actor)? = atMostOnce.isolation
+  let _: Int = MemoryLayout<@once () -> Void>.size
+  // expected-error@-1 {{type '@once () -> Void' does not conform to protocol 'Deinitable'}}
+  let _: Int = MemoryLayout<@callable(once) () -> Void>.size
+}
+
+func borrowedForwarding(_ f: borrowing @once () -> Void) {
+  func inspect(_: borrowing @once () -> Void) {}
+  func inspectAtMostOnce(_: borrowing @callable(once) () -> Void) {}
+
+  inspect(f) // Ok
+  inspectAtMostOnce(f)
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> Void' to function type '@callable(once) () -> Void'}}
+}
 
 // exactly-once parameters are `consuming` by default.
 protocol P_ExactlyOnce {
@@ -549,24 +576,105 @@ func overloadRanking(
   func overloaded(_: @escaping @callable(once) () -> Void) -> Int { 0 }
   func overloaded(_: @escaping @once () -> Void) -> String { "" }
 
-  // The closest execution semantics win.
-  let _: Int = overloaded(plain)
-  let _: Int = overloaded(atMostOnce)
-  let _: String = overloaded(exactlyOnce)
+  // The closest execution semantics win. Each result is bound before its type
+  // is checked, so that the type doesn't choose the overload.
+  let overloadedPlain = overloaded(plain)
+  let _: Int = overloadedPlain
+  let overloadedAtMostOnce = overloaded(atMostOnce)
+  let _: Int = overloadedAtMostOnce
+  let overloadedExactlyOnce = overloaded(exactlyOnce)
+  let _: String = overloadedExactlyOnce
 
   func plainOverloaded(_: @escaping () -> Void) -> Int { 0 }
   func plainOverloaded(_: @escaping @once () -> Void) -> String { "" }
 
-  let _: Int = plainOverloaded(plain)
-  let _: String = plainOverloaded(atMostOnce)
-  let _: String = plainOverloaded(exactlyOnce)
+  let plainOverloadedPlain = plainOverloaded(plain)
+  let _: Int = plainOverloadedPlain
+  let plainOverloadedAtMostOnce = plainOverloaded(atMostOnce)
+  let _: String = plainOverloadedAtMostOnce
+  let plainOverloadedExactlyOnce = plainOverloaded(exactlyOnce)
+  let _: String = plainOverloadedExactlyOnce
 
   // A closure literal adopts either contextual type, so the less restrictive
   // overload wins because it's more specialized.
-  let _: Int = overloaded { }
-  let _: Int = plainOverloaded { }
-  let _: Int = overloaded { @callable(once) in }
-  let _: String = overloaded { @once in }
+  let overloadedClosure = overloaded { }
+  let _: Int = overloadedClosure
+  let plainOverloadedClosure = plainOverloaded { }
+  let _: Int = plainOverloadedClosure
+  let overloadedAtMostOnceClosure = overloaded { @callable(once) in }
+  let _: Int = overloadedAtMostOnceClosure
+  let overloadedExactlyOnceClosure = overloaded { @once in }
+  let _: String = overloadedExactlyOnceClosure
+}
+
+// Overloads can differ only in whether a closure parameter has execution
+// semantics.
+func plainOrOnce(_: () -> Void) -> Int { 0 }
+func plainOrOnce(_: @once () -> Void) -> String { "" }
+func plainOrAtMostOnce(_: () -> Void) -> Int { 0 }
+func plainOrAtMostOnce(_: @callable(once) () -> Void) -> String { "" }
+
+func callPlainOrOnce(plain: () -> Void, exactlyOnce: @once () -> Void) {
+  let plainOrOnceClosure = plainOrOnce { }
+  let _: Int = plainOrOnceClosure
+  let plainOrOncePlain = plainOrOnce(plain)
+  let _: Int = plainOrOncePlain
+  let plainOrOnceExactlyOnce = plainOrOnce(exactlyOnce)
+  let _: String = plainOrOnceExactlyOnce
+  let plainOrAtMostOnceClosure = plainOrAtMostOnce { }
+  let _: Int = plainOrAtMostOnceClosure
+}
+
+// Passing a closure value to a parameter with execution semantics isn't
+// scored as a conversion, so a concrete type's method still wins over a
+// protocol extension method with a plain closure parameter.
+protocol WithValue {
+  func withValue(_ body: () -> Void)
+  func withResult<R>(_ body: () -> R) -> R?
+}
+
+extension WithValue {
+  @available(*, deprecated, message: "unexpectedly selected")
+  func withValue(_ body: () -> Void) {}
+
+  @available(*, deprecated, message: "unexpectedly selected")
+  func withResult<R>(_ body: () -> R) -> R? { nil }
+}
+
+struct ConcreteWithValue: WithValue {
+  func withValue(_ body: @callable(once) () -> Void) { body() }
+  func withResult<R>(_ body: @callable(once) () -> R) -> R? { body() }
+}
+
+func callConcreteWithValue(
+  _ value: ConcreteWithValue, _ body: () -> Void, _ result: () -> Int
+) {
+  value.withValue(body) // Ok
+  _ = value.withResult(result) // Ok
+}
+
+// Execution semantics are ignored when they're all that keep either overload
+// from being more specialized than the other, so a synchronous overload with
+// an exactly-once closure parameter is still more specialized than an `async`
+// one with a plain closure parameter.
+func syncOrAsync(_ body: @once () -> Void) -> Int { 0 }
+func syncOrAsync(_ body: () async -> Void) async -> String { "" }
+
+func optionalSyncOrAsync(_ body: consuming (@callable(once) () -> Void)?) -> Int { 0 }
+func optionalSyncOrAsync(_ body: (() async -> Void)?) async -> String { "" }
+
+func packSyncOrAsync<each T>(_ v: repeat each T, operation: @once () -> Void) -> Int { 0 }
+func packSyncOrAsync<each T>(_ v: repeat each T, operation: () async -> Void) async -> String { "" }
+
+func callSyncOrAsync(_ plain: @escaping () -> Void) async {
+  let syncOrAsyncClosure = syncOrAsync { }
+  let _: Int = syncOrAsyncClosure
+  let optionalSyncOrAsyncClosure = optionalSyncOrAsync { }
+  let _: Int = optionalSyncOrAsyncClosure
+  let optionalSyncOrAsyncPlain = optionalSyncOrAsync(plain)
+  let _: Int = optionalSyncOrAsyncPlain
+  let packSyncOrAsyncClosure = packSyncOrAsync(1, 2) { }
+  let _: Int = packSyncOrAsyncClosure
 }
 
 // MARK: - Existential conversions
@@ -1024,6 +1132,10 @@ func printedAndAtMostOnce(
 }
 
 func printedExplicitlyConsuming(_: consuming @once () -> Void) {}
+func printedBorrowing(_: borrowing @once () -> Void) {}
+func printedBorrowingInFunctionType(
+  _: (borrowing @callable(once) () -> Void) -> Void
+) {}
 func printedInOut(_: inout @callable(once) () -> Void) {}
 func printedExplicitlyConsumingInFunctionType(
   _: (consuming @callable(once) () -> Void) -> Void
@@ -1045,6 +1157,10 @@ func printedTypes() {
   // expected-error@-1 {{cannot convert value of type '(@once () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedInOut
   // expected-error@-1 {{cannot convert value of type '(inout @callable(once) () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedBorrowing
+  // expected-error@-1 {{cannot convert value of type '(borrowing @once () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedBorrowingInFunctionType
+  // expected-error@-1 {{cannot convert value of type '((borrowing @callable(once) () -> Void) -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedExplicitlyConsumingInFunctionType
   // expected-error@-1 {{cannot convert value of type '((@callable(once) () -> Void) -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedAlias

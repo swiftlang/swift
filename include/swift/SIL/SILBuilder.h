@@ -869,11 +869,11 @@ public:
     lowering.emitLoweredStore(*this, Loc, Value, Addr, Qual, ExpansionKind);
   }
 
-  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
+  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV, SILValue valueHint = SILValue()) {
     ASSERT(isLoadableOrOpaque(LV->getType()) &&
            !LV->getType().isTrivial(getFunction()));
     return insert(new (getModule())
-                      LoadBorrowInst(getSILDebugLocation(Loc), LV));
+                      LoadBorrowInst(getSILDebugLocation(Loc), LV, valueHint));
   }
 
   BeginBorrowInst *createBeginBorrow(
@@ -1609,6 +1609,13 @@ public:
                                                    SILValue Operand) {
     return insert(new (getModule()) UncheckedOwnershipInst(
         getSILDebugLocation(Loc), Operand, Operand->getOwnershipKind()));
+  }
+
+  UncheckedOwnershipInst *createUncheckedOwnership(SILLocation Loc,
+                                  SILValue Operand,
+                                  ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(new (getModule()) UncheckedOwnershipInst(
+        getSILDebugLocation(Loc), Operand, forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastInst *
@@ -2610,9 +2617,13 @@ public:
     return insert(new (getModule())
                     DeallocStackRefInst(getSILDebugLocation(Loc), operand));
   }
-  DeallocRefInst *createDeallocRef(SILLocation Loc, SILValue operand) {
-    return insert(new (getModule()) DeallocRefInst(
-        getSILDebugLocation(Loc), operand));
+  DeallocRefInst *
+  createDeallocRef(SILLocation Loc, SILValue operand,
+                   ArrayRef<SILType> ElementTypes = {},
+                   ArrayRef<SILValue> ElementCountOperands = {}) {
+    return insert(DeallocRefInst::create(getSILDebugLocation(Loc),
+                                         getFunction(), operand, ElementTypes,
+                                         ElementCountOperands));
   }
   DeallocPartialRefInst *createDeallocPartialRef(SILLocation Loc,
                                                  SILValue operand,

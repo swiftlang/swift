@@ -52,6 +52,9 @@ ERROR(bridging_objcbridgeable_broken,none,
 ERROR(sil_function_redefinition,none,
       "multiple definitions of symbol '%0'",
       (StringRef))
+ERROR(sil_function_redefinition_bug,none,
+      "multiple definitions of symbol '%0'; " SWIFT_BUG_REPORT_MESSAGE,
+      (StringRef))
 NOTE(sil_function_redefinition_note,none,
       "other definition here",
       ())
@@ -922,12 +925,28 @@ ERROR(sil_movechecking_value_used_after_consume, none,
       "'%0' used after consume", (StringRef))
 ERROR(sil_movechecking_guaranteed_value_consumed, none,
       "'%0' is borrowed and cannot be consumed", (StringRef))
+ERROR(sil_movechecking_guaranteed_value_called, none,
+      "'%0' is borrowed and cannot be called", (StringRef))
 NOTE(sil_movechecking_add_explicit_copy, none,
      "write 'copy %0' to keep '%0' valid after this consume", (StringRef))
 ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "'%0' cannot be captured by an escaping closure since it is a borrowed "
       "parameter",
       (StringRef))
+ERROR(sil_movechecking_borrowed_value_consumed_without_copy, none,
+      "'%0' is borrowed and cannot be consumed without an explicit 'copy'",
+      (StringRef))
+ERROR(sil_movechecking_borrowed_value_captured_by_escaping_closure, none,
+      "borrowed '%0' cannot be captured by an escaping closure", (StringRef))
+NOTE(sil_movechecking_consume_explicit_copy, none,
+     "write 'copy %0' to consume a copy instead", (StringRef))
+NOTE(sil_movechecking_make_parameter_consuming, none,
+     "make '%0' a 'consuming' parameter to take ownership of it", (StringRef))
+NOTE(sil_movechecking_make_method_consuming, none,
+     "make %0 a 'consuming' method to take ownership of 'self'", (DeclName))
+NOTE(sil_movechecking_captured_by_borrowing_closure, none,
+     "'%0' is captured by this %select{local function|closure}1, which only "
+     "borrows it", (StringRef, bool))
 ERROR(sil_movechecking_capture_consumed, none,
       "non-'Copyable' '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type",
       (StringRef))
@@ -1014,6 +1033,8 @@ NOTE(sil_movechecking_consumed_by_argument_here, none,
      "consumed here; %0 takes ownership of this argument", (DeclName))
 NOTE(sil_movechecking_consumed_by_method_here, none,
      "consumed here by call to consuming method %0", (DeclName))
+NOTE(sil_movechecking_consumed_by_call_here, none,
+     "called here; calling a '%0' function consumes it", (StringRef))
 NOTE(sil_movechecking_consider_borrowing_parameter, none,
      "consider making this parameter 'borrowing' if %0 does not need "
      "ownership of it", (DeclName))
@@ -1029,6 +1050,8 @@ ERROR(sil_movechecking_not_understand_moveonly, none,
       "usage of a non-'Copyable' type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
       "copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_lifetime_resolution_bug_missed_copy, none,
+      "LifetimeResolution missed diagnosing a copy. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,
       "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
@@ -1453,6 +1476,10 @@ ERROR(invalid_multiple_return_borrow_accessor, none,
       ())
 ERROR(unsupported_borrow_abstraction, none,
       "cannot witness borrow requirement for result type %0",
+      (Type))
+
+ERROR(tail_allocated_wrong_element_types, none,
+      "%0 must be tail-allocated with its '@_tailAllocated' element types",
       (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

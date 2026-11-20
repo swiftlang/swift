@@ -26,6 +26,8 @@ internal import ucrt
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 /// A backtrace formatting theme.
@@ -796,7 +798,7 @@ public struct BacktraceFormatter {
     }
 
     while feof(fp) == 0 && ferror(fp) == 0 {
-      guard let result = fgets(buffer.baseAddress,
+      guard let result = fgets(buffer.baseAddress!,
                                CInt(buffer.count), fp) else {
         break
       }

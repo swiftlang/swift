@@ -207,7 +207,7 @@ ASTExtInfoBuilder ASTExtInfoBuilder::withTypeDependency(TypeDependenceKind kind,
   }
 
   return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
-                           allocated, lifetimeDependencies);
+                           allocated, lifetimeDependencies, scopeSignature);
 }
 
 ASTExtInfo ASTExtInfoBuilder::build() const {

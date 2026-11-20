@@ -3529,6 +3529,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
       return flags.withOwnershipSpecifier(ParamSpecifier::Default);
     return flags;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -4286,8 +4287,9 @@ CanType ASTMangler::getDeclTypeForMangling(
         isa<SubscriptDecl>(decl)) {
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
-                                  /* yields */ {}, C.TheErrorType, info);
+      return CanFunctionType::get(
+          {AnyFunctionType::Param::bodyAccess(C.TheErrorType)},
+          /* yields */ {}, C.TheErrorType, info);
     }
     return C.TheErrorType;
   }
@@ -5171,6 +5173,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(
     return getPrivateDiscriminatorIfNecessary(
         cast<Decl>(cast<MacroExpansionDecl>(expansion)));
   }
+  llvm_unreachable("covered switch");
 }
 
 void

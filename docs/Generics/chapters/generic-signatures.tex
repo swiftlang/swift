@@ -1330,7 +1330,7 @@ The backing storage of a generic signature. Instances of this class are allocate
 \item \texttt{isEqual()} checks if two generic signatures are canonically equal.
 \item \IndexQuerySource{getSugaredType}\texttt{getSugaredType()} replaces the generic parameter types in the given type, which must be an interface type for this generic signature, with their ``sugared'' forms taken from this generic signature, so that their names are preserved when printed out to a string.
 \item \texttt{forEachParam()} invokes a callback on each generic parameter of the signature; the callback also receives a boolean indicating if the generic parameter type is reduced or not---a generic parameter on the left hand side of a same-type requirement is not reduced.
-\item \texttt{areAllParamsConcrete()} checks if all generic parameters are fixed to concrete types via same-type requirements, which makes the generic signature somewhat like an empty generic signature. Fully-concrete generic signatures are lowered away at the SIL level.
+\item \texttt{isEffectivelyGeneric()} checks if at least one generic parameter is not fixed to a concrete type via a same-type requirement. A generic signature where every generic parameter is fixed to a concrete type is somewhat like an empty generic signature; such fully-concrete generic signatures are lowered away at the SIL level.
 \end{itemize}
 The generic signature queries from \SecRef{genericsigqueries} are methods on \texttt{GenericSignatureImpl}:
 \begin{itemize}

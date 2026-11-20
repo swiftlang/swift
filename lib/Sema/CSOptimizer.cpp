@@ -310,6 +310,7 @@ static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
         case RequirementKind::Layout:
           return false;
         }
+        llvm_unreachable("covered switch");
       }))
     return false;
 
@@ -612,6 +613,26 @@ static void findFavoredChoicesBasedOnArity(
     favoredChoice(choice);
 }
 
+/// Returns true if an argument of \p argumentType matches a parameter of
+/// \p paramType exactly, or only by converting the execution semantics of the
+/// argument.
+static bool matchesExceptForExecutionSemantics(Type argumentType,
+                                               Type paramType) {
+  if (argumentType->isEqual(paramType))
+    return true;
+
+  auto *paramFnType = paramType->getAs<FunctionType>();
+  auto *argumentFnType = argumentType->getAs<FunctionType>();
+  if (!paramFnType || !argumentFnType)
+    return false;
+
+  auto paramSemantics = paramFnType->getExecutionSemantics();
+  return canConvertExecutionSemantics(argumentFnType->getExecutionSemantics(),
+                                      paramSemantics) &&
+         argumentFnType->withExecutionSemantics(paramSemantics)
+             ->isEqual(paramFnType);
+}
+
 /// Preserves old behavior where, for unary calls, the solver would not previously
 /// consider choices that didn't match on the number of parameters (regardless of
 /// defaults and variadics) and only exact matches were favored.
@@ -724,7 +745,8 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
             (isa<LiteralExpr>(argument) || isa<BinaryExpr>(argument)))
           return;
 
-        if (argumentType->isEqual(param.getPlainType())) {
+        if (matchesExceptForExecutionSemantics(argumentType,
+                                               param.getPlainType())) {
           if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (func->isAsyncContext() !=
                 cs.isAsynchronousContext(choice->getDeclContext()))

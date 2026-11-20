@@ -963,7 +963,7 @@ ManagedValue SILGenFunction::emitDoubleToCGFloat(SILLocation loc,
              ManagedValue::forObjectRValueWithoutOwnership(doubleValue),
              argType);
 
-  PreparedArguments args((AnyFunctionType::Param(argType)));
+  PreparedArguments args((AnyFunctionType::Param::bodyAccess(argType)));
   args.add(loc, std::move(arg));
 
   auto result =
@@ -983,7 +983,7 @@ ManagedValue SILGenFunction::emitCGFloatToDouble(SILLocation loc,
              ManagedValue::forObjectRValueWithoutOwnership(cgfloatValue),
              argType);
 
-  PreparedArguments args((AnyFunctionType::Param(argType)));
+  PreparedArguments args((AnyFunctionType::Param::bodyAccess(argType)));
   args.add(loc, std::move(arg));
 
   auto result =

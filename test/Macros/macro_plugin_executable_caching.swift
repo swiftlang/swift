@@ -17,7 +17,7 @@
 
 /// The executable is in the CAS file system.
 // RUN: %{python} %S/../CAS/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/fs.casid | %FileCheck %s --check-prefix=FS
 // FS: /^test{{/|\\}}plugins{{/|\\}}mock-plugin
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd

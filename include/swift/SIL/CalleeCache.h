@@ -93,6 +93,7 @@ public:
       case Kind::multipleCallees:
         return ((Callees *)functionOrCallees)->begin();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return an iterator for the end of the list.
@@ -105,6 +106,7 @@ public:
       case Kind::multipleCallees:
         return ((Callees *)functionOrCallees)->end();
     }
+    llvm_unreachable("covered switch");
   }
 
   size_t getCount() const {

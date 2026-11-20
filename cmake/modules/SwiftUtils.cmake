@@ -294,6 +294,10 @@ function(swift_append_caching_compile_flags result_var)
       "-scanner-prefix-map-sdk" "/^sdk"
       "-scanner-prefix-map-toolchain" "/^toolchain"
       "-scanner-prefix-map" "${SWIFT_CACHING_BUILD_SOURCE_ROOT}=/^src")
+    if(SWIFT_CACHING_BUILD_DEVELOPER_DIR)
+      list(APPEND ${result_var}
+        "-scanner-prefix-map" "${SWIFT_CACHING_BUILD_DEVELOPER_DIR}=/^xcode")
+    endif()
   endif()
   if(SWIFT_CACHING_BUILD_ENABLE_MCCAS)
     list(APPEND ${result_var}

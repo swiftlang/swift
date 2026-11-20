@@ -65,8 +65,10 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
                           /*isMandatory*/ true);
 
   // Check linear OSSA lifetimes.
-  if (opts.VerifyAll || VerifySILGen)
-    Module.verifyOwnership();
+  if (opts.VerifyAll || VerifySILGen) {
+    SILPassManager pm(&Module, /*isMandatory=*/true, /*IRMod=*/nullptr);
+    pm.runMandatoryModuleVerification();
+  }
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {

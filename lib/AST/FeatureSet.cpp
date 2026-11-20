@@ -13,6 +13,7 @@
 #include "FeatureSet.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -229,6 +230,10 @@ static bool usesFeatureTargetAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
+static bool usesFeatureTailAllocatedAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TailAllocatedAttr>();
+}
+
 static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
   for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
     // Exported functions and types, and non-exported types.
@@ -251,14 +256,11 @@ static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
     return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
-  switch (decl->getKind()) {
-  case DeclKind::Var: {
-    auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
-  }
-  default:
-    return hasLifetimeAttr(decl);
-  }
+  // A property or subscript may carry the attribute on its accessors.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+    return hasLifetimeAttr(storage) ||
+           llvm::any_of(storage->getAllAccessors(), hasLifetimeAttr);
+  return hasLifetimeAttr(decl);
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {
@@ -501,6 +503,7 @@ UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinCreateSynchronousDiscardingTask)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
+UNINTERESTING_FEATURE(BuiltinSplitContinuations)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
@@ -668,6 +671,14 @@ static bool usesFeatureInlineAlways(Decl *decl) {
 static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
   if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
     return unsafeAttr->isAlways();
+  }
+  return false;
+}
+
+static bool usesFeatureAvailabilityOSVersionQueryKind(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<SemanticsAttr>()) {
+    if (parseOSVersionQuerySemanticsAttr(attr->Value))
+      return true;
   }
   return false;
 }

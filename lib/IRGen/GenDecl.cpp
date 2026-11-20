@@ -655,7 +655,7 @@ void IRGenModule::emitRuntimeRegistration() {
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
     IRBuilder Builder(getLLVMContext(),
                       DebugInfo && !Context.LangOpts.DebuggerSupport);
-    Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
+    Builder.llvm::IRBuilderBase::SetInsertPoint(IP);
     if (DebugInfo && !Context.LangOpts.DebuggerSupport)
       DebugInfo->setEntryPointLoc(Builder);
     Builder.CreateCall(fnTy, RegistrationFunction, {});
@@ -1659,6 +1659,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
       if (isa<ClassDecl>(type) || isa<ProtocolDecl>(type))
         return false;
 
+      // The generated C++ header references the metadata of the structs and
+      // enums it prints.
+      if (isa<StructDecl, EnumDecl>(type) &&
+          SILDeclRef::declMayBePrintedInCxxHeader(type, SIL))
+        return false;
+
       switch (type->getEffectiveAccess()) {
       case AccessLevel::Open:
       case AccessLevel::Public:
@@ -1681,6 +1687,24 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+bool IRGenerator::mayDispatchFromCxxHeader(SILDeclRef method) {
+  if (!SIL.getOptions().CxxHeaderMinAccess)
+    return false;
+  if (!CxxHeaderDispatchedMethods) {
+    CxxHeaderDispatchedMethods.emplace();
+    for (auto *vtable : SIL.getVTables()) {
+      for (auto &entry : vtable->getEntries()) {
+        if (entry.getMethod().mayBeCalledFromCxxHeader(SIL) ||
+            entry.getImplementation()->getDeclRef().mayBeCalledFromCxxHeader(
+                SIL))
+          CxxHeaderDispatchedMethods->insert(entry.getMethod());
+      }
+    }
+  }
+  return method.mayBeCalledFromCxxHeader(SIL) ||
+         CxxHeaderDispatchedMethods->contains(method);
 }
 
 void IRGenerator::noteUseOfClassMetadata(CanType classType) {
@@ -2872,6 +2896,23 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
+void IRGenModule::overrideLinkageForWeakLinkedClangDecl(
+    llvm::GlobalValue *global, const ModuleDecl *declModule,
+    llvm::GlobalValue::LinkageTypes linkage) {
+  // FIXME: We should be able to set the linkage unconditionally here but
+  //        some fixes are needed for Cxx interop.
+  if (!getSwiftModule()->isImportedAsWeakLinked(declModule))
+    return;
+
+  global->setLinkage(linkage);
+
+  // Clang may have assumed that the declaration is DSO-local based on the
+  // linkage it computed, but a weak reference may resolve to null, which is
+  // outside of the current DSO.
+  if (global->hasExternalWeakLinkage())
+    global->setDSOLocal(false);
+}
+
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
@@ -2882,16 +2923,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
 
-    // Override the linkage computed by Clang if the decl is from another
-    // module that imported @_weakLinked.
-    //
-    // FIXME: We should be able to set the linkage unconditionally here but
-    //        some fixes are needed for Cxx interop.
-    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
-      auto varModule = var->getDecl()->getModuleContext();
-      if (getSwiftModule()->isImportedAsWeakLinked(varModule))
-        globalVar->setLinkage(link.getLinkage());
-    }
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr))
+      overrideLinkageForWeakLinkedClangDecl(
+          globalVar, var->getDecl()->getModuleContext(), link.getLinkage());
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -3633,12 +3667,15 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::FunctionType *ctorFnType =
       cast<llvm::FunctionType>(clangFunc->getValueType());
 
+  // Mirror C++ value-initialization, which zero-initializes the object first
+  // only if its default constructor is not user-provided.
+  bool zeroInitialize = ctor->isDefaultConstructor() && !ctor->isUserProvided();
+
   // Only need a thunk if either:
   // 1. The calling conventions do not match, and we need to pass arguments
   //    differently.
-  // 2. This is a default constructor, and we need to zero the backing memory of
-  //    the struct.
-  if (assumedFnType == ctorFnType && !ctor->isDefaultConstructor()) {
+  // 2. We need to zero the backing memory of the struct.
+  if (assumedFnType == ctorFnType && !zeroInitialize) {
     return ctorAddress;
   }
 
@@ -3684,7 +3721,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     }
   }
 
-  if (ctor->isDefaultConstructor()) {
+  if (zeroInitialize) {
     assert(Args.size() > 0 && "expected at least 1 argument (result address) "
                               "for default constructor");
 
@@ -3829,14 +3866,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
     if (fn) {
       if (!forDefinition) {
-        // Override the linkage computed by Clang if the decl is from another
-        // module that imported @_weakLinked.
-        //
-        // FIXME: We should be able to set the linkage unconditionally here but
-        //        some fixes are needed for Cxx interop.
         if (auto *parentModule = f->getParentModule())
-          if (getSwiftModule()->isImportedAsWeakLinked(parentModule))
-            fn->setLinkage(link.getLinkage());
+          overrideLinkageForWeakLinkedClangDecl(fn, parentModule,
+                                                link.getLinkage());
       }
 
       // If we have a function, move it to the appropriate position.
@@ -3912,11 +3944,15 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
 static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                                  llvm::Constant *global,
-                                                 LinkEntity entity)
+                                                 LinkEntity entity,
+                                                 StringRef name = "")
 {
   // Determine the name of this entity.
   llvm::SmallString<64> globalName;
-  entity.mangle(IGM.Context, globalName);
+  if (name.empty())
+    entity.mangle(IGM.Context, globalName);
+  else
+    globalName = name;
 
   if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
     if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
@@ -3999,6 +4035,25 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
   auto gotEquivalent = createGOTEquivalent(*this, global, entity);
   gotEntry = gotEquivalent;
   return gotEquivalent;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfDefiningModuleTypeDescriptorSlot(NominalTypeDecl *decl) {
+  // This module's copy of the descriptor has a different name.
+  auto name = IRGenMangler(Context).mangleNominalTypeDescriptor(decl);
+  auto *descriptor = Module.getNamedGlobal(name);
+  if (!descriptor)
+    descriptor = new llvm::GlobalVariable(Module, TypeContextDescriptorTy,
+                                          /*isConstant*/ true,
+                                          llvm::GlobalValue::ExternalWeakLinkage,
+                                          /*initializer*/ nullptr, name);
+
+  if (auto *existing = Module.getNamedGlobal("got." + name))
+    return existing;
+
+  // The slot's entity is only used to decide how to sign the descriptor.
+  return createGOTEquivalent(*this, descriptor,
+                             LinkEntity::forNominalTypeDescriptor(decl), name);
 }
 
 static llvm::Constant *getElementBitCast(IRGenModule &IGM,
@@ -4698,6 +4753,9 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   emitProtocolConformance(record);
 
   if (conformanceIsVisibleViaMetadata(record.conformance)) {
+    if (auto *canonical = emitCanonicalTypeProtocolConformance(record))
+      BackDeploymentCanonicalConformances.push_back(canonical);
+
     // Add this conformance to the conformance list.
     ProtocolConformances.push_back(std::move(record));
   }
@@ -4779,6 +4837,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
         getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
       descriptorArray.addRelativeAddress(descriptor);
     }
+    for (auto *descriptor : BackDeploymentCanonicalConformances)
+      descriptorArray.addRelativeAddress(descriptor);
 
     // Define the global variable for the conformance list.
     // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
@@ -4822,6 +4882,18 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
       // or type (from the conformance) is not referenced.
       appendLLVMUsedConditionalEntry(var, record.conformance);
     }
+  }
+
+  for (auto *descriptor : BackDeploymentCanonicalConformances) {
+    auto var = new llvm::GlobalVariable(
+        Module, RelativeAddressTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        "record_" + descriptor->getName());
+    var->setInitializer(emitDirectRelativeReference(descriptor, var, {}));
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
   }
 
   return nullptr;
@@ -5227,8 +5299,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
                                            ArrayRef<llvm::Type *> genericArgs,
                                            ForDefinition_t forDefinition) {
   assert(nominal->isGenericContext());
-  assert(!genericArgs.empty() ||
-         nominal->getGenericSignature()->areAllParamsConcrete());
+  assert(!genericArgs.empty() || !nominal->isEffectivelyGenericContext());
   IRGen.noteUseOfTypeMetadata(nominal);
 
   auto type = nominal->getDeclaredType()->getCanonicalType();
@@ -5356,6 +5427,19 @@ IRGenModule::getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataDemanglingCacheVariable(type);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+}
+
+/// Get or create a type metadata mangled name ref.  These are an
+/// implementation detail of type metadata access functions.
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataMangledNameRef(CanType type,
+                                                 ConstantInit definition) {
+  ASSERT(!type->hasArchetype() && !type->hasTypeParameter());
+  LinkEntity entity = LinkEntity::forTypeMetadataMangledNameRef(type);
+  auto *addr = getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+  auto var = cast<llvm::GlobalVariable>(addr);
+  var->setConstant(true);
+  return addr;
 }
 
 llvm::Constant *

@@ -18,10 +18,12 @@
 #define SWIFT_AST_SCOPERESTRICTIONS_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/RecursiveTypeProperties.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -32,6 +34,7 @@
 
 namespace swift {
 
+class AnyFunctionType;
 class ASTContext;
 class NominalTypeDecl;
 class Type;
@@ -187,60 +190,172 @@ public:
   friend bool operator!=(ScopeDepth lhs, ScopeDepth rhs) {
     return !(lhs == rhs);
   }
+
+  /// The element at this depth from the top of \p binders, a stack of the
+  /// enclosing binders indexed by de Bruijn level, or null if the binder is
+  /// further out.
+  template <typename Binders>
+  auto lookUpIn(Binders &&binders) const -> decltype(&binders[0]) {
+    if (Value >= binders.size())
+      return nullptr;
+    return &binders[binders.size() - 1 - Value];
+  }
 };
 
 /// A reference to a scope from within a type.
 ///
-/// DISCUSSION: Indexing is parameters (for access scopes) followed by scopes
-/// within types ordered by first occurrence of that type. `consuming`
-/// parameters increment the index but their "access scope" does not exist and
-/// won't be referenced, since they are owned.
+/// Indexing is explicit `@_scopeParams`, then accesses of `&foo` parameters.
 ///
 /// Uses de Bruijn indexing, not levels, so that it's cheap to pass function
 /// types without rewriting.
 class ScopeRef {
 public:
   enum class Kind : uint8_t {
+    /// There was an error resolving this scope.
+    Error,
+
     /// The global scope, which outlives every other scope. Lives "sufficiently
     /// long". Escapable types have immortal scope.
     Immortal,
-    /// A scope parameter of an enclosing type.
+
+    /// A scope parameter of an enclosing function or type.
     Param,
 
-    Last_Kind = Param
+    /// The scope for the body of a call to a given function. Represents the
+    /// access scope of a parameter which isn't bound or referred to. Only known
+    /// to live for the body of the call.
+    Body,
+
+    /// A local access scope in the current function *other* than a parameter.
+    /// Note that lifetime analysis can sometimes unify one of these local
+    /// scopes with a parameter scope or even the immortal scope; other
+    /// code should not assume that they cannot outlast such scopes.
+    Local,
+
+    /// A scope variable introduced within a constraint system.
+    /// Should be eliminated after solving.
+    UnresolvedVariable,
   };
 
 private:
-  static constexpr unsigned NumKindBits = 2;
-  static constexpr unsigned NumDataBits = 32 - NumKindBits;
-  static constexpr unsigned NumParamIndexBits = 15;
-  static constexpr unsigned NumParamDepthBits = NumDataBits - NumParamIndexBits;
-  static constexpr uint32_t ParamIndexMask =
-      llvm::maskTrailingOnes<uint32_t>(NumParamIndexBits);
-  static constexpr unsigned ParamDepthShift = NumParamIndexBits;
-  static_assert(llvm::isUInt<NumKindBits>(unsigned(Kind::Last_Kind)),
+  using BitsType = uint32_t;
+  static constexpr unsigned NumBits = 32;
+
+  enum class StorageKind : BitsType {
+    Singleton,
+    Param,
+    Local,
+    UnresolvedVariable,
+    Last_Kind = Param
+  };
+
+  static constexpr unsigned NumStorageKindBits = 2;
+  static constexpr BitsType StorageKindMask =
+    ((BitsType(1) << NumStorageKindBits) - 1) << 0;
+  static_assert(llvm::isUInt<NumStorageKindBits>(BitsType(StorageKind::Last_Kind)),
                 "unable to fit a ScopeRef::Kind in the given number of bits");
 
-  uint32_t TheKind : NumKindBits;
-  /// Interpreted according to the kind: zero for `Immortal`, and the depth
-  /// above the index for `Param`.
-  uint32_t Data : NumDataBits;
+  static constexpr unsigned DataShift = NumStorageKindBits;
+  static constexpr unsigned NumDataBits = NumBits - DataShift;
+  static constexpr BitsType DataMask =
+    ((BitsType(1) << NumDataBits) - 1) << DataShift;
 
-  ScopeRef(Kind kind, uint32_t data) : TheKind(unsigned(kind)), Data(data) {
+  static constexpr unsigned IndexShift = DataShift;
+  static constexpr unsigned NumIndexBits = 15;
+  static constexpr BitsType IndexMask =
+    ((BitsType(1) << NumIndexBits) - 1) << IndexShift;
+
+  static constexpr unsigned DepthShift = DataShift + NumIndexBits;
+  static constexpr unsigned NumDepthBits = NumDataBits - NumIndexBits;
+  static constexpr BitsType DepthMask =
+    ((BitsType(1) << NumDepthBits) - 1) << DepthShift;
+  static_assert(DepthShift + NumDepthBits == NumBits, "used all bits");
+
+  /// StorageKind (0...1) | Data (2...31)
+  /// --------------------+---------------------
+  /// Singleton           | one of the singleton Kinds (2...31)
+  /// Param               | Index (2...17)          | Depth (18...31)
+  ///                     |   (index 0 is Body)     |
+  /// Local               | Data (2...31)
+  /// Variable            | Data (2...31)
+  BitsType Bits;
+
+  StorageKind getStorageKind() const {
+    return StorageKind(Bits & StorageKindMask);
+  }
+  BitsType getRawData() const {
+    return (Bits >> DataShift);
+  }
+  BitsType getRawIndex() const {
+    return (Bits & IndexMask) >> IndexShift;
+  }
+  BitsType getRawDepth() const {
+    return (Bits & DepthMask) >> DepthShift;
+  }
+  static BitsType getRawParamData(unsigned rawIndex, unsigned rawDepth) {
+    ASSERT(llvm::isUInt<NumDepthBits>(rawDepth) &&
+           llvm::isUInt<NumIndexBits>(rawIndex) &&
+           "scope reference overflow");
+    return BitsType(rawIndex | (rawDepth << NumIndexBits));
+  }
+
+  ScopeRef(StorageKind kind, BitsType data)
+      : Bits(BitsType(kind) | (data << DataShift)) {
     ASSERT(llvm::isUInt<NumDataBits>(data) && "scope reference overflow");
   }
 
 public:
-  static ScopeRef forImmortal() { return {Kind::Immortal, 0}; }
-
-  static ScopeRef forParam(ScopeDepth depth, unsigned index) {
-    ASSERT(llvm::isUInt<NumParamDepthBits>(depth.Value) &&
-           llvm::isUInt<NumParamIndexBits>(index) &&
-           "scope reference overflow");
-    return {Kind::Param, (depth.Value << ParamDepthShift) | index};
+  static ScopeRef forError() {
+    return {StorageKind::Singleton, BitsType(Kind::Error)};
   }
 
-  Kind getKind() const { return Kind(TheKind); }
+  static ScopeRef forImmortal() {
+    return {StorageKind::Singleton, BitsType(Kind::Immortal)};
+  }
+
+  static ScopeRef forParam(ScopeDepth depth, unsigned index) {
+    return {StorageKind::Param, getRawParamData(index + 1, depth.Value)};
+  }
+
+  static ScopeRef forBody(ScopeDepth depth) {
+    return {StorageKind::Param, getRawParamData(0, depth.Value)};
+  }
+
+  /// Create a Body scope at depth 0, to use as the default access scope of a
+  /// parameter.
+  static ScopeRef forCallBody() { return forBody(ScopeDepth::zero()); }
+
+  static ScopeRef forLocal(unsigned index) {
+    return {StorageKind::Local, index};
+  }
+
+  static ScopeRef forUnresolvedVariable(unsigned index) {
+    return {StorageKind::UnresolvedVariable, index};
+  }
+
+  Kind getKind() const {
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+      // We directly store the singleton Kind value as Data.
+      return Kind(getRawData());
+
+    case StorageKind::Param:
+      return getRawIndex() == 0 ? Kind::Body : Kind::Param;
+
+    case StorageKind::Local:
+      return Kind::Local;
+
+    case StorageKind::UnresolvedVariable:
+      return Kind::UnresolvedVariable;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  /// Is this the placeholder error scope, used when there was an error
+  /// resolving a scope specifier?
+  bool isError() const {
+    return *this == forError();
+  }
 
   /// The number of function types between this reference and its binder.
   ///
@@ -251,44 +366,79 @@ public:
   /// Here `&a` has depth 1, since the type of `body` is between it and the
   /// type of `with`.
   ScopeDepth getDepth() const {
-    ASSERT(getKind() == Kind::Param);
-    return ScopeDepth(Data >> ParamDepthShift);
+    ASSERT(getStorageKind() == StorageKind::Param);
+    return ScopeDepth(getRawDepth());
   }
 
   /// The index of the scope parameter in its binder.
   ///
   /// ```
-  /// func foo(_ a: MyArray, _ x: MyRef, _ y: MyRef) -> @_scoped(&a) MyRef
-  /// // access: &0            &1 ~~~~~    &2 ~~~~~
-  /// //  value:                    3           4
+  /// @_scopeParams(s, t)
+  /// func foo(_ a: MyArray, _ b: MyArray, _ x: @_scoped(t) MyRef,
+  ///          _ y: @_scoped(s) MyRef) -> @_scoped(&b) MyRef
   /// ```
   ///
-  /// Here `&a`, the access scope of `a`, has index 0. The scopes of `x` and `y`
-  /// have indexes 3 and 4 (assuming `MyRef` only contains one scope), after the
-  /// access scopes of all three parameters. MyArray does not contain any
-  /// scopes, since it is `Escapable`.
+  /// Here `s` and `t` have indexes 0 and 1, in the order they're declared, and
+  /// `&b`, the access scope of `b`, has index 2, since the result refers to it.
+  /// The accesses of `a`, `x`, and `y` are body scopes and don't have an index.
   unsigned getIndex() const {
     ASSERT(getKind() == Kind::Param);
-    return Data & ParamIndexMask;
+    return getRawIndex() - 1;
+  }
+
+  unsigned getLocalIndex() const {
+    ASSERT(getKind() == Kind::Local);
+    return getRawData();
+  }
+
+  unsigned getUnresolvedVariableIndex() const {
+    ASSERT(getKind() == Kind::UnresolvedVariable);
+    return getRawData();
   }
 
   /// Reference the same scope from \p by more function types in.
   ///
-  /// Immortal scopes are not shifted, since they are global.
+  /// Singleton scopes are not shifted, since they are global.
+  /// Local scopes might need to deal with this?
+  /// Unresolved scope variables in the constraint system never should.
   ScopeRef shifted(ScopeDepth by) const {
-    if (getKind() == Kind::Immortal)
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+    case StorageKind::Local:
+    case StorageKind::UnresolvedVariable:
       return *this;
-    return forParam(ScopeDepth(getDepth().Value + by.Value), getIndex());
+    case StorageKind::Param:
+      return {StorageKind::Param,
+              getRawParamData(getRawIndex(), getRawDepth() + by.Value)};
+    }
+    llvm_unreachable("unhandled kind");
   }
 
-  /// Prints `^depth.index`, or `immortal`.
+  /// Return the recursive properties that would apply to a type
+  /// with this scope reference as a component.
+  RecursiveTypeProperties getRecursiveProperties() const {
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+      if (isError()) return RecursiveTypeProperties::HasError;
+      return {};
+    case StorageKind::Local:
+    case StorageKind::Param:
+      return {};
+    case StorageKind::UnresolvedVariable:
+      return (RecursiveTypeProperties::HasTypeVariable |
+              RecursiveTypeProperties::SolverAllocated);
+    }
+    llvm_unreachable("unhandled kind");
+  }
+
+  /// Prints `^depth.index`, `^depth.body`, or `immortal`.
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
 
-  uint32_t getOpaqueValue() const { return llvm::bit_cast<uint32_t>(*this); }
+  BitsType getOpaqueValue() const { return Bits; }
 
   friend bool operator==(ScopeRef lhs, ScopeRef rhs) {
-    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+    return lhs.Bits == rhs.Bits;
   }
   friend bool operator!=(ScopeRef lhs, ScopeRef rhs) { return !(lhs == rhs); }
 };
@@ -298,6 +448,29 @@ public:
 // getOpaqueValue.
 static_assert(std::has_unique_object_representations_v<ScopeRef>,
               "equal ScopeRefs must have equal opaque values");
+
+/// The scope parameters a function type expects from callers, which the scopes
+/// in its parameters and result can refer to.
+class ScopeSignature {
+  unsigned NumParams = 0;
+
+public:
+  ScopeSignature() = default;
+  explicit ScopeSignature(unsigned numParams) : NumParams(numParams) {}
+
+  unsigned getNumParams() const { return NumParams; }
+
+  bool empty() const { return NumParams == 0; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const { ID.AddInteger(NumParams); }
+
+  friend bool operator==(ScopeSignature lhs, ScopeSignature rhs) {
+    return lhs.NumParams == rhs.NumParams;
+  }
+  friend bool operator!=(ScopeSignature lhs, ScopeSignature rhs) {
+    return !(lhs == rhs);
+  }
+};
 
 /// The number of scope parameters a value of the declared type is restricted
 /// by.
@@ -309,7 +482,9 @@ bool hasScopeUnsaturatedType(Type ty);
 
 // FIXME: Types that differ only in scopes are reconciled after solving with a
 // cast, which doesn't cover lvalues or function conversions yet.
-/// \p ty without its scope arguments, which the constraint solver ignores.
+/// \p ty without its scopes, which the constraint solver ignores: its nominal
+/// types' scope arguments, and the access scopes of its function types'
+/// parameters.
 Type eraseScopes(Type ty);
 
 } // end namespace swift

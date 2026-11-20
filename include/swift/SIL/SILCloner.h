@@ -1097,6 +1097,10 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   for (auto *origBB : preorderBlocks) {
     // Set the insertion point to the new mapped BB
     getBuilder().setInsertionPoint(BBMap[origBB]);
+    // Use the terminator's mapped scope for any added cleanups or rewritten
+    // terminator.
+    getBuilder().setCurrentDebugScope(
+        getOpScope(origBB->getTerminator()->getDebugScope()));
     asImpl().visitTerminator(origBB);
   }
 }
@@ -1569,22 +1573,26 @@ void SILCloner<ImplClass>::visitLoadBorrowInst(LoadBorrowInst *Inst) {
   if (!getBuilder().hasOwnership()) {
     return recordClonedInstruction(
         Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
+                                      getOpValue(Inst->getAddress()),
                                       LoadOwnershipQualifier::Unqualified));
   }
 
-  if (getOpValue(Inst->getOperand())
+  if (getOpValue(Inst->getAddress())
           ->getType()
           .isTrivial(getBuilder().getFunction())) {
     return recordClonedInstruction(
         Inst, getBuilder().createLoad(getOpLocation(Inst->getLoc()),
-                                      getOpValue(Inst->getOperand()),
+                                      getOpValue(Inst->getAddress()),
                                       LoadOwnershipQualifier::Trivial));
   }
 
+  // We are intentionally not cloning the value-hint. It is an optional
+  // operand which can be reconstructed.
+  // For some reason cloning the value-hint results in benchmark regressions.
+  // TODO: check why
   recordClonedInstruction(
       Inst, getBuilder().createLoadBorrow(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand())));
+                                          getOpValue(Inst->getAddress())));
 }
 
 template <typename ImplClass>
@@ -2534,7 +2542,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipInst(
 
   recordClonedInstruction(
       uoi, getBuilder().createUncheckedOwnership(
-               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand())));
+               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand()),
+               uoi->getForwardingOwnershipKind()));
 }
 
 template <typename ImplClass>
@@ -3617,9 +3626,16 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto CountArgs =
+      getOpValueArray<8>(OperandValueArrayRef(Inst->getTailAllocatedCounts()));
+  SmallVector<SILType, 4> ElemTypes;
+  for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
+    ElemTypes.push_back(getOpType(OrigElemType));
+  }
   recordClonedInstruction(
       Inst, getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand())));
+                                          getOpValue(Inst->getOperand()),
+                                          ElemTypes, CountArgs));
 }
 
 template<typename ImplClass>

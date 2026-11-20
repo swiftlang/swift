@@ -331,7 +331,8 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
       for (auto *Op : OEAI->getUses()) {
         assert(isa<DestroyAddrInst>(Op->getUser()) ||
                Op->getUser()->isDebugInstruction() && "Unexpected instruction");
-        ToDelete.insert(Op->getUser());
+        if (!Op->getUser()->isDebugInstruction())
+          ToDelete.insert(Op->getUser());
       }
     }
 
@@ -341,7 +342,8 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
            isa<DeallocStackInst>(Op->getUser()) ||
            isa<DeinitExistentialAddrInst>(Op->getUser()) ||
            Op->getUser()->isDebugInstruction() && "Unexpected instruction");
-    ToDelete.insert(Op->getUser());
+    if (!Op->getUser()->isDebugInstruction())
+      ToDelete.insert(Op->getUser());
   }
 
   // Check if a retain is moved after the copy_addr. If the retained object
@@ -354,6 +356,13 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   }
 
   for (CopyAddrInst *copy : takingCopies) {
+    // Move the debug info from the now dead alloc_stack, to describe where the
+    // value was taken from.
+    // This is safe as the old alloc_stack is removed with its variable, and
+    // all writes receives its debug info from the source, which we know still
+    // has the correct content until it is destroyed on the very next
+    // instruction. A breakpoint on the destroy would show the variable value.
+    swift::salvageStoreDebugInfo(copy, copy->getSrc(), AS);
     SILBuilderWithScope destroyBuilder(copy, Builder.getBuilderContext());
     destroyBuilder.createDestroyAddr(copy->getLoc(), copy->getSrc());
   }
@@ -381,7 +390,7 @@ createValueFromAddr(SILValue addr, SILInstruction *forInst, DominanceInfo *DI,
                     SILBuilder *builder, SILLocation loc) {
   SmallVector<std::optional<std::pair<SILValue, SILInstruction *>>, 4> pairs;
   enum Kind {
-    none, store, tuple
+    none, store, copy, tuple
   } kind = none;
 
   for (Operand *use : addr->getUses()) {
@@ -395,6 +404,19 @@ createValueFromAddr(SILValue addr, SILInstruction *forInst, DominanceInfo *DI,
       kind = store;
       // We cannot just return st->getSrc() here because we also have to check
       // if the store destination is the only use of addr.
+      continue;
+    }
+
+    auto *cp = dyn_cast<CopyAddrInst>(user);
+    if (cp && kind == none && cp->getDest() == addr &&
+        cp->isInitializationOfDest()) {
+      if (!cp->getSrc()->getType().isLoadable(*addr->getFunction()))
+        return std::nullopt;
+
+      pairs.push_back({{cp->getSrc(), cp}});
+      kind = copy;
+      // Like for a store, we also have to check if the copy destination is the
+      // only use of addr.
       continue;
     }
 
@@ -429,6 +451,31 @@ createValueFromAddr(SILValue addr, SILInstruction *forInst, DominanceInfo *DI,
       bool isEmpty = pair->first->getType().isEmpty(*addr->getFunction());
       if (isEmpty && !DI->properlyDominates(pair->second, forInst))
         return std::nullopt;
+      return pair;
+    }
+  case copy:
+    assert(pairs.size() == 1);
+    {
+      auto *func = forInst->getFunction();
+      if (!func->hasOwnership())
+        return std::nullopt;
+      auto pair = pairs[0];
+      assert(pair.has_value());
+      bool isEmpty = pair->first->getType().isEmpty(*func);
+      if (isEmpty && !DI->properlyDominates(pair->second, forInst))
+        return std::nullopt;
+      if (builder) {
+        // Load the value at the copy_addr, because the source memory might be
+        // modified between the copy_addr and `forInst`.
+        SILBuilderWithScope builderForLoad(pair->second, *builder);
+        auto loadQual = pair->first->getType().isTrivial(*func)
+            ? LoadOwnershipQualifier::Trivial
+            : cast<CopyAddrInst>(pair->second)->isTakeOfSrc()
+              ? LoadOwnershipQualifier::Take
+              : LoadOwnershipQualifier::Copy;
+        auto *load = builderForLoad.createLoad(loc, pair->first, loadQual);
+        return {{load, pair->second}};
+      }
       return pair;
     }
   case tuple:
@@ -1519,42 +1566,6 @@ SILInstruction *SILCombiner::visitPackElementGetInst(PackElementGetInst *PEGI) {
 
   return Builder.createUncheckedAddrCast(
       PEGI->getLoc(), NewPEGI, PEGI->getElementType());
-}
-
-// Simplify `tuple_pack_element_addr` where the index is a `dynamic_pack_index`
-//with a constant operand.
-//
-// Before:
-// %idx = integer_literal Builtin.Word, N
-// %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
-// %tuple_elt = tuple_pack_element_addr %tuple_value, %pack_idx, @element("...")
-//
-// After:
-// %concrete_elt = tuple_element_addr %tuple_value, N
-// %tuple_elt = unchecked_addr_cast %concrete_elt, @element("...")
-SILInstruction *
-SILCombiner::visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI) {
-  auto *DPII = dyn_cast<DynamicPackIndexInst>(TPEAI->getIndex());
-  if (DPII == nullptr)
-    return nullptr;
-
-  auto PackTy = DPII->getIndexedPackType();
-  if (PackTy->containsPackExpansionType())
-    return nullptr;
-
-  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
-  if (Op == nullptr)
-    return nullptr;
-
-  if (Op->getValue().uge(PackTy->getNumElements()))
-    return nullptr;
-
-  unsigned Index = Op->getValue().getZExtValue();
-
-  auto *TEAI = Builder.createTupleElementAddr(
-      TPEAI->getLoc(), TPEAI->getTuple(), Index);
-  return Builder.createUncheckedAddrCast(
-      TPEAI->getLoc(), TEAI, TPEAI->getElementType());
 }
 
 // This is a hack. When optimizing a simple pack expansion expression which

@@ -1,0 +1,266 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -devirtualizer %s | %FileCheck %s
+
+// The result of a borrow accessor call is a borrow scope. When the call is
+// devirtualized, the scope-ending uses of the result end the scope of the new
+// call, and a borrow of self that the devirtualizer introduces for the new call
+// is ended after them.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Base {
+  init()
+}
+
+final class Derived : Base {
+  override init()
+}
+
+class A {
+  @_hasStorage final let _b: Base { get }
+  init(_ b: Base)
+  var x: Base { borrow }
+  subscript(i: Base) -> Base { borrow }
+}
+
+final class B : A {
+  @_hasStorage final let _d: Derived { get }
+  init(_ d: Derived)
+  override final var x: Derived { borrow }
+  override final subscript(i: Base) -> Base { borrow }
+  override init(_ b: Base)
+}
+
+protocol HasBase {
+  var base: Base { borrow }
+}
+
+struct Wrapper : HasBase {
+  @_hasStorage var _base: Base { get set }
+  var base: Base { borrow }
+}
+
+sil @use_base : $@convention(thin) (@guaranteed Base) -> ()
+
+sil [ossa] @A_x_borrow : $@convention(method) (@guaranteed A) -> @guaranteed Base {
+bb0(%0 : @guaranteed $A):
+  %1 = ref_element_addr [immutable] %0, #A._b
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @B_x_borrow : $@convention(method) (@guaranteed B) -> @guaranteed Derived {
+bb0(%0 : @guaranteed $B):
+  %1 = ref_element_addr [immutable] %0, #B._d
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+sil [ossa] @A_subscript_borrow : $@convention(method) (@guaranteed Base, @guaranteed A) -> @guaranteed Base {
+bb0(%0 : @guaranteed $Base, %1 : @guaranteed $A):
+  %2 = ref_element_addr [immutable] %1, #A._b
+  %3 = load_borrow %2
+  return_borrow %3 from_scopes (%3)
+}
+
+sil [ossa] @B_subscript_borrow : $@convention(method) (@guaranteed Base, @guaranteed B) -> @guaranteed Base {
+bb0(%0 : @guaranteed $Base, %1 : @guaranteed $B):
+  %2 = ref_element_addr [immutable] %1, #B._d
+  %3 = load_borrow %2
+  %4 = upcast %3 to $Base
+  return_borrow %4 from_scopes (%3)
+}
+
+sil [ossa] @Wrapper_base_borrow : $@convention(witness_method: HasBase) (@in_guaranteed Wrapper) -> @guaranteed Base {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper._base
+  %2 = load_borrow %1
+  return_borrow %2 from_scopes (%2)
+}
+
+// The devirtualizer borrows the owned self for the new call. The result is cast
+// to the overridden result type within its borrow scope, and the borrow of self
+// ends after the scope of the result.
+// CHECK-LABEL: sil [ossa] @test_owned_self :
+// CHECK:       bb0(%0 : @owned $B):
+// CHECK:         [[A:%.*]] = upcast %0 to $A
+// CHECK:         [[F:%.*]] = function_ref @B_x_borrow
+// CHECK:         [[SB:%.*]] = begin_borrow [[A]]
+// CHECK:         [[S:%.*]] = unchecked_ref_cast [[SB]] to $B
+// CHECK:         [[R:%.*]] = apply [[F]]([[S]])
+// CHECK:         [[U:%.*]] = upcast [[R]] to $Base
+// CHECK:         apply {{%.*}}([[U]])
+// CHECK-NEXT:    end_borrow [[R]]
+// CHECK-NEXT:    end_borrow [[SB]]
+// CHECK-NEXT:    destroy_value [[A]]
+// CHECK-LABEL: } // end sil function 'test_owned_self'
+sil [ossa] @test_owned_self : $@convention(thin) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = upcast %0 to $A
+  %2 = class_method %1, #A.x!borrow : (A) -> () -> Base, $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %4 = function_ref @use_base : $@convention(thin) (@guaranteed Base) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Base) -> ()
+  end_borrow %3
+  destroy_value %1
+  %8 = tuple ()
+  return %8
+}
+
+// Only the borrow of self encloses the scope of the result. The borrow of an
+// owned index ends after the new call, so the index can be destroyed before the
+// result's scope ends.
+// CHECK-LABEL: sil [ossa] @test_owned_index :
+// CHECK:       bb0(%0 : @owned $B, %1 : @owned $Base):
+// CHECK:         [[A:%.*]] = upcast %0 to $A
+// CHECK:         [[F:%.*]] = function_ref @B_subscript_borrow
+// CHECK:         [[IB:%.*]] = begin_borrow %1
+// CHECK:         [[SB:%.*]] = begin_borrow [[A]]
+// CHECK:         [[S:%.*]] = unchecked_ref_cast [[SB]] to $B
+// CHECK:         [[R:%.*]] = apply [[F]]([[IB]], [[S]])
+// CHECK-NEXT:    end_borrow [[IB]]
+// CHECK-NEXT:    destroy_value %1
+// CHECK:         apply {{%.*}}([[R]])
+// CHECK-NEXT:    end_borrow [[R]]
+// CHECK-NEXT:    end_borrow [[SB]]
+// CHECK-NEXT:    destroy_value [[A]]
+// CHECK-LABEL: } // end sil function 'test_owned_index'
+sil [ossa] @test_owned_index : $@convention(thin) (@owned B, @owned Base) -> () {
+bb0(%0 : @owned $B, %1 : @owned $Base):
+  %2 = upcast %0 to $A
+  %3 = class_method %2, #A.subscript!borrow : (A) -> (Base) -> Base, $@convention(method) (@guaranteed Base, @guaranteed A) -> @guaranteed Base
+  %4 = apply %3(%1, %2) : $@convention(method) (@guaranteed Base, @guaranteed A) -> @guaranteed Base
+  destroy_value %1
+  %6 = function_ref @use_base : $@convention(thin) (@guaranteed Base) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@guaranteed Base) -> ()
+  end_borrow %4
+  destroy_value %2
+  %10 = tuple ()
+  return %10
+}
+
+// The borrow of an owned index is not a scope of the return_borrow.
+// CHECK-LABEL: sil [ossa] @test_owned_index_return_borrow :
+// CHECK:         [[IB:%.*]] = begin_borrow %0
+// CHECK:         [[R:%.*]] = apply {{%.*}}([[IB]], {{%.*}})
+// CHECK-NEXT:    end_borrow [[IB]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function 'test_owned_index_return_borrow'
+sil [ossa] @test_owned_index_return_borrow : $@convention(method) (@owned Base, @guaranteed B) -> @guaranteed Base {
+bb0(%0 : @owned $Base, %1 : @guaranteed $B):
+  %2 = upcast %1 to $A
+  %3 = class_method %2, #A.subscript!borrow : (A) -> (Base) -> Base, $@convention(method) (@guaranteed Base, @guaranteed A) -> @guaranteed Base
+  %4 = apply %3(%0, %2) : $@convention(method) (@guaranteed Base, @guaranteed A) -> @guaranteed Base
+  destroy_value %0
+  return_borrow %4 from_scopes (%4)
+}
+
+// CHECK-LABEL: sil [ossa] @test_guaranteed_self :
+// CHECK:       bb0(%0 : @guaranteed $B):
+// CHECK:         [[F:%.*]] = function_ref @B_x_borrow
+// CHECK:         [[S:%.*]] = unchecked_ref_cast {{%.*}} to $B
+// CHECK:         [[R:%.*]] = apply [[F]]([[S]])
+// CHECK:         [[U:%.*]] = upcast [[R]] to $Base
+// CHECK:         apply {{%.*}}([[U]])
+// CHECK-NEXT:    end_borrow [[R]]
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'test_guaranteed_self'
+sil [ossa] @test_guaranteed_self : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : @guaranteed $B):
+  %1 = upcast %0 to $A
+  %2 = class_method %1, #A.x!borrow : (A) -> () -> Base, $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %4 = function_ref @use_base : $@convention(thin) (@guaranteed Base) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Base) -> ()
+  end_borrow %3
+  %7 = tuple ()
+  return %7
+}
+
+// The return_borrow returns the cast result from the scope of the new call.
+// CHECK-LABEL: sil [ossa] @test_return_borrow :
+// CHECK:         [[F:%.*]] = function_ref @B_x_borrow
+// CHECK:         [[R:%.*]] = apply [[F]]({{%.*}})
+// CHECK:         [[U:%.*]] = upcast [[R]] to $Base
+// CHECK-NEXT:    return_borrow [[U]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function 'test_return_borrow'
+sil [ossa] @test_return_borrow : $@convention(method) (@guaranteed B) -> @guaranteed Base {
+bb0(%0 : @guaranteed $B):
+  %1 = upcast %0 to $A
+  %2 = class_method %1, #A.x!borrow : (A) -> () -> Base, $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed A) -> @guaranteed Base
+  return_borrow %3 from_scopes (%3)
+}
+
+// A result that is reborrowed by a phi is not devirtualized.
+// CHECK-LABEL: sil [ossa] @test_reborrowed_result :
+// CHECK:         [[M:%.*]] = class_method {{%.*}}, #A.x!borrow
+// CHECK:         [[R:%.*]] = apply [[M]]({{%.*}})
+// CHECK:         br bb1([[R]])
+// CHECK-LABEL: } // end sil function 'test_reborrowed_result'
+sil [ossa] @test_reborrowed_result : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : @guaranteed $B):
+  %1 = upcast %0 to $A
+  %2 = class_method %1, #A.x!borrow : (A) -> () -> Base, $@convention(method) (@guaranteed A) -> @guaranteed Base
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed A) -> @guaranteed Base
+  br bb1(%3)
+
+bb1(%5 : @reborrow $Base):
+  %6 = borrowed %5 from (%0)
+  end_borrow %6
+  %8 = tuple ()
+  return %8
+}
+
+// A witness method result that is reborrowed by a phi is not devirtualized.
+// CHECK-LABEL: sil [ossa] @test_witness_reborrowed_result :
+// CHECK:         [[M:%.*]] = witness_method $Wrapper, #HasBase.base!borrow
+// CHECK:         [[R:%.*]] = apply [[M]]<Wrapper>(%0)
+// CHECK:         br bb1([[R]])
+// CHECK-LABEL: } // end sil function 'test_witness_reborrowed_result'
+sil [ossa] @test_witness_reborrowed_result : $@convention(thin) (@in_guaranteed Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  %1 = witness_method $Wrapper, #HasBase.base!borrow : <Self where Self : HasBase> (Self) -> () -> Base : $@convention(witness_method: HasBase) <τ_0_0 where τ_0_0 : HasBase> (@in_guaranteed τ_0_0) -> @guaranteed Base
+  %2 = apply %1<Wrapper>(%0) : $@convention(witness_method: HasBase) <τ_0_0 where τ_0_0 : HasBase> (@in_guaranteed τ_0_0) -> @guaranteed Base
+  br bb1(%2)
+
+bb1(%4 : @reborrow $Base):
+  %5 = borrowed %4 from ()
+  end_borrow %5
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @test_witness :
+// CHECK:         [[F:%.*]] = function_ref @Wrapper_base_borrow
+// CHECK:         [[R:%.*]] = apply [[F]](%0)
+// CHECK:         apply {{%.*}}([[R]])
+// CHECK-NEXT:    end_borrow [[R]]
+// CHECK-LABEL: } // end sil function 'test_witness'
+sil [ossa] @test_witness : $@convention(thin) (@in_guaranteed Wrapper) -> () {
+bb0(%0 : $*Wrapper):
+  %1 = witness_method $Wrapper, #HasBase.base!borrow : <Self where Self : HasBase> (Self) -> () -> Base : $@convention(witness_method: HasBase) <τ_0_0 where τ_0_0 : HasBase> (@in_guaranteed τ_0_0) -> @guaranteed Base
+  %2 = apply %1<Wrapper>(%0) : $@convention(witness_method: HasBase) <τ_0_0 where τ_0_0 : HasBase> (@in_guaranteed τ_0_0) -> @guaranteed Base
+  %3 = function_ref @use_base : $@convention(thin) (@guaranteed Base) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Base) -> ()
+  end_borrow %2
+  %6 = tuple ()
+  return %6
+}
+
+sil_vtable A {
+  #A.x!borrow: (A) -> () -> Base : @A_x_borrow
+  #A.subscript!borrow: (A) -> (Base) -> Base : @A_subscript_borrow
+}
+
+sil_vtable B {
+  #A.x!borrow: (A) -> () -> Base : @B_x_borrow [override]
+  #A.subscript!borrow: (A) -> (Base) -> Base : @B_subscript_borrow [override]
+}
+
+sil_witness_table Wrapper: HasBase module main {
+  method #HasBase.base!borrow: <Self where Self : HasBase> (Self) -> () -> Base : @Wrapper_base_borrow
+}

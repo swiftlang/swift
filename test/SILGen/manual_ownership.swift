@@ -94,3 +94,15 @@ func return_consumingParam(_ t: consuming TriangleClass) -> TriangleClass {
 func return_owned(_ t: __owned TriangleClass) -> TriangleClass {
   return t
 }
+
+func callNonEscaping(_ f: () -> ()) { f() }
+func useTriangle(_ t: borrowing TriangleClass) {}
+
+// A captured `borrowing` parameter is marked `@noImplicitCopy` without using the wrapper type.
+// CHECK-LABEL: sil private {{.*}}@$s{{.*}}16borrowingCapture{{.*}}fU_ :
+// CHECK:       bb0(%0 : @noImplicitCopy @closureCapture @guaranteed $TriangleClass):
+// CHECK-NOT:   moveonlywrapper
+// CHECK:       } // end sil function '$s{{.*}}16borrowingCapture{{.*}}fU_'
+func borrowingCapture(_ t: borrowing TriangleClass) {
+  callNonEscaping { useTriangle(t) }
+}

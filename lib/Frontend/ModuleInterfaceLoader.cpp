@@ -328,10 +328,11 @@ struct ModuleRebuildInfo {
                 StringRef prebuiltCacheDir, SourceLoc loc,
                 DiagArgs &&...diagArgs) {
     diags.diagnose(loc, std::forward<DiagArgs>(diagArgs)...);
-    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.getSDKPath());
+    auto &FS = *ctx.SourceMgr.getFileSystem();
+    auto SDKVer = getSDKBuildVersion(ctx.SearchPathOpts.getSDKPath(), FS);
     llvm::SmallString<64> buffer = prebuiltCacheDir;
     llvm::sys::path::append(buffer, "SystemVersion.plist");
-    auto PBMVer = getSDKBuildVersionFromPlist(buffer.str());
+    auto PBMVer = getSDKBuildVersionFromPlist(buffer.str(), FS);
     if (!SDKVer.empty() && !PBMVer.empty()) {
       // Remark the potential version difference.
       diags.diagnose(loc, diag::sdk_version_pbm_version, SDKVer,
@@ -1703,12 +1704,22 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
   // propagates the same flags into its Clang cc1 args. This is important because
   // -sanitize options can add target-features (e.g. MTE). These are checked when
   // loading a PCM (and mismatches are fatal).
+  //
+  // All sanitizers must be passed as a single comma-joined '-sanitize' flag.
+  // Swift has no '-fno-sanitize' equivalent, so if inheriting
+  // '-sanitize=undefined,address' it would not be possible to disable one of
+  // sanitizers without this 'last occurrence wins' behavior.
   genericSubInvocation.getSILOptions().Sanitizers = silOpts.Sanitizers;
+  std::string SanitizerList;
 #define SANITIZER(_, kind, name, __)                                           \
   if (silOpts.Sanitizers & SanitizerKind::kind) {                              \
-    GenericArgs.push_back("-sanitize=" #name);                                 \
+    if (!SanitizerList.empty())                                                \
+      SanitizerList += ',';                                                    \
+    SanitizerList += #name;                                                    \
   }
 #include "swift/Basic/Sanitizers.def"
+  if (!SanitizerList.empty())
+    GenericArgs.push_back(ArgSaver.save("-sanitize=" + SanitizerList).data());
 
   genericSubInvocation.setImportSearchPaths(
       SearchPathOpts.getImportSearchPaths());
@@ -1844,7 +1855,10 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(interfaceInfo.Arguments, subInstanceDiags)) {
+  if (subInvocation.parseArgs(interfaceInfo.Arguments, subInstanceDiags,
+                              /*ConfigurationFileBuffers=*/nullptr,
+                              /*workingDirectory=*/{},
+                              /*mainExecutablePath=*/{}, SM.getFileSystem())) {
     return true;
   }
 
@@ -2104,7 +2118,8 @@ void InterfaceSubContextDelegateImpl::getCachedOutputPath(
       resolvedOutputPath, moduleName, interfacePath, sdkPath,
       genericSubInvocation,
       genericSubInvocation.getClangImporterOptions()
-          .getReducedExtraArgsForSwiftModuleDependency());
+          .getReducedExtraArgsForSwiftModuleDependency(),
+      *SM.getFileSystem());
 }
 
 std::error_code
@@ -2195,7 +2210,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // DiagnosticEngine holds raw pointers to them.
   ForwardingDiagnosticConsumer FDC(*Diags);
   NullDiagnosticConsumer noopConsumer;
-  CompilerInstance subInstance;
+  CompilerInstance subInstance(SM.getFileSystem());
   if (!silenceErrors) {
     subInstance.addDiagnosticConsumer(&FDC);
   } else {
@@ -2222,8 +2237,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
   info.CompilerVersion = interfaceInfo.CompilerVersion;
-
-  subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
 
   std::string InstanceSetupError;
   if (CAS)
@@ -2276,7 +2289,7 @@ struct ExplicitSwiftModuleLoader::Implementation {
     ExplicitModuleMapParser parser(Allocator);
     // Load the input file.
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
-        llvm::MemoryBuffer::getFile(fileName);
+        Ctx.SourceMgr.getFileSystem()->getBufferForFile(fileName);
     if (!fileBufOrErr) {
       Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
                          fileName);
@@ -2596,8 +2609,6 @@ struct ExplicitCASModuleLoader::Implementation {
                          ID);
       return;
     }
-    llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
-        llvm::MemoryBuffer::getFile(ID);
 
     auto error = parser.parseSwiftExplicitModuleMap(
         buf->getMemBufferRef(), *ExplicitModuleMap, *ExplicitClangModuleMap,
@@ -2916,7 +2927,8 @@ static unsigned getCOMInteropCacheState(const LangOptions &langOpts) {
 static std::string getContextHash(const CompilerInvocation &CI,
                                   const StringRef &interfacePath,
                                   const StringRef &sdkPath,
-                                  const ArgListTy &extraArgs) {
+                                  const ArgListTy &extraArgs,
+                                  llvm::vfs::FileSystem &FS) {
   // When doing dependency scanning for explicit module, use strict context hash
   // to ensure sound module hash.
   bool useStrictCacheHash = CI.getFrontendOptions().RequestedAction ==
@@ -2949,7 +2961,7 @@ static std::string getContextHash(const CompilerInvocation &CI,
     targetVariantStr = targetVariantToHash.str();
   }
 
-  std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
+  std::string sdkBuildVersion = getSDKBuildVersion(sdkPath, FS);
 
   llvm::hash_code H = llvm::hash_combine(
       // Start with the compiler version (which will be either tag names or
@@ -3014,7 +3026,8 @@ static std::string getContextHash(const CompilerInvocation &CI,
 
 void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
                    const StringRef &interfacePath, const StringRef &sdkPath,
-                   const CompilerInvocation &CI, const ArgListTy &extraArgs) {
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs,
+                   llvm::vfs::FileSystem &FS) {
   auto &outputPath = resolvedOutputPath.outputPath;
   outputPath = CI.getClangModuleCachePath();
   auto isPrefixedWith = [interfacePath](StringRef path) {
@@ -3037,7 +3050,7 @@ void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
   llvm::sys::path::append(outputPath, moduleName);
   outputPath.append("-");
   auto hashStart = outputPath.size();
-  outputPath.append(getContextHash(CI, interfacePath, sdkPath, extraArgs));
+  outputPath.append(getContextHash(CI, interfacePath, sdkPath, extraArgs, FS));
   resolvedOutputPath.hash = outputPath.str().substr(hashStart);
   outputPath.append(".");
   auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);

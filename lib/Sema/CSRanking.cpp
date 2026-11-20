@@ -486,12 +486,51 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
                                   bool isDynamicOverloadComparison = false,
                                   bool allowMissingConformances = true,
+                                  bool ignoreExecutionSemantics = false,
                                   bool debugMode = false) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
                                dc, decl1, decl2, isDynamicOverloadComparison,
-                               allowMissingConformances, debugMode},
+                               allowMissingConformances,
+                               ignoreExecutionSemantics, debugMode},
                            false);
+}
+
+/// Determine whether each declaration is as "specialized" as the other.
+///
+/// A plain closure parameter is more specialized than one with execution
+/// semantics, since a plain closure can be passed to either. When execution
+/// semantics are all that keep both declarations from being as specialized as
+/// the other, though, they're ignored. This way adopting execution semantics in
+/// one overload doesn't make it ambiguous with another, such as an `async`
+/// overload that still takes a plain closure.
+static std::pair<bool, bool>
+compareDeclSpecialization(DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
+                          bool isDynamicOverloadComparison = false,
+                          bool allowMissingConformances = true,
+                          bool debugMode = false) {
+  auto compare = [&](bool ignoreExecutionSemantics) {
+    return std::make_pair(
+        isDeclAsSpecializedAs(dc, decl1, decl2, isDynamicOverloadComparison,
+                              allowMissingConformances,
+                              ignoreExecutionSemantics, debugMode),
+        isDeclAsSpecializedAs(dc, decl2, decl1, isDynamicOverloadComparison,
+                              allowMissingConformances,
+                              ignoreExecutionSemantics, debugMode));
+  };
+
+  auto hasExecutionSemantics = [](ValueDecl *decl) {
+    return decl->getInterfaceType().findIf([](Type type) {
+      auto *fnType = type->getAs<AnyFunctionType>();
+      return fnType && fnType->hasCalledAtMostOnceSemantics();
+    });
+  };
+
+  auto result = compare(/*ignoreExecutionSemantics=*/false);
+  if (!result.first && !result.second &&
+      (hasExecutionSemantics(decl1) || hasExecutionSemantics(decl2)))
+    result = compare(/*ignoreExecutionSemantics=*/true);
+  return result;
 }
 
 namespace {
@@ -543,11 +582,13 @@ public:
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison, bool allowMissingConformances,
-    bool debugMode) const {
+    bool ignoreExecutionSemantics, bool debugMode) const {
   auto &C = decl1->getASTContext();
   ConstraintSystemOptions options;
   if (debugMode)
     options |= ConstraintSystemFlags::DebugConstraints;
+  if (ignoreExecutionSemantics)
+    options |= ConstraintSystemFlags::IgnoreExecutionSemanticsMismatch;
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, options);
   if (cs.isDebugMode()) {
@@ -557,6 +598,8 @@ bool CompareDeclSpecializationRequest::evaluate(
     decl2->print(llvm::errs());
     llvm::errs() << "\n(isDynamicOverloadComparison: ";
     llvm::errs() << isDynamicOverloadComparison;
+    llvm::errs() << ", ignoreExecutionSemantics: ";
+    llvm::errs() << ignoreExecutionSemantics;
     llvm::errs() << ")\n";
   }
 
@@ -879,6 +922,20 @@ bool CompareDeclSpecializationRequest::evaluate(
           fewerEffectiveParameters = true;
         }
 
+        // The adjusted type of an autoclosure parameter is its result type, so
+        // compare the execution semantics of the autoclosures separately.
+        if (!ignoreExecutionSemantics && param1.isAutoClosure() &&
+            param2.isAutoClosure()) {
+          auto semantics1 = param1.getPlainType()
+                                ->castTo<FunctionType>()
+                                ->getExecutionSemantics();
+          auto semantics2 = param2.getPlainType()
+                                ->castTo<FunctionType>()
+                                ->getExecutionSemantics();
+          if (!canConvertExecutionSemantics(semantics1, semantics2))
+            return false;
+        }
+
         Type paramType1 = getAdjustedParamType(param1);
         Type paramType2 = getAdjustedParamType(param2);
 
@@ -952,8 +1009,7 @@ bool CompareDeclSpecializationRequest::evaluate(
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,
                                             ValueDecl *decl1,
                                             ValueDecl *decl2){
-  bool decl1Better = isDeclAsSpecializedAs(dc, decl1, decl2);
-  bool decl2Better = isDeclAsSpecializedAs(dc, decl2, decl1);
+  auto [decl1Better, decl2Better] = compareDeclSpecialization(dc, decl1, decl2);
 
   if (decl1Better == decl2Better)
     return Comparison::Unordered;
@@ -1329,20 +1385,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         choice2.getKind() == OverloadChoiceKind::DeclViaDynamic;
 
     // Determine whether one declaration is more specialized than the other.
-    bool firstAsSpecializedAs = false;
-    bool secondAsSpecializedAs = false;
-    if (isDeclAsSpecializedAs(cs.DC, decl1, decl2, isDynamicOverloadComparison,
-                              /*allowMissingConformances=*/false,
-                              cs.isDebugMode())) {
+    auto [firstAsSpecializedAs, secondAsSpecializedAs] =
+        compareDeclSpecialization(
+            cs.DC, decl1, decl2, isDynamicOverloadComparison,
+            /*allowMissingConformances=*/false, cs.isDebugMode());
+    if (firstAsSpecializedAs)
       score1 += weight;
-      firstAsSpecializedAs = true;
-    }
-    if (isDeclAsSpecializedAs(cs.DC, decl2, decl1, isDynamicOverloadComparison,
-                              /*allowMissingConformances=*/false,
-                              cs.isDebugMode())) {
+    if (secondAsSpecializedAs)
       score2 += weight;
-      secondAsSpecializedAs = true;
-    }
 
     // If each is as specialized as the other, and both are constructors,
     // check the constructor kind.

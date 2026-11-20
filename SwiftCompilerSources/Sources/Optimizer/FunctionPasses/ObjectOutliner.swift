@@ -312,7 +312,8 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is StrongRetainInst,
        is StrongReleaseInst,
        is FixLifetimeInst,
-       is MarkDependenceAddrInst:
+       is MarkDependenceAddrInst,
+       is EndBorrowInst:
     return true
 
   case let mdi as MarkDependenceInst:
@@ -344,6 +345,7 @@ private func isValidUseOfObject(_ use: Operand) -> Bool {
        is UncheckedRefCastInst,
        is UpcastInst,
        is BeginDeallocRefInst,
+       is BeginBorrowInst,
        is RefTailAddrInst,
        is RefElementAddrInst:
     for instUse in (inst as! SingleValueInstruction).uses {

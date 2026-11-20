@@ -2276,9 +2276,15 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   if (resultTyRepr == nullptr)
     return TupleType::getEmpty(ctx);
 
+  auto *func = dyn_cast<FuncDecl>(decl);
+  bool appliesScopes = func && resolvesScopesInSignature(func);
+
   // Handle opaque types.
   if (auto *opaqueDecl = decl->getOpaqueResultTypeDecl()) {
-      return opaqueDecl->getDeclaredInterfaceType();
+    auto resultTy = opaqueDecl->getDeclaredInterfaceType();
+    if (appliesScopes)
+      return checkOpaqueResultScopes(func, resultTyRepr, resultTy);
+    return resultTy;
   }
 
   auto options =
@@ -2289,12 +2295,26 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     if (funcDecl->isCoroutine())
       options |= TypeResolutionFlags::Coroutine;
 
+  // An opaque result type isn't resolved with scopes. That's decided from
+  // syntax, as `ParamAccessScopesRequest` decides it, since the syntax can have
+  // an opaque type that doesn't declare one, like within a variadic parameter.
+  std::optional<ScopeBinder> scopeBinder;
+  if (appliesScopes && !decl->getOpaqueResultTypeRepr()) {
+    scopeBinder.emplace(func);
+    options.setScopeBinder(&*scopeBinder);
+  }
+
   auto *const dc = decl->getInnermostDeclContext();
-  return TypeResolution::forInterface(dc, options,
-                                      /*unboundTyOpener*/ nullptr,
-                                      /*placeholderOpener*/ nullptr,
-                                      /*packElementOpener*/ nullptr)
-      .resolveType(resultTyRepr);
+  auto resultTy = TypeResolution::forInterface(dc, options,
+                                               /*unboundTyOpener*/ nullptr,
+                                               /*placeholderOpener*/ nullptr,
+                                               /*packElementOpener*/ nullptr)
+                      .resolveType(resultTyRepr);
+  if (scopeBinder)
+    return checkScopeSaturated(func, resultTyRepr, resultTy);
+  if (appliesScopes)
+    return checkOpaqueResultScopes(func, resultTyRepr, resultTy);
+  return resultTy;
 }
 
 Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl,
@@ -2498,6 +2518,15 @@ static Type validateParameterType(ParamDecl *decl) {
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
+  // The scopes written in the signature of a function that supports them are
+  // applied as its types are resolved.
+  std::optional<ScopeBinder> scopeBinder;
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(dc);
+      fn && resolvesScopesInSignature(fn)) {
+    scopeBinder.emplace(fn);
+    options.setScopeBinder(&*scopeBinder);
+  }
+
   Type Ty;
 
   auto *nestedRepr = decl->getTypeRepr();
@@ -2547,37 +2576,28 @@ static Type validateParameterType(ParamDecl *decl) {
     Ty = resolution.resolveType(decl->getTypeRepr());
   }
 
-  Ty = fillElidedScopes(decl, Ty);
+  if (scopeBinder) {
+    Ty = checkScopeSaturated(scopeBinder->getFunction(), decl->getTypeRepr(),
+                             Ty);
+  } else if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
+             !Ty->hasError() && hasScopeUnsaturatedType(Ty)) {
+    // TODO: Support accessors, closures, subscripts, and enum elements.
+    ctx.Diags.diagnose(decl->getTypeRepr()->getStartLoc(),
+                       diag::scoped_nonescapable_param_context);
+    Ty = ErrorType::get(ctx);
+  }
 
   if (Ty->hasError()) {
     decl->setInvalid();
     return ErrorType::get(ctx);
   }
 
+  // An at-most-once function parameter is consuming by default, and we don't
+  // require that to be written explicitly. An explicit 'borrowing', 'inout',
+  // or 'consuming' specifier is still honored.
   if (auto *F = Ty->getAs<AnyFunctionType>()) {
-    if (F->isCallConsuming()) {
-      switch (ownership) {
-      case ParamSpecifier::Borrowing:
-      case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(
-            decl->getTypeRepr()->getLoc(),
-            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
-            getExecutionSemanticsAttrSpelling(*F->getExecutionSemantics()));
-        return ErrorType::get(ctx);
-
-      case ParamSpecifier::InOut:
-      case ParamSpecifier::Consuming:
-      case ParamSpecifier::LegacyOwned:
-      // used by `sending`
-      case ParamSpecifier::ImplicitlyCopyableConsuming:
-        break;
-      // at-most-once is consuming by default and we don't
-      // require it be to written explicitly.
-      case ParamSpecifier::Default:
-        ownership = ParamSpecifier::Consuming;
-        break;
-      }
-    }
+    if (F->isCallConsuming() && ownership == ParamSpecifier::Default)
+      ownership = ParamSpecifier::Consuming;
   }
 
   // Validate the presence of ownership for a parameter with an inverse applied.
@@ -2724,12 +2744,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
 
-    if (auto clangDecl = VD->getClangDecl()) {
-      auto clangVarDecl = cast<clang::VarDecl>(clangDecl);
-
-      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(
-          clangVarDecl, VD, VD->getDeclContext());
-    }
+    if (VD->getClangDecl())
+      return VD->getASTContext().getClangModuleLoader()->importVarDeclType(VD);
 
     auto *namingPattern = VD->getNamingPattern();
     if (!namingPattern) {
@@ -2811,6 +2827,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     {
       SmallVector<AnyFunctionType::Param, 4> argTy;
       AFD->getParameters()->getParams(argTy);
+      addScopes(AFD, infoBuilder, argTy, resultTy);
 
       // If we don't have the concurrency library, reject the use of 'async'.
       ASTContext &ctx = AFD->getASTContext();
@@ -2856,6 +2873,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       // Substitute in our own 'self' parameter.
       auto selfParam = computeSelfParam(AFD);
       AnyFunctionType::ExtInfoBuilder selfInfoBuilder;
+      addSelfScopes(AFD, selfInfoBuilder, selfParam);
       maybeAddParameterIsolation(selfInfoBuilder, {selfParam});
       if (lifetimeDependenceInfo.has_value() && isInstanceMethod) {
         selfInfoBuilder =
@@ -2916,7 +2934,8 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     // or (Self.Type) -> (Args...) -> Self.
     auto resultTy = ED->getDeclaredInterfaceType();
 
-    AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, Context));
+    auto selfTy = AnyFunctionType::Param::bodyAccess(
+        MetatypeType::get(resultTy, Context));
 
     if (auto *PL = EED->getParameterList()) {
       SmallVector<AnyFunctionType::Param, 4> argTy;
@@ -3543,17 +3562,14 @@ LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
   // TODO: Translate lifetime dependencies into scope restrictions and stop
   // using them, instead of dropping them here to avoid conflicts. Until then
   // this leads to accepting invalid code when using both features.
-  // FIXME: This won't detect fully elided scopes...
   if (decl->getASTContext().LangOpts.hasFeature(Feature::ScopeRestrictions)) {
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (hasScopedAttrInSignature(afd)) {
-        // Without a lifetime dependence, nothing restricts the result.
-        // FIXME: Diagnose the result of an initializer of a non-escapable type.
-        auto *func = dyn_cast<FuncDecl>(afd);
-        if (func && !hasScopedAttr(func->getResultTypeRepr()) &&
-            hasScopeUnsaturatedType(func->getResultInterfaceType()))
-          decl->getASTContext().Diags.diagnose(
-              func->getResultTypeRepr()->getLoc(), diag::scoped_elided_result);
+      // An ABI-only declaration can leave out scopes.
+      ABIRoleInfo abiRole(afd);
+      auto *api = abiRole.providesAPI() ? afd : abiRole.getCounterpart();
+      if (api && hasScopedAttrInSignature(api)) {
+        // FIXME: Diagnose the result of an initializer of a non-escapable type,
+        // which nothing restricts without a lifetime dependence.
         return std::nullopt;
       }
     }

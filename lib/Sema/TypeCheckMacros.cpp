@@ -282,9 +282,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
   if (!libraryPath.empty()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.CASOpts.HasImmutableFileSystem
-                  ? llvm::vfs::createPhysicalFileSystem()
-                  : ctx.SourceMgr.getFileSystem();
+    auto fs = ctx.getPluginLoader().getPluginLoadingFS();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
@@ -853,6 +851,7 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
     return GeneratedSourceInfo::Name##MacroExpansion;
 #include "swift/Basic/MacroRoles.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // If this storage declaration is a variable with an explicit initializer,
@@ -1119,6 +1118,7 @@ static uint8_t getRawMacroRole(MacroRole role) {
   case MacroRole::Preamble: return 9;
   case MacroRole::Body: return 10;
   }
+  llvm_unreachable("covered switch");
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 
@@ -2055,6 +2055,16 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    // An extension macro attached to a protocol cannot add new conformances.
+    // Instead, treat the protocols this protocol already inherits from as
+    // already present, so the macro is not asked to add them. Protocols have
+    // no conformance table, so don't use 'lookupConformance' for them.
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!proto->inheritsFrom(protocol))
+        introducedConformances.push_back(protocol);
+      continue;
+    }
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
 

@@ -21,7 +21,8 @@ using namespace swift;
 
 static llvm::Expected<llvm::cas::ObjectRef>
 createCacheKey(llvm::cas::ObjectStore &CAS, ArrayRef<const char *> Args) {
-  auto BaseKey = createCompileJobBaseCacheKey(CAS, Args);
+  auto BaseKey = createCompileJobBaseCacheKey(
+      CAS, Args, *llvm::vfs::createPhysicalFileSystem());
   if (!BaseKey)
     return BaseKey.takeError();
   return createCompileJobCacheKeyForOutput(CAS, *BaseKey, 0);

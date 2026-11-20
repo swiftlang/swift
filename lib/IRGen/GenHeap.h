@@ -20,6 +20,7 @@
 
 #include "NecessaryBindings.h"
 #include "StructLayout.h"
+#include "TypeLayout.h"
 
 namespace llvm {
   class Constant;
@@ -236,13 +237,34 @@ llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                               SILType objectType,
                                               bool suppressCast = false);
 
+/// Returns true if destroying a value of function type \p fnType destroys its
+/// context with emitDestroyEmbeddedNoncopyableClosureContext() instead of
+/// releasing it. Partial application gives every such value a context of its
+/// own, so that the destructor of a captured object never runs in its place.
+bool isClosureContextDestroyedDirectly(IRGenModule &IGM,
+                                       CanSILFunctionType fnType);
+
+/// Destroy the context of a noncopyable closure in Embedded Swift by calling
+/// the destructor in its metadata, without going through the runtime. Only the
+/// closure refers to such a context, so this is equivalent to releasing it,
+/// except that it also works with -no-allocations.
+void emitDestroyEmbeddedNoncopyableClosureContext(IRGenFunction &IGF,
+                                                  llvm::Value *context);
+
 /// What isa-encoding mechanism does a type use?
 IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
+/// The header at the start of an allocation.
+enum class HeapHeaderKind { None, Swift, ObjC };
+
+/// Compute the typed memory descriptor of an allocation laid out as
+/// `fieldTypes`, followed by a union of `tailElementTypes` if it isn't empty.
 std::optional<uint64_t>
-computeTypedMallocTypeDescriptor(IRGenModule &IGM,
+computeTypedMallocTypeDescriptor(IRGenModule &IGM, HeapHeaderKind header,
                                  llvm::SmallVectorImpl<SILType> &fieldTypes,
-                                 bool isArray = false);
+                                 TypedMemoryCallsiteFlags callsiteFlags =
+                                     TypedMemoryCallsiteFlags::FixedSize,
+                                 ArrayRef<SILType> tailElementTypes = {});
 
 } // end namespace irgen
 } // end namespace swift

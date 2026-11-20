@@ -442,13 +442,7 @@ CastsTests.test("Self-conformance for Any.self") {
   blackhole(b as! Any.Type)
 }
 
-// rdar://59067748 (Error Protocol should self-conform in optimized casts)
-CastsTests.test("Self-conformance for Error.self")
-.skip(.custom({
-      !_isDebugAssertConfiguration()
-    },
-    reason: "Cast optimizer breaks this test"))
-.code {
+CastsTests.test("Self-conformance for Error.self") {
   let c = Error.self
   expectNotNil(runtimeCast(c, to: Error.Protocol.self))
   expectNotNil(c as? Error.Protocol)
@@ -457,9 +451,9 @@ CastsTests.test("Self-conformance for Error.self")
 
   // Unlike most other protocols, Error.self does conform to Error
   expectNotNil(runtimeCast(c, to: Error.Type.self))
-  expectFailure { expectNotNil(c as? Error.Type) }
-  expectFailure { expectTrue(c is Error.Type) }
-  // blackhole(c as! Error.Type) // Should not trap, but currently does
+  expectNotNil(c as? Error.Type)
+  expectTrue(c is Error.Type)
+  blackhole(c as! Error.Type)
 }
 
 // rdar://59067556 (Obj-C Protocol Metatypes should self-conform)
@@ -630,6 +624,29 @@ CastsTests.test("Casting NSError <-> Error") {
   expectNotNil(f)
   let g = Bar() as? Error
   expectNotNil(g)
+}
+#endif
+
+#if _runtime(_ObjC)
+// rdar://186519050
+CastsTests.test("Swift Error class -> NSError") {
+  class SwiftErrorClass: Error {}
+  class NonErrorBase {}
+  class ErrorSubclass: NonErrorBase, Error {}
+
+  let e = SwiftErrorClass()
+  expectNotNil(e as? NSError)
+  expectTrue(e is NSError)
+  let forced = e as! NSError
+  expectEqual(forced.domain, (e as Error)._domain)
+
+  let sub: NonErrorBase = ErrorSubclass()
+  expectNotNil(sub as? NSError)
+  expectTrue(sub is NSError)
+
+  let base = NonErrorBase()
+  expectNil(base as? NSError)
+  expectFalse(base is NSError)
 }
 #endif
 

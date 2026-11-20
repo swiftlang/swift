@@ -520,7 +520,7 @@ private func specializeWitness(_ method: Function, for methodSubs: SubstitutionM
         context.loadFunction(function: method, loadCalleesRecursively: true),
         // The witness is not generic if all generic parameters of the conformance are
         // bound to concrete types, e.g. `extension Array: P where Element == UInt8`.
-        methodSubs.hasAnySubstitutableParams,
+        methodSubs.isEffectivelyGeneric,
         // Keep the abstraction of the parameters and results so that the specialized witness has
         // the same ABI as the original witness.
         let specializedMethod = context.specialize(function: method, for: methodSubs,

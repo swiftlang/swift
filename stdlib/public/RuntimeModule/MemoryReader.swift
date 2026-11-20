@@ -26,13 +26,15 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 #if os(macOS)
 @_implementationOnly import BacktracingImpl.OS.Darwin
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 internal import BacktracingImpl.OS.SafeReadMemory
 #endif
 
@@ -265,7 +267,7 @@ public struct UncachedLocalMemoryReader: MemoryReader {
 }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_spi(MemoryReaders) public struct POSIXError: Error {
   var errno: CInt
 }
@@ -386,8 +388,9 @@ public struct UncachedRemoteMemoryReader: MemoryReader {
     let size = buffer.count
     var fromIOVec = iovec(iov_base: UnsafeMutableRawPointer(
                             bitPattern: UInt(address)),
-                          iov_len: size)
-    var toIOVec = iovec(iov_base: buffer.baseAddress, iov_len: size)
+                          iov_len: numericCast(size))
+    var toIOVec = iovec(iov_base: buffer.baseAddress,
+                        iov_len: numericCast(size))
     let result = process_vm_readv(pid, &toIOVec, 1, &fromIOVec, 1, 0)
     if result != size {
       throw POSIXError(errno: _swift_get_errno())

@@ -200,6 +200,9 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   case Kind::TypeMetadataDemanglingCacheVariable:
     return mangler.mangleTypeMetadataDemanglingCacheVariable(getType());
 
+  case Kind::TypeMetadataMangledNameRef:
+    return mangler.mangleTypeMetadataMangledNameRef(getType());
+
   case Kind::TypeMetadataInstantiationCache:
     return mangler.mangleTypeMetadataInstantiationCache(
                                             cast<NominalTypeDecl>(getDecl()));
@@ -260,9 +263,15 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   case Kind::ClassMetadataBaseOffset:               // class metadata base offset
     return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
 
-  case Kind::NominalTypeDescriptor:
-    return mangler.mangleNominalTypeDescriptor(
-                                        cast<NominalTypeDecl>(getDecl()));
+  case Kind::NominalTypeDescriptor: {
+    auto *nominal = cast<NominalTypeDecl>(getDecl());
+    // A module's copy of the descriptor for a back-deployed type has a
+    // distinct name, so that conformance records can refer to the defining
+    // module's descriptor.
+    if (nominal->isBackDeployedIntoClient())
+      return mangler.mangleBackDeploymentCopyNominalTypeDescriptor(nominal);
+    return mangler.mangleNominalTypeDescriptor(nominal);
+  }
 
   case Kind::NominalTypeDescriptorRecord:
     return mangler.mangleNominalTypeDescriptorRecord(
@@ -753,6 +762,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::TypeMetadataDemanglingCacheVariable:
     return SILLinkage::Shared;
 
+  case Kind::TypeMetadataMangledNameRef:
+    return SILLinkage::Shared;
+
   case Kind::TypeMetadata: {
     if (isForcedShared())
       return SILLinkage::Shared;
@@ -913,9 +925,18 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // If we don't have conditionally available substitutions, we won't emit
     // the descriptor at all, but still make sure we report "shared" linkage
     // so that TBD files don't include a bogus symbol.
+    //
+    // The naming declaration is only emitted into clients if its body is
+    // serialized, which is not the case for a member of an internal type under
+    // `-enable-testing`. In that case, the descriptor must be public.
     auto *srcDecl = opaqueType->getNamingDecl();
-    if (srcDecl->isAlwaysEmittedIntoClient())
-      return SILLinkage::Shared;
+    if (srcDecl->isAlwaysEmittedIntoClient()) {
+      ValueDecl *implDecl = srcDecl;
+      if (auto *storage = dyn_cast<AbstractStorageDecl>(srcDecl))
+        implDecl = storage->getOpaqueAccessor(AccessorKind::Get);
+      if (!implDecl || SILDeclRef(implDecl).isSerialized())
+        return SILLinkage::Shared;
+    }
 
     return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
   }
@@ -1154,6 +1175,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::TypeMetadataMangledNameRef:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
@@ -1225,6 +1247,8 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
     return IGM.TypeMetadataPtrTy;
   case Kind::TypeMetadataDemanglingCacheVariable:
+    return IGM.TypeMetadataPtrTy;
+  case Kind::TypeMetadataMangledNameRef:
     return llvm::StructType::get(IGM.Int32Ty, IGM.Int32Ty);
   case Kind::TypeMetadataSingletonInitializationCache:
     // TODO: put a cache variable on IGM
@@ -1412,6 +1436,8 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::TypeMetadataDemanglingCacheVariable:
     return Alignment(8);
+  case Kind::TypeMetadataMangledNameRef:
+    return Alignment(8);
   case Kind::SILFunction:
     return Alignment(1);
   default:
@@ -1496,6 +1522,7 @@ bool LinkEntity::isText() const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::TypeMetadataMangledNameRef:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
@@ -1527,6 +1554,7 @@ bool LinkEntity::isText() const {
   case Kind::KnownCoroFunctionPointer:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool LinkEntity::isDistributedThunk() const {
@@ -1679,6 +1707,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ValueWitnessTable:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::TypeMetadataMangledNameRef:
   case Kind::ReflectionBuiltinDescriptor:
   case Kind::ReflectionFieldDescriptor:
   case Kind::CoroutineContinuationPrototype:
@@ -1820,6 +1849,7 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::TypeMetadataMangledNameRef:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
   case Kind::CoroAllocator:
@@ -1873,6 +1903,7 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
   case Kind::TypeMetadataLazyCacheVariable:
   case Kind::TypeMetadataDemanglingCacheVariable:
+  case Kind::TypeMetadataMangledNameRef:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
   case Kind::CoroAllocator:

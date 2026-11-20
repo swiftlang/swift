@@ -20,6 +20,27 @@ ArrayDifferentiationTests.test("Array.DifferentiableView+") {
   expectEqual(zero2 + a, [1, 2, 3])
 }
 
+ArrayDifferentiationTests.test("Array.DifferentiableView+=") {
+  var zero1: Array<Float>.DifferentiableView = [0, 0, 0]
+  var zero2: Array<Float>.DifferentiableView = .zero
+  var a: Array<Float>.DifferentiableView = [1, 2, 3]
+  
+  a += a
+  expectEqual(a, [2, 4, 6])
+  
+  a += zero1
+  expectEqual(a, [2, 4, 6])
+  
+  zero1 += a
+  expectEqual(zero1, [2, 4, 6])
+  
+  a += zero2
+  expectEqual(a, [2, 4, 6])
+  
+  zero2 += a
+  expectEqual(zero2, [2, 4, 6])
+}
+
 ArrayDifferentiationTests.test("Array.DifferentiableView-") {
   let zero1: Array<Float>.DifferentiableView = [0, 0, 0]
   let zero2: Array<Float>.DifferentiableView = .zero
@@ -32,6 +53,27 @@ ArrayDifferentiationTests.test("Array.DifferentiableView-") {
   
   expectEqual(a - zero2, [1, 2, 3])
   expectEqual(zero2 - a, [-1, -2, -3])
+}
+
+ArrayDifferentiationTests.test("Array.DifferentiableView-=") {
+  var zero1: Array<Float>.DifferentiableView = [0, 0, 0]
+  var zero2: Array<Float>.DifferentiableView = .zero
+  var a: Array<Float>.DifferentiableView = [1, 2, 3]
+  
+  a -= zero1
+  expectEqual(a, [1, 2, 3])
+  
+  zero1 -= a
+  expectEqual(zero1, [-1, -2, -3])
+  
+  a -= zero2
+  expectEqual(a, [1, 2, 3])
+  
+  zero2 -= a
+  expectEqual(zero2, [-1, -2, -3])
+  
+  a -= a
+  expectEqual(a, [0, 0, 0])
 }
 
 runAllTests()

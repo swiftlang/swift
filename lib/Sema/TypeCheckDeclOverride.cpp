@@ -1689,6 +1689,7 @@ namespace  {
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
     UNINTERESTING_ATTR(Target)
+    UNINTERESTING_ATTR(TailAllocated)
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
@@ -2312,22 +2313,21 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     break;
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true)) {
-    // If the override is unsafe but the base declaration is not, then the
-    // inheritance itself is unsafe.
-    auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
-    ConcreteDeclRef overrideRef(override);
-    ConcreteDeclRef baseRef(base, subs);
-    if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
-      // Don't diagnose @unsafe overrides if the subclass is @unsafe.
-      auto overridingClass = override->getDeclContext()->getSelfClassDecl();
-      bool shouldDiagnose = !overridingClass || !isUnsafe(overridingClass);
+  // If the override is unsafe but the base declaration is not, then the
+  // inheritance itself is unsafe.
+  auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
+  ConcreteDeclRef overrideRef(override);
+  ConcreteDeclRef baseRef(base, subs);
+  if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
+    // Don't diagnose @unsafe overrides if the subclass is @unsafe.
+    auto overridingClass = override->getDeclContext()->getSelfClassDecl();
+    bool shouldDiagnose = !overridingClass || !isUnsafe(overridingClass);
 
-      if (shouldDiagnose) {
-        diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
-      }
+    if (shouldDiagnose) {
+      diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
     }
   }
+
   /// Check attributes associated with the base; some may need to merged with
   /// or checked against attributes in the overriding declaration.
   AttributeOverrideChecker attrChecker(base, override);

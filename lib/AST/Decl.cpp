@@ -1998,6 +1998,7 @@ GenericParamList *GenericContext::getParsedGenericParams() const {
   case GenericParamsState::TypeChecked:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool GenericContext::hasComputedGenericSignature() const {
@@ -2789,11 +2790,8 @@ Decl::getRequiredCodeGenerationModel() const {
   }
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
-  auto dc = getInnermostDeclContext();
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (!sig->areAllParamsConcrete() && isEmbedded)
-      return CodeGenerationModel::Implementation;
-  }
+  if (isEmbedded && getInnermostDeclContext()->isEffectivelyGenericContext())
+    return CodeGenerationModel::Implementation;
 
   // Foreign types are always @export(implementation).
   if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
@@ -4577,16 +4575,17 @@ unsigned ValueDecl::getLocalDiscriminator() const {
     return 0;
 
   // Assign local discriminators in this context.
-  ASTContext &ctx = getASTContext();
-  evaluateOrDefault(
-      ctx.evaluator,
-      LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+  // FIXME: If this a ParamDecl in a secondary file, this will assign
+  // discriminators for the function body too. We ought to be more granular
+  // here.
+  getDeclContext()->assignLocalDiscriminators();
 
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
   //
   // then assign the next discriminator now.
+  ASTContext &ctx = getASTContext();
   if (LocalDiscriminator == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        (getLoc().isValid() &&
@@ -4811,6 +4810,10 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
         return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
 
+      if (auto *nominal = dyn_cast<NominalType>(type.getPointer());
+          nominal && nominal->hasScopeArgs())
+        return mapSignatureType(ctx, nominal->withoutScopeArgs());
+
       return std::nullopt;
     });
 }
@@ -4902,8 +4905,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags,
-                                    param.getInternalLabel());
+    // Don't allow overloading by access scopes either.
+    auto newParam = AnyFunctionType::Param::bodyAccess(
+        newParamType, param.getLabel(), newFlags, param.getInternalLabel());
     newParams.push_back(newParam);
   }
 
@@ -4972,7 +4976,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
-  // FIXME: Erase scopes.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
     return mapSignatureFunctionType(getASTContext(), getInterfaceType(),
@@ -9581,6 +9584,35 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+std::optional<LoweredOwnership> VarDecl::getBindingOwnership() const {
+  switch (getIntroducer()) {
+  case Introducer::Let:
+    // `let` defaults to the prevailing ownership of the match.
+    return std::nullopt;
+
+  case Introducer::Var:
+    // If the variable's type is copyable, then we can bind the variable by
+    // copying without requiring more than a borrow of the original.
+    // FIXME: An explicit `consuming` binding kind consumes regardless of
+    // type.
+    if (!hasInterfaceType() || getTypeInContext()->isCopyable())
+      return std::nullopt;
+
+    // Noncopyable `var` consumes the bound value to move it into a new
+    // independent variable.
+    return LoweredOwnership::Owned;
+
+  case Introducer::InOut:
+    // `inout` bindings modify the value in-place.
+    return LoweredOwnership::InOut;
+
+  case Introducer::Borrowing:
+    // `borrow` bindings borrow parts of the value in-place.
+    return LoweredOwnership::Shared;
+  }
+  llvm_unreachable("bad introducer");
+}
+
 LoweredOwnership ParamDecl::getLoweredOwnership() const {
   auto *dc = getDeclContext();
   auto ownership = getValueOwnership();
@@ -10366,7 +10398,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
       isSending(), isAddressable(), isConstVal());
-  return AnyFunctionType::Param(type, label, flags, internalLabel);
+  // The access scopes of a function's parameters only appear in its type.
+  return AnyFunctionType::Param::bodyAccess(type, label, flags, internalLabel);
 }
 
 std::optional<DefaultArgumentInitializer *>
@@ -10425,6 +10458,25 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::EmptyDictionary:
   case DefaultArgumentKind::ExpressionMacro:
     return true;
+  }
+  llvm_unreachable("invalid default argument kind");
+}
+
+bool ParamDecl::hasDefaultArgumentGenerator() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::StoredProperty:
+    return true;
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
+    return false;
   }
   llvm_unreachable("invalid default argument kind");
 }
@@ -11264,6 +11316,7 @@ bool AbstractFunctionDecl::hasBody() const {
   case BodyKind::TypeChecked:
     return BodyAndFP.getBody() != nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractFunctionDecl::bodyHasExplicitReturnStmt() const {
@@ -11378,6 +11431,7 @@ BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {
   case BodyKind::Deserialized:
     return getBody(/*canSynthesize=*/true);
   }
+  llvm_unreachable("covered switch");
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
@@ -11499,6 +11553,7 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   keepOriginalBodySourceRange();
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
+  setBodyHasDiscriminators(false);
 
   if (auto SF = getParentSourceFile()) {
     SF->getASTContext().evaluator.clearCachedOutput(LocalTypeDeclsRequest{SF});
@@ -12566,6 +12621,7 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Mutate:
     return StringRef();
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AccessorDecl::isAssumedNonMutating() const {
@@ -13329,6 +13385,16 @@ Type ClassDecl::getSuperclass() const {
     Type());
 }
 
+std::pair<TailAllocatedAttr *, ClassDecl *>
+ClassDecl::getTailAllocatedAttr() const {
+  for (auto *cls = const_cast<ClassDecl *>(this); cls;
+       cls = cls->getSuperclassDecl()) {
+    if (auto *attr = cls->getAttrs().getAttribute<TailAllocatedAttr>())
+      return {attr, cls};
+  }
+  return {nullptr, nullptr};
+}
+
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
   auto result = evaluateOrDefault(ctx.evaluator,
@@ -13806,6 +13872,7 @@ StringRef swift::getMacroRoleString(MacroRole role) {
     return Description;
 #include "swift/Basic/MacroRoles.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 std::vector<MacroIntroducedDeclNameKind>
@@ -13832,6 +13899,7 @@ bool swift::macroIntroducedNameRequiresArgument(
   case MacroIntroducedDeclNameKind::Arbitrary:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::getMacroIntroducedDeclNameString(
@@ -13852,6 +13920,7 @@ StringRef swift::getMacroIntroducedDeclNameString(
   case MacroIntroducedDeclNameKind::Arbitrary:
     return "arbitrary";
   }
+  llvm_unreachable("covered switch");
 }
 
 static MacroRoles freestandingMacroRoles =
@@ -13902,6 +13971,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
 #include "swift/Basic/MacroRoles.def"
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
@@ -14322,6 +14392,7 @@ MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
     // their context.
     return getInnermostMacroContext(dc->getParent());
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Retrieve the parent discriminator context for the given macro.
@@ -14373,6 +14444,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::SyntheticMacro:
     return origDC;
   }
+  llvm_unreachable("covered switch");
 }
 
 MacroDiscriminatorContext

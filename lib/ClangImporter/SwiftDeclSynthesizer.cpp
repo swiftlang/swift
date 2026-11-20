@@ -1139,8 +1139,9 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo addressOfInfo;
   addressofFnRefExpr->setType(FunctionType::get(
-      AnyFunctionType::Param(inoutSelfDecl->getInterfaceType(), Identifier(),
-                             ParameterTypeFlags().withInOut(true)),
+      AnyFunctionType::Param::bodyAccess(inoutSelfDecl->getInterfaceType(),
+                                         Identifier(),
+                                         ParameterTypeFlags().withInOut(true)),
       /* yields */ {}, ctx.TheRawPointerType, addressOfInfo));
 
   auto *selfPtrArgs = ArgumentList::createImplicit(
@@ -1161,8 +1162,8 @@ synthesizeUnionFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo initializeInfo;
   initializeFnRefExpr->setType(FunctionType::get(
-      {AnyFunctionType::Param(newValueDecl->getInterfaceType()),
-       AnyFunctionType::Param(ctx.TheRawPointerType)},
+      {AnyFunctionType::Param::bodyAccess(newValueDecl->getInterfaceType()),
+       AnyFunctionType::Param::bodyAccess(ctx.TheRawPointerType)},
       /* yields */ {}, TupleType::getEmpty(ctx), initializeInfo));
 
   auto *initArgs =
@@ -1217,14 +1218,28 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
+  // C++ records that are move-only or can't be passed in registers are taken
+  // by const reference instead, so that reading the field neither consumes nor
+  // copies the record.
   auto recordType = Ctx.getCanonicalTagType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
+  bool getterSelfByRef = false;
+  if (isa<clang::CXXRecordDecl>(structDecl)) {
+    auto *def = structDecl->getDefinitionOrSelf();
+    getterSelfByRef =
+        !def->canPassInRegisters() ||
+        getCxxValueSemanticsKind(recordType.getTypePtr(), ImporterImpl) ==
+            CxxValueSemanticsKind::MoveOnly;
+  }
+  auto getterSelfType = getterSelfByRef
+                            ? Ctx.getLValueReferenceType(recordType.withConst())
+                            : recordType;
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
   auto cGetterType =
-      Ctx.getFunctionType(fieldDecl->getType(), {recordType},
+      Ctx.getFunctionType(fieldDecl->getType(), {getterSelfType},
                           clang::FunctionProtoType::ExtProtoInfo());
   auto cGetterDecl = createClangFunctionDecl(Ctx, structDecl->getDeclContext(),
                                          cGetterName, cGetterType);
@@ -1252,14 +1267,16 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   // Synthesize the getter body
   {
     auto cGetterSelf =
-        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, recordType);
+        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, getterSelfType);
     cGetterDecl->setParams(cGetterSelf);
 
-    auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterSelfExpr = createClangDeclRefExpr(
+        Ctx, cGetterSelf, getterSelfType.getNonReferenceType(),
+        clang::VK_LValue);
     auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
+        /*isarrow=*/false, fieldDecl,
+        getterSelfByRef ? fieldType.withConst() : fieldType, clang::VK_LValue,
         clang::OK_BitField);
     auto cGetterExpr = clang::ImplicitCastExpr::Create(
         Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
@@ -2073,7 +2090,8 @@ Expr *SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(ASTContext &ctx,
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   FunctionType::ExtInfo info;
   reinterpretCastRef->setType(FunctionType::get(
-      {FunctionType::Param(givenType)}, /* yields */ {}, exprType, info));
+      {FunctionType::Param::bodyAccess(givenType)}, /* yields */ {}, exprType,
+      info));
 
   auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {baseExpr});
   auto reinterpreted =
@@ -2273,8 +2291,13 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
+  // A getter for a non-Escapable element returned indirectly would have to go
+  // through 'UnsafePointer.pointee', which requires an Escapable pointee. The
+  // element type may refer to the generic parameters of a templated operator.
+  bool elementIsNonEscapable =
+      !getterImpl->mapTypeIntoEnvironment(elementTy)->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (elementIsNoncopyable || elementIsNonEscapable);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
@@ -2379,12 +2402,17 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
-  // Use 'address' or 'mutableAddress' accessors for non-copyable
-  // types that are returned indirectly.
-  bool isNoncopyable = dc->mapTypeIntoEnvironment(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+  // Use 'address' or 'mutableAddress' accessors for values returned indirectly
+  // when they are non-copyable, when they are non-Escapable (a getter would
+  // have to go through 'UnsafePointer.pointee', which requires an Escapable
+  // pointee), or when they depend on 'self'. Such accessors, and getters of
+  // non-copyable or 'self'-dependent values, are not implicit.
+  auto elementTyInContext = dc->mapTypeIntoEnvironment(elementTy);
+  bool isNoncopyable = elementTyInContext->isNoncopyable();
+  bool isNonEscapable = !elementTyInContext->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (isNoncopyable || isNonEscapable || resultDependsOnSelf);
+  bool isImplicit = !(isNoncopyable || resultDependsOnSelf || useAddress);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
@@ -4057,6 +4085,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   case CxxRecordSemanticsKind::SwiftClassType:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Function body synthesizer for a deinit of a noncopyable type, which

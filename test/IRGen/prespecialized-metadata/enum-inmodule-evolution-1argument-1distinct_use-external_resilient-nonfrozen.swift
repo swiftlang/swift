@@ -23,8 +23,8 @@ enum Value<First> {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
-// CHECK-SAME:   $s4main5ValueOy10TestModule7IntegerVGMD
+// CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(
+// CHECK-SAME:   $s4main5ValueOy10TestModule7IntegerVGMd
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
 // CHECK-SAME:   ptr noalias %{{[0-9]+}}, 
 // CHECK-SAME:   ptr [[DEMANGLED_TYPE]]

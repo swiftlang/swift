@@ -24,11 +24,29 @@ import Swift
 final class ElfImageCache {
   var elf32: [String: Elf32Image] = [:]
   var elf64: [String: Elf64Image] = [:]
+  #if os(Android)
+  var apks: [String: ApkFile] = [:]
+  #endif
 
   func purge() {
     elf32 = [:]
     elf64 = [:]
+    #if os(Android)
+    apks = [:]
+    #endif
   }
+
+  #if os(Android)
+  /// Get the APK at the given path, reading it only once.
+  func apk(path: String) -> ApkFile {
+    if let apk = apks[path] {
+      return apk
+    }
+    let apk = ApkFile(path: path)
+    apks[path] = apk
+    return apk
+  }
+  #endif
 
   enum Result {
     case elf32Image(Elf32Image)
@@ -44,7 +62,7 @@ final class ElfImageCache {
     if let image = elf64[path] {
       return .elf64Image(image)
     }
-    if let source = try? ImageSource(path: path) {
+    if let source = try? openSource(path: path) {
       if let elfImage = try? Elf32Image(source: source) {
         elf32[path] = elfImage
         return .elf32Image(elfImage)
@@ -55,6 +73,23 @@ final class ElfImageCache {
       }
     }
     return nil
+  }
+
+  private func openSource(path: String) throws -> ImageSource {
+    #if os(Android)
+    // A library stored in an APK has a path of the form `<apk>!/<entry>`.
+    if let (apkPath, entryName) = ApkFile.split(path: path) {
+      let apk = apk(path: apkPath)
+      guard let source = apk.source,
+            let entry = apk.entry(named: entryName) else {
+        throw ImageSourceError.outOfBoundsRead
+      }
+      return try source.subrange(UInt64(entry.range.lowerBound)
+                                   ..< UInt64(entry.range.upperBound),
+                                 path: path)
+    }
+    #endif
+    return try ImageSource(path: path)
   }
 
   static var threadLocal: ElfImageCache {

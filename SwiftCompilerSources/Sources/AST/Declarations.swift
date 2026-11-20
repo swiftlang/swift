@@ -126,6 +126,10 @@ public class NominalTypeDecl: GenericTypeDecl {
     return result
   }
 
+  final public var storedProperties: StoredPropertiesArray {
+    StoredPropertiesArray(nominal: self)
+  }
+
   public func add(member: Decl) {
     bridged.NominalTypeDecl_addMember(member.bridged)
   }
@@ -267,7 +271,14 @@ public class VarDecl: AbstractStorageDecl {
 
 final public class ParamDecl: VarDecl {
   /// The location of an explicit `consuming` specifier on this parameter, if present.
-  public var consumingSpecifierLoc: SourceLoc? { SourceLoc(bridged: bridged.Param_getConsumingSpecifierLoc()) }
+  public var consumingSpecifierLoc: SourceLoc? { specifierLoc(.consuming) }
+
+  /// The location of an explicit `borrowing` specifier on this parameter, if present.
+  public var borrowingSpecifierLoc: SourceLoc? { specifierLoc(.borrowing) }
+
+  private func specifierLoc(_ specifier: BridgedParamSpecifier) -> SourceLoc? {
+    SourceLoc(bridged: BridgedParamDecl(raw: bridged.obj).getSpecifierLoc(specifier))
+  }
 
   public func cloneWithoutType() -> ParamDecl {
     BridgedParamDecl(raw: bridged.obj).cloneWithoutType().asDecl.declObj.getAs(ParamDecl.self)
@@ -307,7 +318,9 @@ final public class DestructorDecl: AbstractFunctionDecl {
 
 public class FuncDecl: AbstractFunctionDecl {}
 
-final public class AccessorDecl: FuncDecl {}
+final public class AccessorDecl: FuncDecl {
+  public var storage: AbstractStorageDecl { bridged.Accessor_getStorage().getAs(AbstractStorageDecl.self) }
+}
 
 final public class MacroDecl: ValueDecl {}
 
@@ -402,6 +415,17 @@ public class GenericParameterList {
 }
 
 public typealias TrailingWhereClause = BridgedTrailingWhereClause
+
+public struct StoredPropertiesArray : RandomAccessCollection {
+  fileprivate let nominal: NominalTypeDecl
+
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { nominal.bridged.NominalType_getNumStoredProperties() }
+
+  public subscript(_ index: Int) -> VarDecl {
+    return nominal.bridged.NominalType_getStoredProperty(index).getAs(VarDecl.self)
+  }
+}
 
 public class ParameterList : RandomAccessCollection {
   public var startIndex: Int { 0 }

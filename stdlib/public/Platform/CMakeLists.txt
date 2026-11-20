@@ -8,6 +8,7 @@ set(swift_platform_compile_flags)
 if(SWIFT_ENABLE_REFLECTION)
   list(APPEND swift_platform_compile_flags "-DSWIFT_ENABLE_REFLECTION")
 endif()
+list(APPEND swift_platform_compile_flags -Xfrontend -enable-sil-opaque-values)
 
 set(swiftGlibc_target_sdks CYGWIN FREEBSD OPENBSD LINUX HAIKU)
 if(SWIFT_FREESTANDING_FLAVOR STREQUAL "linux")

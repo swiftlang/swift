@@ -582,6 +582,13 @@ private extension Function {
         context.erase(instruction: allocGlobal)
       case let globalAddr as GlobalAddrInst where globalAddr.global == global:
         context.erase(instructionIncludingAllUsers: globalAddr)
+      case let allocStack as AllocStackInst:
+        // Also remove temporary stack locations which were used to initialize the global, e.g. if a vector
+        // is initialized in a stack location and then loaded and stored to the global.
+        // `GlobalInitValue.init` already checked that all stack locations are only used for initialization.
+        // Leaving the stores to the stack location in place would prevent the `builtin "once"`
+        // from being removed in the Onone pipeline.
+        context.erase(instructionIncludingAllUsers: allocStack)
       default:
         break
       }

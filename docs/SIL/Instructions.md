@@ -27,9 +27,9 @@ address of the allocated memory.
 `alloc_stack` always allocates memory on the stack even for
 runtime-sized type.
 
-`alloc_stack` is a stack allocation instruction. See the section above
-on stack discipline. The corresponding stack deallocation instruction is
-`dealloc_stack`.
+`alloc_stack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_stack`.
 
 The `dynamic_lifetime` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time. This
@@ -68,9 +68,9 @@ Allocates uninitialized memory on the stack for a value pack of the
 given type, which must be a pack type. The result of the instruction is
 the address of the allocated memory.
 
-`alloc_pack` is a stack allocation instruction. See the section above on
-stack discipline. The corresponding stack deallocation instruction is
-`dealloc_pack`.
+`alloc_pack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack`.
 
 ### alloc_pack_metadata
 
@@ -81,9 +81,9 @@ sil-instruction ::= 'alloc_pack_metadata' $()
 Inserted as the last SIL lowering pass of IRGen, indicates that the next
 instruction may have on-stack pack metadata allocated on its behalf.
 
-Notionally, `alloc_pack_metadata` is a stack allocation instruction. See
-the section above on stack discipline. The corresponding stack
-deallocation instruction is `dealloc_pack_metadata`.
+Notionally, `alloc_pack_metadata` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack_metadata`.
 
 Only valid in Lowered SIL.
 
@@ -507,10 +507,15 @@ Marks the deallocation of the stack space for an `alloc_ref [stack]`.
 ### dealloc_ref
 
 ```
-sil-instruction ::= 'dealloc_ref' sil-operand
+sil-instruction ::= 'dealloc_ref'
+                      ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                      sil-operand
 
 dealloc_ref %0 : $T
+dealloc_ref [tail_elems $E * %1 : $Builtin.Int64] %0 : $T
 // $T must be a class type
+// $E is the type of the tail-allocated elements
+// %1 must be of a builtin integer type
 ```
 
 Deallocates an uninitialized class type instance, bypassing the
@@ -518,6 +523,13 @@ reference counting mechanism.
 
 The type of the operand must match the allocated type exactly, or else
 undefined behavior results.
+
+The optional `tail_elems` attributes specify the element types and element
+counts of the tail-allocated arrays, which must be the ones the instance was
+allocated with, in the same order, so that the deallocation can pass the
+allocation's size (and, with typed allocation, its type ID). The
+count-operand must be of a builtin integer type. The `tail_elems` attributes
+are required for a class with `@_tailAllocated` in Embedded Swift.
 
 The instance must have a retain count of one.
 
@@ -861,9 +873,10 @@ In OSSA the ownership kind specifies how to handle ownership:
 ### load_borrow
 
 ```
-sil-instruction ::= 'load_borrow' sil-value
+sil-instruction ::= 'load_borrow' sil-value (',' 'value_hint' sil-operand)?
 
 %1 = load_borrow %0 : $*T
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
 // $T must be a loadable type
 ```
 
@@ -875,6 +888,30 @@ instruction. All [load_borrow](#load_borrow) instructions must be paired
 with exactly one [end_borrow](#end_borrow) instruction along any path
 through the program. Until [end_borrow](#end_borrow), it is illegal to
 invalidate or store to `%0`.
+
+The optional `value_hint` operand states that the loaded value is exactly
+the value of the `value_hint` operand (`%2`), i.e. memory location `%0`
+contains `%2` at the point of the `load_borrow`. Its type must match the
+result type of the `load_borrow`.
+
+This is useful if the `load_borrow` cannot be replaced by the `value_hint`
+in OSSA, because that would violate ownership rules. For example, if the
+`value_hint` is consumed (e.g. by a `store`) before the `load_borrow`:
+
+```
+store %2 to [init] %0 : $*T      // consumes %2
+...
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
+```
+
+The `value_hint` operand is not an ownership use: it does not require
+`%2` to be alive at the `load_borrow` and does not extend its lifetime.
+However, `%2` must dominate the `load_borrow`.
+
+Once OSSA is lowered, the `load_borrow` is replaced by the `value_hint`
+instead of being lowered to a `load`.
+
+The `value_hint` is purely an optimization hint and can always be dropped.
 
 ### store_borrow
 
@@ -1190,13 +1227,45 @@ This is only valid in Raw SIL.
 ### unchecked_ownership
 
 ```
-sil-instruction ::= 'unchecked_ownership' sil-operand
+sil-instruction ::= 'unchecked_ownership' sil-operand (',' 'forwarding' ':' sil-value-ownership-kind)?
 
-unchecked_ownership %1 : $T
+%1 = unchecked_ownership %0 : $T
+%2 = unchecked_ownership %0 : $T, forwarding: @none
 ```
 
-unchecked_ownership disables the ownership verification of it's operand. This used in cases 
-we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
+Produces a value `%1` which is the same value as the operand `%0` but
+"breaks" the ownership chain between the two. The operand is not an ownership
+use (it is a non-use, like a type-dependent operand), so the ownership verifier
+and OSSA utilities, like liveness computations, don't connect uses of the
+result with the operand. In particular, uses of the result are not required to
+be within the lifetime or borrow scope of the operand.
+
+The ownership of the result is the forwarding ownership kind of the
+instruction. By default it's the ownership kind of the operand. It can be set
+explicitly with the `forwarding:` attribute, e.g. `@none` to make the result
+a value without ownership, even if its type is not trivial.
+
+The instruction is only valid in OSSA.
+
+It's the responsibility of the code which creates `unchecked_ownership` to
+ensure that the program is still correct after the ownership model eliminator
+replaced the result with the operand. In particular, the result must only be
+used at places where the value is known to be alive at runtime, even if it is
+not alive in terms of OSSA (e.g. because it's still stored in memory).
+
+How `unchecked_ownership` can be used depends on the forwarding ownership:
+
+* With `@none` forwarding, the result is a value without ownership, which has
+  no lifetime or scope which OSSA utilities and optimizations have to respect.
+
+* With `@guaranteed` or `@owned` forwarding, the result has a lifetime or
+  borrow scope which is not connected with the operand. OSSA optimizations
+  cannot handle this correctly. Therefore, it's only used in raw SIL, in cases
+  where the ownership cannot be resolved until a mandatory pass runs. For
+  example, SILGen produces the result of a borrow accessor inside a local borrow
+  scope and uses `unchecked_ownership` to return it outside that scope. A
+  mandatory pass then removes the `unchecked_ownership` and introduces a
+  `return_borrow`.
 
 ### copy_addr
 
@@ -2854,7 +2923,9 @@ signature). Instead:
     that are passed directly and the noncopyable address-only values that
     are passed as `@in` arguments. The `partial_apply` consumes such an 
     `@in` argument, which leaves its memory uninitialized, and the caller
-    has nothing left to destroy.
+    has nothing left to destroy. Like any other on-stack context, it
+    borrows the values that the closure doesn't consume, whether or not
+    they are Copyable.
 2.  If the `partial_apply` has an escaping function type (not
     `[on_stack]`) then the closure context will be heap allocated with a
     retain count of 1. Any closed over parameters (except for `@inout`
@@ -4305,9 +4376,10 @@ These instructions are collectively called the *pack indexing
 instructions*. Each of them produces a single value of type
 `Builtin.PackIndex`. Instructions that consume pack indices generally
 provide a projected element type which is required to be structurally
-well-typed for the given pack index and the actual pack type they index
-into. This rule depends on the exact pack indexing instruction used and
-is described in a section above.
+well-typed for the given pack index and the actual pack type they
+index into. This rule depends on the exact pack indexing instruction
+used and is described in [Structural type matching for pack
+indices](SIL.md#structural-type-matching-for-pack-indices).
 
 All pack indexing instructions carry an **indexed pack type**, which is
 a formal type that must be a pack type. Pack indexing instructions can
@@ -4541,10 +4613,36 @@ address type.
 
 The `strict` flag indicates whether the returned address adheres to
 strict aliasing. If true, then the type of each memory access dependent
-on this address must be consistent with the memory's bound type. A
-memory access from an address that is not strict cannot have its address
-substituted with a strict address, even if other nearby memory accesses
-at the same location are strict.
+on this address must be consistent with the memory's bound type.
+`UnsafeRawPointer` access omits the `strict` flag so that the same location may
+be accessed as different types, such as:
+```
+public func f(i: inout Int) -> UInt {
+  withUnsafeMutableBytes(of: &i) {
+    $0.storeBytes(of: 3, as: Int.self)
+    return $0.load(as: UInt.self) // returns '3'
+  }
+}
+```
+A `pointer_to_address` without `strict` may be substituted with a
+strictly aliased address of the same type:
+```
+%1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
+%2 = address_to_pointer %1 : $*T to $Builtin.RawPointer
+%3 = pointer_to_address %2 : $Builtin.RawPointer to $*T
+use(%3)
+```
+can be optimized as:
+```
+%1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*T
+use(%1)
+```
+This optimization cannot introduce undefined behavior because it only applies to
+addresses that have the same type as a strictly aliased address. Newly strict
+uses of the address will continue to potentially alias with other non-strict
+addresses. If this optimization applies to more than one address, then those
+addresses will continue to alias even under strict rules because they have the
+same type.
 
 The `invariant` flag is set if loading from the returned address always
 produces the same value.
@@ -5147,7 +5245,8 @@ sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand ('
 
 return_borrow %0 : $T from_scopes (%1, %2 ...)
 // %0 must be a @guaranteed value
-// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`,
+//   ordered from inner to outer
 // $T must be the return type of the current function
 ```
 
@@ -5767,9 +5866,11 @@ sil-instruction ::= 'diagnose' '[' sil-diagnose-kind ']' sil-operand
 
 sil-diagnose-kind ::= 'unpermitted_copy'
                   ::= 'let_reinit'
+                  ::= 'missing_super_init'
 
 diagnose [unpermitted_copy] %1 : $T
 diagnose [let_reinit] %2 : $*T
+diagnose [missing_super_init] %3 : $*C
 ```
 
 Marks its operand as needing a diagnostic of the given kind, to be emitted
@@ -5791,6 +5892,11 @@ noncopyable value.
 If the kind is `let_reinit`, then the operand is the address of immutable
 storage, and the `diagnose` precedes an initialization of that storage
 which may happen after it was already initialized.
+
+If the kind is `missing_super_init`, then the operand is the address of
+`self` in a derived class initializer, and the `diagnose` precedes uses
+that may need the superclass part of `self` before `super.init`
+initializes it.
 
 ### end_formal_scope
 

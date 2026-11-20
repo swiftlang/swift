@@ -1532,6 +1532,43 @@ void Implementation::cleanup() {
 //                   MARK: Borrow and SwitchEnum Gathering
 //===----------------------------------------------------------------------===//
 
+/// Whether \p bbi is borrowed only so that its value can be copied into a
+/// `mark_unresolved_non_copyable_value [no_consume_or_assign]`.
+///
+/// SILGen emits this for the pattern variables that a `where` clause borrows
+/// from the subject of a `switch consume` while it evaluates the condition. The
+/// mark is checked on its own, and eraseMarkWithCopiedOperand replaces the copy
+/// with the borrow once it has been checked. There is nothing to destructure.
+/// Converting such a borrow would turn the copy into a copy of the owned value
+/// and the mark into a consume of that copy, which the checker rejects when the
+/// owned value is consumed afterwards by the case body.
+static bool isBorrowOfNoConsumeCopiesOnly(BeginBorrowInst *bbi) {
+  if (!bbi->isFixed())
+    return false;
+
+  bool foundCopy = false;
+  for (auto *use : bbi->getUses()) {
+    auto *user = use->getUser();
+    if (isa<EndBorrowInst>(user))
+      continue;
+
+    auto *cvi = dyn_cast<CopyValueInst>(user);
+    if (!cvi)
+      return false;
+    auto *copyUse = cvi->getSingleUse();
+    if (!copyUse)
+      return false;
+    auto *mark =
+        dyn_cast<MarkUnresolvedNonCopyableValueInst>(copyUse->getUser());
+    if (!mark ||
+        mark->getCheckKind() !=
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
+      return false;
+    foundCopy = true;
+  }
+  return foundCopy;
+}
+
 /// Visit all of the uses of \p mmci and find all begin_borrows.
 ///
 /// Returns false if we found an escape and thus cannot process. It is assumed
@@ -1608,6 +1645,11 @@ static bool gatherBorrows(SILValue rootValue,
       continue;
     case OperandOwnership::Borrow:
       if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
+        if (isBorrowOfNoConsumeCopiesOnly(bbi)) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Skipping borrow of no-consume copies: " << *bbi);
+          continue;
+        }
         LLVM_DEBUG(llvm::dbgs() << "    Found borrow: " << *bbi);
         borrowWorklist.push_back(bbi);
       }

@@ -299,15 +299,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get()->getOwnershipKind();
       }));
 
-  if (!mergedValue) {
-    // If we have mismatched SILOwnership and sil ownership is not enabled,
-    // just return None for staging purposes. If SILOwnership is enabled, then
-    // we must assert!
-    if (!i->getModule().getOptions().VerifySILOwnership) {
-      return OwnershipKind::None;
-    }
-    llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
-  }
+  ASSERT(mergedValue && "Forwarding inst with mismatching ownership kinds?!");
 
   return mergedValue;
 }
@@ -691,6 +683,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
+CONSTANT_OWNERSHIP_BUILTIN(None, CreateSplitContinuation)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetSplitContinuationAddr)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroySplitContinuation)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinaryTaskExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)

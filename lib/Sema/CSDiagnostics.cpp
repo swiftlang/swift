@@ -431,7 +431,11 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
     }
   } while ((DC = DC->getParent()));
 
-  return AffectedDecl->getAsGenericContext();
+  // None of the enclosing contexts satisfy the requirement, which can
+  // happen e.g. when the requirements of an extension conflict with each
+  // other. The affected declaration is not always a generic context itself
+  // (e.g. a property), so fall back to its innermost declaration context.
+  return AffectedDecl->getInnermostDeclContext();
 }
 
 bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
@@ -2653,6 +2657,7 @@ AssignmentFailure::getMemberRef(ConstraintLocator *locator) const {
                      : std::nullopt;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Diag<StringRef> AssignmentFailure::findDeclDiagnostic(ASTContext &ctx,

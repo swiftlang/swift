@@ -529,6 +529,15 @@ namespace {
     }
 
     bool visitDeallocRefInst(const DeallocRefInst *RHS) {
+      auto *LHSInst = cast<DeallocRefInst>(LHS);
+      auto LHSTypes = LHSInst->getTailAllocatedTypes();
+      auto RHSTypes = RHS->getTailAllocatedTypes();
+      unsigned NumTypes = LHSTypes.size();
+      assert(NumTypes == RHSTypes.size());
+      for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
+        if (LHSTypes[Idx] != RHSTypes[Idx])
+          return false;
+      }
       return true;
     }
 
@@ -1516,6 +1525,7 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(TaskAddCancellationHandlerWithReason, TaskAddCancellationHandler)
       BUILTIN_CASE(TaskPushDeadline, TaskPushDeadline)
       BUILTIN_CASE(TaskCancellationScopePush, TaskCancellationScopePush)
+      BUILTIN_CASE(CreateSplitContinuation, CreateSplitContinuation)
 #undef BUILTIN_CASE
 
       default:
@@ -1630,6 +1640,7 @@ SILInstruction::getStackDeallocation() const {
                    BuiltinTaskAddCancellationHandler)
       BUILTIN_CASE(TaskPopDeadline, BuiltinTaskPushDeadline)
       BUILTIN_CASE(TaskCancellationScopePop, BuiltinTaskCancellationScopePush)
+      BUILTIN_CASE(DestroySplitContinuation, BuiltinCreateSplitContinuation)
 #undef BUILTIN_CASE
 
       default:

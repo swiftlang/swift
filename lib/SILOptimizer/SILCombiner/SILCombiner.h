@@ -284,7 +284,6 @@ public:
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
   
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
-  SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);

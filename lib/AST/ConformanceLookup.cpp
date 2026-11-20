@@ -170,8 +170,7 @@ swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
   return ProtocolConformanceRef::forInvalid();
 }
 
-/// Whether we should create missing conformances to the given protocol.
-static bool shouldCreateMissingConformances(Type type, ProtocolDecl *proto) {
+bool ProtocolConformanceRef::canBeMissing(ProtocolDecl *proto) {
   // Sendable may be able to be synthesized.
   if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
     return true;
@@ -189,7 +188,7 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   // Introduce "missing" conformances when appropriate, so that type checking
   // (and even code generation) can continue.
   ASTContext &ctx = proto->getASTContext();
-  if (shouldCreateMissingConformances(type, proto)) {
+  if (canBeMissing(proto)) {
     return ProtocolConformanceRef(
         ctx.getBuiltinConformance(
           type, proto, BuiltinConformanceKind::Missing));
@@ -223,7 +222,7 @@ ProtocolConformanceRef swift::lookupConformance(Type type,
   // If we aren't supposed to allow missing conformances but we have one,
   // replace the result with an "invalid" result.
   if (!allowMissing &&
-      shouldCreateMissingConformances(type, protocol) &&
+      ProtocolConformanceRef::canBeMissing(protocol) &&
       result.hasMissingConformance())
     return ProtocolConformanceRef::forInvalid();
 
@@ -315,6 +314,7 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   case FunctionTypeRepresentation::Thin:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Whether the given function type conforms to Copyable.
@@ -378,6 +378,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Synthesize a builtin function type conformance to the given protocol, if

@@ -10,13 +10,18 @@ import Swift
 // tryRemoveZeroIndex
 // ============================================================
 
-// Zero index is removed; uses of the index_addr are replaced with base.
-// CHECK-LABEL: sil @remove_zero_index :
+// Zero index is not removed to support old SDKs (swift < 6.5) where the stdlib doesn't
+// use the UnsafePointer's `project` API for projecting array elements.
+// Without `project` alias-analysis wouldn't detect detect potential aliasing of first
+// array element addresses (where the index of `index_addr` is 0).
+//
+// CHECK-LABEL: sil @dont_remove_zero_index :
 // CHECK:         [[BASE:%.*]] = pointer_to_address
-// CHECK:         load [[BASE]]
+// CHECK:         [[IDX:%.*]] = index_addr [[BASE]]
+// CHECK:         load [[IDX]]
 // CHECK-NOT:     index_addr
-// CHECK:       } // end sil function 'remove_zero_index'
-sil @remove_zero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+// CHECK:       } // end sil function 'dont_remove_zero_index'
+sil @dont_remove_zero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
 bb0(%ptr : $Builtin.RawPointer):
   %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
   %idx  = integer_literal $Builtin.Word, 0

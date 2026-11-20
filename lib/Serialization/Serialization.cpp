@@ -582,8 +582,9 @@ static Accessors getAccessors(const AbstractStorageDecl *storage) {
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
   accessors.ReadWriteImpl = getRawReadWriteImplKind(impl.getReadWriteImpl());
-  auto decls = storage->getAllAccessors();
-  accessors.Decls.append(decls.begin(), decls.end());
+  storage->visitEmittedAccessors([&](auto *accessor) {
+    accessors.Decls.push_back(accessor);
+  });
   return accessors;
 }
 
@@ -3355,6 +3356,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           case AvailabilityDomain::Kind::Custom:
             return AvailabilityDomainKind::Custom;
         }
+        llvm_unreachable("covered switch");
       };
 
       auto domainKind = getDomainKind(domain);
@@ -3513,6 +3515,26 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, false, /*implicit flag*/
           S.addDeclRef(afd));
       writeDeclNameRefIfNeeded(theAttr->getReplacedFunctionName());
+      return;
+    }
+
+    case DeclAttrKind::TailAllocated: {
+      auto *theAttr = cast<TailAllocatedAttr>(DA);
+      auto *owner = const_cast<ClassDecl *>(cast<ClassDecl>(D));
+      auto *countsDecl = theAttr->getCountsDecl(owner);
+      if (!countsDecl)
+        return; // The attribute is invalid.
+      SmallVector<TypeID, 3> typeIDs;
+      for (Type type : theAttr->getResolvedTypes(owner)) {
+        if (type->hasError())
+          return; // The attribute is invalid.
+        typeIDs.push_back(S.addTypeRef(type));
+      }
+      auto abbrCode = S.DeclTypeAbbrCodes[TailAllocatedDeclAttrLayout::Code];
+      TailAllocatedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          S.addDeclBaseNameRef(theAttr->getCountsName()),
+          S.addDeclRef(countsDecl), typeIDs);
       return;
     }
 

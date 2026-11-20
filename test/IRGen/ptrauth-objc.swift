@@ -7,7 +7,7 @@
   @objc func foo() {}
 }
 
-// CHECK: @"$s4test1AC3fooyyFTo.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1AC3fooyyFTo", i32 0, i64 ptrtoint (ptr getelementptr inbounds ({ i32, i32, [1 x { ptr, ptr, ptr }] }, ptr @_INSTANCE_METHODS__TtC4test1A, i32 0, i32 2, i32 0, i32 2) to i64), i64 0 }, section "llvm.ptrauth"
+// CHECK: @"$s4test1AC3fooyyFTo.ptrauth" = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1AC3fooyyFTo", i32 0, i64 ptrtoint (ptr getelementptr inbounds (i8, ptr @_INSTANCE_METHODS__TtC4test1A, i64 24) to i64), i64 0 }, section "llvm.ptrauth"
 
 @objc protocol P {
   func bar()

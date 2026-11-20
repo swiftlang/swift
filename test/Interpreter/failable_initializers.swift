@@ -1,5 +1,6 @@
 // RUN: %target-run-simple-swift(-swift-version 4)
 // RUN: %target-run-simple-swift(-swift-version 5)
+// RUN: %target-run-simple-swift(-Xfrontend -enable-lifetime-resolution)
 
 // REQUIRES: executable_test
 

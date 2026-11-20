@@ -1,3 +1,0 @@
-extern module SwiftShims             "shims/module.modulemap"
-extern module _SwiftConcurrencyShims "shims/module.modulemap"
-extern module SwiftOverlayShims      "shims/module.modulemap"

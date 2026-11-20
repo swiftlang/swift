@@ -5,7 +5,7 @@
 // RUN:   -enable-experimental-feature Embedded -Xcc -fdeclspec -disable-stack-protector \
 // RUN:   -o %t/check.o
 // RUN: %clang -target wasm32-unknown-none-wasm %t/check.o %t/rt.c -nostdlib \
-// RUN:   -I %swift_src_root/stdlib/public/EmbeddedPlatform -o %t/check.wasm
+// RUN:   -I %swift_src_root/stdlib/public/EmbeddedPlatform/include -o %t/check.wasm
 // This module imports no shared memory, so it cannot run under the WASI-threads
 // host that %target-run selects on wasip1-threads.
 // RUN: %target-run-no-wasi-threads %t/check.wasm

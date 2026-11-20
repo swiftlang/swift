@@ -363,6 +363,11 @@ func testOne() {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/93255
+func testOptionalNoneMatchingNil() {
+  if case Optional.none = nil {} // expected-error {{generic parameter 'Wrapped' could not be inferred}}
+}
+
 // https://github.com/apple/swift/issues/50875
 // Constrain initializer expressions of optional some pattern bindings to
 // be optional.

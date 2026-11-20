@@ -161,3 +161,13 @@ func testMixedCaptureKinds(_ f: @callable(once) () -> Void) {
   g()
   _ = count
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s18callable_once_attr17borrowedIsolationyScA_pSgyyYAXOoF : $@convention(thin) (@guaranteed @isolated(any) @callable(once) @callee_owned () -> ()) -> @owned Optional<any Actor> {
+// CHECK: bb0({{%.*}} : @guaranteed $@isolated(any) @callable(once) @callee_owned () -> ()):
+// CHECK:   function_extract_isolation {{%.*}} : $@isolated(any) @callable(once) @callee_owned () -> ()
+// CHECK: } // end sil function '$s18callable_once_attr17borrowedIsolationyScA_pSgyyYAXOoF'
+func borrowedIsolation(
+  _ f: borrowing @escaping @isolated(any) @callable(once) () -> Void
+) -> (any Actor)? {
+  f.isolation
+}

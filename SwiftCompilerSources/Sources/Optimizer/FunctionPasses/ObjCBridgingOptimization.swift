@@ -93,6 +93,9 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
   if finalObjCValue.type != originalObjCValue.type {
     return true
   }
+  if isUpcastFromSubclass(originalObjCValue) {
+    return true
+  }
 
   if !context.continueWithNextSubpassRun(for: originalObjCValueSwitch) {
     return false
@@ -138,6 +141,10 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   if let (se, someCase) = isPayloadOfSwitchEnum(swiftValue),
      let originalObjCValueSwitch = isOptionalBridging(of: se.enumOp, isBridging: isBridgeToSwiftCall) {
 
+    if isUpcastFromSubclass(originalObjCValueSwitch.enumOp) {
+      return true
+    }
+
     if !context.continueWithNextSubpassRun(for: originalObjCValueSwitch) {
       return false
     }
@@ -161,7 +168,8 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   //   let s = returnNonOptionalNSString()
   //   useNonOptionalNSString(s)
   // ```
-  guard let bridgeToSwiftCall = isBridgeToSwiftCall(swiftValue) else {
+  guard let bridgeToSwiftCall = isBridgeToSwiftCall(swiftValue),
+        !isUpcastFromSubclass(bridgeToSwiftCall.arguments[0]) else {
     return true
   }
 
@@ -327,6 +335,22 @@ private func isPayloadOfSwitchEnum(_ value: Value) -> (SwitchEnumInst, case: Int
     return (se, caseIdx)
   }
   return nil
+}
+
+/// Returns true if `value` is (an optional of) an `upcast` from a subclass, e.g. `NSMutableString` -> `NSString`.
+///
+/// Bridging such a - potentially mutable - value from ObjC to Swift creates a copy. Therefore it's not
+/// valid to replace the result of the Swift -> ObjC bridging with the original ObjC value, because
+/// the original value might be mutated after the bridging.
+private func isUpcastFromSubclass(_ value: Value) -> Bool {
+  var v = value.lookThoughOwnershipInstructions
+  if let enumInst = v as? EnumInst {
+    guard let payload = enumInst.payload else {
+      return false
+    }
+    v = payload.lookThoughOwnershipInstructions
+  }
+  return v is UpcastInst
 }
 
 /// Returns the apply instruction if `value` is an ObjC -> Swift bridging call.

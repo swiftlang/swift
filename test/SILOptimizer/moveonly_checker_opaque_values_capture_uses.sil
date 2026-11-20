@@ -1,0 +1,41 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -sil-move-only-checker -verify %s
+
+// With opaque values, a generic `~Copyable` capture is an object inside the
+// closure. The closure may borrow it but never consume it.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @borrowVal : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> ()
+sil @consumeVal : $@convention(thin) <T where T : ~Copyable> (@in T) -> ()
+
+sil private [ossa] [opaque] @borrowCapture : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> () {
+bb0(%0 : @closureCapture @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $T
+  debug_value %2 : $T, let, name "n", argno 1
+  %4 = copy_value %2 : $T
+  %5 = function_ref @borrowVal : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
+  %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %4 : $T
+  destroy_value %2 : $T
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil private [ossa] [opaque] @consumeCapture : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed T) -> () {
+bb0(%0 : @closureCapture @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $T
+  // expected-error @-1 {{non-'Copyable' 'n' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+  debug_value %2 : $T, let, name "n", argno 1
+  %4 = copy_value %2 : $T
+  %5 = function_ref @consumeVal : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in τ_0_0) -> ()
+  %6 = apply %5<T>(%4) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in τ_0_0) -> ()
+  // expected-note @-1 {{consumed here}}
+  destroy_value %2 : $T
+  %8 = tuple ()
+  return %8 : $()
+}

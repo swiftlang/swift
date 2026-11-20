@@ -11,6 +11,7 @@
 //--- types.swift
 
 struct S {}
+enum NE: ~Escapable {}
 struct Pair {}
 struct Box<T> { var value: T }
 
@@ -56,6 +57,7 @@ func resultPosition(a: Int) -> @_scoped(a) S { S() }
 
 func genericArgumentPosition(a: Int, b: Box<@_scoped(a) S>) {}
 // expected-off-error@-1:46{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-on-error@-2:46{{'@_scoped' is not supported here}}
 
 func functionTypeParameterPosition(a: Int, body: (@_scoped(a) S) -> Void) {}
 // expected-off-error@-1:52{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
@@ -65,26 +67,33 @@ func functionTypeResultPosition(a: Int, body: () -> @_scoped(a) S) {}
 
 func tuplePosition(a: Int, b: (@_scoped(a) S, Int)) {}
 // expected-off-error@-1:33{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-on-error@-2:33{{'@_scoped' is not supported here}}
 
 func variadicPosition(a: Int, b: @_scoped(a) S...) {}
 // expected-off-error@-1:35{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-on-error@-2:35{{'@_scoped' is not supported here}}
 
 func optionalSugarPosition(a: Int, b: (@_scoped(a) S)?) {}
 // expected-off-error@-1:41{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-on-error@-2:41{{'@_scoped' is not supported here}}
 
 typealias ScopedAlias = @_scoped(immortal) S
 // expected-off-error@-1:26{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-on-error@-2:26{{'@_scoped' is not supported here}}
 
 struct StoredProperties {
   var member: @_scoped(immortal) S
   // expected-off-error@-1:16{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-on-error@-2:16{{'@_scoped' is not supported here}}
   subscript(i: Int) -> @_scoped(immortal) S { S() }
   // expected-off-error@-1:25{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-on-error@-2:25{{'@_scoped' is not supported here}}
 }
 
 func localBinding() {
   let x: @_scoped(immortal) S = S()
   // expected-off-error@-1:11{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-on-error@-2:11{{'@_scoped' is not supported here}}
   _ = x
 }
 
@@ -116,8 +125,10 @@ func twoIndependentUses(a: Int, b: @_scoped(a) S, c: @_scoped(a) Pair) {}
 func speculative(a: Int) {
   _ = Box<@_scoped(a) S>.self
   // expected-off-error@-1:12{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-on-error@-2:12{{'@_scoped' is not supported here}}
   _ = { (x: S) -> @_scoped(immortal) S in x }
   // expected-off-error@-1:20{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-on-error@-2:20{{'@_scoped' is not supported here}}
 }
 
 // MARK: - Escaped identifiers
@@ -142,79 +153,73 @@ func escapedLabel(a: Int, p: @_scoped(`default`: a) Pair) {}
 
 // MARK: - Explicit scope parameters
 
-@_scopeParams(a) func scopeParam() {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
-// expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+@_scopeParams(a) func scopeParam(x: @_scoped(a) NE) {}
+// expected-off-error@-1:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:38{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
-@_scopeParams(a, b) func scopeParamList(x: @_scoped(a) S, y: @_scoped(b) S) {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
-// expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-3:45{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-4:63{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+@_scopeParams(a, b) func scopeParamList(x: @_scoped(a) NE, y: @_scoped(b) NE) {}
+// expected-off-error@-1:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:45{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-3:64{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 struct ScopeParamInit {
-  @_scopeParams(a) init() {}
-  // expected-on-error@-1:4{{explicit scope parameters are not supported}}
-  // expected-off-error@-2:4{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  @_scopeParams(a) init(x: @_scoped(a) NE) {}
+  // expected-off-error@-1:4{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-off-error@-2:29{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 }
 
 @_scopeParams(a) struct ScopeParamStruct {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
+// expected-on-error@-1:2{{explicit scope parameters are not supported on types}}
 // expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 @_scopeParams(a) enum ScopeParamEnum {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
+// expected-on-error@-1:2{{explicit scope parameters are not supported on types}}
 // expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
-func scopeParamFunctionType(body: @_scopeParams(a) (@_scoped(a) S) -> @_scoped(a) S) {}
-// expected-on-error@-1:36{{explicit scope parameters are not supported}}
-// expected-off-error@-2:36{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-3:54{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-4:72{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+func scopeParamFunctionType(body: @_scopeParams(a) (@_scoped(a) NE) -> @_scoped(a) S) {}
+// expected-off-error@-1:36{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:54{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-3:73{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
-func scopeParamWithOtherAttributes(body: @escaping @_scopeParams(a) @Sendable () -> Void) {}
-// expected-on-error@-1:53{{explicit scope parameters are not supported}}
-// expected-off-error@-2:53{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+func scopeParamWithOtherAttributes(body: @escaping @_scopeParams(a) @Sendable (@_scoped(a) NE) -> Void) {}
+// expected-off-error@-1:53{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:81{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 typealias ScopeParamAlias = @_scopeParams(a) () -> Void
-// expected-on-error@-1:30{{explicit scope parameters are not supported}}
+// expected-on-error@-1:30{{'@_scopeParams' is not supported here}}
 // expected-off-error@-2:30{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 func speculativeScopeParams() {
   _ = Box<@_scopeParams(a) () -> Void>.self
-  // expected-on-error@-1:12{{explicit scope parameters are not supported}}
+  // expected-on-error@-1:12{{'@_scopeParams' is not supported here}}
   // expected-off-error@-2:12{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 }
 
-@_scopeParams(`immortal`) func escapedImmortalScopeParam() {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
-// expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+@_scopeParams(`immortal`) func escapedImmortalScopeParam(x: @_scoped(`immortal`) NE) {}
+// expected-off-error@-1:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:62{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
-@_scopeParams(`default`) func escapedKeywordScopeParam() {}
-// expected-on-error@-1:2{{explicit scope parameters are not supported}}
-// expected-off-error@-2:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+@_scopeParams(`default`) func escapedKeywordScopeParam(x: @_scoped(`default`) NE) {}
+// expected-off-error@-1:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-2:60{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 // MARK: - Access scopes
 
 @_scopeParams(s)
 func longer(_ a: borrowing @_accessScope(s) Pair,
-            _ b: borrowing @_accessScope(s) Pair) -> @_scoped(s) S { S() }
-// expected-on-error@-3:2{{explicit scope parameters are not supported}}
-// expected-on-error@-3:29{{binding the access scope of a parameter is not supported}}
-// expected-on-error@-3:29{{binding the access scope of a parameter is not supported}}
-// expected-off-error@-6:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-6:29{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-6:29{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
-// expected-off-error@-7:55{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+            _ b: borrowing @_accessScope(s) Pair) -> @_scoped(s) NE { fatalError() }
+// expected-off-error@-3:2{{'@_scopeParams' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-3:29{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-3:29{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-4:55{{'@_scoped' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+// expected-off-error@-5:66{{a function cannot return a non-'Escapable' result}}
 
-func accessScopeInout(a: inout Int, b: inout @_accessScope(&a) Int) {}
-// expected-on-error@-1:47{{binding the access scope of a parameter is not supported}}
-// expected-off-error@-2:47{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+func accessScopeInout(a: inout Int, body: (inout @_accessScope(&a) Int) -> Void) {}
+// expected-off-error@-1:51{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 
 extension S {
   func visit(_ visitor: (borrowing @_accessScope(&self) Pair) -> Void) {}
-  // expected-on-error@-1:37{{binding the access scope of a parameter is not supported}}
-  // expected-off-error@-2:37{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
+  // expected-off-error@-1:37{{'@_accessScope' attribute is only valid when experimental feature ScopeRestrictions is enabled}}
 }
 
 //--- feature_off.swift
@@ -237,6 +242,7 @@ func scopeParamsStillResolve(body: @_scopeParams(a) (Int) -> S) {
 func speculativeMalformed(a: Int) {
   _ = Box<@_scoped(a,) S>.self
   // expected-error@-1:22{{unexpected ',' separator}}{{21-22=}}
+  // expected-error@-2:12{{'@_scoped' is not supported here}}
   _ = Box<@_scoped(0) S>.self
   // expected-error@-1:20{{expected identifier or 'self' in '_scoped' attribute}}
 }
@@ -343,18 +349,15 @@ func repeatedAttribute(a: Int, b: @_scoped(a) @_scoped(a) S) {}
 // expected-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}}
 
 // Recovered by dropping the separator, so the attribute is still created.
-@_scopeParams(,a) func leadingCommaScopeParam() {}
+@_scopeParams(,a) func leadingCommaScopeParam(x: @_scoped(a) NE) {}
 // expected-error@-1:15{{unexpected ',' separator}}{{15-16=}}
-// expected-error@-2:2{{explicit scope parameters are not supported}}
 
-@_scopeParams(a,) func trailingCommaScopeParam() {}
+@_scopeParams(a,) func trailingCommaScopeParam(x: @_scoped(a) NE) {}
 // expected-error@-1:17{{unexpected ',' separator}}{{16-17=}}
-// expected-error@-2:2{{explicit scope parameters are not supported}}
 
-@_scopeParams(a) @_scopeParams(b) func repeatedScopeParams() {}
+@_scopeParams(a) @_scopeParams(b) func repeatedScopeParams(x: @_scoped(a) NE) {}
 // expected-error@-1:19{{duplicate attribute}}
 // expected-note@-2:2{{attribute already specified here}}
-// expected-error@-3:2{{explicit scope parameters are not supported}}
 
 @_scopeParams(a) class ScopeParamClass {}
 // expected-error@-1:2{{'@_scopeParams' attribute cannot be applied to this declaration}}
@@ -368,9 +371,8 @@ func scopeParamsOnNonFunctionType(x: @_scopeParams(a) S) {}
 func malformedScopeParamsOnFunctionType(body: @_scopeParams(0) @Sendable () -> Void) {}
 // expected-error@-1:61{{expected scope parameter name in '_scopeParams' attribute}}
 
-func repeatedScopeParamsOnFunctionType(body: @_scopeParams(a) @_scopeParams(b) () -> Void) {}
+func repeatedScopeParamsOnFunctionType(body: @_scopeParams(a) @_scopeParams(b) (@_scoped(a) NE) -> Void) {}
 // expected-error@-1:63{{duplicate attribute}}
-// expected-error@-2:47{{explicit scope parameters are not supported}}
 
 // Scopes aren't mangled, so an ABI-only declaration has no use for them.
 @abi(@_scopeParams(a) func abiScopeParams())

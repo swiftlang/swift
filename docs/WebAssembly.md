@@ -151,7 +151,7 @@ the implementation.
 
 Relative pointers are used in Swift runtime, but currently it's not feasible to use them for some cases
 where the pointee is a function pointer. The reason is that WebAssembly has a separate address space for
-functions and data, and the offset bwtween a function and a data pointer cannot be defined. Therefore,
+functions and data, and the offset between a function and a data pointer cannot be defined. Therefore,
 we have to use absolute pointers for function pointers in WebAssembly (see `include/swift/ABI/CompactFunctionPointer.h`
 for more details).
 

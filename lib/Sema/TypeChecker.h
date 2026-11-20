@@ -523,6 +523,7 @@ void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkTailAllocatedCounts(ClassDecl *classDecl);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
@@ -939,9 +940,18 @@ TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 /// \param name The name of the entity to look for.
 /// \param loc The source location at which name lookup occurs.
 /// \param options Options that control name lookup.
-LookupResult lookupUnqualified(
-    DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NLOptions options = defaultUnqualifiedLookupOptions);
+/// \param filter If provided, only the declarations found by lookup for which
+/// the filter returns true are considered for the result. The filter runs
+/// before overridden and shadowed declarations are removed, which avoids the
+/// cost of computing overrides and shadowing for declarations that the caller
+/// would discard anyway. As a result, the filter must make the same decision
+/// for any declarations that could override or shadow one another, such as
+/// functions with the same signature. Otherwise, a rejected declaration could
+/// fail to hide an accepted one.
+LookupResult
+lookupUnqualified(DeclContext *dc, DeclNameRef name, SourceLoc loc,
+                  NLOptions options = defaultUnqualifiedLookupOptions,
+                  llvm::function_ref<bool(ValueDecl *)> filter = nullptr);
 
 /// Perform unqualified type lookup at the given source location
 /// within a particular declaration context.
@@ -1184,6 +1194,12 @@ FuncDecl *getForEachIteratorNextFunction(
 /// Otherwise, return nil.
 VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                UnresolvedDotExpr *UDE);
+
+/// If an initializer of a C++ foreign reference type called with `super.init`
+/// from a Swift subclass cannot construct the base subobject of the subclass,
+/// diagnose it.
+bool diagnoseForeignReferenceSuperInit(ConstructorDecl *ctor, SourceLoc loc,
+                                       bool implicitlyGenerated);
 
 /// Diagnose assigning variable to itself.
 bool diagnoseSelfAssignment(const Expr *E);
@@ -1479,25 +1495,6 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
 
-/// Look for closure discriminators within an AST.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
-  unsigned NextDiscriminator = 0;
-
-public:
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
-
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator();
-
-  unsigned getFirstDiscriminator() const {
-    return FirstDiscriminator;
-  }
-};
 
 using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;

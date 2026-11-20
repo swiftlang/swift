@@ -548,7 +548,8 @@ static ArrayRef<const char *> getDeviceOnlyModuleList() {
 
 void ide::collectModuleNames(StringRef SDKPath,
                                std::vector<std::string> &Modules) {
-  std::string SDKName = getSDKName(SDKPath);
+  std::string SDKName =
+      getSDKName(SDKPath, *llvm::vfs::createPhysicalFileSystem());
   std::string lowerSDKName = StringRef(SDKName).lower();
   bool isOSXSDK = StringRef(lowerSDKName).contains("macosx");
   bool isDeviceOnly = StringRef(lowerSDKName).contains("iphoneos");
@@ -672,6 +673,7 @@ static StringRef adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
     }
     return expandedCode;
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(

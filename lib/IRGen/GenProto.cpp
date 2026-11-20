@@ -972,28 +972,21 @@ namespace {
   };
 } // end anonymous namespace
 
-/// Return true if the witness table requires runtime instantiation to
-/// handle resiliently-added requirements with default implementations.
-///
-/// If disableOptimizations is true, skip optimizations that treat
-/// formally-resilient conformances as non-resilient.
-bool IRGenModule::isResilientConformance(
-    const NormalProtocolConformance *conformance,
-    bool disableOptimizations
-) {
+bool irgen::isResilientConformance(const NormalProtocolConformance *conformance,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool disableOptimizations) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
-  bool shouldTreatProtocolNonResilient =
-    IRGen.Opts.UseFragileResilientProtocolWitnesses;
   if (!conformance->getProtocol()->isResilient() ||
-      shouldTreatProtocolNonResilient)
+      useFragileResilientProtocolWitnesses)
     return false;
 
   auto *conformanceModule = conformance->getDeclContext()->getParentModule();
 
   // If the protocol and the conformance are both in the current module,
   // they're not resilient.
-  if (conformanceModule == getSwiftModule() &&
+  if (conformanceModule == currentModule &&
       conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
@@ -1001,15 +994,15 @@ bool IRGenModule::isResilientConformance(
   // consider the conformance non-resilient, because we used to consider it
   // non-resilient before the symbol moved. This is to ensure ABI stability
   // across module boundaries.
-  if (conformanceModule == getSwiftModule() &&
+  if (conformanceModule == currentModule &&
       conformanceModule->getName().str() ==
-      conformance->getProtocol()->getAlternateModuleName())
+          conformance->getProtocol()->getAlternateModuleName())
     return false;
 
   // A copy of a conformance declared alongside a back-deployed type from
   // another module doesn't get the optimizations below, which assume the
   // conformance is emitted by its own module.
-  if (conformanceModule != getSwiftModule()) {
+  if (conformanceModule != currentModule) {
     if (auto *nominal =
             conformance->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->emitsConformanceIntoClient(conformance->getDeclContext()))
@@ -1035,12 +1028,30 @@ bool IRGenModule::isResilientConformance(
   return true;
 }
 
-bool IRGenModule::isResilientConformance(const RootProtocolConformance *root,
-                                         bool disableOptimizations) {
+bool irgen::isResilientConformance(const RootProtocolConformance *root,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool disableOptimizations) {
   if (auto normal = dyn_cast<NormalProtocolConformance>(root))
-    return isResilientConformance(normal, disableOptimizations);
+    return isResilientConformance(normal, currentModule,
+                                  useFragileResilientProtocolWitnesses,
+                                  disableOptimizations);
   // Self-conformances never require this.
   return false;
+}
+
+bool IRGenModule::isResilientConformance(
+    const NormalProtocolConformance *conformance, bool disableOptimizations) {
+  return irgen::isResilientConformance(
+      conformance, getSwiftModule(),
+      IRGen.Opts.UseFragileResilientProtocolWitnesses, disableOptimizations);
+}
+
+bool IRGenModule::isResilientConformance(const RootProtocolConformance *root,
+                                         bool disableOptimizations) {
+  return irgen::isResilientConformance(
+      root, getSwiftModule(), IRGen.Opts.UseFragileResilientProtocolWitnesses,
+      disableOptimizations);
 }
 
 /// Whether this protocol conformance has a dependent type witness.
@@ -1117,18 +1128,18 @@ static bool protocolCanHaveDependentConformance(
 }
 
 static bool isDependentConformance(
-              IRGenModule &IGM,
-              const RootProtocolConformance *rootConformance,
-              bool isResilient,
-              llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
+    const RootProtocolConformance *rootConformance, ModuleDecl *currentModule,
+    bool useFragileResilientProtocolWitnesses,
+    bool lazyInitializeProtocolConformances, bool isResilient,
+    llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited) {
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
   if (!conformance)
     return false;
 
-  if (IGM.getOptions().LazyInitializeProtocolConformances) {
+  if (lazyInitializeProtocolConformances) {
     const auto *MD = rootConformance->getDeclContext()->getParentModule();
-    if (!(MD == IGM.getSwiftModule() || MD->isStaticLibrary()))
+    if (!(MD == currentModule || MD->isStaticLibrary()))
       return true;
   }
 
@@ -1138,9 +1149,10 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient or synthesized, this is always true.
-  if (IGM.isResilientConformance(conformance)
-      || isSynthesizedNonUnique(conformance)
-      || isBackDeployedIntoClient(conformance))
+  if (isResilientConformance(conformance, currentModule,
+                             useFragileResilientProtocolWitnesses) ||
+      isSynthesizedNonUnique(conformance) ||
+      isBackDeployedIntoClient(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1166,8 +1178,11 @@ static bool isDependentConformance(
 
     auto *assocRoot = assocConformance.getConcrete()->getRootConformance();
     if (isDependentConformance(
-            IGM, assocRoot,
-            IGM.isResilientConformance(assocRoot, /*disableOptimizations=*/true),
+            assocRoot, currentModule, useFragileResilientProtocolWitnesses,
+            lazyInitializeProtocolConformances,
+            isResilientConformance(assocRoot, currentModule,
+                                   useFragileResilientProtocolWitnesses,
+                                   /*disableOptimizations=*/true),
             visited))
       return true;
   }
@@ -1233,20 +1248,33 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 }
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-bool IRGenModule::isDependentConformance(
-    const RootProtocolConformance *conformance) {
+bool irgen::isDependentConformance(const RootProtocolConformance *conformance,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool lazyInitializeProtocolConformances) {
   // A dependent conformance requires its witness table to be instantiated at runtime.
   // This is not possible in Embedded Swift, which has no such runtime. It's also not
   // needed: the mandatory pipeline specializes all witness tables, so that every
   // conformance which is used at runtime is fully concrete.
-  if (Context.LangOpts.hasFeature(Feature::Embedded))
+  if (currentModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
-      *this, conformance,
-      isResilientConformance(conformance, /*disableOptimizations=*/true),
+      conformance, currentModule, useFragileResilientProtocolWitnesses,
+      lazyInitializeProtocolConformances,
+      isResilientConformance(conformance, currentModule,
+                             useFragileResilientProtocolWitnesses,
+                             /*disableOptimizations=*/true),
       visited);
+}
+
+bool IRGenModule::isDependentConformance(
+    const RootProtocolConformance *conformance) {
+  return irgen::isDependentConformance(
+      conformance, getSwiftModule(),
+      IRGen.Opts.UseFragileResilientProtocolWitnesses,
+      getOptions().LazyInitializeProtocolConformances);
 }
 
 static llvm::Value *
@@ -2330,6 +2358,7 @@ namespace {
     SILWitnessTable *SILWT;
     ConformanceDescription Description;
     ConformanceFlags Flags;
+    bool ForDefiningModuleType;
 
     using PlaceholderPosition =
       ConstantAggregateBuilderBase::PlaceholderPosition;
@@ -2339,9 +2368,11 @@ namespace {
     ProtocolConformanceDescriptorBuilder(
                                  IRGenModule &IGM,
                                  ConstantStructBuilder &B,
-                                 const ConformanceDescription &description)
+                                 const ConformanceDescription &description,
+                                 bool forDefiningModuleType = false)
       : IGM(IGM), B(B), Conformance(description.conformance),
-        SILWT(description.wtable), Description(description) { }
+        SILWT(description.wtable), Description(description),
+        ForDefiningModuleType(forDefiningModuleType) { }
 
     void layout() {
       addProtocol();
@@ -2371,6 +2402,18 @@ namespace {
     }
 
     void addConformingType() {
+      // Refer to the defining module's descriptor for a back-deployed type,
+      // through a slot that is null when that module doesn't provide the
+      // type at runtime.
+      if (ForDefiningModuleType) {
+        auto *nominal = Conformance->getDeclContext()->getSelfNominalTypeDecl();
+        auto *slot = IGM.getAddrOfDefiningModuleTypeDescriptorSlot(nominal);
+        B.addRelativeAddress(slot);
+        Flags = Flags.withTypeReferenceKind(
+            TypeReferenceKind::IndirectTypeDescriptor);
+        return;
+      }
+
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = getConformingEntityReference(IGM, Conformance);
@@ -2574,11 +2617,16 @@ namespace {
         auto symbolName =
           mangler.mangleProtocolConformanceInstantiationCache(Conformance);
         
-        auto privateData =
-          new llvm::GlobalVariable(IGM.Module, privateDataTy,
-                                   /*constant*/ false,
-                                   llvm::GlobalVariable::InternalLinkage,
-                                   privateDataInit, symbolName);
+        // The descriptors for a conformance that refer to the type in
+        // different ways share the cache, so that they produce the same
+        // witness tables.
+        llvm::Constant *privateData = IGM.Module.getNamedGlobal(symbolName);
+        if (!privateData)
+          privateData =
+            new llvm::GlobalVariable(IGM.Module, privateDataTy,
+                                     /*constant*/ false,
+                                     llvm::GlobalVariable::InternalLinkage,
+                                     privateDataInit, symbolName);
         B.addRelativeAddress(privateData);
       }
     }
@@ -2639,6 +2687,48 @@ void IRGenModule::emitProtocolConformance(
                                                  init.finishAndCreateFuture()));
   var->setConstant(true);
   setTrueConstGlobal(var);
+}
+
+/// Whether the conformance is declared by this module for a back-deployed
+/// type from another module.
+static bool isConformanceOfBackDeployedType(
+    const RootProtocolConformance *conformance) {
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal || normal->isConformanceOfProtocol())
+    return false;
+
+  auto *nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
+  return nominal && nominal->isBackDeployedIntoClient() &&
+         !nominal->emitsConformanceIntoClient(normal->getDeclContext());
+}
+
+llvm::Constant *IRGenModule::emitCanonicalTypeProtocolConformance(
+    const ConformanceDescription &record) {
+  if (!isConformanceOfBackDeployedType(record.conformance))
+    return nullptr;
+
+  // The runtime only matches the conformance records of a type to the
+  // metadata of the defining module's copy of the type, which has a unique
+  // descriptor, when they refer to that descriptor. Emit a second record that
+  // does so, which is ignored when the defining module doesn't provide the
+  // type. The other record, which refers to this module's copy of the
+  // descriptor, applies in that case.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, record,
+                                               /*forDefiningModuleType=*/true);
+  builder.layout();
+
+  auto name =
+      "__swift_back_deployment_canonical_conformance_" +
+      LinkEntity::forProtocolConformanceDescriptor(record.conformance)
+          .mangleAsString(Context);
+  auto var = init.finishAndCreateGlobal(name, Alignment(4),
+                                        /*isConstant*/ true,
+                                        llvm::GlobalValue::InternalLinkage);
+  setTrueConstGlobal(var);
+  addUsedGlobal(var);
+  return var;
 }
 
 void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {
@@ -4476,7 +4566,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  GenericSignature ncGenerics) {
   // We only need to do something here if the declaration context is
   // somehow generic.
-  if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
+  if (!ncGenerics.isEffectivelyGeneric()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
@@ -4587,6 +4677,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
   case GenericRequirement::Kind::Value:
     return IGF.emitValueGenericRef(argType);
   }
+  llvm_unreachable("covered switch");
 }
 
 void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
@@ -4639,6 +4730,7 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   case GenericRequirement::Kind::WitnessTablePack:
     return IGM.WitnessTablePtrPtrTy;
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {

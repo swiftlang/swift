@@ -932,13 +932,25 @@ void EagerSpecializerTransform::run() {
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), targetFunc,
                            SA->getSpecializedSignature(), SA->isExported());
+    unsigned numNewFunctions = newFunctions.size();
     auto *NewFunc = eagerSpecialize(FuncBuilder, targetFunc, *SA,
                                     ReInfoVec.back(), newFunctions);
-    SpecializedFuncs.push_back(
-        (onlyCreatePrespecializations ||
-         SA->isExported() /*currently we don't handle coroutines in emitDispatchTo*/)
-            ? nullptr
-            : NewFunc);
+    // The function the generic body gets a fast path to, if any.
+    // None if the pass isn't asked to add fast paths.
+    if (!onlyCreatePrespecializations &&
+        // A non-exported attribute, or an exported one only:
+        (!SA->isExported() ||
+         // - for '@specialized', not '@_specialize',
+         (SA->isSpecializedSpelling() &&
+          // - not a coroutine, which emitDispatchTo doesn't handle,
+          !F.getLoweredFunctionType()->isCoroutine() &&
+          // - grew => created now (to avoid adding the same fast path more
+          //   than once, e.g. if this pass runs again on F, as an exported
+          //   attribute isn't removed after specializing)
+          newFunctions.size() > numNewFunctions)))
+      SpecializedFuncs.push_back(NewFunc);
+    else
+      SpecializedFuncs.push_back(nullptr);
     if (!SA->isExported())
       attrsToRemove.push_back(SA);
   }

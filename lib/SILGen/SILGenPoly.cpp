@@ -326,7 +326,8 @@ ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
       constructorDecl,
       SubstitutionMap::get(constructorDecl->getGenericSignature(),
                            {wrappedType}, {diffConf}));
-  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  PreparedArguments args(
+      {AnyFunctionType::Param::bodyAccess(optionalOfWrappedTanType)});
   args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
 
   auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),
@@ -2730,9 +2731,10 @@ void TranslateArguments::expandOuterSingleInnerParam(
   // Pull out a scalar component from the pack and process that.
   } else {
     auto outerValue = outerParam.projectPackComponent(SGF, Loc);
-    expandSingleOuterParam(innerOrigType, innerSubstParam,
-                           outerParam.getOrigType(), outerParam.getSubstParam(),
-                           outerValue);
+    expandSingleOuterParam(
+        innerOrigType, innerSubstParam,
+        outerParam.getOrigType().getPackExpansionPatternType(),
+        outerParam.getSubstParam(), outerValue);
   }
 
   outerParam.advance();
@@ -3014,17 +3016,39 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     }
 
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
-      auto forwardedArg =
-          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (forwardedArg->getType().isObject() && fTy->hasGuaranteedResult()) {
-        forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
-      }
-      forwardedArgs.push_back(forwardedArg);
+      forwardedArgs.push_back(
+          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
     }
 
     forwardedArgs.push_back(arg.getValue());
   }
+}
+
+/// Emit a @guaranteed borrow accessor result as a borrow introducer and emit
+/// unchecked_ownership which SILGenCleanup with fixup.
+static SILValue prepareGuaranteedResultForReturn(SILGenFunction &SGF,
+                                                 SILLocation loc,
+                                                 SILValue result) {
+  // The address result of an accessor with an object self is an interior
+  // pointer of self. Emit unchecked_ownership for self, which SILGenCleanup
+  // fixes up.
+  if (auto *apply = dyn_cast<ApplyInst>(result)) {
+    if (auto *selfOperand =
+            apply->getSelfObjectOfAddressBorrowMutateAccessorResult()) {
+      SILBuilderWithScope builder(apply);
+      selfOperand->set(
+          builder.createUncheckedOwnership(loc, selfOperand->get()));
+      return result;
+    }
+  }
+  if (!result->isBorrowAccessorResult() ||
+      result->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return result;
+  }
+  auto borrowIntroducerResult =
+      SGF.emitManagedBorrowedRValueWithCleanup(result);
+  return SGF.B.createUncheckedOwnership(loc, borrowIntroducerResult).getValue();
 }
 
 namespace {
@@ -5763,6 +5787,7 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
         // and wrap it up as an `Optional<any Actor>`.
         llvm::report_fatal_error("Should never see this?!");
       }
+      llvm_unreachable("covered switch");
     }();
 
     assert(forwardedIsolationValue);
@@ -7290,6 +7315,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
         }
       }
       }
+      llvm_unreachable("covered switch");
     }();
 
     args.push_back(B.convertToImplicitActor(loc, arg));
@@ -7336,6 +7362,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       emitApplyWithRethrow(loc, derivedRef,
                             SILType::getPrimitiveObjectType(derivedFTy),
                             subs, args);
+    implResult = prepareGuaranteedResultForReturn(*this, loc, implResult);
 
     // Reabstract the return.
     result = resultPlanner->execute(implResult, derivedFTy);
@@ -7367,9 +7394,8 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token, allocation);
-
-    result = B.createTuple(loc, {});
+    result = emitEndApplyWithRethrow(loc, token, allocation,
+                                     SILType::getEmptyTupleType(getASTContext()));
     break;
   }
 
@@ -7815,6 +7841,7 @@ void SILGenFunction::emitProtocolWitness(
         }
       }
       }
+      llvm_unreachable("covered switch");
     }();
 
     args.push_back(B.convertToImplicitActor(loc, arg));
@@ -7851,6 +7878,8 @@ void SILGenFunction::emitProtocolWitness(
   case SILCoroutineKind::None: {
     SILValue witnessResultValue =
       emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
+    witnessResultValue =
+        prepareGuaranteedResultForReturn(*this, loc, witnessResultValue);
 
     // Reabstract the result value.
     reqtResultValue = resultPlanner->execute(witnessResultValue, witnessFTy);
@@ -7880,9 +7909,8 @@ void SILGenFunction::emitProtocolWitness(
     }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, token, allocation);
-
-    reqtResultValue = B.createTuple(loc, {});
+    reqtResultValue = emitEndApplyWithRethrow(loc, token, allocation,
+                                             SILType::getEmptyTupleType(getASTContext()));
     break;
   }
 

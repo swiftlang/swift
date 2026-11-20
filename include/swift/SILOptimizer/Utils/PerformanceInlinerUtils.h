@@ -112,8 +112,8 @@ class ConstantTracker {
   
   // Links between loaded and stored values.
   // The key is a load instruction, the value is the corresponding store
-  // instruction which stores the loaded value. Both, key and value can also
-  // be copy_addr instructions.
+  // instruction which stores the loaded value. The key can also be a
+  // load_borrow or a copy_addr, the value can also be a copy_addr.
   llvm::DenseMap<SILInstruction *, SILInstruction *> links;
   
   // The current stored values at memory addresses.
@@ -144,7 +144,7 @@ class ConstantTracker {
   SILValue scanProjections(SILValue addr,
                            SmallVectorImpl<Projection> *Result = nullptr);
   
-  // Get the stored value for a load. The loadInst can be either a real load
+  // Get the stored value for a load. The loadInst can be a load, a load_borrow
   // or a copy_addr.
   SILValue getStoredValue(SILInstruction *loadInst,
                           ProjectionPath &projStack);

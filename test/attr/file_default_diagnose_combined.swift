@@ -8,6 +8,8 @@
 
 // RUN: %target-swift-frontend -strict-memory-safety -typecheck -verify %t/top.swift
 // RUN: %target-swift-frontend -strict-memory-safety -typecheck -verify %t/bottom.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/top.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/bottom.swift
 
 //--- defaults.swift
 default @diagnose(DeprecatedDeclaration, as: ignored)

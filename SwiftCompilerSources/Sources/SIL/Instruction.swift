@@ -175,16 +175,9 @@ public class Instruction : CustomStringConvertible, Hashable {
       return true
 
     case let builtin as BuiltinInst:
-      switch builtin.id {
-      case .CopyArray:
-        // Copying array elements only retains the elements. It cannot run any user code and
-        // therefore cannot observe a de-initializer running earlier.
-        return false
-      default:
-        // A memory accessing builtin can be an implicit load weak, a synchronization point or a
-        // pointer access.
-        return builtin.mayReadOrWriteMemory
-      }
+      // A memory accessing builtin can be an implicit load weak, a synchronization point or a
+      // pointer access.
+      return builtin.mayReadOrWriteMemory
 
     case let endBorrow as EndBorrowInst:
       // Accessing memory via an arbitrary pointer is a deinit barrier, because it may conflict
@@ -311,7 +304,7 @@ private struct FindPointerOrGlobalWalker : AddressUseDefWalker {
     switch accessBase {
     case .box, .stack, .class, .tail, .argument, .yield, .storeBorrow, .index:
       return .continueWalk
-    case .global, .pointer, .unidentified:
+    case .global, .pointer, .borrowMutateAccessor, .unidentified:
       return .abortWalk
     }
   }
@@ -624,6 +617,10 @@ final public class DiagnoseInst : Instruction, UnaryInstruction {
 
     /// The marked address is the destination of a second initialization of immutable storage.
     case letReinit
+
+    /// The marked address holds `self` in a derived class initializer, which may be used before `super.init`
+    /// initializes its superclass part.
+    case missingSuperInit
   }
 
   public var kind: DiagnoseKind { DiagnoseKind(rawValue: bridged.Diagnose_getKind())! }
@@ -949,10 +946,11 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //===----------------------------------------------------------------------===//
 
 @_semantics("fast_cast")
-public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
+public protocol LoadInstruction: SingleValueInstruction {}
 
 extension LoadInstruction {
-  public var address: Value { operand.value }
+  public var addressOperand: Operand { operands[0] }
+  public var address: Value { addressOperand.value }
 }
 
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
@@ -1197,6 +1195,12 @@ class DeinitExistentialValueInst : Instruction {}
 final public
 class OpenExistentialAddrInst : SingleValueInstruction, UnaryInstruction {
   public var isImmutable: Bool { bridged.OpenExistentialAddr_isImmutable() }
+
+  public func set(isImmutable: Bool, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.OpenExistentialAddr_setImmutable(isImmutable)
+    context.notifyInstructionChanged(self)
+  }
 }
 
 final public
@@ -1788,6 +1792,50 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 
   public override var mayCallFunction: Bool { true }
+
+  /// A non-trivial object typed self of a borrow accessor with guaranteed result.
+  public var selfObjectOfGuaranteedBorrowAccessorResult: Operand? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfOperand = selfArgumentOperand, !selfOperand.value.type.isAddress else {
+      return nil
+    }
+    return selfOperand
+  }
+
+  /// A non-trivial address typed self of a borrow accessor with guaranteed result.
+  public var selfAddressOfGuaranteedBorrowAccessorResult: Value? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
+
+  /// The self of a borrow or mutate accessor with an address result.
+  public var selfOfBorrowMutateAccessorAddressResult: Value? {
+    guard functionConvention.hasAddressResult else {
+      return nil
+    }
+    return selfArgument
+  }
+
+  /// The address-typed self of a borrow or mutate accessor with an address result.
+  public var selfAddressOfBorrowMutateAccessorAddressResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
+
+  /// The object-typed self of a borrow or mutate accessor with an address result.
+  public var selfObjectOfBorrowMutateAccessorAddressResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfObject = selfArgument, !selfObject.type.isAddress else {
+      return nil
+    }
+    return selfObject
+  }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}
@@ -2086,6 +2134,22 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
 }
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
+
+  /// The optional value hint.
+  ///
+  /// If not nil, the loaded value is exactly the value of the value hint.
+  /// This is used if the `load_borrow` cannot be replaced by the value hint in OSSA because it would violate
+  /// ownership rules, e.g. if the value hint is consumed (e.g. by a `store`) before the `load_borrow`.
+  /// The value hint is not an ownership use, i.e. it does not need to be alive at the `load_borrow`.
+  public var valueHint: Value? { operands.count == 2 ? operands[1].value : nil }
+
+  /// Sets the value hint, which must have the same type as the `load_borrow`.
+  /// The caller is responsible that the loaded value is exactly the value of `valueHint`.
+  public func set(valueHint: Value, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrow_setValueHint(valueHint.bridged)
+    context.notifyInstructionChanged(self)
+  }
 
   // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
   //

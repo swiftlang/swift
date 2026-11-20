@@ -591,8 +591,64 @@ public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
-  /// Mapping of already-imported declarations.
-  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+  using ImportedDeclsKey = std::pair<const clang::Decl *, Version>;
+
+private:
+  /// Mapping of already-imported declarations, and whether each import is
+  /// complete. An importer may cache a declaration before it is completely
+  /// imported, so that recursive imports find it instead of looping.
+  llvm::DenseMap<ImportedDeclsKey, llvm::PointerIntPair<Decl *, 1, bool>>
+      ImportedDecls;
+
+public:
+  /// Returns the cached import of \p key, which is null if the declaration
+  /// could not be imported, or std::nullopt if nothing is cached (or if
+  /// \p requireCompletelyImported and the cached import is not complete).
+  std::optional<Decl *>
+  findImportedDecl(ImportedDeclsKey key,
+                   bool requireCompletelyImported = false) const {
+    auto it = ImportedDecls.find(key);
+    if (it == ImportedDecls.end())
+      return std::nullopt;
+    if (requireCompletelyImported && !it->second.getInt())
+      return std::nullopt;
+    return it->second.getPointer();
+  }
+
+  /// Caches \p decl as the import of \p key, replacing any cached import.
+  ///
+  /// Pass \p isComplete false to cache \p decl before it is completely
+  /// imported, then call \c markImportedDeclComplete once it is.
+  void cacheImportedDecl(ImportedDeclsKey key, Decl *decl,
+                         bool isComplete = true) {
+    ImportedDecls[key] = {decl, isComplete};
+  }
+
+  /// Marks the import cached for \p key complete, if any.
+  void markImportedDeclComplete(ImportedDeclsKey key) {
+    auto it = ImportedDecls.find(key);
+    if (it != ImportedDecls.end())
+      it->second.setInt(true);
+  }
+
+  /// Caches \p decl as the complete import of \p key, unless another import
+  /// is already cached. Returns the cached import.
+  Decl *cacheImportedDeclIfAbsent(ImportedDeclsKey key, Decl *decl) {
+    auto it = ImportedDecls.try_emplace(key, decl, true).first;
+    return it->second.getPointer();
+  }
+
+  void eraseImportedDecl(ImportedDeclsKey key) { ImportedDecls.erase(key); }
+
+  size_t getNumImportedDecls() const { return ImportedDecls.size(); }
+
+  /// Calls \p fn on each non-null imported declaration and its key.
+  void forEachImportedDecl(
+      llvm::function_ref<void(ImportedDeclsKey, Decl *)> fn) const {
+    for (auto &entry : ImportedDecls)
+      if (auto *decl = entry.second.getPointer())
+        fn(entry.first, decl);
+  }
 
   /// Maps a canonical declaration and a type that only appears \em elsewhere
   /// in its redeclaration chain to the declaration that should be used as part
@@ -761,6 +817,17 @@ public:
                  const clang::CXXMethodDecl *, uint8_t>,
       clang::CXXMethodDecl *>
       synthesizedForwardingMethods;
+
+  /// The C++ method that \p method , if it was built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , forwards to.
+  /// This scans \c synthesizedForwardingMethods , so keep it off hot paths.
+  const clang::CXXMethodDecl *
+  getForwardedCXXMethod(const clang::CXXMethodDecl *method) const {
+    for (const auto &[key, forwarding] : synthesizedForwardingMethods)
+      if (forwarding == method)
+        return std::get<2>(key);
+    return nullptr;
+  }
 
 private:
   // Keep track of the decls that were already cloned for this specific class.
@@ -1018,6 +1085,20 @@ public:
       return {nullptr, nullptr};
     return it->second;
   }
+
+  /// Maps each type that exposes an unusable foreign type to that unusable
+  /// type and why.
+  ///
+  /// An unusable type maps to itself; other entries are added lazily.
+  /// FIXME: If a type exposes several unusable types, this only records one.
+  ///
+  /// Types known not to expose an unusable type are not in this map; they are
+  /// marked with \c NominalTypeDecl::setNoExposedUnusableForeignTypes instead.
+  llvm::DenseMap<const NominalTypeDecl *, UnusableForeignType>
+      UnusableForeignTypes;
+
+  /// Returns the unusable foreign type exposed by values of \p type, if any.
+  UnusableForeignType exposesUnusableForeignType(Type type);
 
   /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
   /// libkern's OSObject hierarchy.
@@ -1437,9 +1518,9 @@ public:
   /// Determines the key that should be used to store or look up \p ClangDecl
   /// in \c ImportedDecls . This will usually canonicalize the decl, although
   /// there are rare exceptions.
-  std::pair<const clang::Decl *, Version>
-  getImportedDeclsKey(const clang::NamedDecl *ClangDecl, Version version,
-                      bool UseCanonicalDecl = true);
+  ImportedDeclsKey getImportedDeclsKey(const clang::NamedDecl *ClangDecl,
+                                       Version version,
+                                       bool UseCanonicalDecl = true);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1654,6 +1735,11 @@ public:
 
   /// Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
+
+  /// Add an implicit \c @unsafe attribute to \p decl.
+  /// An existing \c @unsafe attribute is upgraded to \c @unsafe(always) when
+  /// needed.
+  void markUnsafe(ValueDecl *decl, bool always);
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
@@ -1885,6 +1971,16 @@ public:
   ImportedType importFunctionReturnType(DeclContext *dc,
                                         const clang::FunctionDecl *clangDecl,
                                         bool allowNSUIntegerAsInt);
+
+  /// Computes the imported Swift type of the Clang `VarDecl` \p clangDecl,
+  /// without a corresponding Swift `VarDecl`.
+  ///
+  /// \param clangDecl The Clang `VarDecl` to import the type of.
+  /// \param inSystemModule Whether \p clangDecl is from a system module.
+  ///
+  /// \returns The imported Swift type, or a null `ImportedType` on failure.
+  ImportedType importClangVarType(const clang::VarDecl *clangDecl,
+                                  bool inSystemModule);
 
   /// Import the parameter list for a function
   ///
@@ -2138,6 +2234,11 @@ public:
 
   Type loadTypeEraserType(const TypeEraserAttr *TRA,
                           uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  VarDecl *loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                       uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -2672,6 +2773,11 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+/// Alternative to \c NominalTypeDecl::lookupDirect for an imported C++ record,
+/// which does not load (and hence deserialize) extensions of \p decl.
+TinyPtrVector<ValueDecl *> lookupDirectWithoutExtensions(NominalTypeDecl *decl,
+                                                         DeclName name);
+
 bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
@@ -2680,6 +2786,11 @@ bool hasIteratorAPIAttr(const clang::Decl *decl);
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
+
+/// Whether the C++ escapability of \p type is known to be non-Escapable. An
+/// unknown escapability does not count.
+bool isNonEscapable(Evaluator &evaluator, const clang::Type *type,
+                    ClangImporter::Implementation *impl);
 
 /// The \c @_refCountedPtr attribute marking \p decl as a reference counting
 /// smart pointer, or null if it does not have one.
@@ -2707,7 +2818,7 @@ bool anySubobjectTypeSatisfies(
     const clang::RecordDecl *decl,
     llvm::function_ref<bool(clang::QualType)> pred);
 
-bool isViewType(const clang::CXXRecordDecl *decl);
+bool isViewType(clang::Sema &sema, const clang::CXXRecordDecl *decl);
 
 /// Determine whether \p type is a "direct view": a pointer or reference to a
 /// self-contained pointee, or a record (including a class template
@@ -2815,6 +2926,10 @@ const T *getFirstImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return attrs.empty() ? nullptr : attrs.front();
 }
 
+/// Whether \p method is the dereference operator of \c std::unique_ptr or
+/// \c std::shared_ptr, whose result is imported as depending on \c self.
+bool isSmartPointerDereference(const clang::CXXMethodDecl *method);
+
 /// Compute the foreign reference type info for \p decl without consulting or
 /// populating the \c ForeignReferenceTypeInfoRequest cache.
 ///
@@ -2841,6 +2956,15 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// they can be looked up during IRGen.
 void checkRetainReleaseFunctions(ClassDecl *classDecl,
                                  ClangImporter::Implementation &Impl);
+
+/// Returns true if \p method overrides a virtual member retain or release operation.
+bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
+                                     StringRef swiftBaseName,
+                                     Evaluator &evaluator);
+
+/// Whether Swift copies and destroys values of \p nominal by copying and
+/// destroying its storage.
+bool hasExposedStorage(const NominalTypeDecl *nominal);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.

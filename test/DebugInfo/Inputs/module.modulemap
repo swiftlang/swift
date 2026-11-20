@@ -24,3 +24,8 @@ module ClangModuleWithOverlay {
   header "ClangModuleWithOverlay.h"
   export *
 }
+
+module ForeignReferenceTypes {
+  header "ForeignReferenceTypes.h"
+  requires cplusplus
+}

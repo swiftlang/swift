@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// Check that SILCombine propagates the concrete type of an opened existential
+// reference which is passed indirectly via a `store_borrow`, either directly or
+// via a copy of the `store_borrow`.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol Q {
+  func foo() -> Int
+}
+
+final class D : Q {
+  func foo() -> Int
+}
+
+sil @D_foo : $@convention(witness_method: Q) (@in_guaranteed D) -> Int
+
+// CHECK-LABEL: sil [ossa] @store_borrow_of_opened_ref :
+// CHECK:         [[A:%.*]] = unchecked_addr_cast {{%[0-9]+}} to $*D
+// CHECK:         [[F:%.*]] = function_ref @D_foo
+// CHECK:         apply [[F]]([[A]])
+// CHECK:       } // end sil function 'store_borrow_of_opened_ref'
+sil [ossa] @store_borrow_of_opened_ref : $@convention(thin) (@guaranteed D) -> Int {
+bb0(%0 : @guaranteed $D):
+  %1 = init_existential_ref %0 : $D : $D, $any AnyObject & Q
+  %2 = open_existential_ref %1 to $@opened(1, any AnyObject & Q) Self
+  %3 = alloc_stack $@opened(1, any AnyObject & Q) Self
+  %4 = store_borrow %2 to %3
+  %5 = witness_method $@opened(1, any AnyObject & Q) Self, #Q.foo, %2 : $@opened(1, any AnyObject & Q) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> Int
+  %6 = apply %5<@opened(1, any AnyObject & Q) Self>(%4) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> Int
+  end_borrow %4
+  dealloc_stack %3
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @copy_of_store_borrow_of_opened_ref :
+// CHECK:         [[A:%.*]] = unchecked_addr_cast {{%[0-9]+}} to $*D
+// CHECK:         [[F:%.*]] = function_ref @D_foo
+// CHECK:         apply [[F]]([[A]])
+// CHECK:       } // end sil function 'copy_of_store_borrow_of_opened_ref'
+sil [ossa] @copy_of_store_borrow_of_opened_ref : $@convention(thin) (@guaranteed D) -> Int {
+bb0(%0 : @guaranteed $D):
+  %1 = init_existential_ref %0 : $D : $D, $any AnyObject & Q
+  %2 = open_existential_ref %1 to $@opened(2, any AnyObject & Q) Self
+  %3 = alloc_stack $@opened(2, any AnyObject & Q) Self
+  %4 = store_borrow %2 to %3
+  %5 = alloc_stack $@opened(2, any AnyObject & Q) Self
+  copy_addr %4 to [init] %5
+  %7 = witness_method $@opened(2, any AnyObject & Q) Self, #Q.foo, %2 : $@opened(2, any AnyObject & Q) Self : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> Int
+  %8 = apply %7<@opened(2, any AnyObject & Q) Self>(%5) : $@convention(witness_method: Q) <τ_0_0 where τ_0_0 : Q> (@in_guaranteed τ_0_0) -> Int
+  destroy_addr %5
+  dealloc_stack %5
+  end_borrow %4
+  dealloc_stack %3
+  return %8
+}
+
+sil_witness_table D : Q module test {
+  method #Q.foo: <Self where Self : Q> (Self) -> () -> Int : @D_foo
+}

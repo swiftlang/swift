@@ -251,6 +251,7 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
   case GeneratedSourceInfo::SyntheticMacro:
     return BridgedGeneratedSourceFileKindSyntheticMacro;
   }
+  llvm_unreachable("covered switch");
 }
 
 void *ExportedSourceFileRequest::evaluate(Evaluator &evaluator,

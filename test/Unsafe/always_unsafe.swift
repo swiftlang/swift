@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AlwaysUnsafeAttribute
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // Uses of '@unsafe(always)' declarations must be acknowledged with 'unsafe'
 // even though strict memory safety checking is not enabled here.
@@ -38,7 +40,7 @@ func testTypeUses(value: AlwaysUnsafeType) {
   unsafe value.method()
 }
 
-// Only the always-unsafe use is reported in this language mode.
+// Only the always-unsafe use is reported, as with strict memory safety checking.
 @unsafe(always) func alwaysUnsafeValue() -> Int { 0 }
 
 @unsafe func unsafeValue() -> Int { 0 }

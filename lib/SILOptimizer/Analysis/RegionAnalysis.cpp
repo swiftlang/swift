@@ -676,6 +676,7 @@ static PartialApplyInst *getUnderlyingPartialApply(SILValue closure) {
     case ClosureUseKind::Unsupported:
       return SILValue();
     }
+    llvm_unreachable("covered switch");
   };
 
   while (SILValue unwrapped = tryLookthroughClosureUse(closure))
@@ -702,14 +703,10 @@ static bool canFunctionArgumentBeSent(SILFunctionArgument *arg) {
       if (declRef.isAsyncLetClosure)
         return true;
 
-      // All of the non-Sendable captures of non-escaping at-most-once
-      // closures that aren't explicitly `sending` can be sent.
-      if (auto *closure = declRef.getClosureExpr();
-          closure && closure->hasCalledAtMostOnceSemantics()) {
-        auto *closureTy = closure->getType()->castTo<FunctionType>();
-        if (closureTy->getExtInfo().isNoEscape())
-          return true;
-      }
+      // The captures of non-escaping at-most-once closures that are inferred
+      // to be `sending` can be sent.
+      if (SILIsolationInfo::isInferredSendingClosureCapture(arg))
+        return true;
     }
   }
 
@@ -2386,15 +2383,17 @@ class PartitionOpTranslator {
       if (!trackedValue)
         continue;
 
-      // Skip explicitly `sending` captures.
-      if (callSite.getParamInfoForOperand(op).hasOption(
-              SILParameterInfo::Sending))
-        continue;
-
       unsigned argIndex = callSite.getSubstCalleeArgIndex(op);
       assert(argIndex < calleeFn->getArguments().size());
+      auto *calleeArg =
+          cast<SILFunctionArgument>(calleeFn->getArgument(argIndex));
 
-      if (!calleeInfo.wasValueEverSent(calleeFn->getArgument(argIndex)))
+      // Skip explicitly `sending` captures, and the captures that were merged
+      // instead of sent.
+      if (!SILIsolationInfo::isInferredSendingClosureCapture(calleeArg))
+        continue;
+
+      if (!calleeInfo.wasValueEverSent(calleeArg))
         builder.addUndoSend(trackedValue->value,
                             calledAtMostOnceSemanticsArgument->getUser());
     }
@@ -2819,23 +2818,45 @@ public:
   }
 
   void translateSILNoEscapeCalledAtMostOncePartialApply(PartialApplyInst *pai) {
+    ApplySite applySite(pai);
     REGIONBASEDISOLATION_LOG(
         llvm::dbgs()
         << "Translating non-escaping at-most-once Partial Apply!\n");
 
-    for (auto &op : ApplySite(pai).getArgumentOperands()) {
-      // All of the non-Sendable captures are sent by default. This would
-      // be undone after the call if the value is not actually sent in the
-      // body.
-      if (auto lookupResult = tryToTrackValue(op.get())) {
-        builder.addRequire(*lookupResult);
-        builder.addSend(lookupResult->value, &op);
+    auto *calleeFn = pai->getCalleeFunction();
+    if (calleeFn && !calleeFn->isDefinition())
+      calleeFn = nullptr;
+
+    SmallVector<Operand *> operandsToMerge;
+    for (auto &op : applySite.getArgumentOperands()) {
+      auto lookupResult = tryToTrackValue(op.get());
+      if (!lookupResult)
+        continue;
+
+      // A capture that the closure lists without `sending` is merged just
+      // like in a regular closure.
+      if (calleeFn) {
+        auto *calleeArg = cast<SILFunctionArgument>(
+            calleeFn->getArgument(applySite.getSubstCalleeArgIndex(op)));
+        if (!calleeArg->isSending() &&
+            !SILIsolationInfo::isInferredSendingClosureCapture(calleeArg)) {
+          operandsToMerge.push_back(&op);
+          continue;
+        }
       }
+
+      // All of the other non-Sendable captures are sent. This would be undone
+      // after the call if the value is not actually sent in the body.
+      builder.addRequire(*lookupResult);
+      builder.addSend(lookupResult->value, &op);
     }
 
-    // Mark our partial_apply result as being returned fresh.
-    if (auto lookupResult = tryToTrackValue(pai))
-      builder.addAssignFresh(lookupResult->value);
+    SmallVector<SILValue, 8> directResults;
+    getApplyResults(pai, directResults);
+    translateSILMultiAssign(
+        directResults,
+        ArrayRef<Operand *>(), // No indirect results for a partial_apply.
+        operandsToMerge, RegionMergeReason::NonisolatedClosure);
   }
 
   void translateSILCalledAtMostOncePartialApply(PartialApplyInst *pai) {
@@ -2945,8 +2966,8 @@ public:
     // at-most-once closures are allowed to have `sending` captures
     // which need special handling.
     if (pai->hasCalledAtMostOnceSemantics()) {
-      // no-escaping closures treat non-Sendable captures that aren't explicitly
-      // `sending` as individually sent and undo if the values were never
+      // no-escaping closures treat non-Sendable captures that are inferred to
+      // be `sending` as individually sent and undo if the values were never
       // actually sent in the body.
       if (isNoEscapePartialApply(pai)) {
         return translateSILNoEscapeCalledAtMostOncePartialApply(pai);
@@ -3103,6 +3124,14 @@ public:
     // Handles normal builtins and async let start.
     if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
       return translateSILBuiltin(bi);
+    }
+
+    if (auto *eai = dyn_cast<EndApplyInst>(inst)) {
+      // FIXME: This might not be not entirely correct.
+      auto *bai = eai->getBeginApply();
+      return translateSILMultiAssign(
+          eai->getResults(), ArrayRef<Operand *>(),
+          makeOperandRefRange(bai->getAllOperands()), {});
     }
 
     auto fas = FullApplySite::isa(inst);
@@ -3708,6 +3737,7 @@ public:
     return visit##ID(cast<ID>(inst));
 #include "swift/SIL/SILNodes.def"
       }
+      llvm_unreachable("covered switch");
     };
 
     auto kind = computeOpKind();
@@ -4124,7 +4154,6 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
-CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
@@ -4246,6 +4275,7 @@ CONSTANT_TRANSLATION(ApplyInst, Apply)
 CONSTANT_TRANSLATION(BeginApplyInst, Apply)
 CONSTANT_TRANSLATION(BuiltinInst, Apply)
 CONSTANT_TRANSLATION(TryApplyInst, Apply)
+CONSTANT_TRANSLATION(EndApplyInst, Apply)
 
 //===---
 // Asserting
@@ -4543,8 +4573,8 @@ TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
 /// require the base.
 TranslationSemantics
 PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  if (SILIsolationInfo::isSendable(lbi->getOperand())) {
-    translateSILRequire(lbi->getOperand());
+  if (SILIsolationInfo::isSendable(lbi->getAddress())) {
+    translateSILRequire(lbi->getAddress());
   }
 
   return TranslationSemantics::Special;

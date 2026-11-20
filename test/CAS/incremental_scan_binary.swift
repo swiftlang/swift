@@ -27,7 +27,7 @@
 
 /// Test a swiftmodule in CAS but not in action cache.
 // RUN: rm -rf %t/cas
-// RUN: llvm-cas -cas %t/cas -make-blob -data %t/A.swiftmodule
+// RUN: llvm-cas make-blob -cas %t/cas -data %t/A.swiftmodule
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/module-cache \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   %t/Test.swift -o %t/deps.json -I %t -cache-compile-job -cas-path %t/cas  \

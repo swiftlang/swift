@@ -842,7 +842,10 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
         return IGM.getFunction(constant, NotForDefinition);
       });
 
-  F->setDeclRef(constant);
+  // Note we avoid overwriting the SILDeclRef if already set, this ensures we
+  // can catch duplicate symbol clashes.
+  if (!F->getDeclRef())
+    F->setDeclRef(constant);
 
   assert(F && "SILFunction should have been defined");
 
@@ -930,12 +933,29 @@ static bool isInPrintFunctionList(AbstractFunctionDecl *fd) {
 
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
+static void diagnoseDuplicateDefinition(SILGenModule &SGM, SILFunction *f,
+                                        SILDeclRef constant) {
+  auto hasCustomName = [](SILDeclRef constant) {
+    if (!constant.isFunc() && constant.kind != SILDeclRef::Kind::Allocator)
+      return false;
+
+    auto *D = constant.getDecl();
+    return D && D->getAttrs().hasAttribute<SILGenNameAttr>();
+  };
+  // For functions, users can customize it with silgen_name, otherwise it's
+  // likely a compiler bug.
+  auto diag = diag::sil_function_redefinition_bug;
+  if (hasCustomName(constant) || hasCustomName(f->getDeclRef()))
+    diag = diag::sil_function_redefinition;
+
+  SGM.diagnose(constant.getAsRegularLocation(), diag, f->getName());
+  if (f->hasLocation())
+    SGM.diagnose(f->getLocation(), diag::sil_function_redefinition_note);
+}
+
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
   if (!f->empty()) {
-    diagnose(constant.getAsRegularLocation(), diag::sil_function_redefinition,
-             f->getName());
-    if (f->hasLocation())
-      diagnose(f->getLocation(), diag::sil_function_redefinition_note);
+    diagnoseDuplicateDefinition(*this, f, constant);
     return;
   }
 
@@ -1328,12 +1348,15 @@ void SILGenModule::emitOrDelayFunction(SILDeclRef constant) {
 
   auto emitAfter = lastEmittedFunction;
 
-  // Implicit decls may be delayed if they can't be used externally.
+  // Implicit decls may be delayed if they can't be used externally. The
+  // generated C++ header may call implicit ones, such as synthesized accessors
+  // and memberwise initializers.
   auto linkage = constant.getLinkage(ForDefinition);;
   bool mayDelay = !constant.shouldBeEmittedForDebugger() &&
                   !constant.hasUserWrittenCode() &&
                   !constant.isDynamicallyReplaceable() &&
-                  !isPossiblyUsedExternally(linkage, M.isWholeModule());
+                  !isPossiblyUsedExternally(linkage, M.isWholeModule()) &&
+                  !constant.mayBeCalledFromCxxHeader(M);
 
   if (!mayDelay) {
     // We may visit the same function multiple times in some cases. For
@@ -1765,8 +1788,8 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
   }
 }
 
-SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
-                                       const FunctionTypeInfo &closureInfo) {
+bool SILGenModule::emitClosure(AbstractClosureExpr *e,
+                               const FunctionTypeInfo &closureInfo) {
   Types.setCaptureTypeExpansionContext(SILDeclRef(e), M);
 
   SILFunction *f = nullptr;
@@ -1780,8 +1803,14 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
     // for instance, when closures appear as in-line initializers of stored
     // properties. In these cases the closure will be emitted into every
     // initializer of the containing type.
-    if (!f->isExternalDeclaration())
+    if (!f->isExternalDeclaration()) {
+      // If the SILDeclRef mismatches, we have a definition conflict.
+      if (f->getDeclRef() != constant) {
+        diagnoseDuplicateDefinition(*this, f, constant);
+        f = nullptr;
+      }
       return;
+    }
 
     // Emit property wrapper argument generators.
     emitArgumentGenerators(e, e->getParameters());
@@ -1789,7 +1818,7 @@ SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *e,
     emitFunctionDefinition(constant, f);
   });
 
-  return f;
+  return !f;
 }
 
 /// Determine whether the given class requires a separate instance
@@ -1965,25 +1994,8 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
                                            ParamDecl *param) {
-  switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::None:
-    llvm_unreachable("No default argument here?");
-
-  case DefaultArgumentKind::Normal:
-  case DefaultArgumentKind::StoredProperty:
+  if (param->hasDefaultArgumentGenerator())
     emitOrDelayFunction(constant);
-    break;
-
-  case DefaultArgumentKind::Inherited:
-#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
-  case DefaultArgumentKind::NAME:
-#include "swift/AST/MagicIdentifierKinds.def"
-  case DefaultArgumentKind::NilLiteral:
-  case DefaultArgumentKind::EmptyArray:
-  case DefaultArgumentKind::EmptyDictionary:
-  case DefaultArgumentKind::ExpressionMacro:
-    break;
-  }
 }
 
 void SILGenModule::

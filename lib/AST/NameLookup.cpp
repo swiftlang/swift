@@ -868,6 +868,26 @@ static CanType removeThrownError(Type type) {
   })->getCanonicalType();
 }
 
+/// Remove the execution semantics of every function type.
+///
+/// A parameter with execution semantics is implicitly `consuming`, and that
+/// flag is kept. So, like redeclarations, declarations that only differ in the
+/// execution semantics of a closure parameter don't shadow each other, but
+/// ones that only differ in the execution semantics of a result do.
+static CanType removeExecutionSemantics(CanType type) {
+  return type
+      .transformRec([](TypeBase *type) -> std::optional<Type> {
+        if (auto *fnType = dyn_cast<AnyFunctionType>(type)) {
+          if (fnType->hasCalledAtMostOnceSemantics())
+            return removeExecutionSemantics(
+                fnType->withExecutionSemantics(std::nullopt)
+                    ->getCanonicalType());
+        }
+        return std::nullopt;
+      })
+      ->getCanonicalType();
+}
+
 /// Given a set of declarations whose names and generic signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
@@ -892,7 +912,8 @@ static void recordShadowedDeclsAfterSignatureMatch(
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
       type = asd->getOverloadSignatureType();
     else
-      type = removeThrownError(decl->getInterfaceType()->getCanonicalType());
+      type = removeExecutionSemantics(
+          removeThrownError(decl->getInterfaceType()->getCanonicalType()));
 
     // Strip `@Sendable` annotations for declarations that come from
     // or are exposed to Objective-C to make it possible to introduce

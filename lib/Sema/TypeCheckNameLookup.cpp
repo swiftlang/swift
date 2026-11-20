@@ -261,9 +261,10 @@ static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
   }
 }
 
-LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
-                                            SourceLoc loc,
-                                            NLOptions options) {
+LookupResult
+TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name, SourceLoc loc,
+                               NLOptions options,
+                               llvm::function_ref<bool(ValueDecl *)> filter) {
   auto &ctx = dc->getASTContext();
 
   // HACK: Synthesize CodingKeys if needed.
@@ -281,6 +282,9 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                               options);
   for (auto idx : indices(lookup.allResults())) {
     const auto &found = lookup[idx];
+    if (filter && !filter(found.getValueDecl()))
+      continue;
+
     // Determine which type we looked through to find this result.
     Type foundInType;
 

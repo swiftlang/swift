@@ -605,6 +605,7 @@ public:
     case FixBehavior::Error:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine the impact of this fix on the solution score, if any.

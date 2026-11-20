@@ -50,6 +50,7 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
 
       SWIFT_COMPILE_FLAGS
         ${BUILTIN_FLOAT_SWIFT_FLAGS}
+        -Xfrontend -enable-sil-opaque-values
 
       INSTALL_IN_COMPONENT stdlib
     )

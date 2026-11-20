@@ -1,0 +1,170 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=0 -arc-sequence-opts -enable-experimental-feature Lifetimes %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-loop-arc=1 -arc-sequence-opts -enable-experimental-feature Lifetimes %s | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+// Check that ARCSequenceOpts does not remove a retain/release pair around a
+// call which uses a non-escapable value that depends on the retained object.
+// https://github.com/swiftlang/swift/issues/94047
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {
+  var i: Int
+}
+
+class Owner {
+  var c: C
+}
+
+struct NE: ~Escapable {
+  var p: Builtin.RawPointer
+
+  @_lifetime(immortal)
+  init(p: Builtin.RawPointer) { self.p = p }
+}
+
+struct Wrapper: ~Escapable {
+  var ne: NE
+
+  @_lifetime(copy ne)
+  init(ne: NE) { self.ne = ne }
+}
+
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+sil @use_owned_ne : $@convention(thin) (@owned NE) -> ()
+sil @use_wrapper : $@convention(thin) (@guaranteed Wrapper) -> ()
+sil @use_rawpointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: sil @nonescaping_dependence :
+// CHECK:         strong_retain %2
+// CHECK:         apply
+// CHECK:         strong_release %2
+// CHECK:       } // end sil function 'nonescaping_dependence'
+sil @nonescaping_dependence : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = struct $NE (%4)
+  %6 = mark_dependence [nonescaping] %5 on %2
+  %7 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  strong_retain %2
+  %9 = apply %7(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @owned_argument :
+// CHECK:         strong_retain %2
+// CHECK:         apply
+// CHECK:         strong_release %2
+// CHECK:       } // end sil function 'owned_argument'
+sil @owned_argument : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = struct $NE (%4)
+  %6 = mark_dependence [nonescaping] %5 on %2
+  %7 = function_ref @use_owned_ne : $@convention(thin) (@owned NE) -> ()
+  strong_retain %2
+  %9 = apply %7(%6) : $@convention(thin) (@owned NE) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @wrapped_dependence :
+// CHECK:         strong_retain %2
+// CHECK:         apply
+// CHECK:         strong_release %2
+// CHECK:       } // end sil function 'wrapped_dependence'
+sil @wrapped_dependence : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = struct $NE (%4)
+  %6 = mark_dependence [nonescaping] %5 on %2
+  %7 = mark_dependence [nonescaping] %6 on %0
+  %8 = struct $Wrapper (%7)
+  %9 = function_ref @use_wrapper : $@convention(thin) (@guaranteed Wrapper) -> ()
+  strong_retain %2
+  %11 = apply %9(%8) : $@convention(thin) (@guaranteed Wrapper) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @phi_dependence :
+// CHECK:         strong_retain %2
+// CHECK:         apply
+// CHECK:         strong_release %2
+// CHECK:       } // end sil function 'phi_dependence'
+sil @phi_dependence : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = struct $NE (%4)
+  %6 = mark_dependence [nonescaping] %5 on %2
+  br bb1(%6)
+
+bb1(%8 : $NE):
+  %9 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  strong_retain %2
+  %11 = apply %9(%8) : $@convention(thin) (@guaranteed NE) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}
+
+// The raw pointer is escapable and does not carry a dependence.
+// CHECK-LABEL: sil @no_dependence :
+// CHECK-NOT:     strong_retain
+// CHECK:         apply
+// CHECK-NOT:     strong_release
+// CHECK:       } // end sil function 'no_dependence'
+sil @no_dependence : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %7 = function_ref @use_rawpointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  strong_retain %2
+  %9 = apply %7(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}
+
+// An escaping dependence does not require the base to be alive at the call.
+// CHECK-LABEL: sil @escaping_dependence :
+// CHECK-NOT:     strong_retain
+// CHECK:         apply
+// CHECK-NOT:     strong_release
+// CHECK:       } // end sil function 'escaping_dependence'
+sil @escaping_dependence : $@convention(thin) (@guaranteed Owner) -> () {
+bb0(%0 : $Owner):
+  %1 = ref_element_addr %0, #Owner.c
+  %2 = load %1
+  %3 = ref_tail_addr %2, $Int
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = mark_dependence %4 on %2
+  %7 = function_ref @use_rawpointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  strong_retain %2
+  %9 = apply %7(%5) : $@convention(thin) (Builtin.RawPointer) -> ()
+  strong_release %2
+  %r = tuple ()
+  return %r
+}

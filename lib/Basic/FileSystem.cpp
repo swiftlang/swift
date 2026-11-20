@@ -20,6 +20,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Signals.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
@@ -282,8 +283,11 @@ swift::vfs::getFileOrSTDIN(llvm::vfs::FileSystem &FS,
   llvm::SmallString<256> NameBuf;
   llvm::StringRef NameRef = Filename.toStringRef(NameBuf);
 
-  if (NameRef == "-")
+  if (NameRef == "-") {
+    // Standard input is not part of the file system.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
     return llvm::MemoryBuffer::getSTDIN();
+  }
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> inputFileOrErr = nullptr;
   for (unsigned I = 0; I != BADFRetry + 1; ++ I) {
     inputFileOrErr = FS.getBufferForFile(Filename, FileSize,

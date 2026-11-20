@@ -28,6 +28,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
@@ -199,7 +200,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
     return true;
 
   // So are C++ constructors that initialize a foreign reference type.
-  if (constant.isForeignReferenceInitializer())
+  if (constant.isCXXForeignReferenceInitializer())
     return true;
 
   // Extension methods currently must be statically dispatched, unless they're
@@ -678,7 +679,7 @@ public:
     // A C++ constructor that initializes a foreign reference type is imported
     // as a static factory, but its initializing entry point takes `self` as
     // the trailing `this` argument, like a C++ instance method.
-    if (constant->isForeignReferenceInitializer())
+    if (constant->isCXXForeignReferenceInitializer())
       result.foreign.self = ImportAsMemberStatus();
 
     return result;
@@ -1360,7 +1361,15 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
+    if (SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e))) {
+      // If we couldn't emit the closure, emit an undef.
+      auto substType = cast<FunctionType>(e->getType()->getCanonicalType());
+      auto origType = getIndirectApplyAbstractionPattern(
+          SGF, AbstractionPattern(substType), substType);
+      ManagedValue fn = SGF.emitUndef(SGF.getLoweredType(substType));
+      setCallee(Callee::forIndirect(fn, origType, substType, e));
+      return;
+    }
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
@@ -1902,9 +1911,9 @@ public:
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      substFormalType =
-          CanFunctionType::get({AnyFunctionType::Param(substSelfType)},
-                               /* yields */ {}, substFormalType, info);
+      substFormalType = CanFunctionType::get(
+          {AnyFunctionType::Param::bodyAccess(substSelfType)},
+          /* yields */ {}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -1945,7 +1954,7 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
         SGF.B.createIntegerLiteral(E, Int32Ty,
                                    unicode::extractFirstUnicodeScalar(Str));
 
-    AnyFunctionType::Param param(Int32Ty.getASTType());
+    auto param = AnyFunctionType::Param::bodyAccess(Int32Ty.getASTType());
     PreparedArguments args(llvm::ArrayRef<AnyFunctionType::Param>{param});
     args.add(E, RValue(SGF, E, Int32Ty.getASTType(),
                        ManagedValue::forObjectRValueWithoutOwnership(
@@ -1971,9 +1980,9 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
       ManagedValue::forObjectRValueWithoutOwnership(isASCIIInst)};
 
   AnyFunctionType::Param TypeEltsArray[] = {
-    AnyFunctionType::Param(EltsArray[0].getType().getASTType()),
-    AnyFunctionType::Param(EltsArray[1].getType().getASTType()),
-    AnyFunctionType::Param(EltsArray[2].getType().getASTType())
+    AnyFunctionType::Param::bodyAccess(EltsArray[0].getType().getASTType()),
+    AnyFunctionType::Param::bodyAccess(EltsArray[1].getType().getASTType()),
+    AnyFunctionType::Param::bodyAccess(EltsArray[2].getType().getASTType())
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -2012,7 +2021,7 @@ static void emitRawApply(SILGenFunction &SGF,
                          ExecutorBreadcrumb prevExecutor) {
   // We completely drop the generic signature if all generic parameters were
   // concrete.
-  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+  if (subs && !subs.isEffectivelyGeneric())
     subs = SubstitutionMap();
 
   SILFunctionConventions substFnConv(
@@ -2252,7 +2261,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         NilLiteralExpr *nilLiteral) {
   CanType ty = SGF.getASTContext().TheEmptyTupleType;
   PreparedArguments builtinLiteralArgs;
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(nilLiteral, RValue(SGF, {}, ty));
   return builtinLiteralArgs;
 }
@@ -2267,7 +2276,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   ManagedValue boolManaged =
       ManagedValue::forObjectRValueWithoutOwnership(boolValue);
   CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(booleanLiteral, RValue(SGF, {boolManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2282,7 +2291,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
           SILType::getBuiltinIntegerLiteralType(SGF.getASTContext()),
           integerLiteral->getRawValue()));
   CanType ty = integerManaged.getType().getASTType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(integerLiteral, RValue(SGF, {integerManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2299,7 +2308,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
           floatLiteral->getValue()));
 
   CanType ty = floatManaged.getType().getASTType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(floatLiteral, RValue(SGF, {floatManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2328,7 +2337,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 
   using Param = AnyFunctionType::Param;
   auto builtinIntTy = versionIntLiteral.getType().getASTType();
-  PreparedArguments versionIntBuiltinArgs(ArrayRef<Param>{Param(builtinIntTy)});
+  PreparedArguments versionIntBuiltinArgs(
+      ArrayRef<Param>{Param::bodyAccess(builtinIntTy)});
   versionIntBuiltinArgs.add(
       expr, RValue(SGF, {versionIntLiteral}, builtinIntTy));
 
@@ -2339,8 +2349,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
       expr, intLiteralInit, std::move(versionIntBuiltinArgs),
       /*overriddenSelfType*/ Type(), SGFContext());
 
-  PreparedArguments args(ArrayRef<Param>{Param(ctx.getStringType()),
-                                         Param(ctx.getIntType())});
+  PreparedArguments args(ArrayRef<Param>{Param::bodyAccess(ctx.getStringType()),
+                                         Param::bodyAccess(ctx.getIntType())});
   args.add(expr, std::move(string));
   args.add(expr, std::move(versionInt));
   return args;
@@ -2414,7 +2424,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
     ManagedValue integerManaged =
         ManagedValue::forObjectRValueWithoutOwnership(integer);
     PreparedArguments builtinLiteralArgs;
-    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+    builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
     builtinLiteralArgs.add(magicLiteral, RValue(SGF, {integerManaged}, ty));
     return builtinLiteralArgs;
   }
@@ -3411,12 +3421,22 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
         // that currently disrupts what the move checker expects. It would also
         // be valuable to borrow copyable global lets, but this is a targeted
         // fix to allow noncopyable globals to work properly.
+        // 
+        // rdar://192270068: Also proceed if the decl ref is to a mutable 
+        // variable.
+        // We end up with a non-LValueType DeclRef to a mutable variable 
+        // without a LoadExpr when a closure literal infers `consuming` from
+        // its type context, since the parameter specified is applied only after
+        // the closure body has been type checked.
         bool isGlobal = false;
+        bool isVar = false;
         if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
           isGlobal = vd->isGlobalStorage();
+          isVar = isa<ParamDecl>(vd)
+            && vd->getIntroducer() == VarDecl::Introducer::Var;
         }
         
-        if (!isGlobal) {
+        if (!isGlobal && !isVar) {
           return nullptr;
         }
       }
@@ -3451,6 +3471,16 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
 
   if (!storage)
     return nullptr;
+
+  // A capture held as a value has no memory to consume in place.
+  if (auto *vd = dyn_cast<VarDecl>(storage)) {
+    auto it = VarLocs.find(vd);
+    if (kind == StorageReferenceOperationKind::Consume &&
+        it != VarLocs.end() && vd->getDeclContext() != FunctionDC &&
+        !silConv.useLoweredAddresses() &&
+        it->second.value->getType().isObject())
+      return nullptr;
+  }
 
   // This should match the strategy computation used in
   // SILGenLValue::visit{DeclRef,Member}RefExpr.
@@ -3921,7 +3951,8 @@ public:
   // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType,
-                        ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+                        ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+                        unsigned lifetimeDependenciesBaseIndex) {
     assert(args.isValid());
     auto params = args.getParams();
     auto argSources = std::move(args).getSources();
@@ -3953,7 +3984,7 @@ public:
               continue;
             }
             
-            if (scoped->contains(i)) {
+            if (scoped->contains(lifetimeDependenciesBaseIndex + i)) {
               addressable = SGF.getTypeProperties(origFormalParamType,
                                                   origFormalParamType.getType())
                 .isAddressableForDependencies();
@@ -4232,7 +4263,12 @@ private:
                 loc, result);
           }
         }
-        result = result.materialize(SGF, loc);
+        // A borrowed value may itself be a formal-evaluation borrow, such as
+        // a borrowed subscript index, so the borrow of the temporary has to
+        // end with the formal access rather than with the enclosing scope.
+        result = SGF.isInFormalEvaluationScope()
+                     ? result.formallyMaterialize(SGF, loc)
+                     : result.materialize(SGF, loc);
       }
 
     // Otherwise, simultaneously emit and reabstract.
@@ -5384,6 +5420,7 @@ public:
   void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
             CanSILFunctionType substFnType,
             ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+            unsigned lifetimeDependenciesBaseIndex,
             ParamLowering &lowering,
             SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
@@ -5396,7 +5433,8 @@ public:
     ArgEmitter emitter(SGF, Loc, lowering.Rep, options, params, args,
                        delayedArgs, foreign);
     emitter.emitPreparedArgs(std::move(Args), origFormalType,
-                             lifetimeDependencies);
+                             lifetimeDependencies,
+                             lifetimeDependenciesBaseIndex);
   }
 
   /// Take the arguments for special processing, in place of the above.
@@ -5567,28 +5605,55 @@ private:
 
 namespace {
 /// Cleanup to end a coroutine application.
-class EndCoroutineApply : public Cleanup {
+///
+/// The borrows to end before the coroutine is ended live in a tail allocated
+/// after the cleanup (see CleanupManager::pushCleanupWithTail), since cleanups
+/// are memcpy'd around and never destroyed, so they cannot own memory. The
+/// tail is read relative to 'this' because the cleanup stack relocates
+/// cleanups.
+class EndCoroutineApply final
+    : public Cleanup,
+      private llvm::TrailingObjects<EndCoroutineApply, BeginBorrowInst *> {
+  friend TrailingObjects;
+
   SILValue ApplyToken;
   bool CanUnwind;
-  std::vector<BeginBorrowInst *> BorrowedMoveOnlyValues;
+  unsigned NumBorrowedMoveOnlyValues = 0;
+
+  ArrayRef<BeginBorrowInst *> getBorrowedMoveOnlyValues() {
+    return getTrailingObjects(NumBorrowedMoveOnlyValues);
+  }
+
 public:
+  /// The tail size to push this cleanup with, to hold up to \p capacity
+  /// borrows.
+  static size_t getTailSize(unsigned capacity) {
+    return additionalSizeToAlloc<BeginBorrowInst *>(capacity);
+  }
+
   EndCoroutineApply(SILValue applyToken, bool CanUnwind)
       : ApplyToken(applyToken), CanUnwind(CanUnwind) {}
 
   void setBorrowedMoveOnlyValues(ArrayRef<BeginBorrowInst *> values) {
-    BorrowedMoveOnlyValues.insert(BorrowedMoveOnlyValues.end(),
-                                  values.begin(), values.end());
+    assert(NumBorrowedMoveOnlyValues == 0 && "borrowed values already set");
+    assert(getTailSize(values.size()) <=
+               allocated_size() - sizeof(EndCoroutineApply) &&
+           "not enough tail storage for the borrowed values");
+    llvm::copy(values, getTrailingObjects());
+    NumBorrowedMoveOnlyValues = values.size();
   }
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
-    for (auto i = BorrowedMoveOnlyValues.rbegin(), e = BorrowedMoveOnlyValues.rend();
-         i != e; ++i) {
+    auto borrowedValues = getBorrowedMoveOnlyValues();
+    for (auto i = borrowedValues.rbegin(), e = borrowedValues.rend(); i != e;
+         ++i) {
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
     if (forUnwind && CanUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
+      // TODO: This is not correct when coroutine has a normal result
       SGF.B.createEndApply(l, ApplyToken,
                            SILType::getEmptyTupleType(SGF.getASTContext()));
     }
@@ -5653,7 +5718,8 @@ CleanupHandle SILGenFunction::emitBeginApply(
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
-  Cleanups.pushCleanup<EndCoroutineApply>(token, canUnwind);
+  Cleanups.pushCleanupWithTail<EndCoroutineApply>(
+      EndCoroutineApply::getTailSize(yieldValues.size()), token, canUnwind);
   auto endApplyHandle = getTopCleanup();
 
   // Manage all the yielded values.
@@ -5798,13 +5864,14 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
   emitRawApply(*this, loc, fn, subs, args, substFnType, options,
                /*indirect results*/ {}, /*indirect errors*/ {}, rawResults,
                ExecutorBreadcrumb());
+  // FIXME: Support returning tuples from borrow accessors.
   assert(rawResults.size() == 1);
   auto rawResult = rawResults[0];
 
-  if (rawResult->getType().isMoveOnly()) {
-    if (rawResult->getType().isAddress()) {
-      SILFunctionConventions substFnConv(
-          substFnType, SILAddressConventions::forFunction(F));
+  if (rawResult->getType().isAddress()) {
+    if (rawResult->getType().isMoveOnly()) {
+      SILFunctionConventions substFnConv(substFnType,
+                                         SILAddressConventions::forFunction(F));
       auto result = B.createMarkUnresolvedNonCopyableValueInst(
           loc, rawResult,
           substFnConv.hasInoutResult()
@@ -5814,14 +5881,33 @@ ManagedValue SILGenFunction::applyBorrowMutateAccessor(
                     NoConsumeOrAssign);
       return ManagedValue::forRValueWithoutOwnership(result);
     }
-    auto result = emitManagedCopy(loc, rawResult);
+    return ManagedValue::forForwardedRValue(*this, rawResult);
+  }
+
+  if (rawResult->getOwnershipKind() != OwnershipKind::Guaranteed) {
+     return ManagedValue::forForwardedRValue(*this, rawResult);
+  }
+
+  // A borrow accessor with a @guaranteed result is a borrow introducer, emit
+  // with cleanup.
+  auto borrowIntroducingResult = emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+        loc, rawResult, rawResult);
+
+  // If the callsite is within another borrow accessor, emit unchecked_ownership
+  // which SILGenCleanup will fixup.
+  if (getFunction().getConventions().hasGuaranteedResult()) {
+    borrowIntroducingResult = B.createUncheckedOwnership(loc, borrowIntroducingResult);
+  }
+
+  if (borrowIntroducingResult.getValue()->getType().isMoveOnly()) {
+    auto result = emitManagedCopy(loc, borrowIntroducingResult.getValue());
     result = B.createMarkUnresolvedNonCopyableValueInst(
         loc, result,
         MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
     return emitManagedBeginBorrow(loc, result.getValue());
   }
 
-  return ManagedValue::forForwardedRValue(*this, rawResult);
+  return borrowIntroducingResult;
 }
 
 RValue CallEmission::applyFirstLevelCallee(SGFContext C) {
@@ -6178,13 +6264,17 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       
       // Claim the foreign "self" with the self param.
       auto siteForeign = ForeignInfo{foreign.self, {}, {}};
+      auto origMethodType = origFormalType.getFunctionResultType();
+      // The lifetimeDependencies structure refers to `self` by the final
+      // index after the formal method arguments.
       std::move(*selfArg).emit(SGF, origFormalType, substFnType,
                                lifetimeDependencies,
+                               origMethodType.getNumFunctionParams(),
                                paramLowering,
                                args.back(), delayedArgs,
                                siteForeign);
 
-      origFormalType = origFormalType.getFunctionResultType();
+      origFormalType = origMethodType;
     }
 
     args.push_back({});
@@ -6194,7 +6284,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     auto siteForeignError = ForeignInfo{{}, foreign.error, foreign.async};
     // Claim the method formal params.
     std::move(*callSite).emit(SGF, origFormalType, substFnType,
-                              lifetimeDependencies, paramLowering,
+                              lifetimeDependencies, 0, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
   }
 
@@ -6273,8 +6363,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
         newFlags = newFlags.withShared(true);
     }
 
-    AnyFunctionType::Param selfParam(apply.selfParam.getSubstRValueType(),
-                                     Identifier(), newFlags);
+    auto selfParam = AnyFunctionType::Param::bodyAccess(
+        apply.selfParam.getSubstRValueType(), Identifier(), newFlags);
     emission.addSelfParam(e, std::move(apply.selfParam), selfParam);
   }
 
@@ -6728,7 +6818,7 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                               ArrayRef<SILValue> args) {
   // We completely drop the generic signature if all generic parameters were
   // concrete.
-  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+  if (subs && !subs.isEffectivelyGeneric())
     subs = SubstitutionMap();
 
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
@@ -6855,7 +6945,7 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SmallVectorImpl<SILValue> &yields) {
   // We completely drop the generic signature if all generic parameters were
   // concrete.
-  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+  if (subs && !subs.isEffectivelyGeneric())
     subs = SubstitutionMap();
 
   // TODO: adjust this to create try_begin_apply when appropriate.
@@ -6880,17 +6970,17 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(
+SILValue SILGenFunction::emitEndApplyWithRethrow(
     SILLocation loc, MultipleValueInstructionResult *token,
-    SILValue allocation) {
+    SILValue allocation, SILType resultType) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token,
-                   SILType::getEmptyTupleType(getASTContext()));
+  SILValue result = B.createEndApply(loc, token, resultType);
   if (allocation) {
     B.createDeallocStack(loc, allocation);
   }
+  return result;
 }
 
 void SILGenFunction::emitYield(SILLocation loc,
@@ -7477,7 +7567,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
   // Otherwise, perform the second initialization step.
   auto ty = builtinResult.getType();
-  PreparedArguments args((AnyFunctionType::Param(ty)));
+  PreparedArguments args((AnyFunctionType::Param::bodyAccess(ty)));
   args.add(literal, std::move(builtinResult));
 
   RValue result = emitApplyAllocatingInitializer(literal, init,
@@ -8018,7 +8108,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
                      ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType,
-                           origFnType.getLifetimeDependencies());
+                           origFnType.getLifetimeDependencies(), 0);
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
@@ -8406,7 +8496,11 @@ ManagedValue SILGenFunction::emitBorrowMutateAccessor(
 
   CanAnyFunctionType accessType = callee.getSubstFormalType();
 
+  // Create a dead writeback scope, so that the borrow introducer of a
+  // @guaranteed result ends with the enclosing formal access just as
+  // coroutines.
   FormalEvaluationScope writebackScope(*this);
+  writebackScope.pop();
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
 
   // Self ->
@@ -8682,7 +8776,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
-    FunctionType::Param arg(operand->getType().getASTType());
+    auto arg = FunctionType::Param::bodyAccess(operand->getType().getASTType());
     auto memberFnTy =
         CanFunctionType::get({arg}, /* yields */ {}, methodTy, info);
 
@@ -8782,7 +8876,8 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo functionInfo;
-    FunctionType::Param baseArg(operand->getType().getASTType());
+    auto baseArg =
+        FunctionType::Param::bodyAccess(operand->getType().getASTType());
     auto functionTy = CanFunctionType::get({baseArg}, /* yields */ {}, methodTy,
                                            functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,
@@ -8857,7 +8952,7 @@ SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
   auto prepared = prepareIndices(loc, substFnType,
                                  // Strategy doesn't matter
                                  AccessStrategy::getStorage(), argList);
-  emitter.emitPreparedArgs(std::move(prepared), origFnType, {});
+  emitter.emitPreparedArgs(std::move(prepared), origFnType, {}, 0);
 
   if (!delayedArgs.empty())
     emitDelayedArguments(*this, delayedArgs, argValues);

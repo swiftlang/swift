@@ -88,6 +88,7 @@ bool Feature::isMigratable() const {
 #include "swift/Basic/Features.def"
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool Feature::includeInModuleInterface() const {

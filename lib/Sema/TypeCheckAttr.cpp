@@ -27,6 +27,8 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -207,7 +209,6 @@ public:
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
-  IGNORED_ATTR(Semantics)
   IGNORED_ATTR(NoLocks)
   IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(NoRuntime)
@@ -437,6 +438,7 @@ public:
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
   void visitTargetAttr(TargetAttr *attr);
+  void visitTailAllocatedAttr(TailAllocatedAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -479,6 +481,7 @@ public:
   void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
   void diagnoseNeverEmittedIntoClientInBackDeployedType(DeclAttribute *attr);
   void visitExportAttr(ExportAttr *attr);
+  void visitSemanticsAttr(SemanticsAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -2848,10 +2851,7 @@ void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
-  else if (D->getDeclContext()->isGenericContext() &&
-           !D->getDeclContext()
-                ->getGenericSignatureOfContext()
-                ->areAllParamsConcrete())
+  else if (D->getDeclContext()->isEffectivelyGenericContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope, attr);
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
     if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
@@ -2876,16 +2876,118 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
 
   if (D->getDeclContext()->isLocalContext()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
-  } else if (D->getDeclContext()->isGenericContext() &&
-             !D->getDeclContext()
-                  ->getGenericSignatureOfContext()
-                  ->areAllParamsConcrete()) {
+  } else if (D->getDeclContext()->isEffectivelyGenericContext()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope, attr);
   } else if (!VarD->isStatic() &&
              !D->getDeclContext()->isModuleScopeContext()) {
     diagnose(attr->getLocation(), diag::attr_only_on_static_properties, attr);
   } else if (!VarD->hasStorageOrWrapsStorage()) {
     diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
+  }
+}
+
+void AttributeChecker::visitTailAllocatedAttr(TailAllocatedAttr *attr) {
+  auto *classDecl = cast<ClassDecl>(D);
+  if (!Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_requires_embedded);
+    return;
+  }
+  // An actor's deallocation doesn't go through dealloc_ref.
+  if (classDecl->isAnyActor()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_actor);
+    return;
+  }
+  // The deallocation uses the nearest attribute, so one in a superclass would
+  // describe an allocation that no longer exists.
+  if (auto *superclass = classDecl->getSuperclassDecl()) {
+    if (auto *inheritedOwner = superclass->getTailAllocatedAttr().second) {
+      diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_inherited,
+                            classDecl, inheritedOwner);
+      return;
+    }
+  }
+
+  if (llvm::any_of(attr->getResolvedTypes(classDecl),
+                   [](Type type) { return type->hasError(); }))
+    attr->setInvalid();
+}
+
+ArrayRef<Type> ResolveTailAllocatedTypesRequest::evaluate(
+    Evaluator &evaluator, ClassDecl *owner, TailAllocatedAttr *attr) const {
+  // Resolve the element types in the class's generic context.
+  auto resolution = TypeResolution::forInterface(
+      owner, TypeResolverContext::None,
+      /*unboundTyOpener=*/nullptr, /*placeholderHandler=*/nullptr,
+      /*packElementOpener=*/nullptr);
+  auto &ctx = owner->getASTContext();
+  SmallVector<Type, 4> types;
+  for (auto *typeRepr : attr->getTypeReprs()) {
+    Type type = resolution.resolveType(typeRepr);
+    types.push_back(type ? type : ErrorType::get(ctx));
+  }
+  return ctx.AllocateCopy(types);
+}
+
+VarDecl *
+TailAllocatedCountsDeclRequest::evaluate(Evaluator &evaluator, ClassDecl *owner,
+                                         TailAllocatedAttr *attr) const {
+  if (auto *resolver = attr->Resolver)
+    return resolver->loadTailAllocatedCountsDecl(attr,
+                                                 attr->ResolverContextData);
+  for (auto *cls = owner; cls; cls = cls->getSuperclassDecl()) {
+    for (auto *member : cls->lookupDirect(DeclName(attr->getCountsName()))) {
+      auto *var = dyn_cast<VarDecl>(member);
+      if (var && var->isInstanceMember())
+        return var;
+    }
+  }
+  return nullptr;
+}
+
+void TypeChecker::checkTailAllocatedCounts(ClassDecl *classDecl) {
+  auto *attr = classDecl->getAttrs().getAttribute<TailAllocatedAttr>();
+  if (!attr)
+    return;
+  auto &Ctx = classDecl->getASTContext();
+  auto typeReprs = attr->getTypeReprs();
+
+  // The counts property, in the class or a superclass: one Int per element
+  // type (Int, or a tuple of Ints), read by the deinit. It must be final, so
+  // that a subclass can't change the counts.
+  VarDecl *countsVar = attr->getCountsDecl(classDecl);
+  // An invalid type has been diagnosed already.
+  if (countsVar && countsVar->getInterfaceType()->hasError()) {
+    attr->setInvalid();
+    return;
+  }
+  Type intType = Ctx.getIntType();
+  Type countsType = intType;
+  if (typeReprs.size() > 1) {
+    SmallVector<TupleTypeElt, 4> elts(typeReprs.size(), TupleTypeElt(intType));
+    countsType = TupleType::get(elts, Ctx);
+  }
+  auto *getter =
+      countsVar ? countsVar->getAccessor(AccessorKind::Get) : nullptr;
+  if (!countsVar || !countsVar->isFinal() ||
+      !countsVar->getInterfaceType()->isEqual(countsType) ||
+      (getter && (getter->hasAsync() || getter->hasThrows()))) {
+    Ctx.Diags.diagnose(attr->getCountsNameLoc(),
+                       diag::attr_tail_allocated_counts_property,
+                       attr->getCountsName(), classDecl, countsType);
+    attr->setInvalid();
+    return;
+  }
+  // The deinit, which reads the property, can be emitted in another module.
+  auto classScope = classDecl->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+  auto countsScope = countsVar->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+  if ((classScope.isPublic() && !countsScope.isPublic()) ||
+      (classScope.isPackage() && !countsScope.isPublicOrPackage())) {
+    Ctx.Diags.diagnose(
+        attr->getCountsNameLoc(), diag::attr_tail_allocated_counts_not_visible,
+        attr->getCountsName(), classDecl, classScope.isPackage());
+    attr->setInvalid();
   }
 }
 
@@ -3757,7 +3859,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
   if (!attr->isFullSpecialization())
     return;
 
-  if (specializedSig->areAllParamsConcrete())
+  if (!specializedSig->isEffectivelyGeneric())
     return;
 
   SmallVector<GenericTypeParamType *, 2> unspecializedParams;
@@ -4206,10 +4308,17 @@ void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
   if (attr->getKind() != InlineKind::Always)
     return;
 
-  // Can't have @inline(always) on @usableFromInline.
+  // Can't have @inline(always) on @usableFromInline: @usableFromInline
+  // exposes an entry point but not the body, so a caller in another module
+  // could not inline the function (SE-0496). Suggest @inlinable instead,
+  // rather than offering to remove @inline(always).
   auto *VD = cast<ValueDecl>(D);
-  if (VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
+  if (auto *ufi = VD->getAttrs().getAttribute<UsableFromInlineAttr>()) {
+    attr->setInvalid();
+    auto diag = diagnose(attr->getLocation(),
+                         diag::attr_inline_always_no_usable_from_inline);
+    if (ufi->getLocation().isValid() && !ufi->isImplicit())
+      diag.fixItReplace(ufi->getRangeWithAt(), "@inlinable");
     return;
   }
   // Check that @inline(always) is only used on statically dispatched methods
@@ -4325,6 +4434,38 @@ void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
   }
   diagnoseAndRemoveAttr(attr, diag::exclusivity_on_wrong_decl);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitSemanticsAttr(SemanticsAttr *attr) {
+  StringRef value = attr->Value;
+  if (!value.starts_with(semantics::AVAILABILITY_OSVERSION))
+    return;
+
+  // An explicit kind must be one that we know about.
+  if (value.size() > semantics::AVAILABILITY_OSVERSION.size()) {
+    if (!parseOSVersionQuerySemanticsAttr(value)) {
+      StringRef kind = value.drop_front(
+          semantics::AVAILABILITY_OSVERSION.size());
+      kind.consume_front("(");
+      kind.consume_back(")");
+      diagnose(attr->getLocation(),
+               diag::attr_semantics_unknown_osversion_kind, kind);
+    }
+    return;
+  }
+
+  // Infer the kind of query function and add it to the attribute so that
+  // later stages need not look up the standard library's declarations to find
+  // it. Leave the attribute without a kind if there is no kind to infer.
+  auto *func = dyn_cast<FuncDecl>(D);
+  if (!func)
+    return;
+
+  auto kind = inferOSVersionQueryKind(func);
+  if (!kind)
+    return;
+
+  attr->Value = Ctx.AllocateCopy(getOSVersionQuerySemanticsAttr(*kind));
 }
 
 void AttributeChecker::visitExportAttr(ExportAttr *attr) {
@@ -7089,6 +7230,7 @@ static DescriptiveDeclKind getAccessorDescriptiveDeclKind(AccessorKind kind) {
   case AccessorKind::Mutate:
     return DescriptiveDeclKind::MutateAccessor;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// An abstract function declaration lookup error.
@@ -7555,7 +7697,7 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
     if (linearParamIndices->contains(i)) {
       auto resultType =
           transposeResultTypes[transposeResultTypesIndex++].getType();
-      originalParams.push_back(AnyFunctionType::Param(resultType));
+      originalParams.push_back(AnyFunctionType::Param::bodyAccess(resultType));
     }
     // Otherwise, the next original parameter is the next transpose parameter.
     else {
@@ -7575,7 +7717,8 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
         transposeFnType->isThrowing(), transposeFnType->getThrownError(),
         /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
+        AnyFunctionType::Param::bodyAccess(selfType), /* yields */ {},
+        originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
@@ -9706,7 +9849,10 @@ void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
 }
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
+  // Allowed in safe interop wrappers, which need it to keep references into a
+  // borrowed self valid.
+  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters) &&
+      !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_not_enabled);
   }
   
@@ -9728,6 +9874,16 @@ AttributeChecker::visitAddressableForDependenciesAttr(
 }
 
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
+  // The Clang importer adds '@unsafe(always)' itself, so only spelled-out uses
+  // require the feature.
+  if (attr->isAlways() && !attr->isImplicit() &&
+      !Ctx.LangOpts.hasFeature(Feature::AlwaysUnsafeAttribute) &&
+      !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::requires_experimental_feature,
+             "unsafe(always)", false,
+             Feature::AlwaysUnsafeAttribute.getName());
+  }
+
   if (auto safeAttr = D->getAttrs().getAttribute<SafeAttr>()) {
     D->diagnose(diag::safe_and_unsafe_attr, D)
         .highlight(attr->getRangeWithAt())
@@ -9749,10 +9905,12 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
 }
 
 void AttributeChecker::visitScopeParamsAttr(ScopeParamsAttr *attr) {
-  // TODO: What to do for ABI?
-  if (!ABIRoleInfo(D).providesAPI())
+  // `checkScopedSignature` diagnoses the scope parameters for functions where
+  // scopes are supported.
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(D);
+      fn && resolvesScopesInSignature(fn))
     return;
-  // TODO: Support explicit scope parameters.
+  // TODO: Support explicit scope parameters of types and accessors.
   diagnoseAndRemoveAttr(attr, diag::scope_params_unsupported);
 }
 

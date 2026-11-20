@@ -27,10 +27,12 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -38,6 +40,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -88,8 +91,6 @@ static Expr *isImplicitPromotionToOptional(Expr *E) {
 ///     invalid positions.
 ///   - Marker protocols cannot occur as the type of an as? or is expression.
 ///   - KeyPath expressions cannot refer to effectful properties / subscripts
-///   - SingleValueStmtExprs may only appear in certain places and has
-///     restrictions on the control flow allowed.
 ///   - Move expressions must have a declref expr subvalue.
 ///
 static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
@@ -154,6 +155,24 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto selfApply = dyn_cast<SelfApplyExpr>(E)) {
         checkSuperCallToPureVirtualCXXMethod(selfApply);
         checkSuperCallToSafeInteropWrapper(selfApply);
+      }
+
+      // A class with @_tailAllocated is deallocated with the tail element
+      // counts its counts property reports, so it must be allocated with
+      // Builtin.allocWithTailElems, not through an initializer. An allocating
+      // reference to an initializer, applied or not, is a DeclRefExpr;
+      // delegating `self.init` and `super.init` calls aren't allocations and
+      // use OtherConstructorDeclRefExpr instead.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *ctor = dyn_cast<ConstructorDecl>(DRE->getDecl())) {
+          auto *classDecl = ctor->getDeclContext()->getSelfClassDecl();
+          auto *attr =
+              classDecl ? classDecl->getTailAllocatedAttr().first : nullptr;
+          if (attr && !attr->isInvalid())
+            Ctx.Diags.diagnose(DRE->getLoc(),
+                               diag::tail_allocated_init_allocation,
+                               classDecl->getDeclaredInterfaceType());
+        }
       }
 
       // Check function calls, looking through implicit conversions on the
@@ -480,9 +499,11 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     }
 
     void checkConsumeExpr(ConsumeExpr *consumeExpr) {
-      auto diags = findSyntacticErrorForConsume(DC->getParentModule(),
-                                                consumeExpr->getLoc(),
-                                                consumeExpr->getSubExpr());
+      DeferredDiags diags;
+      if (!Ctx.SILOpts.EnableLifetimeResolution)
+        diags = findSyntacticErrorForConsume(DC->getParentModule(),
+                                             consumeExpr->getLoc(),
+                                             consumeExpr->getSubExpr());
       for (auto &diag : diags)
         diag.emit(Ctx);
 
@@ -1582,12 +1603,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 DeferredDiags swift::findSyntacticErrorForConsume(
     ModuleDecl *module, SourceLoc loc, Expr *subExpr,
     llvm::function_ref<Type(Expr *)> getType) {
+  assert(!module->getASTContext().SILOpts.EnableLifetimeResolution &&
+         "LifetimeResolution permits all consumes; delete this function once "
+         "it is enabled by default");
   DeferredDiags result;
-
-  // LifetimeResolution can handle all kinds of consumes, such as those on
-  // copyable types and results of functions, without restrictions.
-  if (module->getASTContext().SILOpts.EnableLifetimeResolution)
-    return result;
 
   assert(!isa<ConsumeExpr>(subExpr) && "operates on the sub-expr of a consume");
 
@@ -1662,6 +1681,315 @@ DeferredDiags swift::findSyntacticErrorForConsume(
   return result;
 }
 
+static bool isDiscardableType(Type type) {
+  // If type is `(_: repeat ...)`, it can be discardable.
+  if (auto *tuple = type->getAs<TupleType>()) {
+    if (constraints::isSingleUnlabeledPackExpansionTuple(tuple)) {
+      type = tuple->getElementType(0);
+    }
+  }
+
+  if (auto *expansion = type->getAs<PackExpansionType>())
+    return isDiscardableType(expansion->getPatternType());
+
+  if (type->hasError())
+    return true;
+
+  // Look through optionality and check if the type is either `Void` or
+  // 'structurally uninhabited'. Treat either as discardable.
+  auto nonOptionalType = type->lookThroughAllOptionalTypes();
+  return (nonOptionalType->isStructurallyUninhabited() ||
+          nonOptionalType->isVoid());
+}
+
+static void diagnoseIgnoredLiteral(ASTContext &Ctx, LiteralExpr *LE) {
+  Ctx.Diags
+      .diagnose(LE->getLoc(), diag::expression_unused_literal,
+                LE->getLiteralKindDescription())
+      .highlight(LE->getSourceRange());
+}
+
+void TypeChecker::checkIgnoredExpr(Expr *E) {
+  // Skip checking if there is no type, which presumably means there was a
+  // type error.
+  if (!E->getType()) {
+    return;
+  }
+
+  // Complain about l-values that are neither loaded nor stored.
+  auto &Context = E->getType()->getASTContext();
+  auto &DE = Context.Diags;
+  if (E->getType()->hasLValueType()) {
+    // This must stay in sync with diag::expression_unused_lvalue.
+    enum {
+      SK_Variable = 0,
+      SK_Property,
+      SK_Subscript
+    } storageKind = SK_Variable;
+    if (auto declRef = E->getReferencedDecl()) {
+      auto decl = declRef.getDecl();
+      if (isa<SubscriptDecl>(decl))
+        storageKind = SK_Subscript;
+      else if (decl->getDeclContext()->isTypeContext())
+        storageKind = SK_Property;
+    }
+    DE.diagnose(E->getLoc(), diag::expression_unused_lvalue, storageKind)
+        .highlight(E->getSourceRange());
+    return;
+  }
+
+  // Stash the type of the original expression for display: the precise
+  // expression we're looking for might have an intermediary, non-user-facing
+  // type, such as an opened archetype.
+  const Type TypeForDiag = E->getType();
+
+  // Drill through expressions we don't care about.
+  auto valueE = E;
+  while (1) {
+    valueE = valueE->getValueProvidingExpr();
+
+    if (auto *OEE = dyn_cast<OpenExistentialExpr>(valueE))
+      valueE = OEE->getSubExpr();
+    else if (auto *CRCE = dyn_cast<CovariantReturnConversionExpr>(valueE))
+      valueE = CRCE->getSubExpr();
+    else if (auto *EE = dyn_cast<ErasureExpr>(valueE))
+      valueE = EE->getSubExpr();
+    else if (auto *BOE = dyn_cast<BindOptionalExpr>(valueE))
+      valueE = BOE->getSubExpr();
+    else {
+      // If we have an OptionalEvaluationExpr at the top level, then someone is
+      // "optional chaining" and ignoring the result. Keep drilling if it
+      // doesn't make sense to ignore it.
+      if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE)) {
+        if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr())) {
+          valueE = IIO->getSubExpr();
+        } else if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr())) {
+          valueE = C;
+        } else if (auto *OE =
+                       dyn_cast<OpenExistentialExpr>(OEE->getSubExpr())) {
+          valueE = OE;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Check for macro expressions whose macros are marked as
+  // @discardableResult.
+  if (auto expansion = dyn_cast<MacroExpansionExpr>(valueE)) {
+    if (auto macro = expansion->getMacroRef().getDecl()) {
+      if (macro->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+        return;
+      }
+    }
+  }
+
+  // Complain about functions that aren't called.
+  // TODO: What about tuples which contain functions by-value that are
+  // dead?
+  if (valueE->getType()->is<AnyFunctionType>()) {
+    bool isDiscardable = false;
+
+    // The called function could be wrapped inside a `dot_syntax_call_expr`
+    // node, for example:
+    //
+    // class Bar {
+    //   @discardableResult
+    //   func foo() -> Int { return 0 }
+    //
+    //   func baz() {
+    //     self.foo
+    //     foo
+    //   }
+    // }
+    //
+    // So look through the DSCE and get the function being called.
+    auto expr = isa<DotSyntaxCallExpr>(valueE)
+                    ? cast<DotSyntaxCallExpr>(valueE)->getFn()
+                    : valueE;
+
+    if (auto *Fn = dyn_cast<ApplyExpr>(expr)) {
+      /// Some concurrency-related things may have intermediate conversions that
+      /// we want to look through, e.g.
+      ///
+      /// ```swift
+      /// @discardableResult
+      /// @MainActor
+      /// func foo() -> () -> Void {
+      ///   return {}
+      /// }
+      ///
+      /// @MainActor
+      /// func test() {
+      ///   foo()
+      ///   // ^ return value implicitly wapped in a `@Sendable` conversion
+      /// }
+      /// ```
+      /// Attempt to look through function conversions when resolving the
+      /// called value.
+      if (auto *calledValue =
+              Fn->getCalledValue(/*skipFunctionConversions=*/true)) {
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(calledValue)) {
+          if (FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
+            isDiscardable = true;
+          }
+        }
+      }
+    }
+
+    if (!isDiscardable) {
+      DE.diagnose(E->getLoc(), diag::expression_unused_function)
+          .highlight(E->getSourceRange());
+      return;
+    }
+  }
+
+  // If the result of this expression is either "structurally uninhabited" or
+  // `Void`, (potentially wrapped in optionals) then it is safe to ignore.
+  if (isDiscardableType(valueE->getType()))
+    return;
+
+  // Complain about '#selector'.
+  if (auto *ObjCSE = dyn_cast<ObjCSelectorExpr>(valueE)) {
+    DE.diagnose(ObjCSE->getLoc(), diag::expression_unused_selector_result)
+        .highlight(E->getSourceRange());
+    return;
+  }
+
+  // Complain about '#keyPath'.
+  if (isa<KeyPathExpr>(valueE)) {
+    DE.diagnose(valueE->getLoc(), diag::expression_unused_keypath_result)
+        .highlight(E->getSourceRange());
+    return;
+  }
+
+  // Always complain about 'try?'.
+  if (auto *OTE = dyn_cast<OptionalTryExpr>(valueE)) {
+    DE.diagnose(OTE->getTryLoc(), diag::expression_unused_optional_try)
+        .highlight(E->getSourceRange());
+    return;
+  }
+
+  if (auto *LE = dyn_cast<LiteralExpr>(valueE)) {
+    diagnoseIgnoredLiteral(Context, LE);
+    return;
+  }
+
+  // Check if we have a call to a function not marked with
+  // '@discardableResult'.
+  if (auto call = dyn_cast<ApplyExpr>(valueE)) {
+    // Dig through all levels of calls.
+    Expr *fn = call->getFn();
+    while (true) {
+      fn = fn->getSemanticsProvidingExpr();
+      if (auto applyFn = dyn_cast<ApplyExpr>(fn)) {
+        fn = applyFn->getFn();
+      } else if (auto FVE = dyn_cast<ForceValueExpr>(fn)) {
+        fn = FVE->getSubExpr();
+      } else if (auto dotSyntaxRef = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
+        fn = dotSyntaxRef->getRHS();
+      } else if (auto fnConvExpr = dyn_cast<FunctionConversionExpr>(fn)) {
+        fn = fnConvExpr->getSubExpr();
+      } else {
+        break;
+      }
+    }
+
+    // Find the callee.
+    AbstractFunctionDecl *callee = nullptr;
+    if (auto declRef = dyn_cast<DeclRefExpr>(fn))
+      callee = dyn_cast<AbstractFunctionDecl>(declRef->getDecl());
+    else if (auto ctorRef = dyn_cast<OtherConstructorDeclRefExpr>(fn))
+      callee = ctorRef->getDecl();
+    else if (auto memberRef = dyn_cast<MemberRefExpr>(fn))
+      callee = dyn_cast<AbstractFunctionDecl>(memberRef->getMember().getDecl());
+    else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(fn))
+      callee =
+          dyn_cast<AbstractFunctionDecl>(dynMemberRef->getMember().getDecl());
+
+    // If the callee is an unstructured Task factory, warn if the operation
+    // closure can throw a non-Never error warn about discarding the error.
+    if (callee && !call->isImplicit() && callee->isUnstructuredTaskFactory()) {
+      for (auto arg : *call->getArgs()) {
+        auto argTy = arg.getExpr()->getType();
+        if (!argTy)
+          continue;
+        auto *fnTy = argTy->getAs<AnyFunctionType>();
+        if (!fnTy || !fnTy->isThrowing())
+          continue;
+
+        // throws(Never) is fine to discard, don't warn. Bare `throws` has
+        // a null thrown-error type and always warns.
+        auto thrownError = fnTy->getThrownError();
+        if (thrownError && thrownError->isUninhabited())
+          continue;
+
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task, callee);
+        DE.diagnose(fn->getLoc(),
+                    diag::expression_unused_throwing_unstructured_task_silence);
+        return;
+      }
+    }
+
+    // If the callee explicitly allows its result to be ignored, then don't
+    // complain.
+    if (callee && callee->getAttrs().getAttribute<DiscardableResultAttr>())
+      return;
+
+    // Otherwise, complain.  Start with more specific diagnostics.
+
+    // Diagnose unused constructor calls.
+    if (isa_and_nonnull<ConstructorDecl>(callee) && !call->isImplicit()) {
+      DE.diagnose(fn->getLoc(), diag::expression_unused_init_result,
+                  callee->getDeclContext()->getDeclaredInterfaceType())
+          .highlight(call->getSourceRange());
+      return;
+    }
+
+    SourceRange SR1 = call->getSourceRange(), SR2;
+    if (auto *BO = dyn_cast<BinaryExpr>(call)) {
+      SR1 = BO->getLHS()->getSourceRange();
+      SR2 = BO->getRHS()->getSourceRange();
+    }
+
+    // Otherwise, produce a generic diagnostic.
+    if (callee) {
+      auto &ctx = callee->getASTContext();
+      if (callee->isImplicit()) {
+        // Translate calls to implicit functions to their user-facing names
+        if (callee->getBaseName() == ctx.Id_derived_enum_equals ||
+            callee->getBaseName() == ctx.Id_derived_struct_equals) {
+          DE.diagnose(fn->getLoc(),
+                      diag::expression_unused_result_operator_name,
+                      ctx.Id_EqualsOperator)
+              .highlight(SR1)
+              .highlight(SR2);
+          return;
+        }
+      }
+
+      auto diagID = diag::expression_unused_result_call;
+      if (callee->getName().isOperator())
+        diagID = diag::expression_unused_result_operator;
+
+      DE.diagnose(fn->getLoc(), diagID, callee).highlight(SR1).highlight(SR2);
+    } else
+      DE.diagnose(fn->getLoc(), diag::expression_unused_result_unknown,
+                  isa<ClosureExpr>(fn), TypeForDiag)
+          .highlight(SR1)
+          .highlight(SR2);
+
+    return;
+  }
+
+  // Produce a generic diagnostic.
+  DE.diagnose(valueE->getLoc(), diag::expression_unused_result, TypeForDiag)
+      .highlight(valueE->getSourceRange());
+}
 
 /// Diagnose recursive use of properties within their own accessors
 static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
@@ -5741,11 +6069,25 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
 /// Diagnoses whether the given clang::Decl can be referenced by a
 /// `if #_hasSymbol(...)` condition. Returns true if a diagnostic was emitted.
 static bool diagnoseHasSymbolConditionClangDecl(SourceLoc loc,
+                                                const ValueDecl *decl,
                                                 const clang::Decl *clangDecl,
                                                 ASTContext &ctx) {
   if (isa<clang::ObjCInterfaceDecl>(clangDecl) ||
       isa<clang::FunctionDecl>(clangDecl))
     return false;
+
+  if (auto *var = dyn_cast<clang::VarDecl>(clangDecl)) {
+    // Only variables that refer to an externally defined, non-thread-local
+    // symbol can be checked. Constants that were imported as computed
+    // properties have no storage to refer to, and variables that are defined
+    // in a header are emitted into the client.
+    auto *swiftVar = dyn_cast<VarDecl>(decl);
+    if (swiftVar && swiftVar->hasStorage() &&
+        var->getStorageDuration() == clang::SD_Static &&
+        var->isExternallyVisible() &&
+        var->hasDefinition() == clang::VarDecl::DeclarationOnly)
+      return false;
+  }
 
   if (auto *method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     // FIXME: Allow objc_direct methods when supported by IRGen.
@@ -5793,8 +6135,8 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
   }
 
   if (auto *clangDecl = decl->getClangDecl()) {
-    if (diagnoseHasSymbolConditionClangDecl(symbolExpr->getLoc(), clangDecl,
-                                            ctx))
+    if (diagnoseHasSymbolConditionClangDecl(symbolExpr->getLoc(), decl,
+                                            clangDecl, ctx))
       return true;
   }
 
@@ -6912,6 +7254,135 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   }
 }
 
+/// Returns the outermost function, property, or top-level code enclosing \p DC,
+/// or null if \p DC is a type, an extension, or a file.
+static const Decl *getOutermostEnclosingDecl(const DeclContext *DC) {
+  const Decl *result = nullptr;
+  for (; !DC->isModuleScopeContext() && !DC->isTypeContext();
+       DC = DC->getParent()) {
+    if (auto *D = DC->getAsDecl())
+      result = D;
+    else if (auto *init = dyn_cast<PatternBindingInitializer>(DC))
+      result = init->getBinding();
+  }
+  return result;
+}
+
+/// Diagnoses a use of \p type at \p loc if it exposes a foreign type that
+/// Swift code must not use, at most once per unusable type in \p enclosing.
+/// Returns true if \p type exposes such a type.
+static bool diagnoseUnusableForeignType(Type type, SourceLoc loc,
+                                        const Decl *enclosing, SourceFile *SF) {
+  if (!type || type->hasError() || loc.isInvalid())
+    return false;
+  auto &ctx = type->getASTContext();
+  type = type->getWithoutSpecifierType();
+  auto unusable = ctx.getClangModuleLoader()->exposesUnusableForeignType(type);
+  if (!unusable)
+    return false;
+  auto *decl = unusable.getDecl();
+  if (SF && enclosing &&
+      !SF->getExtras()
+           .DiagnosedUnusableForeignTypes.insert({enclosing, decl})
+           .second)
+    return true;
+  ctx.Diags.diagnose(loc, diag::unusable_foreign_type_use, type, decl,
+                     static_cast<unsigned>(unusable.getReason()));
+  return true;
+}
+
+static void diagnoseUnusableForeignTypesInExpr(const Expr *E,
+                                                const DeclContext *DC) {
+  if (!DC->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    const Decl *Enclosing;
+    SourceFile *SF;
+
+  public:
+    DiagnoseWalker(const Decl *enclosing, SourceFile *SF)
+        : Enclosing(enclosing), SF(SF) {}
+
+    // Post-order, so that the error is on the innermost offending expression.
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (diagnoseUnusableForeignType(E->getType(), E->getLoc(), Enclosing, SF))
+        return Action::Stop();
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(getOutermostEnclosingDecl(DC),
+                        DC->getParentSourceFile());
+  const_cast<Expr *>(E)->walk(walker);
+}
+
+void swift::diagnoseUnusableForeignTypesInDecl(const Decl *D) {
+  if (D->isImplicit() || D->isInvalid() ||
+      !D->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+
+  // A local declaration shares its errors with the declaration enclosing it.
+  const Decl *enclosing = getOutermostEnclosingDecl(D->getDeclContext());
+  if (!enclosing)
+    enclosing = D;
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+
+  auto check = [&](Type type, SourceLoc loc) {
+    diagnoseUnusableForeignType(type, loc.isValid() ? loc : D->getLoc(),
+                                enclosing, SF);
+  };
+  auto checkParams = [&](const ParameterList *params) {
+    if (params)
+      for (auto *param : *params)
+        check(param->getInterfaceType(), param->getStartLoc());
+  };
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (auto i : range(PBD->getNumPatternEntries())) {
+      // The initializer expression is diagnosed instead.
+      if (PBD->isExplicitlyInitialized(i))
+        continue;
+      PBD->getPattern(i)->forEachVariable(
+          [&](VarDecl *var) { check(var->getInterfaceType(), var->getLoc()); });
+    }
+    return;
+  }
+
+  // Accessors are covered by their storage declaration.
+  if (isa<AccessorDecl>(D))
+    return;
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // 'self' is covered by the extension or type declaration.
+    checkParams(AFD->getParameters());
+    if (auto *FD = dyn_cast<FuncDecl>(AFD))
+      check(FD->getResultInterfaceType(), FD->getLoc());
+    return;
+  }
+
+  if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+    checkParams(SD->getIndices());
+    check(SD->getElementInterfaceType(), SD->getLoc());
+    return;
+  }
+
+  if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    checkParams(EED->getParameterList());
+    return;
+  }
+
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    check(ED->getExtendedType(), ED->getLoc());
+    return;
+  }
+
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+    check(TAD->getUnderlyingType(), TAD->getLoc());
+    return;
+  }
+}
+
 /// Diagnose each implicit force unwrap, which occurs when referencing an
 /// implicitly unwrapped optional or the result of a dynamic lookup in a
 /// context that requires a non-optional value.
@@ -7141,6 +7612,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
+  diagnoseUnusableForeignTypesInExpr(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
   diagnoseNondeinitableCaptureListEntries(E, DC);
   diagnoseImplicitForceUnwrap(E, DC);

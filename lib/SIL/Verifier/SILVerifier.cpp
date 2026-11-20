@@ -1219,15 +1219,11 @@ private:
   VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> LocalDominance = nullptr;
 
-  /// TODO: LifetimeCompletion: Remove.
-  std::shared_ptr<DeadEndBlocks> DEBlocks;
-
   /// Blocks without function exiting paths.
   ///
   /// Used to verify extend_lifetime instructions.
   ///
-  /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
-  std::shared_ptr<DeadEndBlocks> deadEndBlocks;
+  std::unique_ptr<DeadEndBlocks> deadEndBlocks;
 
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
@@ -1262,10 +1258,6 @@ private:
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
 public:
-  bool isSILOwnershipEnabled() const {
-    return F.getModule().getOptions().VerifySILOwnership;
-  }
-
   void _require(bool condition, const Twine &complaint,
                 llvm::function_ref<void(SILPrintContext &)> extraContext
                   = nullptr) {
@@ -1415,11 +1407,9 @@ public:
   }
 
   DeadEndBlocks &getDeadEndBlocks() {
-    if (DEBlocks) {
-      deadEndBlocks = DEBlocks;
-    } else {
+    if (!deadEndBlocks) {
       deadEndBlocks =
-          std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+          std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     return *deadEndBlocks;
   }
@@ -1614,20 +1604,14 @@ public:
   }
 
   void checkValueBaseOwnership(ValueBase *V) {
-    // If ownership is not enabled, bail.
-    if (!isSILOwnershipEnabled())
-      return;
-
     SILFunction *F = V->getFunction();
     assert(F && "Expected value base with parent function");
-    // If we do not have qualified ownership, then do not verify value base
-    // ownership.
+    // Note that linear lifetimes of values with ownership are checked in
+    // Verification.swift.
     if (!F->hasOwnership()) {
       require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
-      return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
   void checkType(SILType silTy) {
@@ -2203,6 +2187,36 @@ public:
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
+    checkTailAllocatedAttr(ARI->getType(), ARI->getTailAllocatedTypes());
+  }
+
+  /// Both the allocation and the deallocation of a class with
+  /// @_tailAllocated must use the attribute's element types, so that they
+  /// pass the same size and type ID.
+  void checkTailAllocatedAttr(SILType classType, ArrayRef<SILType> Types) {
+    auto *classDecl = classType.getClassDecl();
+    if (Types.empty() || !classDecl)
+      return;
+    auto [attr, owner] = classDecl->getTailAllocatedAttr();
+    if (!attr)
+      return;
+    auto attrTypes = attr->getResolvedTypes(owner);
+    if (llvm::any_of(attrTypes, [](Type type) { return type->hasError(); }))
+      return;
+    require(Types.size() == attrTypes.size(),
+            "tail elements must be the @_tailAllocated element types");
+    auto ownerType = classType.getASTType()->getSuperclassForDecl(owner);
+    auto subs = ownerType->getContextSubstitutionMap();
+    // Lowered with the owner's generic abstraction, like a stored property
+    // (SILGen lowers them so for both the allocation and the deallocation).
+    auto sig = owner->getGenericSignature().getCanonicalSignature();
+    for (unsigned Idx = 0, End = Types.size(); Idx != End; ++Idx) {
+      auto expected = F.getLoweredType(
+          Lowering::AbstractionPattern(sig, attrTypes[Idx]->getCanonicalType()),
+          attrTypes[Idx].subst(subs));
+      require(Types[Idx].getASTType() == expected.getASTType(),
+              "tail elements must be the @_tailAllocated element types");
+    }
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
@@ -2234,7 +2248,7 @@ public:
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (!subs.hasAnySubstitutableParams()) {
+    if (!subs.isEffectivelyGeneric()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
@@ -2629,12 +2643,30 @@ public:
       // Only a nondeinitable closure can capture a nondeinitable function
       // value. The move checker diagnoses consumption of a value that is
       // captured by address instead.
+      //
+      // A closure that only borrows its capture doesn't take ownership of
+      // it either. That is an on-stack closure with a guaranteed capture, or,
+      // in raw SIL, a nonescaping closure with a guaranteed capture, which
+      // ClosureLifetimeFixup usually turns into an on-stack closure. When it
+      // can't, the move checker rejects the closure as an escaping capture of
+      // a borrowed value, and this check applies again in canonical SIL.
       if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
-        require(p.value()->getType().isAddress() ||
-                    !argFnTy->isNondeinitable() ||
-                    PAI->getFunctionType()->isNondeinitable(),
-                "only a nondeinitable closure can capture a nondeinitable "
-                "function value");
+        auto isNonEscapingInRawSIL = [&] {
+          if (F.getFunctionStage() != SILStage::Raw)
+            return false;
+          return llvm::all_of(PAI->getUses(), [](Operand *use) {
+            return isa<ConvertEscapeToNoEscapeInst, DestroyValueInst,
+                       DebugValueInst>(use->getUser());
+          });
+        };
+        bool isBorrowedCapture = substConv.getSILArgumentConvention(argIdx)
+                                     .isGuaranteedConventionInCaller() &&
+                                 (PAI->isOnStack() || isNonEscapingInRawSIL());
+        require(
+            p.value()->getType().isAddress() || !argFnTy->isNondeinitable() ||
+                PAI->getFunctionType()->isNondeinitable() || isBorrowedCapture,
+            "only a nondeinitable closure can capture a nondeinitable "
+            "function value");
       }
       if (PAI->isOnStack()) {
         // A noncopyable closure is allowed to have consuming captures
@@ -3140,11 +3172,15 @@ public:
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(LBI->getType().isLoadableOrOpaque(*LBI->getFunction()),
             "Load must have a loadable type");
-    require(LBI->getOperand()->getType().isAddress(),
+    require(LBI->getAddress()->getType().isAddress(),
             "Load operand must be an address");
-    requireSameType(LBI->getOperand()->getType().getObjectType(),
+    requireSameType(LBI->getAddress()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    if (LBI->hasValueHint()) {
+      requireSameType(LBI->getValueHint()->getType(), LBI->getType(),
+                      "Load value-hint type and result type mismatch");
+    }
     require(F.getFunctionStage() == SILStage::Raw || !LBI->isUnchecked(),
             "load_borrow's unchecked bit is on");
   }
@@ -4304,6 +4340,16 @@ public:
 
     require(!checkResilience(cd, F),
             "cannot directly deallocate resilient class");
+
+    for (auto &Count : DI->getTailAllocatedCounts())
+      require(Count.get()->getType().is<BuiltinIntegerType>(),
+              "count needs integer type");
+    if (cd->getTailAllocatedAttr().first)
+      require(DI->getNumTailTypes() != 0,
+              "dealloc_ref of a class with @_tailAllocated must name its tail "
+              "elements");
+    checkTailAllocatedAttr(DI->getOperand()->getType(),
+                           DI->getTailAllocatedTypes());
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -5828,6 +5874,9 @@ public:
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),
             "convert_function cannot drop execution semantics");
+    require(!resTI->isNoncopyable() || opTI->isNoncopyable(),
+            "convert_function cannot form a noncopyable value; a thunk must "
+            "form it");
     require(!resTI->isNondeinitable() || opTI->isNondeinitable(),
             "convert_function cannot form a nondeinitable value; a thunk "
             "must form it");
@@ -5857,6 +5906,8 @@ public:
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI",
         *ICI->getFunction());
+    require(opTI->getExecutionSemantics() == resTI->getExecutionSemantics(),
+            "convert_escape_to_noescape cannot change execution semantics");
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
@@ -5901,10 +5952,24 @@ public:
     // function argument or Builtin.Borrow.
     if (F.getFunctionStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
-      auto base = AccessBase::compute(RI->getOperand());
-      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
-                                            : base.getBaseAddress()
-                       : SILValue();
+      SILValue root;
+      SILValue address = RI->getOperand();
+      while (true) {
+        auto base = AccessBase::compute(address);
+        root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                         : base.getBaseAddress()
+                    : SILValue();
+        // The address result of an accessor with an address self is derived
+        // from self.
+        auto *apply = dyn_cast_or_null<ApplyInst>(root);
+        auto *selfOp = apply
+            ? apply->getSelfAddressOfAddressBorrowMutateAccessorResult()
+            : nullptr;
+        if (!selfOp) {
+          break;
+        }
+        address = selfOp->get();
+      }
       require(!root || !root->getType().isAddress() ||
                   isa<SILFunctionArgument>(root) ||
                   (isa<ApplyInst>(root) &&
@@ -6122,7 +6187,7 @@ public:
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");
       }
-      if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+      if (!F.hasOwnership()) {
         // In non-OSSA, the destBB can optionally ignore the payload.
         require(dest->getArguments().empty()
                     || dest->getArguments().size() == 1,
@@ -6149,7 +6214,7 @@ public:
       return;
     }
     auto *defaultBB = switchEnum->getDefaultBB();
-    if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+    if (!F.hasOwnership()) {
       require(switchEnum->getDefaultBB()->args_empty(),
               "switch_enum default destination must take no arguments");
       return;
@@ -6683,18 +6748,44 @@ public:
   }
   
   void checkAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AACI) {
-    // The operand must be a GetAsyncContinuation* instruction.
+    // The operand may either be a GetAsyncContinuation* or a
+    // `getSplitContinuationAddr` builtin, which binds a continuation created
+    // elsewhere to this function. The latter form always delivers the value into a
+    // resume buffer, so it behaves as the address form, and its throwing-ness
+    // is carried by the presence of an error successor rather than by the
+    // instruction.
+    auto *splitGet = dyn_cast<BuiltinInst>(AACI->getOperand());
+    if (splitGet &&
+        splitGet->getBuiltinInfo().ID !=
+            BuiltinValueKind::GetSplitContinuationAddr)
+      splitGet = nullptr;
     auto cont = dyn_cast<GetAsyncContinuationInstBase>(AACI->getOperand());
-    require(cont, "can only await the result of a get_async_continuation instruction");
-    bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
+    require(cont || splitGet,
+            "can only await the result of a get_async_continuation instruction "
+            "or of a getSplitContinuationAddr builtin");
+    bool isAddressForm = splitGet || isa<GetAsyncContinuationAddrInst>(cont);
 
-    auto &C = cont->getType().getASTContext();
-    
+    auto &C = AACI->getFunction()->getASTContext();
+
+    if (splitGet) {
+      require(splitGet->getArguments().size() == 2,
+              "getSplitContinuationAddr takes two operands");
+      require(splitGet->getArguments()[0]->getType()
+                  .is<BuiltinRawUnsafeContinuationType>(),
+              "getSplitContinuationAddr's first operand must be a "
+              "Builtin.RawUnsafeContinuation");
+      require(splitGet->getArguments()[1]->getType().isAddress(),
+              "getSplitContinuationAddr's resume buffer must be an address");
+    }
+
     // The shape of the successors depends on the continuation instruction being
     // awaited.
-    require((bool)AACI->getErrorBB() == cont->throws(),
-            "must have an error successor if and only if the continuation is throwing");
-    if (cont->throws()) {
+    if (cont) {
+      require((bool)AACI->getErrorBB() == cont->throws(),
+              "must have an error successor if and only if the continuation is throwing");
+    }
+    bool throws = splitGet ? (bool)AACI->getErrorBB() : cont->throws();
+    if (throws) {
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
@@ -6710,7 +6801,7 @@ public:
     }
     if (isAddressForm) {
       require(AACI->getResumeBB()->getNumArguments() == 0,
-              "resume successor must take no arguments for get_async_continuation_addr");
+              "resume successor must take no arguments for the address form");
     } else {
       require(AACI->getResumeBB()->getNumArguments() == 1,
               "resume successor must take one argument for get_async_continuation");
@@ -7186,6 +7277,7 @@ public:
                          case ParameterConvention::Pack_Inout:
                            return true;
                          }
+                         llvm_unreachable("covered switch");
                        }),
             "entry point address argument must have an indirect calling "
             "convention");
@@ -7303,8 +7395,8 @@ public:
   }
 
   void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
-    require(F.getFunctionStage() == SILStage::Raw,
-            "unchecked_ownership is valid only in raw SIL");
+    require(F.hasOwnership(),
+            "unchecked_ownership is valid only in OSSA");
   }
 
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
@@ -7740,6 +7832,15 @@ public:
         }
       }
 
+      if (F->hasUnresolvedLifetimes()) {
+        require(F->isDefinition(),
+                "only a function definition can have unresolved lifetimes");
+        require(F->hasOwnership(),
+                "a function with unresolved lifetimes must be in OSSA");
+        require(F->getFunctionStage() == SILStage::Raw,
+                "a function with unresolved lifetimes must be in raw SIL");
+      }
+
       if (F->isExternalDeclaration()) {
         if (F->hasForeignBody())
           return;
@@ -7758,9 +7859,7 @@ public:
 
       // Make sure that our SILFunction only has context generic params if our
       // SILFunctionType is non-polymorphic.
-      if (F->getGenericEnvironment() &&
-          !F->getGenericEnvironment()->getGenericSignature()
-              ->areAllParamsConcrete()) {
+      if (F->getGenericSignature().isEffectivelyGeneric()) {
         require(FTy->isPolymorphic(),
                 "non-generic function definitions cannot have a "
                 "generic environment");
@@ -7784,7 +7883,7 @@ public:
     visitSILBasicBlocks(F);
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
-        !mod.getASTContext().hadError()) {
+        !F->hasUnresolvedLifetimes() && !mod.getASTContext().hadError()) {
       F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
 
@@ -7792,10 +7891,7 @@ public:
       verifyReducibleLoops(F);
   }
 
-  void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA) {
-      DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
-    }
+  void verify() {
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
 
@@ -7855,7 +7951,7 @@ static bool verificationEnabled(const SILModule &M) {
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
 void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
-                         bool SingleFunction, bool isCompleteOSSA,
+                         bool SingleFunction,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
@@ -7869,7 +7965,7 @@ void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
   // back trace when the verifier crashes.
   SILVerifier verifier(*this, calleeCache, dominanceInfo, SingleFunction,
                        checkLinearLifetime);
-  verifier.verify(isCompleteOSSA);
+  verifier.verify();
 }
 
 void SILFunction::verifyCriticalEdges() const {
@@ -8237,14 +8333,14 @@ void SILGlobalVariable::verify() const {
   }
 }
 
-void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
+void SILModule::verify(bool checkLinearLifetime) const {
   CalleeCache calleeCache(*const_cast<SILModule *>(this));
-  verify(&calleeCache, isCompleteOSSA, checkLinearLifetime);
+  verify(&calleeCache, checkLinearLifetime);
 }
 
 /// Verify the module.
 void SILModule::verify(CalleeCache *calleeCache,
-                       bool isCompleteOSSA, bool checkLinearLifetime) const {
+                       bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
 
@@ -8258,7 +8354,7 @@ void SILModule::verify(CalleeCache *calleeCache,
       assert(false && "triggering standard assertion failure routine");
     }
     f.verify(calleeCache, /*dominanceInfo=*/nullptr, /*singleFunction*/ false,
-             isCompleteOSSA, checkLinearLifetime);
+             checkLinearLifetime);
   }
 
   // Check all globals.

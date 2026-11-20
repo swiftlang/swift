@@ -1,0 +1,43 @@
+// RUN: %target-swift-frontend -emit-ir -g -Onone %s | %FileCheck %s
+
+// The debug record of a variable gets the variable's scope and location.
+// The debug instruction's scope and location are ignored.
+
+sil_stage canonical
+
+import Builtin
+
+sil @callee : $@convention(thin) () -> ()
+
+// Two inlined copies of @callee: scope 5 is inlined at a.swift:2:3, scope 6
+// at a.swift:3:3. The variables live in scope 5, their instructions in scope 6.
+sil_scope 1 { loc "a.swift":1:6 parent @var_scope : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 2 { loc "b.swift":1:6 parent @callee : $@convention(thin) () -> () }
+sil_scope 3 { loc "a.swift":2:3 parent 1 }
+sil_scope 4 { loc "a.swift":3:3 parent 1 }
+sil_scope 5 { loc "b.swift":2:3 parent 2 inlined_at 3 }
+sil_scope 6 { loc "b.swift":2:3 parent 2 inlined_at 4 }
+
+// CHECK-LABEL: define {{.*}} @var_scope(
+// CHECK-SAME:    !dbg ![[FUNC_SCOPE:[0-9]+]]
+// CHECK:         #dbg_declare(ptr {{.*}}, ![[X:[0-9]+]], !DIExpression(), ![[X_LOC:[0-9]+]])
+// CHECK:         #dbg_declare(ptr {{.*}}, ![[Y:[0-9]+]], !DIExpression(), ![[Y_LOC:[0-9]+]])
+// CHECK:         ret void
+sil @var_scope : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, (name "x", loc "b.swift":2:7, scope 5), loc "b.swift":4:7, scope 6
+  %1 = alloc_stack $Builtin.Int64, var, (name "y", loc "b.swift":3:7, scope 5), loc "b.swift":5:7, scope 6
+  store %0 to %1 : $*Builtin.Int64, loc "b.swift":5:7, scope 6
+  dealloc_stack %1 : $*Builtin.Int64, loc "b.swift":6:3, scope 6
+  %2 = tuple (), loc "a.swift":4:3, scope 1
+  return %2 : $(), loc "a.swift":4:3, scope 1
+}
+
+// The variables are in scope 5.
+// CHECK-DAG: ![[X]] = !DILocalVariable(name: "x", scope: ![[SCOPE:[0-9]+]], {{.*}}line: 2,
+// CHECK-DAG: ![[Y]] = !DILocalVariable(name: "y", scope: ![[SCOPE]], {{.*}}line: 3,
+
+// The records are at the variables' locations in scope 5, inlined at a.swift:2:3.
+// CHECK-DAG: ![[X_LOC]] = !DILocation(line: 2, column: 7, scope: ![[SCOPE]], inlinedAt: ![[CALL:[0-9]+]])
+// CHECK-DAG: ![[Y_LOC]] = !DILocation(line: 3, column: 7, scope: ![[SCOPE]], inlinedAt: ![[CALL]])
+// CHECK-DAG: ![[CALL]] = distinct !DILocation(line: 2, column: 3, scope: ![[FUNC_SCOPE]])

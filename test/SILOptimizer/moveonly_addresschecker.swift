@@ -47,6 +47,35 @@ struct TestTrivialReturnValue : ~Copyable {
 // MARK: Misc Tests //
 //////////////////////
 
+// rdar://161636828
+@inline(never)
+public func opaque() -> Bool {
+  true
+}
+
+public struct PostconditionGuard: ~Copyable {
+  // CHECK-LABEL: sil hidden @$s23moveonly_addresschecker18PostconditionGuardV9terminateyyF : $@convention(method) (@inout PostconditionGuard) -> () {
+  // CHECK:       bb0(%0 : $*PostconditionGuard):
+  // CHECK:         cond_br {{.*}}, bb1, bb2
+  // CHECK:       bb1:
+  // CHECK-NOT:     destroy_addr %0
+  // CHECK:         unreachable
+  // CHECK:       bb2:
+  // CHECK-NEXT:    [[RESULT:%[0-9]+]] = tuple ()
+  // CHECK-NEXT:    return [[RESULT]]
+  // CHECK-LABEL: } // end sil function '$s23moveonly_addresschecker18PostconditionGuardV9terminateyyF'
+  mutating func terminate() {
+    if opaque() {
+      foo()
+      fatalError()
+    }
+  }
+
+  @inline(never)
+  mutating func foo() {}
+}
+
+// assert like use different bits
 func testAssertLikeUseDifferentBits() {
     struct S : ~Copyable {
         var s: [Int] = []

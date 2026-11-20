@@ -668,6 +668,34 @@ bb3:
   return %11
 }
 
+struct AccessorSelf {
+  var c: C
+}
+
+sil @make_accessor_self : $@convention(thin) () -> @owned AccessorSelf
+sil @mutate_accessor_of_object_self : $@convention(method) (@guaranteed AccessorSelf) -> @inout Builtin.Int64
+
+// The address result of a mutate accessor is an interior pointer of its object self. Don't hoist the destroy of
+// self above a write through the result.
+//
+// CHECK-LABEL: sil [ossa] @write_through_mutate_accessor_result :
+// CHECK:         [[S:%.*]] = apply {{%[0-9]+}}() : $@convention(thin) () -> @owned AccessorSelf
+// CHECK:         [[A:%.*]] = apply {{%[0-9]+}}([[S]])
+// CHECK-NEXT:    store %0 to [trivial] [[A]]
+// CHECK-NEXT:    destroy_value [[S]]
+// CHECK:       } // end sil function 'write_through_mutate_accessor_result'
+sil [ossa] @write_through_mutate_accessor_result : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = function_ref @make_accessor_self : $@convention(thin) () -> @owned AccessorSelf
+  %2 = apply %1() : $@convention(thin) () -> @owned AccessorSelf
+  %3 = function_ref @mutate_accessor_of_object_self : $@convention(method) (@guaranteed AccessorSelf) -> @inout Builtin.Int64
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed AccessorSelf) -> @inout Builtin.Int64
+  store %0 to [trivial] %4
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil public_external [ossa] @dont_optimize_deserialized_functions :
 // CHECK:         fix_lifetime
 // CHECK-NEXT:    debug_step

@@ -16,22 +16,8 @@ bb0(%0 : @owned $@callable(once) @callee_owned () -> ()):
   return %1 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @callable(once) @callee_owned () -> () {
-// CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
-// CHECK:   [[PA:%.*]] = partial_apply [[F]]() : $@convention(thin) () -> ()
-// CHECK:   [[R:%.*]] = convert_function [[PA]] : $@callee_owned () -> () to $@callable(once) @callee_owned () -> ()
-// CHECK:   return [[R]] : $@callable(once) @callee_owned () -> ()
-// CHECK: } // end sil function 'produce_called_at_most_once'
-sil [ossa] @produce_called_at_most_once : $@convention(thin) () -> @owned @callable(once) @callee_owned () -> () {
-bb0:
-  %f = function_ref @thin_callee : $@convention(thin) () -> ()
-  %pa = partial_apply %f() : $@convention(thin) () -> ()
-  %r = convert_function %pa : $@callee_owned () -> () to $@callable(once) @callee_owned () -> ()
-  return %r : $@callable(once) @callee_owned () -> ()
-}
-
-// `partial_apply` can directly produce an at-most-once result via the
-// `[called_at_most_once]` attribute, without a separate `convert_function`.
+// `partial_apply` produces an at-most-once result via the
+// `[called_at_most_once]` attribute. A `convert_function` can't form one.
 // CHECK-LABEL: sil [ossa] @produce_called_at_most_once_directly : $@convention(thin) () -> @owned @callable(once) @callee_owned () -> () {
 // CHECK:   [[F:%.*]] = function_ref @thin_callee : $@convention(thin) () -> ()
 // CHECK:   [[PA:%.*]] = partial_apply [called_at_most_once] [[F]]() : $@convention(thin) () -> ()

@@ -70,6 +70,7 @@ inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
   case AccessorKind::Mutate:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
@@ -91,6 +92,7 @@ inline bool requiresFeatureBorrowAndMutateAccessors(AccessorKind kind) {
   case AccessorKind::Init:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 inline bool isYieldingAccessor(AccessorKind kind) {
@@ -112,6 +114,7 @@ inline bool isYieldingAccessor(AccessorKind kind) {
   case AccessorKind::Mutate:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 inline bool isYieldingImmutableAccessor(AccessorKind kind) {
@@ -133,6 +136,7 @@ inline bool isYieldingImmutableAccessor(AccessorKind kind) {
   case AccessorKind::Mutate:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 inline bool isYieldingMutableAccessor(AccessorKind kind) {
@@ -154,6 +158,7 @@ inline bool isYieldingMutableAccessor(AccessorKind kind) {
   case AccessorKind::Mutate:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 const unsigned NumAccessorKinds = unsigned(AccessorKind::Last) + 1;
@@ -177,6 +182,7 @@ static inline llvm::StringRef accessorKindName(AccessorKind ak) {
 #undef ACCESSOR_KEYWORD
 #undef SINGLETON_ACCESSOR
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Whether an access to storage is for reading, writing, or both.

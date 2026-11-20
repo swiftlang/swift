@@ -4,8 +4,6 @@ Namespaces:
   Tags:
   - Name: span
     Methods:
-    - Name: data
-      SwiftName: __dataUnsafe()
     - Name: size
       SwiftSafety: safe
     - Name: size_bytes

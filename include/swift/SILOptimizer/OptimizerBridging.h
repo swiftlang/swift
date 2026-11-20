@@ -137,6 +137,7 @@ struct BridgedPostDomTree {
 
 struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef bool (* _Nonnull ChangeFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
   typedef BridgedInstruction (* _Nonnull UpdateInstructionFn)(BridgedContext, BridgedInstruction);
@@ -147,6 +148,7 @@ struct BridgedOptimizerUtilities {
   static void registerDebugReconstructionSimplification(
       UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
       UpdateInstructionFn simplifyDebugReconstructionBlockFn);
+  static void registerBorrowAccessorFixup(ChangeFunctionFn fixupBorrowAccessorsFn);
 };
 
 struct BridgedLoopTree {
@@ -244,7 +246,27 @@ struct BridgedPassContext {
     SwiftInt otherArgIdx;
   };
 
+  struct DifferentiableFunctionArgMangling {
+    SwiftInt argIdx;
+    BridgedInstruction inst;
+    BridgedInstruction originalRoot;
+    BridgedInstruction jvpRoot;
+    BridgedInstruction vjpRoot;
+  };
+
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
+
+  struct SignatureSpecializedArgMangling {
+    SwiftInt argIdx;
+
+    enum class Kind {
+      ownedToGuaranteed, guaranteedToOwned, dead, explode
+    } kind;
+  };
+
+  BridgedOwnedString mangleWithSignatureSpecializedArgs(BridgedArrayRef bridgedArgSpecializations,
+                                                        bool resultOwnedToGuaranteed,
+                                                        BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
@@ -252,9 +274,12 @@ struct BridgedPassContext {
                                                       BridgedFunction bridgedOriginalFunction) const;
   BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
                                                 BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithDifferentiableFunctionArgs(
+      BridgedArrayRef bridgedDifferentiableFunctionArgs,
+      BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
-  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
+  bool inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
@@ -320,6 +345,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+  bool enableMandatoryVerification(BridgedFunction function) const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
   BRIDGED_INLINE bool noAllocations() const;
 

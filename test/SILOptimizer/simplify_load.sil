@@ -363,6 +363,40 @@ bb0:
   return %15 : $Int64
 }
 
+struct StorageWrapper {
+  var storage: __ContiguousArrayStorageBase
+}
+
+// CHECK-LABEL: sil [ossa] @load_count_from_empty_array_via_value_hint :
+// CHECK:         [[Z:%.*]] = integer_literal $Builtin.Int64, 0
+// CHECK:         [[I:%.*]] = struct $Int64 ([[Z]] : $Builtin.Int64)
+// CHECK:         return [[I]]
+// CHECK:       } // end sil function 'load_count_from_empty_array_via_value_hint'
+sil [ossa] @load_count_from_empty_array_via_value_hint : $@convention(thin) () -> Int64 {
+bb0:
+  %0 = alloc_stack $StorageWrapper
+  %1 = global_addr @_swiftEmptyArrayStorage : $*_SwiftEmptyArrayStorage
+  %2 = address_to_pointer [stack_protection] %1 : $*_SwiftEmptyArrayStorage to $Builtin.RawPointer
+  %3 = raw_pointer_to_ref %2 : $Builtin.RawPointer to $__EmptyArrayStorage
+  %4 = unchecked_ref_cast %3 : $__EmptyArrayStorage to $__ContiguousArrayStorageBase
+  %5 = struct $StorageWrapper (%4 : $__ContiguousArrayStorageBase)
+  %6 = unchecked_ownership %5 : $StorageWrapper, forwarding: @none
+  %7 = struct_extract %6 : $StorageWrapper, #StorageWrapper.storage
+  store %5 to [init] %0 : $*StorageWrapper
+  %9 = struct_element_addr %0 : $*StorageWrapper, #StorageWrapper.storage
+  %10 = load_borrow %9 : $*__ContiguousArrayStorageBase, value_hint %7 : $__ContiguousArrayStorageBase
+  %11 = ref_element_addr [immutable] %10 : $__ContiguousArrayStorageBase, #__ContiguousArrayStorageBase.countAndCapacity
+  %12 = struct_element_addr %11 : $*_ArrayBody, #_ArrayBody._storage
+  %13 = struct_element_addr %12 : $*_SwiftArrayBodyStorage, #_SwiftArrayBodyStorage.count
+  %14 = struct_element_addr %13 : $*Int64, #Int64._value
+  %15 = load [trivial] %14 : $*Builtin.Int64
+  end_borrow %10 : $__ContiguousArrayStorageBase
+  destroy_addr %0 : $*StorageWrapper
+  dealloc_stack %0 : $*StorageWrapper
+  %19 = struct $Int64 (%15 : $Builtin.Int64)
+  return %19 : $Int64
+}
+
 // CHECK-LABEL: sil @load_capacity_from_empty_array :
 // CHECK:         %0 = integer_literal $Builtin.Int64, 0
 // CHECK-NEXT:    %1 = integer_literal $Builtin.Int64, 1

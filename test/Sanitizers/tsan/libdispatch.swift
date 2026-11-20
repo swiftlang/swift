@@ -1,4 +1,6 @@
-// RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
+// RUN: %empty-directory(%t)
+// RUN: %target-clang -x c %S/Inputs/tsan_invisible_barrier.c -c -o %t/tsan_invisible_barrier.o
+// RUN: %target-swiftc_driver %s %t/tsan_invisible_barrier.o -import-objc-header %S/Inputs/tsan_invisible_barrier.h -g -sanitize=thread %import-libdispatch -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
 // RUN: env %env-TSAN_OPTIONS=abort_on_error=0 not %target-run %t_tsan-binary 2>&1 | %FileCheck %s
 // REQUIRES: executable_test
@@ -18,26 +20,20 @@ import Dispatch
 
 let q = DispatchQueue(label: "q", attributes: .concurrent)
 
-let sync1 = DispatchSemaphore(value: 0)
-let sync2 = DispatchSemaphore(value: 0)
 let finish = DispatchSemaphore(value: 0)
-
-func wait1_signal2() { sync1.wait();   sync2.signal() }
-func signal1_wait2() { sync1.signal(); sync2.wait()   }
 
 func race() {
   var racy = 1
+  swift_tsan_invisible_barrier_init(2)
 
   q.async {
-    wait1_signal2()
     racy = 2
-    wait1_signal2()
+    swift_tsan_invisible_barrier_wait()
     finish.signal()
   }
   q.async {
-    signal1_wait2()
+    swift_tsan_invisible_barrier_wait()
     racy = 3
-    signal1_wait2()
     finish.signal()
   }
 
@@ -45,10 +41,7 @@ func race() {
   finish.wait()
 }
 
-// TSan %deflake as part of the test.
-for _ in 1...10 {
-  race()
-}
+race()
 
 print("Done!")
 

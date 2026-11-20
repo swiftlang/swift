@@ -79,6 +79,7 @@
 
 #define DEBUG_TYPE "access-enforcement-opts"
 
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -976,6 +977,32 @@ canMergeBegin(PostDominanceInfo *postDomTree,
   auto parentSCC = parentSCCIt->getSecond();
   auto childSCC = childSCCIt->getSecond();
   if (parentSCC.id == childSCC.id) {
+    if (!parentSCC.hasLoop)
+      return true;
+    // The merged scope ends after the child. Every cycle through the parent
+    // must therefore pass through the child. Otherwise, the parent's
+    // begin_access is re-executed while the merged scope is still active.
+    SILBasicBlock *parentBB = parentIns->getParent();
+    SILBasicBlock *childBB = childIns->getParent();
+    if (parentBB == childBB)
+      return true;
+    // Walk forward from the parent within the SCC, stopping at the child.
+    BasicBlockWorklist worklist(parentBB->getParent());
+    worklist.push(childBB);
+    for (auto *succ : parentBB->getSuccessorBlocks())
+      worklist.pushIfNotVisited(succ);
+    while (SILBasicBlock *bb = worklist.pop()) {
+      if (bb == parentBB)
+        return false;
+      if (bb == childBB)
+        continue;
+      auto sccIt = blockToSCCMap.find(bb);
+      if (sccIt == blockToSCCMap.end() ||
+          sccIt->getSecond().id != parentSCC.id)
+        continue;
+      for (auto *succ : bb->getSuccessorBlocks())
+        worklist.pushIfNotVisited(succ);
+    }
     return true;
   }
   if (parentSCC.hasLoop) {

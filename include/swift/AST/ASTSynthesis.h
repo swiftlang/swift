@@ -116,6 +116,7 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _unconstrainedAny:
     return SC.Context.getUnconstrainedAnyExistentialType();
   }
+  llvm_unreachable("covered switch");
 }
 
 enum RepresentationSynthesizer {
@@ -577,6 +578,7 @@ inline ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
   case _thick: return ASTExtInfo().withRepresentation(
                                            FunctionTypeRepresentation::Swift);
   }
+  llvm_unreachable("covered switch");
 }
 template <class S>
 ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,

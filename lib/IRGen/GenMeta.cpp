@@ -2316,10 +2316,12 @@ namespace {
       buildMethodDescriptorFields(IGM, VTable, fn, descriptor, getType());
       descriptor.finishAndAddTo(B);
 
-      // Emit method dispatch thunk if the class is resilient.
+      // Emit method dispatch thunk if the class is resilient. The generated
+      // C++ header calls the thunks of the methods it may dispatch to.
       auto *func = cast<AbstractFunctionDecl>(fn.getDecl());
 
-      if ((Resilient && func->getEffectiveAccess() >= AccessLevel::Package) ||
+      if ((Resilient && (func->getEffectiveAccess() >= AccessLevel::Package ||
+                         IGM.IRGen.mayDispatchFromCxxHeader(fn))) ||
           IGM.getOptions().VirtualFunctionElimination) {
         IGM.emitDispatchThunk(fn);
       }
@@ -2346,7 +2348,9 @@ namespace {
       
       // Emit method dispatch thunk.
      if (hasPublicVisibility(fn.getLinkage(NotForDefinition)) ||
-         IGM.getOptions().VirtualFunctionElimination) {
+         IGM.getOptions().VirtualFunctionElimination ||
+         (IGM.hasResilientMetadata(getType(), ResilienceExpansion::Minimal) &&
+          IGM.IRGen.mayDispatchFromCxxHeader(fn))) {
        IGM.emitDispatchThunk(fn);
      }
 
@@ -7579,9 +7583,10 @@ irgen::getDefiningModuleTypeMetadataAccessFunction(IRGenModule &IGM,
 /// imported C type uses, so it cannot collide with a real foreign type.
 static llvm::Constant *getBackDeploymentCopyAnchor(IRGenModule &IGM,
                                               NominalTypeDecl *decl) {
+  // Name the helpers after the defining module's descriptor, which is the
+  // same in every image.
   auto descriptorName =
-      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
-          IGM.Context);
+      IRGenMangler(IGM.Context).mangleNominalTypeDescriptor(decl);
   auto anchorName = "__swift_back_deployment_anchor_" + descriptorName;
   if (auto existing = IGM.Module.getNamedGlobal(anchorName))
     return llvm::ConstantExpr::getInBoundsGetElementPtr(
@@ -7651,9 +7656,10 @@ llvm::Value *irgen::emitCanonicalBackDeploymentCopyDescriptor(IRGenFunction &IGF
                                                          NominalTypeDecl *decl) {
   assert(decl->isBackDeployedIntoClient());
   auto &IGM = IGF.IGM;
+  // Name the helpers after the defining module's descriptor, which is the
+  // same in every image.
   auto descriptorName =
-      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
-          IGM.Context);
+      IRGenMangler(IGM.Context).mangleNominalTypeDescriptor(decl);
   auto helper = IGM.getOrCreateHelperFunction(
       "__swift_back_deployment_canonical_descriptor_" + descriptorName,
       IGM.TypeContextDescriptorPtrTy, {},

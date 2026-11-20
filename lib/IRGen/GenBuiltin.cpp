@@ -287,8 +287,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, loweredTy);
     } else {
       SmallVector<SILType, 1> fieldTypes{loweredTy};
-      descriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes,
-                                                    /*isArray=*/false);
+      descriptor = computeTypedMallocTypeDescriptor(
+          IGF.IGM, HeapHeaderKind::None, fieldTypes);
     }
     if (descriptor) {
       out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor));
@@ -434,6 +434,38 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto continuation = args.claimNext();
     auto error = args.claimNext();
     IGF.emitResumeAsyncContinuationThrowing(continuation, error);
+    return;
+  }
+
+  case BuiltinValueKind::CreateSplitContinuation: {
+    // Ignore the metatype argument; the result type comes from the
+    // substitution.
+    (void)args.claimAll();
+    auto resultTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto metadata = IGF.emitTypeMetadataRef(resultTy);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getContinuationCreateSplitFunctionPointer(), {metadata});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    // The call returns the RawUnsafeContinuation for the new continuation.
+    auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
+    out.add(IGF.Builder.CreateBitOrPointerCast(call,
+                                               rawContTI.getStorageType()));
+    return;
+  }
+
+  case BuiltinValueKind::GetSplitContinuationAddr: {
+    // Binding the continuation to this frame is done by the
+    // await_async_continuation that consumes this value, which reads this
+    // builtin's operands directly. Here it is simply forwarded.
+    auto continuation = args.claimNext();
+    (void)args.claimAll();
+    out.add(continuation);
+    return;
+  }
+
+  case BuiltinValueKind::DestroySplitContinuation: {
+    auto continuation = args.claimNext();
+    IGF.emitDestroySplitContinuation(continuation);
     return;
   }
 
@@ -699,7 +731,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     llvm::Value *alloc;
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, HeapHeaderKind::None, fieldTypes,
+            TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       alloc = IGF.emitAllocRawTypedCall(size, alignMask, descriptorConst,
@@ -722,7 +755,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, HeapHeaderKind::None, fieldTypes,
+            TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       IGF.emitDeallocRawTypedCall(pointer, size, alignMask, descriptorConst);
@@ -739,14 +773,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Fixed header layout: heap object header (metadata + refcount) followed
     // by the error box's type pointer and error conformance pointer.
     auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
-    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
-                                       rawPointerType, rawPointerType};
+    SmallVector<SILType, 2> fieldTypes{rawPointerType, rawPointerType};
     auto *typedMetadata =
         IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-    auto *alloc = IGF.emitAllocObjectCall(
-        typedMetadata, size, alignMask,
-        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes),
-        "builtin-allocErrorBoxTyped");
+    auto *alloc =
+        IGF.emitAllocObjectCall(typedMetadata, size, alignMask,
+                                computeTypedMallocTypeDescriptor(
+                                    IGF.IGM, HeapHeaderKind::Swift, fieldTypes),
+                                "builtin-allocErrorBoxTyped");
     out.add(IGF.Builder.CreateBitCast(alloc, IGF.IGM.Int8PtrTy));
     return;
   }
@@ -756,13 +790,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto size = args.claimNext();
     auto alignMask = args.claimNext();
     auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
-    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
-                                       rawPointerType, rawPointerType};
+    SmallVector<SILType, 2> fieldTypes{rawPointerType, rawPointerType};
     auto *object =
         IGF.Builder.CreateBitCast(pointer, IGF.IGM.RefCountedPtrTy);
-    emitDeallocateHeapObject(
-        IGF, object, size, alignMask,
-        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes));
+    emitDeallocateHeapObject(IGF, object, size, alignMask,
+                             computeTypedMallocTypeDescriptor(
+                                 IGF.IGM, HeapHeaderKind::Swift, fieldTypes));
     return;
   }
 

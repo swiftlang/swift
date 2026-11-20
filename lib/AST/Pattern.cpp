@@ -793,16 +793,14 @@ SourceLoc swift::extractNearestSourceLoc(const Pattern *pattern) {
   return pattern->getLoc();
 }
 
-ValueOwnership
-Pattern::getOwnership(
-  SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns) const
-{
+LoweredOwnership Pattern::getOwnership(
+    SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns) const {
   class GetPatternOwnership: public PatternVisitor<GetPatternOwnership, void> {
   public:
-    ValueOwnership Ownership = ValueOwnership::Shared;
+    LoweredOwnership Ownership = LoweredOwnership::Shared;
     SmallVectorImpl<Pattern *> *RestrictingPatterns = nullptr;
 
-    void increaseOwnership(ValueOwnership newOwnership, Pattern *p) {
+    void increaseOwnership(LoweredOwnership newOwnership, Pattern *p) {
       // If the new ownership is stricter than the current ownership, then
       // clear the restricting patterns we'd collected and start over with the
       // new stricter ownership.
@@ -812,10 +810,9 @@ Pattern::getOwnership(
           RestrictingPatterns->clear();
         }
       }
-      
-      if (RestrictingPatterns
-          && newOwnership == Ownership
-          && Ownership > ValueOwnership::Shared) {
+
+      if (RestrictingPatterns && newOwnership == Ownership &&
+          Ownership > LoweredOwnership::Shared) {
         RestrictingPatterns->push_back(p);
       }
     }
@@ -837,35 +834,8 @@ Pattern::getOwnership(
     }
     
     void visitNamedPattern(NamedPattern *p) {
-      switch (p->getDecl()->getIntroducer()) {
-      case VarDecl::Introducer::Let:
-        // `let` defaults to the prevailing ownership of the switch.
-        break;
-      
-      case VarDecl::Introducer::Var:
-        // If the subpattern type is copyable, then we can bind the variable
-        // by copying without requiring more than a borrow of the original.
-        if (!p->hasType() || p->getType()->isCopyable()) {
-          break;
-        }
-        // TODO: An explicit `consuming` binding kind consumes regardless of
-        // type.
-      
-        // Noncopyable `var` consumes the bound value to move it into
-        // a new independent variable.
-        increaseOwnership(ValueOwnership::Owned, p);
-        break;
-        
-      case VarDecl::Introducer::InOut:
-        // `inout` bindings modify the value in-place.
-        increaseOwnership(ValueOwnership::InOut, p);
-        break;
-        
-      case VarDecl::Introducer::Borrowing:
-        // `borrow` bindings borrow parts of the value in-place.
-        increaseOwnership(ValueOwnership::Shared, p);        
-        break;
-      }
+      if (auto ownership = p->getDecl()->getBindingOwnership())
+        increaseOwnership(*ownership, p);
     }
     
     void visitAnyPattern(AnyPattern *p) {

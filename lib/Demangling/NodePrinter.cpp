@@ -528,6 +528,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::TypeMetadataInstantiationFunction:
   case Node::Kind::TypeMetadataSingletonInitializationCache:
   case Node::Kind::TypeMetadataDemanglingCache:
+  case Node::Kind::TypeMetadataMangledNameRef:
   case Node::Kind::TypeMetadataLazyCache:
   case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
@@ -1285,6 +1286,21 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       print(Node->getChild(Idx++), depth + 1);
       Printer << "]";
       break;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      if (Idx + 7 > End)
+        return;
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << ", Components : [";
+      for (int I = 0; I != 3; ++I) {
+        if (I != 0)
+          Printer << ", ";
+        print(Node->getChild(Idx++), depth + 1);
+        Printer << " : ";
+        print(Node->getChild(Idx++), depth + 1);
+      }
+      Printer << "]]";
+      break;
     default:
       assert(
        ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
@@ -2029,6 +2045,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::EscapingClosureProp:
       Printer << "Escaping Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      Printer << "Differentiable Function Propagated";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";
       return nullptr;
@@ -2572,6 +2591,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::TypeMetadataDemanglingCache:
     Printer << "demangling cache variable for type metadata for ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::TypeMetadataMangledNameRef:
+    Printer << "mangled name ref for type metadata for ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::TypeMetadataLazyCache:

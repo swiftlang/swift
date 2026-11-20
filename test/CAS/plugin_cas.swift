@@ -9,7 +9,7 @@
 // RUN:   -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
 // RUN:   -swift-version 4 -enable-cross-import-overlays -cache-compile-job \
 // RUN:   -cas-path %t/cas -scanner-output-dir %t -auto-bridging-header-chaining \
-// RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   -cas-plugin-path %plugin(CASPluginTest) \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
 // RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
 // Check the contents of the JSON output
@@ -28,7 +28,7 @@
 // RUN:   -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h \
 // RUN:   -swift-version 4 -enable-cross-import-overlays -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job \
 // RUN:   -cas-path %t/cas -scanner-output-dir %t -auto-bridging-header-chaining \
-// RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
+// RUN:   -cas-plugin-path %plugin(CASPluginTest) \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
 // RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
 

@@ -26,19 +26,65 @@ extension Instruction {
   }
 
   func mayWrite(toAddress: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
-    if toAddress.isImmutableAddress {
+    mayWrite(toAddress: AddressWithAccessPath(toAddress), aliasAnalysis)
+  }
+
+  func mayWrite(toAddress: AddressWithAccessPath, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    if toAddress.isImmutable {
       // Take a shortcut for indirect-in arguments.
+      return false
+    }
+    if neverWritesToAliasedMemory {
+      // Avoid a potentially expensive alias query if the result would be thrown away anyway.
       return false
     }
     return aliasAnalysis.getMemoryEffect(of: self, on: toAddress).write
   }
 
+  /// True if `AliasAnalysis.getMemoryEffect` never returns a write effect for this instruction,
+  /// regardless of the queried address.
+  private var neverWritesToAliasedMemory: Bool {
+    switch self {
+    case is MarkDependenceInst, is LoadBorrowInst, is DebugValueInst:
+      return true
+    case let load as LoadInst:
+      return load.loadOwnership != .take
+    default:
+      return false
+    }
+  }
+
   func mayReadOrWrite(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
+    mayReadOrWrite(address: AddressWithAccessPath(address), aliasAnalysis)
+  }
+
+  func mayReadOrWrite(address: AddressWithAccessPath, _ aliasAnalysis: AliasAnalysis) -> Bool {
     let effect = aliasAnalysis.getMemoryEffect(of: self, on: address)
-    if address.isImmutableAddress {
+    if address.isImmutable {
       return effect.read
     }
     return effect.read || effect.write
+  }
+}
+
+struct AddressWithAccessPath {
+  let value: Value
+  let accessPath: AccessPath
+
+  init(_ address: Value) {
+    precondition(address.type.isAddress, "expected address value")
+    self.value = address
+    self.accessPath = address.accessPath
+  }
+
+  /// True if the memory cannot be modified in the function, e.g. because it's an indirect-in-guaranteed argument.
+  var isImmutable: Bool {
+    switch accessPath.base {
+    case .argument(let arg):
+      return arg.convention == .indirectInGuaranteed
+    default:
+      return false
+    }
   }
 }
 
@@ -57,13 +103,12 @@ struct AliasAnalysis {
   /// Returns the effects of `inst`'s memory behavior on the memory pointed to by  the `address`.
   func getMemoryEffect(of inst: Instruction, on address: Value) -> SideEffects.Memory {
     precondition(address.type.isAddress, "getMemoryEffects requires address value")
-    var result = computeMemoryEffect(of: inst, on: MemoryLocation.memoryAddress(address))
-    if result.write && isImmutable(instruction: inst, inScopeOf: address) {
-      result.write = false
-    }
-    // In the past we cached the result per instruction-address pair. But it turned out that the hit-miss rate was
-    // pretty high (~ 1:7) and the cache lookup took as long as recomputing.
-    return result
+    return getMemoryEffect(of: inst, onLocation: .memoryAddress(address))
+  }
+
+  /// Like `getMemoryEffect(of:on:)` with an address value, but doesn't recompute the access path of the address.
+  func getMemoryEffect(of inst: Instruction, on address: AddressWithAccessPath) -> SideEffects.Memory {
+    return getMemoryEffect(of: inst, onLocation: .addressWithAccessPath(address))
   }
 
   /// Returns true if `v1` and `v2` do or may alias.
@@ -84,21 +129,28 @@ struct AliasAnalysis {
   ///
   func mayAlias(_ v1: Value, _ v2: Value) -> Bool {
     if v1.type.isAddress && v2.type.isAddress {
+      return mayAlias(AddressWithAccessPath(v1), v2)
+    }
+    return v1.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
+  }
+
+  /// Like `mayAlias(_:_:)` with an address value, but doesn't recompute the access path of the address.
+  func mayAlias(_ address: AddressWithAccessPath, _ v2: Value) -> Bool {
+    if v2.type.isAddress {
       // The projection-path based check and TBAA can only be done if both values are really addresses.
       // This is the common case.
-      let accessPath1 = v1.accessPath
       let accessPath2 = v2.accessPath
-      if accessPath1.isDistinct(from: accessPath2) {
+      if address.accessPath.isDistinct(from: accessPath2) {
         return false
       }
       // Type-based alias analysis is only of minor importance. It's only needed if unsafe pointers are in play.
       // There are some critical functions in the stdlib which use unsafe pointers. Therefore we cannot omit TBAA.
-      if isTypeDistinct(v1, v2, accessPath1.base, accessPath2.base) {
+      if isTypeDistinct(address.value, v2, address.accessPath.base, accessPath2.base) {
         return false
       }
     }
     // Finally use escape info to check if one address "escapes" to the other address.
-    return v1.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
+    return address.value.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
   }
 
   static func register() {
@@ -183,6 +235,16 @@ struct AliasAnalysis {
     }
   }
 
+  private func getMemoryEffect(of inst: Instruction, onLocation memLoc: MemoryLocation) -> SideEffects.Memory {
+    var result = computeMemoryEffect(of: inst, on: memLoc)
+    if result.write && isImmutable(instruction: inst, inScopeOf: memLoc.address) {
+      result.write = false
+    }
+    // In the past we cached the result per instruction-address pair. But it turned out that the hit-miss rate was
+    // pretty high (~ 1:7) and the cache lookup took as long as recomputing.
+    return result
+  }
+
   // The actual logic to compute the memory effect of an instruction.
   private func computeMemoryEffect(of inst: Instruction, on memLoc: MemoryLocation) -> SideEffects.Memory {
     switch inst {
@@ -252,7 +314,7 @@ struct AliasAnalysis {
       return memLoc.mayAlias(with: loadBorrow.address, self) ? .init(read: true) : .noEffects
 
     case let store as StoreInst:
-      if memLoc.isLetValue && store.destination.accessBase != memLoc.address.accessBase {
+      if memLoc.isLetValue && store.destination.accessBase != memLoc.accessBase {
         return .noEffects
       }
       if memLoc.mayAlias(with: store.destination, self) {
@@ -301,7 +363,7 @@ struct AliasAnalysis {
 
     case let endApply as EndApplyInst:
       let beginApply = endApply.beginApply
-      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+      if case .yield(let addr) = memLoc.accessBase, addr.parentInstruction == beginApply {
         // The lifetime of yielded values always end at the end_apply. This is required because a yielded
         // address is non-aliasing inside the begin/end_apply scope, but might be aliasing after the end_apply.
         // For example, if the callee yields an `ref_element_addr` (which is encapsulated in a begin/end_access).
@@ -312,7 +374,7 @@ struct AliasAnalysis {
 
     case let abortApply as AbortApplyInst:
       let beginApply = abortApply.beginApply
-      if case .yield(let addr) = memLoc.address.accessBase, addr.parentInstruction == beginApply {
+      if case .yield(let addr) = memLoc.accessBase, addr.parentInstruction == beginApply {
         // See the comment for `end_apply` above.
         return .worstEffects
       }
@@ -340,6 +402,17 @@ struct AliasAnalysis {
         // from where it loads the value. This includes "write" to prevent any optimization to change the
         // memory location after the load_borrow.
         if borrowEffects != .worstEffects && memLoc.mayAlias(with: loadBorrow.address, self) {
+          return .worstEffects
+        }
+        return borrowEffects
+      case let apply as ApplyInst:
+        // Model the end_borrow of a borrow accessor with @guaranteed result similar to an end_borrow of a load_borrow.
+        let borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
+        if borrowEffects != .worstEffects, let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult,
+           memLoc.mayAlias(with: selfAddress, self) {
+          return .worstEffects
+        }
+        if apply.selfArgument == nil {
           return .worstEffects
         }
         return borrowEffects
@@ -394,23 +467,23 @@ struct AliasAnalysis {
   /// For example, an `end_borrow` of a class reference must alias with all field addresses (= the interior
   /// pointers) of the class instance.
   private func getBorrowEffects(of endBorrow: EndBorrowInst, on memLoc: MemoryLocation) -> SideEffects.Memory {
-    let accessPath = memLoc.address.accessPath
+    let accessPath = memLoc.accessPath
     switch accessPath.base {
     case .stack, .global, .argument, .storeBorrow:
       // Those access bases cannot be interior pointers of a borrowed value
       return .noEffects
-    case .pointer, .index, .unidentified, .yield:
+    case .pointer, .borrowMutateAccessor, .index, .unidentified, .yield:
       // We don't know anything about this address -> get the conservative effects
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
 
-  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow` whose
-  /// address may alias with `memLoc`.
+  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow`, or a borrow accessor
+  /// result with an address self or without self.
   private func isEndOfReborrowedLoadBorrow(_ borrowedFrom: BorrowedFromInst,
                                            aliasingWith memLoc: MemoryLocation) -> Bool {
     var worklist = ValueWorklist(context)
@@ -421,6 +494,14 @@ struct AliasAnalysis {
       switch value {
       case let loadBorrow as LoadBorrowInst:
         if memLoc.mayAlias(with: loadBorrow.address, self) {
+          return true
+        }
+      case let apply as ApplyInst:
+        if let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult,
+           memLoc.mayAlias(with: selfAddress, self) {
+          return true
+        }
+        if apply.selfArgument == nil {
           return true
         }
       case let bf as BorrowedFromInst:
@@ -627,6 +708,9 @@ private enum MemoryLocation {
   // The usual case: an arbitrary address
   case memoryAddress(Value)
 
+  // Like `memoryAddress`, but with a precomputed access path.
+  case addressWithAccessPath(AddressWithAccessPath)
+
   // The address of an modify-access, within the access scope.
   // The difference to an arbitrary address is that we know that there are no other reads or writes to the
   // access-address within the access scope.
@@ -643,14 +727,27 @@ private enum MemoryLocation {
     case .memoryAddress(let value):
       precondition(value.type.isAddress, "expected address value")
       return value
+    case .addressWithAccessPath(let address):
+      return address.value
     case .modifyAccessScope(let beginAccess):
       return beginAccess
     }
   }
 
+  var accessPath: AccessPath {
+    switch self {
+    case .addressWithAccessPath(let address):
+      return address.accessPath
+    case .memoryAddress, .modifyAccessScope:
+      return address.accessPath
+    }
+  }
+
+  var accessBase: AccessBase { accessPath.base }
+
   var walkingDirection: EscapeUtilityTypes.WalkingDirection {
     switch self {
-    case .memoryAddress:
+    case .memoryAddress, .addressWithAccessPath:
       // We need to consider where the address comes from
       return .up
     case .modifyAccessScope:
@@ -662,15 +759,20 @@ private enum MemoryLocation {
 
   var isLetValue: Bool {
     switch self {
-    case .memoryAddress(let addr):
-      return addr.accessBase.isLet
+    case .memoryAddress, .addressWithAccessPath:
+      return accessBase.isLet
     case .modifyAccessScope:
       return false
     }
   }
 
   func mayAlias(with otherAddr: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {
-    return aliasAnalysis.mayAlias(address, otherAddr)
+    switch self {
+    case .addressWithAccessPath(let address):
+      return aliasAnalysis.mayAlias(address, otherAddr)
+    case .memoryAddress, .modifyAccessScope:
+      return aliasAnalysis.mayAlias(address, otherAddr)
+    }
   }
 }
 
@@ -731,6 +833,14 @@ private enum ImmutableScope {
           return
         }
         return nil
+      case .pointer(let p2a):
+        // A global `let` whose addressor is not available (otherwise the access base would be `.global`),
+        // e.g. because it's defined in another module. Such a global cannot be initialized in this function.
+        if p2a.isResultOfGlobalLetAddressorCall && !basedAddress.parentFunction.isGlobalInitOnceFunction {
+          self = .wholeFunction
+          return
+        }
+        return nil
       default:
         return nil
       }
@@ -747,7 +857,7 @@ private enum ImmutableScope {
         }
 
         switch singleBorrowIntroducer {
-        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow:
+        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow, .borrowAccessor:
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
@@ -772,6 +882,7 @@ private enum ImmutableScope {
         case .beginBorrow(let bbi): return bbi
         case .loadBorrow(let lbi):  return lbi
         case .reborrow(let phi):    return phi.borrowedFrom!
+        case .borrowAccessor(let apply): return apply
         default:                    fatalError("unsupported BeginBorrowValue")
       }
     }
@@ -795,7 +906,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BeginBorrowInstruction
+  let beginBorrow: Value
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
@@ -931,17 +1042,6 @@ private struct EscapesToInstructionVisitor : EscapeVisitor {
 
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
-}
-
-private extension Value {
-  var isImmutableAddress: Bool {
-    switch accessBase {
-    case .argument(let arg):
-      return arg.convention == .indirectInGuaranteed
-    default:
-      return false
-    }
-  }
 }
 
 //===--------------------------------------------------------------------===//

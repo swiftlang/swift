@@ -32,6 +32,7 @@
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
@@ -259,7 +260,7 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
-      ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
+      ArgsToFrontendInputsConverter(Diags, Args, FS).convert(buffers);
 
   // None here means error, not just "no inputs". Propagate unconditionally.
   if (!inputsAndOutputs)
@@ -819,12 +820,16 @@ bool ArgsToFrontendOptionsConverter::computeFallbackModuleName() {
   }
   std::optional<std::vector<std::string>> outputFilenames =
       OutputFilesComputer::getOutputFilenamesFromCommandLineOrFilelist(
-          Args, Diags, options::OPT_o, options::OPT_output_filelist);
+          Args, Diags, options::OPT_o, options::OPT_output_filelist, FS);
 
+  auto isDirectory = [&](StringRef path) {
+    auto status = FS.status(path);
+    return status && status->isDirectory();
+  };
   std::string nameToStem =
       outputFilenames && outputFilenames->size() == 1 &&
               outputFilenames->front() != "-" &&
-              !llvm::sys::fs::is_directory(outputFilenames->front())
+              !isDirectory(outputFilenames->front())
           ? outputFilenames->front()
           : Opts.InputsAndOutputs.getFilenameOfFirstInput();
 
@@ -837,10 +842,10 @@ bool ArgsToFrontendOptionsConverter::
   std::vector<std::string> mainOutputs;
   std::vector<std::string> mainOutputForIndexUnits;
   std::vector<SupplementaryOutputPaths> supplementaryOutputs;
-  const bool hadError = ArgsToFrontendOutputsConverter(
-                            Args, Opts.ModuleName, Opts.InputsAndOutputs, Diags)
-                            .convert(mainOutputs, mainOutputForIndexUnits,
-                                     supplementaryOutputs);
+  const bool hadError =
+      ArgsToFrontendOutputsConverter(Args, Opts.ModuleName,
+                                     Opts.InputsAndOutputs, Diags, FS)
+          .convert(mainOutputs, mainOutputForIndexUnits, supplementaryOutputs);
   if (hadError)
     return true;
   Opts.InputsAndOutputs.setMainAndSupplementaryOutputs(mainOutputs,

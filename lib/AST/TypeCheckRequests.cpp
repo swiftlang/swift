@@ -1616,6 +1616,36 @@ void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
 }
 
 //----------------------------------------------------------------------------//
+// BodyDiscriminatorsRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<evaluator::SideEffect>
+BodyDiscriminatorsRequest::getCachedResult() const {
+  auto *dc = std::get<0>(getStorage());
+  bool hasDiscriminators = true;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+    hasDiscriminators = AFD->bodyHasDiscriminators();
+  } else if (auto *TLD = dyn_cast<TopLevelCodeDecl>(dc)) {
+    hasDiscriminators = TLD->bodyHasDiscriminators();
+  }
+  if (!hasDiscriminators)
+    return std::nullopt;
+
+  return evaluator::SideEffect();
+}
+
+void BodyDiscriminatorsRequest::cacheResult(evaluator::SideEffect) const {
+  auto *dc = std::get<0>(getStorage());
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+    AFD->setBodyHasDiscriminators();
+  } else if (auto *TLD = dyn_cast<TopLevelCodeDecl>(dc)) {
+    TLD->setBodyHasDiscriminators();
+  } else {
+    ABORT("Expected TopLevelCodeDecl or AbstractFunctionDecl");
+  }
+}
+
+//----------------------------------------------------------------------------//
 // DifferentiableAttributeTypeCheckRequest computation.
 //----------------------------------------------------------------------------//
 
@@ -1761,6 +1791,24 @@ void ResolveRawLayoutTypeRequest::cacheResult(Type value) const {
   } else {
     attr->CachedResolvedCountType = value;
   }
+}
+
+//----------------------------------------------------------------------------//
+// ResolveTailAllocatedTypesRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<ArrayRef<Type>>
+ResolveTailAllocatedTypesRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  if (llvm::any_of(attr->Types, [](Type type) { return !type; }))
+    return std::nullopt;
+  return ArrayRef<Type>(attr->Types);
+}
+
+void ResolveTailAllocatedTypesRequest::cacheResult(ArrayRef<Type> value) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(value.size() == attr->Types.size());
+  llvm::copy(value, attr->Types.begin());
 }
 
 //----------------------------------------------------------------------------//

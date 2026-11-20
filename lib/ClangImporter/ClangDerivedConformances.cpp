@@ -18,9 +18,11 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -141,45 +143,6 @@ lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
     }
   }
   return {constMethod, mutMethod};
-}
-
-/// Alternative to `NominalTypeDecl::lookupDirect`.
-/// This function does not attempt to load extensions of the nominal decl.
-static TinyPtrVector<ValueDecl *>
-lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
-  ASTContext &ctx = decl->getASTContext();
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-  TinyPtrVector<ValueDecl *> result;
-
-  if (id.isOperator()) {
-    auto underlyingId = getOperatorName(ctx, id);
-    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
-    for (auto it : underlyingFuncs) {
-      if (auto synthesizedFunc =
-              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
-        result.push_back(synthesizedFunc);
-    }
-  } else {
-    // See if there is a Clang decl with the given name.
-    result = evaluateOrDefault(ctx.evaluator,
-                               ClangRecordMemberLookup({decl, id}), {});
-  }
-
-  // Check if there are any synthesized Swift members that match the name.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
-    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-      if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
-          namedMember->getName().getBaseIdentifier().is(id.str()) &&
-          // Make sure we don't add duplicate entries, as that would wrongly
-          // imply that lookup is ambiguous.
-          !llvm::is_contained(result, namedMember)) {
-        result.push_back(namedMember);
-      }
-    }
-  }
-  return result;
 }
 
 template <typename Decl>
@@ -613,11 +576,8 @@ categorizeIteratorFromTypeTag(const clang::TypeDecl *tyDecl) {
   return category;
 }
 
-std::optional<CxxIteratorCategory>
-CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
-                                 CxxRecordDeclDescriptor desc) const {
-  auto *decl = desc.decl;
-  auto &sema = desc.sema;
+static const clang::TypeDecl *
+findIteratorTypeTag(clang::Sema &sema, const clang::CXXRecordDecl *decl) {
   auto &ctx = decl->getASTContext();
 
   // Look for a non-primary specialization of std::iterator_traits<decl>.
@@ -650,42 +610,35 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
     // Only look for iterator_concept if we are using C++20 or above.
     auto *conceptDecl = lookupCxxTypeMember(sema, decl, "iterator_concept");
     if (conceptDecl)
-      return categorizeIteratorFromTypeTag(conceptDecl);
+      return conceptDecl;
 
     // iterator_concept should take precedence, but if it is absent, fallback
     // to iterator_category.
   }
 
-  if (auto *categoryDecl = lookupCxxTypeMember(sema, decl, "iterator_category")) {
-    auto info = categorizeIteratorFromTypeTag(categoryDecl);
-    if (info == CxxIteratorCategory::Contiguous)
-      info = CxxIteratorCategory::RandomAccess;
-    return info;
-  }
-
-  return {};
+  return lookupCxxTypeMember(sema, decl, "iterator_category");
 }
 
-static bool hasTypeMember(const clang::CXXRecordDecl *clangDecl,
-                          StringRef name) {
-  clang::IdentifierInfo *id = &clangDecl->getASTContext().Idents.get(name);
-  auto members = clangDecl->lookup(id);
-  if (members.empty())
-    return false;
-  // NOTE: If this is a templated typedef, Clang might have instantiated
-  // several equivalent typedef decls, so members.isSingleResult() may
-  // return false here. But if they aren't equivalent, Clang should have
-  // already complained about this. Let's assume that they are equivalent.
-  // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  return isa<clang::TypeDecl>(members.front());
+std::optional<CxxIteratorCategory>
+CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
+                                 CxxRecordDeclDescriptor desc) const {
+  auto *tag = findIteratorTypeTag(desc.sema, desc.decl);
+  if (!tag)
+    return {};
+
+  auto info = categorizeIteratorFromTypeTag(tag);
+  if (tag->getName() == "iterator_category" &&
+      info == CxxIteratorCategory::Contiguous)
+    info = CxxIteratorCategory::RandomAccess;
+  return info;
 }
 
 bool swift::hasIteratorCategoryOrIteratorConcept(
-    const clang::CXXRecordDecl *clangDecl) {
-  if (hasTypeMember(clangDecl, "iterator_category"))
-    return true;
-  return clangDecl->getASTContext().getLangOpts().CPlusPlus20 &&
-         hasTypeMember(clangDecl, "iterator_concept");
+    clang::Sema &sema, const clang::CXXRecordDecl *clangDecl) {
+  auto *def = clangDecl->getDefinition();
+  if (!def)
+    return false;
+  return findIteratorTypeTag(sema, def) != nullptr;
 }
 
 ValueDecl *
@@ -726,12 +679,6 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator) ||
       !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator))
     return; // Don't even bother if we don't have protocols for input iterators
-
-  // FIXME: hasIteratorCategoryOrIteratorConcept() is more conservative than
-  // it should be because it doesn't consider an inherited iterator_category or
-  // iterator_concept.
-  // For now, checking this maintains existing behavior and ensures consistency
-  // across ClangImporter, where clang::Sema isn't always readily available.
 
   auto iterInfo = evaluateOrDefault(
       ctx.evaluator, CxxIteratorInfoRequest({clangDecl, clangSema}), {});
@@ -1201,16 +1148,16 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       if (!rawMutableIteratorProto)
         return false;
 
-      // Check if present: `func __beginMutatingUnsafe() -> RawMutableIterator`
-      auto beginMutatingId = ctx.getIdentifier("__beginMutatingUnsafe");
+      // Check if present: `func beginMutating() -> RawMutableIterator`
+      auto beginMutatingId = ctx.getIdentifier("beginMutating");
       auto beginMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginMutatingId);
       if (!beginMutating)
         return false;
       auto rawMutableIteratorTy = beginMutating->getResultInterfaceType();
 
-      // Check if present: `func __endMutatingUnsafe() -> RawMutableIterator`
-      auto endMutatingId = ctx.getIdentifier("__endMutatingUnsafe");
+      // Check if present: `func endMutating() -> RawMutableIterator`
+      auto endMutatingId = ctx.getIdentifier("endMutating");
       auto endMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endMutatingId);
       if (!endMutating)
@@ -1266,6 +1213,69 @@ bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
         .Default(false);
   }
   return false;
+}
+
+bool swift::inferStdOptionalConstructorDependence(
+    ClangImporter::Implementation &Impl, const clang::FunctionDecl *decl,
+    AbstractFunctionDecl *result, size_t returnIdx) {
+  const auto *ctor = dyn_cast<clang::CXXConstructorDecl>(decl);
+  if (!ctor)
+    return false;
+  // Standard libraries build 'std::optional' on base classes that inherit
+  // their constructors with a using-declaration, sometimes through layers that
+  // are not specific to 'std::optional', e.g. the MSVC STL's
+  // '_Non_trivial_copy'. Name the class that declares the constructor.
+  const auto *declaringCtor = ctor;
+  while (declaringCtor->isInheritingConstructor())
+    declaringCtor = declaringCtor->getInheritedConstructor().getConstructor();
+  const auto *declaringRecord = declaringCtor->getParent();
+  if (!declaringRecord->isInStdNamespace() ||
+      !declaringRecord->getIdentifier())
+    return false;
+  StringRef name = declaringRecord->getName();
+  if (name != "optional" &&
+      !name.starts_with("__optional_") && // libc++
+      !name.starts_with("_Optional_"))    // libstdc++, MSVC STL
+    return false;
+
+  const auto *record = ctor->getParent();
+
+  auto isNonEscapableType = [&](clang::QualType type) {
+    return importer::isNonEscapable(Impl.SwiftContext.evaluator,
+                                    type.getNonReferenceType().getTypePtr(),
+                                    &Impl);
+  };
+  if (!isNonEscapableType(
+          Impl.getClangASTContext().getCanonicalTagType(record)))
+    return false;
+
+  auto isTag = [](clang::QualType type) {
+    const auto *tag = type.getNonReferenceType()->getAsCXXRecordDecl();
+    return tag && tag->isInStdNamespace() && tag->getIdentifier() &&
+           (tag->getName() == "nullopt_t" || tag->getName() == "in_place_t");
+  };
+  SmallBitVector inheritIndices(returnIdx);
+  for (auto [idx, param] : llvm::enumerate(ctor->parameters())) {
+    if (isTag(param->getType()))
+      continue;
+    // An argument that is not the value itself, e.g. one forwarded to a
+    // constructor of the value, needs a dependence we cannot know.
+    if (!isNonEscapableType(param->getType()))
+      return false;
+    inheritIndices[idx] = true;
+  }
+
+  auto flags = LifetimeFlags().withAnnotated();
+  auto dependence =
+      inheritIndices.any()
+          ? LifetimeDependenceInfo(
+                IndexSubset::get(Impl.SwiftContext, inheritIndices), nullptr,
+                returnIdx, flags)
+          : LifetimeDependenceInfo::getImmortal(returnIdx, flags);
+  Impl.SwiftContext.evaluator.cacheOutput(
+      LifetimeDependenceInfoRequest{result},
+      Impl.SwiftContext.AllocateCopy(ArrayRef(dependence)));
+  return true;
 }
 
 /// Look up the `insert(const value_type&)` overload on a C++ container.

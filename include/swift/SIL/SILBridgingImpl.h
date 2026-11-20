@@ -614,6 +614,7 @@ swift::ValueOwnershipKind BridgedValue::unbridge(Ownership ownership) {
     case BridgedValue::Ownership::Guaranteed: return swift::OwnershipKind::Guaranteed;
     case BridgedValue::Ownership::None:       return swift::OwnershipKind::None;
   }
+  llvm_unreachable("covered switch");
 }
 
 swift::ValueBase * _Nonnull BridgedValue::getSILValue() const {
@@ -1184,6 +1185,14 @@ bool BridgedFunction::hasOwnershipForTrivialValues() const {
 void BridgedFunction::setOwnershipForTrivialValues(bool hotv) const {
   getFunction()->setOwnershipForTrivialValues(hotv);
 }
+
+bool BridgedFunction::hasUnresolvedLifetimes() const {
+  return getFunction()->hasUnresolvedLifetimes();
+}
+
+void BridgedFunction::setHasUnresolvedLifetimes(bool unresolved) const {
+  getFunction()->setHasUnresolvedLifetimes(unresolved);
+}
   
 
 BridgedLinkage BridgedFunction::getLinkage() const {
@@ -1478,6 +1487,10 @@ SwiftInt BridgedInstruction::LoadInst_getLoadOwnership() const {
   return (SwiftInt)getAs<swift::LoadInst>()->getOwnershipQualifier();
 }
 
+void BridgedInstruction::LoadBorrow_setValueHint(BridgedValue v) const {
+  getAs<swift::LoadBorrowInst>()->setValueHint(v.getSILValue());
+}
+
 bool BridgedInstruction::LoadBorrowInst_isUnchecked() const {
   return (SwiftInt)getAs<swift::LoadBorrowInst>()->isUnchecked();
 }
@@ -1592,6 +1605,12 @@ bool BridgedInstruction::OpenExistentialAddr_isImmutable() const {
     case swift::OpenedExistentialAccess::Immutable: return true;
     case swift::OpenedExistentialAccess::Mutable: return false;
   }
+}
+
+void BridgedInstruction::OpenExistentialAddr_setImmutable(bool immutable) const {
+  getAs<swift::OpenExistentialAddrInst>()->setAccessKind(
+      immutable ? swift::OpenedExistentialAccess::Immutable
+                : swift::OpenedExistentialAccess::Mutable);
 }
 
 BridgedGenericEnvironment BridgedInstruction::OpenExistentialRefInst_getDefinedGenericEnvironment() const {
@@ -2856,6 +2875,7 @@ swift::SILBuilder BridgedBuilder::unbridged() const {
   case BridgedBuilder::InsertAt::intoGlobal:
     return swift::SILBuilder(BridgedGlobalVar(insertionObj).getGlobal());
   }
+  llvm_unreachable("covered switch");
 }
 
 swift::SILLocation BridgedBuilder::regularLoc() const {
@@ -2971,6 +2991,10 @@ BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) cons
 BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) const {
   return {
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createDeallocPartialRef(BridgedValue operand, BridgedValue metatype) const {
+  return {unbridged().createDeallocPartialRef(regularLoc(), operand.getSILValue(), metatype.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocPack(BridgedValue operand) const {
@@ -3266,8 +3290,19 @@ BridgedInstruction BridgedBuilder::createReturn(BridgedValue op) const {
   return {unbridged().createReturn(returnLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createReturnBorrow(BridgedValue op,
+                                                      BridgedValueArray enclosingValues) const {
+  llvm::SmallVector<swift::SILValue, 8> evs;
+  return {unbridged().createReturnBorrow(returnLoc(), op.getSILValue(),
+                                         enclosingValues.getValues(evs))};
+}
+
 BridgedInstruction BridgedBuilder::createThrow(BridgedValue op) const {
   return {unbridged().createThrow(regularLoc(), op.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createThrowAddr() const {
+  return {unbridged().createThrowAddr(regularLoc())};
 }
 
 BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal, SwiftInt caseIdx,
@@ -3399,6 +3434,12 @@ BridgedInstruction BridgedBuilder::createStructExtract(BridgedValue str, SwiftIn
 BridgedInstruction BridgedBuilder::createStructElementAddr(BridgedValue addr, SwiftInt fieldIndex) const {
   swift::SILValue v = addr.getSILValue();
   return {unbridged().createStructElementAddr(
+      regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
+}
+
+BridgedInstruction BridgedBuilder::createRefElementAddr(BridgedValue ref, SwiftInt fieldIndex) const {
+  swift::SILValue v = ref.getSILValue();
+  return {unbridged().createRefElementAddr(
       regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 

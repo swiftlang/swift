@@ -63,3 +63,48 @@ bb0:
   return %6 : $()
 }
 
+// IRGen must recognize the dealloc_ref of such a bare object as a stack
+// deallocation (see test/IRGen/class_stack_alloc.sil).
+// CHECK-LABEL: sil @test_dealloc_ref_through_phi :
+// CHECK:         alloc_ref [bare] [stack] $C
+// CHECK:       } // end sil function 'test_dealloc_ref_through_phi'
+sil @test_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %0 = alloc_ref [stack] $C
+  cond_br %c, bb1, bb2
+bb1:
+  %1 = begin_dealloc_ref %0 : $C of %0 : $C
+  br bb3(%1 : $C)
+bb2:
+  %2 = begin_dealloc_ref %0 : $C of %0 : $C
+  br bb3(%2 : $C)
+bb3(%3 : $C):
+  dealloc_ref %3 : $C
+  dealloc_stack_ref %0 : $C
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil @test_dealloc_ref_through_phi_multiple_roots :
+// CHECK:         alloc_ref [stack] $C
+// CHECK:         alloc_ref [stack] $C
+// CHECK:       } // end sil function 'test_dealloc_ref_through_phi_multiple_roots'
+sil @test_dealloc_ref_through_phi_multiple_roots : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %0 = alloc_ref [stack] $C
+  %1 = alloc_ref [stack] $C
+  cond_br %c, bb1, bb2
+bb1:
+  %2 = begin_dealloc_ref %0 : $C of %0 : $C
+  br bb3(%2 : $C)
+bb2:
+  %3 = begin_dealloc_ref %1 : $C of %1 : $C
+  br bb3(%3 : $C)
+bb3(%4 : $C):
+  dealloc_ref %4 : $C
+  dealloc_stack_ref %1 : $C
+  dealloc_stack_ref %0 : $C
+  %6 = tuple ()
+  return %6 : $()
+}
+

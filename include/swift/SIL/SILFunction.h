@@ -533,6 +533,10 @@ private:
   /// Set when this function gives trivial values explicit ownership.
   unsigned HasOwnershipForTrivialValues : 1;
 
+  /// Set while value lifetimes (inits, destroys, assigns) are undetermined.
+  /// Relaxes the SILVerifier. This flag is cleared by LifetimeResolution.
+  unsigned HasUnresolvedLifetimes : 1;
+
   static constexpr unsigned NumFunctionStageBits = 2;
 
   /// This function's pipeline stage. Seeded at creation to the module's stage
@@ -834,6 +838,11 @@ public:
     HasOwnershipForTrivialValues = val; 
   }
 
+  bool hasUnresolvedLifetimes() const { return HasUnresolvedLifetimes; }
+  void setHasUnresolvedLifetimes(bool val = true) {
+    HasUnresolvedLifetimes = val;
+  }
+
   /// This function's SIL stage. Read this for a per-function legality query,
   /// such as whether an instruction is still legal here. For a live function it
   /// is never below the module's stage floor, and may be ahead of it.
@@ -843,7 +852,8 @@ public:
   void setFunctionStage(SILStage stage);
 
   /// Take the facts a whole-function clone inherits from the function it was
-  /// derived from: the address-lowering form and the SIL stage.
+  /// derived from: the address-lowering form, whether its lifetimes are
+  /// unresolved, and the SIL stage.
   void inheritDerivedFrom(const SILFunction *from);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
@@ -951,8 +961,9 @@ public:
 
   // Returns true if the function has any generic arguments.
   bool isGeneric() const {
-    auto s = getLoweredFunctionType()->getInvocationGenericSignature();
-    return s && !s->areAllParamsConcrete();
+    return getLoweredFunctionType()
+        ->getInvocationGenericSignature()
+        .isEffectivelyGeneric();
   }
 
   /// Returns true if this function ie either a class method, or a
@@ -1914,35 +1925,19 @@ public:
   /// invariants.
   void verify(CalleeCache *calleeCache = nullptr,
               DominanceInfo *dominanceInfo = nullptr,
-              bool SingleFunction = true, bool isCompleteOSSA = true,
+              bool SingleFunction = true,
               bool checkLinearLifetime = true) const;
 
-  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
-  /// blocks.
+  /// Run the SIL verifier on SIL with incomplete OSSA lifetimes, e.g. before
+  /// SILGenCleanup. Linear lifetimes are not checked.
   void verifyIncompleteOSSA() const {
     verify(/*calleeCache*/ nullptr, /*dominanceInfo=*/nullptr,
-           /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+           /*SingleFunction=*/true, /*checkLinearLifetime=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
   void verifyMemoryLifetime(CalleeCache *calleeCache,
                             DeadEndBlocks *deadEndBlocks);
-
-  /// Verifies ownership of the function.
-  /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks
-  /// and calls verifyOwnership(DeadEndBlocks *deadEndBlocks)
-  void verifyOwnership() const;
-
-  /// Run the SIL ownership verifier to check that all values with ownership
-  /// have a linear lifetime. Regular OSSA invariants are checked separately in
-  /// normal SIL verification.
-  ///
-  /// \p deadEndBlocks is nullptr when OSSA lifetimes are complete.
-  ///
-  /// NOTE: The ownership verifier is run when performing normal IR
-  /// verification, so this verification can be viewed as a subset of
-  /// SILFunction::verify(checkLinearLifetimes=true).
-  void verifyOwnership(DeadEndBlocks *deadEndBlocks) const;
 
   /// Verify that all non-cond-br critical edges have been split.
   ///

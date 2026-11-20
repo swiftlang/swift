@@ -126,6 +126,8 @@ Build the MSI installers and packaging.
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+Use 'swift-prepare' to configure and build everything the Swift test suite needs, without running it
+(for example, so that utils\run-test.cmd can be used afterwards). It is not included in '*'.
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -294,13 +296,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
-    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10.exe";
+    PinnedSHA256 = "23FC57903FADFF78F6AC89BACFB1EBD79A48274B0DBAD4D705A4A700CD825E52";
     PinnedVersion = "6.4.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10-arm64.exe"
+    PinnedSHA256 = "B3A93EA91AE9FB46F31435B92BF394EE4534161F76EA8E9FE1AB9F21784D1F05";
     PinnedVersion = "6.4.0";
   };
 }
@@ -725,10 +727,14 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 ## Helpers for logging and timing build steps.
 
-$TimingData = New-Object System.Collections.Generic.List[System.Object]
+# Avoid New-Object: enumerating its [psobject]-wrapped List[object] throws
+# "Argument types do not match", see https://github.com/PowerShell/PowerShell/issues/27558
+$TimingData = [System.Collections.Generic.List[System.Object]]::new()
 $CurrentOperation = $null
 $BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
 $RecordTimings = $Summary -or $Trace
+$BuildStartTime = [DateTime]::UtcNow
+$ExternalTraceEvents = [System.Collections.Generic.List[System.Object]]::new()
 
 if ($RecordTimings) {
   Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
@@ -923,10 +929,68 @@ function Write-TimingTrace([string] $Path) {
     }
   }
 
+  $Metadata = @(
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 0; args = @{ name = "build.ps1" } },
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 1; args = @{ name = "lit" } }
+  )
+
   New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
-  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
+  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = $Metadata + @($Events) + @($ExternalTraceEvents) })
   [IO.File]::WriteAllText($Path, $Json)
   Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
+}
+
+# lit makes the timestamps relative to the first test, so align each trace to end
+# when its file was written.
+function Import-LitTimeTraces([string] $Directory, [TimeSpan] $MinDuration = [TimeSpan]::FromSeconds(1)) {
+  $MinDurationUs = [long]($MinDuration.Ticks / 10)
+  foreach ($File in Get-ChildItem -Path $Directory -Filter "*.json" -File -ErrorAction Ignore) {
+    try {
+      $Events = @((Get-Content -Raw $File.FullName | ConvertFrom-Json).traceEvents)
+    } catch {
+      Write-Warning "Ignoring unreadable lit trace '$($File.FullName)': $_"
+      continue
+    }
+    if ($Events.Count -eq 0) { continue }
+
+    $TraceEnd = [long] 0
+    foreach ($TraceEvent in $Events) { $TraceEnd = [math]::Max($TraceEnd, $TraceEvent.ts + $TraceEvent.dur) }
+    $Offset = [long](($File.LastWriteTimeUtc - $BuildStartTime).Ticks / 10) - $TraceEnd
+
+    foreach ($TraceEvent in $Events) {
+      if ($TraceEvent.dur -lt $MinDurationUs) { continue }
+      $ExternalTraceEvents.Add([ordered]@{
+        name = $TraceEvent.name
+        cat = "lit"
+        ph = "X"
+        ts = $TraceEvent.ts + $Offset
+        dur = $TraceEvent.dur
+        pid = 1
+        tid = $TraceEvent.pid
+      })
+    }
+  }
+}
+
+function Invoke-WithLitTimeTraces([string] $Directory, [ScriptBlock] $ScriptBlock) {
+  # lit's --time-trace-output fails on the unset start time of excluded tests.
+  if (-not $Trace -or $env:LIT_FILTER) {
+    & $ScriptBlock
+    return
+  }
+
+  Remove-Item -Recurse -Force $Directory -ErrorAction Ignore
+  New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+  try {
+    Invoke-IsolatingEnvVars {
+      # lit parses LIT_OPTS with shlex, quote the path to preserve backslashes.
+      # Several lit invocations can run concurrently, have each write its own file.
+      $env:LIT_OPTS = "$env:LIT_OPTS --time-trace-output='$Directory\lit.json' --use-unique-output-file-name".Trim()
+      & $ScriptBlock
+    }
+  } finally {
+    Import-LitTimeTraces $Directory
+  }
 }
 
 function Get-AndroidNDK {
@@ -1832,7 +1896,7 @@ function Get-Dependencies {
 
         Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem "$BundleRoot\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
@@ -1922,8 +1986,10 @@ function Get-Dependencies {
       Install-PIPIfNeeded
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
+      if ($Test -contains "swift" -or $Test -contains "swift-prepare" -or $Test -contains "lldb" -or $Test -contains "lldb-swift") {
+        Install-PythonModule "psutil"       # Required for lit per-test timeouts, and for testing LLDB
+      }
       if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
-        Install-PythonModule "psutil"       # Required for testing LLDB
         Install-PythonModule "cryptography" # Required for testing LLDB
       }
     }
@@ -2489,6 +2555,9 @@ function Build-CMakeProject {
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_API "$AndroidAPILevel"
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_ARCH_ABI $Platform.Architecture.ABI
         Add-KeyValueIfNew $Defines CMAKE_ANDROID_NDK "$AndroidNDKPath"
+        # Use the shared C++ runtime so that libraries like libswiftCore and
+        # _FoundationICU don't carry their own copy.
+        Add-KeyValueIfNew $Defines CMAKE_ANDROID_STL_TYPE c++_shared
         Add-KeyValueIfNew $Defines CMAKE_SYSROOT "$AndroidSysroot"
 
         if ($UseASM) {
@@ -3038,11 +3107,17 @@ function Build-CDispatch([Hashtable] $Platform,
     -Platform $Platform `
     -CCompiler $CCompiler `
     -CXXCompiler $CXXCompiler `
-    -Defines @{
+    -Defines (@{
       BUILD_SHARED_LIBS = $(if ($Static) { "NO" } else { "YES" });
       BUILD_TESTING = "NO";
       ENABLE_SWIFT = "NO";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # libdispatch doesn't use libc++, but with the shared C++ runtime it would
+      # take `__emutls_get_address` from it and depend on libc++_shared.so.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Get-CompilersDefines([Hashtable] $Platform,
@@ -3510,7 +3585,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [switch] $PrepareSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3530,7 +3605,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift) {
+    if ($TestSwift -or $PrepareSwift) {
       # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
       # need it, so it is built before check-swift starts.
       $Targets += @("SwiftCompilerPlugin")
@@ -3673,12 +3748,23 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
-    if ($Targets) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    # Some tests run Stage2 tools with a scrubbed PATH, so cmark's DLLs can't
+    # be found via the PATH set above; put them beside the executables.
+    foreach ($DLL in @("src\cmark-gfm.dll", "extensions\cmark-gfm-extensions.dll")) {
+      $CMarkDLL = Join-Path (Get-CMarkBinaryCache $Platform) $DLL
+      if (Test-Path $CMarkDLL) {
+        Copy-Item -Force -Path $CMarkDLL -Destination $Stage2BinDir
+      }
     }
-    if ($TestSwift) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
+    Invoke-WithLitTimeTraces "$($BuildCMakeArgs.Bin)\lit-time-traces" {
+      if ($Targets) {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+      }
+      if ($TestSwift) {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+      }
     }
 
     if ($LLDBTargets) {
@@ -3965,12 +4051,17 @@ function Build-DS2([Hashtable] $Platform) {
     -Platform $Platform `
     -CCompiler $Compilers.Host.C `
     -CXXCompiler $Compilers.Host.CXX `
-    -Defines @{
+    -Defines (@{
       DS2_REGSGEN2 = "$(Get-ProjectBinaryCache $BuildPlatform RegsGen2)/regsgen2.exe";
       DS2_PROGRAM_PREFIX = "$(Get-ModuleTriple $Platform)-";
       BISON_EXECUTABLE = "$(Get-BisonExecutable)";
       FLEX_EXECUTABLE = "$(Get-FlexExecutable)";
-    }
+    } + $(if ($Platform.OS -eq [OS]::Android) {
+      # ds2 is a standalone executable, so keep the static C++ runtime.
+      @{ CMAKE_ANDROID_STL_TYPE = "c++_static" }
+    } else {
+      @{}
+    }))
 }
 
 function Build-BoringSSL([Hashtable] $Platform,
@@ -4142,7 +4233,7 @@ function Build-CURL([Hashtable] $Platform,
       USE_WINDOWS_SSPI = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
       ZLIB_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$BinaryCache\$($Platform.Triple)\usr\lib\zs.lib"
+        "$BinaryCache\$($Platform.Triple)\usr\lib\libzs.lib"
       } else {
         "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
@@ -4820,6 +4911,12 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         dispatch_INSTALL_ARCH_SUBDIR      = "YES";
       }
       $DispatchDefines = $SDKInstallDefines + $DispatchDefines
+      if ($Platform.OS -eq [OS]::Android) {
+        # libdispatch doesn't use libc++, but with the shared C++ runtime it
+        # would take `__emutls_get_address` from it and depend on
+        # libc++_shared.so.
+        $DispatchDefines.CMAKE_ANDROID_STL_TYPE = "c++_static"
+      }
 
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-libdispatch `
@@ -4890,7 +4987,7 @@ roots:
           CURL_DIR                          = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
           LibXml2_DIR                       = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY                      = if ($Platform.OS -eq [OS]::Windows) {
-                                                "$BinaryCache\$($Platform.Triple)\usr\lib\zs.lib"
+                                                "$BinaryCache\$($Platform.Triple)\usr\lib\libzs.lib"
                                               } else {
                                                 "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
                                               };
@@ -6347,7 +6444,7 @@ if ($Windows) {
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlidec.lib" -Destination "${SwiftResourceDir}\brotlidec.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build CURL)\lib\libcurl.lib" -Destination "${SwiftResourceDir}\libcurl.lib" | Out-Null
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build XML2)\libxml2s.lib" -Destination "${SwiftResourceDir}\libxml2s.lib" | Out-Null
-    Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\zs.lib" -Destination "${SwiftResourceDir}\zs.lib" | Out-Null
+    Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build ZLib)\libzs.lib" -Destination "${SwiftResourceDir}\libzs.lib" | Out-Null
   }
 
   $RebuiltHostDynamicRuntime = @(
@@ -6458,7 +6555,7 @@ if (-not $IsCrossCompiling) {
     }
   }
 
-  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift")
+  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift", "swift-prepare")
   if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
@@ -6467,6 +6564,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLDBSwift" = $Test -contains "lldb-swift";
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
+      "-PrepareSwift" = $Test -contains "swift-prepare";
     }
     Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
   }

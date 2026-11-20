@@ -13,6 +13,7 @@ target_compile_definitions(swiftCRT PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
 target_compile_options(swiftCRT PRIVATE
   "SHELL:-Xfrontend -disable-force-load-symbols"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "SHELL:-Xcc -D_USE_MATH_DEFINES")
 target_link_libraries(swiftCRT PUBLIC
   ClangModules)

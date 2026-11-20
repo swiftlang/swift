@@ -55,6 +55,7 @@ func hex(_ value: UInt) -> String {
   "0x" + String(value, radix: 16)
 }
 
+@available(SwiftStdlib 6.5, *)
 func testSynchronousOperationTask() async {
   reflectionLog(str: "testSynchronousOperationTask")
   // CHECK: testSynchronousOperationTask
@@ -73,10 +74,6 @@ func testSynchronousOperationTask() async {
     await blocker.block(entered: entered, release: release)
   }
   entered.wait()
-
-  guard #available(SwiftStdlib 6.5, *) else {
-    fatalError("This test shouldn't be running against old stdlibs.")
-  }
 
   let flags = _taskCreateFlags(
     priority: nil, isChildTask: false, copyTaskLocals: true,
@@ -126,6 +123,7 @@ func testSynchronousOperationTask() async {
   withExtendedLifetime(task) {}
 }
 
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
     await testSynchronousOperationTask()

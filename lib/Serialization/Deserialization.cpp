@@ -2260,6 +2260,54 @@ void ModuleFile::consumeHiddenTypeXRefPathPieces(
   }
 }
 
+/// Appends to \p results the imported clang class template specialization with
+/// the given \p usr, searching the specializations of the clang class templates
+/// among \p candidates.
+static void
+lookupClangTemplateSpecialization(ArrayRef<ValueDecl *> candidates,
+                                  StringRef usr,
+                                  SmallVectorImpl<ValueDecl *> &results) {
+  for (auto *m : candidates) {
+    if (!m->hasClangNode())
+      continue;
+    // Macros have a clang node but no clang decl.
+    if (auto *ctd =
+            dyn_cast_or_null<clang::ClassTemplateDecl>(m->getClangDecl())) {
+      auto *loader = m->getASTContext().getClangModuleLoader();
+      for (const auto *spec : ctd->specializations()) {
+        llvm::SmallString<128> buffer;
+        clang::index::generateUSRForDecl(spec, buffer);
+        if (usr == buffer) {
+          auto import = loader->importDeclDirectly(spec);
+          if (import && !llvm::is_contained(results, import))
+            results.push_back(cast<ValueDecl>(import));
+        }
+      }
+    }
+  }
+}
+
+/// Looks up the first path piece of a cross-reference in \p module.
+static void lookupTopLevelXRef(ModuleDecl *module, DeclBaseName name,
+                               Identifier privateDiscriminator,
+                               bool importedFromClang,
+                               SmallVectorImpl<ValueDecl *> &values) {
+  if (!privateDiscriminator.empty() && importedFromClang) {
+    // A clang class template specialization, serialized using the template
+    // name and the USR of the specialization.
+    SmallVector<ValueDecl *, 4> templates;
+    module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                            NLFlags::RemoveOverridden, templates);
+    lookupClangTemplateSpecialization(templates, privateDiscriminator.str(),
+                                      values);
+  } else if (!privateDiscriminator.empty()) {
+    module->lookupMember(values, module, name, privateDiscriminator);
+  } else {
+    module->lookupQualified(module, DeclNameRef(name), SourceLoc(),
+                            NLFlags::RemoveOverridden, values);
+  }
+}
+
 Expected<Decl *>
 ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
   using namespace decls_block;
@@ -2326,14 +2374,8 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
       pathTrace.addType(filterTy);
     }
 
-    if (privateDiscriminator) {
-      baseModule->lookupMember(values, baseModule, name,
-                               getIdentifier(privateDiscriminator));
-    } else {
-      baseModule->lookupQualified(baseModule, DeclNameRef(name),
-                                  SourceLoc(), NLFlags::RemoveOverridden,
-                                  values);
-    }
+    lookupTopLevelXRef(baseModule, name, getIdentifier(privateDiscriminator),
+                       importedFromClang, values);
     filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt,
                  importedFromClang, isStatic, std::nullopt, values);
     if (values.empty() && importedFromClang && name.isOperator() && filterTy) {
@@ -2536,14 +2578,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         }
 
         values.clear();
-        if (privateDiscriminator) {
-          otherModule->lookupMember(values, otherModule, name,
-                                   getIdentifier(privateDiscriminator));
-        } else {
-          otherModule->lookupQualified(otherModule, DeclNameRef(name),
-                                       SourceLoc(), NLFlags::RemoveOverridden,
-                                       values);
-        }
+        lookupTopLevelXRef(otherModule, name,
+                           getIdentifier(privateDiscriminator),
+                           importedFromClang, values);
 
         std::optional<ValueDecl*> matchBeforeFiltering = std::nullopt;
         if (!values.empty()) {
@@ -2785,24 +2822,8 @@ giveUpFastPath:
           // This is a clang imported class template, that's
           // serialized using original template name, and
           // its USR that denotes the specific specialization.
-          auto members = nominal->lookupDirect(memberName);
-          for (const auto &m : members) {
-            if (!m->hasClangNode())
-              continue;
-            if (auto *ctd =
-                    dyn_cast<clang::ClassTemplateDecl>(m->getClangDecl())) {
-              for (const auto *spec : ctd->specializations()) {
-                llvm::SmallString<128> buffer;
-                clang::index::generateUSRForDecl(spec, buffer);
-                if (privateDiscriminator.str() == buffer) {
-                  if (auto import = getContext()
-                                        .getClangModuleLoader()
-                                        ->importDeclDirectly(spec))
-                    values.push_back(cast<ValueDecl>(import));
-                }
-              }
-            }
-          }
+          lookupClangTemplateSpecialization(nominal->lookupDirect(memberName),
+                                            privateDiscriminator.str(), values);
         } else {
           ModuleDecl *searchModule = M;
           if (!searchModule)
@@ -4427,9 +4448,10 @@ public:
     Type paramTy;
     SET_OR_RETURN_ERROR(paramTy, MF.getTypeChecked(interfaceTypeID));
 
-    if (paramTy->hasError() && !MF.allowCompilerErrors()) {
-      // FIXME: This should never happen, because we don't serialize
-      // error types.
+    if (paramTy->hasError() && !MF.allowCompilerErrors() &&
+        !MF.compiledAllowingCompilerErrors()) {
+      // This should never happen, because error types are only serialized
+      // when allowing errors.
       DC->printContext(llvm::errs());
       paramTy->dump(llvm::errs());
       return MF.diagnoseFatal();
@@ -6404,6 +6426,7 @@ decodeNonCustomAvailabilityDomain(AvailabilityDomainKind domainKind,
     llvm_unreachable("custom domains aren't handled here");
     return AvailabilityDomain::forUniversal();
   }
+  llvm_unreachable("covered switch");
 }
 
 Expected<AvailableAttr *>
@@ -6973,6 +6996,25 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         assert(!isImplicit && "Need to update for implicit");
         Attr = DynamicReplacementAttr::create(ctx, replacedFunName, &MF,
                                               replacedFunID);
+        break;
+      }
+
+      case decls_block::TailAllocated_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID countsNameID;
+        DeclID countsDeclID;
+        ArrayRef<uint64_t> typeIDs;
+        serialization::decls_block::TailAllocatedDeclAttrLayout::readRecord(
+            scratch, isImplicit, countsNameID, countsDeclID, typeIDs);
+        SmallVector<Type, 3> types;
+        for (auto typeID : typeIDs) {
+          auto type = MF.getTypeChecked(typeID);
+          if (!type)
+            return type.takeError();
+          types.push_back(type.get());
+        }
+        Attr = TailAllocatedAttr::create(ctx, MF.getIdentifier(countsNameID),
+                                         types, isImplicit, &MF, countsDeclID);
         break;
       }
 
@@ -8209,13 +8251,16 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
-                        ParameterTypeFlags(isVariadic, isAutoClosure,
-                                           isNonEphemeral, *ownership,
-                                           isIsolated, isNoDerivative,
-                                           isCompileTimeLiteral, isSending,
-                                           isAddressable, isConstValue),
-                        MF.getIdentifier(internalLabelID));
+    // FIXME: Scopes aren't serialized, neither access bindings nor the scope
+    // arguments of nominal types, so clients see a module's types without
+    // them.
+    params.push_back(AnyFunctionType::Param::bodyAccess(
+        paramTy.get(), MF.getIdentifier(labelID),
+        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
+                           *ownership, isIsolated, isNoDerivative,
+                           isCompileTimeLiteral, isSending, isAddressable,
+                           isConstValue),
+        MF.getIdentifier(internalLabelID)));
   }
 
   SmallVector<AnyFunctionType::Yield, 1> yields;
@@ -9167,7 +9212,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError() && !allowCompilerErrors()) {
+  // A module built with errors may legitimately contain error types. Reading
+  // one has already been diagnosed, here or by an earlier error.
+  if (typeOrOffset.get()->hasError() && !allowCompilerErrors() &&
+      !compiledAllowingCompilerErrors()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
@@ -9776,6 +9824,11 @@ AbstractFunctionDecl *
 ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
                                        uint64_t contextData) {
   return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
+VarDecl *ModuleFile::loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                                 uint64_t contextData) {
+  return cast<VarDecl>(getDecl(contextData));
 }
 
 ValueDecl *ModuleFile::loadTargetFunctionDecl(

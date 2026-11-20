@@ -79,8 +79,11 @@ typealias SomeGlobalActorIsolated = @SomeGlobalActor () -> Void
 typealias TestSpecifiers<Value, Result, E> = (inout sending Value) throws(E) -> sending Result where Value: ~Copyable, Result: ~Copyable, E: Error
 typealias TestSpecifierAndAttr<T> = (__owned @Sendable @escaping () async -> T) -> T
 typealias TestScoped = @_scoped(a, &b, self, &self, immortal) Int
+// expected-error@-1:25{{'@_scoped' is not supported here}}
 typealias TestScopedEscaped = @_scoped(`self`, &`self`, `immortal`, &`immortal`) Int
+// expected-error@-1:32{{'@_scoped' is not supported here}}
 typealias TestScopedLabels = @_scoped(left: a, `default`: &b, `self`: immortal) Int
+// expected-error@-1:31{{'@_scoped' is not supported here}}
 
 let globalOptionalInt: _? = 42
 let optionalIntArray: Array<_> = [42]

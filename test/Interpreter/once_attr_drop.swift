@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -Onone %s -o %t/onone.out
-// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -O -DOPTIMIZED %s -o %t/opt.out
+// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -O %s -o %t/opt.out
 // RUN: %target-codesign %t/onone.out %t/opt.out
 
 // Each case that calls a closure runs to completion, and each case that drops
@@ -16,6 +16,8 @@
 // RUN: %target-run %t/opt.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/onone.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/opt.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/onone.out forwardOrDropForwarded | %FileCheck %s --check-prefix=CALL-forwardOrDrop
+// RUN: %target-run %t/opt.out forwardOrDropForwarded | %FileCheck %s --check-prefix=CALL-forwardOrDrop
 // RUN: %target-run %t/onone.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/opt.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/onone.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
@@ -30,8 +32,8 @@
 // RUN: %target-run %t/opt.out callGenericEscaping | %FileCheck %s --check-prefix=CALL-callGenericEscaping
 // RUN: %target-run %t/onone.out callAsync | %FileCheck %s --check-prefix=CALL-callAsync
 // RUN: %target-run %t/opt.out callAsync | %FileCheck %s --check-prefix=CALL-callAsync
-// FIXME: [called-once] The throwing case is compiled out at -O. See callThrowing.
 // RUN: %target-run %t/onone.out callThrowing | %FileCheck %s --check-prefix=CALL-callThrowing
+// RUN: %target-run %t/opt.out callThrowing | %FileCheck %s --check-prefix=CALL-callThrowing
 // RUN: %target-run %t/onone.out callGeneric | %FileCheck %s --check-prefix=CALL-callGeneric
 // RUN: %target-run %t/opt.out callGeneric | %FileCheck %s --check-prefix=CALL-callGeneric
 // RUN: %target-run %t/onone.out callGenericInout | %FileCheck %s --check-prefix=CALL-callGenericInout
@@ -47,10 +49,20 @@
 // RUN: %target-run %t/onone.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
 // RUN: %target-run %t/opt.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
 //
+// RUN: %target-run %t/onone.out callAfterBorrowing | %FileCheck %s --check-prefix=CALL-callAfterBorrowing
+// RUN: %target-run %t/opt.out callAfterBorrowing | %FileCheck %s --check-prefix=CALL-callAfterBorrowing
+// RUN: %target-run %t/onone.out callAfterClosureBorrowing | %FileCheck %s --check-prefix=CALL-callAfterClosureBorrowing
+// RUN: %target-run %t/opt.out callAfterClosureBorrowing | %FileCheck %s --check-prefix=CALL-callAfterClosureBorrowing
+// RUN: %target-run %t/onone.out callLocalAfterBorrowing | %FileCheck %s --check-prefix=CALL-callLocalAfterBorrowing
+// RUN: %target-run %t/opt.out callLocalAfterBorrowing | %FileCheck %s --check-prefix=CALL-callLocalAfterBorrowing
+// RUN: %target-run %t/onone.out borrowedIsolation | %FileCheck %s --check-prefix=CALL-borrowedIsolation
+// RUN: %target-run %t/opt.out borrowedIsolation | %FileCheck %s --check-prefix=CALL-borrowedIsolation
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out forwardOrDropDropped 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out forwardOrDropDropped 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
@@ -131,6 +143,21 @@ func drop(_ f: consuming @once () -> Void) {
 }
 
 @inline(never)
+func callAtMostOnce(_ f: @callable(once) () -> Void) {
+  f()
+  print("called")
+}
+
+// One path forwards the closure and the other drops it, so the drop must not
+// be deleted after the forwarded call is specialized.
+@inline(__always)
+func forwardOrDrop(_ doForward: Bool, _ f: consuming @once () -> Void) {
+  withoutActuallyDeiniting(f) { g in
+    if doForward { callAtMostOnce(g) }
+  }
+}
+
+@inline(never)
 func dropEscaping(_ f: consuming @escaping @once () -> Void) {
   withoutActuallyDeiniting(f) { _ in }
 }
@@ -171,10 +198,6 @@ func runGeneric<T>(_ value: T, _ generic: consuming Generic<T>) {
 
 // A throwing exactly-once closure that consumes a capture and then throws must
 // destroy the capture once and still count as called.
-//
-// FIXME: [called-once] This is compiled out when optimization is enabled
-// because SILCombine asserts on a throwing closure of this shape at -O.
-#if !OPTIMIZED
 struct Failure: Error {}
 
 @inline(never)
@@ -194,7 +217,6 @@ func runThrowing(_ resource: consuming Resource) {
     print("caught")
   }
 }
-#endif
 
 @inline(never)
 func runAsync(_ resource: consuming Resource) async {
@@ -284,6 +306,52 @@ func transparentForwarded(_ f: @once () -> Void) {
   transparentRebound(f)
 }
 
+// Borrowing an exactly-once closure doesn't call it or drop it.
+@inline(never)
+func inspect(_ f: borrowing @once () -> Void) {
+  print("inspected")
+}
+
+@inline(never)
+func inspectEscaping(_ f: borrowing @escaping @once () -> Void) {
+  print("inspected")
+}
+
+func withBody(_ body: () -> Void) { body() }
+
+@inline(never)
+func borrowAndCall(_ f: @once () -> Void) {
+  inspect(f)
+  inspect(f)
+  f()
+  print("called")
+}
+
+@inline(never)
+func borrowInClosureAndCall(_ f: @once () -> Void) {
+  withBody { inspect(f) }
+  f()
+  print("called")
+}
+
+@inline(never)
+func isolation(
+  _ f: borrowing @escaping @isolated(any) @once () async -> Void
+) -> (any Actor)? {
+  f.isolation
+}
+
+@MainActor func onMainActor() { print("called on main actor") }
+
+func borrowedIsolation() async {
+  let f: @isolated(any) @once () async -> Void = { @MainActor in
+    onMainActor()
+  }
+  let actor = isolation(f)
+  print("main actor: \(actor.map { $0 === MainActor.shared } ?? false)")
+  await f()
+}
+
 @inline(never)
 func genericCall<R>(_ f: @once () -> R) -> R {
   let result = f()
@@ -313,12 +381,23 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     drop { _ = consume resource }
   case "dropEscaping":
     dropEscaping { box.count += 1 }
+  case "forwardOrDropForwarded", "forwardOrDropDropped":
+    forwardOrDrop(which == "forwardOrDropForwarded") { box.count += 1 }
   case "callCaptureless":
     call { print("body") }
   case "callBorrowed":
     // A stack-promoted closure doesn't own the noncopyable value that it
     // borrows, so calling the closure must not destroy that value.
     call { print(resource.name) }
+  case "callAfterBorrowing":
+    borrowAndCall { _ = consume resource }
+  case "callAfterClosureBorrowing":
+    borrowInClosureAndCall { _ = consume resource }
+  case "callLocalAfterBorrowing":
+    let f: @once () -> Void = { _ = consume resource }
+    inspectEscaping(f)
+    f()
+    print("called")
   case "dropCaptureless":
     drop { print("never") }
   case "dropEscapingCaptureless":
@@ -350,10 +429,8 @@ case "callGenericEscaping":
   runGeneric(1, Generic(value: 1, name: "g"))
 case "callAsync":
   await runAsync(Resource(name: "a"))
-#if !OPTIMIZED
 case "callThrowing":
   runThrowing(Resource(name: "t"))
-#endif
 case "callGeneric":
   runGenericConsuming(1, Generic(value: 1, name: "g"))
 case "dropGeneric":
@@ -370,6 +447,8 @@ case "dropGenericConsumingAndInout":
   dropGenericConsumingAndInout(1)
 case "dropMixed":
   dropMixed(Resource(name: "consumed"), Resource(name: "borrowed"))
+case "borrowedIsolation":
+  await borrowedIsolation()
 default:
   run(CommandLine.arguments[1], Box(), Resource(name: "r"))
 }
@@ -382,6 +461,9 @@ default:
 
 // CALL-callOrForward: Resource r deinit
 // CALL-callOrForward-NEXT: called
+
+// CALL-forwardOrDrop: called
+// CALL-forwardOrDrop-NEXT: Resource r deinit
 
 // CALL-callEscaping: called
 // CALL-callEscaping-NEXT: Resource r deinit
@@ -401,6 +483,25 @@ default:
 // CALL-callInlinedForwarded: Resource r deinit
 // CALL-callInlinedForwarded-NEXT: called
 // CALL-callInlinedForwarded-NOT: deinit
+
+// CALL-callAfterBorrowing: inspected
+// CALL-callAfterBorrowing-NEXT: inspected
+// CALL-callAfterBorrowing-NEXT: Resource r deinit
+// CALL-callAfterBorrowing-NEXT: called
+// CALL-callAfterBorrowing-NOT: deinit
+
+// CALL-callAfterClosureBorrowing: inspected
+// CALL-callAfterClosureBorrowing-NEXT: Resource r deinit
+// CALL-callAfterClosureBorrowing-NEXT: called
+// CALL-callAfterClosureBorrowing-NOT: deinit
+
+// CALL-callLocalAfterBorrowing: inspected
+// CALL-callLocalAfterBorrowing-NEXT: Resource r deinit
+// CALL-callLocalAfterBorrowing-NEXT: called
+// CALL-callLocalAfterBorrowing-NOT: deinit
+
+// CALL-borrowedIsolation: main actor: true
+// CALL-borrowedIsolation-NEXT: called on main actor
 
 // CALL-callThroughThunk: called
 // CALL-callThroughThunk-NEXT: hello

@@ -591,7 +591,10 @@ class DeadFunctionAndGlobalElimination {
             isVisibleExternally(fd)
             || Module->isExternallyVisibleDecl(fd)
             // Declarations are always accessible externally, so they are alive.
-            || !F->isDefinition()) {
+            || !F->isDefinition()
+            // The generated C++ header may call the method through the vtable.
+            || entry.getMethod().mayBeCalledFromCxxHeader(*Module)
+            || F->getDeclRef().mayBeCalledFromCxxHeader(*Module)) {
           MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, nullptr, nullptr);
         }

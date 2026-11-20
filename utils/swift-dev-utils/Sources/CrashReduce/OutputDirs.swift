@@ -33,9 +33,7 @@ public struct OutputDirs {
     if reproducer.kind == .complete {
       return ideCrashers
     }
-    if reproducer.options.extraArgs.contains(where: {
-      $0.value?.starts(with: "-cxx-interoperability-mode") ?? false
-    }) {
+    if reproducer.isForCxxInterop {
       return cxxCrashers
     }
     return main

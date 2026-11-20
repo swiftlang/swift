@@ -6,7 +6,7 @@ add_subdirectory(Math)
 if(NOT BUILD_SHARED_LIBS)
   set(libpthread)
   set(android_libraries -llog)
-  set(concurrency_libs)
+  set(concurrency_libs "-ldispatch -lBlocksRuntime")
   configure_file(
     "${PROJECT_SOURCE_DIR}/static-stdlib-args.lnk.in"
     static-stdlib-args.lnk

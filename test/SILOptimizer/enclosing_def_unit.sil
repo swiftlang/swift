@@ -305,3 +305,98 @@ bb1(%4 : @guaranteed $C, %5 : @guaranteed $C):
   %retval = tuple ()
   return %retval : $()
 }
+
+sil @borrow_c : $@convention(method) (@guaranteed PairC) -> @guaranteed C
+sil @borrow_c_from_address : $@convention(method) (@in_guaranteed PairC) -> @guaranteed C
+sil @borrow_c_without_self : $@convention(thin) () -> @guaranteed C
+
+// The enclosing def of a borrow accessor result with a @guaranteed self is the borrow scope of
+// self. A result with an @in_guaranteed self or without self has no enclosing def. The enclosing
+// value of a reborrow of the result is the reborrow of self.
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: find_enclosing_defs with: %obj
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing Defs:
+// CHECK-NEXT: %2 = begin_borrow %0 : $PairC
+// CHECK-NEXT: enclosing_def_borrow_accessor: find_enclosing_defs with: %obj
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: enclosing_values with: %obj
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing values for:   %4 = apply %3(%2) : $@convention(method) (@guaranteed PairC) -> @guaranteed C
+// CHECK-NEXT: %2 = begin_borrow %0 : $PairC
+// CHECK-NEXT: enclosing_def_borrow_accessor: enclosing_values with: %obj
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: find_enclosing_defs with: %addr
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing Defs:
+// CHECK-NEXT: enclosing_def_borrow_accessor: find_enclosing_defs with: %addr
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: enclosing_values with: %addr
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing values for:   %6 = apply %5(%1) : $@convention(method) (@in_guaranteed PairC) -> @guaranteed C
+// CHECK-NEXT: enclosing_def_borrow_accessor: enclosing_values with: %addr
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: find_enclosing_defs with: %glob
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing Defs:
+// CHECK-NEXT: enclosing_def_borrow_accessor: find_enclosing_defs with: %glob
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: enclosing_values with: %glob
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing values for:   %8 = apply %7() : $@convention(thin) () -> @guaranteed C
+// CHECK-NEXT: enclosing_def_borrow_accessor: enclosing_values with: %glob
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: find_enclosing_defs with: %bo
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing Defs:
+// CHECK-NEXT: %12 = argument of bb1 : $C
+// CHECK-NEXT: enclosing_def_borrow_accessor: find_enclosing_defs with: %bo
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: enclosing_values with: %bo
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing values for:   %15 = borrowed %12 : $C from (%11 : $PairC)
+// CHECK-NEXT: %11 = argument of bb1 : $PairC
+// CHECK-NEXT: enclosing_def_borrow_accessor: enclosing_values with: %bo
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: find_enclosing_defs with: %ba
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing Defs:
+// CHECK-NEXT: %13 = argument of bb1 : $C
+// CHECK-NEXT: enclosing_def_borrow_accessor: find_enclosing_defs with: %ba
+
+// CHECK-LABEL: enclosing_def_borrow_accessor: enclosing_values with: %ba
+// CHECK: } // end sil function 'enclosing_def_borrow_accessor'
+// CHECK: Enclosing values for:   %16 = borrowed %13 : $C from ()
+// CHECK-NEXT: enclosing_def_borrow_accessor: enclosing_values with: %ba
+sil [ossa] @enclosing_def_borrow_accessor : $@convention(thin) (@guaranteed PairC, @in_guaranteed PairC) -> () {
+entry(%0 : @guaranteed $PairC, %1 : $*PairC):
+  %borrow = begin_borrow %0 : $PairC
+  %f = function_ref @borrow_c : $@convention(method) (@guaranteed PairC) -> @guaranteed C
+  %obj = apply %f(%borrow) : $@convention(method) (@guaranteed PairC) -> @guaranteed C
+  %fa = function_ref @borrow_c_from_address : $@convention(method) (@in_guaranteed PairC) -> @guaranteed C
+  %addr = apply %fa(%1) : $@convention(method) (@in_guaranteed PairC) -> @guaranteed C
+  %fg = function_ref @borrow_c_without_self : $@convention(thin) () -> @guaranteed C
+  %glob = apply %fg() : $@convention(thin) () -> @guaranteed C
+  specify_test "find_enclosing_defs %obj"
+  specify_test "enclosing_values %obj"
+  specify_test "find_enclosing_defs %addr"
+  specify_test "enclosing_values %addr"
+  specify_test "find_enclosing_defs %glob"
+  specify_test "enclosing_values %glob"
+  end_borrow %glob : $C
+  br exit(%borrow : $PairC, %obj : $C, %addr : $C)
+
+exit(%borrow_phi : @reborrow $PairC, %obj_phi : @reborrow $C, %addr_phi : @reborrow $C):
+  %b = borrowed %borrow_phi : $PairC from (%0 : $PairC)
+  %bo = borrowed %obj_phi : $C from (%borrow_phi : $PairC)
+  %ba = borrowed %addr_phi : $C from ()
+  specify_test "find_enclosing_defs %bo"
+  specify_test "enclosing_values %bo"
+  specify_test "find_enclosing_defs %ba"
+  specify_test "enclosing_values %ba"
+  end_borrow %ba : $C
+  end_borrow %bo : $C
+  end_borrow %b : $PairC
+  %retval = tuple ()
+  return %retval : $()
+}

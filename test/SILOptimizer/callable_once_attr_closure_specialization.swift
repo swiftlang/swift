@@ -31,7 +31,7 @@ func callAtMostOnce(_ fn: @callable(once) () -> Void) { fn() }
 @inline(never)
 func callAtMostOnceEscaping(_ fn: @escaping @callable(once) () -> Void) { fn() }
 
-// A single owned Copyable capture
+// A single Copyable capture, which the on-stack context borrows
 @inline(never)
 func testLocalVariableClass(_ t: Tracker, _ y: Int) {
   callAtMostOnce {
@@ -39,14 +39,14 @@ func testLocalVariableClass(_ t: Tracker, _ y: Int) {
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@owned Tracker, Int) -> () {
-// CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[Y:%.*]] : $Int):
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> () {
+// CHECK: bb0([[TRACKER:%.*]] : @guaranteed $Tracker, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testLocalVariableClass{{.*}} : $@convention(thin) (@guaranteed Tracker, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[Y]])
-// CHECK: destroy_value [[TRACKER]]
-// CHECK: }
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function
 
-// Mixed owned Copyable + borrowed ~Copyable captures
+// Borrowed Copyable and ~Copyable captures
 @inline(never)
 func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: Int) {
   callAtMostOnce {
@@ -54,12 +54,12 @@ func testMixedCaptures(_ t: Tracker, _ v: borrowing BorrowableValue, _ delta: In
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@owned Tracker, @guaranteed BorrowableValue, Int) -> () {
-// CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[V:%.*]] : @guaranteed $BorrowableValue, [[DELTA:%.*]] : $Int):
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed BorrowableValue, Int) -> () {
+// CHECK: bb0([[TRACKER:%.*]] : @guaranteed $Tracker, [[V:%.*]] : @guaranteed $BorrowableValue, [[DELTA:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testMixedCaptures{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed BorrowableValue, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[V]], [[DELTA]])
-// CHECK: destroy_value [[TRACKER]]
-// CHECK: }
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function
 
 @inline(never)
 func testConsumingNoncopyableCapture(_ r: consuming Resource) {
@@ -117,13 +117,12 @@ func testNestedClosureCapture(_ t: Tracker, _ y: Int) {
   }
 }
 
-// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}} : $@convention(thin) (@owned Tracker, @owned @callee_guaranteed (Int) -> Int, Int) -> () {
-// CHECK: bb0([[TRACKER:%.*]] : @owned $Tracker, [[INNER:%.*]] : @owned $@callee_guaranteed (Int) -> Int, [[Y:%.*]] : $Int):
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed @callee_guaranteed (Int) -> Int, Int) -> () {
+// CHECK: bb0([[TRACKER:%.*]] : @guaranteed $Tracker, [[INNER:%.*]] : @guaranteed $@callee_guaranteed (Int) -> Int, [[Y:%.*]] : $Int):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}} : $@convention(thin) (@guaranteed Tracker, @guaranteed @callee_guaranteed (Int) -> Int, Int) -> ()
 // CHECK: apply [[CLOSURE_IMPL]]([[TRACKER]], [[INNER]], [[Y]])
-// CHECK: destroy_value [[TRACKER]]
-// CHECK: destroy_value [[INNER]]
-// CHECK: }
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function
 
 // Trigger specialization
 public func run() {

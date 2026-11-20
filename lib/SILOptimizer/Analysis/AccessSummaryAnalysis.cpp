@@ -551,6 +551,18 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
       // uses. It only uses the address, it does not produce a new address.
       continue;
     }
+    case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
+      // Look through the move-only wrapper cast. A copyable 'consuming'
+      // value is stored as $@moveOnly, so field projections follow the cast.
+      auto projection =
+          getSingleAddressProjectionUser(cast<SingleValueInstruction>(User));
+      if (!projection.first)
+        return std::make_pair(nullptr, 0);
+      SingleUser = projection.first;
+      ProjectionIndex = projection.second;
+      break;
+    }
     default:
       return std::make_pair(nullptr, 0);
     }

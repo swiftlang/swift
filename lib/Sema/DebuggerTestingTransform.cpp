@@ -32,43 +32,18 @@
 
 using namespace swift;
 
-ASTWalker::PostWalkResult<Expr *>
-DiscriminatorFinder::walkToExprPost(Expr *E)  {
-  auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-  if (!ACE)
-    return Action::Continue(E);
-
-  unsigned Discriminator = ACE->getDiscriminator();
-  assert(Discriminator != AbstractClosureExpr::InvalidDiscriminator &&
-         "Existing closures should have valid discriminators");
-  if (Discriminator >= NextDiscriminator)
-    NextDiscriminator = Discriminator + 1;
-  if (FirstDiscriminator == AbstractClosureExpr::InvalidDiscriminator ||
-      Discriminator < FirstDiscriminator)
-    FirstDiscriminator = Discriminator;
-
-  return Action::Continue(E);
-}
-
-unsigned DiscriminatorFinder::getNextDiscriminator() {
-  if (NextDiscriminator == AbstractClosureExpr::InvalidDiscriminator)
-    llvm::report_fatal_error("Out of valid closure discriminators");
-  return NextDiscriminator++;
-}
-
 namespace {
 
 /// Instrument decls with soundness-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
-  DiscriminatorFinder &DF;
   std::vector<DeclContext *> LocalDeclContextStack;
   const DeclNameRef StringForPrintObjectName;
   const DeclNameRef DebuggerTestingCheckExpectName;
 
 public:
-  DebuggerTestingTransform(ASTContext &Ctx, DiscriminatorFinder &DF)
-      : Ctx(Ctx), DF(DF),
+  DebuggerTestingTransform(ASTContext &Ctx)
+      : Ctx(Ctx),
         StringForPrintObjectName(Ctx.getIdentifier("_stringForPrintObject")),
         DebuggerTestingCheckExpectName(
             Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
@@ -266,14 +241,20 @@ private:
     CheckExpectExpr->setThrows(nullptr);
 
     // Create the closure.
+    auto *DC = getCurrentDeclContext();
     auto *Params = ParameterList::createEmpty(Ctx);
-    auto *Closure = new (Ctx)
-        ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
-                    SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
-                    SourceLoc(), SourceLoc(), nullptr,
-                    getCurrentDeclContext());
+    auto *Closure =
+        new (Ctx) ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
+                              SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
+                              SourceLoc(), SourceLoc(), nullptr, DC);
     Closure->setImplicit(true);
-    Closure->setDiscriminator(DF.getNextDiscriminator());
+
+    // Make sure we've already computed discriminators for the context, then
+    // use the next available discriminator for the closure.
+    DC->assignLocalDiscriminators();
+    unsigned Discriminator = Ctx.getNextDiscriminator(DC);
+    Closure->setDiscriminator(Discriminator);
+    Ctx.setMaxAssignedDiscriminator(DC, Discriminator + 1);
 
     // TODO: Save and return the value of $OriginalExpr.
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};
@@ -303,15 +284,9 @@ private:
 } // end anonymous namespace
 
 void swift::performDebuggerTestingTransform(SourceFile &SF) {
-  // Walk over all decls in the file to find the next available closure
-  // discriminator.
-  DiscriminatorFinder DF;
-  for (Decl *D : SF.getTopLevelDecls())
-    D->walk(DF);
-
   // Instrument the decls with checkExpect() soundness-checks.
   for (Decl *D : SF.getTopLevelDecls()) {
-    DebuggerTestingTransform Transform{D->getASTContext(), DF};
+    DebuggerTestingTransform Transform{D->getASTContext()};
     D->walk(Transform);
     swift::verify(D);
   }

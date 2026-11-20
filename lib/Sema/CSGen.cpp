@@ -377,7 +377,8 @@ namespace {
         if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
-        result.emplace_back(ty, arg.getLabel(), flags);
+        result.push_back(
+            AnyFunctionType::Param::bodyAccess(ty, arg.getLabel(), flags));
       }
     }
 
@@ -389,11 +390,12 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getType(), elt.getName());
+          result.push_back(
+              AnyFunctionType::Param::bodyAccess(elt.getType(), elt.getName()));
         return;
       }
       default:
-        result.emplace_back(ty, Identifier());
+        result.push_back(AnyFunctionType::Param::bodyAccess(ty, Identifier()));
       }
     }
 
@@ -2432,14 +2434,9 @@ namespace {
         auto enumPattern = cast<EnumElementPattern>(pattern);
 
         // Create a type variable to represent the pattern.
-        //
-        // This type is contextually dependent in cases like `.a` where
-        // `patternType` represents an implicit base type of `.a` and so
-        // should be allowed to bind to a hole just like regular leading-dot
-        // syntax.
-        Type patternType =
+        auto *patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
+                                  TVO_CanBindToNoEscape);
 
         // Form the member constraint for a reference to a member of this
         // type.
@@ -2509,6 +2506,12 @@ namespace {
 
           baseType = parentType;
         } else {
+          // This type is contextually dependent in cases like `.a` where
+          // `patternType` represents an implicit base type of `.a` and so
+          // should be allowed to bind to a hole just like regular leading-dot
+          // syntax.
+          CS.recordPotentialHole(patternType);
+
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
               MetatypeType::get(patternType), enumPattern->getName(),
@@ -4263,6 +4266,7 @@ bool ConstraintSystem::generateConstraints(
     return false;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {

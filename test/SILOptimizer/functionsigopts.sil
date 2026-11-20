@@ -1879,6 +1879,45 @@ bb0(%0 : @noImplicitCopy $*T):
   return %4
 }
 
+struct NC: ~Copyable {
+  var f: foo
+}
+
+// CHECK-NOT: sil {{.*}}signature_optimized_thunk{{.*}} @owned_noncopyable_result
+// CHECK-LABEL: sil @owned_noncopyable_result : $@convention(thin) (@guaranteed foo) -> @owned NC {
+// CHECK:         strong_retain %0
+// CHECK:       } // end sil function 'owned_noncopyable_result'
+sil @owned_noncopyable_result : $@convention(thin) (@guaranteed foo) -> @owned NC {
+bb0(%0 : $foo):
+  // make it a non-trivial function
+  %c1 = builtin "assert_configuration"() : $Builtin.Int32
+  %c2 = builtin "assert_configuration"() : $Builtin.Int32
+  %c3 = builtin "assert_configuration"() : $Builtin.Int32
+  %c4 = builtin "assert_configuration"() : $Builtin.Int32
+  %c5 = builtin "assert_configuration"() : $Builtin.Int32
+  %c6 = builtin "assert_configuration"() : $Builtin.Int32
+  %c7 = builtin "assert_configuration"() : $Builtin.Int32
+  %c8 = builtin "assert_configuration"() : $Builtin.Int32
+  %c9 = builtin "assert_configuration"() : $Builtin.Int32
+  %c10 = builtin "assert_configuration"() : $Builtin.Int32
+  %c11 = builtin "assert_configuration"() : $Builtin.Int32
+  %c12 = builtin "assert_configuration"() : $Builtin.Int32
+  %c13 = builtin "assert_configuration"() : $Builtin.Int32
+  %c14 = builtin "assert_configuration"() : $Builtin.Int32
+  %c15 = builtin "assert_configuration"() : $Builtin.Int32
+  %c16 = builtin "assert_configuration"() : $Builtin.Int32
+  %c17 = builtin "assert_configuration"() : $Builtin.Int32
+  %c18 = builtin "assert_configuration"() : $Builtin.Int32
+  %c19 = builtin "assert_configuration"() : $Builtin.Int32
+  %c20 = builtin "assert_configuration"() : $Builtin.Int32
+  %c21 = builtin "assert_configuration"() : $Builtin.Int32
+  %c22 = builtin "assert_configuration"() : $Builtin.Int32
+
+  strong_retain %0 : $foo
+  %1 = struct $NC (%0 : $foo)
+  return %1 : $NC
+}
+
 // CHECK-LABEL: sil shared @$s36exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release

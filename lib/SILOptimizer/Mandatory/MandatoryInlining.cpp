@@ -152,7 +152,7 @@ static  bool fixupReferenceCounts(
       auto *stackLoc = builder.createAllocStack(loc, v->getType().getObjectType());
       builder.createCopyAddr(loc, v, stackLoc, IsNotTake, IsInitialization);
 
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
+      LinearLifetimeChecker checker;
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -213,7 +213,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
+      LinearLifetimeChecker checker;
       bool consumedInLoop = checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -260,7 +260,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
+      LinearLifetimeChecker checker;
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -297,7 +297,7 @@ static  bool fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      LinearLifetimeChecker checker(/*deadEndBlocks*/ nullptr);
+      LinearLifetimeChecker checker;
       checker.completeConsumingUseSet(
           pai, applySite.getCalleeOperand(),
           [&](SILBasicBlock::iterator insertPt) {
@@ -1014,6 +1014,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      if (!lastBB) {
+        ASSERT(!PAI || PAI->isOnStack());
+        continue;
+      }
 
       // When inlining an OSSA function into a non-OSSA function, ownership of
       // nonescaping closures is lowered.  At that point, they are recognized

@@ -249,6 +249,10 @@ private:
   /// A map recording if metadata can be emitted lazily for each nominal type.
   llvm::DenseMap<TypeDecl *, bool> HasLazyMetadata;
 
+  /// The class methods that introduce a vtable slot that the generated C++
+  /// header may dispatch through, computed on first use.
+  std::optional<llvm::DenseSet<SILDeclRef>> CxxHeaderDispatchedMethods;
+
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
     bool IsMetadataUsed = false;
@@ -476,6 +480,11 @@ public:
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
   bool hasLazyMetadata(TypeDecl *type);
+
+  /// Whether the generated C++ header may dispatch through the vtable slot
+  /// that \p method introduces, because it may call the method or one of its
+  /// overrides.
+  bool mayDispatchFromCxxHeader(SILDeclRef method);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
@@ -1392,6 +1401,13 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Override the linkage computed by Clang for \p global with \p linkage if
+  /// \p declModule, the module that the corresponding declaration belongs to,
+  /// is imported @_weakLinked.
+  void overrideLinkageForWeakLinkedClangDecl(
+      llvm::GlobalValue *global, const ModuleDecl *declModule,
+      llvm::GlobalValue::LinkageTypes linkage);
+
   /// Global blocks, keyed by their invoke function and constant capture.
   llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
                  llvm::Constant *> GlobalBlocks;
@@ -1474,6 +1490,10 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
+
+  /// Additional conformance descriptors, for the conformances of
+  /// back-deployed types, that refer to the defining module's type descriptor.
+  std::vector<llvm::Constant *> BackDeploymentCanonicalConformances;
   /// List of types to generate runtime-resolvable metadata records for that
   /// are consumable for any Swift runtime.
   SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
@@ -1741,6 +1761,7 @@ public:
 
   FunctionPointer getFixedClassInitializationFn();
   llvm::Function *getAwaitAsyncContinuationFn();
+  llvm::Function *getAwaitSplitContinuationFn();
 
   /// The constructor used when generating code.
   ///
@@ -1823,6 +1844,14 @@ public:
   void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
+  /// Get a slot holding a weak reference to the type context descriptor of a
+  /// back-deployed type in its defining module, as opposed to this module's
+  /// copy of it. The slot is null when that module doesn't provide the type at
+  /// runtime.
+  llvm::Constant *getAddrOfDefiningModuleTypeDescriptorSlot(
+      NominalTypeDecl *decl);
+  llvm::Constant *
+  emitCanonicalTypeProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
 
@@ -1966,6 +1995,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfTypeMetadataMangledNameRef(CanType type,
+                                                      ConstantInit definition);
   llvm::Constant *getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
       NominalTypeDecl *decl);
   llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);

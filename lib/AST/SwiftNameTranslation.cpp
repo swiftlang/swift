@@ -450,6 +450,47 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
   return false;
 }
 
+swift::cxx_translation::CxxExposure
+swift::cxx_translation::getCxxExposure(const ValueDecl *VD) {
+  auto exposure = CxxExposure::Unannotated;
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>()) {
+      switch (attr->getExposureKind()) {
+      case ExposureKind::Cxx:
+        exposure = CxxExposure::Exposed;
+        break;
+      case ExposureKind::NotCxx:
+        return CxxExposure::NotExposed;
+      case ExposureKind::Wasm:
+        break;
+      }
+    }
+  }
+  return exposure;
+}
+
+bool swift::cxx_translation::mayBePrintedInCxxHeader(
+    const ValueDecl *VD, AccessLevel minRequiredAccess,
+    bool requiresExposeAttr) {
+  // Accessors are printed together with their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(VD))
+    VD = accessor->getStorage();
+
+  auto exposure = getCxxExposure(VD);
+  if (exposure == CxxExposure::NotExposed)
+    return false;
+  if (requiresExposeAttr && exposure != CxxExposure::Exposed)
+    return false;
+
+  // A member is only printed as part of its enclosing type.
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    if (!isVisibleToCxx(VD, minRequiredAccess) ||
+        !isExposableToCxx(VD, /*layoutQueries=*/nullptr))
+      return false;
+  }
+  return true;
+}
+
 bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   // If there's no generic signature, it's fine.
   if (!genericSig)
@@ -533,4 +574,5 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
   case UnrepresentableZeroSizedValueType:
     return Diagnostic(diag::expose_zero_size_to_cxx, vd);
   }
+  llvm_unreachable("covered switch");
 }

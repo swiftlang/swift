@@ -127,7 +127,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     if (!li->getType().isTrivial(*li->getFunction()))
       return false;
     SILBuilderWithScope b(li);
-    auto newVal = b.emitLoadValueOperation(li->getLoc(), li->getOperand(),
+    auto newVal = b.emitLoadValueOperation(li->getLoc(), li->getAddress(),
                                            LoadOwnershipQualifier::Trivial);
     li->replaceAllUsesWith(newVal);
     return eraseFromParent(li);

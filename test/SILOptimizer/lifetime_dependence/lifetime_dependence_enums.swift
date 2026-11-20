@@ -1,5 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil \
+// RUN:   -sil-verify-all \
+// RUN:   -o /dev/null
 
 
 public protocol OptionalType<Wrapped> {

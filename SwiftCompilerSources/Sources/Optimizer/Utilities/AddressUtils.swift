@@ -156,7 +156,7 @@ extension AddressUseVisitor {
     // returned address should be structurally used as if it were a projected
     // use in the caller, even though there is no code here in the callee to
     // formally end the access.
-         is ReturnInst:
+         is ReturnInst, is ReturnBorrowInst:
       return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
@@ -171,8 +171,8 @@ extension AddressUseVisitor {
       switch builtin.id {
       // Builtins that cannot load a nontrivial value.
       case .TSanInoutAccess, .ResumeThrowingContinuationReturning,
-           .ResumeNonThrowingContinuationReturning, .GenericAdd,
-           .GenericFAdd, .GenericAnd, .GenericAShr, .GenericLShr, .GenericOr,
+           .ResumeNonThrowingContinuationReturning, .GetSplitContinuationAddr,
+           .GenericAdd, .GenericFAdd, .GenericAnd, .GenericAShr, .GenericLShr, .GenericOr,
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
@@ -581,7 +581,7 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
       }
     case .storeBorrow(let sb):
       return computeValueLiveRange(of: sb.source, context)
-    case .pointer, .index, .unidentified:
+    case .pointer, .borrowMutateAccessor, .index, .unidentified:
       return nil
     }
   }

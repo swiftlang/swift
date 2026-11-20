@@ -71,7 +71,7 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
     // CHECK: [[TYPE:%.*]] = load {{.*}} %0
     // CHECK: call {{.*}} @useMetadata(ptr [[TYPE]], ptr [[TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<U>.self)
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}FinalPrivateNonfinalSubclass
+    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}({{.*}}FinalPrivateNonfinalSubclass
     // CHECK: call {{.*}} @useMetadata(ptr [[INSTANTIATED_TYPE]], ptr [[INSTANTIATED_TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<Int>.self)
   }
@@ -92,7 +92,7 @@ final private class PrivateFinal<T, U, V> {
     // CHECK: [[TYPE:%.*]] = load {{.*}} %0
     // CHECK: call {{.*}} @useMetadata(ptr [[TYPE]], ptr [[TYPE]])
     useMetadata(PrivateFinal<T, U, V>.self)
-    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}PrivateFinal
+    // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}({{.*}}PrivateFinal
     // CHECK: call {{.*}} @useMetadata(ptr [[INSTANTIATED_TYPE]], ptr [[INSTANTIATED_TYPE]])
     useMetadata(PrivateFinal<Int, String, Float>.self)
   }

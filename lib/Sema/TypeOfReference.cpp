@@ -423,10 +423,11 @@ Type ConstraintSystem::openPackExpansionType(PackExpansionType *expansion,
   // "opening" pack expansions is broken.
   {
     if (preparedOverload) {
-      for (auto change : preparedOverload->Changes) {
-        if (change.Kind == PreparedOverload::Change::OpenedPackExpansionType &&
-            change.PackExpansion.TheExpansion == openedPackExpansion)
-          return change.PackExpansion.TypeVar;
+      for (auto &change : preparedOverload->Changes) {
+        if (auto openedExpansion =
+              change.dyn_cast<PreparedOverloadChange::Kind::OpenedPackExpansionType>())
+          if (openedExpansion->TheExpansion == openedPackExpansion)
+            return openedExpansion->TypeVar;
       }
     }
 
@@ -948,7 +949,7 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs,
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     auto paramInternalLabel = paramTypes[i].getInternalLabel();
-    adjustedParamTypes.push_back(AnyFunctionType::Param(
+    adjustedParamTypes.push_back(AnyFunctionType::Param::bodyAccess(
         wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
     cs.applyPropertyWrapperToParameter(
         paramType, wrappedType, paramDecl, argLabel, ConstraintKind::Equal,
@@ -1554,7 +1555,7 @@ Type ConstraintSystem::getTypeOfMemberTypeReference(
     memberTy = MetatypeType::get(memberTy);
   }
 
-  FunctionType::Param baseObjParam(baseObjTy);
+  auto baseObjParam = FunctionType::Param::bodyAccess(baseObjTy);
   return FunctionType::get({baseObjParam}, /* yields */ {}, memberTy);
 }
 
@@ -1623,7 +1624,8 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
                                preparedOverload);
   }
 
-  FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
+  auto selfParam =
+      FunctionType::Param::bodyAccess(selfTy, Identifier(), selfFlags);
 
   FunctionType::ExtInfo info;
   return std::make_pair(
@@ -2389,9 +2391,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       recordArgumentList(argLoc, argList);
     }
 
-    auto *callerTy =
-        FunctionType::get({FunctionType::Param(argTy, ctx.Id_dynamicMember)},
-                          /* yields */ {}, resultTy);
+    auto *callerTy = FunctionType::get(
+        {FunctionType::Param::bodyAccess(argTy, ctx.Id_dynamicMember)},
+        /* yields */ {}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
     addApplicationConstraint(
@@ -2739,8 +2741,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape, preparedOverload);
 
-    FunctionType::Param inputArg(input,
-                                 CS.getASTContext().getIdentifier("of"));
+    auto inputArg = FunctionType::Param::bodyAccess(
+        input, CS.getASTContext().getIdentifier("of"));
 
     CS.addConstraint(
         ConstraintKind::DynamicTypeOf, output, input,
@@ -2769,7 +2771,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0, preparedOverload);
-    FunctionType::Param arg(escapeClosure);
+    auto arg = FunctionType::Param::bodyAccess(escapeClosure);
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2781,8 +2783,9 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
-      FunctionType::Param(noescapeClosure),
-      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
+      FunctionType::Param::bodyAccess(noescapeClosure),
+      FunctionType::Param::bodyAccess(bodyClosure,
+                                      CS.getASTContext().getIdentifier("do")),
     };
 
     auto withoutEscapingIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -2816,7 +2819,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         preparedOverload);
     auto consuming =
         ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::Consuming);
-    FunctionType::Param arg(atMostOnceClosure, Identifier(), consuming);
+    auto arg = FunctionType::Param::bodyAccess(atMostOnceClosure, Identifier(),
+                                               consuming);
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2828,9 +2832,10 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
-        FunctionType::Param(exactlyOnceClosure, Identifier(), consuming),
-        FunctionType::Param(bodyClosure,
-                            CS.getASTContext().getIdentifier("do")),
+        FunctionType::Param::bodyAccess(exactlyOnceClosure, Identifier(),
+                                        consuming),
+        FunctionType::Param::bodyAccess(bodyClosure,
+                                        CS.getASTContext().getIdentifier("do")),
     };
 
     auto withoutDeinitingIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -2861,7 +2866,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0, preparedOverload);
-    FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
+    FunctionType::Param bodyArgs[] = {
+        FunctionType::Param::bodyAccess(openedTy)};
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2873,8 +2879,9 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
-      FunctionType::Param(existentialTy),
-      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
+      FunctionType::Param::bodyAccess(existentialTy),
+      FunctionType::Param::bodyAccess(bodyClosure,
+                                      CS.getASTContext().getIdentifier("do")),
     };
 
     auto openExistentialIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -2904,63 +2911,59 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
 void ConstraintSystem::replayChanges(
     ConstraintLocator *locator,
     PreparedOverload *preparedOverload) {
-  for (auto change : preparedOverload->getChanges()) {
-    switch (change.Kind) {
-    case PreparedOverload::Change::AddedTypeVariable:
-      addTypeVariable(change.TypeVar);
-      break;
+  struct Visitor {
+    void visitAddedTypeVariable(TypeVariableType *typeVar) {
+      cs.addTypeVariable(typeVar);
+    }
 
-    case PreparedOverload::Change::AddedConstraint:
-      simplifyDisjunctionChoice(change.TheConstraint);
-      break;
+    void visitAddedConstraint(Constraint *constraint) {
+      cs.simplifyDisjunctionChoice(constraint);
+    }
 
-    case PreparedOverload::Change::AddedBindConstraint:
-      addConstraint(ConstraintKind::Bind,
-                    change.Bind.FirstType,
-                    change.Bind.SecondType,
-                    locator,
-                    /*isFavored=*/false);
-      break;
+    void visitAddedBindConstraint(Type firstType, Type secondType) {
+      cs.addConstraint(ConstraintKind::Bind,
+                       firstType,
+                       secondType,
+                       locator,
+                       /*isFavored=*/false);
+    }
 
-    case PreparedOverload::Change::OpenedTypes: {
-      ArrayRef<OpenedType> replacements(
-          change.Replacements.Data,
-          change.Replacements.Count);
-
+    void visitOpenedTypes(ArrayRef<OpenedType> replacements) {
       // FIXME: Get rid of this conditional.
-      if (getOpenedTypes(locator).empty())
-        recordOpenedType(locator, replacements);
-      break;
+      if (cs.getOpenedTypes(locator).empty())
+        cs.recordOpenedType(locator, replacements);
     }
 
-    case PreparedOverload::Change::OpenedExistentialType: {
-      recordOpenedExistentialType(locator,
-                                  change.TheExistential);
-      break;
+    void visitOpenedExistentialType(ExistentialArchetypeType *existential) {
+      cs.recordOpenedExistentialType(locator, existential);
     }
 
-    case PreparedOverload::Change::OpenedPackExpansionType:
-      recordOpenedPackExpansionType(
-          change.PackExpansion.TheExpansion,
-          change.PackExpansion.TypeVar);
-      break;
+    void visitOpenedPackExpansionType(PackExpansionType *expansion,
+                                      TypeVariableType *typeVar) {
+      cs.recordOpenedPackExpansionType(expansion, typeVar);
+    }
 
-    case PreparedOverload::Change::AppliedPropertyWrapper: {
+    void visitAppliedPropertyWrapper(Type wrapperType,
+                                     PropertyWrapperInitKind initKind) {
       Expr *anchor = getAsExpr(locator->getAnchor());
-      applyPropertyWrapper(anchor,
-          { Type(change.PropertyWrapper.WrapperType),
-            change.PropertyWrapper.InitKind });
-      break;
+      cs.applyPropertyWrapper(anchor, {wrapperType, initKind});
     }
 
-    case PreparedOverload::Change::AddedFix:
-      recordFix(change.Fix.TheFix, change.Fix.Impact);
-      break;
-
-    case PreparedOverload::Change::RecordedNodeType:
-      setType(change.Node.Node, change.Node.TheType);
-      break;
+    void visitAddedFix(ConstraintFix *fix, FixImpact impact) {
+      cs.recordFix(fix, impact);
     }
+
+    void visitRecordedNodeType(ASTNode node, Type type) {
+      cs.setType(node, type);
+    }
+
+    ConstraintSystem &cs;
+    ConstraintLocator *locator;
+    PreparedOverload *preparedOverload;
+  } visitor{*this, locator, preparedOverload};
+
+  for (auto &change : preparedOverload->getChanges()) {
+    change.visit(visitor);
   }
 }
 
@@ -3122,14 +3125,15 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
 
     FunctionType::Param indices[] = {
-      FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
+      FunctionType::Param::bodyAccess(keyPathIndexTy,
+                                      getASTContext().Id_keyPath),
     };
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo subscriptInfo;
     auto subscriptTy =
         FunctionType::get(indices, /* yields */ {}, elementTy, subscriptInfo);
 
-    FunctionType::Param baseParam(choice.getBaseType());
+    auto baseParam = FunctionType::Param::bodyAccess(choice.getBaseType());
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
     auto fullTy =
@@ -3375,77 +3379,84 @@ void PreparedOverloadChange::dump(llvm::raw_ostream &out,
   PrintOptions PO = PrintOptions::forDebugging();
   out.indent(indent);
 
-  switch (Kind) {
-  case AddedTypeVariable:
-    out << "(AddedTypeVariable ";
-    TypeVar->print(out, PO);
-    out << ")\n";
-    break;
-
-  case AddedConstraint:
-    out << "(AddedConstraint ";
-    TheConstraint->print(out, &cs.getASTContext().SourceMgr,
-                         indent + 2);
-    out << ")\n";
-    break;
-
-  case AddedBindConstraint:
-    out << "(AddedBindConstraint ";
-    Bind.FirstType->print(out, PO);
-    out << " ";
-    Bind.SecondType->print(out, PO);
-    out << ")\n";
-    break;
-
-  case OpenedTypes: {
-    out << "(OpenedTypes";
-    for (unsigned i = 0, e = Replacements.Count; i < e; ++i) {
-      out << " ";
-      auto openedType = Replacements.Data[i];
-      openedType.first->print(out, PO);
-      out << " -> ";
-      openedType.second->print(out, PO);
+  struct Visitor {
+    void visitAddedTypeVariable(TypeVariableType *typeVar) {
+      out << "(AddedTypeVariable ";
+      typeVar->print(out, PO);
+      out << ")\n";
     }
-    out << ")\n";
-    break;
-  }
 
-  case OpenedExistentialType:
-    out << "(OpenedExistentialType ";
-    TheExistential->print(out, PO);
-    out << ")\n";
-    break;
+    void visitAddedConstraint(Constraint *constraint) {
+      out << "(AddedConstraint ";
+      constraint->print(out, &cs.getASTContext().SourceMgr,
+                        indent + 2);
+      out << ")\n";
+    }
 
-  case OpenedPackExpansionType:
-    out << "(OpenedPackExpansionType ";
-    PackExpansion.TheExpansion->print(out, PO);
-    out << " ";
-    PackExpansion.TypeVar->print(out, PO);
-    out << ")\n";
-    break;
+    void visitAddedBindConstraint(Type firstType, Type secondType) {
+      out << "(AddedBindConstraint ";
+      firstType->print(out, PO);
+      out << " ";
+      secondType->print(out, PO);
+      out << ")\n";
+    }
 
-  case AppliedPropertyWrapper:
-    out << "(AppliedPropertyWrapper ";
-    PropertyWrapper.WrapperType->print(out, PO);
-    out << " ";
-    out << unsigned(PropertyWrapper.InitKind);
-    out << ")\n";
-    break;
+    void visitOpenedTypes(ArrayRef<OpenedType> replacements) {
+      out << "(OpenedTypes";
+      for (auto openedType: replacements) {
+        out << " ";
+        openedType.first->print(out, PO);
+        out << " -> ";
+        openedType.second->print(out, PO);
+      }
+      out << ")\n";
+    }
 
-  case AddedFix:
-    out << "(AddedFix ";
-    Fix.TheFix->print(out);
-    out << ")\n";
-    break;
+    void visitOpenedExistentialType(ExistentialArchetypeType *existential) {
+      out << "(OpenedExistentialType ";
+      existential->print(out, PO);
+      out << ")\n";
+    }
 
-  case RecordedNodeType:
-    out << "(RecordedNodeType at ";
-    Node.Node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
-    out << " ";
-    Node.TheType->print(out, PO);
-    out << ")\n";
-    break;
-  }
+    void visitOpenedPackExpansionType(PackExpansionType *expansion,
+                                      TypeVariableType *typeVar) {
+      out << "(OpenedPackExpansionType ";
+      expansion->print(out, PO);
+      out << " ";
+      typeVar->print(out, PO);
+      out << ")\n";
+    }
+
+    void visitAppliedPropertyWrapper(Type wrapperType,
+                                     PropertyWrapperInitKind initKind) {
+      out << "(AppliedPropertyWrapper ";
+      wrapperType->print(out, PO);
+      out << " ";
+      out << unsigned(initKind);
+      out << ")\n";
+    }
+
+    void visitAddedFix(ConstraintFix *fix, FixImpact impact) {
+      out << "(AddedFix ";
+      fix->print(out);
+      out << ")\n";
+    }
+
+    void visitRecordedNodeType(ASTNode node, Type type) {
+      out << "(RecordedNodeType at ";
+      node.getStartLoc().print(out, cs.getASTContext().SourceMgr);
+      out << " ";
+      type->print(out, PO);
+      out << ")\n";
+    }
+
+    llvm::raw_ostream &out;
+    ConstraintSystem &cs;
+    unsigned indent;
+    const PrintOptions &PO;
+  };
+
+  visit(Visitor{out, cs, indent, PO});
 }
 
 void PreparedOverloadBuilder::dump(llvm::raw_ostream &out,

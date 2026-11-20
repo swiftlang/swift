@@ -489,6 +489,7 @@ public:
       return cast<UnconditionalCheckedCastInst>(inst)
           ->getCheckedCastOptions();
     }
+    llvm_unreachable("covered switch");
   }
 };
 

@@ -1,24 +1,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-as-library -enable-experimental-feature BackDeployFrozenValueTypes -enable-library-evolution -module-name MyKit %S/Inputs/back_deployed_type_module.swift -o %t/MyKit.swiftmodule
 // RUN: %target-typecheck-verify-swift -I %t
-// RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution -verify-additional-prefix resilient-
-
-// With a deployment target where MyKit provides the type, there's no copy of
-// the type for conformances to apply to instead.
-// RUN: %target-swift-frontend -typecheck -I %t -enable-library-evolution %s -target %target-cpu-apple-macosx99 2>&1 | %FileCheck %s --allow-empty --check-prefix=NEW
-// NEW-NOT: error
+// RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -I %t -enable-library-evolution -target %target-cpu-apple-macosx99
 
 // REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 
 import MyKit
 
-// Before MyKit provides 'Point', this module uses its own copy of it, and
-// MyKit's metadata for it doesn't see conformances declared for the copy.
+// Before MyKit provides 'Point', this module uses its own copy of it. The
+// conformance records that this module emits for the copy also refer to
+// MyKit's type, so that the runtime finds them when MyKit provides the type.
 
-extension Point: @retroactive CustomStringConvertible { // expected-error {{conformance of back-deployed type 'Point' to protocol 'CustomStringConvertible' must not be available before macOS 99}}
-  // expected-note@-1 {{this module uses its own copy of 'Point' before macOS 99, and the conformance would not apply to 'Point' from 'MyKit'}}
-  // expected-note@-2 {{add '@available' attribute to enclosing extension}}
+extension Point: @retroactive CustomStringConvertible {
   public var description: String { "" }
 }
 
@@ -40,8 +35,6 @@ public protocol LocalProto {
   func f()
 }
 
-extension Point: LocalProto { // expected-resilient-error {{conformance of back-deployed type 'Point' to protocol 'LocalProto' must not be available before macOS 99}}
-  // expected-resilient-note@-1 {{this module uses its own copy of 'Point' before macOS 99, and the conformance would not apply to 'Point' from 'MyKit'}}
-  // expected-resilient-note@-2 {{add '@available' attribute to enclosing extension}}
+extension Point: LocalProto {
   public func f() {}
 }

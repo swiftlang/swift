@@ -290,7 +290,7 @@ bb0(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer):
 // cannot observe a de-initializer running earlier.
 // CHECK-LABEL: begin running test {{.*}} on test_copy_array_builtin: is_deinit_barrier
 // CHECK:       builtin "copyArray"
-// CHECK:       false
+// CHECK:       true
 // CHECK-LABEL: end running test {{.*}} on test_copy_array_builtin: is_deinit_barrier
 sil [ossa] @test_copy_array_builtin : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word):

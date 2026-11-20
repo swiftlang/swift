@@ -15,8 +15,11 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "clang/AST/DeclTemplate.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace clang {
 class ASTContext;
@@ -59,6 +62,34 @@ enum class ClangTypeKind {
   /// Structs, enums, and unions.
   Tag,
   ObjCProtocol,
+};
+
+/// A foreign type that Swift code must not use and why.
+class UnusableForeignType {
+public:
+  /// Why ClangImporter considers a type unusable from Swift.
+  enum class Reason : uint8_t {
+    /// A shared foreign reference type whose definition (or base's definition)
+    /// is not reachable, so its retain/release operations cannot be resolved.
+    UnreachableForeignReferenceType,
+  };
+
+private:
+  llvm::PointerIntPair<NominalTypeDecl *, 3, Reason> declAndReason;
+
+public:
+  /// No unusable type.
+  explicit UnusableForeignType() : declAndReason(nullptr, Reason()) {}
+
+  UnusableForeignType(NominalTypeDecl *decl, Reason reason)
+      : declAndReason(decl, reason) {
+    ASSERT(decl && "use the default constructor for no type");
+  }
+
+  NominalTypeDecl *getDecl() const { return declAndReason.getPointer(); }
+  Reason getReason() const { return declAndReason.getInt(); }
+
+  explicit operator bool() const { return getDecl(); }
 };
 
 /// A path for serializing a declaration.
@@ -281,6 +312,27 @@ public:
   virtual std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) = 0;
 
+  /// If \p type exposes a foreign type that Swift code must not use, returns
+  /// that type and the reason. Otherwise, returns an empty result.
+  ///
+  /// A type T exposes an unusable type U if:
+  ///   - T is U; or
+  ///   - T is formed from a type that exposes U: a generic argument,
+  ///     a tuple element, a function parameter or result (except of a C
+  ///     function pointer), or the instance type of a metatype; or
+  ///   - T is a struct or enum that Swift copies and destroys field by field,
+  ///     and one of its stored properties, enum payloads, or C++ base classes
+  ///     exposes U.
+  ///
+  /// The last rule does not apply to:
+  ///   - classes, since copying a reference doesn't copy the object;
+  ///   - unsafe pointers (e.g. `UnsafePointer<U>`), since they don't copy or
+  ///     destroy U;
+  ///   - resilient types, since their storage is hidden; and
+  ///   - C++ records that C++ copies and destroys, i.e., records with a public
+  ///     copy constructor and a non-trivial destructor.
+  virtual UnusableForeignType exposesUnusableForeignType(Type type) = 0;
+
   /// Returns true if we synthesize this member for every type so no need to
   /// clone it for the derived classes.
   virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
@@ -420,9 +472,15 @@ public:
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
 
-  virtual Type importVarDeclType(const clang::VarDecl *clangDecl,
-                                 VarDecl *swiftDecl,
-                                 DeclContext *dc) = 0;
+  /// Imports the Swift type of the imported Clang variable \p VD.
+  ///
+  /// \p VD - The imported Swift `VarDecl`; requires
+  /// `isa<clang::VarDecl>(VD->getClangDecl())`. This method may mutate \p VD
+  /// based on the computed type and may adjust the computed type based on
+  /// attributes on \p VD.
+  ///
+  /// \returns The imported Swift type, or an `ErrorType` on failure.
+  virtual Type importVarDeclType(VarDecl *VD) = 0;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

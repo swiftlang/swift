@@ -1752,6 +1752,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
       case ActorIsolation::Erased:
         llvm::report_fatal_error("Should never see this");
       }
+      llvm_unreachable("covered switch");
     }();
     args.push_back(B.convertToImplicitActor(loc, value));
   }
@@ -1973,7 +1974,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // If the function we're calling isn't actually polymorphic, drop the
   // substitutions.  This should only happen in concrete specializations.
   if (subs && !nativeFn->getType().castTo<SILFunctionType>()->isPolymorphic()) {
-    assert(subs.getGenericSignature()->areAllParamsConcrete());
+    assert(!subs.isEffectivelyGeneric());
     subs = SubstitutionMap();
   }
     

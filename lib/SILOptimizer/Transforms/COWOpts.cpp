@@ -304,8 +304,15 @@ void COWOptsPass::collectEscapePoints(SILValue v,
       case SILInstructionKind::TupleExtractInst:
       case SILInstructionKind::UncheckedRefCastInst:
       case SILInstructionKind::BeginBorrowInst:
+      case SILInstructionKind::UncheckedOwnershipInst:
         collectEscapePoints(cast<SingleValueInstruction>(user),
                             escapePoints, handled);
+        break;
+      case SILInstructionKind::LoadBorrowInst:
+        // The buffer can only be used as value hint of a load_borrow.
+        // OwnershipModelElimination may replace the load with the value hint,
+        // so the loaded value must be handled like the buffer itself.
+        collectEscapePoints(cast<LoadBorrowInst>(user), escapePoints, handled);
         break;
       case SILInstructionKind::DestructureStructInst:
         for (SILValue result : user->getResults()) {

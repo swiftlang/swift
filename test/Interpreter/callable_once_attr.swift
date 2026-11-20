@@ -140,6 +140,28 @@ func testMixedConsumingAndBorrowingCaptures() {
 // CHECK-NEXT: Tracker(mixed) deinit
 testMixedConsumingAndBorrowingCaptures()
 
+// A closure's context borrows a `borrowing` parameter that it captures, so
+// neither a call nor a drop of the closure destroys the parameter.
+@inline(never)
+func testBorrowingParameterCapture(_ t: borrowing Tracker, call: Bool) {
+  if call {
+    consume({ _ in print("Tracker(\(t.tag)) captured") }, Payload(tag: ""))
+  } else {
+    dontConsume { _ in print("Tracker(\(t.tag)) captured") }
+  }
+  print("Tracker(\(t.tag)) still alive")
+}
+
+// CHECK-NEXT: Tracker(borrowing) captured
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) deinit
+do {
+  let t = Tracker("borrowing")
+  testBorrowingParameterCapture(t, call: true)
+  testBorrowingParameterCapture(t, call: false)
+}
+
 // A zero-sized `~Copyable` consuming capture must still be destroyed
 // (regression test: an empty capture must not be dropped from the
 // context's layout, since it would then never be destroyed at all).
@@ -629,3 +651,147 @@ func makeTag() -> String { "thunk" }
 
 // CHECK-NEXT: thunk
 print(genericCallAtMostOnce(makeTag))
+
+struct Failure: Error {}
+
+@inline(never)
+func callThrowing(_ fn: @callable(once) () throws -> Void) throws {
+  try fn()
+}
+
+func testThrowingCapture(_ tag: String) {
+  let t = Tracker(tag)
+  do {
+    try callThrowing {
+      print("throwing from \(t.tag)")
+      throw Failure()
+    }
+  } catch {
+    print("caught")
+  }
+}
+
+// CHECK-NEXT: throwing from throwing capture
+// CHECK-NEXT: caught
+// CHECK-NEXT: Tracker(throwing capture) deinit
+testThrowingCapture("throwing capture")
+
+@inline(__always)
+func callThrowingInlined(_ fn: @callable(once) () throws -> Int) throws -> Int {
+  try fn()
+}
+
+@inline(never)
+func testInlinedThrowingCapture(_ shouldThrow: Bool, _ tag: String) {
+  let t = Tracker(tag)
+  do {
+    let r = try callThrowingInlined {
+      if shouldThrow { throw Failure() }
+      return t.tag.count
+    }
+    print("returned \(r)")
+  } catch {
+    print("caught")
+  }
+}
+
+// CHECK-NEXT: caught
+// CHECK-NEXT: Tracker(inlined throw) deinit
+testInlinedThrowingCapture(true, "inlined throw")
+// CHECK-NEXT: returned 14
+// CHECK-NEXT: Tracker(inlined return) deinit
+testInlinedThrowingCapture(false, "inlined return")
+
+// A borrowed at-most-once value can be inspected, and its owner can drop it
+// without a call.
+func inspectAtMostOnce(_ fn: borrowing @escaping @callable(once) () -> Void) {
+  print("inspected")
+}
+
+func runBody(_ body: () -> Void) { body() }
+
+@inline(never)
+func testDropAfterBorrowing(_ tag: String) {
+  let r = Resource(tag)
+  let fn: @callable(once) () -> Void = { r.use() }
+  runBody { inspectAtMostOnce(fn) }
+}
+
+// CHECK-NEXT: inspected
+// CHECK-NEXT: Resource(borrowed) deinit
+testDropAfterBorrowing("borrowed")
+
+// The type of a borrowed function value is its static type.
+@inline(never)
+func dynamicType(
+  _ fn: borrowing @escaping @callable(once) () -> Void
+) -> ObjectIdentifier {
+  ObjectIdentifier(type(of: fn))
+}
+
+// CHECK-NEXT: type: true
+// CHECK-NEXT: type is not plain: true
+do {
+  let fn: @callable(once) () -> Void = { }
+  print("type: \(dynamicType(fn) == ObjectIdentifier((@callable(once) () -> Void).self))")
+  print("type is not plain: \(dynamicType(fn) != ObjectIdentifier((() -> Void).self))")
+}
+
+// An at-most-once function has the layout of an ordinary function.
+// CHECK-NEXT: layout: true
+print("layout: \(MemoryLayout<@callable(once) () -> Void>.size == MemoryLayout<() -> Void>.size && MemoryLayout<@callable(once) () -> Void>.alignment == MemoryLayout<() -> Void>.alignment)")
+
+// An at-most-once closure with a consumed noncopyable capture, which is
+// forwarded to a generic function through a heap-allocated re-abstraction
+// thunk.
+
+@inline(never)
+func runGeneric<R>(_ fn: @callable(once) () -> R) -> R { fn() }
+
+@inline(__always)
+func forwardToGeneric(_ fn: @callable(once) () -> Int) -> Int { runGeneric(fn) }
+
+@inline(never)
+func consumeResource(_ r: consuming Resource) -> Int { r.tag.count }
+
+@inline(never)
+func testForwardConsumedCapture(_ tag: String) -> Int {
+  let r = Resource(tag)
+  return forwardToGeneric { consumeResource(r) }
+}
+
+// CHECK-NEXT: Resource(forwarded) deinit
+// CHECK-NEXT: forwarded consumed capture: 9
+print("forwarded consumed capture: \(testForwardConsumedCapture("forwarded"))")
+
+// An inlined at-most-once closure that consumes a noncopyable capture and is
+// called on either of two paths.
+
+@inline(never)
+func useResource(_ r: consuming Resource) { r.use() }
+
+@inline(__always)
+func callOnEitherPath(_ first: Bool, _ body: @callable(once) () -> Void) {
+  if first {
+    print("first path")
+    body()
+  } else {
+    print("second path")
+    body()
+  }
+}
+
+@inline(never)
+func testCalledOnEitherPath(_ first: Bool, _ tag: String) {
+  let r = Resource(tag)
+  callOnEitherPath(first) { useResource(r) }
+}
+
+// CHECK-NEXT: first path
+// CHECK-NEXT: Resource(either first) used
+// CHECK-NEXT: Resource(either first) deinit
+testCalledOnEitherPath(true, "either first")
+// CHECK-NEXT: second path
+// CHECK-NEXT: Resource(either second) used
+// CHECK-NEXT: Resource(either second) deinit
+testCalledOnEitherPath(false, "either second")

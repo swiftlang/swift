@@ -2071,7 +2071,7 @@ class AllocStackInst final
     : public InstructionBase<SILInstructionKind::AllocStackInst,
                              AllocationInst>,
       private SILDebugVariableSupplement,
-      private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
+      private llvm::TrailingObjects<AllocStackInst, SILLocation,
                                     const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
@@ -2194,7 +2194,7 @@ public:
   /// \param complete If true, always retrieve the complete variable with
   /// location, scope, and element type. If false, only return the
   /// values if they are stored (if they are different from the instruction's
-  /// location, scope, and type). This should only be set to false in
+  /// location and scope). This should only be set to false in
   /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
   /// have location and scope and sometimes not.
   std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
@@ -2207,9 +2207,7 @@ public:
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
-    if (HasAuxDebugVariableType)
-      AuxVarType = *getTrailingObjects<SILType>();
-    else if (complete)
+    if (complete)
       AuxVarType = getElementType();
 
     if (hasAuxDebugLocation())
@@ -3021,7 +3019,7 @@ public:
 
   /// True if this application has generic substitutions.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// The substitutions used to bind the generic arguments of this function.
@@ -3394,8 +3392,74 @@ public:
     return getSubstCalleeConv().hasGuaranteedAddressResult();
   }
 
+  /// If the non-trivial @guaranteed result borrows a @guaranteed self value,
+  /// like a begin_borrow, return the self operand. Otherwise return nullptr.
+  Operand *getSelfObjectOfGuaranteedBorrowAccessorResult() {
+    if (!hasGuaranteedResult() || !hasSelfArgument() ||
+        getType().isTrivial(*getFunction())) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If the result borrows an @in_guaranteed self memory location, return the
+  /// self operand, whose address must not be modified over the scope of the
+  /// result. Returns nullptr if self is @guaranteed, there is no self, or the
+  /// result is trivial.
+  Operand *getSelfAddressOfGuaranteedBorrowAccessorResult() {
+    if (!hasGuaranteedResult() || !hasSelfArgument() ||
+        getType().isTrivial(*getFunction())) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
+  }
+
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// address-typed self, return the self operand. Otherwise return nullptr.
+  Operand *getSelfAddressOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// object-typed self, return the self operand.
+  Operand *getSelfObjectOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isObject()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If the result of a borrow or mutate accessor depends on an object-typed
+  /// self, return the self operand: a non-trivial @guaranteed result borrows
+  /// self, and an address result is an interior pointer of self.
+  Operand *getSelfObjectOfBorrowMutateAccessorResult() {
+    if (auto *selfOperand = getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+      return selfOperand;
+    }
+    return getSelfObjectOfAddressBorrowMutateAccessorResult();
   }
 
   bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
@@ -3463,6 +3527,16 @@ public:
   /// Returns true if the resulting closure can't be copied. See
   /// `SILFunctionType::isNoncopyable()`.
   bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
+
+  /// Returns true if this closure's on-stack context borrows the value
+  /// argument \p argOp instead of owning it.
+  ///
+  /// An on-stack context borrows each value argument, except that the context
+  /// of a noncopyable closure owns the values that the closure consumes.
+  /// Always false for an escaping closure, whose context owns its value
+  /// arguments, and for an address argument, whose ownership follows from its
+  /// convention.
+  bool contextBorrowsArgument(const Operand &argOp) const;
 
   /// Returns true if calling the resulting closure consumes it. See
   /// `SILFunctionType::isCallConsuming()`.
@@ -4583,7 +4657,7 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// Return the type parameters to the builtin.
@@ -5018,17 +5092,39 @@ public:
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
-    public UnaryInstructionBase<SILInstructionKind::LoadBorrowInst,
-                                SingleValueInstruction>
+    public InstructionBase<SILInstructionKind::LoadBorrowInst,
+                           SingleValueInstruction>
 {
   friend class SILBuilder;
+
+  FixedOperandList<2> Operands;
 
   bool Unchecked = false;
 
 public:
-  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue LValue)
-      : UnaryInstructionBase(DebugLoc, LValue,
-                             LValue->getType().getObjectType()) {}
+  LoadBorrowInst(SILDebugLocation DebugLoc, SILValue address, SILValue valueHint)
+      : InstructionBase(DebugLoc, address->getType().getObjectType()),
+        Operands{this, address, valueHint} {}
+
+  SILValue getAddress() const { return getOperand(0); }
+
+  /// Returns the optional value hint.
+  ///
+  /// If present, the loaded value is exactly the value of the value hint.
+  /// This is used if the load_borrow cannot be replaced by the value hint in
+  /// OSSA because it would violate ownership rules, e.g. if the value hint is
+  /// consumed before the load_borrow. The value hint is not an ownership use.
+  ///
+  /// Must only be called if `hasValueHint()` is true.
+  SILValue getValueHint() const { return getOperand(1); }
+
+  /// Returns true if the load_borrow has a value hint.
+  bool hasValueHint() const { return (bool)Operands[1].get(); }
+
+  /// Sets the value hint, which must have the same type as the load_borrow.
+  ///
+  /// `v` must not be null, i.e. this cannot be used to remove a value hint.
+  void setValueHint(SILValue v) { Operands[1].set(v); }
 
   // True if the invariants on `load_borrow` have not been checked and
   // should not be strictly enforced.
@@ -5047,6 +5143,13 @@ public:
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
+
+  ArrayRef<Operand> getAllOperands() const {
+    return Operands.asArray().drop_back(hasValueHint() ? 0 : 1);
+  }
+  MutableArrayRef<Operand> getAllOperands() {
+    return Operands.asArray().drop_back(hasValueHint() ? 0 : 1);
+  }
 };
 
 inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
@@ -5870,6 +5973,13 @@ public:
   /// reconstruction block, returns its return type. Otherwise returns the
   /// SSA operand type.
   SILType getVarType() const;
+
+  /// Returns true if the variable type is the type of the SSA operand, and
+  /// therefore follows a change of the operand's type. Otherwise it's a stored
+  /// type or the return type of a debug reconstruction block.
+  bool varTypeFollowsOperand() const {
+    return !HasAuxDebugVariableType && !getDebugReconstructionBlock();
+  }
 
   /// Return the debug variable information attached to this instruction.
   ///
@@ -9364,6 +9474,10 @@ public:
     /// The marked address is the destination of a second initialization of
     /// immutable storage.
     LetReinit,
+
+    /// The marked address holds `self` in a derived class initializer, which
+    /// may be used before `super.init` initializes its superclass part.
+    MissingSuperInit,
   };
 
 private:
@@ -9941,6 +10055,7 @@ public:
     case CheckKind::InitableButNotConsumable:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   IsStrict_t isStrict() const {
@@ -10345,13 +10460,60 @@ public:
 ///
 /// It is undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
-class DeallocRefInst :
-  public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
-                              DeallocationInst> {
+///
+/// Optionally, it names the tail-allocated arrays the instance was allocated
+/// with, as in `alloc_ref`, so that the deallocation can pass the allocation's
+/// size (and, with typed allocation, its type ID). The instance is operand 0,
+/// followed by the tail element counts.
+class DeallocRefInst final : public InstructionBaseWithTrailingOperands<
+                                 SILInstructionKind::DeallocRefInst,
+                                 DeallocRefInst, DeallocationInst, SILType> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) { }
+  DeallocRefInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> AllOperands,
+                 ArrayRef<SILType> ElementTypes)
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc) {
+    sharedUInt8().DeallocRefInst.numTailTypes = ElementTypes.size();
+    assert(sharedUInt8().DeallocRefInst.numTailTypes == ElementTypes.size() &&
+           "Truncation");
+    assert(AllOperands.size() > ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
+  }
+
+  static DeallocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                                SILValue Operand,
+                                ArrayRef<SILType> ElementTypes,
+                                ArrayRef<SILValue> ElementCountOperands);
+
+public:
+  /// The instance to deallocate.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  unsigned getNumTailTypes() const {
+    return sharedUInt8().DeallocRefInst.numTailTypes;
+  }
+
+  ArrayRef<SILType> getTailAllocatedTypes() const {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  MutableArrayRef<SILType> getTailAllocatedTypes() {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  ArrayRef<Operand> getTailAllocatedCounts() const {
+    return getAllOperands().slice(1, getNumTailTypes());
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

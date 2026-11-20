@@ -14,6 +14,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBasicBlock.h"
 #define DEBUG_TYPE "silgen-cleanup"
 
@@ -103,146 +104,7 @@ namespace {
 // satisfied.
 struct SILGenCleanup : SILFunctionTransform {
   void run() override;
-
-  bool fixupBorrowAccessors(SILFunction *function);
-  bool removeAccessToNonDestructiveEnumProjection(SILFunction *function);
 };
-
-/*  SILGen may produce a borrow accessor result from within a local borrow
- * scope. Such as:
- *
- *    ```
- *      %ld = load_borrow %self
- *      %fwd = unchecked_ownership %ld
- *      %ex = struct_extract %fwd, #Struct.storedProperty
- *      end_borrow %ld
- *      return %ex
- *    ```
- *      This is illegal OSSA, since the return uses a value outside it's borrow
- * scope.
- *
- *    Transform this into valid OSSA:
- *
- *    ```
- *      %ld = load_borrow %self
- *      %ex = struct_extract %ld, #Struct.storedProperty
- *      return_borrow %ex from_scopes %ld
- *    ```
- */
-bool SILGenCleanup::fixupBorrowAccessors(SILFunction *function) {
-  if (!function->getConventions().hasGuaranteedResult()) {
-    return false;
-  }
-  auto returnBB = function->findReturnBB();
-  if (returnBB == function->end()) {
-    return false;
-  }
-
-  auto *returnInst = cast<ReturnInst>(returnBB->getTerminator());
-  if (returnInst->getOperand()->getOwnershipKind() !=
-      OwnershipKind::Guaranteed) {
-    return false;
-  }
-
-  SmallVector<SILValue, 8> enclosingValues;
-  findGuaranteedReferenceRoots(returnInst->getOperand(),
-                               /*lookThroughNestedBorrows=*/false,
-                               enclosingValues);
-  SmallVector<SILInstruction *> scopeEnds;
-  SmallVector<SILValue> operands;
-  SmallVector<SILInstruction *> toDelete;
-
-  // For all the local borrow scopes that enclose the return value, delete
-  // their end_borrow instructions and use them as an enclosing value in
-  // return_borrow instruction.
-  for (auto enclosingValue : enclosingValues) {
-    BorrowedValue borrow(enclosingValue);
-    if (!borrow.isLocalScope()) {
-      continue;
-    }
-    borrow.getLocalScopeEndingInstructions(scopeEnds);
-    for (auto *scopeEnd : scopeEnds) {
-      if (auto *endBorrow = dyn_cast<EndBorrowInst>(scopeEnd)) {
-        operands.push_back(endBorrow->getOperand());
-        endBorrow->eraseFromParent();
-      }
-    }
-    for (auto *uncheckedOwnership :
-         borrow->getUsersOfType<UncheckedOwnershipInst>()) {
-      uncheckedOwnership->replaceAllUsesWith(*borrow);
-      toDelete.push_back(uncheckedOwnership);
-    }
-  }
-
-  for (auto *inst : toDelete) {
-    inst->eraseFromParent();
-  }
-
-  if (operands.empty()) {
-    return false;
-  }
-
-  SILBuilderWithScope(returnInst)
-      .createReturnBorrow(returnInst->getLoc(), returnInst->getOperand(),
-                          operands);
-  returnInst->eraseFromParent();
-  return true;
-}
-
-// When switching over an address enum with a potentially noncopyable payload,
-// SILGen emits a scoped 'begin_access' in the payload projection block. This
-// scoped access is problematic when returning a borrowing of the projection for
-// non-destructive enums because it gets treated as an escape:
-//
-//   extension Optional where Wrapped: ~Copyable & ~Escapable {
-//     func borrow() -> Borrow<Wrapped>? {
-//       switch self {
-//       case .some(let wrapped):
-//         return Borrow(wrapped)
-//       case .none:
-//         return nil
-//       }
-//     }
-//   }
-//
-// The above is perfectly safe since projecting the wrapped value out of an
-// optional does not destroy the enum value itself. For destructive enums
-// however, the above cannot possibly work because after switching over the
-// value we need to reconstruct the enum, so borrows cannot be returned from
-// such scopes (they could be yielded). Remove this scoped access for
-// non-destructive cases only.
-bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
-                                                        SILFunction *function) {
-  auto changed = false;
-
-  for (auto &bb : *function) {
-    for (auto &inst : bb) {
-      auto beginAccess = dyn_cast<BeginAccessInst>(&inst);
-
-      if (!beginAccess) {
-        continue;
-      }
-
-      auto enumProjection =
-          dyn_cast<UncheckedInPlaceEnumDataAddrInst>(beginAccess->getSource());
-
-      if (!enumProjection) {
-        continue;
-      }
-
-      for (auto end : beginAccess->getEndAccesses()) {
-        end->eraseFromParent();
-      }
-
-      beginAccess->replaceAllUsesWith(enumProjection);
-      beginAccess->eraseFromParent();
-
-      changed = true;
-    }
-  }
-
-  return changed;
-}
 
 static void removeEndFormalScopeMarkers(SILFunction &f) {
   // TODO: Skip this when lifetime resolution is enabled, since that pass
@@ -289,12 +151,15 @@ void SILGenCleanup::run() {
   clearUnresolvedMarkers(*function);
   removeEndFormalScopeMarkers(*function);
   removeUnreachableBlocks(*function);
-  bool changed = fixupBorrowAccessors(function);
-  changed |= removeAccessToNonDestructiveEnumProjection(function);
+  bool changed = fixupBorrowAccessors(getPassManager(), function);
   breakInfiniteLoops(getPassManager(), function);
   completeAllLifetimes(getPassManager(), function,
                        /*includeTrivialVars=*/true);
-  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
+
+  // Run the mandatory verification, also in compilers built without assertions.
+  // Most importantly, this is the first time ownership is verified after SILGen,
+  // i.e. right after lifetime completion.
+  getPassManager()->runMandatoryVerification(function);
 
   DeadEndBlocks deadEndBlocks(function);
   SILGenCanonicalize sgCanonicalize(deadEndBlocks);

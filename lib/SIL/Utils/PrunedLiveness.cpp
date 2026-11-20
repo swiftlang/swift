@@ -62,6 +62,7 @@ llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
   case LiveOut:
     return "LiveOut";
   }
+  llvm_unreachable("covered switch");
 }
 
 void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
@@ -208,6 +209,7 @@ branchMeet(PrunedLiveness::LifetimeEnding const lhs,
     case PrunedLiveness::LifetimeEnding::Value::NonUse:
       return NonUse;
     }
+    llvm_unreachable("covered switch");
   };
   auto toRegular =
       [](BranchLifetimeEnding const ending) -> PrunedLiveness::LifetimeEnding {
@@ -219,6 +221,7 @@ branchMeet(PrunedLiveness::LifetimeEnding const lhs,
     case NonUse:
       return PrunedLiveness::LifetimeEnding::Value::NonUse;
     }
+    llvm_unreachable("covered switch");
   };
   return toRegular(std::min(toBranch(lhs), toBranch(rhs)));
 }
