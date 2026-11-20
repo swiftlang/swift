@@ -34,14 +34,16 @@ class ArgsToFrontendOutputsConverter {
   StringRef ModuleName;
   FrontendInputsAndOutputs &InputsAndOutputs;
   DiagnosticEngine &Diags;
+  llvm::vfs::FileSystem &FS;
 
 public:
   ArgsToFrontendOutputsConverter(const llvm::opt::ArgList &args,
                                  StringRef moduleName,
                                  FrontendInputsAndOutputs &inputsAndOutputs,
-                                 DiagnosticEngine &diags)
+                                 DiagnosticEngine &diags,
+                                 llvm::vfs::FileSystem &fs)
       : Args(args), ModuleName(moduleName), InputsAndOutputs(inputsAndOutputs),
-        Diags(diags) {}
+        Diags(diags), FS(fs) {}
 
   bool convert(std::vector<std::string> &mainOutputs,
                std::vector<std::string> &mainOutputsForIndexUnits,
@@ -50,7 +52,8 @@ public:
   /// Try to read an output file list file.
   /// \returns `None` if it could not open the filelist.
   static std::optional<std::vector<std::string>>
-  readOutputFileList(StringRef filelistPath, DiagnosticEngine &diags);
+  readOutputFileList(StringRef filelistPath, DiagnosticEngine &diags,
+                     llvm::vfs::FileSystem &fs);
 };
 
 struct OutputOptInfo {
@@ -85,7 +88,7 @@ public:
   static std::optional<OutputFilesComputer>
   create(const llvm::opt::ArgList &args, DiagnosticEngine &diags,
          const FrontendInputsAndOutputs &inputsAndOutputs,
-         OutputOptInfo optInfo);
+         OutputOptInfo optInfo, llvm::vfs::FileSystem &fs);
 
   /// \return the output filenames on the command line or in the output
   /// filelist. If there
@@ -94,7 +97,8 @@ public:
   getOutputFilenamesFromCommandLineOrFilelist(const llvm::opt::ArgList &args,
                                               DiagnosticEngine &diags,
                                               options::ID singleOpt,
-                                              options::ID filelistOpt);
+                                              options::ID filelistOpt,
+                                              llvm::vfs::FileSystem &fs);
 
   std::optional<std::vector<std::string>> computeOutputFiles() const;
 
@@ -127,6 +131,7 @@ private:
 class SupplementaryOutputPathsComputer {
   const llvm::opt::ArgList &Args;
   DiagnosticEngine &Diags;
+  llvm::vfs::FileSystem &FS;
   const FrontendInputsAndOutputs &InputsAndOutputs;
   ArrayRef<std::string> OutputFiles;
   StringRef ModuleName;
@@ -136,6 +141,7 @@ class SupplementaryOutputPathsComputer {
 public:
   SupplementaryOutputPathsComputer(
       const llvm::opt::ArgList &args, DiagnosticEngine &diags,
+      llvm::vfs::FileSystem &fs,
       const FrontendInputsAndOutputs &inputsAndOutputs,
       ArrayRef<std::string> outputFiles, StringRef moduleName);
   std::optional<std::vector<SupplementaryOutputPaths>>

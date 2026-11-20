@@ -638,7 +638,7 @@ private:
     if (MainFile && Filename.ends_with(MainFileName)) {
       SmallString<256> AbsThisFile, AbsMainFile;
       AbsThisFile = Filename;
-      llvm::sys::fs::make_absolute(AbsThisFile);
+      (void)SM.getFileSystem()->makeAbsolute(AbsThisFile);
       if (llvm::sys::path::is_absolute(MainFileName))
         AbsMainFile = MainFileName;
       else

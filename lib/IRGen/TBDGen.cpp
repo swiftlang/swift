@@ -200,7 +200,7 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(FileName);
+      Ctx.SourceMgr.getFileSystem()->getBufferForFile(FileName);
   if (!FileBufOrErr) {
     Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
                        FileName);
@@ -210,7 +210,7 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 
   // Use a new source manager instead of the one from ASTContext because we
   // don't want the Json file to be persistent.
-  SourceManager SM;
+  SourceManager SM(Ctx.SourceMgr.getFileSystem());
   yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
                       SM.getLLVMSourceMgr());
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {

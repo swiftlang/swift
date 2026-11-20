@@ -21,16 +21,17 @@
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Options/Options.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/WindowsDriver/MSVCPaths.h"
 
 using namespace swift;
 
 using Path = SmallString<128>;
 
-static std::optional<Path> getActualModuleMapPath(
-    StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
-    const llvm::Triple &triple, bool isArchSpecific,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+static std::optional<Path>
+getActualModuleMapPath(StringRef name, SearchPathOptions &Opts,
+                       const LangOptions &LangOpts, const llvm::Triple &triple,
+                       bool isArchSpecific, llvm::vfs::FileSystem &vfs) {
   StringRef platform;
   if (swift::tripleIsMacCatalystEnvironment(triple))
     platform = "macosx";
@@ -55,11 +56,11 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result)) {
+    if (vfs.exists(result)) {
       // A relative -resource-dir produces a relative path here, but the VFS
       // overlay requires an absolute path for the file it redirects to.
       // Only use this candidate if it can be resolved against the VFS's cwd.
-      std::error_code EC = vfs->makeAbsolute(result);
+      std::error_code EC = vfs.makeAbsolute(result);
       if (!EC)
         return result;
     }
@@ -78,11 +79,11 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result)) {
+    if (vfs.exists(result)) {
       // The SDK fallback can also be relative when -sdk is relative. Resolve
       // it against the VFS's cwd to obtain an absolute redirect target, and
       // only use it if that succeeds.
-      std::error_code EC = vfs->makeAbsolute(result);
+      std::error_code EC = vfs.makeAbsolute(result);
       if (!EC)
         return result;
     }
@@ -114,16 +115,14 @@ static std::optional<Path> getLibStdCxxModuleMapPath(
     const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   return getActualModuleMapPath("libstdcxx.modulemap", opts, langOpts, triple,
-                                /*isArchSpecific*/ false, vfs);
+                                /*isArchSpecific*/ false, *vfs);
 }
 
-std::optional<SmallString<128>>
-swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
-                               const LangOptions &langOpts,
-                               const llvm::Triple &triple) {
+std::optional<SmallString<128>> swift::getCxxShimModuleMapPath(
+    SearchPathOptions &opts, const LangOptions &langOpts,
+    const llvm::Triple &triple, llvm::vfs::FileSystem &vfs) {
   return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
-                                /*isArchSpecific*/ false,
-                                llvm::vfs::createPhysicalFileSystem());
+                                /*isArchSpecific*/ false, vfs);
 }
 
 static llvm::opt::InputArgList
@@ -240,9 +239,14 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
-  const auto &clangToolchain = clangDriver.getToolChain(
-      clangDriverArgs, llvm::Triple(triple.normalize()));
-  clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    const auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(triple.normalize()));
+    clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs,
+                                             includeArgStrings);
+  }
   auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
 
   // Find the include path that contains libc headers. We use three arbitrarily
@@ -262,7 +266,7 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
   Path actualModuleMapPath;
   if (auto path = getActualModuleMapPath(modulemapFileName, ctx.SearchPathOpts,
                                          ctx.LangOpts, triple,
-                                         /*isArchSpecific*/ true, vfs))
+                                         /*isArchSpecific*/ true, *vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
@@ -320,10 +324,14 @@ static void getLibStdCxxFileMapping(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList stdlibArgStrings;
-  const auto &clangToolchain = clangDriver.getToolChain(
-      clangDriverArgs, llvm::Triple(triple.normalize()));
-  clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
-                                              stdlibArgStrings);
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    const auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(triple.normalize()));
+    clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
+                                                stdlibArgStrings);
+  }
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
 
   // If we were explicitly asked to not bring in the C++ stdlib, bail.
@@ -535,9 +543,13 @@ void GetWindowsFileMappings(
                                        Context.ClangImporterOpts, driverVFS);
   const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
       Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
-  const clang::driver::ToolChain &ToolChain =
-      Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
-  llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
+  const clang::driver::ToolChain *ToolChain = nullptr;
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    ToolChain = &Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
+  }
+  llvm::vfs::FileSystem &VFS = ToolChain->getVFS();
 
   struct {
     std::string Path;
@@ -639,9 +651,18 @@ void GetWindowsFileMappings(
                                           SearchPathOpts.getVCToolsVersion(),
                                           {}, VCTools.Path, VCTools.Layout) ||
       llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
-      llvm::findVCToolChainViaSetupConfig(VFS,
-                                          SearchPathOpts.getVCToolsVersion(),
-                                          VCTools.Path, VCTools.Layout)) {
+      [&] {
+        // FIXME: The Visual Studio installation should be discovered once by
+        // the dependency scanner and passed to the compilation with
+        // -visualc-tools-root and -visualc-tools-version, instead of being
+        // searched for by every compilation.
+        // Like the Clang driver, which is not sandboxed, this reads the
+        // default tools version of the Visual Studio installation from disk.
+        auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+        return llvm::findVCToolChainViaSetupConfig(
+            VFS, SearchPathOpts.getVCToolsVersion(), VCTools.Path,
+            VCTools.Layout);
+      }()) {
     assert(VCTools.Layout == llvm::ToolsetLayout::VS2017OrNewer &&
            "unsupported toolset layout (VS2017+ required)");
 

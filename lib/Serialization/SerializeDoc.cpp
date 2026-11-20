@@ -30,6 +30,7 @@
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 
 #include <vector>
@@ -107,7 +108,7 @@ public:
     if (RecordPath.empty())
       return {};
 
-    auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
+    auto Buffer = Ctx.SourceMgr.getFileSystem()->getBufferForFile(RecordPath);
     if (!Buffer) {
       return diagnoseGroupInfoFile(/*Missing File*/true);
     }
@@ -669,16 +670,24 @@ public:
   }
 };
 
+static llvm::vfs::FileSystem &getFileSystem(ModuleOrSourceFile MSF) {
+  ASTContext &Ctx = isa<SourceFile *>(MSF)
+                        ? cast<SourceFile *>(MSF)->getASTContext()
+                        : cast<ModuleDecl *>(MSF)->getASTContext();
+  return *Ctx.SourceMgr.getFileSystem();
+}
+
 struct BasicDeclLocsTableWriter : public ASTWalker {
   llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
   PathWriter &FWriter;
   DocRangeWriter &DocWriter;
+  llvm::vfs::FileSystem &FS;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
                            PathWriter &FWriter,
-                           DocRangeWriter &DocWriter): USRWriter(USRWriter),
-                           FWriter(FWriter),
-                           DocWriter(DocWriter) {}
+                           DocRangeWriter &DocWriter,
+                           llvm::vfs::FileSystem &FS)
+      : USRWriter(USRWriter), FWriter(FWriter), DocWriter(DocWriter), FS(FS) {}
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
     return Action::SkipNode(S);
@@ -731,7 +740,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
       return Action::Continue();
 
     llvm::SmallString<128> AbsolutePath = RawLocs->SourceFilePath;
-    llvm::sys::fs::make_absolute(AbsolutePath);
+    (void)FS.makeAbsolute(AbsolutePath);
 
     llvm::raw_svector_ostream Out(Buffer);
     endian::Writer Writer(Out, llvm::endianness::little);
@@ -753,7 +762,8 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 DocRangeWriter &DocWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
-  BasicDeclLocsTableWriter Writer(USRWriter, FWriter, DocWriter);
+  BasicDeclLocsTableWriter Writer(USRWriter, FWriter, DocWriter,
+                                  getFileSystem(MSF));
   if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
     SF->walk(Writer);
   } else {
@@ -772,6 +782,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
   struct SourceFileListWriter {
     PathWriter &FWriter;
     const SerializationOptions &options;
+    llvm::vfs::FileSystem &FS;
 
     llvm::SmallString<0> Buffer;
     llvm::DenseSet<uint32_t> seenFileIDs;
@@ -781,7 +792,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
         return;
       // Make 'FilePath' absolute for serialization;
       SmallString<128> absolutePath = info.getFilePath();
-      llvm::sys::fs::make_absolute(absolutePath);
+      (void)FS.makeAbsolute(absolutePath);
 
       // Don't emit duplicated files after applying path mappings.
       auto fileID = FWriter.getPathOffset(absolutePath);
@@ -819,11 +830,13 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
       writer.write<uint64_t>(info.getFileSize());
     }
 
-    SourceFileListWriter(PathWriter &FWriter, const SerializationOptions &options)
-        : FWriter(FWriter), options(options) {
+    SourceFileListWriter(PathWriter &FWriter,
+                         const SerializationOptions &options,
+                         llvm::vfs::FileSystem &FS)
+        : FWriter(FWriter), options(options), FS(FS) {
       Buffer.reserve(1024);
     }
-  } writer(FWriter, options);
+  } writer(FWriter, options, getFileSystem(MSF));
 
   if (SourceFile *SF = MSF.dyn_cast<SourceFile *>()) {
     writer.emitSourceFileInfo(BasicSourceFileInfo(SF));

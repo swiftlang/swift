@@ -100,8 +100,9 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 
   // First element needs to be the current working directory. Note if this
   // scheme ever changes, the FileID computation below will need updating.
-  SmallString<256> WorkingDirectory;
-  llvm::sys::fs::current_path(WorkingDirectory);
+  SmallString<256> WorkingDirectory(getOptions().CoverageCompilationDir);
+  if (WorkingDirectory.empty())
+    llvm::sys::fs::current_path(WorkingDirectory);
   FilenameStrs.emplace_back(Remapper.remapPath(WorkingDirectory));
 
   // Following elements are the filenames present. We use their relative path,

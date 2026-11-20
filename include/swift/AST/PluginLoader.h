@@ -99,6 +99,9 @@ public:
   /// instance is simply returned.
   llvm::Expected<CompilerPlugin *> loadExecutablePlugin(llvm::StringRef path);
 
+  /// Returns the file system that plugins are loaded from.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getPluginLoadingFS();
+
   /// Add the specified plugin associated with the module name to the dependency
   /// tracker if needed.
   void recordDependency(const PluginEntry &plugin, Identifier moduleName);
