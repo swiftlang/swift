@@ -77,7 +77,9 @@ import Swift
 public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
   operation: nonisolated(nonsending) () async throws(Failure) -> Return,
   onCancel handler: sending () -> Void
-) async throws(Failure) -> Return {
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
   // unconditionally add the cancellation record to the task.
   // if the task was already cancelled, it will be executed right away.
 #if $BuiltinConcurrencyStackNesting
@@ -88,6 +90,72 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
   defer { unsafe _taskRemoveCancellationHandler(record: record) }
 #endif
   return try await operation()
+}
+
+/// Execute a synchronous operation with a cancellation handler that's
+/// immediately invoked if the current task is canceled.
+///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute on cancellation.
+///     If the task is canceled, this closure is called at most once;
+///     otherwise, it isn't called.
+///
+/// This is the synchronous counterpart of the asynchronous
+/// `withTaskCancellationHandler(operation:onCancel:)`. Use it in synchronous
+/// code, for example in a synchronous function that's called from a task and
+/// blocks until some external work completes:
+///
+/// ```
+/// func readAll(from source: Source) -> [UInt8] {
+///   withTaskCancellationHandler {
+///     source.readUntilClosed()
+///   } onCancel: {
+///     // This onCancel closure might execute concurrently with the operation.
+///     source.close()
+///   }
+/// }
+/// ```
+///
+/// ### Execution order and semantics
+/// The `operation` closure is always invoked, even when the
+/// `withTaskCancellationHandler(operation:onCancel:)` function is called from a
+/// task that was already canceled.
+///
+/// When called from code that runs in a task, the cancellation handler
+/// behaves exactly like the one of the asynchronous
+/// `withTaskCancellationHandler(operation:onCancel:)`: if the task has already
+/// been canceled, the handler is executed immediately before the `operation`
+/// closure gets to execute; if the task is canceled while the operation is
+/// running, the handler executes *concurrently* with the operation.
+///
+/// When called on a thread that isn't running a task, there is no task that
+/// could be canceled, so the `operation` closure runs and the cancellation
+/// handler is never called.
+///
+/// ### Cancellation handlers and locks
+///
+/// Cancellation handlers which acquire locks must take care to avoid deadlock.
+/// The cancellation handler may be invoked while holding internal locks
+/// associated with the task or other tasks.  Other operations on the task, such
+/// as resuming a continuation, may acquire these same internal locks.
+/// Therefore, if a cancellation handler must acquire a lock, other code should
+/// not cancel tasks or resume continuations while holding that lock.
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func withTaskCancellationHandler<Return, Failure>(
+  operation: () throws(Failure) -> Return,
+  onCancel handler: sending () -> Void
+) throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
+  // Unconditionally add the cancellation record. If the current task was
+  // already cancelled, the handler is executed right away. On a thread that
+  // isn't running a task, nothing can cancel the operation, so no record is
+  // added and the handler never runs.
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: handler)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+  return try operation()
 }
 
 /// Execute an operation with a cancellation handler that's immediately
@@ -192,6 +260,85 @@ nonisolated(nonsending) func __withTaskCancellationHandlerWithReason0<Return, Fa
 #endif
 }
 
+/// Execute a synchronous operation with a cancellation handler that's
+/// immediately invoked with the cancellation reason when the current task is
+/// canceled.
+///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute on cancellation, passed the reason the
+///     task was cancelled.
+///     If the task is canceled, this closure is called at most once;
+///     otherwise, it isn't called.
+///
+/// This is the synchronous counterpart of the asynchronous
+/// `withTaskCancellationHandler(operation:onCancel:)` whose handler receives
+/// the cancellation reason.
+///
+/// ### Execution order and semantics
+/// The `operation` closure is always invoked, even when the
+/// `withTaskCancellationHandler(operation:onCancel:)` function is called from a
+/// task that was already canceled.
+///
+/// When called from code that runs in a task, the cancellation handler
+/// behaves exactly like the one of the asynchronous
+/// `withTaskCancellationHandler(operation:onCancel:)`: if the task has already
+/// been canceled, the handler is executed immediately before the `operation`
+/// closure gets to execute; if the task is canceled while the operation is
+/// running, the handler executes *concurrently* with the operation.
+///
+/// When called on a thread that isn't running a task, there is no task that
+/// could be canceled, so the `operation` closure runs and the cancellation
+/// handler is never called.
+///
+/// The reason passed to `handler` is the same value that `Task.cancellationReason`
+/// would report on the task being cancelled. However, the handler is invoked
+/// from the *cancelling* context, not from the cancelled task's own context,
+/// so checking `Task.cancellationReason` from inside the `onCancel` closure
+/// would report the cancellation status of the cancelling context rather than
+/// that of the task being cancelled; use the passed-in `reason` parameter,
+/// which does represent the cancelled task's status.
+///
+/// ### Cancellation handlers and locks
+///
+/// Cancellation handlers which acquire locks must take care to avoid deadlock.
+/// The cancellation handler may be invoked while holding internal locks
+/// associated with the task or other tasks.  Other operations on the task, such
+/// as resuming a continuation, may acquire these same internal locks.
+/// Therefore, if a cancellation handler must acquire a lock, other code should
+/// not cancel tasks or resume continuations while holding that lock.
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func withTaskCancellationHandler<Return, Failure>(
+  operation: () throws(Failure) -> Return,
+  onCancel handler: sending (CancellationError.Reason) -> Void
+) throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
+  return try __withTaskCancellationHandlerWithReason0(
+    operation: operation,
+    onCancel: {
+      handler(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
+    })
+}
+
+// Method necessary in order to avoid the handler0 to be destroyed too eagerly.
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+func __withTaskCancellationHandlerWithReason0<Return, Failure>(
+  operation: () throws(Failure) -> Return,
+  onCancel handler0: sending (UInt8) -> Void
+) throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error {
+#if $BuiltinCancellationHandlerWithReason
+  let record = unsafe Builtin.taskAddCancellationHandlerWithReason(handler: handler0)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+  return try operation()
+#else
+  fatalError("Swift compiler is incompatible with this SDK version")
+#endif
+}
 #if !$Embedded
 /// Execute an operation with a cancellation handler that's immediately
 /// invoked if the current task is canceled.

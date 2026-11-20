@@ -76,6 +76,52 @@ func test_cancellation_withTaskCancellationHandler(_ anything: Any, isolation: (
   return nil
 }
 
+// Synchronous code uses the synchronous overloads
+@available(SwiftStdlib 6.5, *)
+func test_cancellation_withTaskCancellationHandler_sync() throws(HomeworkError) -> Int {
+  let file = SomeFile()
+  return try withTaskCancellationHandler { () throws(HomeworkError) in
+    42
+  } onCancel: {
+    file.close()
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+func test_cancellation_withTaskCancellationHandler_sync_reason() -> Int {
+  withTaskCancellationHandler {
+    42
+  } onCancel: { reason in
+    _ = reason
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+func test_withTaskPriorityEscalationHandler_sync() -> Int {
+  withTaskPriorityEscalationHandler {
+    42
+  } onPriorityEscalated: { _, _ in
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+func test_cancellation_withTaskCancellationHandler_syncOperation() async -> Int {
+  let a = await withTaskCancellationHandler { // expected-warning@:11{{no 'async' operations occur within 'await' expression}}{{11-17=}}
+    42
+  } onCancel: {
+  }
+  let b = await withTaskCancellationHandler { // expected-warning@:11{{no 'async' operations occur within 'await' expression}}{{11-17=}}
+    42
+  } onCancel: { reason in
+    _ = reason
+  }
+  let c = await withTaskPriorityEscalationHandler { // expected-warning@:11{{no 'async' operations occur within 'await' expression}}{{11-17=}}
+    42
+  } onPriorityEscalated: { _, _ in
+  }
+  return a + b + c
+}
+
 @available(SwiftStdlib 5.1, *)
 func test_cancellation_loop() async -> Int {
   struct SampleTask { func process() async {} }

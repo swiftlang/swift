@@ -132,8 +132,51 @@ extension UnsafeCurrentTask {
 public nonisolated(nonsending) func withTaskPriorityEscalationHandler<T, E>(
   operation: nonisolated(nonsending)  () async throws(E) -> T,
   onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void
-) async throws(E) -> T {
+) async throws(E) -> T
+  where T: ~Copyable {
   return try await __withTaskPriorityEscalationHandler0(
+    operation: operation,
+    onPriorityEscalated: {
+      handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
+    })
+}
+
+/// Runs the passed synchronous `operation` while registering a task priority
+/// escalation handler. The handler will be triggered concurrently to the
+/// current task if the current task is subject to priority escalation.
+///
+/// This is the synchronous counterpart of the asynchronous
+/// `withTaskPriorityEscalationHandler(operation:onPriorityEscalated:)`.
+///
+/// When called from code that runs in a task, the handler behaves exactly like
+/// the one of the asynchronous version: it is called once when it is
+/// installed, before `operation` runs, with the task's current priority as
+/// both arguments, and is then triggered each time a priority escalation of
+/// the task occurs while the operation is in progress. Calls to the handler are
+/// never concurrent with each other.
+///
+/// When called on a thread that isn't running a task, there is no task whose
+/// priority could be escalated, so the `operation` closure runs and the handler
+/// is never called, not even once when it is installed.
+///
+/// If multiple task escalation handlers are nested they will all be triggered.
+///
+/// - Parameters:
+///   - operation: the operation during which to listen for priority escalation
+///   - handler: handler to invoke, concurrently to `operation`,
+///              when priority escalation happens.
+///              The first argument is the old priority (before escalation),
+///              and the second argument is the new escalated priority.
+/// - Returns: the value returned by `operation`
+/// - Throws: when the `operation` throws an error
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func withTaskPriorityEscalationHandler<T, E>(
+  operation: () throws(E) -> T,
+  onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void
+) throws(E) -> T
+  where T: ~Copyable {
+  return try __withTaskPriorityEscalationHandler0(
     operation: operation,
     onPriorityEscalated: {
       handler(TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
@@ -166,7 +209,8 @@ public func _isolatedParameter_withTaskPriorityEscalationHandler<T, E>(
 nonisolated(nonsending) func __withTaskPriorityEscalationHandler0<T, E>(
   operation: nonisolated(nonsending) () async throws(E) -> T,
   onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void
-) async throws(E) -> T {
+) async throws(E) -> T
+  where T: ~Copyable {
 #if $BuiltinConcurrencyStackNesting
   let record =
     unsafe Builtin.taskAddPriorityEscalationHandler(handler: handler0)
@@ -179,6 +223,23 @@ nonisolated(nonsending) func __withTaskPriorityEscalationHandler0<T, E>(
 #endif
 
   return try await operation()
+}
+
+// Method necessary in order to avoid the handler0 to be destroyed too eagerly.
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+func __withTaskPriorityEscalationHandler0<T, E>(
+  operation: () throws(E) -> T,
+  onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void
+) throws(E) -> T
+  where T: ~Copyable {
+  let record =
+    unsafe Builtin.taskAddPriorityEscalationHandler(handler: handler0)
+  defer {
+    unsafe Builtin.taskRemovePriorityEscalationHandler(record: record)
+  }
+
+  return try operation()
 }
 
 @usableFromInline
