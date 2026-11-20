@@ -4092,6 +4092,10 @@ function Build-CURL([Hashtable] $Platform,
   if ($Platform.OS -eq [OS]::Android) {
     $PlatformDefines += @{
       HAVE_FSEEKO = "0";
+      # curl measures time with CLOCK_MONOTONIC_RAW when it is available, and that
+      # clock jumps on some Android 8 and older kernels, so requests hang or time
+      # out at once. Use CLOCK_MONOTONIC instead.
+      HAVE_CLOCK_GETTIME_MONOTONIC_RAW = "0";
     }
   }
 
