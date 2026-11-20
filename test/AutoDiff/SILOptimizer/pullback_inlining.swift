@@ -33,7 +33,7 @@ func caller_of_with_control_flow(x: Float) -> Float {
     gradient(at: x, of: with_control_flow)
 }
 // CHECK-LABEL: decision {{.*}} $s17pullback_inlining17with_control_flowyS2fFTJpSpSr
-// CHECK-NEXT: "pullback of pullback_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
+// CHECK-NEXT: "specialized pullback of pullback_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
 
 // ====================================================================== //
 // Pullbacks with complex control-flow are inlined into non-VJP callers

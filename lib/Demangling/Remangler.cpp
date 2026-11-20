@@ -1667,6 +1667,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
       Buffer << 'a';
       break;
+    case FunctionSigSpecializationParamKind::AutoDiffBranchTracingEnum:
+      Buffer << 'b';
+      break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
       break;
