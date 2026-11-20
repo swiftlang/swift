@@ -182,6 +182,8 @@ public:
     }
 
     AbstractTypeLayout layout;
+    layout.mangledName =
+        Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
     auto type = TD->getDeclaredInterfaceType();
     auto properties = typeConverter.getTypeProperties(
         TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());

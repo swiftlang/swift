@@ -10539,7 +10539,6 @@ public:
     bool InProtocolExtension;
     bool ImportedFromClang;
   };
-  StringRef MangledName;
   Identifier OriginalModuleName;
   bool OriginalModuleIsObjCHeader = false;
   ArrayRef<XRefPathPiece> OriginalXRefPath;
