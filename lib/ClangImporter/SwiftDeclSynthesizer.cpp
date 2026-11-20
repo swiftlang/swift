@@ -3394,23 +3394,18 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto wrapperClangType =
       clangCtx.getCanonicalTagType(wrapperClangDecl).withConst();
 
-  // Create a fake variable with the __SwiftFunctionWrapper<...> type.
-  auto fakeWrapperVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      wrapperClangType, clangCtx.getTrivialTypeSourceInfo(wrapperClangType),
-      clang::StorageClass::SC_None);
-  auto fakeWrapperRefExpr = createClangDeclRefExpr(
-      clangCtx, fakeWrapperVarDecl, wrapperClangType, clang::VK_LValue);
+  // A stand-in for a value of the __SwiftFunctionWrapper<...> type.
+  auto *fakeWrapperExpr = new (clangCtx) clang::OpaqueValueExpr(
+      functionTypeClangDecl->getLocation(), wrapperClangType, clang::VK_LValue);
 
   auto functionTypeClangType =
       clangCtx.getCanonicalTagType(functionTypeClangDecl);
   auto functionTypeClangInfo =
       clangCtx.getTrivialTypeSourceInfo(functionTypeClangType);
-  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperRefExpr};
+  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperExpr};
 
   // Instantiate the templated constructor that would accept the fake
-  // __SwiftFunctionWrapper<...> variable.
+  // __SwiftFunctionWrapper<...> value.
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       functionTypeClangInfo, functionTypeClangDecl->getLocation(),
       constructExprArgs, functionTypeClangDecl->getLocation(),
