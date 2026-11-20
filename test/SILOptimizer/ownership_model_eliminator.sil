@@ -499,3 +499,85 @@ bb0(%0 : $Builtin.RawPointer):
   %2 = tuple ()
   return %2 : $()
 }
+
+sil @closure_with_capture : $@convention(thin) (Builtin.Int32) -> ()
+sil @consume_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @out Builtin.Int32
+sil @consume_at_most_once : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> (@out Builtin.Int32, @error Builtin.Int32)
+sil @consume_both : $@convention(thin) (@owned @noescape @once @callee_owned () -> (), @owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+
+// The call consumes the noncopyable closure's context, so the context's
+// `dealloc_stack` is inserted right after the call. The context is allocated
+// before the stack location for the result, so it must be deallocated after
+// it, even though nothing else in the function changes.
+//
+// CHECK-LABEL: sil @dealloc_of_consumed_context_is_nested :
+// CHECK:         [[C:%.*]] = partial_apply [on_stack] [called_once]
+// CHECK:         [[S:%.*]] = alloc_stack $Builtin.Int32
+// CHECK:         apply {{%.*}}([[S]], [[C]])
+// CHECK-NEXT:    dealloc_stack [[S]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK:       } // end sil function 'dealloc_of_consumed_context_is_nested'
+sil [ossa] @dealloc_of_consumed_context_is_nested : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @closure_with_capture : $@convention(thin) (Builtin.Int32) -> ()
+  %2 = partial_apply [on_stack] [called_once] %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %3 = alloc_stack $Builtin.Int32
+  %4 = function_ref @consume_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @out Builtin.Int32
+  %5 = apply %4(%3, %2) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @out Builtin.Int32
+  dealloc_stack %3
+  return %0
+}
+
+// The call consumes both contexts, so both `dealloc_stack`s are inserted right
+// after it, and the context that is allocated last must be deallocated first.
+//
+// CHECK-LABEL: sil @deallocs_of_contexts_consumed_by_one_call_are_nested :
+// CHECK:         [[C1:%.*]] = partial_apply [on_stack] [called_once]
+// CHECK:         [[C2:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:         apply {{%.*}}([[C1]], [[C2]])
+// CHECK-NEXT:    dealloc_stack [[C2]]
+// CHECK-NEXT:    dealloc_stack [[C1]]
+// CHECK:       } // end sil function 'deallocs_of_contexts_consumed_by_one_call_are_nested'
+sil [ossa] @deallocs_of_contexts_consumed_by_one_call_are_nested : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @closure_with_capture : $@convention(thin) (Builtin.Int32) -> ()
+  %2 = partial_apply [on_stack] [called_once] %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %3 = partial_apply [on_stack] [called_at_most_once] %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %4 = function_ref @consume_both : $@convention(thin) (@owned @noescape @once @callee_owned () -> (), @owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+  %5 = apply %4(%2, %3) : $@convention(thin) (@owned @noescape @once @callee_owned () -> (), @owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+  return %0
+}
+
+// A `try_apply` that consumes the context ends its lifetime in both
+// successors.
+//
+// CHECK-LABEL: sil @dealloc_of_context_consumed_by_try_apply_is_nested :
+// CHECK:         [[C:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:         [[S:%.*]] = alloc_stack $Builtin.Int32
+// CHECK:         try_apply {{%.*}}([[S]], [[C]]) {{.*}}, normal bb1, error bb2
+// CHECK:       bb1(
+// CHECK-NEXT:    dealloc_stack [[S]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK:       bb2(
+// CHECK-NEXT:    dealloc_stack [[S]]
+// CHECK-NEXT:    dealloc_stack [[C]]
+// CHECK:       } // end sil function 'dealloc_of_context_consumed_by_try_apply_is_nested'
+sil [ossa] @dealloc_of_context_consumed_by_try_apply_is_nested : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @closure_with_capture : $@convention(thin) (Builtin.Int32) -> ()
+  %2 = partial_apply [on_stack] [called_at_most_once] %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %3 = alloc_stack $Builtin.Int32
+  %4 = function_ref @consume_at_most_once : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> (@out Builtin.Int32, @error Builtin.Int32)
+  try_apply %4(%3, %2) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> (@out Builtin.Int32, @error Builtin.Int32), normal bb1, error bb2
+
+bb1(%6 : $()):
+  dealloc_stack %3
+  br bb3
+
+bb2(%9 : $Builtin.Int32):
+  dealloc_stack %3
+  br bb3
+
+bb3:
+  return %0
+}

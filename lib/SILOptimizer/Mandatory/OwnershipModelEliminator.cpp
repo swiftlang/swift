@@ -812,26 +812,31 @@ static bool stripOwnership(SILFunction &func) {
   func.setOwnershipEliminated();
 
   // Now that we are in non-ossa, create dealloc_stack at partial_apply's
-  // lifetime ends
+  // lifetime ends. If a call consumes the context of a noncopyable closure,
+  // the `dealloc_stack` may need its nesting fixed afterwards, e.g. if the
+  // context is allocated before a stack location that is deallocated after the
+  // call.
+  bool madeChange = false;
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
-      // An at-most-once closure's context can be consumed directly by a
+      // A noncopyable closure's context can be consumed directly by a
       // `try_apply`, which is a terminator, so the `dealloc_stack` has to
       // go at the start of every successor block instead.
       if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {
         for (auto *successor : term->getSuccessorBlocks()) {
           SILBuilderWithScope(successor->begin())
               .createDeallocStack(lifetimeEnd->getLoc(), pai);
+          madeChange = true;
         }
         continue;
       }
       SILBuilderWithScope(lifetimeEnd->getNextInstruction())
           .createDeallocStack(lifetimeEnd->getLoc(), pai);
+      madeChange = true;
     }
   }
 
-  bool madeChange = false;
   SmallVector<SILInstruction *, 32> createdInsts;
   OwnershipModelEliminatorVisitor visitor(func);
 
