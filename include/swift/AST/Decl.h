@@ -10378,6 +10378,41 @@ public:
   }
 };
 
+/// A view over either a stored property or its layout-only placeholder.
+class StoredPropertyLayoutMemberView {
+  Decl *Member;
+
+public:
+  explicit StoredPropertyLayoutMemberView(VarDecl *member) : Member(member) {}
+
+  explicit StoredPropertyLayoutMemberView(MissingMemberDecl *member)
+      : Member(member) {
+    assert(member->StorageLayout &&
+           "layout view requires a storage-layout placeholder");
+  }
+
+  Decl *getDecl() const { return Member; }
+  VarDecl *getVarDeclOrNull() const { return dyn_cast<VarDecl>(Member); }
+  MissingMemberDecl *getMissingMemberDeclOrNull() const {
+    return dyn_cast<MissingMemberDecl>(Member);
+  }
+
+  DeclContext *getDeclContext() const { return Member->getDeclContext(); }
+  ASTContext &getASTContext() const { return Member->getASTContext(); }
+
+  DeclName getName() const {
+    if (auto *missing = getMissingMemberDeclOrNull())
+      return missing->getName();
+    return cast<VarDecl>(Member)->getName();
+  }
+
+  AbstractTypeLayout *getFallbackLayout() const {
+    if (auto *missing = getMissingMemberDeclOrNull())
+      return missing->StorageLayout;
+    return nullptr;
+  }
+};
+
 /// Provides a declaration of a macro.
 ///
 /// Macros are declared within the source code with the `macro` introducer.

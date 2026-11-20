@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -544,6 +545,32 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M,
 
 SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
+}
+
+SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
+                              TypeConverter &TC,
+                              TypeExpansionContext context) const {
+  if (auto *var = field.getVarDeclOrNull())
+    return getFieldType(var, TC, context);
+
+  auto substitutions =
+      getASTType()->getContextSubstitutionMap(field.getDeclContext());
+  auto *layout = field.getFallbackLayout();
+  assert(layout && "missing member must have a storage layout");
+  layout = layout->getWithSubstitutions(field.getASTContext(), substitutions);
+  Type memberType = HiddenType::get(field.getASTContext(), layout, CanType());
+  field.getASTContext().recordRecoveredHiddenType(
+      memberType->getCanonicalType());
+  auto loweredType = TC.getLoweredRValueType(context, memberType);
+  if (isAddress())
+    return SILType::getPrimitiveAddressType(loweredType);
+  return SILType::getPrimitiveObjectType(loweredType);
+}
+
+SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
+                              SILModule &M,
+                              TypeExpansionContext context) const {
+  return getFieldType(field, M.Types, context);
 }
 
 SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {
