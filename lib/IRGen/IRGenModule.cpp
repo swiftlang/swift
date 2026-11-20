@@ -2625,6 +2625,19 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
   return getGenModule(SF);
 }
 
+IRGenModule *
+IRGenerator::getGenModuleForOpaqueType(const OpaqueTypeDecl *opaque) {
+  // The dynamic replacement tables in the primary IGM reference a
+  // replacement's opaque type descriptor and accessor directly, which can't
+  // cross object files on e.g. x86_64 Mach-O. See also emitGlobalTopLevel().
+  if (GenModules.size() > 1) {
+    if (auto *namingDecl = opaque->getNamingDecl())
+      if (namingDecl->getDynamicallyReplacedDecl())
+        return getPrimaryIGM();
+  }
+  return getGenModule(opaque->getDeclContext());
+}
+
 IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
   if (GenModules.size() == 1) {
     return getPrimaryIGM();
