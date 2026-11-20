@@ -604,26 +604,26 @@ extension InputSpan {
 
 @available(SwiftStdlib 6.5, *)
 extension InputSpan where Element: ~Copyable {
-  /// Removes up to `maxCount` elements from the beginning of this span,
-  /// and returns a new `InputSpan` that takes ownership of them.
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// beginning of this span.
   ///
   /// The returned span is a borrow of this span; when it goes out of scope,
   /// any elements it still holds are deinitialized.
   ///
-  /// - Parameter maxCount: The maximum number of elements to consume.
-  ///     `maxCount` must not be negative. If it exceeds `count`,
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
   ///     all elements are consumed.
   /// - Returns: An `InputSpan` containing the consumed elements.
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_lifetime(&self)
   public mutating func consumePrefix(
-    maxCount: Int
+    maxCount n: Int
   ) -> InputSpan<Element> {
     _precondition(
-      maxCount >= 0, "Can't consume a negative number of elements"
+      n >= 0, "Can't consume a negative number of elements"
     )
-    let c = Swift.min(maxCount, count)
+    let c = Swift.min(n, count)
     let start: UnsafeMutablePointer<Element>? =
       unsafe _initializedStart()?.assumingMemoryBound(to: Element.self)
     let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: c)
@@ -632,8 +632,8 @@ extension InputSpan where Element: ~Copyable {
     return unsafe _overrideLifetime(prefix, mutating: &self)
   }
 
-  /// Removes up to `maxCount` elements from the beginning of this span
-  /// by passing them to a closure through an input span.
+  /// Calls a closure with an input span that takes ownership of up to n
+  /// elements from the beginning of this span.
   ///
   /// The closure takes ownership of the elements: it can do anything with them,
   /// including nothing. Any elements still initialized when the input span
@@ -643,8 +643,8 @@ extension InputSpan where Element: ~Copyable {
   /// The input span has a capacity equal to the number of elements it holds.
   ///
   /// - Parameters:
-  ///   - maxCount: The maximum number of elements to consume.
-  ///       `maxCount` must not be negative. If it exceeds `count`,
+  ///   - n: The maximum number of elements to consume.
+  ///       `n` must not be negative. If it exceeds `count`,
   ///       all elements are consumed.
   ///   - consumer: A closure that takes ownership of an `InputSpan`
   ///       containing the consumed elements.
@@ -652,10 +652,10 @@ extension InputSpan where Element: ~Copyable {
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public mutating func consumePrefix<E: Error, R: ~Copyable>(
-    maxCount: Int,
+    maxCount n: Int,
     consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
-    let prefix = consumePrefix(maxCount: maxCount)
+    let prefix = consumePrefix(maxCount: n)
     return try consumer(prefix)
   }
 }

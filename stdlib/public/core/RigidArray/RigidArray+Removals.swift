@@ -136,8 +136,8 @@ extension _RigidArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.5, *)
 extension _RigidArray where Element: ~Copyable {
-  /// Removes up to `maxCount` elements from the end of the array,
-  /// and returns an `InputSpan` that takes ownership of them.
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of the array.
   ///
   /// The `InputSpan` returned by this function represents a mutation of the
   /// array, and the array cannot be used until the `InputSpan` is consumed or
@@ -147,8 +147,8 @@ extension _RigidArray where Element: ~Copyable {
   /// The returned input span has a `capacity` equal to the number of elements
   /// it holds, and has no free capacity for prepending.
   ///
-  /// - Parameter maxCount: The maximum number of elements to consume.
-  ///     `maxCount` must not be negative. If it exceeds `count`,
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
   ///     all elements are consumed.
   /// - Returns: An `InputSpan` containing the consumed elements, in their
   ///     original order.
@@ -158,12 +158,12 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   internal mutating func consumeSuffix(
-    maxCount: Int
+    maxCount n: Int
   ) -> InputSpan<Element> {
     _precondition(
-      maxCount >= 0, "Can't consume a negative number of elements"
+      n >= 0, "Can't consume a negative number of elements"
     )
-    let c = Swift.min(maxCount, _count)
+    let c = Swift.min(n, _count)
     let buffer = unsafe _storage.extracting(
       Range(uncheckedBounds: (_count &- c, _count))
     )

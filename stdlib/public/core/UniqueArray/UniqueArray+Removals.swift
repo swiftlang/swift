@@ -116,8 +116,8 @@ extension UniqueArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.5, *)
 extension UniqueArray where Element: ~Copyable {
-  /// Removes up to `maxCount` elements from the end of the array,
-  /// and returns an `InputSpan` that takes ownership of them.
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of the array.
   ///
   /// The `InputSpan` returned by this function represents a mutation of the
   /// array, and the array cannot be used until the `InputSpan` is consumed or
@@ -127,8 +127,8 @@ extension UniqueArray where Element: ~Copyable {
   /// The returned input span has a `capacity` equal to the number of elements
   /// it holds, and has no free capacity for prepending.
   ///
-  /// - Parameter maxCount: The maximum number of elements to consume.
-  ///     `maxCount` must not be negative. If it exceeds `count`,
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
   ///     all elements are consumed.
   /// - Returns: An `InputSpan` containing the consumed elements, in their
   ///     original order.
@@ -138,13 +138,13 @@ extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   public mutating func consumeSuffix(
-    maxCount: Int
+    maxCount n: Int
   ) -> InputSpan<Element> {
-    _storage.consumeSuffix(maxCount: maxCount)
+    _storage.consumeSuffix(maxCount: n)
   }
 
-  /// Removes up to `maxCount` elements from the end of the array
-  /// by passing them to a closure through an input span.
+  /// Calls a closure with an input span that takes ownership of up to n
+  /// elements from the end of the array.
   ///
   /// The closure takes ownership of the elements: it can do anything with them,
   /// including nothing. Any elements still initialized when the input span
@@ -154,8 +154,8 @@ extension UniqueArray where Element: ~Copyable {
   /// The input span has a capacity equal to the number of elements it holds.
   ///
   /// - Parameters:
-  ///   - maxCount: The maximum number of elements to consume.
-  ///       `maxCount` must not be negative. If it exceeds `count`,
+  ///   - n: The maximum number of elements to consume.
+  ///       `n` must not be negative. If it exceeds `count`,
   ///       all elements are consumed.
   ///   - consumer: A closure that takes ownership of an `InputSpan`
   ///       containing the consumed elements, in their original order.
@@ -163,10 +163,10 @@ extension UniqueArray where Element: ~Copyable {
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public mutating func consumeSuffix<E: Error, R: ~Copyable>(
-    maxCount: Int,
+    maxCount n: Int,
     consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
-    let suffix = consumeSuffix(maxCount: maxCount)
+    let suffix = consumeSuffix(maxCount: n)
     return try consumer(suffix)
   }
 

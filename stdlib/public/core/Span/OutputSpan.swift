@@ -668,8 +668,8 @@ extension OutputSpan where Element: ~Copyable {
     try consumeSuffix(maxCount: count, consumingWith: consumer)
   }
 
-  /// Removes up to `maxCount` elements from the end of this span, and returns
-  /// an input span that has taken ownership of the removed elements.
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of this span.
   ///
   /// The `InputSpan` returned by this function represents a mutation of `self`,
   /// and `self` cannot be used until the `InputSpan` is consumed or destroyed.
@@ -678,8 +678,8 @@ extension OutputSpan where Element: ~Copyable {
   /// The returned input span has a `capacity` equal to the number of elements
   /// it holds, and has no free capacity for prepending.
   ///
-  /// - Parameter maxCount: The maximum number of elements to consume.
-  ///     `maxCount` must not be negative. If it exceeds `count`,
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
   ///     all elements are consumed.
   /// - Returns: An `InputSpan` containing the consumed elements, in their
   ///     original order.
@@ -687,12 +687,12 @@ extension OutputSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   public mutating func consumeSuffix(
-    maxCount: Int
+    maxCount n: Int
   ) -> InputSpan<Element> {
     _precondition(
-      maxCount >= 0, "Can't consume a negative number of elements"
+      n >= 0, "Can't consume a negative number of elements"
     )
-    let c = Swift.min(maxCount, count)
+    let c = Swift.min(n, count)
     let start: UnsafeMutablePointer<Element>? =
       unsafe _pointer?.advanced(
         by: (count &- c) &* MemoryLayout<Element>.stride
@@ -705,8 +705,8 @@ extension OutputSpan where Element: ~Copyable {
     return unsafe _overrideLifetime(result, mutating: &self)
   }
 
-  /// Removes up to `maxCount` elements from the end of this span
-  /// by passing them to a closure through an input span.
+  /// Calls a closure with an input span that takes ownership of up to n
+  /// elements from the end of this span.
   ///
   /// The closure takes ownership of the elements: it can do anything with them,
   /// including nothing. Any elements still initialized when the input span
@@ -716,8 +716,8 @@ extension OutputSpan where Element: ~Copyable {
   /// The input span has a capacity equal to the number of elements it holds.
   ///
   /// - Parameters:
-  ///   - maxCount: The maximum number of elements to consume.
-  ///       `maxCount` must not be negative. If it exceeds `count`,
+  ///   - n: The maximum number of elements to consume.
+  ///       `n` must not be negative. If it exceeds `count`,
   ///       all elements are consumed.
   ///   - consumer: A closure that takes ownership of an `InputSpan`
   ///       containing the consumed elements, in their original order.
@@ -725,10 +725,10 @@ extension OutputSpan where Element: ~Copyable {
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public mutating func consumeSuffix<E: Error, R: ~Copyable>(
-    maxCount: Int,
+    maxCount n: Int,
     consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
-    let suffix = consumeSuffix(maxCount: maxCount)
+    let suffix = consumeSuffix(maxCount: n)
     return try consumer(suffix)
   }
 }

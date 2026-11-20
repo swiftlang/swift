@@ -631,8 +631,8 @@ extension OutputRawSpan {
     try consumeSuffix(maxByteCount: byteCount, consumingWith: consumer)
   }
 
-  /// Removes up to `maxByteCount` bytes from the end of this span,
-  /// and returns a new `InputRawSpan` that takes ownership of them.
+  /// Returns a new input span that takes ownership of up to n bytes from the
+  /// end of this span.
   ///
   /// The `InputRawSpan` returned by this function represents a mutation of
   /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
@@ -641,8 +641,8 @@ extension OutputRawSpan {
   /// The returned input span has a `capacity` equal to the number of bytes
   /// it holds, and has no free capacity for prepending.
   ///
-  /// - Parameter maxByteCount: The maximum number of bytes to consume.
-  ///     `maxByteCount` must not be negative. If it exceeds `byteCount`,
+  /// - Parameter n: The maximum number of bytes to consume.
+  ///     `n` must not be negative. If it exceeds `byteCount`,
   ///     all bytes are consumed.
   /// - Returns: An `InputRawSpan` containing the consumed bytes, in their
   ///     original order.
@@ -650,12 +650,12 @@ extension OutputRawSpan {
   @export(implementation)
   @_lifetime(&self)
   public mutating func consumeSuffix(
-    maxByteCount: Int
+    maxByteCount n: Int
   ) -> InputRawSpan {
     _precondition(
-      maxByteCount >= 0, "Can't consume a negative number of bytes"
+      n >= 0, "Can't consume a negative number of bytes"
     )
-    let c = Swift.min(maxByteCount, byteCount)
+    let c = Swift.min(n, byteCount)
     let start = unsafe _pointer?.advanced(by: byteCount &- c)
     let buffer = unsafe UnsafeMutableRawBufferPointer(start: start, count: c)
     let result = unsafe InputRawSpan(
@@ -665,14 +665,14 @@ extension OutputRawSpan {
     return unsafe _overrideLifetime(result, mutating: &self)
   }
 
-  /// Removes up to `maxByteCount` bytes from the end of this span
-  /// by passing them to a closure through an input span.
+  /// Calls a closure with an input span that takes ownership of up to n bytes
+  /// from the end of this span.
   ///
   /// The input span has a capacity equal to the number of bytes it holds.
   ///
   /// - Parameters:
-  ///   - maxByteCount: The maximum number of bytes to consume.
-  ///       `maxByteCount` must not be negative. If it exceeds `byteCount`,
+  ///   - n: The maximum number of bytes to consume.
+  ///       `n` must not be negative. If it exceeds `byteCount`,
   ///       all bytes are consumed.
   ///   - consumer: A closure that receives an `InputRawSpan` containing
   ///       the consumed bytes, in their original order.
@@ -680,10 +680,10 @@ extension OutputRawSpan {
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public mutating func consumeSuffix<E: Error, R: ~Copyable>(
-    maxByteCount: Int,
+    maxByteCount n: Int,
     consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
   ) throws(E) -> R {
-    let suffix = consumeSuffix(maxByteCount: maxByteCount)
+    let suffix = consumeSuffix(maxByteCount: n)
     return try consumer(suffix)
   }
 
