@@ -2182,11 +2182,10 @@ public:
     return MetatypeRepresentation::Thin;
   }
 
+  /// Like in SIL type lowering, the metatype of a tuple is empty, even if the
+  /// metatype of an element type, like a class, isn't.
   MetatypeRepresentation visitTupleTypeRef(const TupleTypeRef *T) {
-    auto result = MetatypeRepresentation::Thin;
-    for (auto Element : T->getElements())
-      result = combineRepresentations(result, visit(Element));
-    return result;
+    return MetatypeRepresentation::Thin;
   }
 
   MetatypeRepresentation visitPackTypeRef(const PackTypeRef *P) {
