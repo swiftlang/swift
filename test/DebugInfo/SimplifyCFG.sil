@@ -13,6 +13,7 @@ import Swift
 
 sil @foo : $@convention(thin) () -> ()
 sil @bar : $@convention(thin) () -> ()
+sil @use : $@convention(thin) (Builtin.Int64) -> ()
 
 struct TwoInts {
   @_hasStorage var x: Int64 { get set }
@@ -272,4 +273,39 @@ bb3:
 
 bb4:
   cond_br %1, bb1, bb2
+}
+
+// Folding a switch_enum on an enum instruction erases the dead enum. Its debug
+// value is salvaged into a debug reconstruction block.
+
+// CHECK-LABEL: sil @test_switch_enum_fold_salvage
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value (), let, name "index", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+// CHECK-NEXT:      return %0
+// CHECK-NEXT:    }
+// CHECK-NEXT:    integer_literal
+// CHECK:       } // end sil function 'test_switch_enum_fold_salvage'
+
+sil @test_switch_enum_fold_salvage : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  debug_value %0 : $Optional<Builtin.Int64>, let, name "index"
+  switch_enum %0 : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%2 : $Builtin.Int64):
+  %3 = function_ref @use : $@convention(thin) (Builtin.Int64) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %5 = integer_literal $Builtin.Int64, 1
+  %6 = function_ref @use : $@convention(thin) (Builtin.Int64) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (Builtin.Int64) -> ()
+  %8 = tuple ()
+  return %8 : $()
 }
