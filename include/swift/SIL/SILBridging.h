@@ -347,6 +347,12 @@ struct BridgedType {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
   getFunctionTypeWithCalleeConvention(
       BridgedArgumentConvention convention) const;
+  BRIDGED_INLINE BridgedOptionalExecutionSemantics
+  getFunctionExecutionSemantics() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType
+  getFunctionTypeWithExecutionSemantics(
+      bool hasExecutionSemantics,
+      swift::ExecutionSemantics executionSemantics) const;
   BRIDGED_INLINE BridgedArgumentConvention getCalleeConvention() const;
 
   BRIDGED_INLINE SwiftInt getNumPackElements() const;

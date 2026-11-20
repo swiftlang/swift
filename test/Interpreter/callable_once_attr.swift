@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions) | %FileCheck %s
-// RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions -O) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions -O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_OnceFunctions
@@ -795,3 +795,21 @@ testCalledOnEitherPath(true, "either first")
 // CHECK-NEXT: Resource(either second) used
 // CHECK-NEXT: Resource(either second) deinit
 testCalledOnEitherPath(false, "either second")
+
+// A closure with no captures that is converted without actually deiniting and
+// then passed as an at-most-once argument.
+
+@inline(never)
+func callAtMostOnce(_ f: @callable(once) () -> Void) { f() }
+
+@inline(never)
+func printWithoutActuallyDeiniting() { print("without actually deiniting") }
+
+@inline(never)
+func testWithoutActuallyDeinitingClosureWithoutCaptures() {
+  let f: @once () -> Void = { printWithoutActuallyDeiniting() }
+  withoutActuallyDeiniting(f) { g in callAtMostOnce(g) }
+}
+
+// CHECK-NEXT: without actually deiniting
+testWithoutActuallyDeinitingClosureWithoutCaptures()
