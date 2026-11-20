@@ -3316,8 +3316,8 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 
@@ -3449,8 +3449,8 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 

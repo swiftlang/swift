@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -500,6 +501,15 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
   }
 }
 
+static SILType formLoweredFieldType(SILType baseType, CanType loweredType) {
+  if (!baseType.getClassDecl() && baseType.isMoveOnlyWrapped())
+    loweredType = SILMoveOnlyWrappedType::get(loweredType);
+
+  if (baseType.isAddress() || baseType.getClassDecl() != nullptr)
+    return SILType::getPrimitiveAddressType(loweredType);
+  return SILType::getPrimitiveObjectType(loweredType);
+}
+
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
   NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
@@ -522,19 +532,26 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
         getASTType()->getTypeOfMember(field)->getCanonicalType();
   }
 
-  auto loweredTy =
+  auto loweredType =
       TC.getLoweredRValueType(context, origFieldTy, substFieldTy);
+  return formLoweredFieldType(*this, loweredType);
+}
 
-  // If this type is not a class type, then we propagate "move only"-ness to the
-  // field. Example:
-  if (!getClassDecl() && isMoveOnlyWrapped())
-    loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
+SILType SILType::getFieldType(MissingMemberDecl *field, TypeConverter &TC,
+                              TypeExpansionContext context) const {
+  auto *layout = field->StorageLayout;
+  assert(layout && "missing member must have a storage layout");
 
-  if (isAddress() || getClassDecl() != nullptr) {
-    return SILType::getPrimitiveAddressType(loweredTy);
-  } else {
-    return SILType::getPrimitiveObjectType(loweredTy);
-  }
+  auto substitutions =
+      getASTType()->getContextSubstitutionMap(field->getDeclContext());
+  layout = layout->getWithSubstitutions(field->getASTContext(),
+                                        substitutions);
+  Type memberType = HiddenType::get(field->getASTContext(), layout, CanType());
+  field->getASTContext().recordRecoveredHiddenType(
+      memberType->getCanonicalType());
+
+  auto loweredType = TC.getLoweredRValueType(context, memberType);
+  return formLoweredFieldType(*this, loweredType);
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,

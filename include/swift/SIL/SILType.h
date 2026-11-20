@@ -632,6 +632,10 @@ public:
   SILType getFieldType(VarDecl *field, Lowering::TypeConverter &TC,
                        TypeExpansionContext context) const;
 
+  SILType getFieldType(MissingMemberDecl *field,
+                       Lowering::TypeConverter &TC,
+                       TypeExpansionContext context) const;
+
   SILType getFieldType(VarDecl *field, SILModule &M,
                        TypeExpansionContext context) const;
 

@@ -22,6 +22,7 @@
 
 namespace swift {
 class SILType;
+class TypeExpansionContext;
 
 namespace irgen {
 class IRGenModule;
@@ -54,7 +55,6 @@ private:
 public:
   Field(VarDecl *decl)
       : declOrKind(reinterpret_cast<uintptr_t>(decl) | Var) {
-    assert(decl);
     assert(getKind() == Var);
   }
   Field(MissingMemberDecl *decl)
@@ -78,18 +78,27 @@ public:
     return reinterpret_cast<MissingMemberDecl*>(declOrKind & ~KindMask);
   }
 
+  explicit operator bool() const { return declOrKind != Var; }
+
   /// Is this a concrete field?  When we're emitting a type, all the
   /// fields should be concrete; non-concrete fields occur only with
   /// imported declarations.
   bool isConcrete() const { return getKind() != MissingMember; }
 
-  /// Return the type of this concrete field.
-  SILType getType(IRGenModule &IGM, SILType baseType) const;
+  /// Whether the field's storage layout is known.
+  bool hasKnownLayout() const {
+    return isConcrete() || getMissingMemberDecl()->StorageLayout;
+  }
 
-  /// Return the interface type of this concrete field.
+  /// Return the type of this field.
+  SILType getType(IRGenModule &IGM, SILType baseType) const;
+  SILType getType(IRGenModule &IGM, SILType baseType,
+                  TypeExpansionContext context) const;
+
+  /// Return the interface type of this field.
   Type getInterfaceType(IRGenModule &IGM) const;
 
-  /// Return the nam eof this concrete field.
+  /// Return the name of this field.
   llvm::StringRef getName() const;
 
   bool operator==(Field other) const { return declOrKind == other.declOrKind; }
