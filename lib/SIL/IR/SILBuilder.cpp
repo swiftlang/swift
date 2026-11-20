@@ -644,31 +644,24 @@ void SILBuilder::emitDestructureValueOperation(
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc, SILValue src,
                                              SILDebugVariable Var,
                                              UsesMoveableValueDebugInfo_t moved,
-                                             bool trace, bool overrideLoc) {
-  return createDebugValue(Loc, ArrayRef<SILValue> { src }, Var, moved, trace,
-                          overrideLoc);
+                                             bool trace) {
+  return createDebugValue(Loc, ArrayRef<SILValue> { src }, Var, moved, trace);
 }
 
 DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
                                              ArrayRef<SILValue> operands,
                                              SILDebugVariable Var,
                                              UsesMoveableValueDebugInfo_t moved,
-                                             bool trace, bool overrideLoc) {
+                                             bool trace) {
   if (shouldDropVariable(Var, Loc))
     return nullptr;
 
   llvm::SmallString<4> Name;
-
-  SILDebugLocation DebugLoc;
-  if (overrideLoc) {
-    // Debug location overrides cannot apply to debug value instructions.
-    DebugLocOverrideRAII LocOverride{*this, std::nullopt};
-    DebugLoc = getSILDebugLocation(Loc, true);
-  } else {
-    DebugLoc = getSILDebugLocation(Loc, true);
-  }
-
-  return insert(DebugValueInst::create(DebugLoc, operands, getModule(),
+  // Don't apply location overrides on variables.
+  if (!Var.Loc)
+    Var.Loc = Loc.strippedForDebugVariable();
+  return insert(DebugValueInst::create(getSILDebugLocation(Loc, true), operands,
+                                       getModule(),
                                        *substituteAnonymousArgs(Name, Var, Loc),
                                        moved, trace));
 }
