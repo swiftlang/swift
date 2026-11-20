@@ -98,6 +98,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
@@ -654,7 +655,9 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
                 g);
 
         // If path is stdout, cannot read it back, so check for "-"
-        DEBUG_ASSERT(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
+        DEBUG_ASSERT(outputPath == "-" ||
+                     g.verifyReadsWhatIsWritten(outputPath,
+                                                Instance.getBaseFileSystem()));
 
         if (alsoEmitDotFile)
           g.emitDotFile(Instance.getOutputBackend(), outputPath,
@@ -1693,6 +1696,10 @@ static bool generateReproducer(CompilerInstance &Instance,
     return true;
   }
 
+  // The reproducer is written to its own directory, outside of the outputs of
+  // the compilation.
+  auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+
   auto &upstream = Instance.getObjectStore();
   auto &diags = Instance.getDiags();
   auto &casOpts = Instance.getInvocation().getCASOptions();
@@ -2577,7 +2584,9 @@ static bool performCompileStepsPostSILGen(
       return;
 
     SerializationOptions serializationOpts =
-        Invocation.computeSerializationOptions(outs, Instance.getMainModule());
+        Invocation.computeSerializationOptions(
+            outs, Instance.getMainModule(),
+            *Instance.getSourceMgr().getFileSystem());
 
     // Infer if this is an emit-module job part of an incremental build,
     // vs a partial emit-module job (with primary files) or other kinds.
@@ -2930,8 +2939,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   INITIALIZE_LLVM();
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
+  // Create the file system that all other file system accesses go through.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> RealFS =
+      llvm::vfs::createPhysicalFileSystem();
+
+  // All file system accesses must go through the virtual file system or the
+  // output backend. Diagnose any that don't.
+  auto EnableSandbox = llvm::sys::sandbox::scopedEnable();
+
   std::unique_ptr<CompilerInstance> Instance =
-    std::make_unique<CompilerInstance>();
+      std::make_unique<CompilerInstance>(RealFS);
 
   CompilerInvocation Invocation;
 
@@ -2981,7 +2998,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   SmallString<128> workingDirectory;
-  llvm::sys::fs::current_path(workingDirectory);
+  if (auto CWD = RealFS->getCurrentWorkingDirectory())
+    workingDirectory = *CWD;
 
   std::string MainExecutablePath =
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
@@ -2990,9 +3008,19 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
   if (Invocation.parseArgs(Args, Instance->getDiags(),
                            &configurationFileBuffers, workingDirectory,
-                           MainExecutablePath)) {
+                           MainExecutablePath, RealFS)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
+
+  // Only the actions that support compilation caching are sandboxed for now.
+  // In particular, dependency scanning is not sandboxed: it discovers the
+  // inputs of the compilation on the real file system, and the Clang
+  // dependency scanner runs the Clang driver, which accesses the real file
+  // system directly.
+  auto SandboxForAction = FrontendOptions::supportCompilationCaching(
+                              Invocation.getFrontendOptions().RequestedAction)
+                              ? llvm::sys::sandbox::scopedEnable()
+                              : llvm::sys::sandbox::scopedDisable();
 
   // Don't ask clients to report bugs when running a script in immediate mode.
   // When a script asserts the compiler reports the error with the same
@@ -3110,7 +3138,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions().DeterministicCheck) {
     // Setup a verfication instance to run.
     std::unique_ptr<CompilerInstance> VerifyInstance =
-        std::make_unique<CompilerInstance>();
+        std::make_unique<CompilerInstance>(RealFS);
     // Add a null diagnostic consumer to the diagnostic engine so the
     // compilation will exercise all the diagnose code path but not emitting
     // anything.

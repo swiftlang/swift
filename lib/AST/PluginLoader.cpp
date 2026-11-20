@@ -19,6 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Config/config.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -83,12 +84,15 @@ static StringRef pluginModuleNameStringFromPath(StringRef path) {
   return "";
 }
 
-static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-getPluginLoadingFS(ASTContext &Ctx) {
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+PluginLoader::getPluginLoadingFS() {
   // If there is an immutable file system, using real file system to load plugin
   // as the FS in SourceMgr doesn't support directory iterator.
-  if (Ctx.CASOpts.HasImmutableFileSystem)
+  if (Ctx.CASOpts.HasImmutableFileSystem) {
+    // Plugins are loaded from the real disk.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
     return llvm::vfs::createPhysicalFileSystem();
+  }
   return Ctx.SourceMgr.getFileSystem();
 }
 
@@ -123,7 +127,7 @@ PluginLoader::getPluginMap() {
                                  copy(prefixMappedExecPath)};
   };
 
-  auto fs = getPluginLoadingFS(Ctx);
+  auto fs = getPluginLoadingFS();
   std::error_code ec;
 
   auto validatePlugin = [&](StringRef path) -> llvm::Expected<std::string> {
@@ -266,7 +270,7 @@ llvm::Expected<CompilerPlugin *> PluginLoader::getInProcessPlugins() {
         "library plugins require -in-process-plugin-server-path");
   }
 
-  auto fs = getPluginLoadingFS(Ctx);
+  auto fs = getPluginLoadingFS();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(inProcPluginServerPath, resolvedPath)) {
     return llvm::createStringError(err, err.message());
@@ -277,7 +281,7 @@ llvm::Expected<CompilerPlugin *> PluginLoader::getInProcessPlugins() {
 
 llvm::Expected<CompilerPlugin *>
 PluginLoader::loadExecutablePlugin(StringRef path) {
-  auto fs = getPluginLoadingFS(Ctx);
+  auto fs = getPluginLoadingFS();
   SmallString<128> resolvedPath;
   if (auto err = fs->getRealPath(path, resolvedPath)) {
     return llvm::createStringError(err, err.message());
@@ -285,7 +289,7 @@ PluginLoader::loadExecutablePlugin(StringRef path) {
 
   // Load the plugin.
   auto plugin =
-      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox);
+      getRegistry()->loadExecutablePlugin(resolvedPath, disableSandbox, *fs);
   if (!plugin) {
     resolvedPath.push_back(0);
     return llvm::handleErrors(
@@ -330,7 +334,7 @@ void PluginLoader::recordDependency(const PluginEntry &plugin,
   SmallString<128> resolvedPath;
   // The plugin is not in the CAS file system, so resolve it against the file
   // system it is actually loaded from.
-  auto fs = getPluginLoadingFS(Ctx);
+  auto fs = getPluginLoadingFS();
   if (auto err = fs->getRealPath(path, resolvedPath)) {
     return;
   }

@@ -731,6 +731,13 @@ SwiftDependencyTracker::SwiftDependencyTracker(
                           "SDKSettings.json");
   addCommonFile(SDKSettingPath);
 
+  // Add SDK version file.
+  SmallString<256> SDKVersionPath;
+  llvm::sys::path::append(SDKVersionPath, SearchPathOpts.getSDKPath(), "System",
+                          "Library", "CoreServices");
+  llvm::sys::path::append(SDKVersionPath, "SystemVersion.plist");
+  addCommonFile(SDKVersionPath);
+
   // Add VFSOverlay file.
   for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
     addCommonFile(Overlay);
