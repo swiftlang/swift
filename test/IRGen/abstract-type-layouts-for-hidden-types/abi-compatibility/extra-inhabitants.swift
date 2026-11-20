@@ -3,7 +3,6 @@
 
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 // REQUIRES: executable_test
-// XFAIL: *
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

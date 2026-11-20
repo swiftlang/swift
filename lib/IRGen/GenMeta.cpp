@@ -6148,6 +6148,21 @@ namespace {
       }
     }
 
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(placeholder->getNumberOfFieldOffsetVectorEntries() == 1 &&
+             placeholder->StorageLayout &&
+             "missing struct field must have a storage layout");
+      SILType structType = asImpl().getLoweredType();
+      llvm::Constant *offset = emitPhysicalStructMemberFixedOffset(
+          IGM, structType, Field(placeholder));
+      if (offset) {
+        B.add(offset);
+      } else {
+        asImpl().flagUnfilledFieldOffset();
+        B.addInt(IGM.Int32Ty, 0);
+      }
+    }
+
     void noteEndOfFieldOffsets() {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
@@ -6353,6 +6368,18 @@ namespace {
                                           TypeExpansionContext::minimal()))
                      .isKnownEmpty(ResilienceExpansion::Maximal));
           B.addInt32(0);
+        }
+
+        void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+          if (!Outer.hasKnownFieldOffsets())
+            return;
+          assert(placeholder->getNumberOfFieldOffsetVectorEntries() == 1 &&
+                 placeholder->StorageLayout &&
+                 "missing struct field must have a storage layout");
+          auto offset = emitPhysicalStructMemberFixedOffset(
+              IGM, Type, Field(placeholder));
+          assert(offset && "fixed struct field must have a fixed offset");
+          B.add(offset);
         }
 
         void noteEndOfFieldOffsets() {
