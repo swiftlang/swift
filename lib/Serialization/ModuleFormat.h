@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1049; // SILTypeProperties custom assign flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1050; // Abstract member type layout records
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -70,6 +70,9 @@ using DeclIDField = BCFixed<31>;
 // TypeID must be the same as DeclID because it is stored in the same way.
 using TypeID = DeclID;
 using TypeIDField = DeclIDField;
+
+using MemberAbstractTypeLayoutID = DeclID;
+using MemberAbstractTypeLayoutIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
 
@@ -1802,6 +1805,7 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
+    MemberAbstractTypeLayoutIDField, // fallback abstract type layout
     BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
@@ -2935,6 +2939,7 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
+    ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS,
     HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
     HIDDEN_TYPE_FALLBACK_TABLE,
     LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
