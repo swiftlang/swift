@@ -18,10 +18,8 @@
 #include "DebugTypeInfo.h"
 #include "FixedTypeInfo.h"
 #include "IRGenModule.h"
-#include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILGlobalVariable.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -51,76 +49,150 @@ DebugTypeInfo DebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &TI,
                        /* IsFixedBuffer = */ false, NumExtraInhabitants);
 }
 
-namespace {
-/// Maps each canonical type that occurs within a type to its original,
-/// potentially sugared type.
-class OriginalTypeCollector : public TypeWalker {
-  /// Maps each canonical type to its original type, or to null if it occurs
-  /// with more than one original type or with one that can't be used.
-  llvm::SmallDenseMap<CanType, TypeBase *, 8> OriginalTypes;
-  /// The canonical types of the types being visited, outermost first.
-  SmallVector<CanType, 8> Stack;
-  llvm::SmallPtrSet<TypeAliasType *, 4> VisitedAliases;
-
-public:
-  /// Returns the original type of \p CanTy, or null if \p CanTy doesn't occur,
-  /// occurs with more than one original type, or with one that can't be used.
-  TypeBase *getOriginalType(CanType CanTy) const {
-    return OriginalTypes.lookup(CanTy);
-  }
-
-  Action walkToTypePre(Type Ty) override {
-    CanType CanTy = Ty->getCanonicalType();
-    // A type with the same canonical type as its parent, such as the
-    // underlying type of a typealias, is part of the same occurrence. The
-    // outermost type wins.
-    if (Stack.empty() || Stack.back() != CanTy) {
-      TypeBase *Original = Ty->hasTypeParameter() ? nullptr : Ty.getPointer();
-      auto [It, Inserted] = OriginalTypes.try_emplace(CanTy, Original);
-      if (!Inserted && It->second != Original)
-        It->second = nullptr;
-    }
-    Stack.push_back(CanTy);
-
-    if (auto *Alias = dyn_cast<TypeAliasType>(Ty.getPointer()))
-      if (VisitedAliases.insert(Alias).second)
-        Type(Alias->getSinglyDesugaredType()).walk(*this);
-    return Action::Continue;
-  }
-
-  Action walkToTypePost(Type Ty) override {
-    Stack.pop_back();
-    return Action::Continue;
-  }
-};
-} // namespace
-
 /// Reapply the sugar of \p Sugared to the parts of \p Lowered that are
-/// unchanged. For example, given
+/// unchanged, and return a type canonically equal to \p Lowered. For example,
+/// given
 ///
 ///     typealias MyInt = Int
 ///
 /// SIL type lowering turns `MyInt.Type` into `@thin Int.Type`, which this
-/// function turns back into `@thin MyInt.Type`.
-///
-/// Each subtree of \p Lowered whose canonical type occurs in \p Sugared is
-/// replaced by its original type there, so the result is canonically equal to
-/// \p Lowered.
-///
-/// Note that this does not work for canonical types that occur in \p Sugared
-/// with more than one original type, like `Int` in `(MyInt, Int)`, or for
-/// typealiases whose underlying type is itself changed by lowering, like
-/// `typealias Meta = Int.Type`. They are left unsubstituted, though the sugar
-/// inside such a typealias is still restored.
+/// function turns back into `@thin MyInt.Type`. Sugar that mentions generic
+/// parameters, like `BoxA<T>` or a typealias nested in a generic type, is left
+/// out, because LLDB can't yet resolve a typealias applied to the generic
+/// parameters of the current frame.
 static Type resugar(CanType Lowered, Type Sugared) {
-  OriginalTypeCollector Collector;
-  Sugared.walk(Collector);
+  // Both types are walked in parallel, so sugar is only reapplied where it was
+  // written. Looking it up by canonical type would be wrong, because
+  // specialization and opaque type substitution introduce new occurrences of a
+  // canonical type: specializing `(T, MyInt)` with `T == Int` yields
+  // `(Int, Int)`, whose first element must not become `MyInt`.
+  //
+  // Sugar that can't be used may still contain sugar that can: a typealias
+  // whose underlying type lowering changes, like `typealias MetaT = MyInt.Type`
+  // for `@thin Int.Type`, still contains `MyInt`.
+  for (;;) {
+    if (Sugared->getCanonicalType() == Lowered && !Sugared->hasTypeParameter())
+      return Sugared;
+    auto *Sugar = dyn_cast<SugarType>(Sugared.getPointer());
+    if (!Sugar)
+      break;
+    Sugared = Sugar->getSinglyDesugaredType();
+  }
 
-  return Type(Lowered).transformRec([&](TypeBase *Ty) -> std::optional<Type> {
-    if (auto *Original = Collector.getOriginalType(Ty->getCanonicalType()))
-      return Type(Original);
-    return std::nullopt;
-  });
+  // The outermost type was changed, or it mentions generic parameters, but its
+  // components may be unchanged. It is only rebuilt if one of them is sugared.
+  bool Changed = false;
+  auto resugarPart = [&](CanType LoweredPart, Type SugaredPart) {
+    Type Part = resugar(LoweredPart, SugaredPart);
+    Changed |= Part.getPointer() != LoweredPart.getPointer();
+    return Part;
+  };
+  ASTContext &Ctx = Lowered->getASTContext();
+
+  if (auto LoweredTuple = dyn_cast<TupleType>(Lowered)) {
+    auto *SugaredTuple = dyn_cast<TupleType>(Sugared.getPointer());
+    if (!SugaredTuple)
+      return Lowered;
+    // Substitution can replace a pack expansion with any number of elements,
+    // so only the elements before the first and after the last pack expansion
+    // are known to line up.
+    unsigned NumLowered = LoweredTuple->getNumElements();
+    unsigned NumSugared = SugaredTuple->getNumElements();
+    unsigned Prefix = NumSugared, Suffix = 0;
+    for (unsigned I = 0; I != NumSugared; ++I) {
+      if (SugaredTuple->getElementType(I)->is<PackExpansionType>()) {
+        Prefix = std::min(Prefix, I);
+        Suffix = NumSugared - I - 1;
+      }
+    }
+    if (NumLowered < Prefix + Suffix)
+      return Lowered;
+    SmallVector<TupleTypeElt, 4> Elts(LoweredTuple->getElements());
+    auto resugarElt = [&](unsigned LoweredIdx, unsigned SugaredIdx) {
+      Elts[LoweredIdx] = Elts[LoweredIdx].getWithType(
+          resugarPart(LoweredTuple.getElementType(LoweredIdx),
+                      SugaredTuple->getElementType(SugaredIdx)));
+    };
+    for (unsigned I = 0; I != Prefix; ++I)
+      resugarElt(I, I);
+    for (unsigned I = 1; I <= Suffix; ++I)
+      resugarElt(NumLowered - I, NumSugared - I);
+    return Changed ? TupleType::get(Elts, Ctx) : Type(Lowered);
+  }
+
+  if (auto LoweredMeta = dyn_cast<AnyMetatypeType>(Lowered)) {
+    auto *SugaredMeta = dyn_cast<AnyMetatypeType>(Sugared.getPointer());
+    if (!SugaredMeta || SugaredMeta->getKind() != LoweredMeta->getKind())
+      return Lowered;
+    Type Instance = resugarPart(LoweredMeta.getInstanceType(),
+                                SugaredMeta->getInstanceType());
+    if (!Changed)
+      return Lowered;
+    std::optional<MetatypeRepresentation> Repr;
+    if (LoweredMeta->hasRepresentation())
+      Repr = LoweredMeta->getRepresentation();
+    if (isa<MetatypeType>(LoweredMeta))
+      return MetatypeType::get(Instance, Repr);
+    return ExistentialMetatypeType::get(Instance, Repr);
+  }
+
+  if (auto LoweredNominal = dyn_cast<NominalType>(Lowered)) {
+    auto *SugaredNominal = dyn_cast<NominalType>(Sugared.getPointer());
+    if (!SugaredNominal ||
+        SugaredNominal->getDecl() != LoweredNominal->getDecl() ||
+        bool(SugaredNominal->getParent()) !=
+            bool(LoweredNominal->getParent()) ||
+        SugaredNominal->getGenericArgs().size() !=
+            LoweredNominal->getGenericArgs().size())
+      return Lowered;
+    Type Parent;
+    if (auto LoweredParent = LoweredNominal.getParent())
+      Parent = resugarPart(LoweredParent, SugaredNominal->getParent());
+    SmallVector<Type, 2> Args;
+    for (auto [LoweredArg, SugaredArg] : llvm::zip_equal(
+             LoweredNominal.getGenericArgs(), SugaredNominal->getGenericArgs()))
+      Args.push_back(resugarPart(LoweredArg, SugaredArg));
+    if (!Changed)
+      return Lowered;
+    return NominalType::get(LoweredNominal->getDecl(), Parent, Args, Ctx,
+                            LoweredNominal->getScopeArgs());
+  }
+
+  if (auto LoweredStorage = dyn_cast<ReferenceStorageType>(Lowered)) {
+    auto *SugaredStorage = dyn_cast<ReferenceStorageType>(Sugared.getPointer());
+    if (!SugaredStorage ||
+        SugaredStorage->getKind() != LoweredStorage->getKind())
+      return Lowered;
+    Type Referent = resugarPart(LoweredStorage.getReferentType(),
+                                SugaredStorage->getReferentType());
+    if (!Changed)
+      return Lowered;
+    return ReferenceStorageType::get(Referent, LoweredStorage->getOwnership(),
+                                     Ctx);
+  }
+
+  // AST function types are left alone by lowering, but generic arguments and
+  // metatypes can still contain them.
+  if (auto LoweredFn = dyn_cast<FunctionType>(Lowered)) {
+    auto *SugaredFn = dyn_cast<FunctionType>(Sugared.getPointer());
+    if (!SugaredFn || SugaredFn->getNumParams() != LoweredFn->getNumParams())
+      return Lowered;
+    SmallVector<AnyFunctionType::Param, 4> Params;
+    for (auto [LoweredParam, SugaredParam] :
+         llvm::zip_equal(LoweredFn.getParams(), SugaredFn->getParams()))
+      Params.push_back(LoweredParam.withType(resugarPart(
+          LoweredParam.getPlainType(), SugaredParam.getPlainType())));
+    Type Result = resugarPart(LoweredFn.getResult(), SugaredFn->getResult());
+    if (!Changed)
+      return Lowered;
+    return FunctionType::get(Params, LoweredFn->getYields(), Result,
+                             LoweredFn->getExtInfo());
+  }
+
+  // Other types keep their lowered form. SIL function types only contain
+  // canonical types, and the debug info only records constrained existentials
+  // by their mangled names, which contain no sugar.
+  return Lowered;
 }
 
 DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
@@ -143,12 +215,15 @@ DebugTypeInfo DebugTypeInfo::getLocalVariable(VarDecl *Decl, swift::Type Ty,
     return getFromTypeInfo(DeclType, Info, IGM);
   }
 
-  // Otherwise keep the sugar of the parts that weren't changed. Since Sugared
-  // is an interface type, this leaves out sugar that depends on generic
-  // parameters, like `BoxA<T>`: LLDB can't resolve a generic typealias whose
-  // arguments are bound in the current frame.
-  return getFromTypeInfo(resugar(RealType->getCanonicalType(), Sugared), Info,
-                         IGM);
+  // Otherwise keep the sugar of the parts that weren't changed, if there is
+  // debug info for variables to show it.
+  CanType Lowered = RealType->getCanonicalType();
+  if (IGM.getOptions().DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
+    return getFromTypeInfo(Lowered, Info, IGM);
+  swift::Type Resugared = resugar(Lowered, Sugared);
+  ASSERT(Resugared->getCanonicalType() == Lowered &&
+         "resugaring changed the lowered type");
+  return getFromTypeInfo(Resugared, Info, IGM);
 }
 
 DebugTypeInfo DebugTypeInfo::getGlobalMetadata(swift::Type Ty, Size size,

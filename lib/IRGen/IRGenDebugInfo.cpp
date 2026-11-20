@@ -200,6 +200,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   llvm::StringSet<> OriginallyDefinedInTypes;
   llvm::StringSet<> AnchoredTypeAliases;
+  /// The typealiases already visited by anchorTypeAliasesIn().
+  llvm::SmallPtrSet<TypeAliasType *, 16> VisitedTypeAliases;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   TrackingDIRefMap ExistentialTypeAliasMap;
@@ -2447,11 +2449,9 @@ private:
           !BaseTy->castTo<TupleType>()->containsPackExpansionType())
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
-      // The element types are only described by the mangled name, so emit the
-      // typealiases they refer to, for the debugger to resolve them.
-      anchorTypeAliasesIn(BaseTy);
-      return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
-                                AlignInBits, Flags, MangledName);
+      else
+        return createOpaqueStruct(Scope, MangledName, MainFile, 0, SizeInBits,
+                                  AlignInBits, Flags, MangledName);
     }
 
     case TypeKind::InOut:
@@ -2512,9 +2512,6 @@ private:
       auto L = getFileAndLocation(DbgTy.getDecl());
       unsigned FwdDeclLine = 0;
 
-      // The instance type is only described by the mangled name, so emit the
-      // typealiases it refers to, for the debugger to resolve them.
-      anchorTypeAliasesIn(BaseTy);
       return DBuilder.createStructType(
           Scope, MangledName, L.File, FwdDeclLine, SizeInBits, AlignInBits,
           Flags, nullptr, nullptr, llvm::dwarf::DW_LANG_Swift, nullptr,
@@ -2868,8 +2865,9 @@ private:
     if (!Ty || Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
       return;
     Ty.findIf([&](Type T) -> bool {
+      // Mangling is expensive, so only mangle each alias once.
       auto *Alias = llvm::dyn_cast<TypeAliasType>(T.getPointer());
-      if (!Alias)
+      if (!Alias || !VisitedTypeAliases.insert(Alias).second)
         return false;
       DebugTypeInfo AliasDbgTy = DebugTypeInfo::getForwardDecl(Alias);
       // Dedup by the alias's mangled name.
@@ -3126,6 +3124,13 @@ private:
     if (DbgTy.isNull())
       // We can't use the empty type as an index into DenseMap.
       return createType(DbgTy, "", TheCU, MainFile);
+
+    // Tuples and metatypes can be described by their mangled name alone, even
+    // when they are emitted as a typedef of the canonical type or as a forward
+    // declaration. Emit the typealiases the name refers to, for the debugger to
+    // resolve them.
+    if (isa<TupleType, AnyMetatypeType>(DbgTy.getType()))
+      anchorTypeAliasesIn(DbgTy.getType());
 
     // Only the complete type of a foreign reference type carries the
     // annotation that tells the debugger its values are references, and it
