@@ -106,4 +106,14 @@ MoveOnlyCxxValueType.test("Test inherited method borrowing move only type") {
   expectEqual(nc.x, 3)
 }
 
+if #available(SwiftStdlib 5.8, *) {
+  MoveOnlyCxxValueType.test("Test virtual method of reference type taking move only type by value") {
+    let base = NonCopyableVirtualParamRefBase()
+    expectEqual(base.takesNonCopyable(NonCopyable(1)), 1)
+
+    let derived = NonCopyableVirtualParamRefDerived()
+    expectEqual(derived.takesNonCopyable(NonCopyable(2)), 2)
+  }
+}
+
 runAllTests()

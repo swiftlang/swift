@@ -2,6 +2,7 @@
 #define TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H
 
 #include <memory>
+#include <swift/bridging>
 
 struct Copyable {
     int x;
@@ -110,5 +111,12 @@ struct NonCopyableParamBase {
 struct NonCopyableParamDerived : NonCopyableParamBase {};
 
 struct NonCopyableParamDerivedDerived : NonCopyableParamDerived {};
+
+struct NonCopyableVirtualParamRefBase {
+  virtual int takesNonCopyable(NonCopyable p) const { return p.x; }
+} SWIFT_IMMORTAL_REFERENCE;
+
+struct NonCopyableVirtualParamRefDerived
+    : NonCopyableVirtualParamRefBase {} SWIFT_IMMORTAL_REFERENCE;
 
 #endif // TEST_INTEROP_CXX_CLASS_MOVE_ONLY_VT_H
