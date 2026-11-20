@@ -28,7 +28,11 @@ in separate processes:
 
 The background processes that nothing waits for soon run at a lower priority.
 They log to
-<BinaryCache>\BuildMulti\<name>.log, which this script prints when they end.
+<BinaryCache>\BuildMulti\<name>.log, which this script prints in one piece once
+they end, before it starts its next step or while it waits, so that the logs
+do not interleave. While it waits, it prints every minute the last line that
+the processes that it waits for logged. After a failure, it also prints the
+logs of the processes that it stops.
 
 See BuildSequential.ps1 for the parameters.
 #>
@@ -193,6 +197,7 @@ function ConvertTo-CommandLineArgument([string] $Argument) {
 
 # Starts one of the build scripts in the background.
 function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal) {
+  Write-EndedBuildJobs
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Starting $Name in the background: $Script $Arguments"
 
@@ -221,9 +226,59 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
     Log = $Log
     TimingDataPath = $TimingDataPath
     Timing = if ($RecordTimings) { Add-TimingData $BuildPlatform $Name -Variant "Background" } else { $null }
+    Printed = $false
+    Stopped = $false
   }
   [void]$Jobs.Add($Job)
   return $Job
+}
+
+# Reads the log of a job, or its last bytes, while the job may still write it.
+function Read-BuildJobLog([PSCustomObject] $Job, [long] $Last = 0) {
+  $Stream = [IO.File]::Open($Job.Log, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+  try {
+    if ($Last -gt 0 -and $Stream.Length -gt $Last) {
+      $null = $Stream.Seek(-$Last, [IO.SeekOrigin]::End)
+    }
+    return (New-Object IO.StreamReader($Stream, [Text.Encoding]::UTF8, $true)).ReadToEnd()
+  } finally {
+    $Stream.Dispose()
+  }
+}
+
+# The last line that a job logged, which shows what it does.
+function Get-BuildJobLastLine([PSCustomObject] $Job) {
+  try {
+    $Lines = @((Read-BuildJobLog $Job 4096) -split "[\r\n]+" | Where-Object { $_.Trim() })
+  } catch {
+    return ""
+  }
+  if (-not $Lines) { return "" }
+  $Line = $Lines[-1].Trim()
+  if ($Line.Length -gt 200) { $Line = "$($Line.Substring(0, 200))..." }
+  return $Line
+}
+
+# Prints the log of a job at once, so that it does not interleave with what
+# this script prints.
+function Write-BuildJobLog([PSCustomObject] $Job) {
+  $Job.Printed = $true
+  $Start = $Job.Process.StartTime
+  $End = if ($Job.Process.HasExited) { $Job.Process.ExitTime } else { [DateTime]::Now }
+  Write-Host -ForegroundColor Cyan "===== $($Job.Name) ($($Start.ToString("HH:mm:ss")) to $($End.ToString("HH:mm:ss")), $($End - $Start)), from $($Job.Log) ====="
+  [Console]::Out.Write((Read-BuildJobLog $Job))
+  [Console]::Out.Flush()
+  $Result = if ($Job.Stopped) { "was stopped" } else { "exited with code $($Job.Process.ExitCode)" }
+  Write-Host -ForegroundColor Cyan "===== $($Job.Name) $Result ====="
+}
+
+# Prints the logs of the jobs that ended since this script last did, in the
+# order in which they ended.
+function Write-EndedBuildJobs {
+  $Ended = @($Jobs | Where-Object { -not $_.Printed -and $_.Process.HasExited } | Sort-Object { $_.Process.ExitTime })
+  foreach ($Job in $Ended) {
+    Write-BuildJobLog $Job
+  }
 }
 
 # Records the time that a job took, with the timings of the steps of its script.
@@ -245,18 +300,32 @@ function Complete-BuildJob([PSCustomObject] $Job) {
   $Job.Timing.CPU = if ($Seconds -gt 0) { $BusySeconds / $Seconds } else { 0 }
 }
 
-# Waits for background jobs, prints their logs, and throws if any of them failed.
+# How often this script reports the jobs that it waits for.
+$JobHeartbeat = [TimeSpan]::FromMinutes(1)
+
+# Waits for background jobs, printing the logs of all the jobs that end
+# meanwhile, and throws if any of the jobs that it waited for failed. It reports
+# the jobs that it waits for regularly, so that the build does not look stuck.
 function Wait-BuildJobs([Object[]] $Wait) {
+  $Heartbeat = [DateTime]::Now + $JobHeartbeat
+  while ($true) {
+    $Running = @(foreach ($Job in $Wait) { if (-not $Job.Process.HasExited) { $Job } })
+    Write-EndedBuildJobs
+    if (-not $Running) { break }
+
+    if ([DateTime]::Now -ge $Heartbeat) {
+      foreach ($Job in $Running) {
+        $Line = Get-BuildJobLastLine $Job
+        Write-Host "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Waiting for $($Job.Name) ($(([DateTime]::Now - $Job.Process.StartTime).ToString("hh\:mm\:ss")))$(if ($Line) { ": $Line" })"
+      }
+      $Heartbeat = [DateTime]::Now + $JobHeartbeat
+    }
+    $null = $Running[0].Process.WaitForExit(1000)
+  }
+
   $Failed = @()
   foreach ($Job in $Wait) {
-    $Job.Process.WaitForExit()
     Complete-BuildJob $Job
-
-    $Elapsed = $Job.Process.ExitTime - $Job.Process.StartTime
-    Write-Host -ForegroundColor Cyan "===== $($Job.Name) ($Elapsed), from $($Job.Log) ====="
-    [Console]::Out.Write([IO.File]::ReadAllText($Job.Log))
-    [Console]::Out.Flush()
-    Write-Host -ForegroundColor Cyan "===== $($Job.Name) exited with code $($Job.Process.ExitCode) ====="
     if ($Job.Process.ExitCode -ne 0) {
       $Failed += $Job.Name
     }
@@ -266,12 +335,24 @@ function Wait-BuildJobs([Object[]] $Wait) {
   }
 }
 
-# Stops the jobs that are still running after a failure.
+# Stops the jobs that are still running after a failure, and prints the logs
+# that were not printed yet, as only the output of this script is kept.
 function Stop-BuildJobs {
   foreach ($Job in $Jobs.ToArray()) {
     if (-not $Job.Process.HasExited) {
       Write-Host -ForegroundColor Red "Stopping $($Job.Name), which logs to $($Job.Log)"
       $null = & cmd.exe /d /c "taskkill /T /F /PID $($Job.Process.Id) > nul 2>&1"
+      $null = $Job.Process.WaitForExit(10000)
+      $Job.Stopped = $true
+    }
+  }
+  foreach ($Job in $Jobs.ToArray()) {
+    if (-not $Job.Printed) {
+      try {
+        Write-BuildJobLog $Job
+      } catch {
+        Write-Host -ForegroundColor Red "Could not print $($Job.Log): $_"
+      }
     }
     Complete-BuildJob $Job
   }
@@ -311,6 +392,7 @@ function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $Co
   if ($Background) {
     return Start-BuildJob $Name BuildToolchain.ps1 $Overrides
   }
+  Write-EndedBuildJobs
   Invoke-BuildScript $Name BuildToolchain.ps1 $Parameters $Overrides
 }
 
