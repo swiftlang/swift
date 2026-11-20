@@ -80,6 +80,34 @@ func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
 }
 
 // =============================================================================
+// Owned temporaries
+// =============================================================================
+
+struct CHolder {
+  let c: C
+  let p: UnsafeRawPointer
+
+  @_lifetime(borrow self)
+  func getBV() -> BV {
+    BV(p, 0)
+  }
+}
+
+func makeHolderThrows() throws -> CHolder { fatalError() }
+
+// The dependence is on the try_apply result.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s4test16bv_throwing_tempyyKF : $@convention(thin) () -> @error any Error {
+// CHECK: try_apply %{{.*}}() : $@convention(thin) () -> (@owned CHolder, @error any Error), normal [[NORMAL:bb[0-9]+]], error bb{{[0-9]+}}
+// CHECK: [[NORMAL]]([[HOLDER:%.*]] : @owned $CHolder):
+// CHECK: [[BV:%.*]] = apply %{{.*}}([[HOLDER]]) : $@convention(method) (@guaranteed CHolder) -> @lifetime(borrow 0) @owned BV
+// CHECK: mark_dependence [unresolved] [[BV]] on [[HOLDER]]
+// CHECK-LABEL: } // end sil function '$s4test16bv_throwing_tempyyKF'
+func bv_throwing_temp() throws {
+  use(try makeHolderThrows().getBV())
+}
+
+// =============================================================================
 // Builtin.addressOfBorrow
 // =============================================================================
 
