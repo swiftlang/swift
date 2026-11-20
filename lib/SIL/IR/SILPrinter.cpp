@@ -33,6 +33,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -1330,6 +1331,14 @@ public:
         *this << " inlined_at " << Ctx.getScopeID(CS);
       *this << " }\n";
     }
+  }
+
+  /// Print the scopes referenced by \p I, including its debug variable's scope.
+  void printDebugScopes(const SILInstruction &I, const SourceManager &SM) {
+    printDebugScope(I.getDebugScope(), SM);
+    if (auto DVI = DebugVarCarryingInst(const_cast<SILInstruction *>(&I)))
+      if (auto Var = DVI.getVarInfo(/* complete = */ false))
+        printDebugScope(Var->Scope, SM);
   }
 
   void printDebugScopeRef(const SILDebugScope *DS, const SourceManager &SM,
@@ -3720,7 +3729,7 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
   auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
     SILPrinter P(Ctx);
-    P.printDebugScope(I.getDebugScope(), SM);
+    P.printDebugScopes(I, SM);
   }
 
   SILPrinter(Ctx).print(this);
@@ -3833,7 +3842,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     for (auto &BB : *this)
       for (auto &I : BB) {
         SILPrinter P(PrintCtx);
-        P.printDebugScope(I.getDebugScope(), SM);
+        P.printDebugScopes(I, SM);
       }
     OS << "\n";
   }
