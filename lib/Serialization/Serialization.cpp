@@ -26,6 +26,7 @@
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/HiddenTypeLayout.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
@@ -8399,6 +8400,22 @@ bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
   return true;
 }
 
+void Serializer::handleAbstractMemberTypeLayoutRequirement(
+    const AbstractMemberTypeLayoutRequirement &requirement) {
+  bool scheduled = Options.SkipWritingAbstractTypeLayouts
+                       ? true
+                       : scheduleAbstractMemberTypeLayoutSerialization(
+                             requirement.StoredProperty);
+
+  if (!scheduled || !Options.EnableHiddenTypeLayoutSerializationRemarks)
+    return;
+
+  getASTContext().Diags.diagnose(
+      requirement.StoredProperty->getLoc(),
+      diag::serialization_scheduled_abstract_member_type_layout,
+      requirement.StoredProperty, requirement.ABIExposedStruct);
+}
+
 void Serializer::writeAST(ModuleOrSourceFile DC) {
   DeclTable topLevelDecls, operatorDecls, operatorMethodDecls;
   DeclTable precedenceGroupDecls;
@@ -8546,6 +8563,16 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       auto MangledName = Mangler.mangleOpaqueTypeDecl(OTD);
       opaqueReturnTypeGenerator.insert(MangledName, addDeclRef(OTD));
     }
+  }
+
+  auto &langOpts = M->getASTContext().LangOpts;
+  if (langOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
+      M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
+    forEachRequiredAbstractMemberTypeLayout(
+        files, [&](const AbstractMemberTypeLayoutRequirement &requirement) {
+          handleAbstractMemberTypeLayoutRequirement(requirement);
+        });
   }
 
   writeAllDeclsAndTypes();

@@ -38,6 +38,7 @@ namespace clang {
 }
 
 namespace swift {
+  struct AbstractMemberTypeLayoutRequirement;
   class ModuleFile;
   class SerializableFixedTypeInfoRepresentation;
   struct SerializableLLVMTypeRepresentation;
@@ -387,6 +388,10 @@ private:
 
   /// Writes a reference to a decl in another module.
   void writeCrossReference(const Decl *D);
+
+  /// Handle a member layout requirement discovered by AST analysis.
+  void handleAbstractMemberTypeLayoutRequirement(
+      const AbstractMemberTypeLayoutRequirement &requirement);
 
   TypeID addTranscribedTypeRef(ModuleFile &source, TypeID sourceID);
   DeclID addTranscribedDeclRef(ModuleFile &source, DeclID sourceID);
