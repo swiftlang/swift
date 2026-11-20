@@ -32,9 +32,18 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
 
-    if let forwardingInst = destroyedValue.asOptimizableForwardingInstruction {
+    if let forwardingInst = destroyedValue.asOptimizableForwardingInstruction,
+       // The transformation handles all destroys of `forwardingInst` at once. Only do it for the
+       // first destroy. Otherwise we would get quadratic complexity if `forwardingInst` has
+       // many destroys, because `tryRemoveForwardingInstruction` iterates over all uses.
+       isFirstDestroy(of: forwardingInst)
+    {
       tryRemoveForwardingInstruction(forwardingInst, context)
     }
+  }
+
+  private func isFirstDestroy(of value: Value) -> Bool {
+    return value.uses.first(where: { $0.instruction is DestroyValueInst })?.instruction == self
   }
 
   /// Moves a `destroy_value` of a phi argument to the phi's predecessor blocks.
