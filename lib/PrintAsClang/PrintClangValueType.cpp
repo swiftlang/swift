@@ -760,6 +760,13 @@ void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
   // Do not reference unspecialized templates.
   if (isa<clang::ClassTemplateDecl>(typeDecl->getClangDecl()))
     return;
+  // Do not reference anonymous types that can't be named in C++, like the enum
+  // from the C++ expansion of CF_OPTIONS, whose typedef names the underlying
+  // integer type instead of the enum.
+  if (const auto *tagDecl = dyn_cast<clang::TagDecl>(typeDecl->getClangDecl()))
+    if (tagDecl->getDeclName().isEmpty() &&
+        !tagDecl->getTypedefNameForAnonDecl())
+      return;
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredInterfaceType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
