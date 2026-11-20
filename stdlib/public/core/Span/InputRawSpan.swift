@@ -262,6 +262,63 @@ extension InputRawSpan {
   public mutating func removeAll() {
     _count = 0
   }
+
+  /// Returns a new input span that takes ownership of up to n bytes from the
+  /// beginning of this span.
+  ///
+  /// The `InputRawSpan` returned by this function represents a mutation of
+  /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
+  /// in use. The memory previously occupied by the consumed bytes becomes
+  /// part of this span's free capacity.
+  ///
+  /// The returned input span has a `capacity` equal to the number of bytes
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter n: The maximum number of bytes to consume.
+  ///     `n` must not be negative. If it exceeds `byteCount`,
+  ///     all bytes are consumed.
+  /// - Returns: An `InputRawSpan` containing the consumed bytes.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumePrefix(
+    maxByteCount n: Int
+  ) -> InputRawSpan {
+    _precondition(
+      n >= 0, "Can't consume a negative number of bytes"
+    )
+    let c = Swift.min(n, byteCount)
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
+      start: _initializedStart(), count: c
+    )
+    _count &-= c
+    let prefix = unsafe InputRawSpan(
+      _uncheckedBuffer: buffer, initializedCount: c
+    )
+    return unsafe _overrideLifetime(prefix, mutating: &self)
+  }
+
+  /// Calls a closure with an input span that takes ownership of up to n bytes
+  /// from the beginning of this span.
+  ///
+  /// The input span has a capacity equal to the number of bytes it holds.
+  ///
+  /// - Parameters:
+  ///   - n: The maximum number of bytes to consume.
+  ///       `n` must not be negative. If it exceeds `byteCount`,
+  ///       all bytes are consumed.
+  ///   - consumer: A closure that receives an `InputRawSpan` containing
+  ///       the consumed bytes.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumePrefix<E: Error, R: ~Copyable>(
+    maxByteCount n: Int,
+    consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
+  ) throws(E) -> R {
+    let prefix = consumePrefix(maxByteCount: n)
+    return try consumer(prefix)
+  }
 }
 
 @available(SwiftStdlib 6.5, *)

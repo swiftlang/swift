@@ -525,6 +525,76 @@ suite.test("Iterable conformance")
   }
 }
 
+suite.test("consumePrefix(maxByteCount:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  unsafe withInputRawSpan(
+    capacity: 12, initialBytes: [0, 1, 2, 3, 4, 5]
+  ) { span, _ in
+    do {
+      var prefix = span.consumePrefix(maxByteCount: 2)
+      expectEqual(prefix.byteCount, 2)
+      expectEqual(prefix.capacity, 2)
+      // the bytes keep their order
+      expectEqual(prefix[0], 0)
+      expectEqual(prefix[1], 1)
+      expectEqual(prefix.removeFirst(), 0)
+    }
+    expectEqual(span.byteCount, 4)
+    expectEqual(span.freeCapacity, 8)
+    expectEqual(span[0], 2)
+
+    do {
+      let rest = span.consumePrefix(maxByteCount: .max)
+      expectEqual(rest.byteCount, 4)
+      expectEqual(rest[3], 5)
+    }
+    expectTrue(span.isEmpty)
+    expectEqual(span.freeCapacity, 12)
+  }
+
+  var nothing = InputRawSpan()
+  let none = nothing.consumePrefix(maxByteCount: 4)
+  expectEqual(none.byteCount, 0)
+}
+
+suite.test("consumePrefix(maxByteCount:) negative count")
+.require(.crashTesting)
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var span = InputRawSpan()
+  expectCrashLater(withDebugMessage: "Can't consume a negative number")
+  _ = span.consumePrefix(maxByteCount: -1)
+}
+
+suite.test("consumePrefix(maxByteCount:consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  unsafe withInputRawSpan(
+    capacity: 8, initialBytes: [0, 1, 2, 3, 4]
+  ) { span, _ in
+    var calls = 0
+    let values = span.consumePrefix(maxByteCount: 3) {
+      (prefix: consuming InputRawSpan) -> [UInt8] in
+      calls += 1
+      expectEqual(prefix.byteCount, 3)
+      expectEqual(prefix.capacity, 3)
+      var values: [UInt8] = []
+      for i in prefix.byteOffsets {
+        values.append(prefix[i])
+      }
+      return values
+    }
+    expectEqual(calls, 1)
+    expectEqual(values, [0, 1, 2])
+    expectEqual(span.byteCount, 2)
+    expectEqual(span[0], 3)
+  }
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 suite.test("InputRawSpan Sendability")
