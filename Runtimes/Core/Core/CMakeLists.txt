@@ -178,6 +178,8 @@ add_library(swiftCore
   Span/MutableRawSpan.swift
   Span/OutputSpan.swift
   Span/OutputRawSpan.swift
+  Span/InputSpan.swift
+  Span/InputRawSpan.swift
   StaticString.swift
   StaticPrint.swift
   Stride.swift
