@@ -1085,6 +1085,12 @@ public:
   llvm::Expected<AbstractTypeLayout *>
   getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
 
+  serialization::BitOffset
+  getSerializedTypeOffset(serialization::TypeID ID) const;
+  serialization::BitOffset
+  getSerializedDeclOffset(serialization::DeclID ID) const;
+  llvm::BitstreamCursor getDeclTypeCursorForReplay() const;
+
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
 
@@ -1116,6 +1122,10 @@ public:
   /// Returns the generic environment for the given ID or the first error.
   llvm::Expected<GenericEnvironment *>
   getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID);
+
+  /// Returns the SIL layout for the given ID or the first error.
+  llvm::Expected<SILLayout *>
+  getSILLayoutChecked(serialization::SILLayoutID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.

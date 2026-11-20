@@ -67,8 +67,6 @@ const uint32_t SWIFTMODULE_HASH_SEED = 5381;
 
 using DeclIDField = BCFixed<31>;
 
-// TypeID must be the same as DeclID because it is stored in the same way.
-using TypeID = DeclID;
 using TypeIDField = DeclIDField;
 
 using MemberAbstractTypeLayoutID = DeclID;
