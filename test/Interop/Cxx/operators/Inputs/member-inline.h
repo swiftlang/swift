@@ -88,6 +88,9 @@ struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int operator()(int x, int y) {
     return value + x * y;
   }
+  int operator()(const AddressOnlyIntWrapper &other) const {
+    return value + other.value;
+  }
 
   AddressOnlyIntWrapper operator-(AddressOnlyIntWrapper rhs) const {
     return AddressOnlyIntWrapper(value - rhs.value);
@@ -524,6 +527,16 @@ public:
 };
 
 class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
+
+struct HasOperatorCallConstRefParam {
+  int operator()(const AddressOnlyIntWrapper &other) const {
+    return value + other.value;
+  }
+  int value = 1;
+};
+
+struct DerivedFromHasOperatorCallConstRefParam
+    : HasOperatorCallConstRefParam {};
 
 class HasStaticOperatorCallWithConstOperator {
 public:
