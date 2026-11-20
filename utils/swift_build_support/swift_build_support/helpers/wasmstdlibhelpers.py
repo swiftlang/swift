@@ -152,6 +152,7 @@ def _configure_llvm(cp, host_target, short_triple):
     cmake_options.define('CMAKE_BUILD_TYPE:STRING', args.build_variant)
     cmake_options.define('CMAKE_C_COMPILER_WORKS:BOOL', 'TRUE')
     cmake_options.define('CMAKE_CXX_COMPILER_WORKS:BOOL', 'TRUE')
+    cmake_options.define('LLVM_TARGETS_TO_BUILD:STRING', args.llvm_targets_to_build)
     cmake_options.define('LLVM_COMPILER_CHECKED:BOOL', 'TRUE')
     cmake_options.define('LLVM_ENABLE_ZLIB:BOOL', 'FALSE')
     cmake_options.define('LLVM_ENABLE_LIBXML2:BOOL', 'FALSE')
