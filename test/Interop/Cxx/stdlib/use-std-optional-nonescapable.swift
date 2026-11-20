@@ -60,6 +60,17 @@ inline UniqueView makeUniqueView(const int &x [[clang::lifetimebound]]) {
 
 using OptionalUniqueView = std::optional<UniqueView>;
 
+// Cannot be passed in registers, so an optional of it is address-only on every
+// platform. UniqueView is only address-only with some ABIs, such as MSVC's.
+struct SWIFT_NONESCAPABLE AddressOnlyUniqueView {
+  const int *p = nullptr;
+  AddressOnlyUniqueView() = default;
+  AddressOnlyUniqueView(const AddressOnlyUniqueView &) = delete;
+  AddressOnlyUniqueView(AddressOnlyUniqueView &&other) : p(other.p) {}
+};
+
+using OptionalAddressOnlyUniqueView = std::optional<AddressOnlyUniqueView>;
+
 struct SWIFT_NONESCAPABLE Holder {
   View v;
   const View &operator*() const { return v; }
@@ -187,6 +198,18 @@ func makeNilUnique() -> OptionalUniqueView {
 }
 
 func hasValueUnique(_ o: borrowing OptionalUniqueView) -> Bool {
+  o.hasValue && takeNoncopyableCxxOptional(o)
+}
+
+// 'pointee' is read through an address projected out of the borrowed optional.
+@_lifetime(copy v)
+func wrapAddressOnlyUnique(_ v: consuming AddressOnlyUniqueView)
+  -> OptionalAddressOnlyUniqueView {
+  OptionalAddressOnlyUniqueView(v)
+}
+
+func hasValueAddressOnlyUnique(_ o: borrowing OptionalAddressOnlyUniqueView)
+  -> Bool {
   o.hasValue && takeNoncopyableCxxOptional(o)
 }
 

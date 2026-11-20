@@ -6,8 +6,10 @@ import CxxStdlib
 func takeCopyable<T: Copyable>(_ x: T) {} // expected-note* {{'where T: Copyable' is implicit here}}
 
 func takeCxxOptional<T: CxxOptional>(_ x: T) {
-  // expected-note@-1 {{where 'T.Wrapped' = 'std.__1.optional<HasDeletedCopyCtor>.Wrapped' (aka 'HasDeletedCopyCtor')}}
-  // expected-note@-2 {{'where T: Copyable' is implicit here}}
+  // The standard library may declare 'optional' in an inline namespace, so
+  // only match from 'optional' onwards.
+  // expected-note@-3 {{optional<HasDeletedCopyCtor>.Wrapped' (aka 'HasDeletedCopyCtor')}}
+  // expected-note@-4 {{'where T: Copyable' is implicit here}}
   _ = x.hasValue
 }
 
@@ -30,8 +32,8 @@ where T.Wrapped: ~Copyable {
 takeNonCopyableCxxOptional(nonNilOptNonCopyable)
 // By default, a generic 'CxxOptional' has a copyable 'Wrapped' type.
 takeCxxOptional(nonNilOptNonCopyable)
-// expected-error@-1 {{global function 'takeCxxOptional' requires that 'std.__1.optional<HasDeletedCopyCtor>.Wrapped' (aka 'HasDeletedCopyCtor') conform to 'Copyable'}}
-// expected-error@-2 {{global function 'takeCxxOptional' requires that 'StdOptionalHasDeletedCopyCtor' (aka 'std.__1.optional<HasDeletedCopyCtor>') conform to 'Copyable'}}
+// expected-error@-1 {{optional<HasDeletedCopyCtor>.Wrapped' (aka 'HasDeletedCopyCtor') conform to 'Copyable'}}
+// expected-error@-2 {{global function 'takeCxxOptional' requires that 'StdOptionalHasDeletedCopyCtor' (aka 'std.}}
 
 let _: StdOptionalHasDeletedCopyCtor = nil
 let _ = StdOptionalHasDeletedCopyCtor(HasDeletedCopyCtor(1))

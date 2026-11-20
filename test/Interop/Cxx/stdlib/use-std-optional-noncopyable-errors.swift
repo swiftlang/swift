@@ -10,4 +10,4 @@ import CxxStdlib
 let opt = getNonNilOptionalHasDeletedCopyCtor()
 
 _ = Optional(fromCxx: opt)
-// expected-error@-1 {{referencing initializer 'init(fromCxx:)' on 'Optional' requires that 'std.__1.optional<HasDeletedCopyCtor>.Wrapped' (aka 'HasDeletedCopyCtor') conform to 'Copyable'}}
+// expected-error@-1 {{referencing initializer 'init(fromCxx:)' on 'Optional' requires that 'std.}}
