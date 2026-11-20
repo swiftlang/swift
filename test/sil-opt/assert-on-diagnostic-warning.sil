@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -noreturn-folding -verify %s
+// RUN: %target-sil-opt -enable-sil-verify-all -noreturn-folding -assert-on-diagnostic-error %s -o /dev/null 2>&1 | %FileCheck --check-prefix=NOERROR %s
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all -noreturn-folding -assert-on-diagnostic-warning %s -o /dev/null 2>&1 | %FileCheck %s
+
+// Make sure that -assert-on-diagnostic-warning traps when a warning diagnostic
+// is emitted, and that -assert-on-diagnostic-error does not trap on a warning.
+
+// CHECK: We emitted a warning?!
+// NOERROR: will never be executed
+
+import Swift
+import Builtin
+
+sil @exit : $@convention(thin) (Builtin.Int32) -> Never
+
+sil private @unreachable_code : $@convention(thin) () -> Int64 {
+bb0:
+  %1 = integer_literal $Builtin.Int32, 3
+  %2 = function_ref @exit : $@convention(thin) (Builtin.Int32) -> Never
+  %3 = apply %2(%1) : $@convention(thin) (Builtin.Int32) -> Never
+  // expected-note @-1 {{a call to a never-returning function}}
+  %4 = integer_literal $Builtin.Int64, 7
+  // expected-warning @-1 {{will never be executed}}
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+  return %5 : $Int64
+}
