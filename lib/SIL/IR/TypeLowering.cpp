@@ -6066,7 +6066,8 @@ bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
 }
 
 void TypeLowering::printProperties(llvm::raw_ostream &os,
-                                   unsigned indentation) const {
+                                   unsigned indentation,
+                                   bool includeExpansion) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)
       return "true";
@@ -6077,7 +6078,9 @@ void TypeLowering::printProperties(llvm::raw_ostream &os,
     os.indent(indentation) << name << ": " << value << ".\n";
   };
 
-  os.indent(indentation) << "Expansion: " << getResilienceExpansion() << "\n";
+  if (includeExpansion)
+    os.indent(indentation)
+        << "Expansion: " << getResilienceExpansion() << "\n";
   printProperty("isTrivial", BOOL(Properties.isTrivial()));
   printProperty("isEscapable", BOOL(Properties.isEscapable()));
   printProperty("isNonTrivialOnlyBecauseNonEscapable",
@@ -6109,7 +6112,7 @@ void TypeLowering::printProperties(llvm::raw_ostream &os,
 
 void TypeLowering::print(llvm::raw_ostream &os) const {
   os << "Type Lowering for lowered type: " << LoweredType << ".\n";
-  printProperties(os, 0);
+  printProperties(os, 0, true);
 }
 
 void TypeLowering::printForAbstractTypeLayoutInfoBase(
@@ -6117,7 +6120,7 @@ void TypeLowering::printForAbstractTypeLayoutInfoBase(
     llvm::StringRef concreteTypeName) const {
   os.indent(indentation) << "TypeLowering:\n";
   os.indent(indentation + 2) << "class: " << concreteTypeName << "\n";
-  printProperties(os, indentation + 2);
+  printProperties(os, indentation + 2, false);
 }
 
 void TypeLowering::dump() const {
