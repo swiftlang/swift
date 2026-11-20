@@ -2997,12 +2997,11 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    auto *layoutInfo = hidden->getLayoutInfoDecl();
-    assert(layoutInfo && layoutInfo->Layout &&
-           layoutInfo->Layout->typeInfoRepresentation &&
+    auto *layout = hidden->getLayout();
+    assert(layout->typeInfoRepresentation &&
            "HiddenType must carry a serialized TypeInfo representation");
     return createTypeInfoFromSerializableRepresentation(
-               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+               IGM, *layout->typeInfoRepresentation)
         .release();
   }
   }

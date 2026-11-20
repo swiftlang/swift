@@ -70,7 +70,7 @@ void swift::forEachRequiredHiddenTypeLayout(
               NominalTypeDecl *abiExposedType,
               ValueDecl *layoutAffectingStorage) {
         if (auto *hiddenType = type->getAs<HiddenType>()) {
-          if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
+          if (auto *layoutInfo = hiddenType->getLegacyLayoutInfoDecl())
             reportHiddenType(layoutInfo, type,
                              HiddenTypeLayoutOrigin::RecoveredHiddenType,
                              abiExposedType, layoutAffectingStorage);
