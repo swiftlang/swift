@@ -24,4 +24,18 @@ struct CopyCountingBitFields {
   }
 };
 
+struct FirstBase {
+  int x = 1;
+};
+
+struct BitFieldBase {
+  unsigned b : 3;
+};
+
+struct BitFieldInSecondBase : FirstBase, BitFieldBase {};
+
+struct BitFieldBehindVTable : BitFieldBase {
+  virtual int virt() const { return 42; }
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_BIT_FIELDS_H
