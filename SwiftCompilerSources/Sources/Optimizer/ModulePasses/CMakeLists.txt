@@ -10,6 +10,7 @@ swift_compiler_sources(Optimizer
   ConformanceCheckOptimization.swift
   DiagnoseUnknownConstValues.swift
   EmbeddedSwiftDiagnostics.swift
+  FunctionSignatureOptimization.swift
   MandatoryPerformanceOptimizations.swift
   ReadOnlyGlobalVariables.swift
   StackProtection.swift
