@@ -47,6 +47,8 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 }
 
 // CHECK-BOTH: === Abstract type layout information ===
+// CHECK-BOTH-NEXT: enclosingType: $s7Library7WrapperV
+// CHECK-BOTH-NEXT: memberName: hidden
 // CHECK-BOTH-NEXT: mangledName: $sSo13HiddenCStructa
 // CHECK-LIBRARY-NEXT: origin: serialization
 // CHECK-CLIENT-NEXT: origin: recovery

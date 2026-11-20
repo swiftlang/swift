@@ -559,8 +559,8 @@ SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
   assert(layout && "missing member must have a storage layout");
   layout = layout->getWithSubstitutions(field.getASTContext(), substitutions);
   Type memberType = HiddenType::get(field.getASTContext(), layout, CanType());
-  field.getASTContext().recordRecoveredHiddenType(
-      memberType->getCanonicalType());
+  field.getASTContext().recordRecoveredAbstractMemberTypeLayout(
+      field.getMissingMemberDeclOrNull(), memberType->getCanonicalType());
   auto loweredType = TC.getLoweredRValueType(context, memberType);
   if (isAddress())
     return SILType::getPrimitiveAddressType(loweredType);

@@ -276,7 +276,8 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
-  llvm::SmallSetVector<CanType, 4> RecoveredHiddenTypes;
+  SmallVector<RecoveredAbstractMemberTypeLayout, 4>
+      RecoveredAbstractMemberTypeLayouts;
 
   /// The map from a module's name to a vector of modules that share that name.
   /// The name can be either the module's real name of the module's ABI name.
@@ -926,7 +927,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
                                 << llvm::capacity_in_bytes(Name) << "\n"
 
   SIZE(LoadedModules);
-  SIZE(RecoveredHiddenTypes);
+  SIZE(RecoveredAbstractMemberTypeLayouts);
   SIZE(NameToModules);
   SIZE(IdentifierTable);
   SIZE(Cleanups);
@@ -2747,13 +2748,21 @@ ASTContext::getLoadedModules() const {
   return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
 }
 
-void ASTContext::recordRecoveredHiddenType(CanType type) {
+void ASTContext::recordRecoveredAbstractMemberTypeLayout(
+    MissingMemberDecl *member, CanType type) {
+  assert(member && member->StorageLayout);
   assert(isa<HiddenType>(type));
-  getImpl().RecoveredHiddenTypes.insert(type);
+  auto &recoveredLayouts = getImpl().RecoveredAbstractMemberTypeLayouts;
+  if (llvm::any_of(recoveredLayouts, [&](const auto &entry) {
+        return entry.Member == member && entry.Type == type;
+      }))
+    return;
+  recoveredLayouts.push_back({member, type});
 }
 
-ArrayRef<CanType> ASTContext::getRecoveredHiddenTypes() const {
-  return getImpl().RecoveredHiddenTypes.getArrayRef();
+ArrayRef<RecoveredAbstractMemberTypeLayout>
+ASTContext::getRecoveredAbstractMemberTypeLayouts() const {
+  return getImpl().RecoveredAbstractMemberTypeLayouts;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {

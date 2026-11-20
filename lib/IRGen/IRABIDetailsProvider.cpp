@@ -169,15 +169,16 @@ public:
     return result;
   }
 
-  AbstractTypeLayout getAbstractTypeLayout(Type type) {
+  AbstractTypeLayout getAbstractTypeLayout(Type type, const VarDecl *member) {
     auto canonicalType = type->getCanonicalType();
     auto mangledName =
         Mangle::ASTMangler(type->getASTContext())
             .mangleTypeWithPrefix(canonicalType);
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
-      IGM.dumpAbstractTypeLayoutInfo(canonicalType, mangledName,
-                                     "serialization");
+      IGM.dumpAbstractTypeLayoutInfo(
+          canonicalType, mangledName, "serialization",
+          StoredPropertyLayoutMemberView(const_cast<VarDecl *>(member)));
     }
 
     if (auto *hiddenType = type->getAs<HiddenType>()) {
@@ -592,8 +593,9 @@ bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
   return impl->isSingleSwiftRetainablePointer(TD);
 }
 
-AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(Type type) {
-  return impl->getAbstractTypeLayout(type);
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
+    Type type, const VarDecl *member) {
+  return impl->getAbstractTypeLayout(type, member);
 }
 
 std::optional<LoweredFunctionSignature>

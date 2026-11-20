@@ -110,6 +110,7 @@ namespace swift {
   class SILDifferentiabilityWitness;
   class SILGlobalVariable;
   class SILModule;
+  class StoredPropertyLayoutMemberView;
   class SILDefaultOverrideTable;
   class SILProperty;
   class SILType;
@@ -1172,7 +1173,8 @@ public:
   const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
 
   void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
-                                  StringRef origin);
+                                  StringRef origin,
+                                  StoredPropertyLayoutMemberView member);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();

@@ -35,6 +35,7 @@ class ModuleDecl;
 class NominalTypeDecl;
 class ParamDecl;
 class SerializableHiddenTypeInfoRepresentation;
+class VarDecl;
 
 class IRABIDetailsProviderImpl;
 
@@ -241,7 +242,7 @@ public:
   bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);
 
   /// Returns the abstract layout for a type used by a serialized declaration.
-  AbstractTypeLayout getAbstractTypeLayout(Type type);
+  AbstractTypeLayout getAbstractTypeLayout(Type type, const VarDecl *member);
 
   /// An representation of a single type, or a C struct with multiple members
   /// with specified types. The C struct is expected to be passed via swiftcc
