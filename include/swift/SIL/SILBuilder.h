@@ -239,7 +239,7 @@ public:
 
   /// Apply a debug location override. If loc is None, the current override is
   /// removed. Otherwise, newly created debug locations use the given location.
-  /// Note: the override location does not apply to debug_value[_addr].
+  /// Note: the override location does not apply to debug variables.
   void applyDebugLocOverride(std::optional<SILLocation> loc) {
     CurDebugLocOverride = loc;
   }
@@ -535,6 +535,9 @@ public:
     ASSERT((skipVarDeclAssert ||
             !dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
            "location is a VarDecl, but SILDebugVariable is empty");
+    // Don't apply location overrides on variables.
+    if (Var && !Var->Loc)
+      Var->Loc = Loc.strippedForDebugVariable();
     return insert(AllocBoxInst::create(
         getSILDebugLocation(Loc, true), BoxType, *F,
         substituteAnonymousArgs(Name, Var, Loc), hasDynamicLifetime, reflection,
@@ -1099,11 +1102,11 @@ public:
   DebugValueInst *createDebugValue(
       SILLocation Loc, SILValue src, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false, bool overrideLoc = true);
+      bool trace = false);
   DebugValueInst *createDebugValue(
       SILLocation Loc, ArrayRef<SILValue> operands, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false, bool overrideLoc = true);
+      bool trace = false);
 
   /// Create a debug_value for an undef empty tuple. Used when the type of the
   /// variable cannot be represented.
