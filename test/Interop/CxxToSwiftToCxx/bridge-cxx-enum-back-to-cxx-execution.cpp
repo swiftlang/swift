@@ -16,6 +16,7 @@
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_RawLayout
+// REQUIRES: swift_feature_OnceFunctions
 
 //--- header.h
 enum class SomeEnum {

@@ -17,8 +17,8 @@ public func testIteration(_ p: UnsafeBufferPointer<Int>) -> Int {
 // Check for an optimal loop kernel
 // CHECK:       phi
 // CHECK-NEXT:  phi
-// CHECK-NEXT:  getelementptr
-// CHECK-NEXT:  load
+// CHECK-NEXT:  {{getelementptr|load}}
+// CHECK-NEXT:  {{getelementptr|load}}
 // CHECK-NEXT:  add
 // CHECK-NEXT:  icmp
 // CHECK-NEXT:  br

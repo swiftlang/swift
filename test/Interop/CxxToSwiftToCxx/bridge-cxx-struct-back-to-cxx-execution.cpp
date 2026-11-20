@@ -18,6 +18,7 @@
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_RawLayout
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
+// REQUIRES: swift_feature_OnceFunctions
 
 //--- header.h
 
