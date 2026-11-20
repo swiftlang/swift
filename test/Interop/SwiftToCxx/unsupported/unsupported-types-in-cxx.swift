@@ -10,6 +10,8 @@ public func takesTuple(_ x: (Float, Float)) {}
 
 public func takesVoid(_ x: ()) {}
 
+public func returnsOptionalVoid() -> ()? { nil }
+
 // CHECK:     takeFloat
 
 public enum MoveOnlyEnum: ~Copyable {
@@ -28,6 +30,7 @@ public protocol TestProtocol {}
 
 // CHECK: class TestProtocol { } SWIFT_UNAVAILABLE_MSG("protocol 'TestProtocol' can not yet be represented in C++");
 
+// CHECK: // Unavailable in C++: Swift global function 'returnsOptionalVoid()'. Return type '()?' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesTuple(_:)'. Parameter 'x' of type '(Float, Float)' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesVoid(_:)'. Parameter 'x' of type '()' is not representable in C++.
 
