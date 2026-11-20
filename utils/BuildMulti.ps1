@@ -27,12 +27,13 @@ in separate processes:
 - The installer builds in the background while the tests run.
 
 The background processes that nothing waits for soon run at a lower priority.
-They log to
-<BinaryCache>\BuildMulti\<name>.log, which this script prints in one piece once
-they end, before it starts its next step or while it waits, so that the logs
-do not interleave. While it waits, it prints every minute the last line that
-the processes that it waits for logged. After a failure, it also prints the
-logs of the processes that it stops.
+The steps after SetupDependencies.ps1 log to
+<BinaryCache>\BuildMulti\<name>.log. This script prints the log of the step
+that it waits for as the step writes it, and the logs of the background
+processes in one piece once they end, between lines of the other logs, so that
+they do not interleave. When nothing was printed for a minute, it prints the
+last line that the processes that it waits for logged. After a failure, it
+also prints the logs of the processes that it stops.
 
 See BuildSequential.ps1 for the parameters.
 #>
@@ -185,6 +186,8 @@ $SelectedAndroidSDKArchitectures = @(if ($Android) { $AndroidSDKArchitectures })
 
 $JobLogs = "$BinaryCache\BuildMulti"
 $Jobs = New-Object System.Collections.ArrayList
+# The logs are printed as the jobs wrote them, without decoding them.
+$StandardOutput = [Console]::OpenStandardOutput()
 
 # Quotes an argument for a command line in a batch file.
 function ConvertTo-CommandLineArgument([string] $Argument) {
@@ -195,14 +198,22 @@ function ConvertTo-CommandLineArgument([string] $Argument) {
   return "`"$($Escaped.Replace("%", "%%"))`""
 }
 
-# Starts one of the build scripts in the background.
-function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal) {
+# Starts one of the build scripts in the background. The log of a job with
+# -Followed is printed while this script waits for it, instead of once it ends.
+function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}, [switch] $BelowNormal, [switch] $Followed) {
   Write-EndedBuildJobs
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
-  Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Starting $Name in the background: $Script $Arguments"
+  $Now = [DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss")
+  if ($Followed) {
+    Write-Host -ForegroundColor Cyan "[$Now] $Script $Arguments"
+  } else {
+    Write-Host -ForegroundColor Cyan "[$Now] Starting $Name in the background: $Script $Arguments"
+  }
 
   # cmd.exe runs the script at the requested priority and logs its output.
   $Log = "$JobLogs\$Name.log"
+  # The log of an earlier build would be printed until cmd.exe replaces it.
+  Remove-Item $Log -ErrorAction Ignore
   $CommandLine = @($PowerShell, "-NoProfile", "-ExecutionPolicy", "RemoteSigned", "-File", "$PSScriptRoot\$Script") + $Arguments
   $Batch = "$JobLogs\$Name.cmd"
   [IO.File]::WriteAllLines($Batch, @(
@@ -225,7 +236,11 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
     Process = $Process
     Log = $Log
     TimingDataPath = $TimingDataPath
-    Timing = if ($RecordTimings) { Add-TimingData $BuildPlatform $Name -Variant "Background" } else { $null }
+    # The timings of a followed job go to the step that waits for it.
+    Timing = if (-not $RecordTimings) { $null } elseif ($Followed) { $script:CurrentOperation } else { Add-TimingData $BuildPlatform $Name -Variant "Background" }
+    Followed = [bool] $Followed
+    # The bytes of the log that were printed.
+    Offset = [long] 0
     Printed = $false
     Stopped = $false
   }
@@ -233,11 +248,11 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
   return $Job
 }
 
-# Reads the log of a job, or its last bytes, while the job may still write it.
-function Read-BuildJobLog([PSCustomObject] $Job, [long] $Last = 0) {
+# Reads the last bytes of the log of a job, while the job may still write it.
+function Read-BuildJobLog([PSCustomObject] $Job, [long] $Last) {
   $Stream = [IO.File]::Open($Job.Log, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
   try {
-    if ($Last -gt 0 -and $Stream.Length -gt $Last) {
+    if ($Stream.Length -gt $Last) {
       $null = $Stream.Seek(-$Last, [IO.SeekOrigin]::End)
     }
     return (New-Object IO.StreamReader($Stream, [Text.Encoding]::UTF8, $true)).ReadToEnd()
@@ -259,23 +274,59 @@ function Get-BuildJobLastLine([PSCustomObject] $Job) {
   return $Line
 }
 
-# Prints the log of a job at once, so that it does not interleave with what
-# this script prints.
+# Prints what a job logged since this script last did, up to its last complete
+# line unless -All, and returns whether it printed anything.
+function Write-BuildJobOutput([PSCustomObject] $Job, [switch] $All) {
+  try {
+    $Stream = [IO.File]::Open($Job.Log, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite)
+  } catch [IO.FileNotFoundException] {
+    # cmd.exe did not create it yet.
+    return $false
+  }
+  try {
+    $Count = $Stream.Length - $Job.Offset
+    if ($Count -le 0) { return $false }
+    $null = $Stream.Seek($Job.Offset, [IO.SeekOrigin]::Begin)
+    $Bytes = New-Object byte[] $Count
+    $Count = $Stream.Read($Bytes, 0, $Count)
+  } finally {
+    $Stream.Dispose()
+  }
+  $Length = if ($All) { $Count } elseif ($Count -gt 0) { [Array]::LastIndexOf($Bytes, [byte]10, $Count - 1) + 1 } else { 0 }
+  if ($Length -le 0) { return $false }
+  $StandardOutput.Write($Bytes, 0, $Length)
+  # What this script prints next starts a line.
+  if ($Bytes[$Length - 1] -ne 10) {
+    $StandardOutput.Write([byte[]](13, 10), 0, 2)
+  }
+  $StandardOutput.Flush()
+  $Job.Offset += $Length
+  return $true
+}
+
+# Prints the rest of the log of a job, at once for a job that is not followed so
+# that it does not interleave with what this script prints.
 function Write-BuildJobLog([PSCustomObject] $Job) {
   $Job.Printed = $true
+  $Result = if ($Job.Stopped) { "was stopped" } else { "exited with code $($Job.Process.ExitCode)" }
+  if ($Job.Followed) {
+    $null = Write-BuildJobOutput $Job -All
+    if ($Job.Stopped) {
+      Write-Host -ForegroundColor Cyan "===== $($Job.Name) $Result ====="
+    }
+    return
+  }
   $Start = $Job.Process.StartTime
   $End = if ($Job.Process.HasExited) { $Job.Process.ExitTime } else { [DateTime]::Now }
   Write-Host -ForegroundColor Cyan "===== $($Job.Name) ($($Start.ToString("HH:mm:ss")) to $($End.ToString("HH:mm:ss")), $($End - $Start)), from $($Job.Log) ====="
-  [Console]::Out.Write((Read-BuildJobLog $Job))
-  [Console]::Out.Flush()
-  $Result = if ($Job.Stopped) { "was stopped" } else { "exited with code $($Job.Process.ExitCode)" }
+  $null = Write-BuildJobOutput $Job -All
   Write-Host -ForegroundColor Cyan "===== $($Job.Name) $Result ====="
 }
 
 # Prints the logs of the jobs that ended since this script last did, in the
-# order in which they ended.
+# order in which they ended, except the followed jobs.
 function Write-EndedBuildJobs {
-  $Ended = @($Jobs | Where-Object { -not $_.Printed -and $_.Process.HasExited } | Sort-Object { $_.Process.ExitTime })
+  $Ended = @($Jobs | Where-Object { -not $_.Printed -and -not $_.Followed -and $_.Process.HasExited } | Sort-Object { $_.Process.ExitTime })
   foreach ($Job in $Ended) {
     Write-BuildJobLog $Job
   }
@@ -303,13 +354,17 @@ function Complete-BuildJob([PSCustomObject] $Job) {
 # How often this script reports the jobs that it waits for.
 $JobHeartbeat = [TimeSpan]::FromMinutes(1)
 
-# Waits for background jobs, printing the logs of all the jobs that end
-# meanwhile, and throws if any of the jobs that it waited for failed. It reports
-# the jobs that it waits for regularly, so that the build does not look stuck.
-function Wait-BuildJobs([Object[]] $Wait) {
+# Waits for background jobs, printing the log of $Follow as it is written, and
+# the logs of the other jobs that end meanwhile, and throws if any of the jobs
+# that it waited for failed. It reports the jobs that it waits for when nothing
+# was printed for a while, so that the build does not look stuck.
+function Wait-BuildJobs([Object[]] $Wait, [PSCustomObject] $Follow = $null) {
   $Heartbeat = [DateTime]::Now + $JobHeartbeat
   while ($true) {
     $Running = @(foreach ($Job in $Wait) { if (-not $Job.Process.HasExited) { $Job } })
+    if ($Follow -and (Write-BuildJobOutput $Follow)) {
+      $Heartbeat = [DateTime]::Now + $JobHeartbeat
+    }
     Write-EndedBuildJobs
     if (-not $Running) { break }
 
@@ -321,6 +376,9 @@ function Wait-BuildJobs([Object[]] $Wait) {
       $Heartbeat = [DateTime]::Now + $JobHeartbeat
     }
     $null = $Running[0].Process.WaitForExit(1000)
+  }
+  if ($Follow) {
+    Write-BuildJobLog $Follow
   }
 
   $Failed = @()
@@ -358,6 +416,16 @@ function Stop-BuildJobs {
   }
 }
 
+# Runs one of the build scripts like Invoke-BuildScript, but in the background,
+# so that this script prints its log as it runs, with the logs of the jobs that
+# end meanwhile between its lines.
+function Invoke-FollowedBuildScript([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}) {
+  Record-OperationTime $BuildPlatform $Name {
+    $Job = Start-BuildJob $Name $Script $Overrides -Followed
+    Wait-BuildJobs @($Job) $Job
+  }
+}
+
 try {
 
 New-Item -ItemType Directory -Path $JobLogs -ErrorAction Ignore | Out-Null
@@ -377,10 +445,10 @@ $ToolchainOverrides = @{
   AndroidSDKArchitectures = $SelectedAndroidSDKArchitectures;
 }
 
-# Runs steps of BuildToolchain.ps1 in this process, or in the background with
-# -Background. The projects of -ConfigureSteps are configured first, and with
-# -Configured, the projects of -Steps that are configured are not configured
-# again.
+# Runs steps of BuildToolchain.ps1 and waits for them, or runs them in the
+# background with -Background. The projects of -ConfigureSteps are configured
+# first, and with -Configured, the projects of -Steps that are configured are
+# not configured again.
 function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $ConfigureSteps = @(), [switch] $Configured, [switch] $Background) {
   $Name = "BuildToolchain$(if ($Mode) { "-$Mode" })$(if ($ConfigureSteps -and -not $Steps) { "-Configure-$($ConfigureSteps -join "-")" })$(if ($Steps) { "-$($Steps -join "-")" })"
   $Overrides = $ToolchainOverrides + @{
@@ -392,8 +460,7 @@ function Invoke-ToolchainSteps([string] $Mode, [string[]] $Steps, [string[]] $Co
   if ($Background) {
     return Start-BuildJob $Name BuildToolchain.ps1 $Overrides
   }
-  Write-EndedBuildJobs
-  Invoke-BuildScript $Name BuildToolchain.ps1 $Parameters $Overrides
+  Invoke-FollowedBuildScript $Name BuildToolchain.ps1 $Overrides
 }
 
 if ($Toolchain) {
@@ -490,13 +557,13 @@ if ($SelectedWindowsSDKArchitectures -contains $HostSDKArchitecture) {
 $Stage2ConfigureJob = $null
 if ($HostSDKOverrides) {
   if ($Toolchain) {
-    Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture-CDispatch" BuildSDK.ps1 $Parameters ($HostSDKOverrides + @{
+    Invoke-FollowedBuildScript "BuildSDK-Windows-$HostSDKArchitecture-CDispatch" BuildSDK.ps1 ($HostSDKOverrides + @{
       Steps = @("CDispatch");
     })
     Invoke-ToolchainSteps "" CMark
     $Stage2ConfigureJob = Invoke-ToolchainSteps "" -ConfigureSteps Compilers -Background
   }
-  Invoke-BuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $Parameters $HostSDKOverrides
+  Invoke-FollowedBuildScript "BuildSDK-Windows-$HostSDKArchitecture" BuildSDK.ps1 $HostSDKOverrides
 }
 
 if ($Toolchain) {
@@ -583,7 +650,7 @@ if ($Test -and -not $IsCrossCompiling) {
   if ($TestBuildJob) {
     Wait-BuildJobs @($TestBuildJob)
   } elseif ($CompilerTests) {
-    Invoke-BuildScript "TestToolchain-Build" TestToolchain.ps1 $Parameters @{
+    Invoke-FollowedBuildScript "TestToolchain-Build" TestToolchain.ps1 @{
       Test = $CompilerTests;
       Steps = @("Build");
     }
@@ -605,7 +672,7 @@ if ($Test -and -not $IsCrossCompiling) {
     $ThisPriority = $ThisProcess.PriorityClass
     $ThisProcess.PriorityClass = [Diagnostics.ProcessPriorityClass]::Idle
     try {
-      Invoke-BuildScript "TestToolchain-swift" TestToolchain.ps1 $Parameters @{
+      Invoke-FollowedBuildScript "TestToolchain-swift" TestToolchain.ps1 @{
         Test = @("swift");
         Steps = @("Run");
       }
