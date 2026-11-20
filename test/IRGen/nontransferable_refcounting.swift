@@ -205,12 +205,9 @@ public enum ConditionalTree<T: ~Transferable>: ~Transferable {
 
 extension ConditionalTree: Transferable where T: Transferable {}
 
-// FIXME: The box could be non-atomic, but all instances of a generic enum whose
-// IR type doesn't depend on its arguments share the type info of the generic
-// enum, and some of them are 'Transferable'.
 // CHECK-LABEL: define {{.*}} @"$s1m21copyConditionalTreeNTyAA0bC0OyAA3NTCCGAGF"(
-// CHECK:   call ptr @swift_retain(
-// CHECK-NOT: swift_nonatomic_
+// CHECK:   call ptr @swift_nonatomic_retain(
+// CHECK-NOT: call ptr @swift_retain(
 // CHECK: }
 public func copyConditionalTreeNT(
   _ t: ConditionalTree<NTC>
@@ -232,6 +229,28 @@ public func copyConditionalTreeT(
 public func copyConditionalTreeGeneric<T: ~Transferable>(
   _ t: borrowing ConditionalTree<T>
 ) -> ConditionalTree<T> { copy t }
+
+public struct ConditionalTreeField<T: ~Transferable>: ~Transferable {
+  var tree: ConditionalTree<T>
+}
+
+extension ConditionalTreeField: Transferable where T: Transferable {}
+
+// CHECK-LABEL: define {{.*}} @"$s1m26copyConditionalTreeFieldNTyAA0bcD0VyAA3NTCCGAGF"(
+// CHECK:   call ptr @swift_nonatomic_retain(
+// CHECK-NOT: call ptr @swift_retain(
+// CHECK: }
+public func copyConditionalTreeFieldNT(
+  _ f: ConditionalTreeField<NTC>
+) -> ConditionalTreeField<NTC> { f }
+
+// CHECK-LABEL: define {{.*}} @"$s1m25copyConditionalTreeFieldTyAA0bcD0VyAA1CCGAGF"(
+// CHECK:   call ptr @swift_retain(
+// CHECK-NOT: swift_nonatomic_
+// CHECK: }
+public func copyConditionalTreeFieldT(
+  _ f: ConditionalTreeField<C>
+) -> ConditionalTreeField<C> { f }
 
 // An enum that is laid out as a nullable reference to a non-'Transferable'
 // instance.
