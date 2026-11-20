@@ -342,13 +342,19 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
 /// - a begin_access for a mutable variable access
 /// - a copy loaded from an access of class storage (see `VariableIntroducerUseDefWalker.isAccessedClassStorage`)
 /// - the value or address "root" of the dependence chain
+///
+/// An owned introducer that is forwarded into another value is replaced by that value (see
+/// `VariableIntroducerUseDefWalker.visitIntroducer`).
 func gatherVariableIntroducers(for value: Value, isInoutAccess: Bool, _ context: Context)
   -> SingleInlineArray<Value>
 {
   var introducers = SingleInlineArray<Value>()
   var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, needsAccessScope: true,
-                                                     isInoutAccess: isInoutAccess) {
-    introducers.push($0)
+                                                     isInoutAccess: isInoutAccess) { introducer in
+    // Several owned introducers may be forwarded into the same value.
+    if !introducers.contains(where: { $0 == introducer }) {
+      introducers.push(introducer)
+    }
     return .continueWalk
   }
   defer { useDefVisitor.deinitialize() }
@@ -459,6 +465,17 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
       // the pointer is derived from.
       return walkUp(address: addrToPtr.address)
     }
+    return visitIntroducer(value, owner)
+  }
+
+  /// Visit `owner` instead of an owned `value`. `owner` is the owned or trivial value that `value` is forwarded into. A
+  /// forwarding instruction, such as the switch_enum that unwraps an Optional or the destructure_tuple that extracts a
+  /// trivial element, may consume `value` before the dependent use, so a mark_dependence on `value` would be outside
+  /// its lifetime.
+  private func visitIntroducer(_ value: Value, _ owner: Value?) -> WalkResult {
+    if needsAccessScope, value.ownership == .owned {
+      return visitorClosure(owner!)
+    }
     return visitorClosure(value)
   }
 
@@ -478,7 +495,8 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
     if newLifetime.type.isAddress {
       return walkUp(address: newLifetime)
     }
-    let newOwner = newLifetime.ownership == .owned ? newLifetime : nil
+    // A trivial value is valid at every use, so it can replace an owned introducer forwarded into it.
+    let newOwner = newLifetime.ownership == .owned || newLifetime.ownership == .none ? newLifetime : nil
     return walkUp(value: newLifetime, newOwner)
   }
 
@@ -490,7 +508,7 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
     }
     if needsAccessScope, let load = value as? LoadInst, load.loadOwnership == .copy,
        isAccessedClassStorage(load.address) {
-      return visitorClosure(value)
+      return visitIntroducer(value, owner)
     }
     return walkUpDefault(value: value, owner)
   }
@@ -506,7 +524,8 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
   /// A class property's storage is not a variable whose scope the dependent value must stay within: the copy keeps the
   /// borrowed object alive independent of the property's storage. Depending on the access instead would require it to
   /// cover all dependent uses, and the access's reference may itself be a temporary whose borrow scope has already
-  /// ended, so a mark_dependence on the access would be invalid. LifetimeDependenceScopeFixup extends the copy instead.
+  /// ended, so a mark_dependence on the access would be invalid. LifetimeDependenceScopeFixup extends the copy, or the
+  /// value it is forwarded into, instead.
   private func isAccessedClassStorage(_ address: Value) -> Bool {
     let access = address.accessBaseWithScopes
     guard let beginAccess = access.innermostAccess, beginAccess.unsafeAddressorSelf == nil else {
