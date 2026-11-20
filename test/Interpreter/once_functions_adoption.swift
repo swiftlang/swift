@@ -5,6 +5,11 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_OnceFunctions
 
+// FIXME: With opaque values, SILGen asserts that a capture doesn't match its
+// parameter type for a `defer` that captures a `borrowing` generic parameter,
+// with or without once functions (rdar://193324914).
+// XFAIL: swift_test_mode_optimize_none_with_opaque_values
+
 // Patterns that adopting exactly-once and at-most-once closure parameters in
 // library APIs runs into.
 
