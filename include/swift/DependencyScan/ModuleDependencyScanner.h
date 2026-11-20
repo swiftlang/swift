@@ -77,22 +77,15 @@ private:
           std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>>
           foundIncompatibleCandidates = std::nullopt);
 
-  /// Upon query failure, if incompatible binary module
-  /// candidates were found, emit a failure diagnostic
-  void diagnoseFailureOnOnlyIncompatibleCandidates(
+  /// Diagnose the incompatible binary Swift module candidates found while
+  /// querying \c moduleImport, depending on whether the query resolved
+  /// the module.
+  void diagnoseIncompatibleCandidates(
       const ScannerImportStatementInfo &moduleImport,
       const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
           &candidates,
-      const ModuleDependenciesCache &cache,
+      bool moduleResolved, const ModuleDependenciesCache &cache,
       std::optional<ModuleDependencyID> dependencyOf);
-
-  /// Emit warnings for each discovered binary Swift module
-  /// which was incompatible with the current compilation
-  /// when querying \c moduleName
-  void warnOnIncompatibleCandidates(
-      StringRef moduleName,
-      const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
-          &candidates);
 
   /// If remark emission is enabled, increment the
   /// corresponding metric.
