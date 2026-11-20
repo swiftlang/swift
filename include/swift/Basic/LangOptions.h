@@ -269,8 +269,11 @@ namespace swift {
     /// Emit remarks for unexpected conditions when serializing a module.
     bool EnableModuleSerializationRemarks = false;
 
-    /// Emit remarks about hidden type layout serialization.
+    /// Emit remarks about abstract member layout serialization.
     bool EnableHiddenTypeLayoutSerializationRemarks = false;
+
+    /// Analyze abstract member layout requirements without writing records.
+    bool SkipWritingAbstractTypeLayouts = false;
 
     /// Emit remarks about the source of each element exposed by the module API.
     bool EnableModuleApiImportRemarks = false;

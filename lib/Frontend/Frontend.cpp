@@ -322,6 +322,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.IRGenOpts = &getIRGenOptions();
   serializationOpts.EnableHiddenTypeLayoutSerializationRemarks =
       getLangOptions().EnableHiddenTypeLayoutSerializationRemarks;
+  serializationOpts.SkipWritingAbstractTypeLayouts =
+      getLangOptions().SkipWritingAbstractTypeLayouts;
 
   return serializationOpts;
 }

@@ -8517,45 +8517,20 @@ bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
   return true;
 }
 
-void Serializer::handleHiddenTypeLayoutRequirement(
-    const HiddenTypeLayoutRequirement &requirement) {
-  if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
-      !Options.EnableHiddenTypeLayoutSerializationRemarks)
+void Serializer::handleAbstractMemberTypeLayoutRequirement(
+    const AbstractMemberTypeLayoutRequirement &requirement) {
+  bool scheduled = Options.SkipWritingAbstractTypeLayouts
+                       ? true
+                       : scheduleAbstractMemberTypeLayoutSerialization(
+                             requirement.StoredProperty);
+
+  if (!scheduled || !Options.EnableHiddenTypeLayoutSerializationRemarks)
     return;
 
-  auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
-                             ->getSelfNominalTypeDecl();
-  assert(abiExposedLeaf);
-
-  auto &diags = getASTContext().Diags;
-  switch (requirement.Origin) {
-  case HiddenTypeLayoutOrigin::ImplementationOnly:
-    diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
-        diag::serialization_scheduled_implementation_only_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
-    break;
-  case HiddenTypeLayoutOrigin::InternalBridgingHeader:
-    diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
-        diag::serialization_scheduled_internal_bridging_header_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
-    break;
-  case HiddenTypeLayoutOrigin::RecoveredHiddenType:
-    diags.diagnose(
-        requirement.LayoutAffectingStorage->getLoc(),
-        diag::serialization_scheduled_recovered_hidden_type_layout,
-        requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
-    break;
-  }
-
-  if (abiExposedLeaf != requirement.ABIExposedType)
-    diags.diagnose(requirement.ABIExposedType->getLoc(),
-                   diag::serialization_hidden_type_layout_abi_exposure,
-                   abiExposedLeaf, requirement.ABIExposedType);
+  getASTContext().Diags.diagnose(
+      requirement.StoredProperty->getLoc(),
+      diag::serialization_scheduled_abstract_member_type_layout,
+      requirement.StoredProperty, requirement.ABIExposedStruct);
 }
 
 void Serializer::writeAST(ModuleOrSourceFile DC) {
@@ -8711,9 +8686,9 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
   if (langOpts.hasFeature(
           Feature::SerializeAbstractTypeLayoutForHiddenTypes) &&
       M->getResilienceStrategy() != ResilienceStrategy::Resilient) {
-    forEachRequiredHiddenTypeLayout(
-        M, files, [&](const HiddenTypeLayoutRequirement &requirement) {
-          handleHiddenTypeLayoutRequirement(requirement);
+    forEachRequiredAbstractMemberTypeLayout(
+        files, [&](const AbstractMemberTypeLayoutRequirement &requirement) {
+          handleAbstractMemberTypeLayoutRequirement(requirement);
         });
   }
 

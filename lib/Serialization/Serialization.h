@@ -38,7 +38,7 @@ namespace clang {
 }
 
 namespace swift {
-  struct HiddenTypeLayoutRequirement;
+  struct AbstractMemberTypeLayoutRequirement;
   class ModuleFile;
   class SerializableFixedTypeInfoRepresentation;
   struct SerializableLLVMTypeRepresentation;
@@ -399,9 +399,9 @@ private:
 
   void writeHiddenTypeXRef(const HiddenTypeLayoutInfoDecl *hidden);
 
-  /// Handle a hidden layout requirement discovered by AST analysis.
-  void handleHiddenTypeLayoutRequirement(
-      const HiddenTypeLayoutRequirement &requirement);
+  /// Handle a member layout requirement discovered by AST analysis.
+  void handleAbstractMemberTypeLayoutRequirement(
+      const AbstractMemberTypeLayoutRequirement &requirement);
 
   TypeID addTranscribedTypeRef(ModuleFile &source, TypeID sourceID);
   DeclID addTranscribedDeclRef(ModuleFile &source, DeclID sourceID);

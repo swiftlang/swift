@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines data structures for abstract type layout information,
-// used to encode the layout of hidden C types in .swiftmodule files.
+// This file defines data structures used to encode abstract type layout
+// information in .swiftmodule files.
 //
 //===----------------------------------------------------------------------===//
 
