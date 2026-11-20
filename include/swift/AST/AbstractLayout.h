@@ -27,7 +27,9 @@
 
 namespace swift {
 
+class ASTContext;
 class SerializableHiddenTypeInfoRepresentation;
+class SubstitutionMap;
 
 struct AbstractTypeLayout {
   std::string mangledName;
@@ -35,6 +37,13 @@ struct AbstractTypeLayout {
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
       typeInfoRepresentation;
+
+  /// FIXME: Generic abstract layout specialization is not implemented. It is
+  /// not yet clear whether ASTContext and a substitution map provide all of
+  /// the context needed to specialize the complete lowering and TypeInfo
+  /// recipe. Revisit this API when generic hidden layouts are supported.
+  AbstractTypeLayout *getWithSubstitutions(
+      ASTContext &context, SubstitutionMap substitutions);
 };
 
 } // namespace swift
