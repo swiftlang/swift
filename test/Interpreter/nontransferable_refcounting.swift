@@ -122,6 +122,32 @@ func testList() {
   print("list \(count(a)) \(count(b))")
 }
 
+enum ConditionalList<Element: ~Transferable>: ~Transferable {
+  case end
+  indirect case cons(Element, ConditionalList)
+}
+
+extension ConditionalList: Transferable where Element: Transferable {}
+
+@inline(never)
+func count(_ list: ConditionalList<NT>) -> Int {
+  switch list {
+  case .end:
+    return 0
+  case .cons(let nt, let rest):
+    return nt.id + count(rest)
+  }
+}
+
+// Concrete code counts the boxes of 'ConditionalList<NT>' non-atomically, the
+// value witnesses that generic code uses count them atomically.
+func testConditionalList() {
+  let list = ConditionalList.cons(NT(12), .cons(NT(13), .end))
+  let copy = list
+  let (a, b) = duplicate(list)
+  print("conditional list \(count(copy)) \(count(a)) \(count(b))")
+}
+
 func testTree() {
   let tree = Tree<Int>.node(NT(5), .leaf(0), .node(NT(6), .leaf(0), .leaf(0)))
   let (a, b) = duplicate(tree)
@@ -186,3 +212,10 @@ print("done list")
 testTree()
 print("done tree")
 // CHECK: done tree
+
+// CHECK-NEXT: conditional list 25 25 25
+// CHECK-DAG: deinit NT 12
+// CHECK-DAG: deinit NT 13
+testConditionalList()
+print("done conditional list")
+// CHECK: done conditional list

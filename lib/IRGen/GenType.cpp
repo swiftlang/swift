@@ -3143,12 +3143,25 @@ namespace {
     bool visitEnumDecl(EnumDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
+
+      // The boxes of indirect payloads of a conditionally `Transferable` enum
+      // use different reference counting depending on how it's instantiated.
+      bool isConditionallyTransferable =
+          decl->canBeTransferable() == TypeDecl::CanBeInvertible::Conditionally;
+
       if (decl->isIndirect())
-        return false;
+        return isConditionallyTransferable;
 
       for (auto elt : decl->getAllElements()) {
-        if (!elt->hasAssociatedValues() || elt->isIndirect())
+        if (!elt->hasAssociatedValues())
           continue;
+
+        if (elt->isIndirect()) {
+          if (isConditionallyTransferable)
+            return true;
+
+          continue;
+        }
 
         if (visit(elt->getPayloadInterfaceType()->getCanonicalType()))
           return true;
