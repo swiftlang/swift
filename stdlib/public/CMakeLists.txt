@@ -485,8 +485,14 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Volatile)
   endif()
 
-  if(SWIFT_ENABLE_PLATFORM_EXECUTORS AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+  if(SWIFT_ENABLE_PLATFORM_EXECUTORS)
     add_subdirectory(_PlatformExecutorsCore)
+    if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
+      # swift-system is only needed for the `ExperimentalIOUring` trait of the
+      # package, which isn't enabled here.
+      add_subdirectory(_PlatformExecutorsCollections)
+      add_subdirectory(PlatformExecutors)
+    endif()
   endif()
 endif()
 

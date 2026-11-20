@@ -833,17 +833,43 @@ option(SWIFT_ENABLE_PLATFORM_EXECUTORS
   FALSE)
 
 # The platform executors modules are built from the sources of the
-# swift-platform-executors checkout. Only `_PlatformExecutorsCore`, the
-# protocols and vocabulary types of the executor I/O interfaces, is built.
+# swift-platform-executors checkout:
+# - `_PlatformExecutorsCore`, the protocols and vocabulary types of the executor
+#   I/O interfaces, for all platforms.
+# - `PlatformExecutors`, the executors and their I/O implementations, for the
+#   platforms other than the Apple platforms. It uses containers of
+#   swift-collections, built from the swift-collections checkout as the private
+#   module `_PlatformExecutorsCollections`.
 set(SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR
   "${CMAKE_CURRENT_SOURCE_DIR}/../swift-platform-executors"
   CACHE PATH "Path to the swift-platform-executors checkout")
+set(SWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../swift-collections"
+  CACHE PATH "Path to the swift-collections checkout")
 if(SWIFT_ENABLE_PLATFORM_EXECUTORS AND
    NOT IS_DIRECTORY "${SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR}/Sources/_PlatformExecutorsCore")
   message(STATUS "Not building the platform executors modules: "
     "${SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR}/Sources/_PlatformExecutorsCore "
     "does not exist")
   set(SWIFT_ENABLE_PLATFORM_EXECUTORS FALSE)
+endif()
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS AND NOT SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+  message(STATUS "Not building the platform executors modules: they require "
+    "Concurrency (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS FALSE)
+endif()
+set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS ${SWIFT_ENABLE_PLATFORM_EXECUTORS})
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS AND
+   NOT IS_DIRECTORY "${SWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE}/Sources/BasicContainers")
+  message(STATUS "Not building PlatformExecutors: "
+    "${SWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE}/Sources/BasicContainers "
+    "does not exist")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS FALSE)
+endif()
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS AND NOT SWIFT_ENABLE_SYNCHRONIZATION)
+  message(STATUS "Not building PlatformExecutors: it requires Synchronization "
+    "(SWIFT_ENABLE_SYNCHRONIZATION)")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS FALSE)
 endif()
 
 option(SWIFT_ENABLE_DISPATCH
@@ -1501,6 +1527,17 @@ foreach(sdk ${SWIFT_SDKS})
   unset(UNIVERSAL_LIBRARY_NAMES_${SWIFT_SDK_${sdk}_LIB_SUBDIR} CACHE)
 endforeach()
 
+# PlatformExecutors is only for the platforms other than the Apple platforms.
+# When none of them is built, don't add it at all, so that its C shim's module
+# map isn't put into `lib/swift` either.
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
+  list_intersect("${SWIFT_SDKS}" "ANDROID;LINUX;LINUX_STATIC;FREEBSD;WINDOWS"
+    _platform_executors_sdks)
+  if(NOT _platform_executors_sdks)
+    set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS FALSE)
+  endif()
+endif()
+
 if(SWIFT_PARALLEL_LINK_JOBS)
   if(NOT CMAKE_MAKE_PROGRAM MATCHES "ninja")
     message(WARNING "Job pooling is only available with Ninja generators.")
@@ -1596,7 +1633,8 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Observation Support:                ${SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION}")
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
-  message(STATUS "Platform Executors Support:         ${SWIFT_ENABLE_PLATFORM_EXECUTORS}")
+  message(STATUS "Platform Executors Core:            ${SWIFT_ENABLE_PLATFORM_EXECUTORS}")
+  message(STATUS "Platform Executors (non-Apple):     ${SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS}")
   message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
   message(STATUS "Runtime Support:                    ${SWIFT_ENABLE_RUNTIME_MODULE}")
   message(STATUS "C++ Interop Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP}")

@@ -277,6 +277,14 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
     list(APPEND swift_lit_args_result "--param" "synchronization")
   endif()
 
+  if(SWIFT_ENABLE_PLATFORM_EXECUTORS)
+    list(APPEND swift_lit_args_result "--param" "platform_executors_core")
+  endif()
+
+  if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
+    list(APPEND swift_lit_args_result "--param" "platform_executors")
+  endif()
+
   if(SWIFT_ENABLE_VOLATILE)
     list(APPEND swift_lit_args_result "--param" "volatile")
   endif()
@@ -355,6 +363,8 @@ normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_MODULE)
 normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
 normalize_boolean_spelling(SWIFT_ENABLE_WASM_PLUGINS)
 normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
+normalize_boolean_spelling(SWIFT_ENABLE_PLATFORM_EXECUTORS)
+normalize_boolean_spelling(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
 normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)

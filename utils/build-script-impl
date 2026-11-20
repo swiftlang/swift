@@ -2071,6 +2071,13 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DSWIFT_PLATFORM_EXECUTORS_SOURCE_DIR="${SWIFT_PLATFORM_EXECUTORS_SOURCE_DIR}"
                     )
+                    if [[ -d "${SWIFT_COLLECTIONS_SOURCE_DIR}" && \
+                          -n "$(ls -A "${SWIFT_COLLECTIONS_SOURCE_DIR}")" ]] ; then
+                        cmake_options=(
+                            "${cmake_options[@]}"
+                            -DSWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE="${SWIFT_COLLECTIONS_SOURCE_DIR}"
+                        )
+                    fi
                 fi
 
                 if [[ "${SWIFT_STDLIB_TRACING}" ]] ; then
