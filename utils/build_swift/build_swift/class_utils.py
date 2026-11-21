@@ -26,9 +26,9 @@ def generate_repr(*attrs):
         args = []
         for attr in attrs:
             value = getattr(self, attr)
-            args.append('{}={}'.format(attr, repr(value)))
+            args.append(f'{attr}={value!r}')
 
-        return '{}({})'.format(type(self).__name__, ', '.join(args))
+        return f'{type(self).__name__}({", ".join(args)})'
 
     def decorator(cls):
         setattr(cls, '__repr__', _repr)
