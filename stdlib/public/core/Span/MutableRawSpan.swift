@@ -952,12 +952,14 @@ extension MutableRawSpan {
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from byteOffset: inout Int, copying source: borrowing I
+    startingAt byteOffset: inout Int, copyingAll source: borrowing I
   ) throws(I.Failure) where I.Element == UInt8 {
     var iterator = source.makeBorrowingIterator()
-    try updateElements(from: &byteOffset, copying: &iterator)
+    try updateElements(startingAt: &byteOffset, copyingFrom: &iterator)
     let next = try iterator.nextSpan()
-    _precondition(next.isEmpty)
+    _precondition(
+      next.isEmpty, "Source has more bytes than the destination can contain."
+    )
   }
 
   /// Overwrites bytes of this span, starting at a byte offset, by copying
@@ -977,10 +979,10 @@ extension MutableRawSpan {
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from byteOffset: Int, copying source: borrowing I
+    startingAt byteOffset: Int, copyingAll source: borrowing I
   ) -> Int where I.Element == UInt8, I.Failure == Never {
     var byteOffset = byteOffset
-    updateElements(from: &byteOffset, copying: source)
+    updateElements(startingAt: &byteOffset, copyingAll: source)
     return byteOffset
   }
 
@@ -1007,8 +1009,8 @@ extension MutableRawSpan {
   public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    from byteOffset: inout Int,
-    copying source: inout I
+    startingAt byteOffset: inout Int,
+    copyingFrom source: inout I
   ) throws(I.Failure) where I.Element == UInt8 {
     _precondition(
       UInt(bitPattern: byteOffset) <= UInt(bitPattern: _count),
