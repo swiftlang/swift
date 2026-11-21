@@ -14,6 +14,7 @@
 #define SWIFT_CLANG_DERIVED_CONFORMANCES_H
 
 #include "ImporterImpl.h"
+#include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
 
 namespace swift {
@@ -48,6 +49,7 @@ bool inferStdOptionalConstructorDependence(ClangImporter::Implementation &Impl,
                                            size_t returnIdx);
 
 void deriveAutomaticCxxConformances(ClangImporter::Implementation &Impl,
+                                    SwiftDeclSynthesizer &synthesizer,
                                     NominalTypeDecl *result,
                                     const clang::CXXRecordDecl *clangDecl);
 } // namespace swift
