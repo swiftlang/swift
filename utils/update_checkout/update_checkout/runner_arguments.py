@@ -25,6 +25,7 @@ class UpdateArguments(RunnerArguments):
     stash: bool
     cross_repos_pr: Dict[str, str]
     skip_history: bool
+    skip_tags: bool
     partial_clone: bool
 
 
