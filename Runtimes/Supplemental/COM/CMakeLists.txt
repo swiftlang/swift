@@ -5,6 +5,12 @@ cmake_minimum_required(VERSION 3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
+# `emit_swift_interface` emits nested swiftmodule directories, which CMake 4.1+
+# only does itself when CMP0195 is NEW. This must precede `project()`.
+if(POLICY CMP0195)
+  cmake_policy(SET CMP0195 NEW)
+endif()
+
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
@@ -65,6 +71,9 @@ include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 
 option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
+
+option(${PROJECT_NAME}_ENABLE_SYMBOL_GRAPHS "Emit symbol graphs while building"
+  ${SwiftCore_ENABLE_SYMBOL_GRAPHS})
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:SHELL:-explicit-module-build>

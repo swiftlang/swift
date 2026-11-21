@@ -43,6 +43,10 @@ install(TARGETS swift_RegexParser
   LIBRARY DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_RegexParser)
+if(${PROJECT_NAME}_ENABLE_SYMBOL_GRAPHS)
+  target_link_libraries(swift_RegexParser PRIVATE SwiftCore_SymbolGraph)
+  set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/symbol-graphs")
+endif()
 install_swift_interface(swift_RegexParser)
 
 generate_plist(swiftRegexParser "${CMAKE_PROJECT_VERSION}" swift_RegexParser)
