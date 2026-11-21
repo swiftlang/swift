@@ -7,7 +7,6 @@
 // REQUIRES: objc_interop
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
-// REQUIRES: rdar112623492
 
 import Observation
 
@@ -21,3 +20,26 @@ enum MyEnum {
 
 @Observable // expected-error {{'@Observable' cannot be applied to struct type 'MyStruct'}}
 struct MyStruct {}
+
+// Members don't produce further errors from '@ObservationTracked'.
+
+@Observable // expected-error {{'@Observable' cannot be applied to actor type 'MyActorWithProperty'}}
+actor MyActorWithProperty {
+  var value = 0
+}
+
+@Observable // expected-error {{'@Observable' cannot be applied to enumeration type 'MyEnumWithProperty'}}
+enum MyEnumWithProperty {
+  case myCase
+  var value: Int { 0 }
+}
+
+@Observable // expected-error {{'@Observable' cannot be applied to struct type 'MyStructWithProperty'}}
+struct MyStructWithProperty {
+  var value = 0
+}
+
+@Observable // expected-error {{'@Observable' cannot be applied to struct type 'MyConformingStruct'}}
+struct MyConformingStruct: Observable {
+  var value = 0
+}
