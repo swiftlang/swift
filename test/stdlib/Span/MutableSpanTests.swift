@@ -346,7 +346,6 @@ suite.test("updateAll(copying:)")
 
     var span = a.mutableSpan
     span.updateAll(copying: source.span)
-    // the elements that were overwritten have been released
     expectEqual(LifetimeTracked.instances, originalInstances + capacity)
     expectEqual(a.map(\.value), Array(100..<(100+capacity)))
     expectTrue(a.indices.allSatisfy({ a[$0] === source[$0] }))
@@ -416,7 +415,6 @@ private struct NC: ~Copyable {
     self.tracker = LifetimeTracked(value)
   }
   deinit {
-    // Track deinits to observe rdar://187733648
     NC.deinitializations += 1
   }
   static var deinitializations = 0
@@ -485,7 +483,6 @@ suite.test("updateSubrange(_:moving:)")
     expectEqual(span[3].value, 21)
     expectEqual(span[4].value, 4)
 
-    // two elements in the subrange were destroyed
     expectEqual(LifetimeTracked.instances, originalInstances + capacity)
     expectEqual(NC.deinitializations, originalDeinits + 2)
 
