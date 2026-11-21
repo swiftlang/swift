@@ -53,6 +53,8 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
     @_nonEphemeral _uncheckedStart start: Unsafe${Mutable}Pointer<Element>?,
     count: Int
   ) {
+    _internalInvariant(count >= 0)
+    unsafe _internalInvariant(count == 0 || start != nil)
     _position = unsafe start
     self.count = count
   }
