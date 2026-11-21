@@ -4962,6 +4962,21 @@ bool Type::findIf(llvm::function_ref<bool(Type)> pred) const {
   return walk(Walker(pred));
 }
 
+bool TypeBase::hasBareError() {
+  // The type can't contain a bare error if it doesn't contain
+  // an error at all.
+  if (!hasError()) return false;
+
+  return Type(this).findIf([](Type type) {
+    if (auto errorType = dyn_cast<ErrorType>(type.getPointer())) {
+      auto originalType = errorType->getOriginalType();
+      if (!originalType) return true;
+      if (originalType->hasBareError()) return true;
+    }
+    return false;
+  });
+}
+
 TypeTraitResult TypeBase::canBeClass() {
   // Foreign reference types are represented as Swift classes in the AST,
   // however, they use custom retain/release operations, and therefore aren't

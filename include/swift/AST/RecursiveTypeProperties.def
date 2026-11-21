@@ -1,0 +1,100 @@
+//===--- RecursiveTypeProperties.def - Recursive property list --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+/// PROPERTY(ID, METHOD_NAME)
+///
+/// A recursive property of a type.
+///
+/// RecursiveTypeProperty::ID
+#ifndef PROPERTY
+#error must define PROPERTY before including this file
+#endif
+
+/// This type expression contains a TypeVariableType.
+PROPERTY(HasTypeVariable, hasTypeVariable)
+
+/// This type expression contains a HoleType, a "type hole" that
+/// represents a failure to determine part of the type.
+PROPERTY(HasHole, hasHole)
+
+/// Whether the type is allocated in the constraint solver arena. This can
+/// differ from \c HasTypeVariable for types such as holes, which do
+/// not have type variables, but we still want to allocate in the solver if
+/// they have a type variable originator.
+PROPERTY(SolverAllocated, isSolverAllocated)
+
+/// This type expression contains a PrimaryArchetypeType
+/// or PackArchetypeType.
+PROPERTY(HasPrimaryArchetype, hasPrimaryArchetype)
+
+/// This type expression contains a PackArchetypeType. Implies
+/// HasPrimaryArchetype.
+PROPERTY(HasPackArchetype, hasPackArchetype)
+
+/// This type expression contains an opened existential archetype
+/// (ExistentialArchetypeType).
+PROPERTY(HasOpenedExistential, hasOpenedExistential)
+
+/// This type expression contains an opened pack-element archetype
+/// (ElementArchetypeType).
+PROPERTY(HasElementArchetype, hasElementArchetype)
+
+/// This type expression contains an opaque type (OpaqueTypeArchetype).
+PROPERTY(HasOpaqueArchetype, hasOpaqueArchetype)
+
+/// This type expression contains an open use of a
+/// GenericTypeParamType.
+///
+/// Type parameters bound by the signature of a GenericFunctionType
+/// do not count towards this. Swift currently does not support generic
+/// function types which do not bind all type parameters used within them.
+PROPERTY(HasTypeParameter, hasTypeParameter)
+
+/// This type expression contains an open use of a generic type
+/// parameter that is declared as a parameter pack.
+///
+/// Type parameters bound by the signature of a GenericFunctionType
+/// do not count towards this.
+PROPERTY(HasParameterPack, hasParameterPack)
+
+/// This type expression contains an unbound generic type
+/// (UnboundGenericType).
+PROPERTY(HasUnboundGeneric, hasUnboundGeneric)
+
+/// This type expression contains an LValueType other than as a
+/// function input, and can be loaded to convert to an rvalue.
+PROPERTY(IsLValue, isLValue)
+
+/// This type expression contains a DynamicSelf type.
+PROPERTY(HasDynamicSelf, hasDynamicSelf)
+
+/// This type expression contains an Error type.
+PROPERTY(HasError, hasError)
+
+/// This type expression contains a JoinType or MeetType.
+PROPERTY(HasJoinOrMeet, hasJoinOrMeet)
+
+/// This type expression contains a `_` type placeholder
+/// (PlaceholderType).
+PROPERTY(HasPlaceholder, hasPlaceholder)
+
+/// This type expression contains a parameterized existential type,
+/// \c any P<T> (ParameterizedProtocolType).
+PROPERTY(HasParameterizedExistential, hasParameterizedExistential)
+
+/// This type expression contains a pack generic argument (PackType).
+PROPERTY(HasPack, hasPack)
+
+/// This type expression contains an @unsafe type.
+PROPERTY(IsUnsafe, isUnsafe)
+
+#undef PROPERTY

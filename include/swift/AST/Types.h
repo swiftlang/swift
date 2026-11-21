@@ -777,10 +777,8 @@ public:
   }
 
   /// Determine whether this type contains an error type without an
-  /// underlying original type, i.e prints as `_`.
-  bool hasBareError() const {
-    return getRecursiveProperties().hasBareError();
-  }
+  /// underlying original type, i.e. one that prints as `_`.
+  bool hasBareError();
 
   /// Whether this is a top-level ErrorType without an underlying original
   /// type, i.e prints as `_`.
@@ -1510,18 +1508,10 @@ END_CAN_TYPE_WRAPPER(AnyGenericType, Type)
 class ErrorType final : public TypeBase {
   friend class ASTContext;
 
-  static RecursiveTypeProperties getProperties(Type originalType) {
-    RecursiveTypeProperties props = RecursiveTypeProperties::HasError;
-    if (!originalType || originalType->hasBareError())
-      props |= RecursiveTypeProperties::HasBareError;
-
-    return props;
-  }
-
   ErrorType(ASTContext &C, Type originalType)
       : TypeBase(TypeKind::Error,
                  (!originalType || originalType->isCanonical()) ? &C : nullptr,
-                 getProperties(originalType)) {
+                 RecursiveTypeProperties::HasError) {
     if (originalType) {
       Bits.ErrorType.HasOriginalType = true;
       *reinterpret_cast<Type *>(this + 1) = originalType;
