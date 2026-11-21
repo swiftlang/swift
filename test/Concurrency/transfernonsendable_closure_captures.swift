@@ -1545,6 +1545,32 @@ func useAfterFreeClosureTests() {
     acceptsAutoclosureEscapingSendingClosure(useValue(x)) // expected-error {{mutable var 'x' cannot be captured by 'sending' @autoclosure parameter because 'x' is accessed later in the current task}}
     x = NoncopyableStructSendable() // expected-note {{access can happen concurrently}}
   }
+
+  func simpleTestClosureAliasingNonsendable() {
+    let ns = KlassNonsendable()
+
+    let closure = { ns }
+
+    // FIXME: make diagnostics less janky (mangled names currently appear)
+    sendValue(closure()) // expected-error {{}}
+    // expected-note @-1 {{}}
+
+    useValue(ns) // expected-note {{access can happen concurrently}}
+  }
+
+  func simpleTestClosureAliasingNonsendable2() {
+    let ns = KlassNonsendable()
+
+    func idFn<T>(_ t: T) -> T { t }
+
+    let cl = { ns }
+    let alias = idFn(cl())
+
+    sendValue(alias) // expected-error {{sending 'alias' risks causing data races}}
+    // expected-note @-1 {{'alias' used after being passed as a 'sending' parameter; Later uses could race}}
+
+    useValue(ns) // expected-note {{access can happen concurrently}}
+  }
 }
 
 // The result of calling a closure is named after the variable holding the
