@@ -107,7 +107,7 @@ def run_build_script_helper(action, host_target, product, args):
         '--toolchain', toolchain_path,
         '--ninja-bin', product.toolchain.ninja,
         '--cmake-bin', product.toolchain.cmake,
-    ]
+    ] + product.swiftpm_caching_helper_args()
     if action != 'clean':
         helper_cmd += ["--jobs", str(args.build_jobs)]
     if os.path.exists(dispatch_build_dir):

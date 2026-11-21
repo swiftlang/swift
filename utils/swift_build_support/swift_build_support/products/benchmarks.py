@@ -132,5 +132,5 @@ def run_build_script_helper(host_target, product, args):
         '--package-path', package_path,
         '--build-path', product.build_dir,
         '--toolchain', toolchain_path,
-    ]
+    ] + product.swiftpm_caching_helper_args()
     shell.call(build_cmd)

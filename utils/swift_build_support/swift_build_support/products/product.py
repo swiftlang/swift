@@ -246,6 +246,27 @@ class Product(object):
         else:
             return self.install_toolchain_path(host_target)
 
+    def swiftpm_caching_flags(self):
+        """swiftpm_caching_flags() -> [string]
+
+        Returns the flags to pass to SwiftPM build and test invocations to
+        enable compilation caching in the shared build cache, if requested.
+        """
+        if not self.args.enable_swiftpm_caching:
+            return []
+        return ['--enable-build-caching',
+                '--build-cache-path=' + self.args.swiftpm_build_cache_path,
+                '--enable-build-cache-diagnostic-remarks']
+
+    def swiftpm_caching_helper_args(self):
+        """swiftpm_caching_helper_args() -> [string]
+
+        Returns swiftpm_caching_flags() wrapped for passing through a
+        package's build-script-helper.
+        """
+        return ['--extra-swiftpm-flag=' + flag
+                for flag in self.swiftpm_caching_flags()]
+
     def is_darwin_host(self, host_target):
         return host_target.startswith("macosx") or \
             host_target.startswith("iphone") or \
