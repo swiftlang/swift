@@ -57,6 +57,8 @@ SWIFT_CONCURRENCY_HOOK(bool, swift_task_isOnExecutor,
 
 SWIFT_CONCURRENCY_HOOK(void, swift_task_enqueueMainExecutor, Job *job);
 
+SWIFT_CONCURRENCY_HOOK0(void, swift_asyncstream_multiple_awaiters);
+
 SWIFT_CONCURRENCY_HOOK0(SerialExecutorRef, swift_task_getMainExecutor);
 
 SWIFT_CONCURRENCY_HOOK(bool, swift_task_isMainExecutor, SerialExecutorRef);
