@@ -682,7 +682,7 @@ extension MutableSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: Range<Index>,
-    repeating repeatedValue: consuming Element,
+    repeating repeatedValue: consuming Element
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(repeating: repeatedValue)
@@ -698,7 +698,7 @@ extension MutableSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: some RangeExpression<Index>,
-    repeating repeatedValue: consuming Element,
+    repeating repeatedValue: consuming Element
   ) {
     updateSubrange(subrange.relative(to: indices), repeating: repeatedValue)
   }
@@ -712,7 +712,7 @@ extension MutableSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: UnboundedRange,
-    repeating repeatedValue: consuming Element,
+    repeating repeatedValue: consuming Element
   ) {
     updateAll(repeating: repeatedValue)
   }
@@ -823,7 +823,7 @@ extension MutableSpan {
     try updateElements(startingAt: &index, copyingFrom: &iterator)
     let next = try iterator.nextSpan()
     _precondition(
-      next.isEmpty, "Source has more elements than the destination can contain."
+      next.isEmpty, "Source has more elements than the destination can contain"
     )
   }
 
