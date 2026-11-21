@@ -13,7 +13,7 @@
 /// The implementation of the cooperative global executor.
 ///
 /// It defines the executor entrypoints declared in
-/// SwiftPlatform/Concurrency.h and ExecutorImpl.h.
+/// SwiftPlatform/Concurrency.h.
 ///
 ///===------------------------------------------------------------------===///
 
@@ -71,10 +71,4 @@ void _swift_concurrency_asyncMain(void) {
   }
 }
 
-SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
-  return swift_executor_generic();
-}
-
-bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
-  return swift_executor_isGeneric(executor);
-}
+__swift_ptrdiff_t _swift_concurrency_mainExecutorIsGlobal(void) { return 1; }

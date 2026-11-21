@@ -63,11 +63,24 @@ internal func donateToGlobalExecutor(
 @diagnose(UselessAvailabilityCheck, as: ignored)
 internal func getMainExecutor() -> UnownedSerialExecutor {
   if #available(StdlibDeploymentTarget 6.3, *) {
+    #if $Embedded
+    if _isMainEnqueueReplaced() {
+      return unsafe EmbeddedMainExecutor.shared.asUnownedSerialExecutor()
+    }
+    #endif
     return unsafe _getMainExecutorAsSerialExecutor()
   } else {
     fatalError("this should never happen")
   }
 }
+
+#if $Embedded
+/// Returns `true` when a linked executor defines
+/// `_swift_concurrency_enqueueMainExecutor`.
+@available(StdlibDeploymentTarget 6.3, *)
+@_silgen_name("swift_task_isMainEnqueueReplaced")
+internal func _isMainEnqueueReplaced() -> Bool
+#endif
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
