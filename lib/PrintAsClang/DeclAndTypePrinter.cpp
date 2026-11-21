@@ -38,6 +38,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
@@ -134,7 +135,11 @@ class DeclAndTypePrinter::Implementation
   DeclAndTypePrinter &owningPrinter;
   OutputLanguageMode outputLang;
 
-  SmallVector<const FunctionType *, 4> openFunctionTypes;
+  /// A part of a C declarator that has to be printed after the declared name
+  /// (if any): the parameter list of a function type, or the dimensions of the
+  /// array that a pointer points to.
+  using Declarator = TaggedUnion<FunctionType *, SmallVector<uint64_t, 2>>;
+  SmallVector<Declarator, 4> openDeclarators;
 
   ASTContext &getASTContext() const {
     return owningPrinter.M.getASTContext();
@@ -1591,7 +1596,7 @@ private:
       os << "void";
     }
 
-    os << ')';
+    os << ") SWIFT_NOEXCEPT";
 
     // Finish the result type.
     multiPart.finish();
@@ -1631,7 +1636,6 @@ private:
     assert(FD->getCDeclKind() && "not a C-exported function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
-    os << " SWIFT_NOEXCEPT";
     printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << ";\n";
@@ -2677,12 +2681,49 @@ private:
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    visitPart(args.front(), OTK_None);
+
+    // A pointer to a C array is printed `int (*)[4]`.
+    SmallVector<uint64_t, 2> arrayDimensions;
+    Type pointee = lookThroughCArrayType(args.front(), arrayDimensions);
+    visitPart(pointee, OTK_None);
     if (isConst)
       os << " const";
-    os << " *";
+    if (!arrayDimensions.empty())
+      os << " (";
+    else
+      os << ' ';
+    os << '*';
     printNullability(optionalKind);
+    if (!arrayDimensions.empty())
+      openDeclarators.push_back(Declarator(std::move(arrayDimensions)));
     return true;
+  }
+
+  /// If \p type is a C array that ClangImporter imported as an `InlineArray` or
+  /// a homogeneous tuple, collect its dimensions and return the innermost
+  /// element type. Otherwise, leave \p dimensions empty and return \p type.
+  static Type lookThroughCArrayType(Type type,
+                                    SmallVectorImpl<uint64_t> &dimensions) {
+    while (true) {
+      if (auto element = type->getInlineArrayElementType()) {
+        auto count = type->getInlineArrayCount();
+        assert(count && "pointer to InlineArray with unknown size is not "
+                        "representable");
+        dimensions.push_back(count->getZExtValue());
+        type = element;
+        continue;
+      }
+
+      if (auto tuple = type->getAs<TupleType>()) {
+        if (tuple->getNumElements() >= 2) {
+          dimensions.push_back(tuple->getNumElements());
+          type = tuple->getElementType(0);
+          continue;
+        }
+      }
+
+      return type;
+    }
   }
 
   void
@@ -2902,7 +2943,7 @@ private:
     visitPart(FT->getResult(), OTK_None);
     os << " (" << pointerSigil;
     printNullability(optionalKind);
-    openFunctionTypes.push_back(FT);
+    openDeclarators.push_back(Declarator(FT));
   }
 
   void visitFunctionType(FunctionType *FT,
@@ -2920,13 +2961,24 @@ private:
     }
   }
 
-  /// Print the part of a function type that appears after where the variable
-  /// name would go.
+  /// Print the part of a function or array type that appears after where the
+  /// variable name would go.
   ///
   /// This is necessary to handle C's awful declarator syntax.
   /// "(A) -> ((B) -> C)" becomes "C (^ (^)(A))(B)".
-  void finishFunctionType(const FunctionType *FT) {
-    os << ")(";
+  void finishDeclarator(const Declarator &open) {
+    os << ')';
+
+    // Handle C array types.
+    if (auto dimensions = open.dyn_cast<SmallVector<uint64_t, 2>>()) {
+      for (uint64_t dimension : *dimensions)
+        os << '[' << dimension << ']';
+      return;
+    }
+
+    // Handle function types.
+    FunctionType *FT = open.get<FunctionType *>();
+    os << '(';
     if (!FT->getParams().empty()) {
       interleave(
           FT->getParams(),
@@ -2993,23 +3045,22 @@ private:
   /// RAII class for printing multi-part C types, such as functions and arrays.
   class PrintMultiPartType {
     PrinterImpl &Printer;
-    decltype(PrinterImpl::openFunctionTypes) savedFunctionTypes;
+    decltype(PrinterImpl::openDeclarators) savedDeclarators;
 
     PrintMultiPartType(const PrintMultiPartType &) = delete;
   public:
     explicit PrintMultiPartType(PrinterImpl &Printer)
       : Printer(Printer) {
-      savedFunctionTypes.swap(Printer.openFunctionTypes);
+      savedDeclarators.swap(Printer.openDeclarators);
     }
 
     void finish() {
-      auto &openFunctionTypes = Printer.openFunctionTypes;
-      while (!openFunctionTypes.empty()) {
-        const FunctionType *openFunctionTy = openFunctionTypes.pop_back_val();
-        Printer.finishFunctionType(openFunctionTy);
+      auto &openDeclarators = Printer.openDeclarators;
+      while (!openDeclarators.empty()) {
+        Printer.finishDeclarator(openDeclarators.pop_back_val());
       }
-      openFunctionTypes = std::move(savedFunctionTypes);
-      savedFunctionTypes.clear();
+      openDeclarators = std::move(savedDeclarators);
+      savedDeclarators.clear();
     }
 
     ~PrintMultiPartType() {
@@ -3020,7 +3071,7 @@ private:
   /// Print a full type, optionally declaring the given \p name.
   ///
   /// This will properly handle nested function types (see
-  /// finishFunctionType()). If only a part of a type is being printed, use
+  /// finishDeclarator()). If only a part of a type is being printed, use
   /// visitPart().
 public:
   void print(Type ty, std::optional<OptionalTypeKind> optionalKind,

@@ -13,6 +13,7 @@
 #include "swift/Basic/Feature.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -103,4 +104,8 @@ bool Feature::includeInModuleInterface() const {
 #include "swift/Basic/Features.def"
   }
   llvm_unreachable("covered switch");
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const Feature &feature) {
+  out << feature.getName();
 }

@@ -4,19 +4,24 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ModernImportedCArrays
 // REQUIRES: swift_feature_ModernImportedCArraysOnly
+// REQUIRES: swift_feature_ObjCAttrAllowsCArrays
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array-
-// RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/representability.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/codegen.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array-
-// RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -o /dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/representability.swift -I %t/include -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/codegen.swift -I %t/include -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/disabled.swift -I %t/include
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
+
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
 
 //--- include/module.modulemap
 module CLib {
@@ -25,7 +30,11 @@ module CLib {
 }
 
 //--- include/CLib.h
-#import <Foundation/Foundation.h>
+#import <Foundation.h>
+
+// The mock SDK doesn't define these.
+#define NS_ASSUME_NONNULL_BEGIN _Pragma("clang assume_nonnull begin")
+#define NS_ASSUME_NONNULL_END _Pragma("clang assume_nonnull end")
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -73,10 +82,16 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol P
 - (void)protoTakes:(int (*)[4])array;
+@optional
+- (void)optionalTakes:(int (*)[4])array;
+- (nullable int (*)[4])optionalGives;
+@property (nullable, nonatomic) int (*optionalBuf)[4];
 @end
 
 @interface Adopter : NSObject <P>
 @end
+
+typedef int NTArray[4] __attribute__((swift_wrapper(struct)));
 
 @protocol Q
 @property int (*protoBuf)[4];
@@ -121,7 +136,11 @@ NS_ASSUME_NONNULL_BEGIN
 // the storage as well as its accessors.
 // (anyAppleOS can't express a version below InlineArray's.)
 #define OLD_AVAILABILITY \
-    API_AVAILABLE(macos(12.0), ios(15.0), tvos(15.0), watchos(8.0), visionos(1.0))
+    __attribute__((availability(macos, introduced=12.0))) \
+    __attribute__((availability(ios, introduced=15.0))) \
+    __attribute__((availability(tvos, introduced=15.0))) \
+    __attribute__((availability(watchos, introduced=8.0))) \
+    __attribute__((availability(visionos, introduced=1.0)))
 @interface OldAvailability : NSObject
 @property (nonatomic) int (*row)[4] OLD_AVAILABILITY;
 @property (nonatomic, readonly) int (*readonlyRow)[4] OLD_AVAILABILITY;
@@ -138,7 +157,7 @@ NS_ASSUME_NONNULL_BEGIN
 // The availability of a requirement of a protocol without availability is
 // inferred from its types, and that has to include the types of its modern
 // projection as well as InlineArray's.
-API_AVAILABLE(anyappleos(30.0))
+__attribute__((availability(anyappleos, introduced=30.0)))
 @interface FutureObject : NSObject
 @end
 
@@ -288,6 +307,53 @@ func testAsync(
   let _: UnsafeMutablePointer<InlineArray<4, Int32>>? = await svc.result()
   // expected-legacy-c-array-error@-1 {{cannot assign value of type 'UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>?' (aka 'Optional<UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>>') to type 'UnsafeMutablePointer<InlineArray<4, Int32>>?'}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') and 'InlineArray<4, Int32>') are expected to be equal}}
+}
+
+// Conforming from Swift
+
+@available(anyAppleOS 26, *)
+class ModernWitness: NSObject, P {
+  // expected-legacy-c-array-error@-1 {{type 'ModernWitness' does not conform to protocol 'P'}}
+  // expected-legacy-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<InlineArray<4, Int32>>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+}
+
+@available(anyAppleOS 26, *)
+class LegacyWitness: NSObject, P {
+  // expected-modern-c-array-error@-1 {{type 'LegacyWitness' does not conform to protocol 'P'}}
+  // expected-modern-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+}
+
+// Trying to implement the hidden projection, not the visible one, of the
+// optional requirement is diagnosed as a conflict.
+
+@available(anyAppleOS 26, *)
+class ModernRequiredLegacyOptionalWitness: NSObject, P {
+  // expected-legacy-c-array-error@-1 {{type 'ModernRequiredLegacyOptionalWitness' does not conform to protocol 'P'}}
+  // expected-legacy-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<InlineArray<4, Int32>>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-error@-1 {{Objective-C method 'optionalTakes:' provided by method 'optionalTakes' conflicts with optional requirement method 'optionalTakes' in protocol 'P'}}
+  // expected-modern-c-array-note@-7 {{class 'ModernRequiredLegacyOptionalWitness' declares conformance to protocol 'P' here}}
+  // expected-modern-c-array-note@-3 {{add '@nonobjc' to silence this error}}
+}
+
+@available(anyAppleOS 26, *)
+class LegacyRequiredModernOptionalWitness: NSObject, P {
+  // expected-modern-c-array-error@-1 {{type 'LegacyRequiredModernOptionalWitness' does not conform to protocol 'P'}}
+  // expected-modern-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-error@-1 {{Objective-C method 'optionalTakes:' provided by method 'optionalTakes' conflicts with optional requirement method 'optionalTakes' in protocol 'P'}}
+  // expected-legacy-c-array-note@-7 {{class 'LegacyRequiredModernOptionalWitness' declares conformance to protocol 'P' here}}
+  // expected-legacy-c-array-note@-3 {{add '@nonobjc' to silence this error}}
 }
 
 @available(anyAppleOS 26, *)
@@ -474,6 +540,29 @@ func testMirroredInitAndSubscript(
 }
 
 #if MODERN_C_ARRAYS
+typealias Witness = InlineArray<4, Int32>
+#else
+typealias Witness = (Int32, Int32, Int32, Int32)
+#endif
+
+// Conforming from Swift and using the class
+
+@available(anyAppleOS 26, *)
+class Conformer: NSObject, P {
+  func protoTakes(_ array: UnsafeMutablePointer<Witness>) {}
+  func optionalTakes(_ array: UnsafeMutablePointer<Witness>) {}
+  func optionalGives() -> UnsafeMutablePointer<Witness>? { nil }
+  var optionalBuf: UnsafeMutablePointer<Witness>?
+}
+
+@available(anyAppleOS 26, *)
+func testConformer(_ conformer: Conformer, _ pointer: UnsafeMutablePointer<Witness>) {
+  conformer.protoTakes(pointer)
+  let existential: any P = conformer
+  existential.protoTakes(pointer)
+}
+
+#if MODERN_C_ARRAYS
 typealias Row6 = InlineArray<6, Float>
 #else
 typealias Row6 = (Float, Float, Float, Float, Float, Float)
@@ -485,4 +574,232 @@ func testDecayedArrayParameters(
 ) {
   _ = Matrix(identifier: 0, informationMatrixSymmetric: mutable)
   _ = Matrix(source: 0, informationMatrixSymmetric: immutable)
+}
+
+//--- representability.swift
+import CLib
+
+// Both projections of a C array are representable, since they're two spellings
+// of the same C type, so every case is written with each of them.
+typealias Tuple2<T> = (T, T)
+typealias Tuple3<T> = (T, T, T)
+typealias Tuple4<T> = (T, T, T, T)
+@available(anyAppleOS 26, *)
+typealias Inline2<T> = InlineArray<2, T>
+@available(anyAppleOS 26, *)
+typealias Inline3<T> = InlineArray<3, T>
+@available(anyAppleOS 26, *)
+typealias Inline4<T> = InlineArray<4, T>
+
+// Pointers to C arrays are representable...
+
+@available(anyAppleOS 26, *)
+class Pointers: NSObject {
+  @objc func arrayTuple(_ a: UnsafeMutablePointer<Tuple4<Int32>>) {}
+  @objc func constPointerTuple(_ a: UnsafePointer<Tuple4<Int32>>?) {}
+  @objc func nestedTuple(_ a: UnsafeMutablePointer<Tuple3<Tuple2<Int32>>>) {}
+  @objc func resultTuple() -> UnsafeMutablePointer<Tuple4<Int32>>? { nil }
+  @objc var propertyTuple: UnsafeMutablePointer<Tuple4<Int32>>?
+  @objc func arrayInline(_ a: UnsafeMutablePointer<Inline4<Int32>>) {}
+  @objc func constPointerInline(_ a: UnsafePointer<Inline4<Int32>>?) {}
+  @objc func nestedInline(_ a: UnsafeMutablePointer<Inline3<Inline2<Int32>>>) {}
+  @objc func resultInline() -> UnsafeMutablePointer<Inline4<Int32>>? { nil }
+  @objc var propertyInline: UnsafeMutablePointer<Inline4<Int32>>?
+  @objc func newtype(_ a: UnsafeMutablePointer<NTArray>) {}
+}
+
+@available(anyAppleOS 26, *)
+@c func cFunctionTuple(_ a: UnsafeMutablePointer<Tuple4<Int32>>) {}
+@available(anyAppleOS 26, *)
+@c func cFunctionInline(_ a: UnsafeMutablePointer<Inline4<Int32>>) {}
+@available(anyAppleOS 26, *)
+@c func cNewtype(_ a: UnsafePointer<NTArray>) {}
+
+// ...but C arrays, and newtypes of them, aren't.
+
+@available(anyAppleOS 26, *)
+class Values: NSObject {
+  @objc func arrayTuple(_ a: Tuple4<Int32>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{tuples cannot be represented in Objective-C}}
+  @objc func arrayInline(_ a: Inline4<Int32>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func newtype(_ a: NTArray) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func mixedTuple(_ a: UnsafeMutablePointer<(Int32, Int64)>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func unrepresentableElementTuple(_ a: UnsafeMutablePointer<Tuple4<String>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func unrepresentableElementInline(_ a: UnsafeMutablePointer<Inline4<String>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+
+  // ClangImporter never labels the elements of a tuple it imports, at any level.
+  @objc func labeled(_ a: UnsafeMutablePointer<(x: Int32, y: Int32)>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func labeledElements(_ a: UnsafeMutablePointer<((x: Int32, y: Int32), (x: Int32, y: Int32))>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+
+  // A zero-length array isn't valid C, especially in nested position.
+  @objc func zeroLength(_ a: UnsafeMutablePointer<InlineArray<0, Int32>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+}
+
+@available(anyAppleOS 26, *)
+@c func cValueTuple(_ a: Tuple4<Int32>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{tuples cannot be represented in C}}
+@available(anyAppleOS 26, *)
+@c func cValueInline(_ a: Inline4<Int32>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+
+@available(anyAppleOS 26, *)
+@c func cZeroLength(_ a: UnsafeMutablePointer<InlineArray<0, Int32>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+
+// The element type has to be representable too.
+
+struct SwiftStruct { var x: Int }
+class SwiftClass {}
+@objc enum ObjCEnum: Int32 { case a }
+@c enum CEnum: Int32 { case a }
+
+@available(anyAppleOS 26, *)
+class Elements: NSObject {
+  @objc func swiftStructTuple(_ a: UnsafeMutablePointer<Tuple4<SwiftStruct>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func swiftClassTuple(_ a: UnsafeMutablePointer<Tuple4<SwiftClass>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func optionalTuple(_ a: UnsafeMutablePointer<Tuple4<Int32?>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func nestedTuple(_ a: UnsafeMutablePointer<Tuple3<Tuple2<String>>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func swiftStructInline(_ a: UnsafeMutablePointer<Inline4<SwiftStruct>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func swiftClassInline(_ a: UnsafeMutablePointer<Inline4<SwiftClass>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func optionalInline(_ a: UnsafeMutablePointer<Inline4<Int32?>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func nestedInline(_ a: UnsafeMutablePointer<Inline3<Inline2<String>>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+
+  // An @objc enum is representable in Objective-C, but not in C.
+  @objc func objcEnumTuple(_ a: UnsafeMutablePointer<Tuple4<ObjCEnum>>) {}
+  @objc func cEnumTuple(_ a: UnsafeMutablePointer<Tuple4<CEnum>>) {}
+  @objc func pointerTuple(_ a: UnsafeMutablePointer<Tuple4<UnsafeMutablePointer<Int32>>>) {}
+  @objc func objcEnumInline(_ a: UnsafeMutablePointer<Inline4<ObjCEnum>>) {}
+  @objc func cEnumInline(_ a: UnsafeMutablePointer<Inline4<CEnum>>) {}
+  @objc func pointerInline(_ a: UnsafeMutablePointer<Inline4<UnsafeMutablePointer<Int32>>>) {}
+
+  // ARC can't infer an ownership qualifier for an array of objects or blocks,
+  // though it can for a pointer to one.
+  @objc func objectPointee(_ a: UnsafeMutablePointer<NSObject>) {}
+  @objc func objectElementTuple(_ a: UnsafeMutablePointer<Tuple4<NSObject>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func blockElementTuple(_ a: UnsafeMutablePointer<Tuple4<@convention(block) () -> Void>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func objectElementInline(_ a: UnsafeMutablePointer<Inline4<NSObject>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+  @objc func blockElementInline(_ a: UnsafeMutablePointer<Inline4<@convention(block) () -> Void>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+}
+
+@available(anyAppleOS 26, *)
+@c func cSwiftStructTuple(_ a: UnsafeMutablePointer<Tuple4<SwiftStruct>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+@available(anyAppleOS 26, *)
+@c func cSwiftClassTuple(_ a: UnsafeMutablePointer<Tuple4<SwiftClass>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+@available(anyAppleOS 26, *)
+@c func cObjCEnumTuple(_ a: UnsafeMutablePointer<Tuple4<ObjCEnum>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+// expected-note@-3 {{use '@objc' to expose this function to Objective-C}}
+@available(anyAppleOS 26, *)
+@c func cCEnumTuple(_ a: UnsafeMutablePointer<Tuple4<CEnum>>) {}
+@available(anyAppleOS 26, *)
+@c func cPointerTuple(_ a: UnsafeMutablePointer<Tuple4<UnsafeMutablePointer<Int32>>>) {}
+@available(anyAppleOS 26, *)
+@c func cSwiftStructInline(_ a: UnsafeMutablePointer<Inline4<SwiftStruct>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+@available(anyAppleOS 26, *)
+@c func cSwiftClassInline(_ a: UnsafeMutablePointer<Inline4<SwiftClass>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+@available(anyAppleOS 26, *)
+@c func cObjCEnumInline(_ a: UnsafeMutablePointer<Inline4<ObjCEnum>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+// expected-note@-3 {{use '@objc' to expose this function to Objective-C}}
+@available(anyAppleOS 26, *)
+@c func cCEnumInline(_ a: UnsafeMutablePointer<Inline4<CEnum>>) {}
+@available(anyAppleOS 26, *)
+@c func cPointerInline(_ a: UnsafeMutablePointer<Inline4<UnsafeMutablePointer<Int32>>>) {}
+
+//--- disabled.swift
+
+// Compiled without any C array feature, so C array types are unrepresentable.
+
+import CLib
+
+@available(anyAppleOS 26, *)
+class Pointers: NSObject {
+  @objc func tuple(_ a: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+
+  @objc func array(_ a: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-error@-1 {{instance method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
+}
+
+@c func cFunctionTuple(_ a: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+
+@available(anyAppleOS 26, *)
+@c func cFunctionArray(_ a: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+// expected-error@-1 {{global function cannot be marked '@c' because the type of the parameter cannot be represented in C}}
+// expected-note@-2 {{Swift structs cannot be represented in C}}
+
+// C arrays in `@objcMembers` should just make the method `@nonobjc`.
+@available(anyAppleOS 26, *)
+@objcMembers class Inferred: NSObject {
+  func processTuple(_ p: UnsafeMutablePointer<(Float, Float)>) {}
+  func processArray(_ p: UnsafeMutablePointer<InlineArray<2, Float>>) {}
+  func processElement(_ p: UnsafeMutablePointer<Float>) {}
+
+  func checkSelectors() {
+    _ = #selector(processTuple(_:))
+    // expected-error@-1 {{argument of '#selector' refers to instance method 'processTuple' that is not exposed to Objective-C}}
+    // expected-note@-7 {{add '@objc' to expose this instance method to Objective-C}}
+    _ = #selector(processArray(_:))
+    // expected-error@-1 {{argument of '#selector' refers to instance method 'processArray' that is not exposed to Objective-C}}
+    // expected-note@-9 {{add '@objc' to expose this instance method to Objective-C}}
+    _ = #selector(processElement(_:))
+  }
 }

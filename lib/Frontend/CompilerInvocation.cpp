@@ -930,6 +930,23 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   return false;
 }
 
+/// Additional feature to enable by default when \p specifiedFeature is enabled.
+static std::optional<Feature> getImpliedFeature(Feature specifiedFeature) {
+  switch (specifiedFeature) {
+  case Feature::ModernImportedCArrays:
+  case Feature::ModernImportedCArraysOnly:
+    return Feature::ObjCAttrAllowsCArrays;
+
+  case Feature::StandaloneSwiftAvailability:
+    return Feature::SwiftRuntimeAvailability;
+
+  default:
+    return std::nullopt;
+  }
+
+  llvm_unreachable("unhandled Feature in switch");
+}
+
 bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
                              DiagnosticEngine &Diags) {
   using namespace options;
@@ -942,6 +959,7 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
   // honored, we iterate over them in reverse order.
   std::vector<StringRef> psuedoFeatures;
   llvm::SmallSet<Feature, 8> seenFeatures;
+  SmallVector<std::pair<Feature, bool>, 2> impliedFeatures;
   for (const Arg *A : Args.filtered_reverse(
            OPT_enable_experimental_feature, OPT_disable_experimental_feature,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
@@ -1061,13 +1079,18 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
     bool forMigration = featureMode.has_value();
 
     // Enable the feature if requested.
-    if (isEnableFeatureFlag)
+    if (isEnableFeatureFlag) {
       Opts.enableFeature(*feature, forMigration);
 
-    // 'StandaloneSwiftAvailability' implies 'SwiftRuntimeAvailability'
-    if (*feature == Feature::StandaloneSwiftAvailability)
-      Opts.enableFeature(Feature::SwiftRuntimeAvailability, forMigration);
+      if (auto impliedFeature = getImpliedFeature(*feature))
+        impliedFeatures.emplace_back(*impliedFeature, forMigration);
+    }
   }
+
+  // Implied features are only defaults; an explicit flag takes precedence.
+  for (auto [impliedFeature, forMigration] : impliedFeatures)
+    if (!seenFeatures.count(impliedFeature))
+      Opts.enableFeature(impliedFeature, forMigration);
 
   // Since pseudo-features don't have a boolean on/off state, process them in
   // the order they were specified on the command line.

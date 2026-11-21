@@ -16,6 +16,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LanguageMode.h"
 
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include <optional>
 
@@ -85,7 +86,14 @@ struct Feature {
   /// `std::nullopt` if the feature is not associated with a language mode
   /// (i.e., not an upcoming feature).
   std::optional<LanguageMode> getLanguageMode() const;
+
+  friend llvm::hash_code
+  hash_value(const Feature &feature) {
+    return llvm::hash_value(static_cast<uint16_t>(feature.kind));
+  }
 };
+
+void simple_display(llvm::raw_ostream &out, const Feature &feature);
 
 #define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
   constexpr inline Feature Feature::FeatureName =                              \

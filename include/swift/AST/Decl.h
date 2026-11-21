@@ -5868,7 +5868,7 @@ public:
   using FunctionList = TinyPtrVector<AbstractFunctionDecl *>;
 
 private:
-  using MethodKey = std::pair<ObjCSelector, char>;
+  using MethodKey = std::tuple<ObjCSelector, char, CArrayProjection>;
   llvm::SmallDenseMap<MethodKey, FunctionList, 4> storage;
 
   static MethodKey getObjCMethodKey(AbstractFunctionDecl *func);
