@@ -20,10 +20,8 @@ extension ClassWithOperatorStarUnavailable : HasPointee {} // expected-error {{d
                                                            // expected-error@-1 {{unavailable property}}
 extension ClassWithOperatorStarUnavailable : HasSucc {} // expected-error {{does not conform to protocol}}
 
-// FIXME: The below test should also fail with 'pointee' is unavailable in Swift error,
-// but currently pointee is not hidden in derived classes.
-extension DerivedClassWithOperatorStarUnavailable : HasPointee {} // FIXME-error {{does not conform to protocol}}
-                                                                  // FIXME-error@-1 {{unavailable property}}
+extension DerivedClassWithOperatorStarUnavailable : HasPointee {} // expected-error {{does not conform to protocol}}
+                                                                  // expected-error@-1 {{unavailable property}}
 extension DerivedClassWithOperatorStarUnavailable : HasSucc {} // expected-error {{does not conform to protocol}}
 
 extension ClassWithSuccessorAvailable : HasPointee {} // expected-error {{does not conform to protocol}}
