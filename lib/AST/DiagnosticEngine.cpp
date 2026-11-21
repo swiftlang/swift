@@ -838,8 +838,12 @@ void swift::printClangDeclName(const clang::NamedDecl *ND,
 }
 
 void swift::printClangTypeName(const clang::Type *Ty, llvm::raw_ostream &os) {
-  clang::QualType::print(Ty, clang::Qualifiers(), os,
-                         clang::PrintingPolicy{clang::LangOptions()}, "");
+  // A record is spelled the same in Swift whether or not it is declared with a
+  // tag keyword, so leave the keyword out, even for a canonical type (e.g. a
+  // template argument) that does not record how it was written.
+  clang::PrintingPolicy policy{clang::LangOptions()};
+  policy.SuppressTagKeyword = true;
+  clang::QualType::print(Ty, clang::Qualifiers(), os, policy, "");
 }
 
 /// Print a reference to an attribute or modifier, writing its name via

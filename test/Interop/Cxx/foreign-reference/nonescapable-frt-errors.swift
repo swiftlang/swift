@@ -80,8 +80,8 @@ struct SWIFT_IMMORTAL_REFERENCE ComplexFRTWithNonEscapableField {
 
 // A templated foreign reference type that stores a non-escapable template
 // argument is rejected, whether or not it spells SWIFT_ESCAPABLE_IF. A
-// non-escapable argument that is not stored is fine, since nothing that cannot
-// escape ends up inside the class.
+// non-escapable argument that is not stored makes the class unsafe instead (see
+// escapable-frt.swift).
 // expected-warning@+3 2 {{SWIFT_SELF_CONTAINED_IF has no effect on}}
 // expected-note@+2 {{'Escapable' record 'StoresArgument<View>' cannot have non-'Escapable' field 'value'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
@@ -123,6 +123,30 @@ template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
   T value;
 };
 using ConditionallyEscapableInt = ConditionallyEscapable<int>;
+
+// Copyability annotations have no effect on a foreign reference type either, but
+// the type is still imported.
+// expected-warning@+1 {{SWIFT_NONCOPYABLE has no effect on 'ImmortalNonCopyable'; foreign reference types are imported as Swift classes, which are always copyable}}
+struct SWIFT_IMMORTAL_REFERENCE SWIFT_NONCOPYABLE ImmortalNonCopyable {
+  int value;
+};
+
+void destroyImmortal(struct ImmortalWithDestroy);
+// expected-warning@+2 {{SWIFT_NONCOPYABLE has no effect on 'ImmortalWithDestroy'}}
+struct SWIFT_IMMORTAL_REFERENCE SWIFT_NONCOPYABLE_WITH_DESTROY(destroyImmortal)
+    ImmortalWithDestroy {
+  int value;
+};
+
+// expected-warning@+1 {{SWIFT_NONCOPYABLE has no effect on 'DerivedNonCopyable'}}
+struct SWIFT_NONCOPYABLE DerivedNonCopyable : Immortal {};
+
+// expected-warning@+2 {{SWIFT_COPYABLE_IF has no effect on 'ConditionallyCopyable<int>'}}
+template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_COPYABLE_IF(T)
+    ConditionallyCopyable {
+  T value;
+};
+using ConditionallyCopyableInt = ConditionallyCopyable<int>;
 
 struct HoldsNonEscapableFRT {
   // expected-note@+2 {{field 'field' unavailable (cannot import)}}
@@ -171,7 +195,8 @@ public func useComplexFRTWithNEField(_ x: ComplexFRTWithNonEscapableField) {} //
 public func useStoresNE(_ x: StoresNonEscapable) {} // expected-error {{cannot find type 'StoresNonEscapable' in scope}}
 public func useUnannotatedNE(_ x: UnannotatedNonEscapable) {} // expected-error {{cannot find type 'UnannotatedNonEscapable' in scope}}
 
-// A non-escapable template argument that is never stored is not a problem.
+// A non-escapable template argument that is never stored is imported (as unsafe,
+// which this test does not check).
 public func useStoresEscapable(_ x: StoresEscapable) -> Int32 { x.value }
 public func useDoesNotStoreNE(_ x: DoesNotStoreNonEscapable) -> Int32 { x.value }
 
@@ -179,6 +204,17 @@ public func useEscapable(_ x: Immortal) -> Int32 { x.value }
 public func useImmortalEscapable(_ x: ImmortalEscapable) -> Int32 { x.value }
 public func useDerivedEscapable(_ x: DerivedEscapable) {}
 public func useConditional(_ x: ConditionallyEscapableInt) -> Int32 { x.value }
+
+// The copyability annotations are ignored: references are copied freely.
+public func copyNonCopyable(_ a: ImmortalNonCopyable, _ b: ImmortalWithDestroy,
+                            _ c: DerivedNonCopyable,
+                            _ d: ConditionallyCopyableInt) {
+  let a2 = a, a3 = a
+  let b2 = b, b3 = b
+  let c2 = c, c3 = c
+  let d2 = d, d3 = d
+  _ = (a2, a3, b2, b3, c2, c3, d2, d3)
+}
 
 // Records with a non-escapable foreign reference field are imported without
 // that field.
