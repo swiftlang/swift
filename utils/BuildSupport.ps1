@@ -40,6 +40,11 @@ function Get-DependencyManifest {
 
 ## Platforms.
 
+# Only the scripts that build for Android take an API level.
+if (-not (Get-Variable AndroidAPILevel -ErrorAction Ignore)) {
+  $AndroidAPILevel = 23
+}
+
 enum OS {
   Windows
   Android
@@ -384,6 +389,75 @@ function Write-TimingTrace([string] $Path) {
   Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
 
+# Writes the timing data for Import-TimingData.
+function Export-TimingData([string] $Path) {
+  function ConvertTo-TimingRecord([PSCustomObject] $Entry) {
+    [ordered]@{
+      Name = $Entry."Build Step"
+      Variant = $Entry.Variant
+      Platform = $Entry.Platform
+      Arch = $Entry.Arch
+      Start = $Entry.Start.Ticks
+      Elapsed = $Entry."Elapsed Time".Ticks
+      CPU = $Entry.CPU
+      Children = @(foreach ($Child in $Entry.Children) { ConvertTo-TimingRecord $Child })
+    }
+  }
+
+  $Steps = @(foreach ($Entry in $TimingData) {
+    if (-not $Entry.Parent) { ConvertTo-TimingRecord $Entry }
+  })
+  New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
+  $Json = ConvertTo-Json -Depth 100 -InputObject ([ordered]@{ Start = $BuildStartTime.Ticks; Steps = $Steps; Events = @($ExternalTraceEvents) })
+  [IO.File]::WriteAllText($Path, $Json)
+}
+
+# Adds the steps that a build script wrote with Export-TimingData under $Parent.
+function Import-TimingData([PSCustomObject] $Parent, [string] $Path) {
+  if (-not $Parent -or -not (Test-Path $Path)) { return }
+  $Data = [IO.File]::ReadAllText($Path) | ConvertFrom-Json
+  Remove-Item $Path
+  # The steps start relative to the start of the script.
+  $Offset = [TimeSpan]::FromTicks($Data.Start - $BuildStartTime.Ticks)
+
+  function Import-TimingRecord($Record, [PSCustomObject] $ParentEntry) {
+    $Entry = [PSCustomObject]@{
+      Arch = $Record.Arch
+      Platform = $Record.Platform
+      "Build Step" = $Record.Name
+      Variant = $Record.Variant
+      Start = $Offset + [TimeSpan]::FromTicks($Record.Start)
+      "Elapsed Time" = [TimeSpan]::FromTicks($Record.Elapsed)
+      CPU = $Record.CPU
+      Parent = $ParentEntry
+      Children = @()
+    }
+    $ParentEntry.Children += $Entry
+    $TimingData.Add($Entry)
+    foreach ($Child in $Record.Children) {
+      Import-TimingRecord $Child $Entry
+    }
+  }
+
+  foreach ($Record in $Data.Steps) {
+    Import-TimingRecord $Record $Parent
+  }
+
+  # The events of lit, also relative to the start of the script.
+  $OffsetUs = [long]($Offset.Ticks / 10)
+  foreach ($TraceEvent in @($Data.Events)) {
+    $ExternalTraceEvents.Add([ordered]@{
+      name = $TraceEvent.name
+      cat = $TraceEvent.cat
+      ph = $TraceEvent.ph
+      ts = $TraceEvent.ts + $OffsetUs
+      dur = $TraceEvent.dur
+      pid = $TraceEvent.pid
+      tid = $TraceEvent.tid
+    })
+  }
+}
+
 # lit makes the timestamps relative to the first test, so align each trace to end
 # when its file was written.
 function Import-LitTimeTraces([string] $Directory, [TimeSpan] $MinDuration = [TimeSpan]::FromSeconds(1)) {
@@ -434,6 +508,55 @@ function Invoke-WithLitTimeTraces([string] $Directory, [ScriptBlock] $ScriptBloc
     }
   } finally {
     Import-LitTimeTraces $Directory
+  }
+}
+
+# The scripts that run other build scripts make them write their timings to this
+# path instead of printing them, so that the summary and the timeline cover the
+# whole build.
+$TimingDataExportPath = $env:SWIFT_BUILD_TIMINGS_PATH
+Remove-Item env:SWIFT_BUILD_TIMINGS_PATH -ErrorAction Ignore
+
+# Prints the summary and writes the timeline of the build of a script, or
+# writes its timings for the script that runs it.
+function Write-BuildTimings([string] $Name) {
+  if ($TimingDataExportPath) {
+    if ($RecordTimings) {
+      Export-TimingData $TimingDataExportPath
+    }
+    return
+  }
+  if ($Summary) {
+    Write-Summary
+  }
+  if ($Trace) {
+    Write-TimingTrace "$BinaryCache\build-timings-$Name.json"
+  }
+}
+
+# Prints an error with its PowerShell and .NET stack traces.
+function Write-BuildError([System.Management.Automation.ErrorRecord] $ErrorRecord) {
+  function Write-ErrorLines($Text, $Indent = 0) {
+    $IndentString = " " * $Indent
+    $Text.Replace("`r", "") -split "`n" | ForEach-Object {
+      Write-Host "$IndentString$_" -ForegroundColor Red
+    }
+  }
+
+  Write-ErrorLines "Error: $ErrorRecord"
+  Write-ErrorLines $ErrorRecord.ScriptStackTrace -Indent 4
+
+  # Walk the .NET inner exception chain to print all messages and stack traces
+  $Exception = $ErrorRecord.Exception
+  $Indent = 2
+  while ($Exception -is [Exception]) {
+      Write-ErrorLines "From $($Exception.GetType().FullName): $($Exception.Message)" -Indent $Indent
+      if ($null -ne $Exception.StackTrace) {
+          # .NET exceptions stack traces are already indented by 3 spaces
+          Write-ErrorLines $Exception.StackTrace -Indent ($Indent + 1)
+      }
+      $Exception = $Exception.InnerException
+      $Indent += 2
   }
 }
 
@@ -1466,6 +1589,10 @@ function Import-DependencyManifest {
   }
 }
 
+if (Test-Path $DependencyManifestPath) {
+  Import-DependencyManifest
+}
+
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1958,14 +2085,22 @@ function Get-BuildScriptArguments([string] $Script, [Hashtable] $Parameters, [Ha
   }
 }
 
-# Runs one of the build scripts in its own process.
+# Runs one of the build scripts in its own process, with the timings of its
+# steps under this step.
 function Invoke-BuildScript([string] $Name, [string] $Script, [Hashtable] $Parameters, [Hashtable] $Overrides = @{}) {
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $Script $Arguments"
   Record-OperationTime $BuildPlatform $Name {
-    & $PowerShell -NoProfile -ExecutionPolicy RemoteSigned -File "$PSScriptRoot\$Script" @Arguments
-    if ($LastExitCode -ne 0) {
-      throw "$Script exited with code $LastExitCode"
+    $ScriptTimingDataPath = "$BinaryCache\BuildTimings\$Name.json"
+    Remove-Item $ScriptTimingDataPath -ErrorAction Ignore
+    Invoke-IsolatingEnvVars {
+      $env:SWIFT_BUILD_TIMINGS_PATH = $ScriptTimingDataPath
+      & $PowerShell -NoProfile -ExecutionPolicy RemoteSigned -File "$PSScriptRoot\$Script" @Arguments
+    }
+    $ExitCode = $LastExitCode
+    Import-TimingData $script:CurrentOperation $ScriptTimingDataPath
+    if ($ExitCode -ne 0) {
+      throw "$Script exited with code $ExitCode"
     }
   }
 }
