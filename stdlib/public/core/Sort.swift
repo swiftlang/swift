@@ -238,8 +238,9 @@ extension MutableCollection where Self: RandomAccessCollection {
   /// - Parameter areInIncreasingOrder: A predicate that returns `true` if its
   ///   first argument should be ordered before its second argument;
   ///   otherwise, `false`. If `areInIncreasingOrder` throws an error during
-  ///   the sort, the elements may be in a different order, but none will be
-  ///   lost.
+  ///   the sort, the elements may be in a different order, but the collection
+  ///   still contains exactly the same elements: none are lost, added, or
+  ///   duplicated.
   ///
   /// - Complexity: O(*n* log *n*), where *n* is the length of the collection.
   @inlinable
