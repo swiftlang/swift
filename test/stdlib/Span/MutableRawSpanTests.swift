@@ -496,11 +496,18 @@ suite.test("updateSubrange(_:moving:)")
   var span = MutableRawSpan(elements: a.mutableSpan)
   span.updateSubrange(2..<4, moving: &source)
   expectEqual(source.isEmpty, true)
+  expectEqual(span.load(fromByteOffset: 1, as: UInt8.self), 0)
+  expectEqual(span.load(fromByteOffset: 2, as: UInt8.self), 0xab)
+  expectEqual(span.load(fromByteOffset: 3, as: UInt8.self), 0xcd)
+  expectEqual(span.load(fromByteOffset: 4, as: UInt8.self), 0)
 
   source.append(0xef)
   source.append(0x01)
   span.updateSubrange(4..., moving: &source)
   expectEqual(source.isEmpty, true)
+  expectEqual(span.load(fromByteOffset: 3, as: UInt8.self), 0xcd)
+  expectEqual(span.load(fromByteOffset: 4, as: UInt8.self), 0xef)
+  expectEqual(span.load(fromByteOffset: 5, as: UInt8.self), 0x01)
 
   for i in 0..<6 {
     source.append(UInt8(10 + i))
