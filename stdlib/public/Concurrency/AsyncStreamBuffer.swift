@@ -249,7 +249,7 @@ extension AsyncStream {
 
     }
 
-    func next() async -> Element? {
+    nonisolated(nonsending) func next() async -> Element? {
       await withTaskCancellationHandler {
         unsafe await withUnsafeContinuation {
           unsafe next($0)
