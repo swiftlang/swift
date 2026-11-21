@@ -8,6 +8,7 @@
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 class NotConcurrent { } // expected-note 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
+// expected-swift5-note@-1 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
 // ----------------------------------------------------------------------
 // Sendable restriction on actor operations

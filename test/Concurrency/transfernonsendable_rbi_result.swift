@@ -157,3 +157,42 @@ func testGenericResults() async {
 func testInlineArray() {
   let _: InlineArray<_, UInt8> = [0]
 }
+
+// When the result is non-Sendable only because of a generic argument, the note
+// should point at the type that is missing a 'Sendable' conformance and not at
+// the generic type that wraps it.
+
+class NonSendableElement {} // expected-note 4{{class 'NonSendableElement' does not conform to the 'Sendable' protocol}}
+
+struct NonSendableStructElement { // expected-note {{consider making struct 'NonSendableStructElement' conform to the 'Sendable' protocol}}
+  var element = NonSendableElement()
+}
+
+actor WrappedResults<T> {
+  func optional() -> NonSendableElement? { nil }
+  func array() -> [NonSendableElement] { [] }
+  func dictionary() -> [String: NonSendableElement] { [:] }
+  func nested() -> [[NonSendableElement]?] { [] }
+  func optionalStruct() -> NonSendableStructElement? { nil }
+  func optionalFunction() -> (() -> Void)? { nil }
+  func genericArray() -> [T] { [] }
+}
+
+@MainActor
+func testWrappedResults<T>(_ a: WrappedResults<T>) async { // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  let _ = await a.optional()
+  // expected-error @-1 {{non-Sendable 'NonSendableElement?'-typed result can not be returned from actor-isolated instance method 'optional()' to main actor-isolated context}}
+  let _ = await a.array()
+  // expected-error @-1 {{non-Sendable '[NonSendableElement]'-typed result can not be returned from actor-isolated instance method 'array()' to main actor-isolated context}}
+  let _ = await a.dictionary()
+  // expected-error @-1 {{non-Sendable '[String : NonSendableElement]'-typed result can not be returned from actor-isolated instance method 'dictionary()' to main actor-isolated context}}
+  let _ = await a.nested()
+  // expected-error @-1 {{non-Sendable '[[NonSendableElement]?]'-typed result can not be returned from actor-isolated instance method 'nested()' to main actor-isolated context}}
+  let _ = await a.optionalStruct()
+  // expected-error @-1 {{non-Sendable 'NonSendableStructElement?'-typed result can not be returned from actor-isolated instance method 'optionalStruct()' to main actor-isolated context}}
+  let _ = await a.optionalFunction()
+  // expected-error @-1 {{non-Sendable '(() -> Void)?'-typed result can not be returned from actor-isolated instance method 'optionalFunction()' to main actor-isolated context}}
+  // expected-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  let _ = await a.genericArray()
+  // expected-error @-1 {{non-Sendable '[T]'-typed result can not be returned from actor-isolated instance method 'genericArray()' to main actor-isolated context}}
+}
