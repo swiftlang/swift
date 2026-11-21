@@ -31,15 +31,45 @@ enum class HiddenTypeLayoutOrigin {
   RecoveredHiddenType,
 };
 
+/// The hidden representation needed to preserve an ABI-contributing type.
+enum class HiddenTypeRepresentationKind {
+  /// The hidden declaration's identity is needed to resolve a type expression,
+  /// but its layout does not contribute to the enclosing type's layout. If the
+  /// type expression cannot be resolved, deserialization may drop the
+  /// declaration that uses it and produce an incorrect enclosing layout.
+  ///
+  /// For example, suppose `HiddenProtocol` and `HiddenValue` come from a
+  /// hidden dependency:
+  ///
+  /// \code
+  /// struct Storage<T: HiddenProtocol> {
+  ///   var value: Int
+  /// }
+  ///
+  /// public struct Wrapper {
+  ///   private var storage: Storage<HiddenValue>
+  /// }
+  /// \endcode
+  ///
+  /// The client must resolve the hidden references to preserve `storage`, but
+  /// their layouts do not contribute to `Storage` in this example.
+  Opaque,
+
+  /// The declaration's layout contributes to client-visible storage.
+  AbstractTypeLayout,
+};
+
 struct HiddenTypeLayoutRequirement {
   const Decl *LayoutDecl;
   Type HiddenType;
   HiddenTypeLayoutOrigin Origin;
+  HiddenTypeRepresentationKind Kind;
   NominalTypeDecl *ABIExposedType;
   ValueDecl *LayoutAffectingStorage;
 };
 
-/// Find hidden types that contribute to this module's client-visible ABI.
+/// Find hidden declarations needed to deserialize this module's
+/// client-visible ABI.
 void forEachRequiredHiddenTypeLayout(
     const ModuleDecl *module, ArrayRef<const FileUnit *> files,
     llvm::function_ref<void(const HiddenTypeLayoutRequirement &)> callback);
