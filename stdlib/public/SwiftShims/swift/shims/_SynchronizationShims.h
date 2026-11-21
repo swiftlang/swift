@@ -42,6 +42,24 @@ static inline __swift_uint32_t _swift_stdlib_wasilibc_use_busy_futex_get() {
 #include <linux/futex.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+#include "Visibility.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern SWIFT_RUNTIME_EXPORT_ATTRIBUTE __attribute__((weak))
+void (*_swift_tsan_acquire)(const void *);
+
+#ifdef __cplusplus
+}
+#endif
+
+static inline void _swift_stdlib_tsan_acquire(__swift_uintptr_t addr) {
+  if (SWIFT_UNLIKELY(_swift_tsan_acquire != NULL)) {
+    _swift_tsan_acquire((const void *)addr);
+  }
+}
 
 // Plain-futex wait: sleeps if *addr == expected. Returns 0 on success
 // (woken by FUTEX_WAKE) or the errno value (EAGAIN=11, EINTR=4 are the
