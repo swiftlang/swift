@@ -19,6 +19,9 @@ other:
   build artifacts for CI.
 - TestToolchain.ps1 runs the tests for supported projects.
 
+BuildMulti.ps1 takes the same parameters and runs the same scripts, some of them
+at the same time.
+
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
 been cloned.

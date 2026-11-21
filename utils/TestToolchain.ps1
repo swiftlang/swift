@@ -391,6 +391,9 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
     $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $env:PYTHONUTF8 = "1"
+    # lit writes the tests that failed to stdout and its warnings to stderr, which
+    # BuildMulti.ps1 logs to the same file, so they must not be buffered.
+    $env:PYTHONUNBUFFERED = "1"
     $CompilerCache = Get-ProjectBinaryCache $Platform Stage2Compilers
 
     if ($Build) {
@@ -563,7 +566,8 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
               # These runs exclude tests, which lit fails to write traces for.
               Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target
             } else {
-              # Each suite writes its traces to its own directory.
+              # The suites of a build tree can run at the same time, so each one
+              # writes its traces to its own directory.
               Invoke-WithLitTimeTraces "$CompilerCache\lit-time-traces\$Suite" {
                 Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target
               }

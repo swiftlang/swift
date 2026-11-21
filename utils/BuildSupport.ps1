@@ -315,9 +315,16 @@ function Write-Summary {
   $TrackedTime = [TimeSpan]::Zero
   $TrackedBusySeconds = 0
   $RootEntries = @($TimingData | Where-Object { -not $_.Parent })
-  foreach ($Entry in $RootEntries) {
-    $TrackedTime = $TrackedTime.Add($Entry."Elapsed Time")
-    $TrackedBusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
+  # The steps can run at the same time, so count the time during which any of
+  # them runs.
+  $TrackedEnd = [TimeSpan]::Zero
+  foreach ($Entry in ($RootEntries | Sort-Object Start)) {
+    $End = $Entry.Start + $Entry."Elapsed Time"
+    if ($End -le $TrackedEnd) { continue }
+    $Start = if ($Entry.Start -gt $TrackedEnd) { $Entry.Start } else { $TrackedEnd }
+    $TrackedTime = $TrackedTime.Add($End - $Start)
+    $TrackedBusySeconds += $Entry.CPU * ($End - $Start).TotalSeconds
+    $TrackedEnd = $End
   }
 
   # Account for the time spent outside of any recorded build step.
