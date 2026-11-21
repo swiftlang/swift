@@ -8,6 +8,8 @@
 #define LIBKERN_RETURNS_NOT_RETAINED __attribute__((os_returns_not_retained))
 #define LIBKERN_CONSUMED __attribute__((os_consumed))
 #define LIBKERN_CONSUMES_THIS __attribute__((os_consumes_this))
+#define LIBKERN_OWNERSHIP_CONVENTION                                           \
+  __attribute__((swift_attr("libkern_ownership_convention")))
 
 class ObjectManager {
   mutable int totalRetains = 0;
@@ -34,12 +36,12 @@ class ObjectManager {
   }
 } SWIFT_IMMORTAL_REFERENCE;
 
-class OSObject {
+class OSMetaClassBase {
   mutable int retainCount;
   
 protected:
-  OSObject() : retainCount(1) {}
-  virtual ~OSObject() = default;
+  OSMetaClassBase() : retainCount(1) {}
+  virtual ~OSMetaClassBase() = default;
 
 public:
   virtual void retain() const { 
@@ -53,9 +55,9 @@ public:
   }
 
   virtual int getRetainCount() const { return retainCount; }
-} SWIFT_SHARED_REFERENCE(.retain, .release);
+} SWIFT_SHARED_REFERENCE(.retain, .release) LIBKERN_OWNERSHIP_CONVENTION;
 
-class RegistryEntry : public OSObject {
+class RegistryEntry : public OSMetaClassBase {
   RegistryEntry *parent = nullptr;
   RegistryEntry *child = nullptr;
 
@@ -223,7 +225,7 @@ class NonOSService {
   NonOSService(int n) : id(n) {}
 
 public:
-  // Swift infers +0, and this is not a subclass of OSObject, so libkern's
+  // Swift infers +0, and this is not a subclass of OSMetaClassBase, so libkern's
   // ownership rules don't apply.
   static NonOSService *_Nonnull noAnnotationWithID(int id) {
     return new NonOSService(id);
@@ -243,18 +245,17 @@ public:
 
 } SWIFT_SHARED_REFERENCE(.retain, .release);
 
-class OSIterator : public OSObject {
+class OSIterator : public OSMetaClassBase {
 public:
-  // According to libkern's ownership conventions, methods that start with "get"
-  // return +0 by default. However, if such a method returns OSIterator or one of
-  // its subclasses, then it still returns +1.
-  static OSIterator *_Nonnull getIterator() { return new OSIterator(); }
+  static LIBKERN_RETURNS_RETAINED OSIterator *_Nonnull getIterator() {
+    return new OSIterator();
+  }
 };
 
 class OSCollectionIterator : public OSIterator {
 public:
-  // The iterator exception applies to subclasses of OSIterator too.
-  static OSCollectionIterator *_Nonnull getCollectionIterator() {
+  static LIBKERN_RETURNS_RETAINED OSCollectionIterator
+      *_Nonnull getCollectionIterator() {
     return new OSCollectionIterator();
   }
 };
