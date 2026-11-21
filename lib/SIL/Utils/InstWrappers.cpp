@@ -50,6 +50,7 @@ bool ForwardingOperation::hasSameRepresentation() const {
   case SILInstructionKind::OpenCOMExistentialInst:
   case SILInstructionKind::OpenExistentialValueInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
+  case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
   case SILInstructionKind::MarkUninitializedInst:
   case SILInstructionKind::StructExtractInst:

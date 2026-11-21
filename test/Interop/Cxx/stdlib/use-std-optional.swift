@@ -103,4 +103,101 @@ StdOptionalTestSuite.test("std::optional of move-only std::vector") {
   expectEqual(987, optVectorNonCopyable.pointee[1].value)
 }
 
+func hasValueGeneric<O: CxxOptional & ~Copyable>(_ opt: borrowing O) -> Bool
+where O.Wrapped: ~Copyable {
+  return opt.hasValue
+}
+
+func pointeeValueGeneric<O: CxxOptional<MoveOnlyCounted> & ~Copyable>(
+  _ opt: borrowing O
+) -> Int32 {
+  return opt.pointee.value
+}
+
+func makeGeneric<O: CxxOptional<MoveOnlyCounted> & ~Copyable>(
+  _: O.Type, _ value: consuming MoveOnlyCounted
+) -> O {
+  return O(value)
+}
+
+func makeNilGeneric<O: CxxOptional & ~Copyable>(_: O.Type) -> O
+where O.Wrapped: ~Copyable {
+  return nil
+}
+
+StdOptionalTestSuite.test("std::optional of move-only type") {
+  do {
+    let opt = getNonNilOptionalHasDeletedCopyCtor()
+    expectTrue(opt.hasValue)
+    expectEqual(654, opt.pointee.value)
+
+    let opt2 = StdOptionalHasDeletedCopyCtor(HasDeletedCopyCtor(321))
+    expectTrue(opt2.hasValue)
+    expectEqual(321, opt2.pointee.value)
+
+    let nilOpt: StdOptionalHasDeletedCopyCtor = nil
+    expectFalse(nilOpt.hasValue)
+
+    expectFalse(takesOptionalHasDeletedCopyCtor(nil))
+    expectTrue(takesOptionalHasDeletedCopyCtor(
+      StdOptionalHasDeletedCopyCtor(HasDeletedCopyCtor(1))))
+  }
+
+  do {
+    let opt = StdOptionalMoveOnlyVector(makeMoveOnlyVector())
+    expectTrue(opt.hasValue)
+    expectEqual(2, opt.pointee.size())
+    expectEqual(111, opt.pointee[0].value)
+    expectEqual(222, opt.pointee[1].value)
+  }
+
+  do {
+    let opt = StdOptionalAnnotatedNonCopyable(AnnotatedNonCopyable(5))
+    expectTrue(hasValueGeneric(opt))
+    expectEqual(5, opt.pointee.value)
+  }
+
+  do {
+    let opt = StdOptionalOptionalHasDeletedCopyCtor(
+      StdOptionalHasDeletedCopyCtor(HasDeletedCopyCtor(77)))
+    expectTrue(opt.hasValue)
+    expectTrue(opt.pointee.hasValue)
+    expectEqual(77, opt.pointee.pointee.value)
+
+    let innerNil: StdOptionalHasDeletedCopyCtor = nil
+    let outerOfNil = StdOptionalOptionalHasDeletedCopyCtor(innerNil)
+    expectTrue(outerOfNil.hasValue)
+    expectFalse(outerOfNil.pointee.hasValue)
+  }
+
+  do {
+    let opt = getNonNilOptionalMoveOnlyCounted()
+    expectEqual(1, getMoveOnlyCountedAlive())
+    expectTrue(hasValueGeneric(opt))
+    expectEqual(42, pointeeValueGeneric(opt))
+  }
+  expectEqual(0, getMoveOnlyCountedAlive())
+
+  do {
+    var opt = StdOptionalMoveOnlyCounted(MoveOnlyCounted(7))
+    expectEqual(1, getMoveOnlyCountedAlive())
+    expectEqual(7, opt.pointee.value)
+    opt = nil
+    expectEqual(0, getMoveOnlyCountedAlive())
+    expectFalse(opt.hasValue)
+  }
+  expectEqual(0, getMoveOnlyCountedAlive())
+
+  do {
+    let opt = makeGeneric(StdOptionalMoveOnlyCounted.self, MoveOnlyCounted(9))
+    expectEqual(1, getMoveOnlyCountedAlive())
+    expectTrue(hasValueGeneric(opt))
+    expectEqual(9, pointeeValueGeneric(opt))
+
+    let nilOpt = makeNilGeneric(StdOptionalMoveOnlyCounted.self)
+    expectFalse(hasValueGeneric(nilOpt))
+  }
+  expectEqual(0, getMoveOnlyCountedAlive())
+}
+
 runAllTests()

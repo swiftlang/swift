@@ -28,6 +28,41 @@ using StdOptionalHasDeletedCopyCtor = std::optional<HasDeletedCopyCtor>;
 using StdOptionalMoveOnlyVector =
     std::optional<std::vector<HasDeletedCopyCtor>>;
 
+struct MoveOnlyCounted {
+  static inline int alive = 0;
+  int value;
+  MoveOnlyCounted(int value) : value(value) { ++alive; }
+  MoveOnlyCounted(const MoveOnlyCounted &other) = delete;
+  MoveOnlyCounted(MoveOnlyCounted &&other) : value(other.value) {
+    other.value = -1;
+    ++alive;
+  }
+  ~MoveOnlyCounted() { --alive; }
+};
+using StdOptionalMoveOnlyCounted = std::optional<MoveOnlyCounted>;
+
+inline StdOptionalMoveOnlyCounted getNonNilOptionalMoveOnlyCounted() {
+  return StdOptionalMoveOnlyCounted(MoveOnlyCounted(42));
+}
+inline int getMoveOnlyCountedAlive() { return MoveOnlyCounted::alive; }
+
+// Copyable in C++, but imported as non-copyable.
+struct __attribute__((swift_attr("~Copyable"))) AnnotatedNonCopyable {
+  int value;
+  AnnotatedNonCopyable(int value) : value(value) {}
+};
+using StdOptionalAnnotatedNonCopyable = std::optional<AnnotatedNonCopyable>;
+
+using StdOptionalOptionalHasDeletedCopyCtor =
+    std::optional<std::optional<HasDeletedCopyCtor>>;
+
+inline std::vector<HasDeletedCopyCtor> makeMoveOnlyVector() {
+  std::vector<HasDeletedCopyCtor> vec;
+  vec.emplace_back(111);
+  vec.emplace_back(222);
+  return vec;
+}
+
 struct HasDeletedMoveCtor {
   int value;
   HasDeletedMoveCtor(int value) : value(value) {}

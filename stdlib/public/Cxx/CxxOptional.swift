@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral, ~Escapable {
-  associatedtype Wrapped: ~Escapable
+public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral, ~Copyable, ~Escapable {
+  associatedtype Wrapped: ~Copyable, ~Escapable
 
   @_lifetime(immortal)
   init()
 
   @_lifetime(copy value)
-  init(_ value: Wrapped)
+  init(_ value: consuming Wrapped)
 
   func __convertToBool() -> Bool
 
@@ -27,7 +27,7 @@ public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral, ~Escapable {
   }
 }
 
-extension CxxOptional where Self: ~Escapable, Wrapped: ~Escapable {
+extension CxxOptional where Self: ~Copyable & ~Escapable, Wrapped: ~Copyable & ~Escapable {
   @_lifetime(immortal)
   public init(nilLiteral: ()) {
     self.init()
@@ -39,7 +39,10 @@ extension CxxOptional where Self: ~Escapable, Wrapped: ~Escapable {
       return __convertToBool()
     }
   }
+}
 
+extension CxxOptional
+where Self: ~Copyable & ~Escapable, Wrapped: Copyable & ~Escapable {
   @inlinable
   public var value: Wrapped? {
     @_lifetime(copy self)
@@ -60,11 +63,12 @@ extension CxxOptional where Self: ~Escapable, Wrapped: ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Escapable {
+extension Optional where Wrapped: Copyable & ~Escapable {
   @inlinable
   @_lifetime(copy value)
-  public init<O: CxxOptional<Wrapped> & ~Escapable>(fromCxx value: borrowing O)
-  where O.Wrapped: ~Escapable {
+  public init<O: CxxOptional<Wrapped> & ~Copyable & ~Escapable>(
+    fromCxx value: borrowing O
+  ) where O.Wrapped: ~Escapable {
     self = value.value
   }
 }
