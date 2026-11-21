@@ -24,8 +24,7 @@ actor Counter {
     value += 1
   }
 
-  // The runtime calls the executor's _swift_concurrency_isMainExecutor before
-  // running this deinit.
+  // The runtime calls swift_task_isMainExecutor before running this deinit.
   isolated deinit {
     print("isolated deinit, value \(value)")
   }

@@ -6,6 +6,7 @@
 // REQUIRES: swift_feature_Embedded
 
 // NOT-IMPORTED: error: cannot find '_swift_job_run_c' in scope
+// NOT-IMPORTED: error: cannot find '_swift_task_getMainExecutor_c' in scope
 
 import SwiftPlatform
 
@@ -35,6 +36,11 @@ func executorHelpers(_ executor: SwiftExecutorRef) -> Bool {
     && swift_executor_getKind(ordinary) == .ordinary
     && swift_executor_hasWitnessTable(ordinary)
     && !swift_executor_isDefaultActor(ordinary)
+    && !swift_executor_isGeneric(ordinary)
+}
+
+func mainExecutor() -> SwiftExecutorRef {
+  swift_executor_main()
 }
 
 func priorityRank(_ priority: SwiftJobPriority) -> Int {
@@ -56,6 +62,7 @@ func isReserved(_ kind: SwiftJobKind) -> Bool {
 #if NOT_IMPORTED
 func runJob(_ job: UnsafeMutablePointer<SwiftJob>) {
   _swift_job_run_c(job, swift_executor_generic())
+  _ = _swift_task_getMainExecutor_c()
 }
 #endif
 
@@ -71,14 +78,9 @@ func enqueueMainExecutor(_ job: UnsafeMutablePointer<SwiftJob>) {
   queue = job
 }
 
-@c(_swift_concurrency_getMainExecutor)
-func getMainExecutor() -> SwiftExecutorRef {
-  swift_executor_generic()
-}
-
-@c(_swift_concurrency_isMainExecutor)
-func isMainExecutor(_ executor: SwiftExecutorRef) -> Bool {
-  swift_executor_isGeneric(executor) || executorHelpers(executor)
+@c(_swift_concurrency_mainExecutorIsGlobal)
+func mainExecutorIsGlobal() -> Int {
+  1
 }
 
 @c(_swift_concurrency_asyncMain)

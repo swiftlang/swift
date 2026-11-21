@@ -54,23 +54,17 @@ void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
   swift_task_enqueueGlobalImpl(job);
 }
 
-extern "C" __attribute__((weak))
-void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
+extern "C"
+void swift_task_enqueueMainExecutorDefault(SwiftJob *job) {
   swift_task_enqueueMainExecutorImpl(job);
 }
 
-extern "C" __attribute__((weak))
-SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
-  return swift_task_getMainExecutorImpl();
-}
+extern "C" __attribute__((weak, alias("swift_task_enqueueMainExecutorDefault")))
+void _swift_concurrency_enqueueMainExecutor(SwiftJob *job);
 
-extern "C" __attribute__((weak))
-bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
-  // In the embedded cooperative executor model the main executor is the generic
-  // executor, as in CooperativeGlobalExecutor.cpp. Custom SerialExecutor
-  // witness tables and the _swift_task_isMainExecutorSwift bridge are
-  // unavailable in embedded mode.
-  return swift_executor_isGeneric(executor);
+extern "C" SWIFT_CC(swift) bool swift_task_isMainEnqueueReplaced(void) {
+  return &_swift_concurrency_enqueueMainExecutor !=
+         &swift_task_enqueueMainExecutorDefault;
 }
 
 extern "C" __attribute__((weak))

@@ -2850,12 +2850,10 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
     return swift_defaultActor_enqueue(job, serialExecutorRef.getDefaultActor());
   }
 
-#if SWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS
+#if SWIFT_CONCURRENCY_EMBEDDED
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
   auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
   _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorWtable);
-#elif SWIFT_CONCURRENCY_EMBEDDED
-  swift_unreachable("custom executors not supported in embedded Swift");
 #else
   // For main actor or actors with custom executors
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
