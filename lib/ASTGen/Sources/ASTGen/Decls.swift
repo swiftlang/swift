@@ -131,14 +131,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.asNominalTypeDecl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.asNominalTypeDecl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -165,14 +160,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -200,14 +190,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -235,14 +220,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -272,14 +252,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -327,14 +302,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -468,8 +438,8 @@ extension ASTGenVisitor {
     accessor.remapLegacyCoroutineAccessorIfEnabled()
     accessor.asDecl.attachParsedAttrs(attrs)
     if let body = node.body {
-      self.withDeclContext(accessor.asDeclContext) {
-        accessor.setParsedBody(self.generate(codeBlock: body))
+      self.attachBody(body, to: accessor.asDecl, declContext: accessor.asDeclContext) {
+        accessor.setParsedBody($0)
       }
     }
     return accessor
@@ -506,15 +476,8 @@ extension ASTGenVisitor {
         throwsSpecifierLoc: nil,
         thrownType: nil
       )
-      self.withDeclContext(accessor.asDeclContext) {
-        let brace = BridgedBraceStmt.createParsed(
-          self.ctx,
-          lBraceLoc: leftBrace,
-          elements: self.generate(codeBlockItemList: codeBlock).lazy.bridgedArray(in: self),
-          rBraceLoc: rightBrace
-        )
-        accessor.setParsedBody(brace)
-      }
+      self.attachImplicitGetterBody(
+        accessorBlock, items: codeBlock, leftBrace: leftBrace, rightBrace: rightBrace, to: accessor)
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
         accessors: CollectionOfOne(accessor).bridgedArray(in: self),
@@ -796,8 +759,8 @@ extension ASTGenVisitor {
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+        decl.setParsedBody($0)
       }
     }
 
@@ -838,8 +801,8 @@ extension ASTGenVisitor {
     }
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+        decl.setParsedBody($0)
       }
     }
 
@@ -857,8 +820,8 @@ extension ASTGenVisitor {
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+        decl.setParsedBody($0)
       }
     }
 

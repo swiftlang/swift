@@ -1,5 +1,9 @@
 // REQUIRES: swift_swift_parser
 
+// ASTGen needs the syntax tree of every file it builds the AST for, so the
+// secondary file is always parsed.
+// UNSUPPORTED: parser_astgen
+
 // This test ensures that we only attempt to parse the syntax tree of a
 // secondary file if the primary file needs it.
 
