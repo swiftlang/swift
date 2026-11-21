@@ -1,7 +1,7 @@
 # Supporting Types
 
-Use wrappers, indices, and iterators in operations like slicing, flattening, and
-reversing a collection.
+Use wrappers, indices, and iterators for operations like slicing, flattening, and
+reversing collections.
 
 ## Topics
 
@@ -29,8 +29,8 @@ reversing a collection.
 
 ### Lazy Wrappers
 
-Use these lazy wrappers to defer any filtering or transformation of collection elements
-until elements are accessed.
+Use lazy wrappers to defer filtering or transformation of collection elements
+until the elements are accessed.
 
 - ``Swift/LazySequence``
 - ``Swift/LazyMapSequence``
@@ -69,8 +69,8 @@ instead of copying the collection's contents.
 
 ### Indices and Iterators
 
-Index and iterator types for other sequence and collection types in the standard
-library.
+Use index and iterator types with other sequence and collection types in the
+standard library.
 
 - ``Swift/IteratorSequence``
 - ``Swift/IndexingIterator``
