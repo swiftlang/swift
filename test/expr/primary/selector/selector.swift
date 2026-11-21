@@ -25,6 +25,7 @@ class C1 {
     let testUnqualifiedSelector = 1
     _ = #selector(testUnqualifiedSelector(_:b:))
     _ = testUnqualifiedSelector // suppress unused warning
+    _ = #selector(getC1()) // expected-error{{argument of '#selector' does not refer to an '@objc' method, property, or initializer}} expected-note{{remove the parentheses to reference the method}}{{24-26=}}
   }
 
   @objc func testParam(_ testParam: A) { // expected-note{{'testParam' declared here}}
