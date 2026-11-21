@@ -2001,9 +2001,16 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
       init = awaitExpr->getSubExpr();
     if (auto tryExpr = dyn_cast<TryExpr>(init))
       init = tryExpr->getSubExpr();
-    init = cast<CallExpr>(init)->getFn();
+    auto *initCall = cast<CallExpr>(init);
+    init = initCall->getFn();
     auto initClosure = cast<AutoClosureExpr>(init);
-    bool isThrowing = init->getType()->castTo<AnyFunctionType>()->isThrowing();
+    std::optional<CanType> thrownErrorType;
+
+    // Record the lowered type of the child task's inferred error.
+    if (auto errorType = initCall->throws().getThrownErrorType()) {
+      thrownErrorType =
+          getLoweredRValueType(AbstractionPattern::getOpaque(), errorType);
+    }
 
     // Allocate space to receive the child task's result.
     auto initLoweredTy = getLoweredType(AbstractionPattern::getOpaque(),
@@ -2039,7 +2046,7 @@ void SILGenFunction::emitPatternBinding(PatternBindingDecl *PBD, unsigned idx,
     enterAsyncLetCleanup(alet, resultBufPtr);
 
     // Save the child task so we can await it as needed.
-    AsyncLetChildTasks[{PBD, idx}] = {alet, resultBufPtr, isThrowing};
+    AsyncLetChildTasks[{PBD, idx}] = {alet, resultBufPtr, thrownErrorType};
     return;
   }
 
