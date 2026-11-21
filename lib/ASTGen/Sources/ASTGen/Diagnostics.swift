@@ -116,13 +116,6 @@ extension ASTGenDiagnostic {
     )
   }
 
-  static func nonTrivialPatternForAccessor(_ pattern: some SyntaxProtocol) -> Self {
-    Self(
-      node: pattern,
-      message: "getter/setter can only be defined for a single variable"
-    )
-  }
-
   static func unknownAccessorSpecifier(_ specifier: TokenSyntax) -> Self {
     Self(
       node: specifier,
@@ -133,20 +126,6 @@ extension ASTGenDiagnostic {
 
 /// Decl diagnostics
 extension ASTGenDiagnostic {
-  static func illegalTopLevelStmt(_ stmt: some SyntaxProtocol) -> Self {
-    Self(
-      node: stmt,
-      message: "statements are not allowed at the top level"
-    )
-  }
-
-  static func illegalTopLevelExpr(_ expr: some SyntaxProtocol) -> Self {
-    Self(
-      node: expr,
-      message: "expressions are not allowed at the top level"
-    )
-  }
-
   static func invalidFileDefaultSpecifier(_ specifier: some SyntaxProtocol) -> Self {
     Self(
       node: specifier,
@@ -157,14 +136,6 @@ extension ASTGenDiagnostic {
 
 /// DeclAttributes diagnostics
 extension ASTGenDiagnostic {
-  static func expectedArgumentsInAttribute(_ attribute: AttributeSyntax) -> Self {
-    // FIXME: The diagnostic position should be at the and of the attribute name.
-    Self(
-      node: attribute,
-      message: "expected arguments for '\(attribute.attributeName.trimmedDescription)' attribute"
-    )
-  }
-
   static func extraneousArgumentsInAttribute(_ attribute: AttributeSyntax, _ extra: some SyntaxProtocol) -> Self {
     Self(
       node: extra,
