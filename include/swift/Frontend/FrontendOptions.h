@@ -280,6 +280,10 @@ public:
   /// entity.
   bool ProfileEntities = false;
 
+  /// Collect only the statistics that measure incremental build performance,
+  /// as IncrementalBuildStatistics.def lists them, in StatsOutputDir.
+  bool IncrementalBuildStats = false;
+
   /// Indicates whether or not an import statement can pick up a Swift source
   /// file (as opposed to a module file).
   bool EnableSourceImport = false;

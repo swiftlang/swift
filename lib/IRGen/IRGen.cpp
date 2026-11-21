@@ -924,7 +924,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine, FS,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
-  if (Stats) {
+  if (Stats && Stats->isCollectingSubsystem("IRModule")) {
     if (DiagMutex)
       DiagMutex->lock();
     countStatsPostIRGen(*Stats, *Module);
@@ -1651,7 +1651,8 @@ GeneratedModule IRGenRequest::evaluate(Evaluator &evaluator,
   (void)layoutStringsEnabled(IGM, /*diagnose*/ true);
 
   {
-    FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
+    FrontendStatsTracer tracer(Ctx.Stats, "IRGen",
+                               /*IsIncrementalBuildEvent=*/true);
 
     // Emit the module contents.
     irgen.emitGlobalTopLevel(desc.getLinkerDirectives());
@@ -1930,7 +1931,8 @@ static void performParallelIRGeneration(IRGenDescriptor desc) {
   }
 
   {
-    FrontendStatsTracer tracer(Ctx.Stats, "IRGen");
+    FrontendStatsTracer tracer(Ctx.Stats, "IRGen",
+                               /*IsIncrementalBuildEvent=*/true);
 
     // Emit the module contents.
     irgen.emitGlobalTopLevel(desc.getLinkerDirectives());

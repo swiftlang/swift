@@ -146,7 +146,8 @@ void swift::serialize(
       getContext(DC).Diags, getContext(DC).getOutputBackend(),
       options.OutputPath, [&](raw_ostream &out) {
         FrontendStatsTracer tracer(getContext(DC).Stats,
-                                   "Serialization, swiftmodule");
+                                   "Serialization, swiftmodule",
+                                   /*IsIncrementalBuildEvent=*/true);
         serialization::writeToStream(out, DC, M, options, DG);
         return false;
       });
@@ -158,7 +159,8 @@ void swift::serialize(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.DocOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,
-                                     "Serialization, swiftdoc");
+                                     "Serialization, swiftdoc",
+                                     /*IsIncrementalBuildEvent=*/true);
           serialization::writeDocToStream(out, DC, options.GroupInfoPath);
           return false;
         });
@@ -169,7 +171,8 @@ void swift::serialize(
         getContext(DC).Diags, getContext(DC).getOutputBackend(),
         options.SourceInfoOutputPath, [&](raw_ostream &out) {
           FrontendStatsTracer tracer(getContext(DC).Stats,
-                                     "Serialization, swiftsourceinfo");
+                                     "Serialization, swiftsourceinfo",
+                                     /*IsIncrementalBuildEvent=*/true);
           serialization::writeSourceInfoToStream(out, DC, options);
           return false;
         });
