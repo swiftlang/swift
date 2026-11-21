@@ -80,13 +80,7 @@ static Type resugar(CanType Lowered, Type Sugared) {
   }
 
   // The outermost type was changed, or it mentions generic parameters, but its
-  // components may be unchanged. It is only rebuilt if one of them is sugared.
-  bool Changed = false;
-  auto resugarPart = [&](CanType LoweredPart, Type SugaredPart) {
-    Type Part = resugar(LoweredPart, SugaredPart);
-    Changed |= Part.getPointer() != LoweredPart.getPointer();
-    return Part;
-  };
+  // components may be unchanged.
   ASTContext &Ctx = Lowered->getASTContext();
 
   if (auto LoweredTuple = dyn_cast<TupleType>(Lowered)) {
@@ -110,24 +104,22 @@ static Type resugar(CanType Lowered, Type Sugared) {
     SmallVector<TupleTypeElt, 4> Elts(LoweredTuple->getElements());
     auto resugarElt = [&](unsigned LoweredIdx, unsigned SugaredIdx) {
       Elts[LoweredIdx] = Elts[LoweredIdx].getWithType(
-          resugarPart(LoweredTuple.getElementType(LoweredIdx),
-                      SugaredTuple->getElementType(SugaredIdx)));
+          resugar(LoweredTuple.getElementType(LoweredIdx),
+                  SugaredTuple->getElementType(SugaredIdx)));
     };
     for (unsigned I = 0; I != Prefix; ++I)
       resugarElt(I, I);
     for (unsigned I = 1; I <= Suffix; ++I)
       resugarElt(NumLowered - I, NumSugared - I);
-    return Changed ? TupleType::get(Elts, Ctx) : Type(Lowered);
+    return TupleType::get(Elts, Ctx);
   }
 
   if (auto LoweredMeta = dyn_cast<AnyMetatypeType>(Lowered)) {
     auto *SugaredMeta = dyn_cast<AnyMetatypeType>(Sugared.getPointer());
     if (!SugaredMeta || SugaredMeta->getKind() != LoweredMeta->getKind())
       return Lowered;
-    Type Instance = resugarPart(LoweredMeta.getInstanceType(),
-                                SugaredMeta->getInstanceType());
-    if (!Changed)
-      return Lowered;
+    Type Instance =
+        resugar(LoweredMeta.getInstanceType(), SugaredMeta->getInstanceType());
     std::optional<MetatypeRepresentation> Repr;
     if (LoweredMeta->hasRepresentation())
       Repr = LoweredMeta->getRepresentation();
@@ -147,13 +139,11 @@ static Type resugar(CanType Lowered, Type Sugared) {
       return Lowered;
     Type Parent;
     if (auto LoweredParent = LoweredNominal.getParent())
-      Parent = resugarPart(LoweredParent, SugaredNominal->getParent());
+      Parent = resugar(LoweredParent, SugaredNominal->getParent());
     SmallVector<Type, 2> Args;
     for (auto [LoweredArg, SugaredArg] : llvm::zip_equal(
              LoweredNominal.getGenericArgs(), SugaredNominal->getGenericArgs()))
-      Args.push_back(resugarPart(LoweredArg, SugaredArg));
-    if (!Changed)
-      return Lowered;
+      Args.push_back(resugar(LoweredArg, SugaredArg));
     return NominalType::get(LoweredNominal->getDecl(), Parent, Args, Ctx,
                             LoweredNominal->getScopeArgs());
   }
@@ -163,10 +153,8 @@ static Type resugar(CanType Lowered, Type Sugared) {
     if (!SugaredStorage ||
         SugaredStorage->getKind() != LoweredStorage->getKind())
       return Lowered;
-    Type Referent = resugarPart(LoweredStorage.getReferentType(),
-                                SugaredStorage->getReferentType());
-    if (!Changed)
-      return Lowered;
+    Type Referent = resugar(LoweredStorage.getReferentType(),
+                            SugaredStorage->getReferentType());
     return ReferenceStorageType::get(Referent, LoweredStorage->getOwnership(),
                                      Ctx);
   }
@@ -180,11 +168,9 @@ static Type resugar(CanType Lowered, Type Sugared) {
     SmallVector<AnyFunctionType::Param, 4> Params;
     for (auto [LoweredParam, SugaredParam] :
          llvm::zip_equal(LoweredFn.getParams(), SugaredFn->getParams()))
-      Params.push_back(LoweredParam.withType(resugarPart(
-          LoweredParam.getPlainType(), SugaredParam.getPlainType())));
-    Type Result = resugarPart(LoweredFn.getResult(), SugaredFn->getResult());
-    if (!Changed)
-      return Lowered;
+      Params.push_back(LoweredParam.withType(
+          resugar(LoweredParam.getPlainType(), SugaredParam.getPlainType())));
+    Type Result = resugar(LoweredFn.getResult(), SugaredFn->getResult());
     return FunctionType::get(Params, LoweredFn->getYields(), Result,
                              LoweredFn->getExtInfo());
   }
