@@ -2981,16 +2981,6 @@ bool swift::diagnoseMissingOwnership(ParamSpecifier ownership,
   auto loc = repr->getLoc();
   repr->setInvalid();
 
-  // Without SubscriptParametersWithOwnership there is no ownership specifier
-  // to suggest for a subscript parameter, so say that the type simply cannot
-  // be used here.
-  if (options.hasBase(TypeResolverContext::SubscriptDecl) &&
-      !resolution.getASTContext().LangOpts.hasFeature(
-          Feature::SubscriptParametersWithOwnership)) {
-    diags.diagnose(loc, diag::noncopyable_parameter_subscript_unsupported);
-    return true;
-  }
-
   diags.diagnose(loc, diag::noncopyable_parameter_requires_ownership, ty);
 
   diags.diagnose(loc, diag::noncopyable_parameter_ownership_suggestion,
@@ -6007,12 +5997,8 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
                                        TypeResolutionOptions options) {
   auto ownershipRepr = dyn_cast<OwnershipTypeRepr>(repr);
 
-  // Ownership is valid on function, initializer, yields, and subscript parameters,
-  // but not on enum case payloads. Subscript parameters are only allowed
-  // ownership under the SubscriptParametersWithOwnership feature.
-  bool ownershipOnSubscriptParams =
-      getASTContext().LangOpts.hasFeature(
-          Feature::SubscriptParametersWithOwnership);
+  // Ownership is valid on function, initializer, yields, and subscript
+  // parameters, but not on enum case payloads.
   bool isCoroutineInOutYield =
     (options.hasBase(TypeResolverContext::FunctionResult) || // decls
      options.is(TypeResolverContext::FunctionResult)) && // function types
@@ -6021,9 +6007,7 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
      ownershipRepr->getSpecifier() == ParamSpecifier::InOut);
   
   if (!(options.is(TypeResolverContext::FunctionInput) &&
-      !options.hasBase(TypeResolverContext::EnumElementDecl) &&
-      !(options.hasBase(TypeResolverContext::SubscriptDecl) &&
-        !ownershipOnSubscriptParams)) &&
+        !options.hasBase(TypeResolverContext::EnumElementDecl)) &&
       !isCoroutineInOutYield) {
     decltype(diag::attr_only_on_parameters) diagID;
     if (options.is(TypeResolverContext::VariadicFunctionInput)) {
