@@ -174,6 +174,7 @@ class CMake(object):
         define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
         define("CMAKE_AR:PATH", toolchain.ar)
         define("CMAKE_RANLIB:PATH", toolchain.ranlib)
+        define("CMAKE_Swift_COMPILATION_MODE", "$<IF:$<CONFIG:Debug>,incremental,wholemodule>")
 
         if args.clang_user_visible_version:
             major, minor, patch = \
