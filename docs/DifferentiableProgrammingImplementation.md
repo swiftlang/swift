@@ -124,7 +124,7 @@ The Swift compiler translates Swift source code into executable machine code. Be
 Here is a description of the main phases in compilation:[†](https://www.swift.org/swift-compiler/)
 - **Parsing**: The parser takes Swift source code and generates an abstract syntax tree (AST) without type information. Warnings and errors are produced for grammatical problems in source code.
 - **Type checking**: The type checker takes the parsed AST and transforms it into a fully type-checked form, performing type inference. Warnings and errors are produced for semantic problems in source code.
-- **SIL generation**: The Swift Intermediate Language (SIL) is a high-level intermediate language for Swift suitable for analysis and optimization. The SIL generation phase lowers the type-checked AST into ["raw" SIL](SIL.rst#silgen).
+- **SIL generation**: The Swift Intermediate Language (SIL) is a high-level intermediate language for Swift suitable for analysis and optimization. The SIL generation phase lowers the type-checked AST into ["raw" SIL](SIL/SIL.md#sil-in-the-swift-compiler).
 - **SIL mandatory passes**: The SIL mandatory passes perform analyses (diagnosing user errors) and lowering (down to canonical SIL).
 - **SIL optimizations passes**: The SIL optimization passes perform additional high-level optimizations to SIL.
 - **LLVM IR generation**: IR generation lowers SIL to LLVM IR. LLVM performs further optimizations and generates machine code.
@@ -139,7 +139,7 @@ Here is how differentiation fits into each of the stages of compilation:
     - `@differentiable` attributes are type-checked and verified.
     - `@differentiable` function types are type-checked: this includes conversions to and from normal function types. Conversion from a normal function to a differentiable function is represented as an explicit `DifferentiableFunctionExpr` expression.
 - **SIL generation**
-    - `@differentiable` AST declaration attributes are lowered to [SIL differentiability witnesses](SIL.rst#differentiability-witnesses).
+    - `@differentiable` AST declaration attributes are lowered to [SIL differentiability witnesses](SIL/SIL.md#differentiability-witnesses).
     - `DifferentiableFunctionExpr` function conversion expressions are lowered to the `differentiable_function` SIL instruction.
 - **SIL mandatory passes**
     - The differentiation transform is a SIL mandatory pass that implements [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation).
@@ -586,7 +586,7 @@ So now, this differential struct is a nested data structure, which consists of a
 
 Another additional transformation that is done in the JVP is the creation of trampoline blocks. These are basic blocks which deal with handling the transition from one basic block to another, specifically regarding the differential structs. For a concrete example, we would roughly have the following SIL code for the control flow function above:
 
-> NOTE: The SIL code below is simplified in both naming and how each instruction looks like. For more information regarding how each instruction looks like in actual code, refer to [SIL.rst](SIL.rst).
+> NOTE: The SIL code below is simplified in both naming and how each instruction looks like. For more information regarding how each instruction looks like in actual code, refer to [SIL.md](SIL/SIL.md).
 
 ```swift
 func m(_ x: Float) -> Float {
@@ -784,7 +784,7 @@ Multiple basic blocks and control flow basic block terminators (`cond_br`, `swit
 
 > TODO: **Explain the control flow differentiation approach.** The approach is novel and highly worth documenting. [See "Control Flow Differentiation" slides](https://drive.google.com/corp/drive/folders/1y1FeJenXhoz_8xPw0ftVPngJUO_MdmRX) for an overview.
 
-- Original functions may have instructions other than `apply`. This includes the entire SIL [instruction set](SIL.rst#instruction-set):
+- Original functions may have instructions other than `apply`. This includes the entire SIL [instruction set](SIL/Instructions.md):
     - Memory-related operations: `alloc_stack`, `dealloc_stack`, `load`, `store`, etc.
     - Aggregate operations: `struct`, `tuple`, `enum`.
     - Projections: `struct_extract`, `tuple_extract`, `struct_element_addr`, `tuple_element_addr`.
@@ -807,7 +807,7 @@ In general, tangent transformation rules are simpler because the tangent transfo
 
 ### Modules and access levels
 
-Swift organizes code into [modules](Modules.rst). Modules enforce access controls on what code can be used outside of them.
+Swift organizes code into [modules](Modules.md). Modules enforce access controls on what code can be used outside of them.
 
 Differentiation is designed with modules and access levels in mind. `@differentiable` declaration attributes act like a "differentiability contract": declarations marked with the attribute can be differentiated from other modules. This is because the differentiation transform is guaranteed to fill in all SIL differentiability witnesses with derivatives functions. Conversely, declarations not marked with `@differentiable` cannot be differentiated from other modules because they do not have registered derivative functions and are essentially opaque (their bodies may not be exposed).
 
