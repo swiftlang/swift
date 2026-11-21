@@ -1366,7 +1366,11 @@ public:
           // condition, and allows us to compute the exit count correctly. We
           // don't need the fake `else` scope to be included in the resulting
           // set of regions, so we mark it scoping-only.
-          if (isa<BraceStmt>(Else)) {
+          // Implicit braces are skipped by the statement walker, so they also
+          // need a scoping-only region to keep their exit count independent.
+          bool HasExplicitElseBrace =
+              isa<BraceStmt>(Else) && !Else->isImplicit();
+          if (HasExplicitElseBrace) {
             assignCounter(Else, ElseCounter);
           } else {
             pushRegion(SourceMappingRegion::scopingOnly(Else, SM, ElseCounter));
@@ -1379,9 +1383,9 @@ public:
           // a proper scope. This is a little hacked together, but we'll be able
           // to do away with all of this once we re-implement as a SILOptimizer
           // pass.
-          auto AfterElse = isa<BraceStmt>(Else) ? getExitCounter()
-                                                : getCurrentCounter();
-          if (!isa<BraceStmt>(Else))
+          auto AfterElse =
+              HasExplicitElseBrace ? getExitCounter() : getCurrentCounter();
+          if (!HasExplicitElseBrace)
             popRegions(Else);
 
           ElseDelta = CounterExpr::Sub(ElseCounter, AfterElse, CounterBuilder);
