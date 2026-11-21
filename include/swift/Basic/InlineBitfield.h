@@ -59,40 +59,56 @@ namespace swift {
 #define SWIFT_INLINE_BITFIELD(T, U, C, ...) \
   SWIFT_INLINE_BITFIELD_TEMPLATE(T, U, C, 0, __VA_ARGS__)
 
-/// Define a full bitfield for type 'T' that uses all of the remaining bits in
-/// the inline bitfield.
+/// Define a bitfield for type 'T' that uses all of the remaining bits in
+/// the inline bitfield. The start of the bitfield is padded so that
+/// the requested bits are aligned at the end of the bitfield.
+/// This is useful when the bitfield has 8-, 16-, or 32-bit components
+/// that the compiler can probably generate better code for if they're
+/// allocated at addressable offsets. Such components should be placed
+/// at the end of the component list.
 ///
-/// For optimal code gen, place naturally sized fields at the end, with the
-/// largest naturally sized field at the very end. For example:
+/// For example:
 ///
 /// SWIFT_INLINE_BITFIELD_FULL(Foo, Bar, 1+8+16,
 ///   flag : 1,
-///   : NumPadBits, // pad the center, not the end
 ///   x : 8,
 ///   y : 16
 /// );
+///
+/// In theory, it might be slightly better to place 'flag' next to the
+/// bits from the base class, since the bits could theoretically be
+/// extracted together. However, in practice this is unlikely, and it
+/// requires users of this macro to manually place the padding bits,
+/// which breaks when the number of padding bits hits zero because
+/// a zero-width bit-field forces the bits to be allocated into
+/// distinct storage units. The source instability this causes is
+/// extremely inconvenient.
 #define SWIFT_INLINE_BITFIELD_FULL(T, U, C, ...) \
   LLVM_PACKED_START \
   class T##Bitfield { \
     friend class T; \
-    enum { NumPadBits = 64 - (NumberOf##U##Bits + (C)) }; \
-    uint64_t : NumberOf##U##Bits, __VA_ARGS__; \
+    uint64_t : 64 - (C), __VA_ARGS__; \
   } T; \
   LLVM_PACKED_END \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")
 
-/// Define a full bitfield for type 'T' that uses all of the remaining bits in
-/// the inline bitfield. We allow for 'T' to have a single generic parameter.
+/// Define a bitfield for type 'T' that uses all of the remaining bits in
+/// the inline bitfield. The start of the bitfield is padded so that
+/// the requested bits are aligned at the end of the bitfield.
+/// This is useful when the bitfield has 8-, 16-, or 32-bit components
+/// that the compiler can probably generate better code for if they're
+/// allocated at addressable offsets. Such components should be placed
+/// at the end of the component list.
 ///
-/// For optimal code gen, place naturally sized fields at the end, with the
-/// largest naturally sized field at the very end. For example:
+/// For example:
 ///
-/// SWIFT_INLINE_BITFIELD_FULL(Foo, Bar, 1+8+16,
+/// SWIFT_INLINE_BITFIELD_FULL_TEMPLATE(Foo, Bar, 1+8+16,
 ///   flag : 1,
-///   : NumPadBits, // pad the center, not the end
 ///   x : 8,
 ///   y : 16
 /// );
+///
+/// T must be a class template with template signature <typename>.
 ///
 /// NOTE: All instances of Foo will access via the same bitfield entry even if
 /// they differ in the templated value!
@@ -101,8 +117,7 @@ namespace swift {
   class T##Bitfield {                                                          \
     template <typename TTy>                                                    \
     friend class T;                                                            \
-    enum { NumPadBits = 64 - (NumberOf##U##Bits + (C)) };                      \
-    uint64_t : NumberOf##U##Bits, __VA_ARGS__;                                 \
+    uint64_t : 64 - (C), __VA_ARGS__;                                          \
   } T;                                                                         \
   LLVM_PACKED_END                                                              \
   static_assert(sizeof(T##Bitfield) <= 8, "Bitfield overflow")

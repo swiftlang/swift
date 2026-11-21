@@ -6968,6 +6968,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice: {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
+      return true;
+
     // If this is an attempt to use readonly IUO as a destination
     // of an assignment e.g.
     //

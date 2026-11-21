@@ -13,3 +13,16 @@ bb0:
   // CHECK: return undef : $(), loc {{.*}}, scope 2 // id: %1
   return undef : $(), scope 2 // id: %1
 }
+
+// A debug variable's scope is printed even if no instruction uses it.
+// CHECK: sil_scope 3 { loc "bar.sil":1:2 parent @var_scope : $@convention(thin) () -> () }
+          sil_scope 3 { loc "bar.sil":1:2 parent @var_scope : $@convention(thin) () -> () }
+// CHECK: sil_scope 4 { loc "bar.sil":3:4 parent 3 }
+          sil_scope 4 { loc "bar.sil":3:4 parent 3 }
+
+sil @var_scope : $@convention(thin) () -> () {
+bb0:
+  // CHECK: debug_value undef : $(), let, (name "x", loc "bar.sil":5:6, scope 4), loc "bar.sil":7:8, scope 3
+  debug_value undef : $(), let, (name "x", loc "bar.sil":5:6, scope 4), loc "bar.sil":7:8, scope 3
+  return undef : $(), scope 3
+}

@@ -2308,7 +2308,7 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
   }
 
   if (EI && isInstructionTriviallyDead(EI)) {
-    EI->replaceAllUsesOfAllResultsWithUndef();
+    salvageDebugInfo(EI);
     EI->eraseFromParent();
   }
 

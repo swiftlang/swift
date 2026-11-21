@@ -8,7 +8,7 @@
 
 // RUN: %target-clang -x c -O2 -c %t/CTable/ctable.c -o %t/ctable.o
 // RUN: %target-build-swift -target %target-swift-6.2-abi-triple -O -wmo -parse-as-library -module-name Client -I %t -I %t/CTable %t/Client.swift -c -o %t/Client.o
-// RUN: %target-build-swift -target %target-swift-6.2-abi-triple -O -module-name Main %t/main.swift %t/Client.o %t/Tables.o %t/ctable.o -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-6.2-abi-triple -O -module-name Main %t/main.swift %t/Client.o %t/Tables.o %t/ctable.o -o %t/a.out %if CPU=wasm32 %{ -Xclang-linker --no-wasm-opt %}
 // RUN: llvm-objdump -d --no-show-raw-insn --no-leading-addr %t/a.out | %FileCheck %s --check-prefix=CHECK-ASM %if CPU=arm64 || CPU=arm64e || CPU=aarch64 %{ --check-prefix=CHECK-ASM-ARM64 %}
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib

@@ -131,6 +131,19 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
       return false;
   }
 
+  // Try to extend the store_borrows before inserting any copies, because a
+  // store_borrow of a move-only type which cannot be extended must not be
+  // copied either. Extending a store_borrow fails e.g. if it has no end_borrow
+  // because it ends in a dead-end block.
+  SmallVector<StoreBorrowInst *, 8> storeBorrowsToCopy;
+  for (auto *storeBorrow : storeBorrowsToHandle) {
+    if (extendStoreBorrow(storeBorrow, paiUses, callbacks))
+      continue;
+    if (storeBorrow->getType().isMoveOnly())
+      return false;
+    storeBorrowsToCopy.push_back(storeBorrow);
+  }
+
   for (Operand *argOp : argsToHandle) {
     SILValue arg = argOp->get();
     SILValue tmp = arg;
@@ -150,10 +163,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     endLifetimeAtFrontier(tmp, partialApplyFrontier, builderCtxt, callbacks);
   }
 
-  for (auto *storeBorrow : storeBorrowsToHandle) {
-    if (extendStoreBorrow(storeBorrow, paiUses, callbacks)) {
-      continue;
-    }
+  for (auto *storeBorrow : storeBorrowsToCopy) {
     SILBuilderWithScope builder(pai, builderCtxt);
     // Copy address-arguments into a stack-allocated temporary.
     auto *asi = builder.createAllocStack(pai->getLoc(), storeBorrow->getType());

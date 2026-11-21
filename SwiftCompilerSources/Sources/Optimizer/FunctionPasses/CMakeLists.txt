@@ -33,7 +33,6 @@ swift_compiler_sources(Optimizer
   DiagnoseResolvedLifetimes.swift
   EmbeddedWitnessCallSpecialization.swift
   ImplicitDestroyChecker.swift
-  FunctionSignatureOptimization.swift
   InitializeStaticGlobals.swift
   KillInvalidDebugValues.swift
   LetPropertyLowering.swift

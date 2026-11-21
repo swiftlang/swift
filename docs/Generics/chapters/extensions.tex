@@ -582,8 +582,7 @@ extension Pair: Diagonal where T == U {}
 Thus, conditional requirements must always be checked by~\AlgRef{reqissatisfied}, and not in some ``ad-hoc'' manner by digging through the substitution map.
 
 \paragraph{Protocol inheritance.}
-\index{inherited protocol}
-We model protocol inheritance by introducing an \index{associated conformance requirement!protocol inheritance}associated conformance requirement with a subject type of \tSelf, so for instance \texttt{Derived} below has an associated conformance requirement $\ConfReq{Self}{Base}$:
+We model \index{protocol inheritance}protocol inheritance by introducing an \index{associated conformance requirement!protocol inheritance}associated conformance requirement with a subject type of \tSelf, so for instance \texttt{Derived} below has an associated conformance requirement $\ConfReq{Self}{Base}$:
 \begin{Verbatim}
 protocol Base {...}
 protocol Derived: Base {...}

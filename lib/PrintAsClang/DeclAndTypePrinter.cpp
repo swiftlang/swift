@@ -623,7 +623,7 @@ private:
       auto associatedValueList = elementDecl->getParameterList();
       // TODO: add tuple type support
       if (!elementDecl->hasAssociatedValues() ||
-          associatedValueList->size() > 1) {
+          associatedValueList->size() != 1) {
         return;
       }
       // Projecting the payload out of a borrowed enum needs a copy of it.
@@ -3225,6 +3225,11 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
+    // A stub only fills the vtable slot of an initializer the class does not
+    // inherit; calling it traps.
+    if (auto *ctor = dyn_cast<ConstructorDecl>(VD))
+      if (ctor->hasStubImplementation())
+        return false;
     // Nested types are only printed as part of their enclosing type.
     if (isa<NominalTypeDecl>(VD) && !VD->hasClangNode())
       if (auto *parent = VD->getDeclContext()->getSelfNominalTypeDecl())

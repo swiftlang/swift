@@ -189,7 +189,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
-    : NumPadBits,
     InterpolationCount : 20,
     LiteralCapacity : 32
   );
@@ -211,7 +210,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleElementExpr, Expr, 32,
-    : NumPadBits,
     FieldNo : 32
   );
 
@@ -222,7 +220,6 @@ protected:
     /// Whether this tuple has label locations.
     HasElementNameLocations : 1,
 
-    : NumPadBits,
     NumElements : 32
   );
 
@@ -230,13 +227,13 @@ protected:
     FunctionRefInfo : 4
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
+  SWIFT_INLINE_BITFIELD(SubscriptExpr, LookupExpr, 2,
     Semantics : 2 // an AccessSemantics
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 4,
+  SWIFT_INLINE_BITFIELD(UnresolvedMemberExpr, Expr, 4,
     FunctionRefInfo : 4
   );
 
@@ -253,7 +250,7 @@ protected:
     StringEncoding : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ObjectLiteralExpr, LiteralExpr, 3,
+  SWIFT_INLINE_BITFIELD(ObjectLiteralExpr, LiteralExpr, 3,
     LitKind : 3
   );
 
@@ -315,7 +312,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
-    : NumPadBits,
     Depth : 16
   );
 
@@ -339,18 +335,15 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32+20,
-    : NumPadBits,
-    NumConformances : 32,
-    NumArgumentConversions : 20
+    NumArgumentConversions : 20,
+    NumConformances : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
-    : NumPadBits,
     NumUnresolvedParams : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CaptureListExpr, Expr, 32,
-    : NumPadBits,
     NumCaptures : 32
   );
 
@@ -385,7 +378,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
-    : NumPadBits,
     NumElements : 32
   );
 
@@ -394,7 +386,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
-    : NumPadBits,
     NumElements : 32
   );
 

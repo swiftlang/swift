@@ -228,6 +228,7 @@
 \newcommand{\ThmRef}[1]{\hyperref[#1]{Theorem~\ref*{#1}}}
 \newcommand{\CorollaryRef}[1]{\hyperref[#1]{Corollary~\ref*{#1}}}
 \newcommand{\LemmaRef}[1]{\hyperref[#1]{Lemma~\ref*{#1}}}
+\newcommand{\RemarkRef}[1]{\hyperref[#1]{Remark~\ref*{#1}}}
 \newcommand{\AlgRef}[1]{\hyperref[#1]{Algorithm~\ref*{#1}}}
 \newcommand{\ExRef}[1]{\hyperref[#1]{Example~\ref*{#1}}}
 \newcommand{\FigRef}[1]{\hyperref[#1]{Figure~\ref*{#1}}}
@@ -284,6 +285,7 @@
 \newcommand{\tIterator}{\texttt{IteratorProtocol}}
 \newcommand{\tInt}{\texttt{Int}}
 \newcommand{\tN}{\texttt{N}}
+\newcommand{\tO}{\texttt{O}}
 
 \newcommand{\nA}{\texttt{A}}
 \newcommand{\nB}{\texttt{B}}
@@ -490,6 +492,14 @@
 \newcommand{\WL}{\triangleleft}
 \newcommand{\WR}{\triangleright}
 
+\newcommand{\FP}{\mathrm{FP}}
+
+\newcommand{\Eq}{\Leftrightarrow}
+\newcommand{\Red}{\Rightarrow}
+\newcommand{\NotEq}{\not\Eq}
+
+\newcommand{\Ts}{\mathfrak{C}_1}
+
 % Requirement Machine
 \newcommand{\protosym}[1]{[\texttt{#1}]}
 \newcommand{\assocsym}[2]{[\texttt{#1}|\texttt{#2}]}
@@ -506,6 +516,7 @@
 \newcommand{\Type}{\mathsf{type}}
 
 \newcommand{\pN}{\protosym{N}}
+\newcommand{\pO}{\protosym{O}}
 \newcommand{\pP}{\protosym{P}}
 \newcommand{\pQ}{\protosym{Q}}
 \newcommand{\pR}{\protosym{R}}
@@ -516,8 +527,10 @@
 \newcommand{\aPD}{\assocsym{P}{D}}
 
 \newcommand{\aNA}{\assocsym{N}{A}}
+\newcommand{\aOA}{\assocsym{O}{A}}
 
 \newcommand{\aQA}{\assocsym{Q}{A}}
+\newcommand{\aQB}{\assocsym{Q}{B}}
 
 \newcommand{\pSequence}{\protosym{Sequence}}
 \newcommand{\pCollection}{\protosym{Collection}}
@@ -529,33 +542,38 @@
 \newcommand{\SameRule}[2]{#1 \Eq #2}
 \newcommand{\AssocRule}[2]{\protosym{#1}\cdot\texttt{#2} \Eq \assocsym{#1}{#2}}
 
-\newcommand{\CRule}[1]{$\diamond\, #1$}
+\newcommand{\CRule}[1]{\diamond\, #1}
+
+\newcommand{\AssocIntro}[2]{\protosym{#1}\cdot\texttt{#2}\Red\assocsym{#1}{#2}}
+\newcommand{\AssocIntroInv}[2]{\assocsym{#1}{#2}\Red\protosym{#1}\cdot\texttt{#2}}
+
+\newcommand{\InheritAssocIntro}[3]{\protosym{#1}\cdot\assocsym{#2}{#3}\Red\assocsym{#1}{#3}}
+\newcommand{\InheritAssocIntroInv}[3]{\assocsym{#1}{#3}\Red\protosym{#1}\cdot\assocsym{#2}{#3}}
+
+\newcommand{\ProtoConf}[2]{#1\cdot\protosym{#2}\Red #1}
+\newcommand{\ProtoConfInv}[2]{#1\Red #1\cdot\protosym{#2}}
+
+\newcommand{\ProtoInherit}[2]{\ProtoConf{\protosym{#1}}{#2}}
+\newcommand{\ProtoInheritInv}[2]{\ProtoConfInv{\protosym{#1}}{#2}}
+
+\tikzstyle{trie} = [circle,fill=light-gray,outer sep=0.05cm]
 
 %%%
 % Proof at the end of completion chapter
 %%%
 
-\newcommand{\CC}[2]{#1#2 \Eq #1}
-\newcommand{\TheM}{\Pres{t, p, q, a}{\CC{t}{p},\, \CC{t}{q},\, \CC{pa}{p},\, \CC{qa}{q}}}
-\newcommand{\TheMS}{\Pres{t,p,q,r,a}{\CC{t}{p},\, \CC{t}{q},\, \CC{pa}{p},\, \CC{qa}{q},\, \CC{p}{r},\, \CC{q}{r}}}
-\newcommand{\MS}{M_\succ}
-
-\newcommand{\Eq}{\Leftrightarrow}
-\newcommand{\Red}{\Rightarrow}
 \newcommand{\Irr}{\textsc{Irr}}
-\newcommand{\NotEq}{\not\Eq}
 \newcommand{\PAndQ}{\{p,q\}}
+\newcommand{\PQA}{\{p,q,a\}}
 
 \newcommand{\RInf}{R^\infty}
 
 \newcommand{\Rank}{\mathsf{rank}}
 \newcommand{\Deg}{\mathsf{deg}}
-\newcommand{\First}{\mathsf{first}}
 \newcommand{\Tail}{\mathsf{tail}}
 
-\newcommand{\Ell}{\ell(S_0)}
-\newcommand{\Ts}{\mathfrak{C}_1}
-\newcommand{\FP}{\mathrm{FP}}
+\newcommand{\Ell}{\mathcal{L}}
+\newcommand{\Enn}{\mathcal{N}}
 
 %%%
 % Math helpers
@@ -578,7 +596,7 @@
 \def\apiref#1#2
 {\bigskip\hrule\nobreak\vskip 3pt\noindent\texttt{\vphantom{p}#1}\hfill\textsl{#2}\par\nobreak\vskip 3pt\hrule\vskip 3pt\noindent}
 
-% Type parameter and conformance path graph
+% Type parameter and conformance graphs
 \tikzstyle{root} = [rounded corners, fill=lightgray, outer sep=0.1em]
 \tikzstyle{interior} = [rounded corners, fill=light-gray, outer sep=0.1em]
 

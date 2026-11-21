@@ -197,7 +197,7 @@ func pickElement<E>(_ elts: some Sequence<E>) -> E {...}
 \end{Verbatim}
 An opaque parameter simultaneously declares a parameter value, a generic parameter type that is the type of the value, and a requirement this type must satisfy. Here, we can refer to ``\texttt{elts}'' from an expression inside the function body, but we cannot name the \emph{type} of ``\texttt{elts}'' in a type representation. From \index{expression}expression context however, the type of an opaque parameter can be obtained via the \texttt{type(of:)} special form, which produces a metatype value. This allows for invoking static methods on these types.
 
-The \IndexDefinition{generic parameter list request}\Request{generic parameter list request} appends the opaque parameters to the parsed generic parameter list, so they follow the parsed generic parameters in index order. In \texttt{pickElement()}, the generic parameter \texttt{E} has canonical type~\rT, while the opaque parameter associated with ``\texttt{elts}'' has canonical type~\rU. Opaque parameter declarations also state a constraint type, which imposes a requirement on this unnamed generic parameter. We will discuss this in the next section. Note that when \texttt{some} appears in the return type of a function, it declares an \emph{opaque result type}, which is a related but different feature (\ChapRef{chap:opaque result types}).
+The \IndexDefinition{generic parameter list request}\Request{generic parameter list request} appends the opaque parameters to the parsed generic parameter list, so they follow the parsed generic parameters in index order. In \texttt{pickElement()}, the generic parameter \texttt{E} has canonical type~\rT, while the opaque parameter associated with ``\texttt{elts}'' has canonical type~\rU. We will discuss opaque parameter types in more detail shortly. Note that when \texttt{some} appears in the return type of a function, it declares an \emph{opaque result type}, which is a related but different feature (\ChapRef{chap:opaque result types}).
 
 In \ChapRef{chap:generic signatures}, we will discuss the generic signature, a data structure which collects all generic parameters that parameterize a declaration, independent of surface syntax.
 
@@ -358,7 +358,7 @@ Protocols can also impose \IndexDefinition{associated requirement}\emph{associat
 \paragraph{Protocol inheritance clauses.}
 A protocol can have an \index{inheritance clause!protocol declaration}inheritance clause with a list of one or more comma-separated \index{constraint type!protocol inheritance clause}constraint types. Each inheritance clause entry states an associated requirement with a subject type of \tSelf. These are additional requirements the conforming type itself must satisfy in order to conform.
 
-An associated conformance requirement with a subject type of \tSelf\ establishes a \index{protocol inheritance|see{inherited protocol}}\IndexDefinition{inherited protocol}\emph{protocol inheritance} relationship. The protocol stating the requirement is the \emph{derived protocol}, and the protocol on the right-hand side is the \emph{base protocol}. The derived protocol is said to \emph{inherit} from (or sometimes, \emph{refine}) the base protocol. A \index{qualified lookup!protocol inheritance}qualified lookup into a protocol (or a concrete nominal type) will traverse all of its base protocols (or all base protocols of each conformed protocol of the concrete nominal type).
+An associated conformance requirement with a subject type of \tSelf\ establishes a \index{inherited protocol|see{protocol inheritance}}\IndexDefinition{protocol inheritance}\emph{protocol inheritance} relationship. The protocol stating the requirement is the \emph{derived protocol}, and the protocol on the right-hand side is the \emph{base protocol}. The derived protocol is said to \emph{inherit} from (or sometimes, \emph{refine}) the base protocol. A \index{qualified lookup!protocol inheritance}qualified lookup into a protocol (or a concrete nominal type) will traverse all of its base protocols (or all base protocols of each conformed protocol of the concrete nominal type).
 
 For example, the standard library's \tCollection\ protocol inherits from \tSequence\ by stating the associated requirement $\ConfReq{Self}{Sequence}$:
 \begin{Verbatim}
@@ -521,7 +521,7 @@ The self apply expression applies the argument \texttt{universe} to the \texttt{
 \end{itemize}
 The extra call to apply \texttt{self} disappears in \index{SILGen}SILGen, because a method is represented as a SIL function that receives all formal parameters and the \texttt{self} parameter at once.
 
-A partially-applied method reference, such as \texttt{universe.wormhole}, can also be used as a value of type \verb|(Int, String) -> Bool|. This binds the \texttt{self} parameter but does not call the method. We implement this by wrapping the method reference in a closure that invokes the method; this closure has the same type as the method reference. In the \index{lambda calculus}lambda calculus formalism, this is what's known as \index{eta expansion}\emph{$\eta$-expansion}:
+A partially-applied method reference, such as \texttt{universe.wormhole}, can also be used as a value of type \verb|(Int, String) -> Bool|. This binds the \texttt{self} parameter but does not call the method. We implement this by wrapping the method reference in a closure that invokes the method; this closure has the same type as the method reference. In the \index{lambda calculus}lambda calculus formalism, this is what's known as \index{eta expansion@$\eta$ expansion}\emph{$\eta$-expansion}:
 \begin{Verbatim}
 { x, y in universe.wormhole(x: x, y: y) }
 \end{Verbatim}
@@ -1108,7 +1108,7 @@ Trailing \texttt{where} clauses and inheritance clauses are not preserved in ser
 
 The last three utility methods operate on the requirement signature, so are safe to use on deserialized protocols:
 \begin{itemize}
-\item \texttt{getInheritedProtocols()} returns an array of all protocols directly \IndexSource{inherited protocol}inherited by this protocol, computed from the inheritance clause.
+\item \texttt{getInheritedProtocols()} returns an array of all protocols directly \IndexSource{protocol inheritance}inherited by this protocol, computed from the inheritance clause.
 \item \texttt{inheritsFrom()} determines if this protocol inherits from the given protocol, possibly transitively.
 \item \texttt{getSuperclassDecl()} returns this protocol's \IndexSource{superclass declaration}superclass declaration.
 \end{itemize}

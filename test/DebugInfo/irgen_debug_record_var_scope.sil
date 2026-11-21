@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -g -Onone %s | %FileCheck %s
+// RUN: %target-swift-frontend -sil-verify-none -emit-irgen -g -Onone %s | %FileCheck %s
 
 // The debug record of a variable gets the variable's scope and location.
 // The debug instruction's scope and location are ignored.
@@ -8,6 +8,7 @@ sil_stage canonical
 import Builtin
 
 sil @callee : $@convention(thin) () -> ()
+sil [transparent] @transparent_callee : $@convention(thin) () -> ()
 
 // Two inlined copies of @callee: scope 5 is inlined at a.swift:2:3, scope 6
 // at a.swift:3:3. The variables live in scope 5, their instructions in scope 6.
@@ -33,6 +34,42 @@ bb0(%0 : $Builtin.Int64):
   return %2 : $(), loc "a.swift":4:3, scope 1
 }
 
+// Whether a variable is dropped for being in a transparent function depends on
+// the variable's scope, not the instruction scope.
+
+sil_scope 7 { loc "a.swift":10:6 parent @transparent_scopes : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 8 { loc "t.swift":1:6 parent @transparent_callee : $@convention(thin) () -> () }
+sil_scope 9 { loc "t.swift":2:3 parent 8 inlined_at 7 }
+
+// CHECK-LABEL: define {{.*}} @transparent_scopes(
+// CHECK:         #dbg_declare(ptr {{.*}}, ![[Z:[0-9]+]], !DIExpression(),
+// CHECK-NOT:     #dbg_declare
+// CHECK:         ret void
+sil @transparent_scopes : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, (name "z", loc "a.swift":11:7, scope 7), loc "t.swift":2:3, scope 9
+  debug_value %0 : $Builtin.Int64, let, (name "t", loc "t.swift":3:7, scope 9), loc "a.swift":11:7, scope 7
+  %1 = tuple (), loc "a.swift":12:3, scope 7
+  return %1 : $(), loc "a.swift":12:3, scope 7
+}
+
+// One variable described in two instruction scopes has a single shadow copy.
+sil_scope 10 { loc "a.swift":20:6 parent @shadow_slot : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () }
+sil_scope 11 { loc "a.swift":21:3 parent 10 }
+sil_scope 12 { loc "a.swift":22:3 parent 10 }
+
+// CHECK-LABEL: define {{.*}} @shadow_slot(
+// CHECK:         alloca i64
+// CHECK-NOT:     alloca
+// CHECK:         ret void
+sil @shadow_slot : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, var, name "w", loc "a.swift":21:7, scope 11
+  debug_value %1 : $Builtin.Int64, var, (name "w", loc "a.swift":21:7, scope 11), loc "a.swift":22:7, scope 12
+  %2 = tuple (), loc "a.swift":23:3, scope 10
+  return %2 : $(), loc "a.swift":23:3, scope 10
+}
+
 // The variables are in scope 5.
 // CHECK-DAG: ![[X]] = !DILocalVariable(name: "x", scope: ![[SCOPE:[0-9]+]], {{.*}}line: 2,
 // CHECK-DAG: ![[Y]] = !DILocalVariable(name: "y", scope: ![[SCOPE]], {{.*}}line: 3,
@@ -41,3 +78,5 @@ bb0(%0 : $Builtin.Int64):
 // CHECK-DAG: ![[X_LOC]] = !DILocation(line: 2, column: 7, scope: ![[SCOPE]], inlinedAt: ![[CALL:[0-9]+]])
 // CHECK-DAG: ![[Y_LOC]] = !DILocation(line: 3, column: 7, scope: ![[SCOPE]], inlinedAt: ![[CALL]])
 // CHECK-DAG: ![[CALL]] = distinct !DILocation(line: 2, column: 3, scope: ![[FUNC_SCOPE]])
+
+// CHECK-DAG: ![[Z]] = !DILocalVariable(name: "z",

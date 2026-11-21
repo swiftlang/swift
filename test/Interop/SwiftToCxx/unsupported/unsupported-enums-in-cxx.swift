@@ -4,6 +4,7 @@
 // RUN: cat %s | grep -v _expose > %t/clean.swift
 // RUN: %target-swift-frontend %t/clean.swift -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/header.h
 // RUN: %FileCheck %s < %t/header.h
+// RUN: %FileCheck %s --check-prefix=EMPTY < %t/header.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/header.h)
 
@@ -32,6 +33,20 @@ public enum unsupportedEnumProtocolType {
     case A
     case B(Error)
 }
+
+// An empty associated value list is still accepted in Swift 5 mode. The case
+// has no payload to project.
+public enum enumEmptyAssociatedValueList {
+    case A() // expected-warning {{enum element with associated values must have at least one associated value}}
+    // expected-note@-1 {{did you mean to remove the empty associated value list?}}
+    // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}}
+    case B
+}
+
+// EMPTY: class SWIFT_SYMBOL("{{.*}}") enumEmptyAssociatedValueList final {
+// EMPTY: SWIFT_INLINE_THUNK bool isA() const;
+// EMPTY-NOT: getA()
+// EMPTY: SWIFT_INLINE_THUNK bool isB() const;
 
 // CHECK: class unsupportedEnumAssociatedValueType { } SWIFT_UNAVAILABLE_MSG("enum 'unsupportedEnumAssociatedValueType' can not be represented in C++ as one of its cases has an associated value with type that can't be represented in C++");
 // CHECK-EMPTY:

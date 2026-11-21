@@ -861,7 +861,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
   if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
     if (asi->isFromVarDecl()) {
-      if (auto *varDecl = asi->getLoc().getAsASTNode<VarDecl>()) {
+      if (auto *varDecl = asi->getDecl()) {
         auto isolation = swift::getActorIsolation(varDecl);
         if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
           return SILIsolationInfo::getDisconnected(
@@ -881,7 +881,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (mvi->isFromVarDecl()) {
       if (auto *debugInfo = getSingleDebugUse(mvi)) {
         if (auto *dbg = dyn_cast<DebugValueInst>(debugInfo->getUser())) {
-          if (auto *varDecl = dbg->getLoc().getAsASTNode<VarDecl>()) {
+          if (auto *varDecl = dbg->getDecl()) {
             auto isolation = swift::getActorIsolation(varDecl);
             if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
               return SILIsolationInfo::getDisconnected(

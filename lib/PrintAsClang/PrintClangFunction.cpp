@@ -331,6 +331,9 @@ public:
     // FIXME: how to support `()` parameters.
     if (typeUseKind != FunctionSignatureTypeUse::ReturnType)
       return ClangRepresentation::unsupported;
+    // FIXME: `()?` would need a C++ optional of void.
+    if (optionalKind && *optionalKind != OTK_None)
+      return ClangRepresentation::unsupported;
     os << "void";
     return ClangRepresentation::representable;
   }

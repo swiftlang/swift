@@ -115,7 +115,7 @@ private func trySpecialize(apply: FullApplySite,
   // Inlining the thunk lets the caller directly call the specialized function. It also exposes the
   // ownership instructions of the thunk to the caller's optimizations.
   moduleContext.transform(function: apply.parentFunction) { context in
-    context.inlineFunction(apply: apply, mandatoryInline: false)
+    _ = context.inlineFunction(apply: apply, mandatoryInline: false)
   }
   return true
 }

@@ -1571,25 +1571,11 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   else
     impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxMutableSpan});
 
-  // create fake variable for pointer (constructor arg 1)
-  auto fakePointerVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      pointerType, clangCtx.getTrivialTypeSourceInfo(pointerType),
-      clang::StorageClass::SC_None);
-
-  auto fakePointer = createClangDeclRefExpr(clangCtx, fakePointerVarDecl,
-                                            pointerType, clang::VK_LValue);
-
-  // create fake variable for count (constructor arg 2)
-  auto fakeCountVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      sizeType, clangCtx.getTrivialTypeSourceInfo(sizeType),
-      clang::StorageClass::SC_None);
-
-  auto fakeCount = createClangDeclRefExpr(clangCtx, fakeCountVarDecl, sizeType,
-                                         clang::VK_LValue);
+  // Stand-ins for the pointer and count arguments of the constructor.
+  auto *fakePointer = new (clangCtx) clang::OpaqueValueExpr(
+      clangDecl->getLocation(), pointerType, clang::VK_LValue);
+  auto *fakeCount = new (clangCtx) clang::OpaqueValueExpr(
+      clangDecl->getLocation(), sizeType, clang::VK_LValue);
 
   // Use clangSema.BuildCxxTypeConstructExpr to create a CXXTypeConstructExpr,
   // passing constPointer and count
@@ -1598,7 +1584,7 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
   auto *clangDeclTyInfo = clangCtx.getTrivialTypeSourceInfo(
       clangCtx.getCanonicalTagType(clangDecl));
 
-  // Instantiate the templated constructor that would accept this fake variable.
+  // Instantiate the templated constructor that would accept these fake values.
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
       clangDecl->getLocation(), /*ListInitialization*/ false);

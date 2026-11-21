@@ -1806,14 +1806,15 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
-  // We cannot inline/clone debug intrinsics without a scope. If they
+  std::optional<SILDebugVariable> VarInfo = Inst->getVarInfo();
+
+  // We cannot inline/clone debug variables without a scope. If they
   // describe function arguments there is no way to determine which
   // function they belong to.
-  if (!Inst->getDebugScope())
+  if (!VarInfo->Scope)
     return;
 
   // Since we want the debug info to survive, we do not remap the location here.
-  std::optional<SILDebugVariable> VarInfo = Inst->getVarInfo();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   remapDebugVariable(VarInfo);
 
