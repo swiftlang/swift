@@ -177,8 +177,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addRawSILInstLowering();
   }
 
-  P.addAddressLowering();
-
   // TODO: remove this once CapturePromotion deletes specialized functions itself.
   P.addDiagnosticDeadFunctionElimination();
 
@@ -218,6 +216,8 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
+
+  P.addAddressLowering();
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping
