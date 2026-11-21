@@ -143,4 +143,12 @@ struct EmbeddedBuildConfiguration: BuildConfiguration {
   var compilerVersion: VersionTuple {
     return configuration.compilerVersion
   }
+
+  var deploymentTargetVersion: VersionTuple? {
+    return configuration.deploymentTargetVersion
+  }
+
+  func isDeploymentTargetAtLeast(platform: String, version: VersionTuple) -> Bool {
+    return configuration.isDeploymentTargetAtLeast(platform: platform, version: version)
+  }
 }
