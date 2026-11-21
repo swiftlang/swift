@@ -111,6 +111,19 @@ extension Actor {
         unsafe "Incorrect actor executor assumption; Expected '\(self.unownedExecutor)' executor. \(message())",
         file: file, line: line)
   }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.1, *)
+  @_unavailableInEmbedded
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sScAsE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF")
+  @usableFromInline
+  internal nonisolated func __abi_preconditionIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    preconditionIsolated(message(), file: file, line: line)
+  }
 }
 
 @available(SwiftStdlib 5.1, *)

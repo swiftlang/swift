@@ -1049,6 +1049,16 @@ extension ContiguousArray: RangeReplaceableCollection {
       return try unsafe body(&bufferPointer)
     }
   }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss15ContiguousArrayV04withA25MutableStorageIfAvailableyqd__Sgqd__SryxGzKXEKlF")
+  @usableFromInline
+  internal mutating func __abi_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousMutableStorageIfAvailable(body)
+  }
   
   @inlinable
   @safe
@@ -1059,6 +1069,16 @@ extension ContiguousArray: RangeReplaceableCollection {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss15ContiguousArrayV04withA18StorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
   }
 
   @inlinable
@@ -1645,6 +1665,16 @@ extension ContiguousArray {
     }
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss15ContiguousArrayV22withUnsafeMutableBytesyqd__qd__SwKXEKlF")
+  @usableFromInline
+  internal mutating func __abi_withUnsafeMutableBytes<R>(
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutableBytes(body)
+  }
+
   /// Calls the given closure with a pointer to the underlying bytes of the
   /// array's contiguous storage.
   ///
@@ -1680,6 +1710,16 @@ extension ContiguousArray {
     return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss15ContiguousArrayV15withUnsafeBytesyqd__qd__SWKXEKlF")
+  @usableFromInline
+  internal func __abi_withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeBytes(body)
   }
 }
 

@@ -956,6 +956,22 @@ extension Dictionary {
     }
   }
 
+  // ABI: Preserves the accessors from before `defaultValue` was at-most-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal subscript(
+    __abi key: Key, __abi_default defaultValue: @autoclosure () -> Value
+  ) -> Value {
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtcig")
+    get {
+      return self[key, default: defaultValue()]
+    }
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtciM")
+    _modify {
+      yield &self[key, default: defaultValue()]
+    }
+  }
+
   /// Returns a new dictionary containing the keys of this dictionary with the
   /// values transformed by the given closure.
   ///

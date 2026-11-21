@@ -1156,6 +1156,16 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss10ArraySliceV32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
+  }
+
   @inlinable
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     if let n = _buffer.requestNativeBuffer() {

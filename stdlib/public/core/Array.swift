@@ -1460,6 +1460,16 @@ extension Array: RangeReplaceableCollection {
     }
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSa39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEKlF")
+  @usableFromInline
+  internal mutating func __abi_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousMutableStorageIfAvailable(body)
+  }
+
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
@@ -1469,6 +1479,16 @@ extension Array: RangeReplaceableCollection {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSa32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
   }
   
   @inlinable
@@ -2087,6 +2107,16 @@ extension Array {
     return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$sSa22withUnsafeMutableBytesyqd__qd__SwKXEKlF")
+  @usableFromInline
+  internal mutating func __abi_withUnsafeMutableBytes<R>(
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutableBytes(body)
   }
 
   /// Calls the given closure with a pointer to the underlying bytes of the

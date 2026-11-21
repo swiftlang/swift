@@ -180,6 +180,16 @@ public func assertionFailure(
   }
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@_silgen_name("$ss16assertionFailure_4file4lineySSyXK_s12StaticStringVSutF")
+@usableFromInline
+internal func __abi_assertionFailure(
+  _ message: @autoclosure () -> String, file: StaticString, line: UInt
+) {
+  assertionFailure(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func assertionFailure(

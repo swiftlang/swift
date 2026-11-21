@@ -275,6 +275,25 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
       file: file, line: line)
   }
 
+  // ABI: Preserves the entry point from before `operation` was exactly-once.
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF")
+  @usableFromInline
+  internal func __abi_withValue<R>(
+    _ valueDuringOperation: Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)?,
+    file: String, line: UInt
+  ) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation,
+      operation: operation,
+      isolation: isolation,
+      file: file, line: line)
+  }
+
   // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
   // in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
   // to the type checker.
