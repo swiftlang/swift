@@ -18,6 +18,7 @@
 #if SWIFT_ENABLE_REFLECTION
 
 #include "swift/RemoteInspection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/ReflectionDiag.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/RemoteInspection/Records.h"
@@ -25,6 +26,7 @@
 #include "swift/RemoteInspection/TypeRef.h"
 #include <iomanip>
 #include <iostream>
+#include <set>
 #include <sstream>
 
 using namespace swift;
@@ -593,37 +595,80 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeInfo(
   for (; NormalizedReflectionNameCacheLastReflectionInfoCache <
          ReflectionInfos.size();
        NormalizedReflectionNameCacheLastReflectionInfoCache++) {
+    unsigned diagTotal = 0, diagBadStride = 0, diagBadSize = 0,
+             diagNoName = 0, diagBadAlign = 0, diagNormFailed = 0,
+             diagInserted = 0;
     for (auto BuiltinTypeDescriptor :
          ReflectionInfos[NormalizedReflectionNameCacheLastReflectionInfoCache]
              .Builtin) {
-      if (BuiltinTypeDescriptor->Stride <= 0)
+      ++diagTotal;
+      if (BuiltinTypeDescriptor->Stride <= 0) {
+        ++diagBadStride;
         continue;
-      if (BuiltinTypeDescriptor->Size > BuiltinTypeDescriptor->Stride)
+      }
+      if (BuiltinTypeDescriptor->Size > BuiltinTypeDescriptor->Stride) {
+        ++diagBadSize;
         continue;
-      if (!BuiltinTypeDescriptor->hasMangledTypeName())
+      }
+      if (!BuiltinTypeDescriptor->hasMangledTypeName()) {
+        ++diagNoName;
         continue;
+      }
 
       auto Alignment = BuiltinTypeDescriptor->getAlignment();
-      if (Alignment <= 0)
+      if (Alignment <= 0) {
+        ++diagBadAlign;
         continue;
+      }
       // Reject any alignment that's not a power of two.
-      if (Alignment & (Alignment - 1))
+      if (Alignment & (Alignment - 1)) {
+        ++diagBadAlign;
         continue;
+      }
 
       auto CandidateMangledName =
           readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
       auto CandidateNormalizedName =
           normalizeReflectionName(CandidateMangledName);
       if (CandidateNormalizedName) {
+        ++diagInserted;
+        if (diagInserted <= 64)
+          REFLECTION_DIAG("getBuiltinTypeInfo: reflection info #%zu: cached "
+                          "builtin '%s' (size=%u stride=%u align=%u)",
+                          (size_t)
+                              NormalizedReflectionNameCacheLastReflectionInfoCache,
+                          CandidateNormalizedName->c_str(),
+                          (unsigned)BuiltinTypeDescriptor->Size,
+                          (unsigned)BuiltinTypeDescriptor->Stride,
+                          (unsigned)Alignment);
         BuiltInTypeDescriptorCache.insert(
             std::make_pair(*CandidateNormalizedName, BuiltinTypeDescriptor));
+      } else {
+        ++diagNormFailed;
       }
     }
+    REFLECTION_DIAG("getBuiltinTypeInfo: reflection info #%zu scanned: "
+                    "descriptors=%u cached=%u rejected: stride<=0=%u "
+                    "size>stride=%u noMangledName=%u badAlignment=%u "
+                    "nameNormalizationFailed=%u",
+                    (size_t)NormalizedReflectionNameCacheLastReflectionInfoCache,
+                    diagTotal, diagInserted, diagBadStride, diagBadSize,
+                    diagNoName, diagBadAlign, diagNormFailed);
   }
 
   if (const auto found = BuiltInTypeDescriptorCache.find(MangledName);
       found != BuiltInTypeDescriptorCache.end()) {
     return found->second;
+  }
+
+  if (diagEnabled()) {
+    // Only report each missing name once.
+    static std::set<std::string> diagReported;
+    if (diagReported.insert(MangledName).second)
+      REFLECTION_DIAG("getBuiltinTypeInfo: NOT FOUND: '%s' (%zu reflection "
+                      "infos, %zu cached builtin names)",
+                      MangledName.c_str(), ReflectionInfos.size(),
+                      (size_t)BuiltInTypeDescriptorCache.size());
   }
 
   return nullptr;

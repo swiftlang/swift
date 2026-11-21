@@ -38,6 +38,7 @@
 #include "swift/RemoteInspection/RuntimeInternals.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
+#include "swift/RemoteInspection/ReflectionDiag.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Basic/Unreachable.h"
 
@@ -547,18 +548,44 @@ public:
         "__swift5_reflection_sections";
     constexpr uint64_t ELFReflectionSectionsVersion = 1u;
 
+    static const char *const diagSectionNames[] = {
+#define SWIFT_REFLECTION_SECTION(Name, Field) #Name,
+#include "ELFReflectionSections.def"
+    };
+
+    REFLECTION_DIAG("readELFSections: image start=0x%llx pointerSize=%u",
+                    (unsigned long long)ImageStart.getRawAddress(),
+                    (unsigned)T::PointerSize);
+
     // Locate reflection section table
     RemoteAddress tableAddr = getReader().getSymbolAddress(
         ImageStart, ELFReflectionSectionSymbol.str());
 
-    if (!tableAddr)
+    if (!tableAddr) {
+      REFLECTION_DIAG("readELFSections: FAILED: symbol %s not found",
+                      ELFReflectionSectionSymbol.str().c_str());
       return std::nullopt;
+    }
+    REFLECTION_DIAG("readELFSections: %s table at 0x%llx",
+                    ELFReflectionSectionSymbol.str().c_str(),
+                    (unsigned long long)tableAddr.getRawAddress());
 
     typename T::Pointer version = 0;
-    if (!getReader().readInteger(tableAddr, T::PointerSize, &version))
+    if (!getReader().readInteger(tableAddr, T::PointerSize, &version)) {
+      REFLECTION_DIAG("readELFSections: FAILED: could not read the table "
+                      "version at 0x%llx",
+                      (unsigned long long)tableAddr.getRawAddress());
       return std::nullopt;
-    if (version != ELFReflectionSectionsVersion)
+    }
+    if (version != ELFReflectionSectionsVersion) {
+      REFLECTION_DIAG("readELFSections: FAILED: table version %llu, expected "
+                      "%llu",
+                      (unsigned long long)version,
+                      (unsigned long long)ELFReflectionSectionsVersion);
       return std::nullopt;
+    }
+    REFLECTION_DIAG("readELFSections: table version %llu OK",
+                    (unsigned long long)version);
 
     struct ReflectionSection {
       RemoteRef<void> contents;
@@ -575,13 +602,40 @@ public:
       auto start = getReader().readPointer(startFieldAddr, T::PointerSize);
       auto stop = getReader().readPointer(stopFieldAddr, T::PointerSize);
 
-      if (!start || !stop)
+      const char *secName = diagSectionNames[index];
+      if (!start || !stop) {
+        REFLECTION_DIAG("readELFSections: %s: FAILED: readPointer failed "
+                        "(start field at 0x%llx: %s, stop field at 0x%llx: %s)",
+                        secName, (unsigned long long)startFieldAddr.getRawAddress(),
+                        start ? "ok" : "FAILED",
+                        (unsigned long long)stopFieldAddr.getRawAddress(),
+                        stop ? "ok" : "FAILED");
         return {nullptr, 0};
+      }
       RemoteAddress sectionStart = start->getResolvedAddress();
       RemoteAddress sectionStop = stop->getResolvedAddress();
 
-      if (!sectionStart || !sectionStop || sectionStart >= sectionStop)
+      REFLECTION_DIAG("readELFSections: %s: start field at 0x%llx -> "
+                      "resolved=0x%llx symbol='%s' offset=%lld; stop field at "
+                      "0x%llx -> resolved=0x%llx symbol='%s' offset=%lld",
+                      secName,
+                      (unsigned long long)startFieldAddr.getRawAddress(),
+                      (unsigned long long)sectionStart.getRawAddress(),
+                      start->getSymbol().str().c_str(),
+                      (long long)start->getOffset(),
+                      (unsigned long long)stopFieldAddr.getRawAddress(),
+                      (unsigned long long)sectionStop.getRawAddress(),
+                      stop->getSymbol().str().c_str(),
+                      (long long)stop->getOffset());
+
+      if (!sectionStart || !sectionStop || sectionStart >= sectionStop) {
+        REFLECTION_DIAG("readELFSections: %s: empty or invalid range "
+                        "(start=0x%llx stop=0x%llx)",
+                        secName,
+                        (unsigned long long)sectionStart.getRawAddress(),
+                        (unsigned long long)sectionStop.getRawAddress());
         return {nullptr, 0};
+      }
 
       const uint64_t secSize =
           sectionStop.getRawAddress() - sectionStart.getRawAddress();
@@ -589,8 +643,17 @@ public:
         return {nullptr, 0};
 
       auto sectionBuffer = this->getReader().readBytes(sectionStart, secSize);
-      if (!sectionBuffer)
+      if (!sectionBuffer) {
+        REFLECTION_DIAG("readELFSections: %s: FAILED: readBytes(0x%llx, "
+                        "0x%llx) returned nothing",
+                        secName,
+                        (unsigned long long)sectionStart.getRawAddress(),
+                        (unsigned long long)secSize);
         return {nullptr, 0};
+      }
+      REFLECTION_DIAG("readELFSections: %s: OK, %llu bytes at 0x%llx", secName,
+                      (unsigned long long)secSize,
+                      (unsigned long long)sectionStart.getRawAddress());
       auto secContents = RemoteRef<void>(sectionStart, sectionBuffer.get());
       savedBuffers.push_back(std::move(sectionBuffer));
       return {secContents, secSize};
@@ -610,8 +673,11 @@ public:
   populated |= bool(sections[idx_##Name]);
 #include "ELFReflectionSections.def"
 
-    if (!populated)
+    if (!populated) {
+      REFLECTION_DIAG("readELFSections: FAILED: no reflection section could "
+                      "be read from this image");
       return std::nullopt;
+    }
 
     ReflectionInfo info{
 #define SWIFT_REFLECTION_SECTION(Name, Field)                                  \
@@ -646,14 +712,21 @@ public:
           llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
-    if (!Buf)
+    if (!Buf) {
+      REFLECTION_DIAG("readELF: FAILED: could not read an ELF header at "
+                      "0x%llx",
+                      (unsigned long long)ImageStart.getRawAddress());
       return std::nullopt;
+    }
 
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
 
-    if (!Hdr->checkMagic())
+    if (!Hdr->checkMagic()) {
+      REFLECTION_DIAG("readELF: FAILED: bad ELF magic at 0x%llx",
+                      (unsigned long long)ImageStart.getRawAddress());
       return std::nullopt;
+    }
 
     // Check if we have a ELFCLASS32 or ELFCLASS64
     unsigned char FileClass = Hdr->getFileClass();
@@ -963,8 +1036,12 @@ public:
            llvm::SmallVector<llvm::StringRef, 1> PotentialModuleNames = {}) {
     // Read the first few bytes to look for a magic header.
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
-    if (!Magic)
+    if (!Magic) {
+      REFLECTION_DIAG("addImage: FAILED: could not read the image magic at "
+                      "0x%llx",
+                      (unsigned long long)ImageStart.getRawAddress());
       return {};
+    }
 
     uint32_t MagicWord;
     memcpy(&MagicWord, Magic.get(), sizeof(MagicWord));
@@ -1002,6 +1079,9 @@ public:
                       PotentialModuleNames);
     }
     // We don't recognize the format.
+    REFLECTION_DIAG("addImage: FAILED: unrecognized image format at 0x%llx "
+                    "(magic 0x%08x)",
+                    (unsigned long long)ImageStart.getRawAddress(), MagicWord);
     return std::nullopt;
   }
 
