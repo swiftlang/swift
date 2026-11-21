@@ -1036,6 +1036,42 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
   llvm_unreachable("bad storage kind");
 }
 
+bool swift::hasScopedReadCoroutineDependence(AbstractStorageDecl *storage) {
+  auto *readAccessor = storage->getAccessor(AccessorKind::Read);
+  if (!readAccessor)
+    readAccessor = storage->getAccessor(AccessorKind::YieldingBorrow);
+  if (!readAccessor)
+    return false;
+  auto lifetimeDependencies = readAccessor->getLifetimeDependencies();
+  if (!lifetimeDependencies)
+    return false;
+  return llvm::any_of(*lifetimeDependencies, [](auto &lifetimeDependenceInfo) {
+    return lifetimeDependenceInfo.hasScopeLifetimeParamIndices();
+  });
+}
+
+static OpaqueReadOwnership
+computeOwnOpaqueReadOwnership(AbstractStorageDecl *storage);
+
+bool swift::canProvideOpaqueRead(AbstractStorageDecl *storage,
+                                OpaqueReadOwnership required) {
+  switch (required) {
+  case OpaqueReadOwnership::YieldingBorrow:
+    // A read coroutine can be synthesized from any read implementation.
+    return true;
+  case OpaqueReadOwnership::Owned:
+  case OpaqueReadOwnership::OwnedOrBorrowed:
+    // A getter cannot be synthesized from a scoped read coroutine, or (not yet)
+    // from a borrow accessor.
+    return !hasScopedReadCoroutineDependence(storage) &&
+           !storage->getAccessor(AccessorKind::Borrow);
+  case OpaqueReadOwnership::Borrow:
+    // A borrow accessor cannot be synthesized.
+    return storage->getAccessor(AccessorKind::Borrow) != nullptr;
+  }
+  llvm_unreachable("bad OpaqueReadOwnership");
+}
+
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
@@ -1043,6 +1079,25 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getOpaqueReadOwnership();
 
+  auto ownership = computeOwnOpaqueReadOwnership(storage);
+
+  // A class member override has the same opaque read accessors as the storage
+  // it overrides, so that dispatch through the base reaches the override.
+  // Otherwise, an accessor that the base dispatches through might have no
+  // counterpart in the override. If the override cannot provide them,
+  // checkOverrides diagnoses the conflict.
+  if (storage->getDeclContext()->getSelfClassDecl()) {
+    if (auto *base = storage->getOverriddenDecl()) {
+      auto baseOwnership = base->getOpaqueReadOwnership();
+      if (canProvideOpaqueRead(storage, baseOwnership))
+        return baseOwnership;
+    }
+  }
+  return ownership;
+}
+
+static OpaqueReadOwnership
+computeOwnOpaqueReadOwnership(AbstractStorageDecl *storage) {
   enum class DiagKind {
     BorrowedAttr,
     NoncopyableType
@@ -1065,20 +1120,8 @@ OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
 
   // A '_read' or 'yielding borrow' coroutine whose yielded value has a scoped
   // lifetime dependence borrows its source, so the opaque read is a borrow.
-  auto *readAccessor = storage->getAccessor(AccessorKind::Read);
-  if (!readAccessor)
-    readAccessor = storage->getAccessor(AccessorKind::YieldingBorrow);
-  if (readAccessor) {
-    auto lifetimeDependencies = readAccessor->getLifetimeDependencies();
-    if (lifetimeDependencies.has_value() && !lifetimeDependencies->empty()) {
-      for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
-        if (lifetimeDependenceInfo.hasScopeLifetimeParamIndices()) {
-          // A scoped lifetime dependence borrows its source.
-          return OpaqueReadOwnership::YieldingBorrow;
-        }
-      }
-    }
-  }
+  if (hasScopedReadCoroutineDependence(storage))
+    return OpaqueReadOwnership::YieldingBorrow;
 
   // A 'yielding borrow' protocol requirement keeps a borrowing opaque read, like
   // '@_borrowed', so the read-coroutine spellings stay symmetric in a protocol's
