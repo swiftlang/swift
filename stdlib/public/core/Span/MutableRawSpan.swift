@@ -733,6 +733,7 @@ extension MutableRawSpan {
   }
 }
 
+// MARK: bulk-update functions
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {

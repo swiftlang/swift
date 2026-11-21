@@ -797,6 +797,101 @@ extension MutableSpan {
   ) {
     updateAll(copying: source)
   }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ~Copyable {
+
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameter source: The elements to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(moving source: inout OutputSpan<Element>) {
+    _precondition(
+      source.count == self.count,
+      "Source must have as many elements as the destination"
+    )
+    if self.isEmpty { return }
+    withUnsafeMutableBufferPointer { destination in
+      unsafe source.withUnsafeMutableBufferPointer {
+        let c = unsafe destination.moveUpdate(
+          fromContentsOf: $0.extracting(first: $1)
+        )
+        _internalInvariant(c == destination.count)
+        $1 = 0
+      }
+    }
+  }
+
+  /// Overwrites every element within a range of indices by moving
+  /// the elements from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Index>, moving source: inout OutputSpan<Element>
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(moving: &source)
+  }
+
+  /// Overwrites every element within a range of indices by moving
+  /// the elements from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>,
+    moving source: inout OutputSpan<Element>
+  ) {
+    updateSubrange(subrange.relative(to: indices), moving: &source)
+  }
+
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - source: The elements to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout OutputSpan<Element>
+  ) {
+    updateAll(moving: &source)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
   /// Overwrites elements of this span, starting at an index, by copying
@@ -896,96 +991,6 @@ extension MutableSpan {
     }
   }
 #endif // !SPAN_COMPATIBILITY_STUB
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension MutableSpan where Element: ~Copyable {
-
-  /// Overwrites every element of this span by moving the elements
-  /// from the source.
-  ///
-  /// `source` must have exactly as many initialized elements as this span.
-  /// When this function returns, `source` is empty, and its memory has been
-  /// returned to the uninitialized state.
-  ///
-  /// - Parameter source: The elements to move into this span.
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func updateAll(moving source: inout OutputSpan<Element>) {
-    _precondition(
-      source.count == self.count,
-      "Source must have as many elements as the destination"
-    )
-    if self.isEmpty { return }
-    withUnsafeMutableBufferPointer { destination in
-      unsafe source.withUnsafeMutableBufferPointer {
-        let c = unsafe destination.moveUpdate(
-          fromContentsOf: $0.extracting(first: $1)
-        )
-        _internalInvariant(c == destination.count)
-        $1 = 0
-      }
-    }
-  }
-
-  /// Overwrites every element within a range of indices by moving
-  /// the elements from the source.
-  ///
-  /// `source` must have exactly as many initialized elements as `subrange`.
-  /// When this function returns, `source` is empty, and its memory has been
-  /// returned to the uninitialized state.
-  ///
-  /// - Parameters:
-  ///   - subrange: A valid range of indices. Every index in this range
-  ///      must be within the bounds of this `MutableSpan`.
-  ///   - source: The elements to move into `subrange`.
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func updateSubrange(
-    _ subrange: Range<Index>, moving source: inout OutputSpan<Element>
-  ) {
-    var span = self._mutatingExtracting(subrange)
-    span.updateAll(moving: &source)
-  }
-
-  /// Overwrites every element within a range of indices by moving
-  /// the elements from the source.
-  ///
-  /// `source` must have exactly as many initialized elements as `subrange`.
-  /// When this function returns, `source` is empty, and its memory has been
-  /// returned to the uninitialized state.
-  ///
-  /// - Parameters:
-  ///   - subrange: A valid range of indices. Every index in this range
-  ///      must be within the bounds of this `MutableSpan`.
-  ///   - source: The elements to move into `subrange`.
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func updateSubrange(
-    _ subrange: some RangeExpression<Index>,
-    moving source: inout OutputSpan<Element>
-  ) {
-    updateSubrange(subrange.relative(to: indices), moving: &source)
-  }
-
-  /// Overwrites every element of this span by moving the elements
-  /// from the source.
-  ///
-  /// `source` must have exactly as many initialized elements as this span.
-  /// When this function returns, `source` is empty, and its memory has been
-  /// returned to the uninitialized state.
-  ///
-  /// - Parameters:
-  ///   - subrange: An unbounded range, selecting every index of this span.
-  ///   - source: The elements to move into this span.
-  @export(implementation)
-  @_lifetime(self: copy self)
-  public mutating func updateSubrange(
-    _ subrange: UnboundedRange, moving source: inout OutputSpan<Element>
-  ) {
-    updateAll(moving: &source)
-  }
 }
 
 // MARK: sub-spans
