@@ -2811,6 +2811,27 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
+/// When printing an inlineable `yielding borrow`/`yielding mutate` accessor,
+/// we emit two blocks depending on whether CoroutineAccessors is enabled.
+/// For older compilers, we emit the feature-disabled block using the
+/// legacy `_read`/`_modify` keyword so it can be correctly inlined.
+static bool printsWithLegacyCoroutineKeyword(const AccessorDecl *accessor,
+                                             const PrintOptions &options) {
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+         options.SuppressCoroutineAccessors;
+}
+
+static AccessorKind getLegacyCoroutineAccessorKind(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::YieldingBorrow:
+    return AccessorKind::Read;
+  case AccessorKind::YieldingMutate:
+    return AccessorKind::Modify;
+  default:
+    return kind;
+  }
+}
+
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
                               bool printedInitializer) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
@@ -3004,12 +3025,19 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
-    if (Options.SuppressCoroutineAccessors &&
-        requiresFeatureCoroutineAccessors(kind))
-      return;
     auto *Accessor = ASD->getAccessor(kind);
     if (!Accessor)
       return;
+    // A `yielding` accessor printed with the legacy keyword stands in for the
+    // legacy accessor; don't print both.
+    if (kind == AccessorKind::Read || kind == AccessorKind::Modify) {
+      auto yieldingKind = kind == AccessorKind::Read
+                              ? AccessorKind::YieldingBorrow
+                              : AccessorKind::YieldingMutate;
+      if (auto *yielding = ASD->getAccessor(yieldingKind))
+        if (printsWithLegacyCoroutineKeyword(yielding, Options))
+          return;
+    }
     if (shouldPrint(Accessor))
       accessorsToPrint.push_back(Accessor);
   };
@@ -4799,10 +4827,6 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 }
 
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
-  if (Options.SuppressCoroutineAccessors &&
-      requiresFeatureCoroutineAccessors(decl->getAccessorKind())) {
-    return;
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
@@ -4821,7 +4845,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Borrow:
     recordDeclLoc(decl,
       [&]{
-        Printer << getAccessorLabel(decl->getAccessorKind());
+        auto kind = decl->getAccessorKind();
+        if (printsWithLegacyCoroutineKeyword(decl, Options))
+          kind = getLegacyCoroutineAccessorKind(kind);
+        Printer << getAccessorLabel(kind);
       });
     break;
   case AccessorKind::Set:
