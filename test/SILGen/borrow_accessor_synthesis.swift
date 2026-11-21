@@ -252,12 +252,8 @@ func testNCP2(_ p: inout some NCP) {
 // CHECK: bb0([[REG0:%.*]] : $*W<T>):
 // CHECK:   [[REG2:%.*]] = function_ref @$s25borrow_accessor_synthesis1WV5prop1xvb : $@convention(method) <τ_0_0> (@in_guaranteed W<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK:   [[REG3:%.*]] = apply [[REG2]]<T>([[REG0]]) : $@convention(method) <τ_0_0> (@in_guaranteed W<τ_0_0>) -> @guaranteed_address τ_0_0
-// CHECK:   [[REG4:%.*]] = alloc_stack $T
-// CHECK:   copy_addr [[REG3]] to [init] [[REG4]]
 // CHECK:   [[REG6:%.*]] = function_ref @$s25borrow_accessor_synthesis3useyyxRi_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   [[REG7:%.*]] = apply [[REG6]]<T>([[REG4]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
-// CHECK:   destroy_addr [[REG4]]
-// CHECK:   dealloc_stack [[REG4]]
+// CHECK:   [[REG7:%.*]] = apply [[REG6]]<T>([[REG3]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   [[REG10:%.*]] = function_ref @$s25borrow_accessor_synthesis1WV5prop2xvr : $@yield_once @convention(method) <τ_0_0> (@in_guaranteed W<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   ([[REG11:%.*]], [[REG12:%.*]]) = begin_apply [[REG10]]<T>([[REG0]]) : $@yield_once @convention(method) <τ_0_0> (@in_guaranteed W<τ_0_0>) -> @yields @in_guaranteed τ_0_0
 // CHECK:   [[REG13:%.*]] = alloc_stack $T
