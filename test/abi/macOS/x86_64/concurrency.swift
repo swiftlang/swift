@@ -602,3 +602,8 @@ Added: _swift_continuation_resumeOnExecutors
 // shared by its inlinable overloads.
 Added: _$sScC20_resumeSynchronously8throwing__yq_n_BeBetF
 Added: _$sScC20_resumeSynchronously9returning__yxn_BeBetF
+
+// Async{Throwing}Stream (Typed throws, nonisolated(nonsending))
+Added: _$sScs10makeStream2of8throwing15bufferingPolicyScsyxq_G6stream_Scs12ContinuationVyxq__G12continuationtxm_q_mAH09BufferingF0Oyxq___GtFZ
+Added: _$sScs9unfolding8onCancelScsyxq_GxSgyYaq_YKc_yycSgtcfC
+Added: _$sScs_15bufferingPolicy_Scsyxq_Gxm_Scs12ContinuationV09BufferingB0Oyxq___GyADyxq__GXEtcfC

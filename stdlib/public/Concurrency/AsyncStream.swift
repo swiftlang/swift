@@ -239,9 +239,12 @@ public struct AsyncStream<Element> {
 
   final class _Context {
     let storage: _Storage?
-    let produce: () async -> Element?
+    let produce: nonisolated(nonsending) () async -> Element?
 
-    init(storage: _Storage? = nil, produce: @escaping () async -> Element?) {
+    init(
+      storage: _Storage? = nil,
+      produce: nonisolated(nonsending) @escaping () async -> Element?
+    ) {
       self.storage = storage
       self.produce = produce
     }
@@ -345,12 +348,12 @@ public struct AsyncStream<Element> {
   @_silgen_name("$sScS9unfolding8onCancelScSyxGxSgyYac_yyYbcSgtcfC")
   @preconcurrency // Original API had `@Sendable` only on `onCancel`
   public init(
-    unfolding produce: @escaping @Sendable () async -> Element?,
+    unfolding produce: nonisolated(nonsending) @escaping @Sendable () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
-    let storage: _AsyncStreamCriticalStorage<Optional<() async -> Element?>>
+    let storage: _AsyncStreamCriticalStorage<Optional<nonisolated(nonsending) @Sendable () async -> Element?>>
       = .create(produce)
-    context = _Context {
+    self.context = _Context {
       return await withTaskCancellationHandler {
         guard let result = await storage.value?() else {
           storage.value = nil
@@ -476,8 +479,8 @@ extension AsyncStream {
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 5.9)
   public static func makeStream(
-      of elementType: Element.Type = Element.self,
-      bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
+    of elementType: Element.Type = Element.self,
+    bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
   ) -> (stream: AsyncStream<Element>, continuation: AsyncStream<Element>.Continuation) {
     var continuation: AsyncStream<Element>.Continuation!
     let stream = AsyncStream<Element>(bufferingPolicy: limit) { continuation = $0 }
