@@ -322,6 +322,10 @@ public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
 
+  /// Opaque types to be emitted into a different IGM; see emitOpaqueTypeDecl.
+  /// emitLazyDefinitions() emits them with getGenModuleForOpaqueType() current.
+  llvm::SmallVector<OpaqueTypeDecl *, 4> DeferredOpaqueTypeDecls;
+
   /// A record of all ExtensionDescriptors emitted for protocol-to-protocol
   /// conformances, as two such LinkEntity's can be unequal
   /// (point to different extensions of the same protocol) but name the same
@@ -407,6 +411,10 @@ public:
   /// Returns the IRGenModule of the containing source file, or if this cannot
   /// be determined, returns the primary IRGenModule.
   IRGenModule *getGenModule(DeclContext *ctxt);
+
+  /// Get the IRGenModule into which an opaque type's descriptor and descriptor
+  /// accessor are emitted.
+  IRGenModule *getGenModuleForOpaqueType(const OpaqueTypeDecl *opaque);
 
   /// Get an IRGenModule for a function.
   /// Returns the IRGenModule of the containing source file, or if this cannot

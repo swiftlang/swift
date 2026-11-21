@@ -8321,6 +8321,11 @@ llvm::Value *irgen::emitMetatypeInstanceType(IRGenFunction &IGF,
 }
 
 void IRGenModule::emitOpaqueTypeDecl(OpaqueTypeDecl *D) {
+  // Defer to emitLazyDefinitions() if the descriptor belongs to another IGM.
+  if (IRGen.getGenModuleForOpaqueType(D) != this) {
+    IRGen.DeferredOpaqueTypeDecls.push_back(D);
+    return;
+  }
   // Emit the opaque type descriptor.
   OpaqueTypeDescriptorBuilder(*this, D).emit();
 }
