@@ -197,6 +197,12 @@ extension ApplySite {
     argumentOperands.values
   }
 
+  /// The `self` argument value, or nil if the callee has no `self` parameter.
+  /// `self` is always the last argument.
+  public var selfArgument: Value? {
+    functionConvention.hasSelfParameter ? arguments.last : nil
+  }
+
   /// Indirect results including the error result.
   public var indirectResultOperands: OperandArray {
     let ops = operandConventions
@@ -360,6 +366,10 @@ extension ApplySite {
 
   public var hasGuaranteedResult: Bool {
     functionConvention.hasGuaranteedResult
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    functionConvention.hasGuaranteedAddressResult
   }
 }
 
