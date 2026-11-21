@@ -30,6 +30,7 @@
 namespace swift {
 
 class ASTContext;
+class StoredPropertyLayoutMemberView;
 class VarDecl;
 class SILFunction;
 class SILModule;
@@ -636,6 +637,13 @@ public:
                        TypeExpansionContext context) const;
 
   SILType getFieldType(VarDecl *field, SILFunction *fn) const;
+
+  SILType getFieldType(StoredPropertyLayoutMemberView field,
+                       Lowering::TypeConverter &TC,
+                       TypeExpansionContext context) const;
+
+  SILType getFieldType(StoredPropertyLayoutMemberView field, SILModule &M,
+                       TypeExpansionContext context) const;
 
   SILType getFieldType(intptr_t fieldIndex, SILFunction *function) const;
 

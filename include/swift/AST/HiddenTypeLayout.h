@@ -1,4 +1,4 @@
-//===--- HiddenTypeLayout.h - Hidden type layout analysis ------*- C++ -*-===//
+//===--- HiddenTypeLayout.h - Abstract member layout analysis --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,7 +13,6 @@
 #ifndef SWIFT_AST_HIDDENTYPELAYOUT_H
 #define SWIFT_AST_HIDDENTYPELAYOUT_H
 
-#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -21,28 +20,20 @@ namespace swift {
 
 class Decl;
 class FileUnit;
-class ModuleDecl;
-class NominalTypeDecl;
-class ValueDecl;
+class StructDecl;
+class VarDecl;
 
-enum class HiddenTypeLayoutOrigin {
-  ImplementationOnly,
-  InternalBridgingHeader,
-  RecoveredHiddenType,
+struct AbstractMemberTypeLayoutRequirement {
+  StructDecl *ABIExposedStruct;
+  VarDecl *StoredProperty;
 };
 
-struct HiddenTypeLayoutRequirement {
-  const Decl *LayoutDecl;
-  Type HiddenType;
-  HiddenTypeLayoutOrigin Origin;
-  NominalTypeDecl *ABIExposedType;
-  ValueDecl *LayoutAffectingStorage;
-};
-
-/// Find hidden types that contribute to this module's client-visible ABI.
-void forEachRequiredHiddenTypeLayout(
-    const ModuleDecl *module, ArrayRef<const FileUnit *> files,
-    llvm::function_ref<void(const HiddenTypeLayoutRequirement &)> callback);
+/// Find non-client-visible stored properties whose layouts contribute to this
+/// module's client-visible ABI.
+void forEachRequiredAbstractMemberTypeLayout(
+    llvm::ArrayRef<const FileUnit *> files,
+    llvm::function_ref<void(
+        const AbstractMemberTypeLayoutRequirement &)> callback);
 
 } // end namespace swift
 

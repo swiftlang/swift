@@ -169,22 +169,30 @@ public:
     return result;
   }
 
-  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
-    auto &typeInfo =
-        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
-
+  AbstractTypeLayout getAbstractTypeLayout(Type type, const VarDecl *member) {
+    auto canonicalType = type->getCanonicalType();
+    auto mangledName =
+        Mangle::ASTMangler(type->getASTContext())
+            .mangleTypeWithPrefix(canonicalType);
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
-      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
-      auto mangledName =
-          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
-      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+      IGM.dumpAbstractTypeLayoutInfo(
+          canonicalType, mangledName, "serialization",
+          StoredPropertyLayoutMemberView(const_cast<VarDecl *>(member)));
     }
 
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      auto *layout = hiddenType->getLayout();
+      assert(layout && layout->typeInfoRepresentation &&
+             "HiddenType must carry an abstract layout");
+      return *layout;
+    }
+
+    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     AbstractTypeLayout layout;
-    auto type = TD->getDeclaredInterfaceType();
+    layout.mangledName = std::move(mangledName);
     auto properties = typeConverter.getTypeProperties(
-        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+        type, TypeExpansionContext::minimal());
     layout.typeProperties = properties;
     if (type->hasReferenceSemantics())
       layout.referenceCountingSystem = type->getReferenceCounting();
@@ -586,8 +594,8 @@ bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
-    const NominalTypeDecl *TD) {
-  return impl->getAbstractTypeLayout(TD);
+    Type type, const VarDecl *member) {
+  return impl->getAbstractTypeLayout(type, member);
 }
 
 std::optional<LoweredFunctionSignature>

@@ -116,7 +116,8 @@ private:
   /// The first lowering is always for ResilientExpansion::Minimal.
   mutable const TypeLowering *NextExpansion = nullptr;
 
-  void printProperties(llvm::raw_ostream &os, unsigned indentation) const;
+  void printProperties(llvm::raw_ostream &os, unsigned indentation,
+                       bool includeExpansion) const;
 
 protected:
   void printForAbstractTypeLayoutInfoBase(llvm::raw_ostream &os,

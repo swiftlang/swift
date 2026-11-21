@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines data structures for abstract type layout information,
-// used to encode the layout of hidden C types in .swiftmodule files.
+// This file defines data structures used to encode abstract type layout
+// information in .swiftmodule files.
 //
 //===----------------------------------------------------------------------===//
 
@@ -20,19 +20,39 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILTypeProperties.h"
 
 namespace swift {
 
+class ASTContext;
 class SerializableHiddenTypeInfoRepresentation;
+class SubstitutionMap;
+class ModuleFile;
+
+/// Identifies a type record in the serialized module from which an abstract
+/// layout was recovered. Serialization can replay this record graph without
+/// first reconstructing a complete AST type.
+struct SerializedTypeReference {
+  ModuleFile *moduleFile = nullptr;
+  serialization::TypeID typeID = 0;
+
+  explicit operator bool() const { return moduleFile && typeID; }
+};
 
 struct AbstractTypeLayout {
+  std::string mangledName;
   SILTypeProperties typeProperties;
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>
       typeInfoRepresentation;
+  SerializedTypeReference serializedType;
+
+  AbstractTypeLayout *getWithSubstitutions(
+      ASTContext &context, SubstitutionMap substitutions);
 };
 
 } // namespace swift

@@ -47,12 +47,13 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 }
 
 // CHECK-BOTH: === Abstract type layout information ===
+// CHECK-BOTH-NEXT: enclosingType: $s7Library7WrapperV
+// CHECK-BOTH-NEXT: memberName: hidden
 // CHECK-BOTH-NEXT: mangledName: $sSo13HiddenCStructa
 // CHECK-LIBRARY-NEXT: origin: serialization
 // CHECK-CLIENT-NEXT: origin: recovery
 // CHECK-BOTH-NEXT: TypeLowering:
 // CHECK-BOTH-NEXT:   class: TrivialTypeLowering
-// CHECK-BOTH-NEXT:   Expansion: Maximal
 // CHECK-BOTH-NEXT:   isTrivial: true.
 // CHECK-BOTH-NEXT:   isEscapable: true.
 // CHECK-BOTH-NEXT:   isNonTrivialOnlyBecauseNonEscapable: false.

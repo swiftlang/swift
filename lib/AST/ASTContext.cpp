@@ -20,6 +20,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -275,7 +276,8 @@ struct ASTContext::Implementation {
   /// DenseMap.
   llvm::MapVector<Identifier, ModuleDecl *> LoadedModules;
 
-  llvm::SmallSetVector<CanType, 4> RecoveredHiddenTypes;
+  SmallVector<RecoveredAbstractMemberTypeLayout, 4>
+      RecoveredAbstractMemberTypeLayouts;
 
   /// The map from a module's name to a vector of modules that share that name.
   /// The name can be either the module's real name of the module's ABI name.
@@ -925,7 +927,7 @@ void ASTContext::Implementation::dump(llvm::raw_ostream &os) const {
                                 << llvm::capacity_in_bytes(Name) << "\n"
 
   SIZE(LoadedModules);
-  SIZE(RecoveredHiddenTypes);
+  SIZE(RecoveredAbstractMemberTypeLayouts);
   SIZE(NameToModules);
   SIZE(IdentifierTable);
   SIZE(Cleanups);
@@ -2746,13 +2748,21 @@ ASTContext::getLoadedModules() const {
   return {getImpl().LoadedModules.begin(), getImpl().LoadedModules.end()};
 }
 
-void ASTContext::recordRecoveredHiddenType(CanType type) {
+void ASTContext::recordRecoveredAbstractMemberTypeLayout(
+    MissingMemberDecl *member, CanType type) {
+  assert(member && member->StorageLayout);
   assert(isa<HiddenType>(type));
-  getImpl().RecoveredHiddenTypes.insert(type);
+  auto &recoveredLayouts = getImpl().RecoveredAbstractMemberTypeLayouts;
+  if (llvm::any_of(recoveredLayouts, [&](const auto &entry) {
+        return entry.Member == member && entry.Type == type;
+      }))
+    return;
+  recoveredLayouts.push_back({member, type});
 }
 
-ArrayRef<CanType> ASTContext::getRecoveredHiddenTypes() const {
-  return getImpl().RecoveredHiddenTypes.getArrayRef();
+ArrayRef<RecoveredAbstractMemberTypeLayout>
+ASTContext::getRecoveredAbstractMemberTypeLayouts() const {
+  return getImpl().RecoveredAbstractMemberTypeLayouts;
 }
 
 ModuleDecl *ASTContext::getLoadedModule(Identifier ModuleName) const {
@@ -4180,21 +4190,22 @@ IntegerType *IntegerType::get(const APSInt &value, const ASTContext &ctx) {
   return IntegerType::get(countBuf, isNegative, ctx);
 }
 
-HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+StringRef HiddenType::getMangledName() const {
+  return Layout->mangledName;
+}
+
+HiddenType *HiddenType::get(const ASTContext &ctx, AbstractTypeLayout *layout,
                             CanType parent) {
+  assert(layout && "HiddenType requires an abstract layout");
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, layoutInfoDecl, parent);
+  HiddenType::Profile(id, layout, parent);
 
   llvm::FoldingSetInsertToken insertToken;
-  if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken)) {
+  if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken))
     return hidden;
-  }
-
-  auto nameCopy = ctx.AllocateCopy(mangledName);
 
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, layoutInfoDecl, parent, ctx);
+      HiddenType(layout, parent, ctx);
 
   ctx.getImpl().HiddenTypes.insert(hidden, insertToken);
   return hidden;
