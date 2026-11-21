@@ -24,7 +24,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
+  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
   xx = identity2(yy) // expected-error{{no 'identity2' candidates produce the expected contextual result type 'X'}}
 }
 
@@ -89,7 +89,7 @@ func testReturnTuple(_ x: Int, y: Float) {
   var _ : (Float, Float) = returnTuple(y)
 
   // <rdar://problem/22333090> QoI: Propagate contextual information in a call to operands
-  var _ : (Int, Float) = returnTuple(y) // expected-error{{conflicting arguments to generic parameter 'T' ('Float' vs. 'Int')}}
+  var _ : (Int, Float) = returnTuple(y) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
 }
 
 
@@ -315,7 +315,7 @@ do {
 
     for i in min(1,2) { // expected-error{{for-in loop requires 'Int' to conform to 'Sequence'}}
     }
-    let j = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
+    let j = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
     let k = min(A(), A()) // expected-error{{global function 'min' requires that 'A' conform to 'Comparable'}}
     let oi : Int? = 5
     let l = min(3, oi) // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}

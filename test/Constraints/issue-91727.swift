@@ -5,6 +5,6 @@ struct S {
   func foo<T>(_ fn: (Int) -> T) -> T {}
   func bar() {
     let y: Bool = foo { x in }
-    // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
+    // expected-error@-1 {{cannot convert value of type '()' to specified type 'Bool'}}
   }
 }

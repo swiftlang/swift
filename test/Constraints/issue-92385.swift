@@ -5,5 +5,5 @@ func query<Result>(_ body: () -> Result) -> Result { body() }
 
 func test() {
   let (a, b) = query { print(1) }
-  // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  // expected-error@-1 {{'()' is not convertible to '(_, _)', tuples have a different number of elements}}
 }

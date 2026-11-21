@@ -203,7 +203,7 @@ class C0 {
 }
 
 // Check diagnostics changes.
-let _ = min(Int(3), Float(2.5)) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. 'Float')}}
+let _ = min(Int(3), Float(2.5)) // expected-error{{cannot convert value of type 'Int' to expected argument type 'Float'}}
 
 // https://github.com/apple/swift/issues/53830
 func testIntermediateCoercions() {

@@ -267,8 +267,7 @@ func associatedTypeIdentity() {
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
   sameType(gary(doug()).r_out(), gary(candace()).r_out())
-  // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
-  // expected-error@-2 {{conflicting arguments to generic parameter 'T' ('some R' (result type of 'doug') vs. 'some R' (result type of 'candace'))}}
+  // expected-error@-1 {{cannot convert value of type 'some R' (result of 'doug()') to expected argument type 'some R' (result of 'candace()')}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}
@@ -632,6 +631,6 @@ do {
 
   func test() {
     Test(v1: MyV().scaled(), v2: MyV())
-    // expected-error@-1 {{conflicting arguments to generic parameter 'T' ('some Proto' (result type of 'scaled') vs. 'MyV')}}
+    // expected-error@-1 {{cannot convert value of type 'some Proto' to expected argument type 'MyV'}}
   }
 }
