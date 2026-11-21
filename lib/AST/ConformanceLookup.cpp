@@ -333,6 +333,13 @@ static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
   return !cast<const SILFunctionType *>(eitherFnTy)->isNondeinitable();
 }
 
+static bool isTransferableFunctionType(EitherFunctionType eitherFnTy) {
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isNonTransferable();
+
+  return !cast<const SILFunctionType *>(eitherFnTy)->isNonTransferable();
+}
+
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
@@ -420,6 +427,10 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       break;
     case KnownProtocolKind::SendableMetatype:
       return synthesizeConformance();
+    case KnownProtocolKind::Transferable:
+      if (isTransferableFunctionType(functionType))
+        return synthesizeConformance();
+      break;
     default:
       break;
     }
@@ -488,6 +499,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
     case KnownProtocolKind::Deinitable:
+    case KnownProtocolKind::Transferable:
     case KnownProtocolKind::BitwiseCopyable:
     case KnownProtocolKind::SendableMetatype:
       return ProtocolConformanceRef(
@@ -512,7 +524,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
     case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
-    case KnownProtocolKind::Deinitable: {
+    case KnownProtocolKind::Deinitable:
+    case KnownProtocolKind::Transferable: {
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
@@ -549,8 +562,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
         }
       }
     
-      // All other builtin types are Sendable, SendableMetatype, Copyable, and
-      // Escapable.
+      // All other builtin types are Sendable, SendableMetatype, Copyable,
+      // Escapable, Deinitable and Transferable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -1025,6 +1038,9 @@ void TypeBase::computeInvertibleConformances() {
        InverseRequirement::copyableImpliesDeinitable(
            canType->getASTContext())) ||
       conformsToInvertible(canType, InvertibleProtocolKind::Deinitable);
+
+  Bits.TypeBase.IsTransferable =
+      conformsToInvertible(canType, InvertibleProtocolKind::Transferable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
@@ -1059,6 +1075,12 @@ bool TypeBase::isEscapable(GenericSignature sig) {
     contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isEscapable();
+}
+
+bool TypeBase::isTransferable() {
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsTransferable;
 }
 
 bool TypeBase::isBitwiseCopyable() {

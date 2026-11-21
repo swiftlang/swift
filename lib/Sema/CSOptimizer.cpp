@@ -1060,13 +1060,15 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
         break;
 
       case RequirementKind::Conformance:
-        // The introduction of the Deinitable protocol, which almost
-        // everything conforms to, changed the favoring computation.
-        // Ignore Deinitable to get the old behavior back for now.
+        // The introduction of the Deinitable/Transferable protocols, which
+        // almost everything conforms to, changed the favoring computation.
+        // Ignore Deinitable/Transferable to get the old behavior back for now.
         //
         // FIXME: Get rid of this, obviously.
         if (requirement.getProtocolDecl()->isSpecificProtocol(
-            KnownProtocolKind::Deinitable)) {
+                KnownProtocolKind::Deinitable) ||
+            requirement.getProtocolDecl()->isSpecificProtocol(
+                KnownProtocolKind::Transferable)) {
           continue;
         }
 

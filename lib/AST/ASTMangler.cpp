@@ -2438,6 +2438,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back('h');
   }
 
+  if (fn->isNonTransferable()) {
+    OpArgs.push_back('D');
+  }
+
   // Asynchronous functions.
   if (fn->isAsync()) {
     OpArgs.push_back('H');
@@ -3437,6 +3441,8 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     appendOperator("Ya");
   if (fn->isSendable())
     appendOperator("Yb");
+  if (fn->isNonTransferable())
+    appendOperator("Yd");
   if (auto thrownError = fn->getEffectiveThrownErrorType()) {
     if ((*thrownError)->isEqual(Context.getErrorExistentialType())
         || !AllowTypedThrows) {

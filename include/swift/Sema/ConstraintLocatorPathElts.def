@@ -57,6 +57,10 @@ SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 /// The thrown error of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureThrownError)
 
+/// Whether a closure without a contextual type is Transferable, which depends
+/// on the types of its captures.
+SIMPLE_LOCATOR_PATH_ELT(ClosureTransferability)
+
 /// FIXME: Misleading name: this locator is used only for single-expression
 /// closure returns.
 ///
@@ -286,6 +290,9 @@ SIMPLE_LOCATOR_PATH_ELT(FunctionSendability)
 
 /// The execution semantics dependence of a function type.
 SIMPLE_LOCATOR_PATH_ELT(FunctionExecutionSemantics)
+
+/// The Transferable dependence of a function type.
+SIMPLE_LOCATOR_PATH_ELT(FunctionTransferability)
 
 /// A type coercion operand.
 SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)

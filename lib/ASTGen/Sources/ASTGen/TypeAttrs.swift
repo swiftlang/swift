@@ -65,6 +65,7 @@ extension ASTGenVisitor {
         .Local,
         .NoMetadata,
         .Nonisolated,
+        .NonTransferable,
         .Once,
         .PackGuaranteed,
         .PackInout,

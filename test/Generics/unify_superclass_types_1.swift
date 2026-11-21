@@ -21,6 +21,7 @@ extension P where Self : Derived {
 // CHECK-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // CHECK-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
 // CHECK-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
+// CHECK-NEXT: - [Transferable].[Transferable] => [Transferable] [permanent]
 // CHECK-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
@@ -31,6 +32,7 @@ extension P where Self : Derived {
 // CHECK-NEXT:   [P] => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Base] }
 // CHECK-NEXT:   [Copyable] => { conforms_to: [Copyable Deinitable] }
 // CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
+// CHECK-NEXT:   [Transferable] => { conforms_to: [Transferable] }
 // CHECK-NEXT:   [Deinitable] => { conforms_to: [Deinitable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }

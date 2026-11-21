@@ -172,6 +172,9 @@ void ASTExtInfoBuilder::checkInvariants() const {
     case TypeDependenceKind::ExecutionSemantics:
       ASSERT(!hasCalledAtMostOnceSemantics());
       break;
+    case TypeDependenceKind::Transferable:
+      ASSERT(!isNonTransferable());
+      break;
     }
   }
 }

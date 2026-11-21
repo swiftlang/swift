@@ -1400,6 +1400,11 @@ public:
     return InvertibleProtocolSet(Data >> InvertedProtocolshift);
   }
 
+  bool isNonTransferable() const {
+    return getInvertedProtocols().contains(
+        InvertibleProtocolKind::Transferable);
+  }
+
   static TargetExtendedFunctionTypeFlags<int_type> fromIntValue(int_type Data) {
     return TargetExtendedFunctionTypeFlags(Data);
   }

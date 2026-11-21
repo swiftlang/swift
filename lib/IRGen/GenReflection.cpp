@@ -235,6 +235,11 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type,
       if (fn->getExecutionSemantics())
         return addRequirement(Swift_6_5);
 
+      // The mangling for @nontransferable function types was introduced in
+      // Swift 6.5.
+      if (fn->isNonTransferable())
+        return addRequirement(Swift_6_5);
+
       // The mangling for nonisolated(nonsending) function types was introduced
       // in Swift 6.2.
       if (isolation.isNonisolatedNonsending())

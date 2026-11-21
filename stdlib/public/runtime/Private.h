@@ -831,6 +831,10 @@ public:
   checkInvertibleRequirements(const Metadata *type,
                               InvertibleProtocolSet ignored);
 
+  /// The value witnesses for escaping '@nontransferable' Swift function types.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  extern const ValueWitnessTable NonTransferableThickFunctionValueWitnesses;
+
   /// Hook function that calls into the concurrency library to check whether
   /// we are currently executing the given global actor.
   SWIFT_RUNTIME_LIBRARY_VISIBILITY

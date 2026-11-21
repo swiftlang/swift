@@ -5264,6 +5264,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
   TRIVIAL_ATTR_PRINTER(UnsafeSelfDependentResult, unsafe_self_dependent_result)
+  TRIVIAL_ATTR_PRINTER(NonTransferable, nontransferable)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -6877,6 +6878,10 @@ namespace {
           printRec(dependentType.getPointer(),
                    Label::always("execution_semantics_dep"));
           break;
+        case TypeDependenceKind::Transferable:
+          printRec(dependentType.getPointer(),
+                   Label::always("transferable_dep"));
+          break;
         }
       }
 
@@ -7017,6 +7022,9 @@ namespace {
           break;
         case InvertibleProtocolKind::Deinitable:
           printFlag("inverse_deinitable");
+          break;
+        case InvertibleProtocolKind::Transferable:
+          printFlag("inverse_transferable");
           break;
         }
       }

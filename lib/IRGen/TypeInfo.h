@@ -423,6 +423,11 @@ public:
                                          ReferenceCounting *refcounting
                                              = nullptr) const;
 
+  /// Whether some of the reference counting operations on values of this
+  /// type are non-atomic, because they reference instances that are
+  /// confined to a single isolation domain.
+  virtual bool usesNonAtomicReferenceCounting() const { return false; }
+
   /// This is virtual to support the optimizations which rely on the
   /// representations of some structs being a single refcounted pointer.
   virtual void strongCustomRetain(IRGenFunction &IGF, Explosion &e,

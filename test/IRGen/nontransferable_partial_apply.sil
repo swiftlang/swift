@@ -1,0 +1,102 @@
+// RUN: %target-swift-frontend -emit-ir %s -module-name m | %FileCheck %s
+
+import Builtin
+import Swift
+
+final class NT: ~Transferable {}
+sil_vtable NT {}
+sil @$s1m2NTCfD : $@convention(method) (NT) -> ()
+
+final class C {}
+sil_vtable C {}
+sil @$s1m1CCfD : $@convention(method) (C) -> ()
+
+sil @takesOwnedNT : $@convention(thin) @nontransferable (@owned NT) -> ()
+sil @takesGuaranteedNT : $@convention(thin) @nontransferable (@guaranteed NT) -> ()
+sil @takesGuaranteedNTAndInt : $@convention(thin) @nontransferable (@guaranteed NT, Int) -> ()
+sil @takesOwnedC : $@convention(thin) (@owned C) -> ()
+sil @takesGuaranteedCAndInt : $@convention(thin) (@guaranteed C, Int) -> ()
+sil @nontransferableTakesGuaranteedC : $@convention(thin) @nontransferable (@guaranteed C) -> ()
+
+// CHECK-LABEL: define {{.*}} @"$s12takesOwnedNTTA"
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call ptr @swift_nonatomic_retain
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK: }
+sil @captureOwnedNT : $@convention(thin) (@owned NT) -> @owned @nontransferable @callee_guaranteed () -> () {
+bb0(%0 : $NT):
+  %f = function_ref @takesOwnedNT : $@convention(thin) @nontransferable (@owned NT) -> ()
+  %g = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) @nontransferable (@owned NT) -> ()
+  return %g : $@nontransferable @callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$s11takesOwnedCTA"
+// CHECK:   call ptr @swift_retain
+// CHECK-NOT: swift_nonatomic_
+// CHECK: }
+sil @captureOwnedC : $@convention(thin) (@owned C) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : $C):
+  %f = function_ref @takesOwnedC : $@convention(thin) (@owned C) -> ()
+  %g = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@owned C) -> ()
+  return %g : $@callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$s17takesGuaranteedNTTA"
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call void @swift_nonatomic_release
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK: }
+sil @captureGuaranteedNT : $@convention(thin) (@owned NT) -> @owned @nontransferable @callee_owned () -> () {
+bb0(%0 : $NT):
+  %f = function_ref @takesGuaranteedNT : $@convention(thin) @nontransferable (@guaranteed NT) -> ()
+  %g = partial_apply %f(%0) : $@convention(thin) @nontransferable (@guaranteed NT) -> ()
+  return %g : $@nontransferable @callee_owned () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$s23takesGuaranteedNTAndIntTA"
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call void @swift_nonatomic_release
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK: }
+sil @captureNTAndInt : $@convention(thin) (@owned NT, Int) -> @owned @nontransferable @callee_owned () -> () {
+bb0(%0 : $NT, %1 : $Int):
+  %f = function_ref @takesGuaranteedNTAndInt : $@convention(thin) @nontransferable (@guaranteed NT, Int) -> ()
+  %g = partial_apply %f(%0, %1) : $@convention(thin) @nontransferable (@guaranteed NT, Int) -> ()
+  return %g : $@nontransferable @callee_owned () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$s22takesGuaranteedCAndIntTA"
+// CHECK:   call void @swift_release
+// CHECK-NOT: swift_nonatomic_
+// CHECK: }
+sil @captureCAndInt : $@convention(thin) (@owned C, Int) -> @owned @callee_owned () -> () {
+bb0(%0 : $C, %1 : $Int):
+  %f = function_ref @takesGuaranteedCAndInt : $@convention(thin) (@guaranteed C, Int) -> ()
+  %g = partial_apply %f(%0, %1) : $@convention(thin) (@guaranteed C, Int) -> ()
+  return %g : $@callee_owned () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$sTA"
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call ptr @swift_nonatomic_retain
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call void @swift_nonatomic_release
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK: }
+sil @partiallyApplyNontransferable : $@convention(thin) (@owned @nontransferable @callee_owned (Int) -> (), Int) -> @owned @nontransferable @callee_owned () -> () {
+bb0(%0 : $@nontransferable @callee_owned (Int) -> (), %1 : $Int):
+  %g = partial_apply %0(%1) : $@nontransferable @callee_owned (Int) -> ()
+  return %g : $@nontransferable @callee_owned () -> ()
+}
+
+// CHECK-LABEL: define {{.*}} @"$s31nontransferableTakesGuaranteedCTA"
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK:   call void @swift_nonatomic_release
+// CHECK-NOT: call {{.*}} @swift_{{(retain|release)}}
+// CHECK: }
+sil @captureCIntoNontransferable : $@convention(thin) (@owned C) -> @owned @nontransferable @callee_owned () -> () {
+bb0(%0 : $C):
+  %f = function_ref @nontransferableTakesGuaranteedC : $@convention(thin) @nontransferable (@guaranteed C) -> ()
+  %g = partial_apply %f(%0) : $@convention(thin) @nontransferable (@guaranteed C) -> ()
+  return %g : $@nontransferable @callee_owned () -> ()
+}

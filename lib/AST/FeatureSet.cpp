@@ -938,6 +938,8 @@ static bool usesFeatureOnceFunctions(Decl *D) {
 
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
+UNINTERESTING_FEATURE(ModernImportedCArrays)
+UNINTERESTING_FEATURE(ModernImportedCArraysOnly)
 
 static bool usesFeatureNondeinitableTypes(Decl *decl) {
   auto &ctx = decl->getASTContext();
@@ -947,9 +949,236 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
   return suppressesDeinitable(decl);
 }
 
-UNINTERESTING_FEATURE(ModernImportedCArrays)
-UNINTERESTING_FEATURE(ModernImportedCArraysOnly)
+namespace {
+/// Determines whether declarations depend on NontransferableTypes, either by
+/// naming or suppressing Transferable, or by referring to a declaration that
+/// does. Older compilers don't see such declarations at all.
+class TransferableUsage {
+  llvm::SmallPtrSet<NominalTypeDecl *, 8> visited;
 
+public:
+  bool declUses(Decl *decl) {
+    // Without the feature, `Transferable` can't be named, and a module that
+    // only refers to declarations using it can't be guarded: `$` checks for
+    // experimental features fail when the interface is built without them.
+    auto &ctx = decl->getASTContext();
+    if (!ctx.LangOpts.hasFeature(Feature::NontransferableTypes))
+      return false;
+
+    // Opaque type declarations aren't printed; the declaration naming one
+    // carries the guard.
+    if (isa<OpaqueTypeDecl>(decl))
+      return false;
+
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
+      if (nominalUses(nominal))
+        return true;
+    }
+
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+      if (inheritanceUses(ext))
+        return true;
+      if (auto *nominal = ext->getExtendedNominal())
+        if (nominalUses(nominal))
+          return true;
+    }
+
+    if (auto *genericContext = decl->getAsGenericContext()) {
+      if (signatureUses(genericContext->getGenericSignature()))
+        return true;
+    }
+
+    if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+      for (unsigned i = 0, n = pbd->getNumPatternEntries(); i != n; ++i) {
+        bool uses = false;
+        pbd->getPattern(i)->forEachVariable(
+            [&](VarDecl *var) { uses |= typeUses(var->getInterfaceType()); });
+        if (uses)
+          return true;
+      }
+    }
+
+    if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
+      if (typeUses(alias->getUnderlyingType()))
+        return true;
+    }
+
+    if (auto *value = dyn_cast<ValueDecl>(decl)) {
+      if (auto type = value->getInterfaceType())
+        return typeUses(type);
+    }
+
+    return false;
+  }
+
+private:
+  bool signatureUses(GenericSignature sig) {
+    if (!sig)
+      return false;
+
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    sig->getRequirementsWithInverses(reqs, inverses);
+    return mentionsTransferable(reqs, inverses) || requirementsUse(reqs);
+  }
+
+  bool requirementSignatureUses(ProtocolDecl *proto) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
+                                                                 inverses);
+    return mentionsTransferable(reqs, inverses) || requirementsUse(reqs);
+  }
+
+  bool requirementsUse(ArrayRef<Requirement> reqs) {
+    return llvm::any_of(reqs, [&](const Requirement &req) {
+      if (req.getKind() == RequirementKind::Layout)
+        return false;
+      return typeUses(req.getFirstType()) || typeUses(req.getSecondType());
+    });
+  }
+
+  /// Whether the inheritance clause names or suppresses Transferable, or
+  /// refers to a declaration that uses it.
+  bool inheritanceUses(
+      llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> inheritor) {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    auto found =
+        getDirectlyInheritedNominalTypeDecls(inheritor, inverses, anyObject);
+    return inverses.contains(InvertibleProtocolKind::Transferable) ||
+           llvm::any_of(found, [&](const InheritedNominalEntry &entry) {
+             if (auto *proto = dyn_cast<ProtocolDecl>(entry.Item))
+               if (isTransferable(proto))
+                 return true;
+             return nominalUses(entry.Item);
+           });
+  }
+
+  bool nominalUses(NominalTypeDecl *nominal) {
+    // Transferable itself only counts where it's named explicitly, because
+    // every type parameter has an implicit requirement to conform to it.
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+      if (proto->getInvertibleProtocolKind())
+        return false;
+    }
+
+    // Protocols and generic signatures can refer to each other.
+    if (!visited.insert(nominal).second)
+      return false;
+
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal))
+      return inheritanceUses(proto) || requirementSignatureUses(proto);
+
+    // This covers ~Transferable, including through a superclass or a
+    // conditional conformance, for types from any module.
+    if (nominal->canBeTransferable() != TypeDecl::CanBeInvertible::Always)
+      return true;
+
+    if (inheritanceUses(nominal) ||
+        signatureUses(nominal->getGenericSignature()))
+      return true;
+
+    if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
+      if (auto superclass = classDecl->getSuperclass())
+        return typeUses(superclass);
+    }
+
+    return false;
+  }
+
+  bool typeUses(Type type) {
+    return type.findIf([&](Type type) {
+      Type constraint;
+      if (auto *existential = type->getAs<ExistentialType>())
+        constraint = existential->getConstraintType();
+      else if (auto *metatype = type->getAs<ExistentialMetatypeType>())
+        constraint = metatype->getInstanceType();
+
+      if (constraint) {
+        if (auto *protoTy = constraint->getAs<ProtocolType>())
+          if (isTransferable(protoTy->getDecl()))
+            return true;
+        if (auto *composition = constraint->getAs<ProtocolCompositionType>()) {
+          if (composition->getInverses().contains(
+                  InvertibleProtocolKind::Transferable))
+            return true;
+          if (llvm::any_of(composition->getMembers(), [](Type member) {
+                auto *protoTy = member->getAs<ProtocolType>();
+                return protoTy && isTransferable(protoTy->getDecl());
+              }))
+            return true;
+        }
+      }
+
+      if (auto *opaque = type->getAs<OpaqueTypeArchetypeType>()) {
+        if (signatureUses(
+                opaque->getDecl()->getOpaqueInterfaceGenericSignature()))
+          return true;
+      }
+
+      if (auto *nominal = type->getAnyNominal())
+        return nominalUses(nominal);
+
+      if (auto *funcType = type->getAs<AnyFunctionType>())
+        return funcType->isNonTransferable();
+
+      return false;
+    });
+  }
+
+  static bool isTransferable(ProtocolDecl *proto) {
+    return proto->isSpecificProtocol(KnownProtocolKind::Transferable);
+  }
+
+  static bool mentionsTransferable(ArrayRef<Requirement> reqs,
+                                   ArrayRef<InverseRequirement> inverses) {
+    return llvm::any_of(reqs,
+                        [](const Requirement &req) {
+                          return req.getKind() ==
+                                     RequirementKind::Conformance &&
+                                 isTransferable(req.getProtocolDecl());
+                        }) ||
+           llvm::any_of(inverses, [](const InverseRequirement &inverse) {
+             return inverse.getKind() == InvertibleProtocolKind::Transferable;
+           });
+  }
+};
+} // end anonymous namespace
+
+static bool usesFeatureNontransferableTypes(Decl *decl) {
+  return TransferableUsage().declUses(decl);
+}
+
+static bool usesFeatureTransferableProtocol(Decl *decl) {
+  auto *proto = dyn_cast<ProtocolDecl>(decl);
+  if (!proto)
+    return false;
+
+  // The protocol is synthesized into the stdlib.
+  if (proto->isSpecificProtocol(KnownProtocolKind::Transferable))
+    return true;
+
+  // Elsewhere, naming or suppressing Transferable requires
+  // NontransferableTypes, which guards the declaration without a fallback.
+  if (!proto->getParentModule()->isStdlibModule())
+    return false;
+
+  // Sendable inherits Transferable, and SendableMetatype suppresses it.
+  InheritedTypes inherited(proto);
+  return llvm::any_of(inherited.getIndices(), [&](unsigned i) {
+    auto type = inherited.getResolvedType(i);
+    if (!type)
+      return false;
+    if (auto *inheritedProto = type->getAs<ProtocolType>())
+      if (inheritedProto->getDecl()->isSpecificProtocol(
+              KnownProtocolKind::Transferable))
+        return true;
+    if (auto *pct = type->getCanonicalType()->getAs<ProtocolCompositionType>())
+      return pct->getInverses().contains(InvertibleProtocolKind::Transferable);
+    return false;
+  });
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
@@ -995,6 +1224,13 @@ static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
     auto *proto = dyn_cast<ProtocolDecl>(decl);
     if (!proto || proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
       return true;
+  }
+
+  // Compilers without the Transferable protocol must not see it at all.
+  if (featureName == "TransferableProtocol") {
+    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
+      if (proto->isSpecificProtocol(KnownProtocolKind::Transferable))
+        return true;
   }
 
   return hasFeatureSuppressionAttribute(decl, featureName, true);

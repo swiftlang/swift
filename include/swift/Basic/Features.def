@@ -626,6 +626,10 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AlwaysUnsafeAttribute, false)
 /// The Deinitable invertible protocol, which Copyable inherits
 SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
 
+/// The Transferable invertible protocol, which models non-Sendable values that
+/// cannot cross an isolation boundary unless consumed
+SUPPRESSIBLE_LANGUAGE_FEATURE(TransferableProtocol, 0, "Transferable protocol")
+
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
 
@@ -679,6 +683,10 @@ EXPERIMENTAL_FEATURE(OnceFunctions, false)
 /// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
 /// testing the compiler's support for `~Deinitable` types.
 EXPERIMENTAL_FEATURE(NondeinitableTypes, false)
+
+/// Allow types, generic parameters, associated types, and existentials to
+/// suppress `Transferable`, and allow naming it.
+EXPERIMENTAL_FEATURE(NontransferableTypes, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)

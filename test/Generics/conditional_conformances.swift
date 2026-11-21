@@ -23,6 +23,8 @@ struct Free<T> {}
 // CHECK-NEXT:      (builtin_conformance type="Free<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="Free<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="Free<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
 extension Free: P2 where T: P1 {} 
 // expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}} 
@@ -42,6 +44,8 @@ struct Constrained<T: P1> {}
 // CHECK-NEXT:      (builtin_conformance type="Constrained<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="Constrained<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="Constrained<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P3"))
 extension Constrained: P2 where T: P3 {} // expected-note {{requirement from conditional conformance of 'Constrained<U>' to 'P2'}}
 func constrained_good<U: P1 & P3>(_: U) {
@@ -58,7 +62,9 @@ struct RedundantSame<T: P1> {}
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Copyable"
 // CHECK-NEXT:     (builtin_conformance type="RedundantSame<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
-// CHECK-NEXT:     (builtin_conformance type="RedundantSame<T>" protocol="Escapable"{{.*}})))
+// CHECK-NEXT:     (builtin_conformance type="RedundantSame<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="RedundantSame<T>" protocol="Transferable"{{.*}})))
 extension RedundantSame: P2 where T: P1 {}
 
 struct RedundantSuper<T: P4> {}
@@ -68,7 +74,9 @@ struct RedundantSuper<T: P4> {}
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Copyable"
 // CHECK-NEXT:      (builtin_conformance type="RedundantSuper<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
-// CHECK-NEXT:      (builtin_conformance type="RedundantSuper<T>" protocol="Escapable"{{.*}})))
+// CHECK-NEXT:      (builtin_conformance type="RedundantSuper<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="RedundantSuper<T>" protocol="Transferable"{{.*}})))
 extension RedundantSuper: P2 where T: P1 {}
 
 struct OverlappingSub<T: P1> {}
@@ -79,6 +87,8 @@ struct OverlappingSub<T: P1> {}
 // CHECK-NEXT:      (builtin_conformance type="OverlappingSub<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="OverlappingSub<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="OverlappingSub<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P4"))
 extension OverlappingSub: P2 where T: P4 {} // expected-note {{requirement from conditional conformance of 'OverlappingSub<U>' to 'P2'}}
 func overlapping_sub_good<U: P4>(_: U) {
@@ -97,6 +107,8 @@ struct SameType<T> {}
 // CHECK-NEXT:      (builtin_conformance type="SameType<Int>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="SameType<Int>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="SameType<Int>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" same_type "Int"))
 extension SameType: P2 where T == Int {}
 // expected-note@-1 {{requirement from conditional conformance of 'SameType<U>' to 'P2'}}
@@ -118,6 +130,8 @@ struct SameTypeGeneric<T, U> {}
 // CHECK-NEXT:      (builtin_conformance type="SameTypeGeneric<T, T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="SameTypeGeneric<T, T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="SameTypeGeneric<T, T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" same_type "U"))
 extension SameTypeGeneric: P2 where T == U {}
 // expected-note@-1 {{requirement from conditional conformance of 'SameTypeGeneric<U, Int>' to 'P2'}}
@@ -148,6 +162,8 @@ struct Infer<T, U> {}
 // CHECK-NEXT:      (builtin_conformance type="Infer<Constrained<U>, U>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="Infer<Constrained<U>, U>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="Infer<Constrained<U>, U>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" same_type "Constrained<U>")
 // CHECK-NEXT:    (requirement "U" conforms_to "P1"))
 extension Infer: P2 where T == Constrained<U> {}
@@ -171,6 +187,8 @@ struct InferRedundant<T, U: P1> {}
 // CHECK-NEXT:      (builtin_conformance type="InferRedundant<Constrained<U>, U>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="InferRedundant<Constrained<U>, U>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="InferRedundant<Constrained<U>, U>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" same_type "Constrained<U>"))
 extension InferRedundant: P2 where T == Constrained<U> {}
 func infer_redundant_good<U: P1>(_: U) {
@@ -196,6 +214,8 @@ struct ClassFree<T> {}
 // CHECK-NEXT:      (builtin_conformance type="ClassFree<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="ClassFree<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="ClassFree<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" subclass_of "C1"))
 extension ClassFree: P2 where T: C1 {} // expected-note {{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
 func class_free_good<U: C1>(_: U) {
@@ -214,6 +234,8 @@ struct ClassMoreSpecific<T: C1> {}
 // CHECK-NEXT:      (builtin_conformance type="ClassMoreSpecific<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="ClassMoreSpecific<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="ClassMoreSpecific<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" subclass_of "C3"))
 extension ClassMoreSpecific: P2 where T: C3 {} // expected-note {{requirement from conditional conformance of 'ClassMoreSpecific<U>' to 'P2'}}
 func class_more_specific_good<U: C3>(_: U) {
@@ -232,7 +254,9 @@ struct ClassLessSpecific<T: C3> {}
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Copyable"
 // CHECK-NEXT:      (builtin_conformance type="ClassLessSpecific<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
-// CHECK-NEXT:      (builtin_conformance type="ClassLessSpecific<T>" protocol="Escapable"{{.*}})))
+// CHECK-NEXT:      (builtin_conformance type="ClassLessSpecific<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="ClassLessSpecific<T>" protocol="Transferable"{{.*}})))
 extension ClassLessSpecific: P2 where T: C1 {}
 
 
@@ -260,6 +284,8 @@ struct InheritEqual<T> {}
 // CHECK-NEXT:      (builtin_conformance type="InheritEqual<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="InheritEqual<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="InheritEqual<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
 extension InheritEqual: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritEqual<U>' to 'P2'}}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritEqual
@@ -271,6 +297,8 @@ extension InheritEqual: P2 where T: P1 {} // expected-note {{requirement from co
 // CHECK-LABEL:         (builtin_conformance type="InheritEqual<T>" protocol="Copyable"{{.*}}))
 // CHECK-LABEL:       (assoc_conformance type="Self" proto="Escapable"
 // CHECK-LABEL:         (builtin_conformance type="InheritEqual<T>" protocol="Escapable"{{.*}}))
+// CHECK-LABEL:       (assoc_conformance type="Self" proto="Transferable"
+// CHECK-LABEL:         (builtin_conformance type="InheritEqual<T>" protocol="Transferable"{{.*}}))
 // CHECK-LABEL:       (requirement "T" conforms_to "P1")))
 // CHECK-LABEL:   (requirement "T" conforms_to "P1"))
 extension InheritEqual: P5 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritEqual<U>' to 'P5'}}
@@ -301,6 +329,8 @@ struct InheritMore<T> {}
 // CHECK-NEXT:      (builtin_conformance type="InheritMore<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="InheritMore<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="InheritMore<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1"))
 extension InheritMore: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'InheritMore<U>' to 'P2'}}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=InheritMore
@@ -312,6 +342,8 @@ extension InheritMore: P2 where T: P1 {} // expected-note {{requirement from con
 // CHECK-NEXT:          (builtin_conformance type="InheritMore<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:        (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:          (builtin_conformance type="InheritMore<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:        (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:          (builtin_conformance type="InheritMore<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:        (requirement "T" conforms_to "P1")))
 // CHECK-NEXT:    (requirement "T" conforms_to "P4"))
 extension InheritMore: P5 where T: P4 {} // expected-note 2 {{requirement from conditional conformance of 'InheritMore<U>' to 'P5'}}
@@ -401,6 +433,8 @@ struct RedundancyOrderDependenceGood<T: P1, U> {}
 // CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceGood<T, T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceGood<T, T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceGood<T, T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" same_type "U"))
 extension RedundancyOrderDependenceGood: P2 where U: P1, T == U {}
 
@@ -412,6 +446,8 @@ struct RedundancyOrderDependenceBad<T, U: P1> {}
 // CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceBad<T, T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:    (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceBad<T, T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:    (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:      (builtin_conformance type="RedundancyOrderDependenceBad<T, T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:    (requirement "T" conforms_to "P1")
 // CHECK-NEXT:    (requirement "T" same_type "U"))
 extension RedundancyOrderDependenceBad: P2 where T: P1, T == U {}

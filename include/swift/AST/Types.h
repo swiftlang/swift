@@ -222,14 +222,14 @@ class alignas(1 << TypeAlignInBits) TypeBase
   }
 
 protected:
-  enum { NumAFTExtInfoBits = 19 };
-  enum { NumSILExtInfoBits = 17 };
+  enum { NumAFTExtInfoBits = 20 };
+  enum { NumSILExtInfoBits = 18 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
-                             RecursiveTypeProperties::BitWidth + 1 + 4,
+                             RecursiveTypeProperties::BitWidth + 1 + 5,
     /// Kind - The discriminator that indicates what subclass of type this is.
     Kind : NumTypeKindBits,
 
@@ -241,7 +241,8 @@ protected:
     ComputedInvertibleConformances : 1,
     IsCopyable : 1,
     IsEscapable : 1,
-    IsDeinitable : 1
+    IsDeinitable : 1,
+    IsTransferable : 1                             
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -272,16 +273,16 @@ protected:
     NumProtocols : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+25,
+  SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+24,
     /// Type variable options.
     Options : 7,
     /// The unique number assigned to this type variable.
-    ID : 25
+    ID : 24
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
+  SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 31,
     // Number of terms in the union.
-    NumTerms : 32
+    NumTerms : 31
   );
     
   SWIFT_INLINE_BITFIELD(SILFunctionType, TypeBase, NumSILExtInfoBits+1+4+1+2+1+1+1,
@@ -302,62 +303,62 @@ protected:
     Representation : 2
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+31,
+  SWIFT_INLINE_BITFIELD_FULL(ProtocolCompositionType, TypeBase, 1+30,
     /// Whether we have an explicitly-stated class constraint not
     /// implied by any of our members.
     HasExplicitAnyObject : 1,
 
     /// The number of protocols being composed.
+    Count : 30;
+
+    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 31,
+    /// The number of type arguments.
+    ArgCount : 31
+  );
+
+  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 31,
+    /// The number of elements of the tuple.
     Count : 31;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
-    /// The number of type arguments.
-    ArgCount : 32
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
-    /// The number of elements of the tuple.
-    Count : 32;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
-  );
-
-  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
+  SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 31,
     /// The number of elements of the pack.
-    Count : 32;
+    Count : 31;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+31,
+  SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+30,
     /// Whether elements of the pack are addresses.
     ElementIsAddress : 1,
 
     /// The number of elements of the pack
-    Count : 31;
+    Count : 30;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+16,
+  SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+15,
     /// The number of scope arguments.
     ScopeArgCount : 16,
 
     /// The number of generic arguments.
-    GenericArgCount : 16;
+    GenericArgCount : 15;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+29,
     /// Whether we have a parent type.
     HasParent : 1,
 
     /// The number of generic arguments.
-    GenericArgCount : 30;
+    GenericArgCount : 29;
 
     static_assert(NumPadBits == 0, "Re-insert padding if > 0");
   );
@@ -387,6 +388,7 @@ protected:
     Bits.TypeBase.IsCopyable = false;
     Bits.TypeBase.IsEscapable = false;
     Bits.TypeBase.IsDeinitable = false;
+    Bits.TypeBase.IsTransferable = false;
 
     setRecursiveProperties(properties);
   }
@@ -534,6 +536,9 @@ public:
 
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
+
+  /// Returns true if this type satisfies a conformance to Transferable.
+  bool isTransferable();
 
   /// Returns true if this contextual type satisfies a conformance to
   /// BitwiseCopyable.
@@ -3987,6 +3992,14 @@ public:
   /// Returns true if calling a value of this function type consumes the value.
   bool isCallConsuming() const { return hasCalledAtMostOnceSemantics(); }
 
+  /// Returns true if values of this function type cannot cross an isolation
+  /// boundary without also being consumed.
+  bool isNonTransferable() const {
+    ASSERT(!hasTypeDependencyFor(TypeDependenceKind::Transferable) &&
+           "Query Transferable dependence first");
+    return hasExtInfo() && getExtInfo().isNonTransferable();
+  }
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -5533,6 +5546,7 @@ public:
   }
 
   bool isSendable() const { return getExtInfo().isSendable(); }
+  bool isNonTransferable() const { return getExtInfo().isNonTransferable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
   std::optional<ExecutionSemantics> getExecutionSemantics() const {

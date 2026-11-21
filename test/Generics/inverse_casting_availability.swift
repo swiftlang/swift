@@ -76,6 +76,19 @@ func noAvailabilityNeeded<T>(_ generic: NCG<T>, _ concrete: NCG<All>) {
   _ = generic as Any
 }
 
+@available(SwiftStdlib 6.2, *)
+struct ValueGeneric<let n: Int, T> {}
+
+// Value generic arguments aren't types, so they don't suppress anything.
+@available(SwiftStdlib 6.2, *)
+func valueGenericArguments<let n: Int>(_ concrete: ValueGeneric<4, All>,
+                                       _ generic: ValueGeneric<n, All>,
+                                       _ array: InlineArray<4, Int>) {
+  _ = concrete as Any
+  _ = generic as Any
+  _ = array as Any
+}
+
 func expected_checked_cast_errors<T: ~Copyable>(_ generic: NCG<T>, _ concrete: NCG<NoCopy>,
                                                 _ concreteEsc: NEG<NoEscape>) {
   _ = concrete as any P // expected-error {{type_does_not_conform_decl_owner}}

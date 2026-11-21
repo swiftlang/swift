@@ -52,188 +52,194 @@ using namespace swift;
 using namespace irgen;
 
 namespace {
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
-  class Nativeness##Name##ReferenceTypeInfo \
-      : public IndirectTypeInfo<Nativeness##Name##ReferenceTypeInfo, \
-                                FixedTypeInfo> { \
-    llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
-  public: \
-    TypeLayoutEntry \
-    *buildTypeLayoutEntry(IRGenModule &IGM, \
-                          SILType T, \
-                          bool useStructLayouts) const override { \
-      if (!useStructLayouts) { \
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
-      } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry( \
-          *this, T, ScalarKind::Nativeness##Name##Reference); \
-    } \
-    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
-                                    llvm::Type *type, \
-                                    Size size, Alignment alignment, \
-                                    SpareBitVector &&spareBits, \
-                                    bool isOptional) \
-      : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize, IsABIAccessible), \
-        ValueTypeAndIsOptional(valueType, isOptional) {} \
-    void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
-                            Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##CopyInit(destAddr, srcAddr); \
-    } \
-    void initializeWithTake(IRGenFunction &IGF, Address destAddr, \
-                            Address srcAddr, SILType T, \
-                            bool isOutlined, bool zeroizeIfSensitive) const override { \
-      IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr); \
-    } \
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness)            \
+  class Nativeness##Name##ReferenceTypeInfo                                    \
+      : public IndirectTypeInfo<Nativeness##Name##ReferenceTypeInfo,           \
+                                FixedTypeInfo> {                               \
+    llvm::PointerIntPair<llvm::Type *, 1, bool> ValueTypeAndIsOptional;        \
+                                                                               \
+  public:                                                                      \
+    TypeLayoutEntry *                                                          \
+    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,                          \
+                         bool useStructLayouts) const override {               \
+      if (!useStructLayouts) {                                                 \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);    \
+      }                                                                        \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(                       \
+          *this, T, ScalarKind::Nativeness##Name##Reference);                  \
+    }                                                                          \
+    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType,                 \
+                                        llvm::Type *type, Size size,           \
+                                        Alignment alignment,                   \
+                                        SpareBitVector &&spareBits,            \
+                                        bool isOptional,                       \
+                                        bool isNonTransferable)                \
+        : IndirectTypeInfo(type, size, std::move(spareBits), alignment,        \
+                           IsNotTriviallyDestroyable, IsNotBitwiseTakable,     \
+                           IsCopyable, IsFixedSize, IsABIAccessible),          \
+          ValueTypeAndIsOptional(valueType, isOptional) {                      \
+      /* FIXME: These references only have atomic runtime entry points. */     \
+      (void)isNonTransferable;                                                 \
+    }                                                                          \
+    void initializeWithCopy(IRGenFunction &IGF, Address destAddr,              \
+                            Address srcAddr, SILType T,                        \
+                            bool isOutlined) const override {                  \
+      IGF.emit##Nativeness##Name##CopyInit(destAddr, srcAddr);                 \
+    }                                                                          \
+    void initializeWithTake(IRGenFunction &IGF, Address destAddr,              \
+                            Address srcAddr, SILType T, bool isOutlined,       \
+                            bool zeroizeIfSensitive) const override {          \
+      IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr);                 \
+    }                                                                          \
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr, \
-                        SILType T, bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##CopyAssign(destAddr, srcAddr); \
-    } \
+                        SILType T, bool isOutlined) const override {           \
+      IGF.emit##Nativeness##Name##CopyAssign(destAddr, srcAddr);               \
+    }                                                                          \
     void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr, \
-                        SILType T, bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##TakeAssign(destAddr, srcAddr); \
-    } \
-    void destroy(IRGenFunction &IGF, Address addr, SILType T, \
-                 bool isOutlined) const override { \
-      IGF.emit##Nativeness##Name##Destroy(addr); \
-    } \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      auto count = IGM.getReferenceStorageExtraInhabitantCount( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-      return count - ValueTypeAndIsOptional.getInt(); \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return IGM.getReferenceStorageExtraInhabitantValue(bits, \
-                                      index + ValueTypeAndIsOptional.getInt(), \
-                                      ReferenceOwnership::Name, \
-                                      ReferenceCounting::Nativeness); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override { \
-      return IGF.getReferenceStorageExtraInhabitantIndex(src, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
-      return IGM.getReferenceStorageExtraInhabitantMask( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    llvm::Type *getOptionalIntType() const { \
-      return llvm::IntegerType::get( \
-          ValueTypeAndIsOptional.getPointer()->getContext(), \
-          getFixedSize().getValueInBits()); \
-    } \
-    void printForAbstractTypeLayoutInfo( \
-        IRGenModule &IGM, llvm::raw_ostream &OS, \
-        unsigned indentation) const override { \
-      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
-    } \
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
-    createSerializableHiddenTypeInfoRepresentation( \
-        IRGenModule &) const override { \
-      unsupportedSerializableHiddenTypeInfoRepresentation(); \
-    } \
+                        SILType T, bool isOutlined) const override {           \
+      IGF.emit##Nativeness##Name##TakeAssign(destAddr, srcAddr);               \
+    }                                                                          \
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,                  \
+                 bool isOutlined) const override {                             \
+      IGF.emit##Nativeness##Name##Destroy(addr);                               \
+    }                                                                          \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {   \
+      auto count = IGM.getReferenceStorageExtraInhabitantCount(                \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+      return count - ValueTypeAndIsOptional.getInt();                          \
+    }                                                                          \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,        \
+                                       unsigned index) const override {        \
+      return IGM.getReferenceStorageExtraInhabitantValue(                      \
+          bits, index + ValueTypeAndIsOptional.getInt(),                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,      \
+                                         SILType T,                            \
+                                         bool isOutlined) const override {     \
+      return IGF.getReferenceStorageExtraInhabitantIndex(                      \
+          src, ReferenceOwnership::Name, ReferenceCounting::Nativeness);       \
+    }                                                                          \
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,          \
+                              Address dest, SILType T,                         \
+                              bool isOutlined) const override {                \
+      return IGF.storeReferenceStorageExtraInhabitant(                         \
+          index, dest, ReferenceOwnership::Name,                               \
+          ReferenceCounting::Nativeness);                                      \
+    }                                                                          \
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {       \
+      return IGM.getReferenceStorageExtraInhabitantMask(                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Type *getOptionalIntType() const {                                   \
+      return llvm::IntegerType::get(                                           \
+          ValueTypeAndIsOptional.getPointer()->getContext(),                   \
+          getFixedSize().getValueInBits());                                    \
+    }                                                                          \
+    void printForAbstractTypeLayoutInfo(IRGenModule &IGM,                      \
+                                        llvm::raw_ostream &OS,                 \
+                                        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);          \
+    }                                                                          \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>                  \
+    createSerializableHiddenTypeInfoRepresentation(                            \
+        IRGenModule &) const override {                                        \
+      unsupportedSerializableHiddenTypeInfoRepresentation();                   \
+    }                                                                          \
   };
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness) \
-  class Nativeness##Name##ReferenceTypeInfo \
-    : public SingleScalarTypeInfo<Nativeness##Name##ReferenceTypeInfo, \
-                                  LoadableTypeInfo> { \
-    llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
-  public: \
-    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
-                                              llvm::Type *type, \
-                                              Size size, Alignment alignment, \
-                                              SpareBitVector &&spareBits, \
-                                              bool isOptional) \
-      : SingleScalarTypeInfo(type, size, std::move(spareBits), \
-                             alignment, IsNotTriviallyDestroyable, \
-                             IsCopyable, \
-                             IsFixedSize, IsABIAccessible), \
-        ValueTypeAndIsOptional(valueType, isOptional) {} \
-    enum { IsScalarTriviallyDestroyable = false }; \
-    TypeLayoutEntry \
-    *buildTypeLayoutEntry(IRGenModule &IGM, \
-                          SILType T, \
-                          bool useStructLayouts) const override { \
-      if (!useStructLayouts) { \
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
-      } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry( \
-          *this, T, ScalarKind::Nativeness##Name##Reference); \
-    } \
-    llvm::Type *getScalarType() const { \
-      return ValueTypeAndIsOptional.getPointer(); \
-    } \
-    Address projectScalar(IRGenFunction &IGF, Address addr) const { \
-      return IGF.Builder.CreateElementBitCast(addr, getScalarType()); \
-    } \
-    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value, \
-                          Atomicity atomicity) const { \
-      IGF.emit##Nativeness##Name##Retain(value, atomicity); \
-    } \
-    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value, \
-                           Atomicity atomicity) const { \
-      IGF.emit##Nativeness##Name##Release(value, atomicity); \
-    } \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, Nativeness)           \
+  class Nativeness##Name##ReferenceTypeInfo                                    \
+      : public SingleScalarTypeInfo<Nativeness##Name##ReferenceTypeInfo,       \
+                                    LoadableTypeInfo> {                        \
+    llvm::PointerIntPair<llvm::Type *, 1, bool> ValueTypeAndIsOptional;        \
+    bool IsNonTransferable;                                                    \
+                                                                               \
+  public:                                                                      \
+    Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType,                 \
+                                        llvm::Type *type, Size size,           \
+                                        Alignment alignment,                   \
+                                        SpareBitVector &&spareBits,            \
+                                        bool isOptional,                       \
+                                        bool isNonTransferable)                \
+        : SingleScalarTypeInfo(type, size, std::move(spareBits), alignment,    \
+                               IsNotTriviallyDestroyable, IsCopyable,          \
+                               IsFixedSize, IsABIAccessible),                  \
+          ValueTypeAndIsOptional(valueType, isOptional),                       \
+          IsNonTransferable(isNonTransferable) {}                              \
+    enum { IsScalarTriviallyDestroyable = false };                             \
+    TypeLayoutEntry *                                                          \
+    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,                          \
+                         bool useStructLayouts) const override {               \
+      if (!useStructLayouts) {                                                 \
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);    \
+      }                                                                        \
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(                       \
+          *this, T, ScalarKind::Nativeness##Name##Reference);                  \
+    }                                                                          \
+    llvm::Type *getScalarType() const {                                        \
+      return ValueTypeAndIsOptional.getPointer();                              \
+    }                                                                          \
+    Address projectScalar(IRGenFunction &IGF, Address addr) const {            \
+      return IGF.Builder.CreateElementBitCast(addr, getScalarType());          \
+    }                                                                          \
+    /* See HeapTypeInfo::getAtomicity. */                                      \
+    Atomicity getAtomicity(Atomicity defaultAtomicity) const {                 \
+      return IsNonTransferable ? Atomicity::NonAtomic : defaultAtomicity;      \
+    }                                                                          \
+    bool usesNonAtomicReferenceCounting() const override {                     \
+      return IsNonTransferable;                                                \
+    }                                                                          \
+    void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,              \
+                          Atomicity defaultAtomicity) const {                  \
+      IGF.emit##Nativeness##Name##Retain(value,                                \
+                                         getAtomicity(defaultAtomicity));      \
+    }                                                                          \
+    void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,             \
+                           Atomicity defaultAtomicity) const {                 \
+      IGF.emit##Nativeness##Name##Release(value,                               \
+                                          getAtomicity(defaultAtomicity));     \
+    }                                                                          \
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const { \
-      IGF.emitFixLifetime(value); \
-    } \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      auto count = IGM.getReferenceStorageExtraInhabitantCount( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-      return count - ValueTypeAndIsOptional.getInt(); \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      return IGM.getReferenceStorageExtraInhabitantValue(bits, \
-                                      index + ValueTypeAndIsOptional.getInt(), \
-                                      ReferenceOwnership::Name, \
-                                      ReferenceCounting::Nativeness); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src, \
-                                         SILType T, bool isOutlined) \
-    const override {     \
-      return IGF.getReferenceStorageExtraInhabitantIndex(src, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index, \
-                              Address dest, SILType T, bool isOutlined) \
-    const override { \
-      return IGF.storeReferenceStorageExtraInhabitant(index, dest, \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override { \
-      return IGM.getReferenceStorageExtraInhabitantMask( \
-                                               ReferenceOwnership::Name, \
-                                               ReferenceCounting::Nativeness); \
-    } \
-    void printForAbstractTypeLayoutInfo( \
-        IRGenModule &IGM, llvm::raw_ostream &OS, \
-        unsigned indentation) const override { \
-      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
-    } \
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
-    createSerializableHiddenTypeInfoRepresentation( \
-        IRGenModule &) const override { \
-      unsupportedSerializableHiddenTypeInfoRepresentation(); \
-    } \
+      IGF.emitFixLifetime(value);                                              \
+    }                                                                          \
+    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {   \
+      auto count = IGM.getReferenceStorageExtraInhabitantCount(                \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+      return count - ValueTypeAndIsOptional.getInt();                          \
+    }                                                                          \
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,        \
+                                       unsigned index) const override {        \
+      return IGM.getReferenceStorageExtraInhabitantValue(                      \
+          bits, index + ValueTypeAndIsOptional.getInt(),                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,      \
+                                         SILType T,                            \
+                                         bool isOutlined) const override {     \
+      return IGF.getReferenceStorageExtraInhabitantIndex(                      \
+          src, ReferenceOwnership::Name, ReferenceCounting::Nativeness);       \
+    }                                                                          \
+    void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,          \
+                              Address dest, SILType T,                         \
+                              bool isOutlined) const override {                \
+      return IGF.storeReferenceStorageExtraInhabitant(                         \
+          index, dest, ReferenceOwnership::Name,                               \
+          ReferenceCounting::Nativeness);                                      \
+    }                                                                          \
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {       \
+      return IGM.getReferenceStorageExtraInhabitantMask(                       \
+          ReferenceOwnership::Name, ReferenceCounting::Nativeness);            \
+    }                                                                          \
+    void printForAbstractTypeLayoutInfo(IRGenModule &IGM,                      \
+                                        llvm::raw_ostream &OS,                 \
+                                        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);          \
+    }                                                                          \
+    std::unique_ptr<SerializableHiddenTypeInfoRepresentation>                  \
+    createSerializableHiddenTypeInfoRepresentation(                            \
+        IRGenModule &) const override {                                        \
+      unsupportedSerializableHiddenTypeInfoRepresentation();                   \
+    }                                                                          \
   };
 
   // The nativeness of a reference storage type is a policy decision.
@@ -914,6 +920,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(
 namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
+    bool IsNonTransferable;
+
   public:
     void printForAbstractTypeLayoutInfo(
         IRGenModule &IGM, llvm::raw_ostream &OS,
@@ -927,24 +935,27 @@ namespace {
       unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
-    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
-                                 Size size, SpareBitVector spareBits,
-                                 Alignment align)
-    : HeapTypeInfo(ReferenceCounting::Native, storage, size, spareBits,
-                   align) {}
+    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage, Size size,
+                                SpareBitVector spareBits, Alignment align,
+                                bool isNonTransferable)
+        : HeapTypeInfo(ReferenceCounting::Native, storage, size, spareBits,
+                       align),
+          IsNonTransferable(isNonTransferable) {}
 
     /// Builtin.NativeObject uses Swift native reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Native;
     }
+
+    bool isNonTransferable() const { return IsNonTransferable; }
   };
 } // end anonymous namespace
 
-const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
-  return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
-                                      IGM.getPointerSize(),
-                                      IGM.getHeapObjectSpareBits(),
-                                      IGM.getPointerAlignment());
+const LoadableTypeInfo *
+TypeConverter::convertBuiltinNativeObject(bool isNonTransferable) {
+  return new BuiltinNativeObjectTypeInfo(
+      IGM.RefCountedPtrTy, IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
+      IGM.getPointerAlignment(), isNonTransferable);
 }
 
 unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
@@ -1129,14 +1140,16 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
 
 #define SOMETIMES_UNKNOWN(Name)                                                \
   const TypeInfo *TypeConverter::create##Name##StorageType(                    \
-      llvm::Type *valueType, ReferenceCounting style, bool isOptional) {       \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional,         \
+      bool isNonTransferable) {                                                \
     auto &&spareBits =                                                         \
         IGM.getReferenceStorageSpareBits(ReferenceOwnership::Name, style);     \
     switch (style) {                                                           \
     case ReferenceCounting::Native:                                            \
       return new Native##Name##ReferenceTypeInfo(                              \
           valueType, IGM.Name##ReferenceStructTy, IGM.getPointerSize(),        \
-          IGM.getPointerAlignment(), std::move(spareBits), isOptional);        \
+          IGM.getPointerAlignment(), std::move(spareBits), isOptional,         \
+          isNonTransferable);                                                  \
     case ReferenceCounting::ObjC:                                              \
     case ReferenceCounting::None:                                              \
     case ReferenceCounting::Custom:                                            \
@@ -1144,28 +1157,25 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
     case ReferenceCounting::Unknown:                                           \
       return new Unknown##Name##ReferenceTypeInfo(                             \
           valueType, IGM.Name##ReferenceStructTy, IGM.getPointerSize(),        \
-          IGM.getPointerAlignment(), std::move(spareBits), isOptional);        \
+          IGM.getPointerAlignment(), std::move(spareBits), isOptional,         \
+          isNonTransferable);                                                  \
     case ReferenceCounting::Bridge:                                            \
     case ReferenceCounting::Error:                                             \
       llvm_unreachable("not supported!");                                      \
     }                                                                          \
     llvm_unreachable("bad reference-counting style");                          \
   }
-#define ALWAYS_NATIVE(Name) \
-  const TypeInfo * \
-  TypeConverter::create##Name##StorageType(llvm::Type *valueType, \
-                                           ReferenceCounting style, \
-                                           bool isOptional) { \
-    assert(style == ReferenceCounting::Native); \
-    auto &&spareBits = IGM.getReferenceStorageSpareBits( \
-                                                   ReferenceOwnership::Name, \
-                                                   ReferenceCounting::Native); \
-    return new Native##Name##ReferenceTypeInfo(valueType, \
-                                   IGM.Name##ReferencePtrTy->getElementType(), \
-                                   IGM.getPointerSize(), \
-                                   IGM.getPointerAlignment(), \
-                                   std::move(spareBits), \
-                                   isOptional); \
+#define ALWAYS_NATIVE(Name)                                                    \
+  const TypeInfo *TypeConverter::create##Name##StorageType(                    \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional,         \
+      bool isNonTransferable) {                                                \
+    assert(style == ReferenceCounting::Native);                                \
+    auto &&spareBits = IGM.getReferenceStorageSpareBits(                       \
+        ReferenceOwnership::Name, ReferenceCounting::Native);                  \
+    return new Native##Name##ReferenceTypeInfo(                                \
+        valueType, IGM.Name##ReferencePtrTy->getElementType(),                 \
+        IGM.getPointerSize(), IGM.getPointerAlignment(), std::move(spareBits), \
+        isOptional, isNonTransferable);                                        \
   }
 
   // Always native versus "sometimes unknown" reference storage type policy:
@@ -1833,17 +1843,23 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
 namespace {
 /// Basic layout and common operations for box types.
 class BoxTypeInfo : public HeapTypeInfo<BoxTypeInfo> {
+  bool IsNonTransferable;
+
 public:
-  BoxTypeInfo(IRGenModule &IGM)
-    : HeapTypeInfo(ReferenceCounting::Native, IGM.RefCountedPtrTy,
-                   IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
-                   IGM.getPointerAlignment())
-  {}
+  BoxTypeInfo(IRGenModule &IGM, bool isNonTransferable)
+      : HeapTypeInfo(ReferenceCounting::Native, IGM.RefCountedPtrTy,
+                     IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
+                     IGM.getPointerAlignment()),
+        IsNonTransferable(isNonTransferable) {}
 
   ReferenceCounting getReferenceCounting() const {
     // Boxes are always native-refcounted.
     return ReferenceCounting::Native;
   }
+
+  /// Contents that use non-atomic reference counting aren't 'Transferable',
+  /// so a box of them can't be referenced by a 'Transferable' value either.
+  bool isNonTransferable() const { return IsNonTransferable; }
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
@@ -1874,7 +1890,8 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+  EmptyBoxTypeInfo(IRGenModule &IGM)
+      : BoxTypeInfo(IGM, /*isNonTransferable=*/false) {}
 
   OwnedAddress
   allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *box,
@@ -1914,7 +1931,8 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+  NonFixedBoxTypeInfo(IRGenModule &IGM, bool isNonTransferable)
+      : BoxTypeInfo(IGM, isNonTransferable) {}
 
   OwnedAddress
   allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *boxType,
@@ -1955,9 +1973,9 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
   HeapLayout layout;
 
 public:
-  FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
-    : BoxTypeInfo(IGM), layout(std::move(layout))
-  {
+  FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout,
+                       bool isNonTransferable)
+      : BoxTypeInfo(IGM, isNonTransferable), layout(std::move(layout)) {
     // Trivial empty layouts should always use EmptyBoxTypeInfo instead
     assert(!layout.isKnownEmpty()
            || !layout.isTriviallyDestroyable());
@@ -2035,9 +2053,11 @@ public:
   }
 
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                             IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
-  }
+      : FixedBoxTypeInfoBase(
+            IGM,
+            getHeapLayoutForSingleTypeInfo(
+                IGM, IGM.getOpaqueStorageTypeInfo(stride, alignment)),
+            /*isNonTransferable=*/false) {}
 };
 
 /// Common implementation for single-refcounted boxes.
@@ -2055,10 +2075,16 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                                   IGM.getReferenceObjectTypeInfo(refcounting)))
-  {
+  SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting,
+                              bool isNonTransferable)
+      : FixedBoxTypeInfoBase(
+            IGM,
+            getHeapLayoutForSingleTypeInfo(
+                IGM, isNonTransferable
+                         ? IGM.getNonTransferableNativeObjectTypeInfo()
+                         : IGM.getReferenceObjectTypeInfo(refcounting)),
+            isNonTransferable) {
+    ASSERT(!isNonTransferable || refcounting == ReferenceCounting::Native);
   }
 };
 
@@ -2107,8 +2133,9 @@ public:
   }
 
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
-  {}
+      : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T),
+                             IGM.getTypeInfo(getFieldType(IGM, T))
+                                 .usesNonAtomicReferenceCounting()) {}
 };
 
 } // end anonymous namespace
@@ -2157,10 +2184,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   auto eltTy = getSILBoxFieldLoweredType(
     IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0);
   auto &eltTI = IGM.getTypeInfoForLowered(eltTy);
+  bool isNonTransferable = eltTI.usesNonAtomicReferenceCounting();
   if (!eltTI.isFixedSize()) {
-    if (!NonFixedBoxTI)
-      NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
-    return NonFixedBoxTI;
+    auto *&boxTI =
+        isNonTransferable ? NonTransferableNonFixedBoxTI : NonFixedBoxTI;
+    if (!boxTI)
+      boxTI = new NonFixedBoxTypeInfo(IGM, isNonTransferable);
+    return boxTI;
   }
 
   // For fixed-sized types, we can emit concrete box metadata.
@@ -2198,10 +2228,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
 
   // We can share box info for all single-refcounted types.
   if (fixedTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-    if (!SwiftRetainablePointerBoxTI)
-      SwiftRetainablePointerBoxTI
-        = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native);
-    return SwiftRetainablePointerBoxTI;
+    auto *&boxTI = isNonTransferable
+                       ? NonTransferableSwiftRetainablePointerBoxTI
+                       : SwiftRetainablePointerBoxTI;
+    if (!boxTI)
+      boxTI = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native,
+                                              isNonTransferable);
+    return boxTI;
   }
 
   // TODO: Other common shapes? Optional-of-Refcounted would be nice.

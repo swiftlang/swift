@@ -98,12 +98,31 @@ public:
 
   static const bool IsScalarTriviallyDestroyable = false;
 
+  /// Whether values of this type reference instances that can never be
+  /// 'Transferable'.
+  bool isNonTransferable() const { return false; }
+
+  /// The atomicity of reference counting operations on values of this type,
+  /// given the atomicity that the operation would use by default.
+  ///
+  /// Non-'Transferable' instances are confined to a single isolation domain,
+  /// so their reference counts are never updated concurrently.
+  Atomicity getAtomicity(Atomicity defaultAtomicity) const {
+    return asDerived().isNonTransferable() ? Atomicity::NonAtomic
+                                           : defaultAtomicity;
+  }
+
+  bool usesNonAtomicReferenceCounting() const override {
+    return asDerived().isNonTransferable();
+  }
+
   // Emit the copy/destroy operations required by SingleScalarTypeInfo
   // using strong reference counting.
   virtual void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
-                                 Atomicity atomicity) const {
+                                 Atomicity defaultAtomicity) const {
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);
-    IGF.emitStrongRelease(value, asDerived().getReferenceCounting(), atomicity);
+    IGF.emitStrongRelease(value, asDerived().getReferenceCounting(),
+                          asDerived().getAtomicity(defaultAtomicity));
   }
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -111,25 +130,26 @@ public:
   }
 
   virtual void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
-                                Atomicity atomicity) const {
+                                Atomicity defaultAtomicity) const {
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);
-    IGF.emitStrongRetain(value, asDerived().getReferenceCounting(), atomicity);
+    IGF.emitStrongRetain(value, asDerived().getReferenceCounting(),
+                         asDerived().getAtomicity(defaultAtomicity));
   }
 
   // Implement the primary retain/release operations of ReferenceTypeInfo
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
-                    Atomicity atomicity) const override {
+                    Atomicity defaultAtomicity) const override {
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRetain(IGF, value, atomicity);
+    asDerived().emitScalarRetain(IGF, value, defaultAtomicity);
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
-                     Atomicity atomicity) const override {
+                     Atomicity defaultAtomicity) const override {
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);
     llvm::Value *value = e.claimNext();
-    asDerived().emitScalarRelease(IGF, value, atomicity);
+    asDerived().emitScalarRelease(IGF, value, defaultAtomicity);
   }
 
 #define REF_STORAGE_HELPER(Name) \
@@ -139,6 +159,13 @@ public:
     return TC.create##Name##StorageType(this->getStorageType(), \
                                         asDerived().getReferenceCounting(), \
                                         isOptional); \
+  }
+#define CHECKED_REF_STORAGE_HELPER(Name)                                       \
+  const TypeInfo *create##Name##StorageType(TypeConverter &TC,                 \
+                                            bool isOptional) const override {  \
+    return TC.create##Name##StorageType(                                       \
+        this->getStorageType(), asDerived().getReferenceCounting(),            \
+        isOptional, asDerived().isNonTransferable());                          \
   }
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
   void name##LoadStrong(IRGenFunction &IGF, Address src, \
@@ -173,47 +200,53 @@ public:
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                 \
   void strongRetain##Name(IRGenFunction &IGF, Explosion &e,                    \
-                          Atomicity atomicity) const override {                \
+                          Atomicity defaultAtomicity) const override {         \
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);   \
     llvm::Value *value = e.claimNext();                                        \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native);   \
-    IGF.emitNativeStrongRetain##Name(value, atomicity);                        \
+    IGF.emitNativeStrongRetain##Name(                                          \
+        value, asDerived().getAtomicity(defaultAtomicity));                    \
   }                                                                            \
   void strongRetain##Name##Release(IRGenFunction &IGF, Explosion &e,           \
-                                   Atomicity atomicity) const override {       \
-    assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);   \
-    llvm::Value *value = e.claimNext();                                        \
-    assert(asDerived().getReferenceCounting() == ReferenceCounting::Native);   \
-    IGF.emitNativeStrongRetainAnd##Name##Release(value, atomicity);            \
-  }                                                                            \
-  void name##Retain(IRGenFunction &IGF, Explosion &e, Atomicity atomicity)     \
+                                   Atomicity defaultAtomicity)                 \
       const override {                                                         \
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);   \
     llvm::Value *value = e.claimNext();                                        \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native);   \
-    IGF.emitNative##Name##Retain(value, atomicity);                            \
+    IGF.emitNativeStrongRetainAnd##Name##Release(                              \
+        value, asDerived().getAtomicity(defaultAtomicity));                    \
   }                                                                            \
-  void name##Release(IRGenFunction &IGF, Explosion &e, Atomicity atomicity)    \
-      const override {                                                         \
+  void name##Retain(IRGenFunction &IGF, Explosion &e,                          \
+                    Atomicity defaultAtomicity) const override {               \
     assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);   \
     llvm::Value *value = e.claimNext();                                        \
     assert(asDerived().getReferenceCounting() == ReferenceCounting::Native);   \
-    IGF.emitNative##Name##Release(value, atomicity);                           \
+    IGF.emitNative##Name##Retain(value,                                        \
+                                 asDerived().getAtomicity(defaultAtomicity));  \
+  }                                                                            \
+  void name##Release(IRGenFunction &IGF, Explosion &e,                         \
+                     Atomicity defaultAtomicity) const override {              \
+    assert(asDerived().getReferenceCounting() != ReferenceCounting::Custom);   \
+    llvm::Value *value = e.claimNext();                                        \
+    assert(asDerived().getReferenceCounting() == ReferenceCounting::Native);   \
+    IGF.emitNative##Name##Release(value,                                       \
+                                  asDerived().getAtomicity(defaultAtomicity)); \
   }
-#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
-  REF_STORAGE_HELPER(Name)
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
-  REF_STORAGE_HELPER(Name)
-#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
-  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
-  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
-  REF_STORAGE_HELPER(Name)
+#define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                    \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                        \
+  CHECKED_REF_STORAGE_HELPER(Name)
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                   \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                       \
+  CHECKED_REF_STORAGE_HELPER(Name)
+#define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                \
+  NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                        \
+  ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                       \
+  CHECKED_REF_STORAGE_HELPER(Name)
 #define UNCHECKED_REF_STORAGE(Name, ...) \
   REF_STORAGE_HELPER(Name)
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
+#undef CHECKED_REF_STORAGE_HELPER
 #undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
 #undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
 

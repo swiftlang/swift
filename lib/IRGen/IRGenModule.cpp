@@ -1600,6 +1600,11 @@ AvailabilityRange IRGenModule::getAvailabilityRange() const {
   return AvailabilityRange::forDeploymentTarget(Context);
 }
 
+Atomicity IRGenModule::getDefaultAtomicity() const {
+  return getSILModule().isDefaultAtomic() ? Atomicity::Atomic
+                                          : Atomicity::NonAtomic;
+}
+
 Lowering::TypeConverter &IRGenModule::getSILTypes() const {
   return IRGen.SIL.Types;
 }

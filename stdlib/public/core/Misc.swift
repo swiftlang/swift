@@ -281,6 +281,22 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 /// refer to it yet.
 @_marker public protocol Deinitable/*: ~Copyable, ~Escapable*/ {}
 
+/// A type whose values can be transferred to another isolation domain.
+///
+/// Every type is `Transferable` unless it suppresses the conformance with
+/// `~Transferable`. Every `Sendable` type is `Transferable`, but
+/// `SendableMetatype` doesn't require it: a metatype can be shared across
+/// isolation domains even when values of its type can't be.
+///
+/// A value of a non-`Sendable` but `Transferable` type can be sent to another
+/// isolation domain when nothing else can access it; a value of a type that
+/// suppresses this conformance can only cross an isolation boundary by being
+/// consumed.
+///
+/// Source code can refer to this protocol only with the experimental
+/// `NontransferableTypes` feature enabled.
+@_marker public protocol Transferable/*: ~Copyable, ~Escapable, ~Deinitable*/ {}
+
 @_marker public protocol BitwiseCopyable: ~Escapable { }
 
 @available(*, deprecated, message: "Use BitwiseCopyable")

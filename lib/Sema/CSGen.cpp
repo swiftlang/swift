@@ -264,10 +264,13 @@ static void getArgumentsAfterCodeCompletionToken(
 
 void TypeVarRefCollector::inferTypeVars(Decl *D) {
   // We're only interested in VarDecls.
-  if (!isa_and_nonnull<VarDecl>(D))
+  auto *var = dyn_cast_or_null<VarDecl>(D);
+  if (!var)
     return;
 
-  auto ty = CS.getTypeIfAvailable(D);
+  ReferencedVars.insert(var);
+
+  auto ty = CS.getTypeIfAvailable(var);
   if (!ty)
     return;
 
@@ -2064,7 +2067,10 @@ namespace {
       }();
       extInfo = extInfo.withIsolation(isolation);
       if (isolation.isGlobalActor() &&
-          CS.getASTContext().LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability)) {
+          CS.getASTContext().LangOpts.hasFeature(
+              Feature::GlobalActorIsolatedTypesUsability) &&
+          // ~Transferable values cannot be Sendable.
+          !extInfo.isNonTransferable()) {
         extInfo = extInfo.withSendable();
       }
 

@@ -873,7 +873,7 @@ sil @generic_thunk_lowering_yield_test_2 : $@convention(thin) <T> () -> () {
 bb0:
   %0 = function_ref @generic_yield_noparam_twoyield_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
   %1 = thunk [identity] %0<T>() : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
-  (%result1, %result2, %result3, %result4, %tag) = begin_apply %1() : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0) for <T>
+  (%result1, %result2, %result3, %result4, %tag) = begin_apply %1() : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable, τ_0_0 : Transferable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0) for <T>
   debug_value %result1 : $Klass
   debug_value %result2 : $T
   debug_value %result3 : $Klass
@@ -910,7 +910,7 @@ sil @generic_thunk_lowering_yield_test_mixed : $@convention(thin) <T> () -> (@ou
 bb0(%result : $*T):
   %0 = function_ref @generic_yield_noparam_mixedyieldreturn_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @owned Klass, @yields τ_0_0, @yields Klass, @out τ_0_0, @yields τ_0_0, @owned Klass)
   %1 = thunk [identity] %0<T>() : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @owned Klass, @yields τ_0_0, @yields Klass, @out τ_0_0, @yields τ_0_0, @owned Klass)
-  (%yield1, %yield2, %yield3, %yield4, %tag) = begin_apply %1(%result) : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass) for <T>
+  (%yield1, %yield2, %yield3, %yield4, %tag) = begin_apply %1(%result) : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable, τ_0_0 : Transferable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass) for <T>
   debug_value %yield1 : $Klass
   debug_value %yield2 : $T
   debug_value %yield3 : $Klass

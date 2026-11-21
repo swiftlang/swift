@@ -6,45 +6,45 @@
 // REQUIRES: swift_feature_LifetimeDependence
 
 // CHECK-LABEL: .Outer@
-// CHECK: Generic signature: <A where A : Deinitable, A : Escapable>
+// CHECK: Generic signature: <A where A : Deinitable, A : Escapable, A : Transferable>
 
 // CHECK-LABEL: .Outer.innerFn@
-// CHECK: Generic signature: <A, B where A : Deinitable, A : Escapable, B : Deinitable, B : Escapable>
+// CHECK: Generic signature: <A, B where A : Deinitable, A : Escapable, A : Transferable, B : Deinitable, B : Escapable, B : Transferable>
 
 // CHECK-LABEL: .Outer.InnerStruct@
-// CHECK: Generic signature: <A, C where A : Deinitable, A : Escapable, C : Deinitable, C : Escapable>
+// CHECK: Generic signature: <A, C where A : Deinitable, A : Escapable, A : Transferable, C : Deinitable, C : Escapable, C : Transferable>
 
 // CHECK-LABEL: .Outer.InnerStruct.g@
-// CHECK: Generic signature: <A, C, D where A : Deinitable, A : Escapable, C : Deinitable, C : Escapable, D : Deinitable, D : Escapable>
+// CHECK: Generic signature: <A, C, D where A : Deinitable, A : Escapable, A : Transferable, C : Deinitable, C : Escapable, C : Transferable, D : Deinitable, D : Escapable, D : Transferable>
 
 // CHECK-LABEL: .Outer.InnerStruct.init()@
-// CHECK: Generic signature: <A, C where A : Deinitable, A : Escapable, C : Deinitable, C : Escapable>
+// CHECK: Generic signature: <A, C where A : Deinitable, A : Escapable, A : Transferable, C : Deinitable, C : Escapable, C : Transferable>
 
 // CHECK: (builtin_conformance type="Outer<A>.InnerStruct<C>" protocol="Escapable"{{.*}})
 
 // CHECK-LABEL: .Outer.InnerVariation1@
-// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, D : Deinitable, D : Escapable>
+// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, A : Transferable, D : Deinitable, D : Escapable, D : Transferable>
 
 // CHECK-LABEL: .Outer.InnerVariation2@
-// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, D : Copyable>
+// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, A : Transferable, D : Copyable, D : Transferable>
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer.InnerStruct
-// CHECK: Generic signature: <A, C where A : Copyable, A : Escapable, C : Copyable, C : Escapable>
+// CHECK: Generic signature: <A, C where A : Copyable, A : Escapable, A : Transferable, C : Copyable, C : Escapable, C : Transferable>
 
 // CHECK-LABEL: .InnerStruct extension.hello@
-// CHECK: Generic signature: <A, C, T where A : Copyable, A : Escapable, C : Copyable, C : Escapable, T : Copyable>
+// CHECK: Generic signature: <A, C, T where A : Copyable, A : Escapable, A : Transferable, C : Copyable, C : Escapable, C : Transferable, T : Copyable, T : Transferable>
 
 // CHECK-LABEL: .Freestanding@
-// CHECK: Generic signature: <T where T : Deinitable>
+// CHECK: Generic signature: <T where T : Deinitable, T : Transferable>
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer
-// CHECK: Generic signature: <A where A : Copyable, A : Escapable>
+// CHECK: Generic signature: <A where A : Copyable, A : Escapable, A : Transferable>
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer.InnerVariation1
-// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, D : Copyable, D : Escapable>
+// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, A : Transferable, D : Copyable, D : Escapable, D : Transferable>
 
 // CHECK-LABEL: ExtensionDecl {{.*}} base=Outer.InnerVariation2
-// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, D : Copyable>
+// CHECK: Generic signature: <A, D where A : Deinitable, A : Escapable, A : Transferable, D : Copyable, D : Transferable>
   
 public struct Outer<A: ~Copyable> {
   public func innerFn<B: ~Copyable>(_ b: borrowing B) {}

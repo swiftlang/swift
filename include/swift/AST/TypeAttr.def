@@ -77,6 +77,7 @@ TYPE_ATTR(_scopeParams, ScopeParams)
 TYPE_ATTR(_accessScope, AccessScope)
 SIMPLE_TYPE_ATTR(yield_once, YieldOnce)
 SIMPLE_TYPE_ATTR(yield_once_2, YieldOnce2)
+SIMPLE_TYPE_ATTR(nontransferable, NonTransferable)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(async, Async)
