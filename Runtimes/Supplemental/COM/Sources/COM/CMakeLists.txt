@@ -33,13 +33,15 @@ target_link_libraries(swiftCOM PRIVATE
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+emit_swift_interface(swiftCOM)
 install(TARGETS swiftCOM
   EXPORT SwiftSupplementalTargets
   COMPONENT ${PROJECT_NAME}_runtime
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftCOM)
-install_swift_interface(swiftCOM)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 embed_manifest(swiftCOM)

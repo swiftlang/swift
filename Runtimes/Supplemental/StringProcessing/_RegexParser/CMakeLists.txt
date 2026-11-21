@@ -38,12 +38,14 @@ target_link_libraries(swift_RegexParser PRIVATE
 set_target_properties(swift_RegexParser PROPERTIES
   Swift_MODULE_NAME _RegexParser)
 
+emit_swift_interface(swift_RegexParser)
 install(TARGETS swift_RegexParser
   ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swift_RegexParser)
-install_swift_interface(swift_RegexParser)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 generate_plist(swiftRegexParser "${CMAKE_PROJECT_VERSION}" swift_RegexParser)
 embed_manifest(swift_RegexParser)

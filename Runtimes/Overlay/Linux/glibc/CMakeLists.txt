@@ -26,10 +26,12 @@ target_compile_options(swiftGlibc PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "SHELL:-library-level api")
 
+emit_swift_interface(swiftGlibc)
 install(TARGETS swiftGlibc
   EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftGlibc)
-install_swift_interface(swiftGlibc)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")
