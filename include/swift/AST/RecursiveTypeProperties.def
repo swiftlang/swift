@@ -80,10 +80,6 @@ PROPERTY(HasDynamicSelf, hasDynamicSelf)
 /// This type expression contains an Error type.
 PROPERTY(HasError, hasError)
 
-/// This type expression contains an Error type without an
-/// underlying original type.
-PROPERTY(HasBareError, hasBareError)
-
 /// This type expression contains a JoinType or MeetType.
 PROPERTY(HasJoinOrMeet, hasJoinOrMeet)
 

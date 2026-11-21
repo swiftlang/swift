@@ -98,6 +98,12 @@ public:
     return *this;
   }
 
+  /// Remove a specific property from this set.
+  RecursiveTypeProperties &operator-=(Property property) {
+    Bits &= ~property;
+    return *this;
+  }
+
   /// Remove the HasTypeParameter property from this set.
   void removeHasTypeParameter() {
     Bits &= ~HasTypeParameter;
