@@ -390,8 +390,9 @@ suite.test("updateSubrange(_:repeating:)")
   var a = ContiguousArray<UInt8>(repeating: 0, count: byteCount)
   var span = MutableRawSpan(elements: a.mutableSpan)
   span.updateSubrange(2..<6, repeating: 0xff)
-  let i = Int.random(in: 0...span.byteCount)
-  span.updateSubrange(i..<i, repeating: 0x11)
+  for i in 0...span.byteCount {
+    span.updateSubrange(i..<i, repeating: 0x11)
+  }
   expectEqual(a, [0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0])
 }
 

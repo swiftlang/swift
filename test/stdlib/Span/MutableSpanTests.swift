@@ -324,8 +324,9 @@ suite.test("updateSubrange(_:repeating:)")
   var a = ContiguousArray(0..<capacity)
   var span = a.mutableSpan
   span.updateSubrange(2..<6, repeating: -1)
-  let i = Int.random(in: 0...span.count)
-  span.updateSubrange(i..<i, repeating: .min)
+  for i in 0...span.count {
+    span.updateSubrange(i..<i, repeating: .min)
+  }
   expectEqual(a, [0, 1, -1, -1, -1, -1, 6, 7])
 }
 
