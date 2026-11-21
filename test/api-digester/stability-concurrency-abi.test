@@ -6,10 +6,6 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-concurrency-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -99,7 +95,6 @@ Func withCheckedThrowingContinuation(function:_:) has mangled name changing from
 
 // #isolation adoption for cancellation handlers; old APIs are kept ABI compatible
 Func withTaskCancellationHandler(operation:onCancel:) has been renamed to Func withTaskCancellationHandler(operation:onCancel:isolation:)
-Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
 
 // Task.value adopted typed throws and old one needed `@_silgen_name` which this test doesn't understand how to handle.
 Accessor Task.value.Get() has been removed
@@ -123,8 +118,6 @@ Func Executor.enqueue(_:) is a new API without '@available'
 
 // Adopt #isolation in TaskLocal.withValue APIs
 Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValueImpl(_:operation:isolation:file:line:)
-Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
-Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValueImpl<A>(_: __owned A, operation: () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 0 changing from Default to Owned
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () async throws -> τ_1_0 to () throws -> τ_1_0
 Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 type change from () throws -> τ_1_0 to () async throws -> τ_1_0
@@ -133,10 +126,8 @@ Func TaskLocal.withValue(_:operation:file:line:) has parameter 3 type change fro
 Func TaskLocal.withValue(_:operation:file:line:) has removed default argument from parameter 2
 Func withTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.TaskGroup<τ_0_0>) async -> τ_0_1 to (any _Concurrency.Actor)?
 Func withThrowingTaskGroup(of:returning:body:) has been renamed to Func withThrowingTaskGroup(of:returning:isolation:body:)
-Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
 Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from (inout _Concurrency.ThrowingTaskGroup<τ_0_0, any Swift.Error>) async throws -> τ_0_1 to (any _Concurrency.Actor)?
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
-Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
 
 // Adopt nonisolated(nonsending) in withCheckedContinuation
 Func withCheckedContinuation(function:_:) has been renamed to Func _unsafeInheritExecutor_withCheckedContinuation(function:_:)
@@ -157,7 +148,18 @@ Func _taskIsCancelled(_:) has parameter 0 type change from Builtin.NativeObject 
 Func _defaultActorDestroy(_:) has been removed
 Func _defaultActorInitialize(_:) has been removed
 
+// Once functions: these closure parameters are now exactly-once or at-most-once.
+// The previous entry points are preserved by `@abi` shims.
+Constructor AsyncStream.init(_:bufferingPolicy:_:) has parameter 2 changing from Default to Owned
+Constructor AsyncThrowingStream.init(_:bufferingPolicy:_:) has parameter 2 changing from Default to Owned
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, file: Swift.String, line: Swift.UInt) async throws -> A1' to '_Concurrency.TaskLocal.withValue<A>(_: A, operation: __owned () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has mangled name changing from '_Concurrency.TaskLocal.withValue<A>(_: A, operation: () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1' to '_Concurrency.TaskLocal.withValueImpl<A>(_: __owned A, operation: __owned () async throws -> A1, isolation: isolated Swift.Optional<Swift.Actor>, file: Swift.String, line: Swift.UInt) async throws -> A1'
+Func TaskLocal.withValue(_:operation:file:line:) has parameter 1 changing from Default to Owned
+Func withTaskCancellationHandler(operation:onCancel:) has mangled name changing from '_Concurrency.withTaskCancellationHandler<A>(operation: () async throws -> A, onCancel: @Sendable () -> ()) async throws -> A' to '_Concurrency.withTaskCancellationHandler<A>(operation: __owned () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Optional<Swift.Actor>) async throws -> A'
+Func withTaskCancellationHandler(operation:onCancel:) has parameter 0 changing from Default to Owned
+Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: __owned (inout Swift.TaskGroup<A>) async -> B) async -> B'
+Func withThrowingTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B' to '_Concurrency.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: __owned (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B'
+Func withUnsafeCurrentTask(body:) has mangled name changing from '_Concurrency.withUnsafeCurrentTask<A>(body: (Swift.Optional<Swift.UnsafeCurrentTask>) throws -> A) throws -> A' to '_Concurrency.withUnsafeCurrentTask<A>(body: __owned (Swift.Optional<Swift.UnsafeCurrentTask>) throws -> A) throws -> A'
+Func withUnsafeCurrentTask(body:) has parameter 0 changing from Default to Owned
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
-
-
-

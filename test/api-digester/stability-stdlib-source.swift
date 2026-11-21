@@ -13,7 +13,3 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed '/^\s*$/d' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-source.swift.expected %t.tmp/changes.txt.tmp
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-

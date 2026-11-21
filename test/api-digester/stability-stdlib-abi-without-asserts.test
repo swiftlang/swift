@@ -7,10 +7,6 @@
 // RUN: %clang -E -P -x c %t.tmp/changes.txt -o - | sed -E -e '/^\s*$/d' -e 's/ in _[0-9A-F]{32}/ in #UNSTABLE ID#/g' | sort > %t.tmp/changes.txt.tmp
 // RUN: diff -u %t.tmp/stability-stdlib-abi.swift.expected.sorted %t.tmp/changes.txt.tmp
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -888,5 +884,93 @@ Func Hasher.combine(_:) is now with @_preInverseGenerics
 Func _hashValue(for:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
 Func _hashValue(for:) has parameter 0 changing from Default to Shared
 Func _hashValue(for:) is now with @_preInverseGenerics
+
+// Once functions: these closure parameters are now exactly-once or at-most-once.
+// The previous entry points are preserved by `@abi` shims.
+Accessor Dictionary.subscript(_:default:).Get() has mangled name changing from 'Swift.Dictionary.subscript.getter : (_: A, default: @autoclosure () -> B) -> B' to 'Swift.Dictionary.subscript.getter : (_: A, default: __owned @autoclosure () -> B) -> B'
+Accessor Dictionary.subscript(_:default:).Get() has parameter 1 changing from Default to Owned
+Accessor Dictionary.subscript(_:default:).Modify() has mangled name changing from 'Swift.Dictionary.subscript.modify : (_: A, default: @autoclosure () -> B) -> B' to 'Swift.Dictionary.subscript.modify : (_: A, default: __owned @autoclosure () -> B) -> B'
+Accessor Dictionary.subscript(_:default:).Modify() has parameter 1 changing from Default to Owned
+Accessor Dictionary.subscript(_:default:).Set() has mangled name changing from 'Swift.Dictionary.subscript.setter : (_: A, default: @autoclosure () -> B) -> B' to 'Swift.Dictionary.subscript.setter : (_: A, default: __owned @autoclosure () -> B) -> B'
+Accessor Dictionary.subscript(_:default:).Set() has parameter 2 changing from Default to Owned
+Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has parameter 2 changing from Default to Owned
+Func Array._withUnsafeMutableBufferPointerIfSupported(_:) has mangled name changing from 'Swift.Array._withUnsafeMutableBufferPointerIfSupported<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.Array._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func Array._withUnsafeMutableBufferPointerIfSupported(_:) has parameter 0 changing from Default to Owned
+Func Array.withContiguousMutableStorageIfAvailable(_:) has mangled name changing from 'Swift.Array.withContiguousMutableStorageIfAvailable<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.Array.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func Array.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func Array.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.Array.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.Array.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func Array.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeBytes(_:) has mangled name changing from 'Swift.Array.withUnsafeBytes<A>((Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.Array.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1'
+Func Array.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeMutableBytes(_:) has mangled name changing from 'Swift.Array.withUnsafeMutableBytes<A>((Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.Array.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1'
+Func Array.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice._withUnsafeMutableBufferPointerIfSupported(_:) has mangled name changing from 'Swift.ArraySlice._withUnsafeMutableBufferPointerIfSupported<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ArraySlice._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ArraySlice._withUnsafeMutableBufferPointerIfSupported(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has mangled name changing from 'Swift.ArraySlice.withContiguousMutableStorageIfAvailable<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ArraySlice.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.ArraySlice.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ArraySlice.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeBytes(_:) has mangled name changing from 'Swift.ArraySlice.withUnsafeBytes<A>((Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.ArraySlice.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1'
+Func ArraySlice.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeMutableBytes(_:) has mangled name changing from 'Swift.ArraySlice.withUnsafeMutableBytes<A>((Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.ArraySlice.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1'
+Func ArraySlice.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func Bool.&&(_:_:) has mangled name changing from 'static Swift.Bool.&& infix(Swift.Bool, @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool' to 'static Swift.Bool.&& infix(Swift.Bool, __owned @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool'
+Func Bool.&&(_:_:) has parameter 1 changing from Default to Owned
+Func Bool.||(_:_:) has mangled name changing from 'static Swift.Bool.|| infix(Swift.Bool, @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool' to 'static Swift.Bool.|| infix(Swift.Bool, __owned @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool'
+Func Bool.||(_:_:) has parameter 1 changing from Default to Owned
+Func ContiguousArray._withUnsafeMutableBufferPointerIfSupported(_:) has mangled name changing from 'Swift.ContiguousArray._withUnsafeMutableBufferPointerIfSupported<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ContiguousArray._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ContiguousArray._withUnsafeMutableBufferPointerIfSupported(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has mangled name changing from 'Swift.ContiguousArray.withContiguousMutableStorageIfAvailable<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ContiguousArray.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.ContiguousArray.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.ContiguousArray.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeBytes(_:) has mangled name changing from 'Swift.ContiguousArray.withUnsafeBytes<A>((Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.ContiguousArray.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1'
+Func ContiguousArray.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeMutableBytes(_:) has mangled name changing from 'Swift.ContiguousArray.withUnsafeMutableBytes<A>((Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1' to 'Swift.ContiguousArray.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1'
+Func ContiguousArray.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has mangled name changing from 'static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>' to 'static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: __owned (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>'
+Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has parameter 1 changing from Default to Owned
+Func StaticString.withUTF8Buffer(_:) has mangled name changing from 'Swift.StaticString.withUTF8Buffer<A>((Swift.UnsafeBufferPointer<Swift.UInt8>) -> A) -> A' to 'Swift.StaticString.withUTF8Buffer<A>(__owned (Swift.UnsafeBufferPointer<Swift.UInt8>) -> A) -> A'
+Func StaticString.withUTF8Buffer(_:) has parameter 0 changing from Default to Owned
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.String.UTF8View.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<Swift.UInt8>) throws -> A) throws -> Swift.Optional<A>' to 'Swift.String.UTF8View.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<Swift.UInt8>) throws -> A) throws -> Swift.Optional<A>'
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func Unicode.UTF32.encode(_:into:) has mangled name changing from 'static Swift.Unicode.UTF32.encode(_: Swift.Unicode.Scalar, into: (Swift.UInt32) -> ()) -> ()' to 'static Swift.Unicode.UTF32.encode(_: Swift.Unicode.Scalar, into: __owned (Swift.UInt32) -> ()) -> ()'
+Func Unicode.UTF32.encode(_:into:) has parameter 1 changing from Default to Owned
+Func Unmanaged._withUnsafeGuaranteedRef(_:) has mangled name changing from 'Swift.Unmanaged._withUnsafeGuaranteedRef<A>((A) throws -> A1) throws -> A1' to 'Swift.Unmanaged._withUnsafeGuaranteedRef<A>(__owned (A) throws -> A1) throws -> A1'
+Func Unmanaged._withUnsafeGuaranteedRef(_:) has parameter 0 changing from Default to Owned
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.UnsafeBufferPointer.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.UnsafeBufferPointer.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func UnsafeMutableBufferPointer._withUnsafeMutableBufferPointerIfSupported(_:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer._withUnsafeMutableBufferPointerIfSupported<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.UnsafeMutableBufferPointer._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func UnsafeMutableBufferPointer._withUnsafeMutableBufferPointerIfSupported(_:) has parameter 0 changing from Default to Owned
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable<A>((inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has mangled name changing from 'Swift.UnsafeMutableBufferPointer.withContiguousStorageIfAvailable<A>((Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>' to 'Swift.UnsafeMutableBufferPointer.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> Swift.Optional<A1>'
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func _debugPrecondition(_:_:file:line:) has mangled name changing from 'Swift._debugPrecondition(_: @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift._debugPrecondition(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func _debugPrecondition(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func _internalInvariant(_:_:file:line:) has mangled name changing from 'Swift._internalInvariant(_: @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift._internalInvariant(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func _internalInvariant(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func _precondition(_:_:file:line:) has mangled name changing from 'Swift._precondition(_: @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift._precondition(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func _precondition(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func _undefined(_:file:line:) has mangled name changing from 'Swift._undefined<A>(_: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> A' to 'Swift._undefined<A>(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> A'
+Func _undefined(_:file:line:) has parameter 0 changing from Default to Owned
+Func _withVaList(_:_:) has mangled name changing from 'Swift._withVaList<A>(Swift.__VaListBuilder, (Swift.CVaListPointer) -> A) -> A' to 'Swift._withVaList<A>(Swift.__VaListBuilder, __owned (Swift.CVaListPointer) -> A) -> A'
+Func _withVaList(_:_:) has parameter 1 changing from Default to Owned
+Func assert(_:_:file:line:) has mangled name changing from 'Swift.assert(_: @autoclosure () -> Swift.Bool, _: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift.assert(_: __owned @autoclosure () -> Swift.Bool, _: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func assert(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func assert(_:_:file:line:) has parameter 1 changing from Default to Owned
+Func assertionFailure(_:file:line:) has mangled name changing from 'Swift.assertionFailure(_: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift.assertionFailure(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func assertionFailure(_:file:line:) has parameter 0 changing from Default to Owned
+Func fatalError(_:file:line:) has mangled name changing from 'Swift.fatalError(_: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never' to 'Swift.fatalError(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never'
+Func fatalError(_:file:line:) has parameter 0 changing from Default to Owned
+Func precondition(_:_:file:line:) has mangled name changing from 'Swift.precondition(_: @autoclosure () -> Swift.Bool, _: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()' to 'Swift.precondition(_: __owned @autoclosure () -> Swift.Bool, _: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()'
+Func precondition(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func precondition(_:_:file:line:) has parameter 1 changing from Default to Owned
+Func preconditionFailure(_:file:line:) has mangled name changing from 'Swift.preconditionFailure(_: @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never' to 'Swift.preconditionFailure(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never'
+Func preconditionFailure(_:file:line:) has parameter 0 changing from Default to Owned
+Func withVaList(_:_:) has mangled name changing from 'Swift.withVaList<A>(Swift.Array<Swift.CVarArg>, (Swift.CVaListPointer) -> A) -> A' to 'Swift.withVaList<A>(Swift.Array<Swift.CVarArg>, __owned (Swift.CVaListPointer) -> A) -> A'
+Func withVaList(_:_:) has parameter 1 changing from Default to Owned
+Subscript Dictionary.subscript(_:default:) has mangled name changing from 'Swift.Dictionary.subscript(_: A, default: @autoclosure () -> B) -> B' to 'Swift.Dictionary.subscript(_: A, default: __owned @autoclosure () -> B) -> B'
+Subscript Dictionary.subscript(_:default:) has parameter 1 changing from Default to Owned
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
