@@ -291,3 +291,40 @@ FRTTemplateCtorWithDefaultArg {
 };
 
 using FRTTemplateCtorWithDefaultArgInt = FRTTemplateCtorWithDefaultArg<int>;
+
+// Swift copies this with the public copy constructor, but C++ copies a
+// non-const lvalue with the private one.
+struct ArgWithPrivateNonConstCopy {
+  ArgWithPrivateNonConstCopy() {}
+  ArgWithPrivateNonConstCopy(const ArgWithPrivateNonConstCopy &) {}
+
+private:
+  ArgWithPrivateNonConstCopy(ArgWithPrivateNonConstCopy &) {}
+};
+
+// The static factory for the second constructor would forward its argument as a
+// non-const lvalue, which is an access error, so that constructor gets none.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+FRTCtorWithPrivateArgCopy {
+  FRTCtorWithPrivateArgCopy(int x) {}
+  FRTCtorWithPrivateArgCopy(ArgWithPrivateNonConstCopy arg) {}
+};
+
+// A user-provided static factory template suppresses synthesized factories,
+// like a non-template one does.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+FRTTemplateFactory {
+  template <class T>
+  __attribute__((swift_name("init(value:)")))
+  static FRTTemplateFactory *make(T v) {
+    return new FRTTemplateFactory(static_cast<int>(v));
+  }
+
+  FRTTemplateFactory(int x) {}
+};
