@@ -143,7 +143,7 @@ private:
   // If the pattern contains a single variable that has an attached
   // property wrapper, set up the initializer expression to initialize
   // the backing storage.
-  void maybeApplyPropertyWrapper();
+  void maybeApplyPropertyWrapper(Type backingStorageType = Type());
 
 public:
   SyntacticElementTarget(Expr *expr, DeclContext *dc,
@@ -258,7 +258,7 @@ public:
   /// Form a target for a synthesized property wrapper initializer.
   static SyntacticElementTarget
   forPropertyWrapperInitializer(VarDecl *wrappedVar, DeclContext *dc,
-                                Expr *initializer);
+                                Expr *initializer, Type backingStorageType);
 
   /// Form a target for the match expression of an ExprPattern.
   static SyntacticElementTarget forExprPattern(ExprPattern *pattern);
