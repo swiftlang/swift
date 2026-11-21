@@ -575,7 +575,7 @@ suite.test("updateElements(startingAt:copyingAll:), returning the end index")
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 8, 9])
 }
 
-struct IterableSequence: Sequence, Iterable {
+private struct IterableSequence: Sequence, Iterable {
   typealias Element = Int
 
   let bound: Int
