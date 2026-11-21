@@ -585,16 +585,19 @@ void swift::performLLVMOptimizations(
   // -Xcc -O2): to remove clang.arc.use / clang.arc.noop.use, and to insert
   // the assembly markers Clang leaves to it (recorded in a module flag that
   // Swift itself sets only when optimizing). Run it only if any of these
-  // actually appear and LTO isn't used (LTO runs ObjCARCContract).
-  if (!DisableObjCARCContract &&
+  // actually appear.
+  //
+  // Under LTO, leave it to the link-time code generator, as Clang does:
+  // running it before the link creates objc_claimAutoreleasedReturnValue
+  // bundles that the link-time inliner mishandles.
+  if (!DisableObjCARCContract && !isThinLTO && !isFullLTO &&
       (Opts.shouldOptimize()
            ? !Opts.DisableLLVMOptzns
-           : !isThinLTO && !isFullLTO &&
-                 (Intrinsic::getDeclarationIfExists(
-                      Module, Intrinsic::objc_clang_arc_use) ||
-                  Intrinsic::getDeclarationIfExists(
-                      Module, Intrinsic::objc_clang_arc_noop_use) ||
-                  Module->getModuleFlag(objcarc::getRVMarkerModuleFlagStr()))))
+           : (Intrinsic::getDeclarationIfExists(
+                  Module, Intrinsic::objc_clang_arc_use) ||
+              Intrinsic::getDeclarationIfExists(
+                  Module, Intrinsic::objc_clang_arc_noop_use) ||
+              Module->getModuleFlag(objcarc::getRVMarkerModuleFlagStr()))))
     MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
 
   if (Opts.Verify) {
