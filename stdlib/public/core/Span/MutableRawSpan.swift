@@ -1653,4 +1653,4 @@ extension MutableRawSpan: Iterable {
     .init(Span(viewing: self.bytes))
   }
 }
-#endif
+#endif // !SPAN_COMPATIBILITY_STUB

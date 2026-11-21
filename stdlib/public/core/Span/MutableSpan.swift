@@ -1608,4 +1608,4 @@ extension MutableSpan: Iterable where Element: ~Copyable {
     .init(self.span)
   }
 }
-#endif
+#endif // !SPAN_COMPATIBILITY_STUB
