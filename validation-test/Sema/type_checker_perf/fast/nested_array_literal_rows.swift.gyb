@@ -1,0 +1,10 @@
+// RUN: %scale-test --begin 5 --end 40 --step 5 --select NumSolutionEntriesRecorded %s
+
+// Every row is its own connected component; each row's partial solution
+// must record only what that row changed, not the whole literal.
+
+let _: [[Int]] = [
+%for i in range(0, N):
+  [${i}, 1, 2, 3],
+%end
+]
