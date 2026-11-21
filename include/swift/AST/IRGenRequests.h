@@ -260,6 +260,12 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
+/// Report that a request of the given kind returned a cached result, so it
+/// can be recorded by the stats reporter.
+template<typename Request>
+void reportCachedRequest(UnifiedStatsReporter &stats,
+                         const Request &request);
+
 class IRGenRequest
     : public SimpleRequest<IRGenRequest, GeneratedModule(IRGenDescriptor),
                            RequestFlags::Uncached |
@@ -326,12 +332,17 @@ public:
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
- // Set up reporting of evaluated requests.
+// Set up reporting of evaluated and cache-hit requests.
 #define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
 template<>                                                                     \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,                \
                             const RequestType &request) {                      \
   ++stats.getFrontendCounters().RequestType;                                   \
+}                                                                              \
+template<>                                                                     \
+inline void reportCachedRequest(UnifiedStatsReporter &stats,                   \
+                                const RequestType &request) {                  \
+  ++stats.getFrontendCounters().RequestType##CacheHit;                         \
 }
 #include "swift/AST/IRGenTypeIDZone.def"
 #undef SWIFT_REQUEST
