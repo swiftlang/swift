@@ -100,12 +100,12 @@ extension Repeated: RandomAccessCollection {
 ///
 /// - Parameters:
 ///   - element: The element to repeat.
-///   - n: The number of times to repeat `element`.
+///   - count: The number of times to repeat `element`.
 /// - Returns: A collection that contains `count` elements that are all
 ///   `element`.
 @inlinable // trivial-implementation
-public func repeatElement<T>(_ element: T, count n: Int) -> Repeated<T> {
-  return Repeated(_repeating: element, count: n)
+public func repeatElement<T>(_ element: T, count: Int) -> Repeated<T> {
+  return Repeated(_repeating: element, count: count)
 }
 
 extension Repeated: Sendable where Element: Sendable { }

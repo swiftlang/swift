@@ -134,7 +134,7 @@ extension UniqueArray where Element: ~Copyable {
   /// buffer of the specified capacity, moving all existing elements
   /// to its new storage. The old storage is then deallocated.
   ///
-  /// - Parameter capacity: The desired new capacity. `newCapacity` must be
+  /// - Parameter newCapacity: The desired new capacity. `newCapacity` must be
   ///    greater than or equal to the current count.
   ///
   /// - Complexity: O(`count`)
@@ -146,14 +146,14 @@ extension UniqueArray where Element: ~Copyable {
   /// Ensure that the array has capacity to store the specified number of
   /// elements, by growing its storage buffer if necessary.
   ///
-  /// If `capacity < n`, then this operation reallocates the unique array's
-  /// storage to grow it; on return, the array's capacity becomes `n`.
+  /// If `capacity < minimumCapacity`, then this operation reallocates the unique array's
+  /// storage to grow it; on return, the array's capacity becomes `minimumCapacity`.
   /// Otherwise the array is left as is.
   ///
   /// - Complexity: O(`count`)
   @export(implementation)
-  public mutating func reserveCapacity(_ n: Int) {
-    _storage.reserveCapacity(n)
+  public mutating func reserveCapacity(_ minimumCapacity: Int) {
+    _storage.reserveCapacity(minimumCapacity)
   }
 
   @export(implementation)
