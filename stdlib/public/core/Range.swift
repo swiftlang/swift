@@ -312,6 +312,45 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   }
 }
 
+extension Range where Bound: FixedWidthInteger, Bound.Stride: SignedInteger {
+  /// Returns a random element of the range, using the given generator as a
+  /// source for randomness.
+  ///
+  /// This override avoids the default `Collection.randomElement()`, which
+  /// narrows the element count to `Int` and crashes for ranges whose count
+  /// exceeds `Int.max` (e.g. `UInt128.min..<UInt128.max`).
+  ///
+  /// - Parameter generator: The random number generator to use when choosing a
+  ///   random element.
+  /// - Returns: A random element from the range. If the range is empty,
+  ///   the method returns `nil`.
+  ///
+  /// - Complexity: O(1).
+  @inlinable
+  public func randomElement<T: RandomNumberGenerator>(
+    using generator: inout T
+  ) -> Bound? {
+    guard !isEmpty else { return nil }
+    return Bound.random(in: self, using: &generator)
+  }
+
+  /// Returns a random element of the range.
+  ///
+  /// This override avoids the default `Collection.randomElement()`, which
+  /// narrows the element count to `Int` and crashes for ranges whose count
+  /// exceeds `Int.max` (e.g. `UInt128.min..<UInt128.max`).
+  ///
+  /// - Returns: A random element from the range. If the range is empty,
+  ///   the method returns `nil`.
+  ///
+  /// - Complexity: O(1).
+  @inlinable
+  public func randomElement() -> Bound? {
+    var g = SystemRandomNumberGenerator()
+    return randomElement(using: &g)
+  }
+}
+
 extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Creates an instance equivalent to the given `ClosedRange`.
   ///
