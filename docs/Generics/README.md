@@ -48,23 +48,16 @@ pdflatex generics
 
 ## Reading the PDF
 
-The book makes use of internal hyperlinks so it is best to use PDF reader with support for PDF bookmarks and back/forward history:
-
-- Preview.app on macOS fits the bill; you can add Back/Forward buttons to the toolbar with **View** > **Customize Toolbar**.
-- [Skim.app](https://skim-app.sourceforge.io) is a BSD-licensed open source PDF reader for macOS.
-
-The font size and link targets are probably too small for a smartphone display, so I recommend using something bigger.
+The book makes use of internal hyperlinks so it is best to use PDF reader with support for PDF bookmarks and back/forward history. Preview.app on macOS fits the bill; you can add Back/Forward buttons to the toolbar with **View** > **Customize Toolbar**. However, the font size and link targets are probably too small for a smartphone display, so I recommend using something bigger.
 
 ## Current Status
 
-This is a work in progress. The following chapters are still in progress:
+This is a work in progress. The following chapters are incomplete:
 
 - Part II:
   - Existential Types
-- Part III:
-  - Completion
 
-The following chapters are not yet written:
+The following chapters have not yet been written:
 
 - Part III:
   - The Property Map

@@ -15,7 +15,7 @@ Mapping into an environment produces a type which no longer contains type parame
 
 Contextual types and primary archetypes are used in place of interface types inside the \index{expression}expressions that appear in generic function bodies, but archetypes don't surface as a distinct concept in the language; instead, it's a representation change. \index{SILGen}SILGen lowers expressions to \index{SIL}SIL instructions which consume and produce SIL values, so the types of SIL values are also contextual types. Finally, when \index{IRGen}IRGen generates code for a generic function, archetypes become \emph{values} representing the \index{runtime type metadata}runtime type metadata provided by the caller of the generic function.
 
-We will see that various operations on interface types, such as generic signature queries and type substitution, have analogs in the world of contextual types. As a practical matter, understanding these is important for compiler developers. The representation of archetypes will also motivate the \emph{type parameter graph} in \SecRef{type parameter graph}, which will give us a new way to think about generic signatures. Finally, in \SecRef{archetype builder} we give a historical sketch of the Swift~3 generics implementation, based on the construction of a finite type parameter graph where archetypes were the source of truth.
+We will see that various operations on interface types, such as generic signature queries and type substitution, have analogs in the world of contextual types. As a practical matter, understanding these is important for compiler developers. The representation of archetypes will also motivate the \emph{type parameter graph} in \SecRef{type parameter graph}, which will give us a new way to think about generic signatures. Finally, in \SecRef{sec:archetype builder} we give a historical sketch of the Swift~3 generics implementation, based on the construction of a finite type parameter graph where archetypes were the source of truth.
 
 \paragraph{Nesting.}
 A nested generic declaration with a distinct generic signature (because it introduced new generic parameters or requirements) also introduces a fresh primary generic environment; we do not ``inherit'' primary archetypes from the outer scope. All primary archetypes, including those that represent outer generic parameters, are instantiated from the innermost environment. (If the inner declaration does not declare new generic parameters or requirements, it has the same generic signature, and thus the same generic environment, as its parent context.)
@@ -417,11 +417,7 @@ The next example exhibits an \index{infinite graph!type parameter graph}infinite
 
 \begin{example}\label{protocol n graph}
 Recall \IndexProto{N}protocol \texttt{N} from \ExRef{protocol n example}:
-\begin{Verbatim}
-protocol N {
-  associatedtype A: N
-}
-\end{Verbatim}
+\VerbInput{generic-signatures/N.swift}
 We saw that the protocol generic signature $\GN$ (that is, \verb|<τ_0_0 where τ_0_0: N>|) defines an infinite set of equivalence classes. Its type parameter graph is called a \index{infinite path|see{ray}}\index{ray}\emph{ray}, or an infinite path:
 \begin{center}
 \begin{tikzpicture}
@@ -440,11 +436,7 @@ We saw that the protocol generic signature $\GN$ (that is, \verb|<τ_0_0 where �
 \end{example}
 
 \begin{example}\label{protocol z4 graph}  Now let's \IndexProto{Z4}change \tN\ by adding an associated same-type requirement:
-\begin{Verbatim}
-protocol Z4 {
-  associatedtype A: Z4 where Self == Self.A.A.A.A
-}
-\end{Verbatim}
+\VerbInput{archetypes/Z4.swift}
 Just like $\GN$, the protocol generic signature $G_\texttt{Z4}$ still defines an infinite set of valid type parameters, but the set of equivalence classes is now finite, so we're back in the world of finite graphs. The type parameter graph is the \IndexDefinition{cycle graph}\emph{cycle graph} of order~4:
 \begin{center}
 \begin{tikzpicture}[x=2cm]
@@ -567,9 +559,9 @@ If $v$ and $w$ are vertices in some directed graph $(V, E)$, we say that $v$ is 
 A directed graph $(V,E)$ is \IndexDefinition{locally finite graph}\emph{locally finite} if every vertex has a finite set of successors, so for every $v\in V$, there are finitely many $e\in E$ with $\Src(e)=v$.
 \end{definition}
 
-In \SecRef{finding conformance paths}, we will meet another locally finite directed graph that we can associate with a generic signature, called the \emph{conformance path graph}.
+In \SecRef{finding conformance paths}, we will meet another locally finite directed graph that we can associate with a generic signature, called the \emph{conformance graph}.
 
-\section{The Archetype Builder}\label{archetype builder}
+\section{The Archetype Builder}\label{sec:archetype builder}
 
 A generic environment faithfully represents the equivalence classes of a generic signature: the~$\MapIn$ operation encodes the \index{reduced type equality}reduced type equality relation, and the \index{local requirements}local requirements of its archetypes encode everything else. Today, a generic environment is a \emph{derived} representation, in the sense that it sits on top of \index{generic signature query}generic signature queries. This was not always the case, and back in Swift 3, archetypes were the fundamental primitives. In this section, we will describe the \IndexDefinition{ArchetypeBuilder@\texttt{ArchetypeBuilder}}\texttt{ArchetypeBuilder} algorithm that was used to build them. While now obsolete and no longer part of the implementation, the algorithm has a certain elegance to it, and understanding it will motivate the material in \PartRef{part:rqm}.
 
