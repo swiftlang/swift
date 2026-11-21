@@ -741,7 +741,7 @@ extension MutableRawSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(repeating repeatedByte: UInt8) {
-    guard !isEmpty else { return }
+    if self.isEmpty { return }
     unsafe _start().withMemoryRebound(to: UInt8.self, capacity: byteCount) {
       unsafe $0.update(repeating: repeatedByte, count: byteCount)
     }

@@ -668,7 +668,7 @@ extension MutableSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(repeating repeatedValue: consuming Element) {
-    guard !isEmpty else { return }
+    if self.isEmpty { return }
     unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
       unsafe $0.update(repeating: repeatedValue, count: count)
     }
