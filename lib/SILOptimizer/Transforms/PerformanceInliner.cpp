@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -460,6 +461,48 @@ bool isAllocator(SILFunction *callee) {
   return false;
 }
 
+// The pullback is the last direct result of a VJP. If the primal has only
+// indirect results, the VJP can return the pullback by itself.
+static SILValue getVJPPullbackResult(FullApplySite applySiteOfVJP) {
+  auto *applyOfVJP = dyn_cast<ApplyInst>(applySiteOfVJP.getInstruction());
+  if (applyOfVJP == nullptr)
+    return nullptr;
+
+  SILValue calleePullback = nullptr;
+  if (applyOfVJP->getType().isTuple()) {
+    auto numTupleElements = applyOfVJP->getType().getNumTupleElements();
+    assert(numTupleElements > 0);
+    for (auto user : applyOfVJP->getUsers()) {
+      if (auto *tei = dyn_cast<TupleExtractInst>(user)) {
+        if (tei->getFieldIndex() + 1 == numTupleElements) {
+          calleePullback = tei;
+          break;
+        }
+      } else if (auto *dti = dyn_cast<DestructureTupleInst>(user)) {
+        calleePullback = dti->getResult(numTupleElements - 1);
+        break;
+      } else {
+        return nullptr;
+      }
+    }
+  } else {
+    calleePullback = applyOfVJP;
+  }
+  assert(calleePullback != nullptr);
+  assert(calleePullback->getType().isFunction());
+  return calleePullback;
+}
+
+static bool isPullbackSavedInBranchTape(SILValue pullback, SILFunction *vjp) {
+  if (!pullback || !pullback->hasOneUse())
+    return false;
+  auto *payload = pullback->getSingleUserOfType<TupleInst>();
+  if (!payload || !payload->hasOneUse())
+    return false;
+  auto *tape = payload->getSingleUserOfType<EnumInst>();
+  return tape && isAutodiffBranchTracingEnumInVJP(tape->getType(), vjp);
+}
+
 // Check if we match one of the following patterns:
 // (I):
 //   %resAndPb = apply %vjp(...)
@@ -485,33 +528,10 @@ bool isAllocator(SILFunction *callee) {
 //   %topPb = partial_apply(..., %reabstractedPb, ...)
 //   %tuple = tuple(..., %topPb)
 //   return %tuple
-static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
-  auto *applyOfVJP = dyn_cast<ApplyInst>(applySiteOfVJP.getInstruction());
-  if (applyOfVJP == nullptr)
-    return false;
-
-  SILValue calleePullback = nullptr;
-  if (applyOfVJP->getType().isTuple()) {
-    auto numTupleElements = applyOfVJP->getType().getNumTupleElements();
-    assert(numTupleElements > 0);
-    for (auto user : applyOfVJP->getUsers()) {
-      if (auto *tei = dyn_cast<TupleExtractInst>(user)) {
-        if (tei->getFieldIndex() + 1 == numTupleElements) {
-          calleePullback = tei;
-          break;
-        }
-      } else if (auto *dti = dyn_cast<DestructureTupleInst>(user)) {
-        calleePullback = dti->getResult(numTupleElements - 1);
-        break;
-      } else {
-        return false;
-      }
-    }
-  } else {
-    calleePullback = applyOfVJP;
-  }
-  assert(calleePullback != nullptr);
-  assert(calleePullback->getType().isFunction());
+// The caller can also return %topPb directly.
+static ReturnInst *getReturnCapturingPullback(SILValue calleePullback) {
+  if (!calleePullback)
+    return nullptr;
 
   auto getSingleUser = [](SILValue val) -> SILInstruction * {
     auto *use = val->getSingleUse();
@@ -559,17 +579,14 @@ static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
     pai = next;
   }
   if (!pai)
-    return false;
+    return nullptr;
 
-  auto *ti = dyn_cast_or_null<TupleInst>(getSingleUser(pai));
-  if (!ti)
-    return false;
-
-  auto *ri = dyn_cast_or_null<ReturnInst>(getSingleUser(ti));
-  if (!ri)
-    return false;
-
-  return true;
+  SILInstruction *user = getSingleUser(pai);
+  if (auto *tuple = dyn_cast_or_null<TupleInst>(user))
+    return dyn_cast_or_null<ReturnInst>(getSingleUser(tuple));
+  if (!llvm::is_contained(pai->getArguments(), calleePullback))
+    return nullptr;
+  return dyn_cast_or_null<ReturnInst>(user);
 }
 
 // Treat VJP as trivial if both statements below hold.
@@ -596,12 +613,15 @@ static bool isTrivialVJP(SILFunction *vjp) {
       if (!pai)
         continue;
 
-      auto *ti = dyn_cast_or_null<TupleInst>(getSingleUser(pai));
-      if (!ti)
-        return false;
+      SILValue pullback = pai;
+      while (auto *conversion =
+                 dyn_cast_or_null<ConvertFunctionInst>(getSingleUser(pullback)))
+        pullback = conversion;
 
-      auto *ri = dyn_cast_or_null<ReturnInst>(getSingleUser(ti));
-      if (!ri)
+      SILInstruction *user = getSingleUser(pullback);
+      if (auto *tuple = dyn_cast_or_null<TupleInst>(user))
+        user = getSingleUser(tuple);
+      if (!isa_and_nonnull<ReturnInst>(user))
         return false;
     }
   }
@@ -609,15 +629,88 @@ static bool isTrivialVJP(SILFunction *vjp) {
   return true;
 }
 
-static bool isProfitableToInlineAutodiffVJP(FullApplySite applySiteOfVJP,
-                                            StringRef stageName) {
+static PartialApplyInst *getTopLevelPullback(SILFunction *vjp) {
+  ReturnInst *ri = nullptr;
+  for (SILBasicBlock &bb : *vjp) {
+    if (auto *retInst = dyn_cast<ReturnInst>(bb.getTerminator())) {
+      ri = retInst;
+      break;
+    }
+  }
+  if (!ri)
+    return nullptr;
+
+  auto handleConvertFunctionOrPartialApply =
+      [](SILInstruction *inst) -> PartialApplyInst * {
+    if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
+      return pai;
+    }
+    if (auto *cfi = dyn_cast<ConvertFunctionInst>(inst)) {
+      if (auto *pai = dyn_cast<PartialApplyInst>(cfi->getOperand())) {
+        return pai;
+      }
+    }
+    return nullptr;
+  };
+
+  SILInstruction *retValDefInst = ri->getOperand().getDefiningInstruction();
+  if (retValDefInst == nullptr)
+    return nullptr;
+
+  if (auto *ti = dyn_cast<TupleInst>(retValDefInst)) {
+    assert(ti->getNumOperands() > 0);
+    SILInstruction *lastElemDefInst =
+        ti->getOperand(ti->getNumOperands() - 1).getDefiningInstruction();
+    if (lastElemDefInst == nullptr)
+      return nullptr;
+    return handleConvertFunctionOrPartialApply(lastElemDefInst);
+  }
+
+  return handleConvertFunctionOrPartialApply(retValDefInst);
+}
+
+static bool vjpHasBranchTracingEnumContext(SILFunction *vjp) {
+  PartialApplyInst *topLevelPullback = getTopLevelPullback(vjp);
+  if (topLevelPullback == nullptr)
+    return false;
+
+  for (SILValue arg : topLevelPullback->getArguments())
+    if (isAutodiffBranchTracingEnumInVJP(arg->getType(), vjp))
+      return true;
+
+  return false;
+}
+
+static bool vjpHasLoopContext(SILFunction *vjp) {
+  for (SILBasicBlock &bb : *vjp)
+    for (SILInstruction &inst : bb)
+      if (auto *builtinInst = dyn_cast<BuiltinInst>(&inst))
+        if (builtinInst->getName().is("autoDiffProjectTopLevelSubcontext"))
+          return true;
+  return false;
+}
+
+namespace {
+// Cache results only during candidate collection, before inlining changes SIL.
+struct AutoDiffInliningCallerInfo {
+  std::optional<bool> isVJP;
+  std::optional<bool> hasLoops;
+  std::optional<bool> hasBTE;
+  llvm::DenseMap<SILFunction *, bool> calleeHasLoopContext;
+};
+} // end anonymous namespace
+
+static bool isProfitableToInlineAutodiffVJP(
+    FullApplySite applySiteOfVJP, StringRef stageName,
+    AutoDiffInliningCallerInfo &callerInfo) {
   SILFunction *caller = applySiteOfVJP.getFunction();
   SILFunction *calleeVJP = applySiteOfVJP.getReferencedFunctionOrNull();
   assert(calleeVJP);
 
   bool isLowLevelFunctionPassPipeline = stageName == "LowLevel,Function";
-  auto isCallerVJP = isFunctionAutodiffVJP(caller);
-  auto callerHasControlFlow = caller->size() > 1;
+  if (!callerInfo.isVJP.has_value())
+    callerInfo.isVJP = isFunctionAutodiffVJP(caller);
+  bool isCallerVJP = *callerInfo.isVJP;
 
   // If the pass is being run as part of the low-level function pass pipeline,
   // the autodiff closure-spec optimization is done doing its work. Therefore,
@@ -645,20 +738,93 @@ static bool isProfitableToInlineAutodiffVJP(FullApplySite applySiteOfVJP,
     return false;
   }
 
-  if (isCallerVJP && callerHasControlFlow) {
-    // If pullback extracted from this VJP call result is only passed to
-    // top-level pullback of caller VJP, consider this callee VJP for inlining.
-    // It does not harm ADCS effectiveness since it properly handles nested
-    // inlining by running multiple specialization rounds and immediately
-    // folding partial_apply+apply pairs in the specialized caller pullback.
-    if (hasPullbackOnlyDirectUses(applySiteOfVJP))
-      return true;
+  if (!callerInfo.hasLoops.has_value())
+    callerInfo.hasLoops = vjpHasLoopContext(caller);
+  bool callerHasLoops = *callerInfo.hasLoops;
+  auto [calleeLoop, inserted] =
+      callerInfo.calleeHasLoopContext.try_emplace(calleeVJP, false);
+  if (inserted)
+    calleeLoop->second = vjpHasLoopContext(calleeVJP);
+  bool calleeHasLoops = calleeLoop->second;
 
-    // TODO: allow inlining into VJP callers with control flow when ADCS handles
-    // this properly.
+  auto calleePullbackResult = getVJPPullbackResult(applySiteOfVJP);
+  auto *pullbackReturn = getReturnCapturingPullback(calleePullbackResult);
+  // If pullback extracted from this VJP call result is only passed to
+  // top-level pullback of caller VJP, consider this callee VJP for inlining.
+  // It does not harm ADCS effectiveness since it properly handles nested
+  // inlining by running multiple specialization rounds and immediately
+  // folding partial_apply+apply pairs in the specialized caller pullback.
+  bool hasOnlyDirectUses =
+      pullbackReturn && isa<TupleInst>(pullbackReturn->getOperand());
+
+  bool calleeHasBTE = vjpHasBranchTracingEnumContext(calleeVJP);
+  if (!callerInfo.hasBTE.has_value())
+    callerInfo.hasBTE = vjpHasBranchTracingEnumContext(caller);
+  bool callerHasBTE = *callerInfo.hasBTE;
+
+  if (callerHasLoops) {
+    if (calleeHasLoops) {
+      return hasOnlyDirectUses;
+    }
+    if (!calleeHasBTE) {
+      return hasOnlyDirectUses;
+    }
     return false;
   }
 
+  if (calleeHasLoops) {
+    if (callerHasBTE) {
+      return false;
+    }
+    return hasOnlyDirectUses;
+  }
+
+  assert(!callerHasLoops && !calleeHasLoops);
+
+  // Let ADCS specialize the callee's branch tracing enum before inlining.
+  if (calleeHasBTE)
+    return false;
+
+  if (!callerHasBTE || hasOnlyDirectUses)
+    return true;
+
+  auto isCallback = [](SILValue capture) {
+    return capture->getType().isFunction();
+  };
+  if (!pullbackReturn) {
+    // Mid-level inlining exposes a straight-line pullback to the second ADCS
+    // run without changing the caller's tape shape.
+    if (stageName != "MidLevel,Function" || calleeVJP->size() != 1 ||
+        !isPullbackSavedInBranchTape(calleePullbackResult, caller))
+      return false;
+  } else {
+    // Limit growth so the caller can still inline into a gradient computation
+    // that could eliminate the tape.
+    auto *callerPullback = getTopLevelPullback(caller);
+    if (!callerPullback ||
+        llvm::count_if(callerPullback->getArguments(), isCallback) != 1)
+      return false;
+  }
+
+  // Leave the callee's function captures for ADCS to specialize first.
+  auto *calleePullback = getTopLevelPullback(calleeVJP);
+  if (!calleePullback || !calleePullback->getReferencedFunctionOrNull() ||
+      !llvm::none_of(calleePullback->getArguments(), isCallback))
+    return false;
+
+  if (!pullbackReturn)
+    return true;
+
+  // Reserve the ordinary call budget for inlining the flattened VJP into its
+  // consumers. Charge the current bodies before simplification to bound growth.
+  int remainingCost = RemovedCallBenefit;
+  for (auto *function : {caller, calleeVJP})
+    for (auto &block : *function)
+      for (auto &instruction : block) {
+        remainingCost -= int(instructionInlineCost(instruction));
+        if (remainingCost < 0)
+          return false;
+      }
   return true;
 }
 
@@ -704,11 +870,6 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee);
   bool IsGeneric = AI.hasSubstitutions();
-
-  if (isFunctionAutodiffVJP(Callee) &&
-      !isProfitableToInlineAutodiffVJP(AI, this->pm->getStageName())) {
-    return false;
-  }
 
   // Start with a base benefit.
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
@@ -1386,6 +1547,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
+  AutoDiffInliningCallerInfo autoDiffCallerInfo;
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     Weight BlockWeight;
@@ -1428,6 +1590,16 @@ void SILPerformanceInliner::collectAppliesToInline(
 
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
+
+        // Apply the AutoDiff policy only on the cost model path. Definitive
+        // generic decisions and always-inline calls bypass it.
+        if (isFunctionAutodiffVJP(Callee) &&
+            (!AI.hasSubstitutions() ||
+             !shouldInlineGeneric(AI, NumCallerBlocks).has_value()) &&
+            !isProfitableToInlineAutodiffVJP(
+                AI, pm->getStageName(), autoDiffCallerInfo)) {
+          continue;
+        }
 
         if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks,
                               BBToWeightMap)) {

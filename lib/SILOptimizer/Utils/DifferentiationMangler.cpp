@@ -13,9 +13,104 @@
 #include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/MD5Stream.h"
+#include "swift/Demangling/ManglingMacros.h"
+#include "swift/SILOptimizer/Utils/SpecializationMangler.h"
+#include "llvm/ADT/StringExtras.h"
 
 using namespace swift;
 using namespace Mangle;
+
+// See also ASTMangler::mangleAutoDiffGeneratedDeclaration.
+bool swift::isAutodiffBranchTracingEnumInVJP(SILType type, SILFunction *vjp) {
+  EnumDecl *ed = type.getEnumDecl();
+  if (ed == nullptr)
+    return false;
+
+  llvm::StringRef edName = ed->getNameStr();
+  if (!edName.consume_front("_AD__"))
+    return false;
+  if (!edName.consume_front(MANGLING_PREFIX_STR))
+    return false;
+
+  // The branch tracing enum decl name has the following components:
+  // 1) "_AD__";
+  // 2) MANGLING_PREFIX;
+  // 3) original function name;
+  // 4) "_bb";
+  // 5) a block number;
+  // 6) "__Pred__" and the derivative configuration.
+  Demangle::Context Ctx;
+  auto *root = Ctx.demangleSymbolAsNode(vjp->getName());
+  if (!root)
+    return false;
+  auto *derivative = root->findByKind(Demangle::Node::Kind::AutoDiffFunction,
+                                      /*maxDepth=*/3);
+  if (!derivative)
+    return false;
+
+  // The first child identifies the primal. Searching for a Function node can
+  // miss getters or find a closure's enclosing function.
+  auto primalName = mangleNode(derivative->getFirstChild());
+  if (!primalName.isSuccess() || !edName.consume_front(primalName.result()) ||
+      !edName.consume_front("_bb"))
+    return false;
+
+  // Start just after "_bb" because the generic signature can also contain
+  // "__Pred__".
+  std::size_t idx = edName.find("__Pred__");
+  if (idx == llvm::StringRef::npos || idx == 0)
+    return false;
+
+  // Before "__Pred__", we have "_bbX", where X is a number.
+  // The loop calculates the start position of X.
+  for (; idx != 0 && llvm::isDigit(edName[idx - 1]); --idx)
+    ;
+
+  return idx == 0;
+}
+
+std::string Mangle::mangleAutoDiffSpecializedBranchTracingEnum(
+    StringRef prefix, CanType schema, CanGenericSignature signature,
+    StringRef fileDiscriminator) {
+  ASTMangler mangler(schema->getASTContext());
+  auto key = mangler.mangleTypeForDebugger(schema, signature);
+  if (signature) {
+    ASTMangler signatureMangler(schema->getASTContext());
+    key += signatureMangler.mangleGenericSignature(signature);
+  }
+  // Separate primary files can specialize the same imported VJP and need
+  // distinct identities for the resulting enum metadata.
+  key += ":";
+  key += fileDiscriminator;
+  // A digest keeps nested predecessor schemas from making names grow
+  // exponentially.
+  MD5Stream stream;
+  stream << key;
+  llvm::MD5::MD5Result digest;
+  stream.final(digest);
+  SmallString<32> suffix;
+  llvm::MD5::stringifyResult(digest, suffix);
+  return (prefix + "_" + suffix).str();
+}
+
+std::string Mangle::mangleAutoDiffSpecializedPullback(
+    SILFunction *pullback, SILFunction *vjp, SILType enumType, unsigned argIndex) {
+  ASTMangler typeMangler(vjp->getASTContext());
+  auto type = enumType.getASTType()->mapTypeOutOfEnvironment()->getCanonicalType();
+  auto typeName = typeMangler.mangleTypeForDebugger(
+      type, vjp->getGenericSignature().getCanonicalSignature());
+  // Include the enum type because later ADCS runs can change it while keeping
+  // the same VJP name.
+  auto name = vjp->getName();
+  auto key = std::to_string(name.size()) + ":" + name.str() + typeName;
+  FunctionSignatureSpecializationMangler mangler(
+      pullback->getASTContext(), Demangle::SpecializationPass::ClosureSpecializer,
+      pullback->getSerializedKind(), pullback);
+  mangler.setArgumentAutoDiffBranchTracingEnum(
+      argIndex, pullback->getASTContext().getIdentifier(key));
+  return mangler.mangle();
+}
 
 /// Mangles the generic signature and get its mangling tree. This is necessary
 /// because the derivative generic signature's requirements may contain names
