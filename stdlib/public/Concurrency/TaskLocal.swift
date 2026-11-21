@@ -240,17 +240,17 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   // ABI Note: @abi needed because the mangling otherwise conflicts with the
   // legacy @_unsafeInheritExecutor declaration.
   @abi(
-    nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable>(
+    nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable, Failure:Error>(
       _ valueDuringOperation: Value,
-      operation: nonisolated(nonsending) () async throws -> R,
+      operation: nonisolated(nonsending) () async throws(Failure) -> R,
       file: String, line: UInt
-    ) async throws -> R
+    ) async throws(Failure) -> R
   )
-  public nonisolated(nonsending) func withValue<R: ~Copyable>(
+  public nonisolated(nonsending) func withValue<R: ~Copyable, Failure: Error>(
     _ valueDuringOperation: Value,
-    operation: nonisolated(nonsending) () async throws -> R,
+    operation: nonisolated(nonsending) () async throws(Failure) -> R,
     file: String = #fileID, line: UInt = #line
-  ) async rethrows -> R {
+  ) async throws(Failure) -> R {
     return try await withValueImpl(
       valueDuringOperation,
       operation: operation,
@@ -281,7 +281,12 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   //
   // This function also doubles as an ABI-compatibility shim predating the
   // introduction of #isolation.
+  //
+  // Disfavored so that, inside @_unsafeInheritExecutor functions, a
+  // synchronous closure still resolves to the synchronous typed-throws
+  // withValue instead of being ambiguous with this overload.
   @discardableResult
+  @_disfavoredOverload
   @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
   @available(SwiftStdlib 5.1, *)
   @_silgen_name("$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yYaKXESSSutYaKlF")
@@ -314,11 +319,11 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @export(implementation)
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  internal nonisolated(nonsending) func withValueImpl<R: ~Copyable>(
+  internal nonisolated(nonsending) func withValueImpl<R: ~Copyable, Failure: Error>(
     _ valueDuringOperation: __owned Value,
-    operation: nonisolated(nonsending) () async throws -> R,
+    operation: nonisolated(nonsending) () async throws(Failure) -> R,
     file: String = #fileID, line: UInt = #line
-  ) async rethrows -> R {
+  ) async throws(Failure) -> R {
 #if $BuiltinAddTaskLocalValue
     let binding = Builtin.addTaskLocalValue(key, consume valueDuringOperation)
     defer { Builtin.removeTaskLocalValue(binding) }
@@ -368,13 +373,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     return try await operation()
   }
 
-
-  // Copyable-result overload; restores the more-specialized tie-break and the
-  // original ABI symbol. The ~Copyable overload below is the documented entry point
+  // ABI-only: preserves the original symbol of the Copyable-result, untyped
+  // `rethrows` overload for binaries compiled against older SDKs. Source
+  // callers now resolve to the typed-throws overload below.
   @inlinable
   @discardableResult
-  public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
-                           file: String = #fileID, line: UInt = #line) rethrows -> R {
+  internal func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
+                             file: String = #fileID, line: UInt = #line) rethrows -> R {
 #if $BuiltinAddTaskLocalValue
     let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
     defer { Builtin.removeTaskLocalValue(binding) }
@@ -406,10 +411,10 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @export(implementation)
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  public func withValue<R: ~Copyable>(
-    _ valueDuringOperation: Value, operation: () throws -> R,
+  public func withValue<R: ~Copyable, Failure: Error>(
+    _ valueDuringOperation: Value, operation: () throws(Failure) -> R,
     file: String = #fileID, line: UInt = #line
-  ) rethrows -> R {
+  ) throws(Failure) -> R {
 #if $BuiltinAddTaskLocalValue
     let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
     defer { Builtin.removeTaskLocalValue(binding) }
