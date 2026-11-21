@@ -225,6 +225,14 @@ public:
   // Print the #include sequence for the specified C++ interop shim header.
   void printIncludeForShimHeader(StringRef headerName);
 
+  /// Print the opening/closing of the preprocessor guard around the C++
+  /// bindings of a throwing Swift function. The guard matches the condition
+  /// under which the stdlib overlay declares swift::Error, swift::Expected
+  /// and swift::ThrowingResult: SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR is
+  /// defined and SWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR is not.
+  void printSwiftErrorBindingsGuardBegin();
+  void printSwiftErrorBindingsGuardEnd();
+
   // Print the #define for the given macro.
   void printDefine(StringRef macroName);
 
