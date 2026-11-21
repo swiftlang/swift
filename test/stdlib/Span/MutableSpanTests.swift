@@ -298,24 +298,19 @@ private class ID {
   }
 }
 
-suite.test("update(repeating:)")
-.require(.minimumStdlib(.stdlib_6_2))
-.code {
-  var a = ContiguousArray((0..<8).map(ID.init(id:)))
-  expectEqual(a.map(\.id).contains(.max), false)
-  var span = a.mutableSpan
-  span.update(repeating: ID(id: .max))
-  expectEqual(a.allSatisfy({ $0.id == .max }), true)
-}
-
 suite.test("updateAll(repeating:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   var a = ContiguousArray((0..<8).map(ID.init(id:)))
+  var span: MutableSpan<ID>
   expectEqual(a.map(\.id).contains(.max), false)
-  var span = a.mutableSpan
+  span = a.mutableSpan
   span.updateAll(repeating: ID(id: .max))
   expectEqual(a.allSatisfy({ $0.id == .max }), true)
+
+  span = a.mutableSpan
+  span.update(repeating: ID(id: .min))
+  expectEqual(a.allSatisfy({ $0.id == .min }), true)
 
   var empty = MutableSpan<Int>()
   empty.updateAll(repeating: .max)
