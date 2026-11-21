@@ -196,7 +196,7 @@ extension Optional {
   ///   returns `nil`.
   @export(implementation)
   public func map<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U
+    _ transform: @callable(once) (Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
     case .some(let y):
@@ -224,7 +224,7 @@ extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public consuming func _consumingMap<U: ~Copyable, E: Error>(
-    _ transform: (consuming Wrapped) throws(E) -> U
+    _ transform: @callable(once) (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch consume self {
     case .some(let y):
@@ -237,7 +237,7 @@ extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U
+    _ transform: @callable(once) (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch self {
     case .some(let y):
@@ -270,7 +270,7 @@ extension Optional {
   ///   returns `nil`.
   @export(implementation)
   public func flatMap<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U?
+    _ transform: @callable(once) (Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
     case .some(let y):
@@ -298,7 +298,7 @@ extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
-    _ transform: (consuming Wrapped) throws(E) -> U?
+    _ transform: @callable(once) (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch consume self {
     case .some(let y):
@@ -311,7 +311,7 @@ extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public func _borrowingFlatMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U?
+    _ transform: @callable(once) (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
     case .some(let y):
@@ -834,7 +834,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 @export(implementation)
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T // FIXME: typed throws
+  defaultValue: @autoclosure @callable(once) () throws -> T // FIXME: typed throws
 ) rethrows -> T {
   // FIXME: We want this to support nonescapable `T` types.
   // To implement that, we need to be able to express that the result's lifetime
@@ -910,7 +910,7 @@ internal func _legacy_abi_optionalNilCoalescingOperator <T>(
 @export(implementation)
 public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T? // FIXME: typed throws
+  defaultValue: @autoclosure @callable(once) () throws -> T? // FIXME: typed throws
 ) rethrows -> T? {
   // FIXME: We want this to support nonescapable `T` types.
   // To implement that, we need to be able to express that the result's lifetime

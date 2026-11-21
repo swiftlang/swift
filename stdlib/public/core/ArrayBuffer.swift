@@ -655,7 +655,7 @@ extension _ArrayBuffer {
   @export(implementation) @inline(never)
   @safe
   internal func withUnsafeBufferPointer_nonNative<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     let buffer = getOrAllocateAssociatedObjectBuffer()
     let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
@@ -686,7 +686,7 @@ extension _ArrayBuffer {
   @export(implementation)
   @safe
   internal func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     if _fastPath(_isNative) {
       defer { _fixLifetime(self) }
@@ -713,7 +713,7 @@ extension _ArrayBuffer {
   @export(implementation)
   @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     _internalInvariant(
       _isNative || count == 0,
@@ -804,9 +804,11 @@ extension _ArrayBuffer {
   /// - Precondition: `_isNative`.
   @inlinable
   internal var _native: NativeBuffer {
-    return NativeBuffer(
-      _isClassOrObjCExistential(Element.self)
-      ? _storage.nativeInstance : _storage.unflaggedNativeInstance)
+    @inline(__always) get {
+      return NativeBuffer(
+        _isClassOrObjCExistential(Element.self)
+        ? _storage.nativeInstance : _storage.unflaggedNativeInstance)
+    }
   }
 
   /// Fast access to the native representation.

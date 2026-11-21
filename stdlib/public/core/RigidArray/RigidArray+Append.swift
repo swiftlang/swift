@@ -73,7 +73,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal mutating func append<E: Error>(
     addingCount newItemCount: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     _precondition(newItemCount >= 0, "Cannot add a negative number of items")
     _precondition(freeCapacity >= newItemCount, "RigidArray capacity overflow")

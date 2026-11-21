@@ -79,7 +79,7 @@ extension Dictionary {
   init(
     _unsafeUninitializedCapacity capacity: Int,
     allowingDuplicates: Bool,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ keys: UnsafeMutableBufferPointer<Key>,
       _ values: UnsafeMutableBufferPointer<Value>
     ) -> Int
@@ -96,7 +96,7 @@ extension _NativeDictionary {
   internal init(
     _unsafeUninitializedCapacity capacity: Int,
     allowingDuplicates: Bool,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ keys: UnsafeMutableBufferPointer<Key>,
       _ values: UnsafeMutableBufferPointer<Value>
     ) -> Int

@@ -222,7 +222,7 @@ public struct Disconnected<Value: ~Copyable>: ~Copyable, Sendable {
   @export(implementation)
   @_transparent
   public mutating func withValue<Return: ~Copyable, Failure>(
-    body: (inout sending Value) throws(Failure) -> Return
+    body: @once (inout sending Value) throws(Failure) -> Return
   ) throws(Failure) -> Return {
     var value = consume _value
     let result: Return

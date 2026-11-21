@@ -190,7 +190,7 @@ extension String {
 
   internal static func _fromLargeUTF8Repairing<E: Error>(
     uninitializedCapacity capacity: Int,
-    initializingWith initializer: (
+    initializingWith initializer: @once (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) -> String {

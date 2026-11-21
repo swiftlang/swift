@@ -219,7 +219,7 @@ extension DefaultStringInterpolation {
   @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?,
-    default: @autoclosure () -> some StringProtocol
+    default: @autoclosure @callable(once) () -> some StringProtocol
   ) where T: TextOutputStreamable, T: CustomStringConvertible {
     if let value {
       self.appendInterpolation(value)
@@ -249,7 +249,7 @@ extension DefaultStringInterpolation {
   @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?,
-    default: @autoclosure () -> some StringProtocol
+    default: @autoclosure @callable(once) () -> some StringProtocol
   ) where T: TextOutputStreamable {
     if let value {
       self.appendInterpolation(value)
@@ -279,7 +279,7 @@ extension DefaultStringInterpolation {
   @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?, 
-    default: @autoclosure () -> some StringProtocol
+    default: @autoclosure @callable(once) () -> some StringProtocol
   ) where T: CustomStringConvertible {
     if let value {
       self.appendInterpolation(value)
@@ -309,7 +309,7 @@ extension DefaultStringInterpolation {
   @export(implementation)
   public mutating func appendInterpolation<T>(
     _ value: T?, 
-    default: @autoclosure () -> some StringProtocol
+    default: @autoclosure @callable(once) () -> some StringProtocol
   ) {
     if let value {
       self.appendInterpolation(value)

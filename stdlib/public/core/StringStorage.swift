@@ -191,7 +191,7 @@ fileprivate func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
   growthFactor: Float? = nil, // Exponential growth factor for large allocs
-  tailAllocator: (_ numTailBytes: Int) -> T // Do the actual tail allocation
+  tailAllocator: @once (_ numTailBytes: Int) -> T // Do the actual tail allocation
 ) -> (T, realNumTailBytes: Int) {
 #if !$Embedded
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
@@ -402,7 +402,7 @@ extension __StringStorage {
   internal static func create<E: Error>(
     uninitializedCodeUnitCapacity capacity: Int,
     precalculatedUTF16Count utf16Len: Int? = nil,
-    initializingUncheckedUTF8With initializer: (
+    initializingUncheckedUTF8With initializer: @once (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) -> __StringStorage {

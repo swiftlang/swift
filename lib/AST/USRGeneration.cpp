@@ -322,11 +322,11 @@ std::string ide::demangleUSR(StringRef mangled) {
   return nodeToString(Dem.demangleSymbol(mangled));
 }
 
-std::string
+Mangle::LocalTypeDeclManglings
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
   if (isa<ModuleDecl>(D))
-    return std::string(); // Ignore.
+    return {}; // Ignore.
 
   Mangle::ASTMangler NewMangler(D->getASTContext());
   return NewMangler.mangleLocalTypeDecl(D);

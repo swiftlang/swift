@@ -126,7 +126,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   _ expiration: C.Instant,
   tolerance: C.Instant.Duration? = nil,
   clock: C = ContinuousClock(),
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Return
 ) async throws(Failure) -> Return
   where Return: ~Copyable,
         Failure: Error,
@@ -192,6 +192,34 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
 #endif
 }
 
+// ABI: Preserves the entry point from before `operation` was exactly-once.
+@available(StdlibDeploymentTarget 6.5, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  nonisolated(nonsending) func withDeadline<Return, Failure, C>(
+    _ expiration: C.Instant,
+    tolerance: C.Instant.Duration?,
+    clock: C,
+    operation: nonisolated(nonsending) () async throws(Failure) -> Return
+  ) async throws(Failure) -> Return
+    where Return: ~Copyable,
+          Failure: Error,
+          C: Clock & Identifiable
+)
+@usableFromInline
+internal nonisolated(nonsending) func __abi_withDeadline<Return, Failure, C>(
+  _ expiration: C.Instant,
+  tolerance: C.Instant.Duration?,
+  clock: C,
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+) async throws(Failure) -> Return
+  where Return: ~Copyable,
+        Failure: Error,
+        C: Clock & Identifiable {
+  return try await withDeadline(
+    expiration, tolerance: tolerance, clock: clock, operation: operation)
+}
+
 // ==== -----------------------------------------------------------------------
 // MARK: withDeadline(in:)
 
@@ -225,7 +253,7 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   in timeout: C.Instant.Duration,
   tolerance: C.Instant.Duration? = nil,
   clock: C = ContinuousClock(),
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Return
 ) async throws(Failure) -> Return
   where Return: ~Copyable,
         Failure: Error,

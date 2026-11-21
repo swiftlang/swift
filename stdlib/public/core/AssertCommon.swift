@@ -454,10 +454,26 @@ func _unimplementedInitializer(className: StaticString,
 /// Previously used to evaluate editor placeholders.
 @usableFromInline // COMPILER_INTRINSIC
 internal func _undefined<T>(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)
+}
+
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _undefined<T>(
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  ) -> T
+)
+@usableFromInline
+internal func __abi__undefined<T>(
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) -> T {
+  return _undefined(message(), file: file, line: line)
 }
 
 #else
@@ -465,7 +481,7 @@ internal func _undefined<T>(
 /// Previously used to evaluate editor placeholders.
 @usableFromInline // COMPILER_INTRINSIC
 internal func _undefined<T>(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> T {
   _assertionFailure(kind: .fatal(), message(), file: file, line: line, flags: 0)

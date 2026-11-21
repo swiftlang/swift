@@ -131,7 +131,7 @@ import Swift
 public func withTaskExecutorPreference<T, Failure>(
   _ taskExecutor: (any TaskExecutor)?,
   isolation: isolated (any Actor)? = #isolation,
-  operation: () async throws(Failure) -> T
+  operation: @once () async throws(Failure) -> T
 ) async throws(Failure) -> T {
   guard let taskExecutor else {
     // User explicitly passed a "nil" preference, so we invoke the operation
@@ -156,6 +156,27 @@ public func withTaskExecutorPreference<T, Failure>(
   // No need to manually hop to the target executor, because as we execute
   // the operation, its enqueue will respect the attached executor preference.
   return try await operation()
+}
+
+// ABI: Preserves the entry point from before `operation` was exactly-once.
+@_unavailableInEmbedded
+@available(SwiftStdlib 6.0, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withTaskExecutorPreference<T, Failure>(
+    _ taskExecutor: (any TaskExecutor)?,
+    isolation: isolated (any Actor)?,
+    operation: () async throws(Failure) -> T
+  ) async throws(Failure) -> T
+)
+@usableFromInline
+internal func __abi_withTaskExecutorPreference<T, Failure>(
+  _ taskExecutor: (any TaskExecutor)?,
+  isolation: isolated (any Actor)?,
+  operation: () async throws(Failure) -> T
+) async throws(Failure) -> T {
+  return try await withTaskExecutorPreference(
+    taskExecutor, isolation: isolation, operation: operation)
 }
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions

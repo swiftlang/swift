@@ -94,7 +94,7 @@ extension ManagedBuffer where Element: ~Copyable {
   #endif
   public final class func create(
     minimumCapacity: Int,
-    makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
+    makingHeaderWith factory: @once (ManagedBuffer<Header, Element>) throws -> Header
   ) rethrows -> ManagedBuffer<Header, Element> {
     let p = Builtin.allocWithTailElems_1(
          self,
@@ -112,6 +112,29 @@ extension ManagedBuffer where Element: ~Copyable {
     _fixLifetime(p)
     return p
   }
+
+#if !$Embedded
+  // ABI: Preserves the entry point from before `factory` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    @_preInverseGenerics
+    final class func create(
+      minimumCapacity: Int,
+      makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
+    ) rethrows -> ManagedBuffer<Header, Element>
+  )
+  // FIXME: The mangler ignores `@_preInverseGenerics` inside `@abi`, so the
+  // API declaration needs it too (rdar://193378291).
+  @_preInverseGenerics
+  @usableFromInline
+  internal final class func __abi_create(
+    minimumCapacity: Int,
+    makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
+  ) rethrows -> ManagedBuffer<Header, Element> {
+    return try self.create(
+      minimumCapacity: minimumCapacity, makingHeaderWith: factory)
+  }
+#endif
 
   /// The actual number of elements that can be stored in this object.
   ///
@@ -159,7 +182,7 @@ extension ManagedBuffer where Element: ~Copyable {
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
-    _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
+    _ body: @once (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
     try unsafe withUnsafeMutablePointers { (v, _) throws(E) in try unsafe body(v) }
   }
@@ -175,7 +198,7 @@ extension ManagedBuffer where Element: ~Copyable {
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
-    _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     try unsafe withUnsafeMutablePointers { (_, v) throws(E) in try unsafe body(v) }
   }
@@ -191,7 +214,7 @@ extension ManagedBuffer where Element: ~Copyable {
   @inline(__always)
   @unsafe
   public final func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
-    _ body: (
+    _ body: @once (
       UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
     ) throws(E) -> R
   ) throws(E) -> R {
@@ -300,7 +323,7 @@ public struct ManagedBufferPointer<
     bufferClass: AnyClass,
     minimumCapacity: Int,
     makingHeaderWith factory:
-      (_ buffer: AnyObject, _ capacity: (AnyObject) -> Int) throws -> Header
+      @once (_ buffer: AnyObject, _ capacity: (AnyObject) -> Int) throws -> Header
   ) rethrows {
     self = ManagedBufferPointer(
       bufferClass: bufferClass, minimumCapacity: minimumCapacity)
@@ -470,7 +493,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @export(implementation)
   @unsafe
   public func withUnsafeMutablePointerToHeader<E: Error, R: ~Copyable>(
-    _ body: (UnsafeMutablePointer<Header>) throws(E) -> R
+    _ body: @once (UnsafeMutablePointer<Header>) throws(E) -> R
   ) throws(E) -> R {
     try unsafe withUnsafeMutablePointers { (v, _) throws(E) in try unsafe body(v) }
   }
@@ -484,7 +507,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @export(implementation)
   @unsafe
   public func withUnsafeMutablePointerToElements<E: Error, R: ~Copyable>(
-    _ body: (UnsafeMutablePointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeMutablePointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     try unsafe withUnsafeMutablePointers { (_, v) throws(E) in try unsafe body(v) }
   }
@@ -499,7 +522,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @export(implementation)
   @unsafe
   public func withUnsafeMutablePointers<E: Error, R: ~Copyable>(
-    _ body: (
+    _ body: @once (
       UnsafeMutablePointer<Header>, UnsafeMutablePointer<Element>
     ) throws(E) -> R
   ) throws(E) -> R {

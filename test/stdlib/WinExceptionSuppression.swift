@@ -6,8 +6,10 @@
 // REQUIRES: OS=windows-msvc
 
 // Check that a fatal error terminates the process and it appears only once.
-// CHECK: Fatal error
-// CHECK-NOT: Fatal error
+// The backtrace's memory dumps can contain the bare string "Fatal error", so
+// match the message's colon too.
+// CHECK: Fatal error:
+// CHECK-NOT: Fatal error:
 
 import WinSDK
 

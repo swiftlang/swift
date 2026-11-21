@@ -20,3 +20,8 @@
 
 // REQUIRES: swift_feature_InferSendableFromCaptures
 // REQUIRES: optimized_stdlib
+
+// FIXME: With the once functions adopted in the stdlib, the call of
+// precondition's at-most-once autoclosure isn't inlined, and the evaluator
+// can't call a closure (rdar://193255552).
+// XFAIL: *

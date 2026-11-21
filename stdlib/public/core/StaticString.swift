@@ -200,7 +200,7 @@ public struct StaticString: Sendable {
   @_transparent
   @safe
   public func withUTF8Buffer<R>(
-    _ body: (UnsafeBufferPointer<UInt8>) -> R
+    _ body: @once (UnsafeBufferPointer<UInt8>) -> R
   ) -> R {
     if hasPointerRepresentation {
       return unsafe body(UnsafeBufferPointer(
@@ -212,6 +212,20 @@ public struct StaticString: Sendable {
       return unicodeScalar.withUTF8CodeUnits { unsafe body($0) }
       #endif
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUTF8Buffer<R>(
+      _ body: (UnsafeBufferPointer<UInt8>) -> R
+    ) -> R
+  )
+  @usableFromInline
+  internal func __abi_withUTF8Buffer<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) -> R
+  ) -> R {
+    return withUTF8Buffer(body)
   }
 }
 

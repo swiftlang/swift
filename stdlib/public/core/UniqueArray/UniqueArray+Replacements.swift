@@ -56,7 +56,7 @@ extension UniqueArray where Element: ~Copyable {
   public mutating func replaceSubrange<E: Error>(
     _ subrange: Range<Int>,
     addingCount newItemCount: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) -> Void {
     _storage._checkValidBounds(subrange)
     _precondition(newItemCount >= 0, "Cannot add a negative number of items")

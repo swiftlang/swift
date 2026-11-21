@@ -1206,3 +1206,93 @@ bb0(%0 : $Klass, %1 : $Int):
   %8 = tuple ()
   return %8 : $()
 }
+
+sil @consumeNoncopyableCapture : $@convention(thin) (@owned NonCopyableStruct) -> ()
+sil @borrowKlassCapture : $@convention(thin) (@guaranteed Klass) -> ()
+sil @takeAtMostOnceClosure : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+
+// The call of an at-most-once closure consumes it, so after its call is
+// combined, the closure is deleted, and the path that dropped the closure
+// releases the capture instead.
+//
+// CHECK-LABEL: sil @combine_at_most_once_closure_called_or_dropped :
+// CHECK:         [[F:%.*]] = function_ref @consumeNoncopyableCapture
+// CHECK-NOT:     partial_apply
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]](%1)
+// CHECK:       bb2:
+// CHECK-NEXT:    release_value %1
+// CHECK-NOT:     {{strong_release|dealloc_stack}}
+// CHECK-LABEL: } // end sil function 'combine_at_most_once_closure_called_or_dropped'
+sil @combine_at_most_once_closure_called_or_dropped : $@convention(thin) (Builtin.Int1, @owned NonCopyableStruct) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $NonCopyableStruct):
+  %2 = function_ref @consumeNoncopyableCapture : $@convention(thin) (@owned NonCopyableStruct) -> ()
+  %3 = partial_apply [on_stack] [called_at_most_once] %2(%1) : $@convention(thin) (@owned NonCopyableStruct) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %5 = apply %3() : $@noescape @callable(once) @callee_owned () -> ()
+  br bb3
+
+bb2:
+  strong_release %3 : $@noescape @callable(once) @callee_owned () -> ()
+  br bb3
+
+bb3:
+  dealloc_stack %3 : $@noescape @callable(once) @callee_owned () -> ()
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The closure outlives a combined call if another function takes it, so its
+// call isn't combined, because the call would need a copy of the noncopyable
+// capture.
+//
+// CHECK-LABEL: sil @dont_combine_at_most_once_closure_called_or_forwarded :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_at_most_once]
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[CLOSURE]]()
+// CHECK:       bb2:
+// CHECK:         apply {{%.*}}([[CLOSURE]])
+// CHECK-LABEL: } // end sil function 'dont_combine_at_most_once_closure_called_or_forwarded'
+sil @dont_combine_at_most_once_closure_called_or_forwarded : $@convention(thin) (Builtin.Int1, @owned NonCopyableStruct) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $NonCopyableStruct):
+  %2 = function_ref @consumeNoncopyableCapture : $@convention(thin) (@owned NonCopyableStruct) -> ()
+  %3 = partial_apply [on_stack] [called_at_most_once] %2(%1) : $@convention(thin) (@owned NonCopyableStruct) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %5 = apply %3() : $@noescape @callable(once) @callee_owned () -> ()
+  br bb3
+
+bb2:
+  %7 = function_ref @takeAtMostOnceClosure : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+  %8 = apply %7(%3) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> ()
+  br bb3
+
+bb3:
+  dealloc_stack %3 : $@noescape @callable(once) @callee_owned () -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// An escaping closure's context owns each capture. The combined call only
+// borrows the capture, so it's released after the call, where the call would
+// release it with the closure, and it needs no copy.
+//
+// CHECK-LABEL: sil @combine_escaping_at_most_once_closure :
+// CHECK:         [[F:%.*]] = function_ref @borrowKlassCapture
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     strong_retain
+// CHECK:         apply [[F]](%0)
+// CHECK-NEXT:    strong_release %0
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'combine_escaping_at_most_once_closure'
+sil @combine_escaping_at_most_once_closure : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : $Klass):
+  %1 = function_ref @borrowKlassCapture : $@convention(thin) (@guaranteed Klass) -> ()
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2() : $@callable(once) @callee_owned () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}

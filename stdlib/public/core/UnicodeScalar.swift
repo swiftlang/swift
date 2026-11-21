@@ -504,7 +504,7 @@ extension Unicode.Scalar {
   // Access the scalar as encoded in UTF-16
   @safe
   internal func withUTF16CodeUnits<Result>(
-    _ body: (UnsafeBufferPointer<UInt16>) throws -> Result
+    _ body: @once (UnsafeBufferPointer<UInt16>) throws -> Result
   ) rethrows -> Result {
     var codeUnits: (UInt16, UInt16) = (self.utf16[0], 0)
     let utf16Count = self.utf16.count
@@ -523,7 +523,7 @@ extension Unicode.Scalar {
   @export(implementation)
   @safe
   internal func withUTF8CodeUnits<Result, E: Error>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> Result
+    _ body: @once (UnsafeBufferPointer<UInt8>) throws(E) -> Result
   ) throws(E) -> Result {
     let encodedScalar = UTF8.encode(self)!
     var (codeUnits, utf8Count) = encodedScalar._bytes

@@ -506,9 +506,25 @@ extension Unicode.UTF32: UnicodeCodec {
   @inlinable
   public static func encode(
     _ input: Unicode.Scalar,
-    into processCodeUnit: (CodeUnit) -> Void
+    into processCodeUnit: @once (CodeUnit) -> Void
   ) {
     processCodeUnit(UInt32(input))
+  }
+
+  // ABI: Preserves the entry point from before `processCodeUnit` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    static func encode(
+      _ input: Unicode.Scalar,
+      into processCodeUnit: (CodeUnit) -> Void
+    )
+  )
+  @usableFromInline
+  internal static func __abi_encode(
+    _ input: Unicode.Scalar,
+    into processCodeUnit: (CodeUnit) -> Void
+  ) {
+    encode(input, into: processCodeUnit)
   }
 }
 

@@ -301,11 +301,29 @@ public struct ObservationRegistrar: Sendable {
   public func withMutation<Subject: Observable, Member, T>(
     of subject: Subject,
     keyPath: KeyPath<Subject, Member>,
-    _ mutation: () throws -> T
+    _ mutation: @once () throws -> T
   ) rethrows -> T {
     willSet(subject, keyPath: keyPath)
     defer { didSet(subject, keyPath: keyPath) }
     return try mutation()
+  }
+
+  // ABI: Preserves the entry point from before `mutation` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withMutation<Subject: Observable, Member, T>(
+      of subject: Subject,
+      keyPath: KeyPath<Subject, Member>,
+      _ mutation: () throws -> T
+    ) rethrows -> T
+  )
+  @usableFromInline
+  internal func __abi_withMutation<Subject: Observable, Member, T>(
+    of subject: Subject,
+    keyPath: KeyPath<Subject, Member>,
+    _ mutation: () throws -> T
+  ) rethrows -> T {
+    return try withMutation(of: subject, keyPath: keyPath, mutation)
   }
 }
 

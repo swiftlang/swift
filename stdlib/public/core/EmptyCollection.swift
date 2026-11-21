@@ -167,7 +167,7 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
 extension EmptyCollection {
   @export(implementation)
   public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
     unsafe try body(UnsafeBufferPointer<Element>(start: nil, count: 0))
   }

@@ -242,13 +242,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @abi(
     nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable>(
       _ valueDuringOperation: Value,
-      operation: nonisolated(nonsending) () async throws -> R,
+      operation: nonisolated(nonsending) @once () async throws -> R,
       file: String, line: UInt
     ) async throws -> R
   )
   public nonisolated(nonsending) func withValue<R: ~Copyable>(
     _ valueDuringOperation: Value,
-    operation: nonisolated(nonsending) () async throws -> R,
+    operation: nonisolated(nonsending) @once () async throws -> R,
     file: String = #fileID, line: UInt = #line
   ) async rethrows -> R {
     return try await withValueImpl(
@@ -264,9 +264,35 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @available(*, deprecated, message: "Prefer the 'nonisolated(nonsending)' overload with stricter execution on caller context semantics: withValue(_:operation:file:line:)")
   public func withValue<R>( // for source compatibility
     _ valueDuringOperation: Value,
-    operation: () async throws -> R,
+    operation: @once () async throws -> R,
     isolation: isolated (any Actor)? = #isolation,
     file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation,
+      operation: operation,
+      isolation: isolation,
+      file: file, line: line)
+  }
+
+  // ABI: Preserves the entry point from before `operation` was exactly-once.
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withValue<R>(
+      _ valueDuringOperation: Value,
+      operation: () async throws -> R,
+      isolation: isolated (any Actor)?,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
+  @usableFromInline
+  internal func __abi_withValue<R>(
+    _ valueDuringOperation: Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)?,
+    file: String, line: UInt
   ) async rethrows -> R {
     return try await withValueImpl(
       valueDuringOperation,
@@ -316,7 +342,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @available(SwiftStdlib 5.1, *)
   internal nonisolated(nonsending) func withValueImpl<R: ~Copyable>(
     _ valueDuringOperation: __owned Value,
-    operation: nonisolated(nonsending) () async throws -> R,
+    operation: nonisolated(nonsending) @once () async throws -> R,
     file: String = #fileID, line: UInt = #line
   ) async rethrows -> R {
 #if $BuiltinAddTaskLocalValue
@@ -334,7 +360,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
   internal func withValueImpl<R>(_ valueDuringOperation: __owned Value,
-                                 operation: () async throws -> R,
+                                 operation: @once () async throws -> R,
                                  isolation: isolated (any Actor)?,
                                  file: String = #fileID, line: UInt = #line) async rethrows -> R {
 #if $BuiltinAddTaskLocalValue
@@ -345,6 +371,30 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     defer { _taskLocalValuePop() }
 #endif
     return try await operation()
+  }
+
+  // ABI: Preserves the entry point from before `operation` was exactly-once.
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withValueImpl<R>(
+      _ valueDuringOperation: __owned Value,
+      operation: () async throws -> R,
+      isolation: isolated (any Actor)?,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
+  @usableFromInline
+  internal func __abi_withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)?,
+    file: String, line: UInt
+  ) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation, operation: operation, isolation: isolation,
+      file: file, line: line)
   }
 
   @_silgen_name("$ss9TaskLocalC13withValueImpl_9operation4file4lineqd__xn_qd__yYaKXESSSutYaKlF")
@@ -373,7 +423,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   // original ABI symbol. The ~Copyable overload below is the documented entry point
   @inlinable
   @discardableResult
-  public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
+  public func withValue<R>(_ valueDuringOperation: Value, operation: @once () throws -> R,
                            file: String = #fileID, line: UInt = #line) rethrows -> R {
 #if $BuiltinAddTaskLocalValue
     let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
@@ -384,6 +434,23 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 #endif
 
     return try operation()
+  }
+
+  // ABI: Preserves the entry point from before `operation` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withValue<R>(
+      _ valueDuringOperation: Value, operation: () throws -> R,
+      file: String, line: UInt
+    ) rethrows -> R
+  )
+  @usableFromInline
+  internal func __abi_withValue<R>(
+    _ valueDuringOperation: Value, operation: () throws -> R,
+    file: String, line: UInt
+  ) rethrows -> R {
+    return try withValue(
+      valueDuringOperation, operation: operation, file: file, line: line)
   }
 
   /// Binds the task-local to the specific value for the duration of the
@@ -407,7 +474,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   public func withValue<R: ~Copyable>(
-    _ valueDuringOperation: Value, operation: () throws -> R,
+    _ valueDuringOperation: Value, operation: @once () throws -> R,
     file: String = #fileID, line: UInt = #line
   ) rethrows -> R {
 #if $BuiltinAddTaskLocalValue

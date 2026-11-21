@@ -51,7 +51,7 @@ extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   public mutating func append<E: Error>(
     addingCount newItemCount: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     _ensureFreeCapacity(newItemCount)
     return try _storage.append(

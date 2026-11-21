@@ -7824,12 +7824,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
       hasLocalTypes = true;
 
-      std::string MangledName =
-          evaluateOrDefault(M->getASTContext().evaluator,
-                            MangleLocalTypeDeclRequest { TD },
-                            std::string());
-      assert(!MangledName.empty() && "Mangled type came back empty!");
-      localTypeGenerator.insert(MangledName, addDeclRef(TD));
+      // Local types can be looked up using the mangling of either debug info
+      // or USRs, so record both if they differ.
+      auto Manglings = evaluateOrDefault(M->getASTContext().evaluator,
+                                         MangleLocalTypeDeclRequest{TD}, {});
+      assert(!Manglings.getMangling().empty() &&
+             "Mangled type came back empty!");
+      localTypeGenerator.insert(Manglings.getMangling(), addDeclRef(TD));
+      if (Manglings.hasDistinctUSRMangling())
+        localTypeGenerator.insert(Manglings.getUSRMangling(), addDeclRef(TD));
 
       if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
         if (auto bodyFP = IDC->getBodyFingerprint()) {

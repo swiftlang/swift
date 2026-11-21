@@ -75,7 +75,7 @@ extension UniqueArray where Element: ~Copyable {
   public mutating func insert<E: Error>(
     addingCount newItemCount: Int,
     at index: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     _ensureFreeCapacity(newItemCount)
     try _storage.insert(

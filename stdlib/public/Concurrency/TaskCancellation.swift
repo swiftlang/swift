@@ -75,7 +75,7 @@ import Swift
 @available(SwiftStdlib 5.1, *)
 @export(implementation)
 public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Return,
   onCancel handler: sending () -> Void
 ) async throws(Failure) -> Return {
   // unconditionally add the cancellation record to the task.
@@ -160,7 +160,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 @available(StdlibDeploymentTarget 6.5, *)
 @export(implementation)
 public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Return,
   onCancel handler: sending (CancellationError.Reason) -> Void
 ) async throws(Failure) -> Return
   where Return: ~Copyable,
@@ -176,7 +176,7 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
 @available(StdlibDeploymentTarget 6.5, *)
 @export(implementation)
 nonisolated(nonsending) func __withTaskCancellationHandlerWithReason0<Return, Failure>(
-  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Return,
   onCancel handler0: sending (UInt8) -> Void
 ) async throws(Failure) -> Return
   where Return: ~Copyable,
@@ -255,7 +255,7 @@ nonisolated(nonsending) func __withTaskCancellationHandlerWithReason0<Return, Fa
 @available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 6.0)
 public func withTaskCancellationHandler<T>(
-  operation: () async throws -> T,
+  operation: @once () async throws -> T,
   onCancel handler: @Sendable () -> Void,
   isolation: isolated (any Actor)?
 ) async rethrows -> T {
@@ -269,6 +269,26 @@ public func withTaskCancellationHandler<T>(
   defer { unsafe _taskRemoveCancellationHandler(record: record) }
 #endif
   return try await operation()
+}
+
+// ABI: Preserves the entry point from before `operation` was exactly-once.
+@available(SwiftStdlib 5.1, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withTaskCancellationHandler<T>(
+    operation: () async throws -> T,
+    onCancel handler: @Sendable () -> Void,
+    isolation: isolated (any Actor)?
+  ) async rethrows -> T
+)
+@usableFromInline
+internal func __abi_withTaskCancellationHandler<T>(
+  operation: () async throws -> T,
+  onCancel handler: @Sendable () -> Void,
+  isolation: isolated (any Actor)?
+) async rethrows -> T {
+  return try await withTaskCancellationHandler(
+    operation: operation, onCancel: handler, isolation: isolation)
 }
 #endif
 
@@ -632,7 +652,7 @@ func _taskRemoveCancellationHandler(record: UnsafeRawPointer /*any cancellation 
 @available(SwiftStdlib 6.4, *)
 @export(implementation)
 public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
-  operation: nonisolated(nonsending) () async throws(Failure) -> Value,
+  operation: nonisolated(nonsending) @once () async throws(Failure) -> Value,
 ) async throws(Failure) -> Value {
 #if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()
@@ -726,7 +746,7 @@ public nonisolated(nonsending) func withTaskCancellationShield<Value, Failure>(
 @available(SwiftStdlib 6.4, *)
 @export(implementation)
 public func withTaskCancellationShield<Value, Failure>(
-  operation: () throws(Failure) -> Value,
+  operation: @once () throws(Failure) -> Value,
 ) throws(Failure) -> Value {
 #if $BuiltinTaskCancellationShield
   let didInstallShield = Builtin.taskCancellationShieldPush()

@@ -3,3 +3,104 @@
 // NOTE: Most differences from the baseline are common across all architectures
 // should go into stability-stdlib-source-base.swift.expected. Only capture
 // x86_64-specific differences from the baseline here.
+
+// Once functions: these closure parameters are now exactly-once or at-most-once.
+// The previous entry points are preserved by `@abi` shims.
+Accessor Dictionary.subscript(_:default:).Get() has parameter 1 changing from Default to Owned
+Accessor Dictionary.subscript(_:default:).Set() has parameter 2 changing from Default to Owned
+Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 changing from Default to Owned
+Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 changing from Default to Owned
+Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has parameter 2 changing from Default to Owned
+Constructor Result.init(catching:) has parameter 0 changing from Default to Owned
+Constructor Result.init(catching:) has parameter 0 type change from () throws -> Success to () throws(Failure) -> Success
+Func ??(_:_:) has parameter 1 changing from Default to Owned
+Func Array.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func Array.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeBufferPointer(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<Element>) throws -> R to (Swift.UnsafeBufferPointer<Element>) throws(E) -> R
+Func Array.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeMutableBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func Array.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeBufferPointer(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<Element>) throws -> R to (Swift.UnsafeBufferPointer<Element>) throws(E) -> R
+Func ArraySlice.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeMutableBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func ArraySlice.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func Bool.&&(_:_:) has parameter 1 changing from Default to Owned
+Func Bool.||(_:_:) has parameter 1 changing from Default to Owned
+Func ContiguousArray.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeBufferPointer(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<Element>) throws -> R to (Swift.UnsafeBufferPointer<Element>) throws(E) -> R
+Func ContiguousArray.withUnsafeBytes(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 changing from Default to Owned
+Func ContiguousArray.withUnsafeMutableBytes(_:) has parameter 0 changing from Default to Owned
+Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has parameter 1 changing from Default to Owned
+Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has parameter 0 changing from Default to Owned
+Func ManagedBuffer.withUnsafeMutablePointerToElements(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Element>) throws -> R to (Swift.UnsafeMutablePointer<Element>) throws(E) -> R
+Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has parameter 0 changing from Default to Owned
+Func ManagedBuffer.withUnsafeMutablePointerToHeader(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Header>) throws -> R to (Swift.UnsafeMutablePointer<Header>) throws(E) -> R
+Func ManagedBuffer.withUnsafeMutablePointers(_:) has parameter 0 changing from Default to Owned
+Func ManagedBuffer.withUnsafeMutablePointers(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Header>, Swift.UnsafeMutablePointer<Element>) throws -> R to (Swift.UnsafeMutablePointer<Header>, Swift.UnsafeMutablePointer<Element>) throws(E) -> R
+Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has parameter 0 changing from Default to Owned
+Func ManagedBufferPointer.withUnsafeMutablePointerToElements(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Element>) throws -> R to (Swift.UnsafeMutablePointer<Element>) throws(E) -> R
+Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has parameter 0 changing from Default to Owned
+Func ManagedBufferPointer.withUnsafeMutablePointerToHeader(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Header>) throws -> R to (Swift.UnsafeMutablePointer<Header>) throws(E) -> R
+Func ManagedBufferPointer.withUnsafeMutablePointers(_:) has parameter 0 changing from Default to Owned
+Func ManagedBufferPointer.withUnsafeMutablePointers(_:) has parameter 0 type change from (Swift.UnsafeMutablePointer<Header>, Swift.UnsafeMutablePointer<Element>) throws -> R to (Swift.UnsafeMutablePointer<Header>, Swift.UnsafeMutablePointer<Element>) throws(E) -> R
+Func Optional.flatMap(_:) has parameter 0 changing from Default to Owned
+Func Optional.flatMap(_:) has parameter 0 type change from (Wrapped) throws -> U? to (Wrapped) throws(E) -> U?
+Func Optional.map(_:) has parameter 0 changing from Default to Owned
+Func Optional.map(_:) has parameter 0 type change from (Wrapped) throws -> U to (Wrapped) throws(E) -> U
+Func Result.flatMap(_:) has parameter 0 changing from Default to Owned
+Func Result.flatMapError(_:) has parameter 0 changing from Default to Owned
+Func Result.map(_:) has parameter 0 changing from Default to Owned
+Func Result.mapError(_:) has parameter 0 changing from Default to Owned
+Func StaticString.withUTF8Buffer(_:) has parameter 0 changing from Default to Owned
+Func String.UTF8View.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func String.withCString(_:) has parameter 0 changing from Default to Owned
+Func String.withCString(_:) has parameter 0 type change from (Swift.UnsafePointer<Swift.Int8>) throws -> Result to (Swift.UnsafePointer<Swift.Int8>) throws(E) -> Result
+Func String.withCString(encodedAs:_:) has parameter 1 changing from Default to Owned
+Func String.withCString(encodedAs:_:) has parameter 1 type change from (Swift.UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result to (Swift.UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+Func String.withUTF8(_:) has parameter 0 changing from Default to Owned
+Func String.withUTF8(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<Swift.UInt8>) throws -> R to (Swift.UnsafeBufferPointer<Swift.UInt8>) throws(E) -> R
+Func Substring.withCString(_:) has parameter 0 changing from Default to Owned
+Func Substring.withCString(_:) has parameter 0 type change from (Swift.UnsafePointer<Swift.CChar>) throws -> Result to (Swift.UnsafePointer<Swift.CChar>) throws(E) -> Result
+Func Substring.withCString(encodedAs:_:) has parameter 1 changing from Default to Owned
+Func Substring.withCString(encodedAs:_:) has parameter 1 type change from (Swift.UnsafePointer<TargetEncoding.CodeUnit>) throws -> Result to (Swift.UnsafePointer<TargetEncoding.CodeUnit>) throws(E) -> Result
+Func Substring.withUTF8(_:) has parameter 0 changing from Default to Owned
+Func Substring.withUTF8(_:) has parameter 0 type change from (Swift.UnsafeBufferPointer<Swift.UInt8>) throws -> R to (Swift.UnsafeBufferPointer<Swift.UInt8>) throws(E) -> R
+Func Unicode.UTF32.encode(_:into:) has parameter 1 changing from Default to Owned
+Func UnsafeBufferPointer.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) has parameter 1 changing from Default to Owned
+Func UnsafeBufferPointer.withMemoryRebound(to:_:) has parameter 1 type change from (Swift.UnsafeBufferPointer<T>) throws -> Result to (Swift.UnsafeBufferPointer<T>) throws(E) -> Result
+Func UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func UnsafeMutableBufferPointer.withContiguousStorageIfAvailable(_:) has parameter 0 changing from Default to Owned
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has parameter 1 changing from Default to Owned
+Func UnsafeMutableBufferPointer.withMemoryRebound(to:_:) has parameter 1 type change from (Swift.UnsafeMutableBufferPointer<T>) throws -> Result to (Swift.UnsafeMutableBufferPointer<T>) throws(E) -> Result
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has parameter 2 changing from Default to Owned
+Func UnsafeMutablePointer.withMemoryRebound(to:capacity:_:) has parameter 2 type change from (Swift.UnsafeMutablePointer<T>) throws -> Result to (Swift.UnsafeMutablePointer<T>) throws(E) -> Result
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has parameter 2 changing from Default to Owned
+Func UnsafePointer.withMemoryRebound(to:capacity:_:) has parameter 2 type change from (Swift.UnsafePointer<T>) throws -> Result to (Swift.UnsafePointer<T>) throws(E) -> Result
+Func assert(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func assert(_:_:file:line:) has parameter 1 changing from Default to Owned
+Func assertionFailure(_:file:line:) has parameter 0 changing from Default to Owned
+Func fatalError(_:file:line:) has parameter 0 changing from Default to Owned
+Func precondition(_:_:file:line:) has parameter 0 changing from Default to Owned
+Func precondition(_:_:file:line:) has parameter 1 changing from Default to Owned
+Func preconditionFailure(_:file:line:) has parameter 0 changing from Default to Owned
+Func withExtendedLifetime(_:_:) has parameter 1 changing from Default to Owned
+Func withExtendedLifetime(_:_:) has parameter 1 type change from () throws -> Result to () throws(E) -> Result
+Func withExtendedLifetime(_:_:) has parameter 1 type change from (T) throws -> Result to (borrowing T) throws(E) -> Result
+Func withUnsafeBytes(of:_:) has parameter 1 changing from Default to Owned
+Func withUnsafeBytes(of:_:) has parameter 1 type change from (Swift.UnsafeRawBufferPointer) throws -> Result to (Swift.UnsafeRawBufferPointer) throws(E) -> Result
+Func withUnsafeMutableBytes(of:_:) has parameter 1 changing from Default to Owned
+Func withUnsafeMutableBytes(of:_:) has parameter 1 type change from (Swift.UnsafeMutableRawBufferPointer) throws -> Result to (Swift.UnsafeMutableRawBufferPointer) throws(E) -> Result
+Func withUnsafeMutablePointer(to:_:) has parameter 1 changing from Default to Owned
+Func withUnsafeMutablePointer(to:_:) has parameter 1 type change from (Swift.UnsafeMutablePointer<T>) throws -> Result to (Swift.UnsafeMutablePointer<T>) throws(E) -> Result
+Func withUnsafePointer(to:_:) has parameter 1 changing from Default to Owned
+Func withUnsafePointer(to:_:) has parameter 1 type change from (Swift.UnsafePointer<T>) throws -> Result to (Swift.UnsafePointer<T>) throws(E) -> Result
+Func withVaList(_:_:) has parameter 1 changing from Default to Owned
+Subscript Dictionary.subscript(_:default:) has parameter 1 changing from Default to Owned

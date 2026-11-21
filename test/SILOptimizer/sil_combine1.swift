@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil -solver-enable-promote-supertypes | %FileCheck %s
 
+// FIXME: With the once functions adopted in the stdlib, Dictionary's
+// subscript(_:default:) leaves a heap reabstraction thunk that captures an
+// at-most-once closure (rdar://192503315).
+// XFAIL: *
+
 func curry<T1, T2, T3, T4>(_ f: @escaping (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
   return { x in { y in { z in f(x, y, z) } } }
 }

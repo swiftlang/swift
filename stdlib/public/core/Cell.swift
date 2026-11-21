@@ -43,7 +43,7 @@ extension Cell where Value: ~Copyable {
   @export(implementation)
   @_transparent
   public func withUnsafeMutablePointer<Result: ~Copyable, E>(
-    _ body: (UnsafeMutablePointer<Value>) throws(E) -> Result
+    _ body: @once (UnsafeMutablePointer<Value>) throws(E) -> Result
   ) throws(E) -> Result {
     unsafe try body(_address)
   }

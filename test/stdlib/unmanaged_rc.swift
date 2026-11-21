@@ -16,13 +16,13 @@ public func myPrint(_ k: Klass) { print(k) }
 
 // Check the codegen of _withUnsafeGuaranteedRef
 //
-// CHECK-LABEL: sil public_external [transparent] @$ss9UnmanagedV24_withUnsafeGuaranteedRefyqd__qd__xKXEKlF :
-// CHECK: bb0([[RESULT:%.*]] : $*Result, [[FUNC:%.*]] : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <Instance, Result>, [[UNMANAGED:%.*]] : $Unmanaged<Instance>):
+// CHECK-LABEL: sil public_external [transparent] @$ss9UnmanagedV24_withUnsafeGuaranteedRefyqd__qd__xKXEnKlF :
+// CHECK: bb0([[RESULT:%.*]] : $*Result, [[FUNC:%.*]] : $@noescape @once @callee_owned @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@guaranteed τ_0_0) -> (@out τ_0_1, @error any Error) for <Instance, Result>, [[UNMANAGED:%.*]] : $Unmanaged<Instance>):
 // CHECK: [[UNMANAGED_REF:%.*]] = struct_extract [[UNMANAGED]]
 // CHECK: [[REF:%.*]] = unmanaged_to_ref [[UNMANAGED_REF]]
 // CHECK: try_apply {{%.*}}([[RESULT]], [[REF]]) :
 // CHECK-NOT: destroy_value
-// CHECK: } // end sil function '$ss9UnmanagedV24_withUnsafeGuaranteedRefyqd__qd__xKXEKlF'
+// CHECK: } // end sil function '$ss9UnmanagedV24_withUnsafeGuaranteedRefyqd__qd__xKXEnKlF'
 
 // OPT-LABEL: sil @$s12unmanaged_rc12useUnmanagedyys0D0VyAA14KlassContainerCGF : $@convention(thin) (Unmanaged<KlassContainer>) -> () {
 // OPT: bb0([[UNMANAGED:%.*]] :

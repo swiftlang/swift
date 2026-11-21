@@ -198,7 +198,7 @@ extension _RigidArray where Element: ~Copyable {
   ///    argument.
   @export(implementation)
   internal mutating func edit<E: Error, R: ~Copyable>(
-    _ body: (inout OutputSpan<Element>) throws(E) -> R
+    _ body: @once (inout OutputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
     var span = unsafe OutputSpan(buffer: _storage, initializedCount: _count)
     defer {
@@ -212,7 +212,7 @@ extension _RigidArray where Element: ~Copyable {
   @unsafe
   @export(implementation)
   internal mutating func _unsafeEdit<E: Error, R: ~Copyable>(
-    _ body: (UnsafeMutableBufferPointer<Element>, inout Int) throws(E) -> R
+    _ body: @once (UnsafeMutableBufferPointer<Element>, inout Int) throws(E) -> R
   ) throws(E) -> R {
     defer { _precondition(_count >= 0 && _count <= capacity) }
     return unsafe try body(_storage, &_count)

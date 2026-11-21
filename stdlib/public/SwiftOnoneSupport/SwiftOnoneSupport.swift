@@ -172,7 +172,7 @@ extension Array {
   // _withUnsafeMutableBufferPointerIfSupported<A>(
   //   (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1
   // ) throws -> A1?
-  @_semantics("prespecialize.$sSa42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEKlF")
+  @_semantics("prespecialize.$sSa42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEnKlF")
   func _prespecializeArray<R>(with: (inout UnsafeMutableBufferPointer<Element>) throws -> R) {}
 } // extension Array
 

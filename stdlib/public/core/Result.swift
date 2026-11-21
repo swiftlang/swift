@@ -55,7 +55,7 @@ extension Result {
                        // functions that used to shadow the original map
                        // (rdar://125016028)
   public func map<NewSuccess: ~Copyable>(
-    _ transform: (Success) -> NewSuccess
+    _ transform: @callable(once) (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
     case let .success(success):
@@ -86,7 +86,7 @@ extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public consuming func _consumingMap<NewSuccess: ~Copyable>(
-    _ transform: (consuming Success) -> NewSuccess
+    _ transform: @callable(once) (consuming Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch consume self {
     case let .success(success):
@@ -99,7 +99,7 @@ extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public borrowing func _borrowingMap<NewSuccess: ~Copyable>(
-    _ transform: (borrowing Success) -> NewSuccess
+    _ transform: @callable(once) (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
     case .success(let success):
@@ -140,7 +140,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   @export(implementation)
   @_lifetime(copy self)
   public consuming func mapError<NewFailure>(
-    _ transform: (Failure) -> NewFailure
+    _ transform: @callable(once) (Failure) -> NewFailure
   ) -> Result<Success, NewFailure> {
     switch consume self {
     case let .success(success):
@@ -198,7 +198,7 @@ extension Result {
                        // functions that used to shadow the original flatMap
                        // (rdar://125016028)
   public func flatMap<NewSuccess: ~Copyable>(
-    _ transform: (Success) -> Result<NewSuccess, Failure>
+    _ transform: @callable(once) (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
     case let .success(success):
@@ -229,7 +229,7 @@ extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public consuming func _consumingFlatMap<NewSuccess: ~Copyable>(
-    _ transform: (consuming Success) -> Result<NewSuccess, Failure>
+    _ transform: @callable(once) (consuming Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch consume self {
     case let .success(success):
@@ -242,7 +242,7 @@ extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @export(implementation)
   public borrowing func _borrowingFlatMap<NewSuccess: ~Copyable>(
-    _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
+    _ transform: @callable(once) (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
     case .success(let success):
@@ -266,7 +266,7 @@ extension Result where Success: ~Copyable {
   ///   `.success`.
   @export(implementation)
   public consuming func flatMapError<NewFailure>(
-    _ transform: (Failure) -> Result<Success, NewFailure>
+    _ transform: @callable(once) (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch consume self {
     case let .success(success):
@@ -344,7 +344,7 @@ extension Result where Success: ~Copyable {
   ///
   /// - Parameter body: A potentially throwing closure to evaluate.
   @export(implementation)
-  public init(catching body: () throws(Failure) -> Success) {
+  public init(catching body: @once () throws(Failure) -> Success) {
     // FIXME: This should allow a non-escapable `Success` -- but what's `self`'s lifetime dependence in that case?
     do {
       self = .success(try body())

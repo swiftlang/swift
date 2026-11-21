@@ -199,7 +199,7 @@ internal typealias _VAInt  = Int32
 /// - Returns: The return value, if any, of the `body` closure parameter.
 @inlinable // c-abi
 public func withVaList<R>(_ args: [CVarArg],
-  _ body: (CVaListPointer) -> R) -> R {
+  _ body: @once (CVaListPointer) -> R) -> R {
   let builder = unsafe __VaListBuilder()
   for a in args {
     unsafe builder.append(a)
@@ -209,15 +209,45 @@ public func withVaList<R>(_ args: [CVarArg],
   return result
 }
 
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withVaList<R>(
+    _ args: [CVarArg], _ body: (CVaListPointer) -> R
+  ) -> R
+)
+@usableFromInline
+internal func __abi_withVaList<R>(
+  _ args: [CVarArg], _ body: (CVaListPointer) -> R
+) -> R {
+  return unsafe withVaList(args, body)
+}
+
 /// Invoke `body` with a C `va_list` argument derived from `builder`.
 @inlinable // c-abi
 internal func _withVaList<R>(
   _ builder: __VaListBuilder,
-  _ body: (CVaListPointer) -> R
+  _ body: @once (CVaListPointer) -> R
 ) -> R {
   let result = unsafe body(builder.va_list())
   unsafe _fixLifetime(builder)
   return result
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _withVaList<R>(
+    _ builder: __VaListBuilder,
+    _ body: (CVaListPointer) -> R
+  ) -> R
+)
+@usableFromInline
+internal func __abi__withVaList<R>(
+  _ builder: __VaListBuilder,
+  _ body: (CVaListPointer) -> R
+) -> R {
+  return unsafe _withVaList(builder, body)
 }
 
 #if _runtime(_ObjC)

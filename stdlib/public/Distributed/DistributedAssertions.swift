@@ -96,7 +96,7 @@ extension DistributedActor {
   @available(SwiftStdlib 5.9, *)
   @_transparent
   public nonisolated func assertIsolated(
-      _ message: @autoclosure () -> String = String(),
+      _ message: @autoclosure @callable(once) () -> String = String(),
       file: StaticString = #fileID, line: UInt = #line
   ) {
     guard _isDebugAssertConfiguration() else {
@@ -117,6 +117,23 @@ extension DistributedActor {
       assertionFailure(msg, file: file, line: line) // short-cut so we get the exact same failure reporting semantics
       return
     }
+  }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.9, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    nonisolated func assertIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
+  @usableFromInline
+  internal nonisolated func __abi_assertIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    assertIsolated(message(), file: file, line: line)
   }
 }
 

@@ -252,7 +252,7 @@ internal final class _ContiguousArrayStorage<
   /// If `Element` is bridged verbatim, invoke `body` on an
   /// `UnsafeBufferPointer` to the elements.
   internal final func _withVerbatimBridgedUnsafeBufferImpl(
-    _ body: (UnsafeBufferPointer<AnyObject>) throws -> Void
+    _ body: @callable(once) (UnsafeBufferPointer<AnyObject>) throws -> Void
   ) rethrows {
     if _isBridgedVerbatimToObjectiveC(Element.self) {
       let count = countAndCapacity.count
@@ -473,7 +473,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @export(implementation)
   @safe
   internal func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try unsafe body(UnsafeBufferPointer(start: firstElementAddress,
@@ -497,7 +497,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @export(implementation)
   @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try unsafe body(

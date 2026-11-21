@@ -1126,18 +1126,33 @@ extension ArraySlice: RangeReplaceableCollection {
   @inlinable
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @available(*, deprecated)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal mutating func __abi__withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try unsafe _withUnsafeMutableBufferPointerIfSupported(body)
   }
 
   @inlinable
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
@@ -1145,15 +1160,43 @@ extension ArraySlice: RangeReplaceableCollection {
     }
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal mutating func __abi_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousMutableStorageIfAvailable(body)
+  }
+
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
   }
 
   @inlinable
@@ -1247,7 +1290,7 @@ extension ArraySlice {
   @export(implementation)
   @safe
   public func withUnsafeBufferPointer<R, E>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
@@ -1330,7 +1373,7 @@ extension ArraySlice {
   // once we allocate noescape closures on the stack.
   @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     let count = self.count
     // Ensure unique storage
@@ -1579,11 +1622,25 @@ extension ArraySlice {
   @inlinable
   @safe
   public mutating func withUnsafeMutableBytes<R>(
-    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+    _ body: @once (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withUnsafeMutableBytes<R>(
+      _ body: (UnsafeMutableRawBufferPointer) throws -> R
+    ) rethrows -> R
+  )
+  @usableFromInline
+  internal mutating func __abi_withUnsafeMutableBytes<R>(
+    _ body: (UnsafeMutableRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeMutableBytes(body)
   }
 
   /// Calls the given closure with a pointer to the underlying bytes of the
@@ -1616,11 +1673,25 @@ extension ArraySlice {
   @inlinable
   @safe
   public func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
+    _ body: @once (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUnsafeBytes<R>(
+      _ body: (UnsafeRawBufferPointer) throws -> R
+    ) rethrows -> R
+  )
+  @usableFromInline
+  internal func __abi_withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    return try withUnsafeBytes(body)
   }
 }
 
