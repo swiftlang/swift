@@ -463,7 +463,7 @@ The right-hand side has but one interpretation, since we require $\otimes$ to be
 \[\bigl(\APA \otimes \TP\bigr)\otimes\Sigma := \APA\otimes\bigl(\TP\otimes\Sigma\bigr)\]
 We're applying the substitution map $\Sigma$ to the abstract conformance $\TP$, and then we get the final result by projecting a type witness from this substituted conformance. This new form of conformance substitution is called \IndexDefinition{local conformance lookup}\emph{local conformance lookup}, by analogy with \index{global conformance lookup!compatibility}global conformance lookup, because it plays a similar role.
 
-While we won't investigate the implementation of local conformance lookup until \ChapRef{conformance paths}, we can completely \emph{specify} its behavior now. Suppose that $\TP$ and $\Sigma$ are as above. Since $\TP=\PP\otimes\tT$, we also have:
+While we won't investigate the implementation of local conformance lookup until \ChapRef{chap:conformance paths}, we can completely \emph{specify} its behavior now. Suppose that $\TP$ and $\Sigma$ are as above. Since $\TP=\PP\otimes\tT$, we also have:
 \[\TP\otimes\Sigma=(\PP\otimes\tT)\otimes\Sigma=\PP\otimes(\tT\otimes\Sigma)\]
 In other words, local conformance lookup of $\TP$ in $\Sigma$ must find the \emph{same} conformance as global conformance lookup of $\tT\otimes\Sigma$ to \tP.
 
@@ -589,7 +589,7 @@ Let \IndexSetDefinition{assocconf}{\AssocConfObj{P}}$\AssocConfObj{P}$ denote th
 One final variant of $\otimes$ is described in \SecRef{checking generic arguments}. A complete summary of the type substitution algebra appears in \AppendixRef{notation summary}.
 
 \paragraph{Protocol inheritance.}
-Recall that when a protocol \tP\ \index{inherited protocol}inherits from another protocol~\tQ, we represent this with an associated conformance requirement $\AssocConfReq{Self}{Q}{P}$ (\SecRef{protocols}). In this case, given any conformance to the derived protocol $\XP$, we can project the conformance with the same conforming type, but to the base protocol \tQ:
+Recall that when a protocol \tP\ \index{protocol inheritance}inherits from another protocol~\tQ, we represent this with an associated conformance requirement $\AssocConfReq{Self}{Q}{P}$ (\SecRef{protocols}). In this case, given any conformance to the derived protocol $\XP$, we can project the conformance with the same conforming type, but to the base protocol \tQ:
 \[
 \AssocConf{Self}{Q} \otimes \XP = \ConfReq{X}{Q}
 \]
@@ -623,7 +623,7 @@ We've found a \index{conformance path}\emph{conformance path} for $\rTSequence$ 
 \end{gather*}
 We evaluate $\rTCollection \otimes \Sigma$ first, to get the root conformance from $\Sigma$. Then, we project the associated conformance $\ConfReq{Array<\rT>}{Sequence}$, and from there, the type witness for \nElement, to get \texttt{Int}:
 \[\texttt{\rT.[Sequence]Element} \otimes \Sigma = \texttt{Int}\]
-\ChapRef{conformance paths} will show that we can always find a conformance path for an arbitrary abstract conformance.
+\ChapRef{chap:conformance paths} will show that we can always find a conformance path for an arbitrary abstract conformance.
 \end{example}
 
 \begin{example}\label{indexing iterator example}
@@ -901,8 +901,8 @@ func inspect(_: Permutations<Int>.Element) {...}
 \end{Verbatim}
 \end{example}
 
-\begin{example}
-For the third behavior, we recall the \texttt{IndexingIterator} type from \ExRef{indexing iterator example}. We saw that \texttt{IndexingIterator} has the interesting property that it can witness the \texttt{Iterator} associated type of \tSequence\ for an \emph{arbitrary} \tCollection, so it could be a default type witness for conformances to \tCollection. However, it cannot be the default for all \tSequence\ conformances, because it's generic argument must be a \IndexProto{Collection}\tCollection. The standard library models this by having \tCollection\ re-state \texttt{Iterator} to give it a \index{default type witness}default type witness:
+\begin{example}\label{ex:restate assoc type default}
+For the third behavior, we recall the \texttt{IndexingIterator} type from \ExRef{indexing iterator example}. We saw that \texttt{IndexingIterator} has the interesting property that it can witness the \texttt{Iterator} associated type of \tSequence\ for an \emph{arbitrary} \tCollection, so it could be a default type witness for conformances to \tCollection. However, it cannot be the default for all \tSequence\ conformances, because it's generic argument must be a \IndexProto{Collection}\tCollection. The standard library models this by having \tCollection\ \index{restated associated type}restate \texttt{Iterator} to give it a \index{default type witness}default type witness:
 \begin{Verbatim}
 associatedtype Iterator = IndexingIterator<Self>
 \end{Verbatim}
@@ -933,7 +933,7 @@ struct S: P {  // error
 \end{Verbatim}
 \end{example}
 
-\begin{example}
+\begin{example}\label{ex:restate assoc type infer}
 A \index{limitation!associated type inference}limitation of the current associated type inference implementation is that we only consider a single conformance at a time, so we miss certain deductions that would be possible if the problem instance could describe multiple conformances at once. For example, we are unable to deduce that \texttt{Food} must be \texttt{Int} here:
 \begin{Verbatim}
 protocol Base { associatedtype Food }
@@ -944,7 +944,7 @@ struct Snack: Derived {
   func eat(_: Int) {}
 }
 \end{Verbatim}
-This is a long-standing bug; the workaround is to re-declare \texttt{Food} in \texttt{Derived}~\cite{sr2235}.
+One workaround is to \index{restated associated type}restate the \texttt{Food} associated type in \texttt{Derived}~\cite{sr2235}.
 \end{example}
 
 \paragraph{Boolean satisfiability.}
@@ -1054,7 +1054,7 @@ There is one caveat with how we interpret the output of our ``SAT solver.'' Form
 
 As far as non-deterministic algorithms go, this one is extremely efficient. If someone hands us an assignment of truth values, we can \emph{check} if it is a satisfying assignment in $O(n)$ \index{asymptotic complexity}steps, where $n$ is the length of the formula. More generally, a decision problem belongs to the class of \index{non-deterministic polynomial time}\emph{non-deterministic polynomial time problems}, also known as \index{NP problem}NP for short, if we can check that a given solution satisfies the problem instance with an algorithm that always terminates in at most $O(n^k)$ steps, where $n$ is the size of the instance, and $k$ is a fixed constant.
 
-We require that the checking phase terminates on all inputs, which implies it only uses a finite amount of memory. In a 1971~paper, \index{Stephen Cook}Stephen A.~Cook used this observation to show that the execution of a non-deterministic algorithm can be modeled by a Boolean formula (the general idea here is almost like assembling a finite digital circuit). In other words, \emph{every} NP problem can be translated into a Boolean satisfiability problem---and importantly, this encoding itself takes only polynomial time and space~\cite{cook}.
+We require that the checking phase terminates on all inputs, which implies it only uses a finite amount of memory. In a 1971~paper, Stephen A.~Cook used this observation to show that the execution of a non-deterministic algorithm can be modeled by a Boolean formula (the general idea here is almost like assembling a finite digital circuit). In other words, \emph{every} NP problem can be translated into a Boolean satisfiability problem---and importantly, this encoding itself takes only polynomial time and space~\cite{cook}.
 
 Boolean satisfiability was the first of many \index{NP-complete problem}\emph{NP-complete} problems to be discovered. The NP-complete problems are ``the hardest'' problems in NP, because they have every \emph{other} problem in NP as a special case, and they are all as ``equally hard'' as each other. More generally, if our problem can encode an NP-complete problem, but our problem is itself not necessarily in NP, we just say that our problem is \index{NP-hard problem}\emph{NP-hard}:
 

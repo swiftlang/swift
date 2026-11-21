@@ -37,7 +37,7 @@ The next three chapters focus on the \emph{semantic objects} of Swift generics:
 
 \item \ChapRef{chap:building generic signatures} explains how we build a generic signature from syntax written in source, and gives a formal description of \emph{requirement minimization}. This chapter also shows how invalid requirements are diagnosed, and defines a \emph{well-formed generic signature} as one that passes these checks.
 
-\item \ChapRef{conformance paths} describes \emph{conformance paths}, which complete the description of the type substitution algebra. A further exploration of recursive conformances shows that the type substitution algebra is Turing-complete.
+\item \ChapRef{chap:conformance paths} describes \emph{conformance paths}, which complete the description of the type substitution algebra. A further exploration of recursive conformances shows that the type substitution algebra is Turing-complete.
 
 \item \ChapRef{chap:opaque result types} describes \emph{opaque result types}, which are a generic abstraction that allows a function to hide its concrete return type from its caller, by specifying the generic requirements this return type satisfies instead. This capability is built in terms of generic signatures, substitution maps, and archetypes.
 
@@ -46,9 +46,9 @@ The next three chapters focus on the \emph{semantic objects} of Swift generics:
 
 \PartRef{part:rqm} is devoted to the Requirement Machine, a \emph{decision procedure} for the derived requirements of \ChapRef{chap:generic signatures} and requirement minimization of \ChapRef{chap:building generic signatures}. The main result is that, once recursive conformances are permitted, generic signature queries and requirement minimization become questions about \emph{finitely-presented monoids}:
 \begin{itemize}
-\item \ChapRef{rqm basic operation} gives a high level overview of how both generic signature queries and requirement minimization recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
+\item \ChapRef{chap:basic operation} gives a high level overview of how both generic signature queries and requirement minimization recursively build a \emph{requirement machine} for a generic signature from the requirement machines of its \emph{protocol components}.
 
-\item \ChapRef{monoids} introduces finitely-presented monoids and the \emph{word problem}, and then presents the theoretical result that a finitely-presented monoid can be encoded as a generic signature, such that word problems become generic signature queries. Therefore, generic signature queries are \emph{at least} as hard as the word problem, so \emph{undecidable} in the general case.
+\item \ChapRef{chap:monoids} introduces finitely-presented monoids and the \emph{word problem}, and then presents the theoretical result that a finitely-presented monoid can be encoded as a generic signature, such that word problems become generic signature queries. Therefore, generic signature queries are \emph{at least} as hard as the word problem, so \emph{undecidable} in the general case.
 
 \item \ChapRef{chap:symbols terms rules} goes in the other direction and shows that a generic signature can be encoded in the form of a finitely-presented monoid, such that generic signature queries become word problems. Thus, derived requirements are \emph{at most} as hard as the word problem---and the word problem can be solved in many cases using known techniques. This is the heart of the Requirement Machine.
 
@@ -67,13 +67,13 @@ To grasp the mathematical asides, it helps to have some experience working with 
 \begin{itemize}
 \item Formal systems (\SecRef{derived req}).
 \item Equivalence relations (\SecRef{valid type params}, \SecRef{sec:rewriting}).
-\item Partial and linear orders (\SecRef{reduced types}, \SecRef{sec:normal form algorithm}, \SecRef{building terms}).
+\item Partial and linear orders (\SecRef{reduced types}, \SecRef{sec:normal form algorithm}, \SecRef{sec:rqm terms}).
 \item Category theory (\SecRef{sec:composition}).
 \item Boolean satisfiability (\SecRef{associated type inference}).
 \item Directed graphs (\SecRef{type parameter graph}, \SecRef{finding conformance paths}, \SecRef{recursive conformances}, \SecRef{protocol component}).
 \item Proof by induction (\SecRef{generic signature validity}).
 \item Computability theory (\SecRef{halting problem}, \SecRef{word problem}).
-\item Finitely-presented monoids (\ChapRef{monoids}, \ChapRef{chap:completion}).
+\item Finitely-presented monoids (\ChapRef{chap:monoids}, \ChapRef{chap:completion}).
 \item Regular languages and the pumping lemma (\SecRef{sec:regular languages}).
 \end{itemize}
 
@@ -95,7 +95,7 @@ To guarantee that I could complete this book in finite time, I decided not to di
 \item \index{non-escapable type}Non-escapable types, introduced in \IndexSwift{6.2}Swift~6.2 \cite{se0446}.
 \item Integer generic parameters, introduced in \IndexSwift{6.2}Swift~6.2 \cite{se0452}.
 \end{itemize}
-These features are mostly additive, and can be understood by reading the evolution proposals. Otherwise, all of the material in this book is current as of Swift~6.3.
+These features are mostly additive, and can be understood by reading the evolution proposals. Otherwise, all of the material in this book is current as of Swift~6.5.
 
 Finally, while there is some discussion of \index{expression type checker}the type checking of \emph{expressions} throughout, I don't talk about overload resolution, which is arguably the expression type checker's primary responsibility; this is a very involved topic and the challenges there probably warrant their own book.
 
@@ -122,5 +122,4 @@ A periodically-updated typeset PDF is available from the Swift website:
   year   = {2026}
 }
 \end{Verbatim}
-Do not say something like ``Unpublished,'' in lieu of a URL. This book was published, at the above URL; there are no plans for a print edition.
 \end{document}

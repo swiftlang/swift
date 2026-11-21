@@ -43,7 +43,7 @@ Generic signature: <T, U where T : Sequence, U == T.[Sequence]Element>
 \end{Verbatim}
 
 This flag also allows us to observe \index{requirement minimization}\emph{requirement minimization}. Here are three functions, each one generic over a pair of types conforming to \IndexProto{Sequence}\texttt{Sequence}:
-\VerbInput{generic-signatures/minimization_example.swift}
+\VerbInput{generic-signatures/minimization.swift}
 The first function expects two sequences with the same \texttt{Element} associated type, so ``\verb|sameElt(Array<Int>(), Set<Int>())|'' for example. The second function requires both have the same \texttt{Iterator} type. The third function requires both conditions, but a consequence of how \tSequence\ is declared in the standard library is that the second condition is stronger than the first; that is, if two sequences have the same \texttt{Iterator} type, they \emph{also} have the same \texttt{Element} type. In other words, the same-type requirement $\SameReq{S1.Element}{S2.Element}$ is \emph{redundant} in \texttt{sameEltAndIter()}. (We will be able to \emph{prove} this fact when we revisit this generic signature in \ExRef{same name rule example}.) When we compile this program with \texttt{-debug-generic-signatures}, we observe that the generic signature of \texttt{sameElt()} is distinct from the other two, while \texttt{sameIter()} and \texttt{sameEltAndIter()} have a generic signature that looks like this:
 \begin{quote}
 \begin{verbatim}
@@ -93,7 +93,7 @@ $\ConfReq{\ttgp{0}{1}}{Sequence}$&$\AssocConfReq{Self.Iterator}{IteratorProtocol
 \bottomrule
 \end{tabular}
 \end{center}
-(Requirement signatures also describe the type alias members of the protocol; these are called \index{protocol type alias}\emph{protocol type aliases}. They're not part of the formalism described in the next section, but we will discuss them in \SecRef{protocol type aliases}.)
+(Requirement signatures also describe the type alias members of the protocol; these are called \index{protocol type alias}\emph{protocol type aliases}. They're not part of the formalism described in the next section, but we will discuss them in \SecRef{sec:protocol type aliases}.)
 
 If a generic signature $G$ states a conformance requirement $\TP$, the requirement signature of~\tP\ generates additional structure, which we describe informally at first:
 \begin{itemize}
@@ -540,11 +540,7 @@ We could not have derived this requirement without \textsc{SameName}.
 
 \begin{example}\label{protocol n example}
 We can conjure up a generic signature with infinitely many equivalence classes. We start with \IndexProto{N}this protocol:
-\begin{Verbatim}
-protocol N {
-  associatedtype A: N
-}
-\end{Verbatim}
+\VerbInput{generic-signatures/N.swift}
 Now, consider the protocol generic signature $\GN$. We can derive an infinite sequence of conformance requirements from $\ConfReq{\rT}{N}$, by repeated application of the \textsc{AssocConf} inference rule with the associated conformance requirement $\AssocConfReq{Self.A}{N}{N}$:
 \begin{gather*}
 \ConfStep{\rT}{N}{1}\\
@@ -779,7 +775,7 @@ Suppose a generic parameter \rT\ conforms to two protocols \texttt{P1} and \text
 \SymStep{4}{\rT.A}{\rT.[P2]A}{5}\\
 \TransStep{2}{5}{\rT.[P1]A}{\rT.[P2]A}{6}
 \end{gather*}
-A special case is when the first protocol inherits from the other. That is, re-stating an associated type declaration from an \index{inherited associated type}\index{inherited protocol}inherited protocol does not change the equivalence class structure of a generic signature.
+A special case is when the first protocol inherits from the other. That is, \index{restated associated type}restating an associated type declaration from an \index{inherited associated type}\index{protocol inheritance}inherited protocol does not change the equivalence class structure of a generic signature.
 \end{example}
 
 Bound type parameters don't seem to yield anything new. Why bother then? Type substitution must issue generic signature queries in the general case anyway, and we could just consult the generic signature every time we decompose a dependent member type. Instead, our representation basically pre-computes certain information and encodes it in the structure of the dependent member type itself. This avoids generic signature queries in simple instances of type substitution, and our formal system proves this is sound.
@@ -801,8 +797,8 @@ A complete summary of all elementary statements and inference rules in the deriv
 So far, we've only used our formal system to derive concrete statements \emph{in} a fixed generic signature. In later chapters, we prove results \emph{about} generic signatures:
 \begin{itemize}
 \item In \ChapRef{chap:building generic signatures}, we describe how we diagnose invalid requirements, and show that if no diagnostics are emitted, our formal system has a particularly nice theory.
-\item In \ChapRef{conformance paths}, we take a closer look at derived conformance requirements, to describe substitution of dependent member types; in particular, we prove that a certain algorithm must terminate.
-\item In \ChapRef{monoids}, we use derived requirements to show that a Swift protocol can encode an arbitrary finitely-presented monoid, which demonstrates that a generic signature can have an undecidable theory.
+\item In \ChapRef{chap:conformance paths}, we take a closer look at derived conformance requirements, to describe substitution of dependent member types; in particular, we prove that a certain algorithm must terminate.
+\item In \ChapRef{chap:monoids}, we use derived requirements to show that a Swift protocol can encode an arbitrary finitely-presented monoid, which demonstrates that a generic signature can have an undecidable theory.
 \item In \ChapRef{chap:symbols terms rules}, we will translate the explicit requirements of a generic signature into rewrite rules, and then show that derived requirements correspond to \emph{rewrite paths} under this mapping. This provides a correctness proof for the implementation.
 \end{itemize}
 
@@ -889,9 +885,9 @@ To order dependent member types, we must order associated type declarations, and
 
 Suppose the \texttt{Barn} module declares a \index{horse}\texttt{Horse} protocol, and the \texttt{Swift} module declares \texttt{Collection}. Then $\texttt{Horse} < \texttt{Collection}$, because they are declared in different modules, and \texttt{Barn} precedes \texttt{Swift} in lexicographic order. If the \texttt{Barn} module also declares a \texttt{Saddle} protocol, then $\texttt{Horse}<\texttt{Saddle}$, because both are from the same module, so we compare the names of the protocols.
 
-In the previous section, we showed that re-stating an inherited associated type has no effect in our formal system. We also want this to have no effect on reduced types, so our type parameter order must prefer certain associated type declarations over others:
+In the previous section, we showed that \index{restated associated type}restating an inherited associated type has no effect in our formal system. We also want this to have no effect on reduced types, so our type parameter order must prefer certain associated type declarations over others:
 
-\begin{definition}\label{root associated type} A \IndexDefinition{root associated type}\emph{root associated type} is an associated type whose parent protocol does not \index{inherited protocol}inherit from any protocol having an associated type with the same name.
+\begin{definition}\label{root associated type} A \IndexDefinition{root associated type}\emph{root associated type} is an associated type whose parent protocol does not \index{protocol inheritance}inherit from any protocol having an associated type with the same name.
 \end{definition}
 
 In the following, \texttt{Derived.Foo} is not a root, because \texttt{Derived} inherits from \texttt{Base}, and \texttt{Base} also declares an associated type named \texttt{Foo}. However, \texttt{Derived.Bar} is a root:
@@ -1021,7 +1017,7 @@ such that \tP\ declares an associated type named~\nA.
 \end{itemize}
 As for $\Query{getRequiredProtocols}{}$, because the ``for all'' quantifier is selecting from a finite universe of protocols, a correct but inefficient implementation would repeatedly check if $\Query{requiresProtocol}{G,\tT,\,\tP}$ for each~\tP\ in turn. The real implementation instead builds a data structure that can perform this lookup more efficiently (\ChapRef{chap:property map}).
 
-The $\Query{getRequiredProtocols}{}$ query is used when type checking a \index{member reference expression}member reference expression like ``\texttt{foo.bar}'' where the type of ``\texttt{foo}'' is a type parameter, because we resolve ``\texttt{bar}'' by a \index{qualified lookup}qualified name lookup into this list of protocols. This list is minimal in the sense that no protocol inherits from any other, because qualified lookup recursively visits all inherited protocols anyway. The protocols are also sorted using \AlgRef{linear protocol order}.}
+The $\Query{getRequiredProtocols}{}$ query is used when type checking a \index{member reference expression}member reference expression like ``\texttt{foo.bar}'' where the type of ``\texttt{foo}'' is a type parameter, because we resolve ``\texttt{bar}'' by a \index{qualified lookup}qualified name lookup into this list of protocols. This list is minimal in the sense that no protocol inherits from any other, because qualified lookup recursively visits all \index{protocol inheritance!name lookup}inherited protocols anyway. The protocols are also sorted using \AlgRef{linear protocol order}.}
 
 \begin{example}
 Let $G$ be the generic signature from \ExRef{motivating derived reqs}:
@@ -1318,6 +1314,7 @@ Computing reduced types:
 \end{itemize}
 Other:
 \begin{itemize}
+\item \texttt{isEffectivelyGeneric()} checks if at least one generic parameter is not fixed to a concrete type via a same-type requirement. A generic signature where every generic parameter is fixed to a concrete type is somewhat like an empty generic signature; such fully-concrete generic signatures are lowered away at the SIL level.
 \item \texttt{print()} prints the generic signature, with various options to control the output.
 \item \texttt{dump()} prints the generic signature, meant for use from the debugger or ad-hoc print debug statements.
 \end{itemize}
@@ -1330,7 +1327,6 @@ The backing storage of a generic signature. Instances of this class are allocate
 \item \texttt{isEqual()} checks if two generic signatures are canonically equal.
 \item \IndexQuerySource{getSugaredType}\texttt{getSugaredType()} replaces the generic parameter types in the given type, which must be an interface type for this generic signature, with their ``sugared'' forms taken from this generic signature, so that their names are preserved when printed out to a string.
 \item \texttt{forEachParam()} invokes a callback on each generic parameter of the signature; the callback also receives a boolean indicating if the generic parameter type is reduced or not---a generic parameter on the left hand side of a same-type requirement is not reduced.
-\item \texttt{isEffectivelyGeneric()} checks if at least one generic parameter is not fixed to a concrete type via a same-type requirement. A generic signature where every generic parameter is fixed to a concrete type is somewhat like an empty generic signature; such fully-concrete generic signatures are lowered away at the SIL level.
 \end{itemize}
 The generic signature queries from \SecRef{genericsigqueries} are methods on \texttt{GenericSignatureImpl}:
 \begin{itemize}
