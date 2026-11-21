@@ -31,6 +31,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenClass.h"
 #include "GenConcurrency.h"
 #include "GenDistributed.h"
 #include "GenEnum.h"
@@ -210,6 +211,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::OnFastPath: {
     // The onFastPath builtin has only an effect on SIL level, so we lower it
     // to a no-op.
+    return;
+  }
+
+  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables: {
+    auto self = args.claimNext();
+    emitForeignReferenceSubclassVTablesInitialization(IGF, argTypes[0], self);
     return;
   }
 
@@ -1818,7 +1825,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
-  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }
 }

@@ -166,6 +166,12 @@ namespace irgen {
   llvm::Value *emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                   bool objc, bool isBare, int &StackAllocSize, TailArraysRef TailArrays);
 
+  /// Point the C++ v-table pointers of \p self, a Swift class that subclasses
+  /// a C++ foreign reference type, at the v-tables of its class.
+  void emitForeignReferenceSubclassVTablesInitialization(IRGenFunction &IGF,
+                                                         SILType selfType,
+                                                         llvm::Value *self);
+
   /// Emit an allocation of a class using a metadata value.
   llvm::Value *emitClassAllocationDynamic(IRGenFunction &IGF,
                                           llvm::Value *metadata,
