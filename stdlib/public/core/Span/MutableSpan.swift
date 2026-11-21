@@ -813,12 +813,14 @@ extension MutableSpan {
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from index: inout Index, copying source: borrowing I
+    startingAt index: inout Index, copyingAll source: borrowing I
   ) throws(I.Failure) where I.Element == Element {
     var iterator = source.makeBorrowingIterator()
-    try updateElements(from: &index, copying: &iterator)
+    try updateElements(startingAt: &index, copyingFrom: &iterator)
     let next = try iterator.nextSpan()
-    _precondition(next.isEmpty)
+    _precondition(
+      next.isEmpty, "Source has more elements than the destination can contain."
+    )
   }
 
   /// Overwrites elements of this span, starting at an index, by copying
@@ -838,10 +840,10 @@ extension MutableSpan {
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from index: Index, copying source: borrowing I
+    startingAt index: Index, copyingAll source: borrowing I
   ) -> Index where I.Element == Element, I.Failure == Never {
     var index = index
-    updateElements(from: &index, copying: source)
+    updateElements(startingAt: &index, copyingAll: source)
     return index
   }
 
@@ -868,7 +870,7 @@ extension MutableSpan {
   public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    from index: inout Index, copying source: inout I
+    startingAt index: inout Index, copyingFrom source: inout I
   ) throws(I.Failure) where I.Element == Element {
     _precondition(
       UInt(bitPattern: index) <= UInt(bitPattern: _count),
