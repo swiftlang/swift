@@ -647,11 +647,8 @@ namespace {
     TypeLayoutEntry
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
-                          bool useStructLayouts) const override {
-      if (!useStructLayouts) {
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
-      }
-      assert(false && "Implement proper type layout info in the future");
+                          bool /*useStructLayouts*/) const override {
+      // Address-diversified fields can't be copied field-wise.
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
 
