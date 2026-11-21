@@ -771,7 +771,7 @@ function Install-PythonModules {
   Install-PIPIfNeeded
   Install-PythonModule "packaging"  # For building LLVM 18+
   Install-PythonModule "setuptools" # Required for SWIG support
-  if ($Test -contains "swift" -or $Test -contains "swift-prepare" -or $Test -contains "lldb" -or $Test -contains "lldb-swift") {
+  if ($Test -contains "swift" -or $Test -contains "lldb" -or $Test -contains "lldb-swift") {
     Install-PythonModule "psutil"       # Required for lit per-test timeouts, and for testing LLDB
   }
   if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {

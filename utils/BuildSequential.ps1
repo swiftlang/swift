@@ -134,8 +134,6 @@ Build the MSI installers and packaging.
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
-Use 'swift-prepare' to configure and build everything the Swift test suite needs, without running it
-(for example, so that utils\run-test.cmd can be used afterwards). It is not included in '*'.
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
