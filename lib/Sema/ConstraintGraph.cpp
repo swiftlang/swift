@@ -170,6 +170,13 @@ void ConstraintGraphNode::removeConstraint(Constraint *constraint) {
   Constraints.pop_back();
 }
 
+inference::BindingSet &ConstraintGraphNode::getBindingSet() {
+  ASSERT(hasBindingSet());
+  if (!Set->isDirty())
+    Set->promoteBindings();
+  return *Set;
+}
+
 void ConstraintGraphNode::notifyReferencingVars(
     llvm::function_ref<void(ConstraintGraphNode &,
                             Constraint *)> notification) const {
