@@ -162,7 +162,13 @@ public func withTaskExecutorPreference<T, Failure>(
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEtYaq_YKs5ErrorR_r0_lF")
+@abi(
+  func withTaskExecutorPreference<T, Failure>(
+    _ taskExecutor: (any TaskExecutor)?,
+    isolation: isolated (any Actor)?,
+    operation: () async throws(Failure) -> T
+  ) async throws(Failure) -> T
+)
 @usableFromInline
 internal func __abi_withTaskExecutorPreference<T, Failure>(
   _ taskExecutor: (any TaskExecutor)?,

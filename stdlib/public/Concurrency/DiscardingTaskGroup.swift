@@ -95,7 +95,13 @@ public func withDiscardingTaskGroup<GroupResult>(
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalF")
+@abi(
+  func withDiscardingTaskGroup<GroupResult>(
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout DiscardingTaskGroup) async -> GroupResult
+  ) async -> GroupResult
+)
 @usableFromInline
 internal func __abi_withDiscardingTaskGroup<GroupResult>(
   returning returnType: GroupResult.Type,
@@ -401,7 +407,13 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEtYaKlF")
+@abi(
+  func withThrowingDiscardingTaskGroup<GroupResult>(
+      returning returnType: GroupResult.Type,
+      isolation: isolated (any Actor)?,
+      body: (inout ThrowingDiscardingTaskGroup<Error>) async throws -> GroupResult
+  ) async throws -> GroupResult
+)
 @usableFromInline
 internal func __abi_withThrowingDiscardingTaskGroup<GroupResult>(
     returning returnType: GroupResult.Type,

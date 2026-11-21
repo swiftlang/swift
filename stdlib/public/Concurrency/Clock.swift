@@ -62,7 +62,11 @@ extension Clock {
   // ABI: Preserves the entry point from before `work` was exactly-once.
   @available(StdlibDeploymentTarget 5.7, *)
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss5ClockPsE7measurey8DurationQzyyKXEKF")
+  @abi(
+    func measure(
+      _ work: () throws -> Void
+    ) rethrows -> Instant.Duration
+  )
   @usableFromInline
   internal func __abi_measure(
     _ work: () throws -> Void

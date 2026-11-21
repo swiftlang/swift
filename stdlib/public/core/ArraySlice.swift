@@ -1158,7 +1158,11 @@ extension ArraySlice: RangeReplaceableCollection {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss10ArraySliceV32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
   @usableFromInline
   internal func __abi_withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1635,7 +1639,11 @@ extension ArraySlice {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss10ArraySliceV15withUnsafeBytesyqd__qd__SWKXEKlF")
+  @abi(
+    func withUnsafeBytes<R>(
+      _ body: (UnsafeRawBufferPointer) throws -> R
+    ) rethrows -> R
+  )
   @usableFromInline
   internal func __abi_withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R

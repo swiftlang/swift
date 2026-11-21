@@ -116,7 +116,16 @@ extension ManagedBuffer where Element: ~Copyable {
 #if !$Embedded
   // ABI: Preserves the entry point from before `factory` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC6create15minimumCapacity16makingHeaderWithAByxq_GSi_xAFKXEtKFZ")
+  @abi(
+    @_preInverseGenerics
+    final class func create(
+      minimumCapacity: Int,
+      makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
+    ) rethrows -> ManagedBuffer<Header, Element>
+  )
+  // FIXME: The mangler ignores `@_preInverseGenerics` inside `@abi`, so the
+  // API declaration needs it too (rdar://193378291).
+  @_preInverseGenerics
   @usableFromInline
   internal final class func __abi_create(
     minimumCapacity: Int,

@@ -849,7 +849,11 @@ public func withUnsafeCurrentTask<T>(body: @once (UnsafeCurrentTask?) throws -> 
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @available(SwiftStdlib 5.1, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss21withUnsafeCurrentTask4bodyxxSctSgKXE_tKlF")
+@abi(
+  func withUnsafeCurrentTask<T>(
+    body: (UnsafeCurrentTask?) throws -> T
+  ) rethrows -> T
+)
 @usableFromInline
 internal func __abi_withUnsafeCurrentTask<T>(
   body: (UnsafeCurrentTask?) throws -> T

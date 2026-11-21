@@ -1052,7 +1052,11 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss15ContiguousArrayV04withA25MutableStorageIfAvailableyqd__Sgqd__SryxGzKXEKlF")
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
   @usableFromInline
   internal mutating func __abi_withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -1073,7 +1077,11 @@ extension ContiguousArray: RangeReplaceableCollection {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss15ContiguousArrayV04withA18StorageIfAvailableyqd__Sgqd__SRyxGKXEKlF")
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
   @usableFromInline
   internal func __abi_withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
@@ -1667,7 +1675,11 @@ extension ContiguousArray {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss15ContiguousArrayV22withUnsafeMutableBytesyqd__qd__SwKXEKlF")
+  @abi(
+    mutating func withUnsafeMutableBytes<R>(
+      _ body: (UnsafeMutableRawBufferPointer) throws -> R
+    ) rethrows -> R
+  )
   @usableFromInline
   internal mutating func __abi_withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
@@ -1714,7 +1726,11 @@ extension ContiguousArray {
 
   // ABI: Preserves the entry point from before `body` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss15ContiguousArrayV15withUnsafeBytesyqd__qd__SWKXEKlF")
+  @abi(
+    func withUnsafeBytes<R>(
+      _ body: (UnsafeRawBufferPointer) throws -> R
+    ) rethrows -> R
+  )
   @usableFromInline
   internal func __abi_withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R

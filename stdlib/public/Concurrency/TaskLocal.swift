@@ -279,7 +279,14 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF")
+  @abi(
+    func withValue<R>(
+      _ valueDuringOperation: Value,
+      operation: () async throws -> R,
+      isolation: isolated (any Actor)?,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
   @usableFromInline
   internal func __abi_withValue<R>(
     _ valueDuringOperation: Value,
@@ -407,7 +414,12 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
   // ABI: Preserves the entry point from before `operation` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yKXESSSutKlF")
+  @abi(
+    func withValue<R>(
+      _ valueDuringOperation: Value, operation: () throws -> R,
+      file: String, line: UInt
+    ) rethrows -> R
+  )
   @usableFromInline
   internal func __abi_withValue<R>(
     _ valueDuringOperation: Value, operation: () throws -> R,

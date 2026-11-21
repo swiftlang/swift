@@ -116,7 +116,12 @@ extension Actor {
   @available(SwiftStdlib 5.1, *)
   @_unavailableInEmbedded
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sScAsE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutF")
+  @abi(
+    nonisolated func preconditionIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
   @usableFromInline
   internal nonisolated func __abi_preconditionIsolated(
       _ message: @autoclosure () -> String,
@@ -166,7 +171,12 @@ extension GlobalActor {
   @available(SwiftStdlib 5.1, *)
   @_unavailableInEmbedded
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss11GlobalActorPsE20preconditionIsolated_4file4lineySSyXK_s12StaticStringVSutFZ")
+  @abi(
+    static func preconditionIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
   @usableFromInline
   internal static func __abi_preconditionIsolated(
       _ message: @autoclosure () -> String,
@@ -275,7 +285,12 @@ extension Actor {
   @available(SwiftStdlib 5.1, *)
   @_unavailableInEmbedded
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$sScAsE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutF")
+  @abi(
+    nonisolated func assertIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
   @usableFromInline
   internal nonisolated func __abi_assertIsolated(
       _ message: @autoclosure () -> String,
@@ -325,7 +340,12 @@ extension GlobalActor {
   @available(SwiftStdlib 5.1, *)
   @_unavailableInEmbedded
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss11GlobalActorPsE14assertIsolated_4file4lineySSyXK_s12StaticStringVSutFZ")
+  @abi(
+    static func assertIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
   @usableFromInline
   internal static func __abi_assertIsolated(
       _ message: @autoclosure () -> String,

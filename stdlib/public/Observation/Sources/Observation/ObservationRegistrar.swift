@@ -310,7 +310,13 @@ public struct ObservationRegistrar: Sendable {
 
   // ABI: Preserves the entry point from before `mutation` was exactly-once.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$s11Observation0A9RegistrarV12withMutation2of7keyPath_q0_x_s03KeyG0Cyxq_Gq0_yKXEtKAA10ObservableRzr1_lF")
+  @abi(
+    func withMutation<Subject: Observable, Member, T>(
+      of subject: Subject,
+      keyPath: KeyPath<Subject, Member>,
+      _ mutation: () throws -> T
+    ) rethrows -> T
+  )
   @usableFromInline
   internal func __abi_withMutation<Subject: Observable, Member, T>(
     of subject: Subject,

@@ -211,7 +211,11 @@ public func withVaList<R>(_ args: [CVarArg],
 
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss10withVaListyxSays7CVarArg_pG_xs03CVaC7PointerVXEtlF")
+@abi(
+  func withVaList<R>(
+    _ args: [CVarArg], _ body: (CVaListPointer) -> R
+  ) -> R
+)
 @usableFromInline
 internal func __abi_withVaList<R>(
   _ args: [CVarArg], _ body: (CVaListPointer) -> R

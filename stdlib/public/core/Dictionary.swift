@@ -957,6 +957,8 @@ extension Dictionary {
   }
 
   // ABI: Preserves the accessors from before `defaultValue` was at-most-once.
+  // FIXME: Use `@abi` instead of `@_silgen_name` on the accessors once `@abi`
+  // supports storage with a `_modify` accessor (rdar://193376739).
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   internal subscript(

@@ -274,7 +274,13 @@ public func withTaskCancellationHandler<T>(
 // ABI: Preserves the entry point from before `operation` was exactly-once.
 @available(SwiftStdlib 5.1, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF")
+@abi(
+  func withTaskCancellationHandler<T>(
+    operation: () async throws -> T,
+    onCancel handler: @Sendable () -> Void,
+    isolation: isolated (any Actor)?
+  ) async rethrows -> T
+)
 @usableFromInline
 internal func __abi_withTaskCancellationHandler<T>(
   operation: () async throws -> T,

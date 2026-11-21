@@ -486,7 +486,12 @@ public func withObservationTracking<T>(
 // ABI: Preserves the entry point from before `apply` was exactly-once.
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$s11Observation04withA8Tracking_8onChangexxyXE_yyYbcyXKtlF")
+@abi(
+  func withObservationTracking<T>(
+    _ apply: () -> T,
+    onChange: @autoclosure () -> @Sendable () -> Void
+  ) -> T
+)
 @usableFromInline
 internal func __abi_withObservationTracking<T>(
   _ apply: () -> T,
@@ -510,7 +515,13 @@ public func withObservationTracking<T>(
 // ABI: Preserves the entry point from before `apply` was exactly-once.
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$s11Observation04withA8Tracking_7willSet03didE0xxyXE_yAA0aC0VYbcyAFYbctlF")
+@abi(
+  func withObservationTracking<T>(
+    _ apply: () -> T,
+    willSet: @escaping @Sendable (ObservationTracking) -> Void,
+    didSet: @escaping @Sendable (ObservationTracking) -> Void
+  ) -> T
+)
 @usableFromInline
 internal func __abi_withObservationTracking<T>(
   _ apply: () -> T,
@@ -545,7 +556,12 @@ public func withObservationTracking<T>(
 // ABI: Preserves the entry point from before `apply` was exactly-once.
 @available(SwiftStdlib 5.9, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$s11Observation04withA8Tracking_6didSetxxyXE_yAA0aC0VYbctlF")
+@abi(
+  func withObservationTracking<T>(
+    _ apply: () -> T,
+    didSet: @escaping @Sendable (ObservationTracking) -> Void
+  ) -> T
+)
 @usableFromInline
 internal func __abi_withObservationTracking<T>(
   _ apply: () -> T,

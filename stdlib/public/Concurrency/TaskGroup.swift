@@ -75,7 +75,14 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @available(SwiftStdlib 5.1, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss13withTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_ScGyxGzYaXEtYas8SendableRzr0_lF")
+@abi(
+  func withTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+  ) async -> GroupResult
+)
 @usableFromInline
 internal func __abi_withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
@@ -224,7 +231,14 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 // ABI: Preserves the entry point from before `body` was exactly-once.
 @available(SwiftStdlib 5.1, *)
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-@_silgen_name("$ss21withThrowingTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_Scgyxs5Error_pGzYaKXEtYaKs8SendableRzr0_lF")
+@abi(
+  func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+  ) async rethrows -> GroupResult
+)
 @usableFromInline
 internal func __abi_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type,
