@@ -85,6 +85,58 @@ public func zippedPackElements<each T: BinaryInteger, each U: BinaryInteger>(ts:
   }
 }
 
+// Pack loops with early exits and other control flow in the body.
+public func breakFromPackLoop<each T: BinaryInteger>(s: repeat each T) {
+  for elem in repeat each s {
+    if elem.bitWidth == 16 { break }
+    print(elem)
+  }
+}
+
+public func returnFromPackLoop<each T: BinaryInteger>(s: repeat each T) -> Int {
+  for elem in repeat each s {
+    if elem.bitWidth == 16 { return 1 }
+    print(elem)
+  }
+  return 0
+}
+
+public func continueInPackLoop<each T: BinaryInteger>(s: repeat each T) {
+  for elem in repeat each s {
+    if elem.bitWidth == 16 { continue }
+    print(elem)
+  }
+}
+
+public func ifInPackLoop<each T: BinaryInteger>(s: repeat each T) {
+  for elem in repeat each s {
+    if elem.bitWidth == 16 { print("sixteen") }
+    print(elem)
+  }
+}
+
+enum PackError: Error {
+  case sixteenBits
+}
+
+@inline(never)
+func throwIfSixteenBits<T: BinaryInteger>(_ n: T) throws {
+  print("checking \(n)")
+  if n.bitWidth == 16 { throw PackError.sixteenBits }
+}
+
+public func throwFromPackLoop<each T: BinaryInteger>(s: repeat each T) throws {
+  for elem in repeat each s {
+    try throwIfSixteenBits(elem)
+    print(elem)
+  }
+}
+
+public func throwInPackExpansion<each T: BinaryInteger>(s: repeat each T) throws {
+  _ = (repeat printInt(each s))
+  _ = try (repeat throwIfSixteenBits(each s))
+}
+
 @main
 struct Main {
   static func main() {
@@ -158,5 +210,58 @@ struct Main {
     // CHECK: 1 3
     // CHECK-NEXT: 2 4
     zippedPackElements(ts: Int8(1), Int16(2), us: Int32(3), UInt8(4))
+
+    // CHECK: 1
+    // CHECK-NEXT: after break
+    breakFromPackLoop(s: Int8(1), Int16(2), Int32(3))
+    print("after break")
+
+    // CHECK: 7
+    // CHECK-NEXT: 1
+    print(returnFromPackLoop(s: Int8(7), Int16(8), Int32(9)))
+
+    // CHECK: 1
+    // CHECK-NEXT: 3
+    continueInPackLoop(s: Int8(1), Int16(2), Int32(3))
+
+    // CHECK: 1
+    // CHECK-NEXT: sixteen
+    // CHECK-NEXT: 2
+    // CHECK-NEXT: 3
+    ifInPackLoop(s: Int8(1), Int16(2), Int32(3))
+
+    // CHECK: checking 1
+    // CHECK-NEXT: 1
+    // CHECK-NEXT: checking 2
+    // CHECK-NEXT: caught
+    do {
+      try throwFromPackLoop(s: Int8(1), Int16(2), Int32(3))
+    } catch {
+      print("caught")
+    }
+
+    // CHECK: checking 1
+    // CHECK-NEXT: 1
+    // CHECK-NEXT: checking 3
+    // CHECK-NEXT: 3
+    // CHECK-NEXT: no error
+    do {
+      try throwFromPackLoop(s: Int8(1), Int32(3))
+      print("no error")
+    } catch {
+      print("caught")
+    }
+
+    // CHECK: 1
+    // CHECK-NEXT: 2
+    // CHECK-NEXT: 3
+    // CHECK-NEXT: checking 1
+    // CHECK-NEXT: checking 2
+    // CHECK-NEXT: caught
+    do {
+      try throwInPackExpansion(s: Int8(1), Int16(2), Int32(3))
+    } catch {
+      print("caught")
+    }
   }
 }
