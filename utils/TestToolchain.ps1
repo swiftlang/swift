@@ -6,8 +6,8 @@
 Runs the tests of the Swift toolchain.
 
 .DESCRIPTION
-Runs the tests of the toolchain that build.ps1 built, against the Windows SDK of
-the host that it built.
+Runs the tests of the toolchain that BuildToolchain.ps1 built, against the
+Windows SDK of the host that BuildSDK.ps1 built.
 
 The test suites of the compilers (swift, lld, lldb, ...) run in the build tree
 of the compilers. The Build step configures it for testing and builds what the

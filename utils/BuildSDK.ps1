@@ -8,8 +8,9 @@ Builds the Swift SDK for Windows or Android.
 .DESCRIPTION
 Builds the runtime, the overlays, the supplemental libraries, libdispatch,
 Foundation and its dependencies, swift-testing and XCTest for each architecture,
-with the Stage1 compilers and the macros that build.ps1 built. Installs them in
-the platform root of the image, and the Windows runtime next to the toolchain.
+with the Stage1 compilers and the macros that BuildToolchain.ps1 -Mode Bootstrap
+built. Installs them in the platform root of the image, and the Windows runtime
+next to the toolchain.
 
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
@@ -181,8 +182,8 @@ foreach ($Build in $SDKBuilds) {
   $Build.LinkModes = $LinkModes
 }
 
-# ds2 and its generator build with the compilers of the host, like the tools that
-# run during the build.
+# ds2 and its generator build with the compilers of the host, like the tools in
+# BuildToolchain.ps1.
 $Compilers.Host = @{
   C = if ($UseHostToolchain) { $Compilers.MSVC.C } else { $Compilers.Pinned.C }
   CXX = if ($UseHostToolchain) { $Compilers.MSVC.CXX } else { $Compilers.Pinned.CXX }
