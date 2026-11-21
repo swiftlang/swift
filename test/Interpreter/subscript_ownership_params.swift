@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature SubscriptParametersWithOwnership) | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -sil-verify-all -enable-experimental-feature SubscriptParametersWithOwnership %s -o /dev/null
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_SubscriptParametersWithOwnership
 
@@ -153,3 +154,18 @@ mt[Tracked(1)] += 10
 // CHECK-NEXT: mixed rmw [1, 12] ["deinit 1"]
 print("mixed rmw", mt.slots, consumeLog)
 
+// A coroutine takes an address-only `consuming` index when it starts.
+struct GenericTable {
+  var slots: [Int] = [1, 2]
+  subscript<T: ~Copyable>(t: consuming T) -> Int {
+    _read { yield slots[0] }
+    _modify { yield &slots[0] }
+  }
+}
+
+var gt = GenericTable()
+gt[Tracked(0)] += 10
+// CHECK-NEXT: generic rmw [11, 2]
+print("generic rmw", gt.slots)
+// CHECK-NEXT: generic read 11
+print("generic read", gt[Tracked(1)])

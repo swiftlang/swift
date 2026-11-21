@@ -574,6 +574,12 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       }
       case SILInstructionKind::BeginApplyInst: {
         auto *BAI = cast<BeginApplyInst>(&I);
+        // The coroutine takes its arguments when it starts, like any call.
+        ApplySite AS(BAI);
+        for (Operand &op : BAI->getAllOperands()) {
+          if (AS.isArgumentOperand(op))
+            setFuncOperandBits(state, op, AS.getArgumentConvention(op), BAI);
+        }
         auto yieldedValues = BAI->getYieldedValues();
         for (auto index : indices(yieldedValues)) {
           auto fnType = BAI->getSubstCalleeType();
@@ -948,6 +954,11 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       }
       case SILInstructionKind::BeginApplyInst: {
         auto *BAI = cast<BeginApplyInst>(&I);
+        ApplySite AS(BAI);
+        for (Operand &op : BAI->getAllOperands()) {
+          if (AS.isArgumentOperand(op))
+            checkFuncArgument(bits, op, AS.getArgumentConvention(op), BAI);
+        }
         auto yieldedValues = BAI->getYieldedValues();
         for (auto index : indices(yieldedValues)) {
           auto fnType = BAI->getSubstCalleeType();
