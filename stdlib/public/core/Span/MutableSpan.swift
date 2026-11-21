@@ -656,6 +656,8 @@ extension MutableSpan {
 
   /// Overwrites every element of this span with the given value.
   ///
+  /// - Note: This function is a synonym for `updateAll(repeating:)`.
+  ///
   /// - Parameter repeatedValue: The value to set for every element.
   @export(implementation)
   @_lifetime(self: copy self)
