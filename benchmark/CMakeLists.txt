@@ -45,6 +45,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArrayTests
     single-source/AssumeIsolated
     single-source/AsyncTree
+    single-source/AutoDiffBuildingSimulator
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
     single-source/BitCount
