@@ -168,6 +168,16 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
 
+/// Find the partial_apply or thin_to_thick_function initializing an async let,
+/// looking through function conversions and reabstraction thunks. Return null
+/// if unrecognized or rejected by acceptSource, which is checked before
+/// stripping conversions and at each reabstraction thunk's captured source.
+SILValue findAsyncLetPartialApplyFromStart(
+    SILValue value, function_ref<bool(SILValue)> acceptSource = nullptr);
+
+/// Follow unique thunk and function-conversion users of an async-let closure.
+SILValue lookThroughAsyncLetClosureUsers(SILValue value);
+
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.
 bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
