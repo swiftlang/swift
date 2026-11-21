@@ -1008,6 +1008,66 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Whether Clang can declare the special members of \a record (see
+/// CanDeclareSpecialMemberFunction in SemaLookup.cpp).
+static bool canDeclareSpecialMembers(const clang::CXXRecordDecl *record) {
+  return !record->isDependentContext() && areRecordFieldsComplete(record);
+}
+
+/// Whether \a record's C++ default constructor is imported, including an
+/// implicit one that is not declared yet (see declareImplicitConstructors()).
+static bool hasImportedDefaultConstructor(const clang::CXXRecordDecl *record) {
+  if (!record->hasDefaultConstructor())
+    return false;
+  if (!record->ctors().empty())
+    return true;
+  return record->needsImplicitDefaultConstructor() &&
+         canDeclareSpecialMembers(record);
+}
+
+void ClangImporter::Implementation::declareImplicitConstructors(
+    const clang::CXXRecordDecl *record) {
+  // LLDB can import C++ records without C++ interop (e.g., from DWARF), where
+  // declaring their members can crash Clang's Sema.
+  if (!SwiftContext.LangOpts.EnableCXXInterop)
+    return;
+
+  record = record->getDefinition();
+  if (!record)
+    return;
+
+  bool needsDefaultCtor = record->needsImplicitDefaultConstructor(),
+       hasInheritedCtors = record->hasInheritedConstructor();
+  if ((!needsDefaultCtor && !hasInheritedCtors) ||
+      !canDeclareSpecialMembers(record))
+    return;
+
+  if (needsDefaultCtor) {
+    getClangSema().DeclareImplicitDefaultConstructor(
+        const_cast<clang::CXXRecordDecl *>(record));
+  }
+
+  if (hasInheritedCtors) {
+    // findInheritingConstructor() adds the constructors it declares to the
+    // record, so collect the shadows of the using-declarations before calling
+    // it. (It returns the existing constructor if it has already declared one.)
+    llvm::SmallVector<clang::ConstructorUsingShadowDecl *, 4> shadows;
+    for (auto *member : record->decls())
+      if (auto *shadow = dyn_cast<clang::ConstructorUsingShadowDecl>(member))
+        shadows.push_back(shadow);
+
+    for (auto *shadow : shadows) {
+      auto *baseCtor =
+          dyn_cast<clang::CXXConstructorDecl>(shadow->getTargetDecl());
+      if (!baseCtor || baseCtor->isDeleted() || baseCtor->isCopyConstructor() ||
+          baseCtor->isMoveConstructor())
+        continue;
+      getClangSema().findInheritingConstructor(shadow->getLocation(), baseCtor,
+                                               shadow);
+    }
+  }
+}
+
 static bool hasComputedPropertyAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, {"import_computed_property"});
 }
@@ -1049,8 +1109,7 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
     switch (fn->getDeclName().getNameKind()) {
     case clang::DeclarationName::CXXOperatorName:
     case clang::DeclarationName::CXXConversionFunctionName:
-    case clang::DeclarationName::CXXConstructorName:
-      // Eagerly import operators, conversions, and constructors for now.
+      // Eagerly import operators and conversions for now.
       // Some of these are handled in special ways that require them to
       // be eagerly available, e.g., in VisitCXXRecordDecl() and
       // conformToCxxConvertibleToBoolIfNeeded().
@@ -3122,7 +3181,6 @@ namespace {
 
       // Import each of the members.
       SmallVector<VarDecl *, 4> members;
-      SmallVector<ConstructorDecl *, 4> ctors;
 
       // The name of every member.
       llvm::DenseSet<StringRef> allMemberNames;
@@ -3223,15 +3281,9 @@ namespace {
           continue;
         }
 
-        if (auto CD = dyn_cast<ConstructorDecl>(member)) {
-          ctors.push_back(CD);
-          if (auto *legacyCD =
-                  importer::getDeclForCounterpartCArrayProjection(CD))
-            ctors.push_back(legacyCD);
-          continue;
-        }
-
-        if (isa<FuncDecl>(member))
+        // Constructors (and their C array counterparts, which are recorded as
+        // alternate decls) are looked up lazily; see lookupClangConstructors().
+        if (isa<FuncDecl, ConstructorDecl>(member))
           continue;
 
         if (isa<VarDecl>(member) && isa<clang::CXXMethodDecl>(nd)) {
@@ -3329,7 +3381,10 @@ namespace {
 
             if (isNonEscapable)
               markReturnsUnsafeNonescapable(valueCtor);
-            ctors.push_back(valueCtor);
+
+            // Synthesized initializers only apply to imported structs, not FRTs
+            if (isa<StructDecl>(result))
+              result->addMember(valueCtor);
 
             return valueCtor;
           });
@@ -3366,11 +3421,10 @@ namespace {
       }
 
       bool needsEmptyInitializer = true;
-      if (cxxRecordDecl) {
+      if (cxxRecordDecl && Impl.SwiftContext.LangOpts.EnableCXXInterop) {
         needsEmptyInitializer = cxxRecordDecl->isCompleteDefinition() &&
                                 !cxxRecordDecl->isAbstract() &&
-                                (!cxxRecordDecl->hasDefaultConstructor() ||
-                                 cxxRecordDecl->ctors().empty());
+                                !hasImportedDefaultConstructor(cxxRecordDecl);
       }
 
       // TODO: builtin "zeroInitializer" does not work with non-escapable
@@ -3398,7 +3452,9 @@ namespace {
               "");
           defaultCtor->addAttribute(attr);
         }
-        ctors.push_back(defaultCtor);
+        // Only structs get Swift-synthesized initializers; see above.
+        if (isa<StructDecl>(result))
+          result->addMember(defaultCtor);
       }
 
       bool forceMemberwiseInitializer = false;
@@ -3462,47 +3518,14 @@ namespace {
           if (isNonEscapable)
             markReturnsUnsafeNonescapable(valueCtor);
 
-          ctors.push_back(valueCtor);
+          // Only structs get Swift-synthesized initializers; see above.
+          if (isa<StructDecl>(result))
+            result->addMember(valueCtor);
+
           return valueCtor;
         });
 
         Impl.applyAvailabilityFloor(valueCtor);
-      }
-
-      if (isa<StructDecl>(result)) {
-        for (auto ctor : ctors) {
-          // Add ctors directly as they cannot always be looked up from the
-          // clang decl (some are synthesized by Swift).
-          result->addMember(ctor);
-        }
-      } else {
-        assert(
-            isa<ClassDecl>(result) &&
-            "Expected result to be a ClassDecl as it cannot be a StructDecl");
-        // When we add full support for C foreign reference types then we
-        // should synthesize static factories for them as well
-        if (auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl)) {
-          bool hasUserProvidedStaticFactory = llvm::any_of(
-              cxxRecordDecl->methods(), [](const clang::CXXMethodDecl *method) {
-                return method->isStatic() &&
-                       llvm::any_of(
-                           method->specific_attrs<clang::SwiftNameAttr>(),
-                           [](const auto *attr) {
-                             return attr->getName().starts_with("init(");
-                           });
-              });
-          if (!hasUserProvidedStaticFactory) {
-            auto generatedCxxMethodDecls =
-                synthesizer.synthesizeStaticFactoryForCXXForeignRef(
-                    cxxRecordDecl);
-            for (auto *methodDecl : generatedCxxMethodDecls) {
-              if (Decl *importedInitDecl =
-                      Impl.SwiftContext.getClangModuleLoader()
-                          ->importDeclDirectly(methodDecl))
-                result->addMember(importedInitDecl);
-            }
-          }
-        }
       }
 
       if (auto structResult = dyn_cast<StructDecl>(result)) {
@@ -3729,51 +3752,14 @@ namespace {
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
-      // Make Clang define any implicit constructors it may need (copy,
-      // default). Make sure we only do this if the class has been fully defined
-      // with complete fields, and we're not in a dependent context(this is
-      // equivalent to the logic in CanDeclareSpecialMemberFunction in Clang's
-      // SemaLookup.cpp).
+      // Declare the implicit special members we look for among the record's
+      // members, which Clang only declares lazily.
       assert(!decl->isBeingDefined() && "can only import fully defined decls");
-      if (!decl->isDependentContext() && areRecordFieldsComplete(decl)) {
-        if (decl->hasInheritedConstructor()) {
-          for (auto member : decl->decls()) {
-            if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
-              for (auto usingShadowDecl : usingDecl->shadows()) {
-                if (auto ctorUsingShadowDecl =
-                        dyn_cast<clang::ConstructorUsingShadowDecl>(
-                            usingShadowDecl)) {
-                  auto baseCtorDecl = dyn_cast<clang::CXXConstructorDecl>(
-                      ctorUsingShadowDecl->getTargetDecl());
-                  if (!baseCtorDecl || baseCtorDecl->isDeleted() ||
-                      baseCtorDecl->isCopyConstructor() ||
-                      baseCtorDecl->isMoveConstructor())
-                    continue;
-                  auto loc = ctorUsingShadowDecl->getLocation();
-
-                  auto derivedCtorDecl = clangSema.findInheritingConstructor(
-                      loc, baseCtorDecl, ctorUsingShadowDecl);
-                  if (!derivedCtorDecl->isDefined() &&
-                      !derivedCtorDecl->isDeleted())
-                    clangSema.DefineInheritingConstructor(loc, derivedCtorDecl);
-                }
-              }
-            }
-          }
-        }
-        if (decl->needsImplicitDefaultConstructor()) {
-          clang::CXXConstructorDecl *ctor =
-              clangSema.DeclareImplicitDefaultConstructor(
-                  const_cast<clang::CXXRecordDecl *>(decl));
-          if (!ctor->isDeleted())
-            clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
-                                                       ctor);
-        }
+      if (canDeclareSpecialMembers(decl)) {
         // If the C++ struct is annotated as non-copyable, we should not try to
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
 
-        clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
           clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
@@ -3781,31 +3767,6 @@ namespace {
         if (decl->needsImplicitMoveConstructor()) {
           clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        }
-        if (decl->needsImplicitDefaultConstructor()) {
-          defaultCtor = clangSema.DeclareImplicitDefaultConstructor(
-              const_cast<clang::CXXRecordDecl *>(decl));
-        }
-        // We may have a defaulted copy/move/default constructor that needs to
-        // be defined. Try to find it.
-        for (auto methods : decl->methods()) {
-          if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-            if (declCtor->isDefaulted() &&
-                declCtor->getAccess() == clang::AS_public &&
-                !declCtor->isDeleted() &&
-                // Note: we use "doesThisDeclarationHaveABody" here because
-                // that's what "DefineImplicitCopyConstructor" checks.
-                !declCtor->doesThisDeclarationHaveABody()) {
-              if (declCtor->isDefaultConstructor()) {
-                if (!defaultCtor)
-                  defaultCtor = declCtor;
-              }
-            }
-          }
-        }
-        if (defaultCtor) {
-          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
-                                                     defaultCtor);
         }
 
         if (decl->needsImplicitDestructor()) {
@@ -12032,6 +11993,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
                          baseRecord &&
                          importer::getPrivateFileIDAttrs(baseRecord).empty();
 
+  if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord);
+      cxxRecord && !storage && !inheritance)
+    Impl.declareImplicitConstructors(cxxRecord);
+
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
@@ -12143,13 +12108,26 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     if (isa<AccessorDecl>(member))
       continue;
 
-    // FIXME: subscripts and constructors are imported and added eagerly
-    //        (though they shouldn't be and won't be in the near future).
-    // Skip adding these here to avoid double-adding the same member.
-    if (isa<SubscriptDecl, ConstructorDecl>(member)) {
+    // FIXME: subscripts are imported and added eagerly (though they shouldn't
+    //        be and won't be in the near future). Skip adding those here to
+    //        avoid double-adding the same member.
+    if (isa<SubscriptDecl>(member)) {
       const auto &LangOpts = Impl.SwiftContext.LangOpts;
       if (auto *nd = dyn_cast_or_null<clang::NamedDecl>(member->getClangDecl());
           nd && shouldEagerlyImportClangRecordMember(nd, LangOpts))
+        continue;
+    }
+
+    // An FRT's C++ constructors are not directly imported as initializers.
+    // (Instead we synthesize static factories that call these constructors and
+    // import those factories as initializers.)
+    if (isa<ConstructorDecl>(member) && isa<ClassDecl>(swiftDecl)) {
+      // getAsFunction() looks through the FunctionTemplateDecl of a constructor
+      // template, which is what the imported decl carries as its Clang node.
+      const clang::FunctionDecl *fn = nullptr;
+      if (auto *clangDecl = member->getClangDecl())
+        fn = clangDecl->getAsFunction();
+      if (isa_and_nonnull<clang::CXXConstructorDecl>(fn))
         continue;
     }
 
@@ -12203,6 +12181,8 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     (void)Impl.lookupAndImportOperatorBool(swiftDecl);
     (void)Impl.lookupAndImportSubscripts(swiftDecl);
     (void)Impl.lookupAndImportAsReference(swiftDecl);
+    if (auto *classDecl = dyn_cast<ClassDecl>(swiftDecl))
+      (void)Impl.lookupAndImportSynthesizedFactories(classDecl);
   }
 }
 } // namespace

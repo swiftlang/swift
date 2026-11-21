@@ -54,3 +54,14 @@ func ctorWithDefaultArgs() {
   let _ = FRTTemplateCtorWithDefaultArgInt()
   let _ = FRTTemplateCtorWithDefaultArgInt(7)
 }
+
+@available(SwiftStdlib 5.8, *)
+func ctorWithPrivateArgCopy() {
+  let _ = FRTCtorWithPrivateArgCopy(42)
+  let _ = FRTCtorWithPrivateArgCopy(ArgWithPrivateNonConstCopy()) // expected-error {{cannot convert value of type 'ArgWithPrivateNonConstCopy' to expected argument type 'CInt'}}
+}
+
+@available(SwiftStdlib 5.8, *)
+func inheritedCtor() {
+  let _ = FRTInheritedCtor(42)
+}
