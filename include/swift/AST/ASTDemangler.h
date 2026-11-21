@@ -66,6 +66,10 @@ class ASTBuilder {
   /// Created lazily.
   DeclContext *NotionalDC = nullptr;
 
+  /// The generic signature of the context in which the mangled type appears,
+  /// if any.
+  GenericSignature GenericSig;
+
   /// The depth and index of each parameter pack in the current generic
   /// signature. We need this because the mangling for a type parameter
   /// doesn't record whether it is a pack or not; we find the correct
@@ -104,7 +108,8 @@ public:
 
   static constexpr bool needsToPrecomputeParentGenericContextShapes = false;
 
-  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig) : Ctx(ctx) {
+  explicit ASTBuilder(ASTContext &ctx, GenericSignature genericSig)
+      : Ctx(ctx), GenericSig(genericSig) {
     ManglingFlavor = ctx.LangOpts.hasFeature(Feature::Embedded)
                  ? Mangle::ManglingFlavor::Embedded
                  : Mangle::ManglingFlavor::Default;
