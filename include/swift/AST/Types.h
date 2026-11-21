@@ -253,7 +253,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -268,7 +268,6 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
     HasSuperclass : 1,
     HasLayoutConstraint : 1,
-    : NumPadBits,
     NumProtocols : 16
   );
 
@@ -308,9 +307,7 @@ protected:
     HasExplicitAnyObject : 1,
 
     /// The number of protocols being composed.
-    Count : 31;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    Count : 31
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ParameterizedProtocolType, TypeBase, 32,
@@ -320,16 +317,12 @@ protected:
 
   SWIFT_INLINE_BITFIELD_FULL(TupleType, TypeBase, 32,
     /// The number of elements of the tuple.
-    Count : 32;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    Count : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(PackType, TypeBase, 32,
     /// The number of elements of the pack.
-    Count : 32;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    Count : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SILPackType, TypeBase, 1+31,
@@ -337,9 +330,7 @@ protected:
     ElementIsAddress : 1,
 
     /// The number of elements of the pack
-    Count : 31;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    Count : 31
   );
 
   SWIFT_INLINE_BITFIELD_FULL(NominalType, TypeBase, 16+16,
@@ -347,9 +338,7 @@ protected:
     ScopeArgCount : 16,
 
     /// The number of generic arguments.
-    GenericArgCount : 16;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    GenericArgCount : 16
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+30,
@@ -357,9 +346,7 @@ protected:
     HasParent : 1,
 
     /// The number of generic arguments.
-    GenericArgCount : 30;
-
-    static_assert(NumPadBits == 0, "Re-insert padding if > 0");
+    GenericArgCount : 30
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,

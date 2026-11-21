@@ -150,8 +150,6 @@ union TypeInfoBitfields {
   /// language, defining an extremely large object is quite impractical.
   /// For now: "4 GiB should be more than good enough."
   SWIFT_INLINE_BITFIELD_FULL(FixedTypeInfo, TypeInfo, 32,
-    : NumPadBits,
-
     /// The storage size of this type in bytes.  This may be zero even
     /// for well-formed and complete types, such as a trivial enum or
     /// tuple.
