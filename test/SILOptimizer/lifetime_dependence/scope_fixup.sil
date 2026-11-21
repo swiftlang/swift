@@ -615,6 +615,70 @@ bb2(%25 : @guaranteed $NCWrapper):
   return %37
 }
 
+// Extend an owned terminator result only within its own block. The terminator's other successors are outside its
+// lifetime.
+//
+// CHECK-LABEL: sil [ossa] @testUnwrappedOwner : $@convention(thin) (@owned Optional<Holder>) -> () {
+// CHECK:   switch_enum %0, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK-NEXT:   unreachable
+// CHECK: bb2([[PAYLOAD:%.*]] : @owned $Holder):
+// CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] %{{.*}} on [[PAYLOAD]]
+// CHECK:   apply %{{.*}}([[DEP]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK:   destroy_value [[DEP]]
+// CHECK:   destroy_value [[PAYLOAD]]
+// CHECK-LABEL: } // end sil function 'testUnwrappedOwner'
+sil [ossa] @testUnwrappedOwner : $@convention(thin) (@owned Optional<Holder>) -> () {
+bb0(%0 : @owned $Optional<Holder>):
+  switch_enum %0, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  unreachable
+
+bb2(%3 : @owned $Holder):
+  %4 = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %3
+  destroy_value %3
+  %8 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %9 = apply %8(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  %11 = tuple ()
+  return %11
+}
+
+sil @getHolderThrows : $@convention(thin) () -> (@owned Holder, @error any Error)
+
+// CHECK-LABEL: sil [ossa] @testThrowingOwner : $@convention(thin) () -> @error any Error {
+// CHECK:   try_apply %{{.*}}() : $@convention(thin) () -> (@owned Holder, @error any Error), normal bb1, error bb2
+// CHECK: bb1([[HOLDER:%.*]] : @owned $Holder):
+// CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] %{{.*}} on [[HOLDER]]
+// CHECK:   apply %{{.*}}([[DEP]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK:   destroy_value [[DEP]]
+// CHECK:   destroy_value [[HOLDER]]
+// CHECK: bb2([[ERROR:%.*]] : @owned $any Error):
+// CHECK-NEXT:   throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'testThrowingOwner'
+sil [ossa] @testThrowingOwner : $@convention(thin) () -> @error any Error {
+bb0:
+  %0 = function_ref @getHolderThrows : $@convention(thin) () -> (@owned Holder, @error any Error)
+  try_apply %0() : $@convention(thin) () -> (@owned Holder, @error any Error), normal bb1, error bb2
+
+bb1(%2 : @owned $Holder):
+  %3 = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  destroy_value %2
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %5
+  %10 = tuple ()
+  return %10
+
+bb2(%12 : @owned $any Error):
+  throw %12
+}
+
 // =============================================================================
 // Return value extension
 // =============================================================================

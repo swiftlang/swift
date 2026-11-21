@@ -399,6 +399,43 @@ bb0:
   return %14
 }
 
+class HolderStorage {
+  @_hasStorage var holder: Optional<Holder> { get set }
+}
+
+sil @getNEFromHolder : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+
+// The switch_enum consumes the copy loaded from class storage, so the dependence must be on the payload, not the copy.
+//
+// CHECK-LABEL: sil [ossa] @testUnwrappedClassStorage : $@convention(thin) (@guaranteed HolderStorage) -> () {
+// CHECK:   [[COPY:%.*]] = load [copy]
+// CHECK:   switch_enum [[COPY]], case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb2([[PAYLOAD:%.*]] : @owned $Holder):
+// CHECK:   [[NE:%.*]] = apply %{{.*}}([[PAYLOAD]]) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on [[PAYLOAD]]
+// CHECK-LABEL: } // end sil function 'testUnwrappedClassStorage'
+sil [ossa] @testUnwrappedClassStorage : $@convention(thin) (@guaranteed HolderStorage) -> () {
+bb0(%0 : @guaranteed $HolderStorage):
+  %1 = ref_element_addr %0, #HolderStorage.holder
+  %2 = begin_access [read] [dynamic] %1
+  %3 = load [copy] %2
+  end_access %2
+  switch_enum %3, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  unreachable
+
+bb2(%7 : @owned $Holder):
+  %8 = function_ref @getNEFromHolder : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  destroy_value %7
+  %11 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %12 = apply %11(%9) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %9
+  %14 = tuple ()
+  return %14
+}
+
 struct NCItems: ~Copyable {
   var p: UnsafeRawPointer
 }

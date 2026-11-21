@@ -80,6 +80,71 @@ func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
 }
 
 // =============================================================================
+// Owned temporaries
+// =============================================================================
+
+struct CHolder {
+  let c: C
+  let p: UnsafeRawPointer
+
+  @_lifetime(borrow self)
+  func getBV() -> BV {
+    BV(p, 0)
+  }
+}
+
+func makeOptionalHolder() -> CHolder? { nil }
+func makeHolderThrows() throws -> CHolder { fatalError() }
+func makePointerAndObject() -> (UnsafeRawPointer, C) { fatalError() }
+
+// The switch_enum that unwraps the Optional consumes it. The dependence is on its payload.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s4test20bv_force_unwrap_tempyyF : $@convention(thin) () -> () {
+// CHECK: switch_enum %{{.*}}, case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: bb{{[0-9]+}}
+// CHECK: [[SOME]]([[PAYLOAD:%.*]] : @owned $CHolder):
+// CHECK: [[BV:%.*]] = apply %{{.*}}([[PAYLOAD]]) : $@convention(method) (@guaranteed CHolder) -> @lifetime(borrow 0) @owned BV
+// CHECK: mark_dependence [unresolved] [[BV]] on [[PAYLOAD]]
+// CHECK-LABEL: } // end sil function '$s4test20bv_force_unwrap_tempyyF'
+func bv_force_unwrap_temp() {
+  use(makeOptionalHolder()!.getBV())
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test26bv_force_unwrap_temp_localyyF : $@convention(thin) () -> () {
+// CHECK: switch_enum %{{.*}}, case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: bb{{[0-9]+}}
+// CHECK: [[SOME]]([[PAYLOAD:%.*]] : @owned $CHolder):
+// CHECK: [[BV:%.*]] = apply %{{.*}}([[PAYLOAD]]) : $@convention(method) (@guaranteed CHolder) -> @lifetime(borrow 0) @owned BV
+// CHECK: [[DEP:%.*]] = mark_dependence [unresolved] [[BV]] on [[PAYLOAD]]
+// CHECK: move_value [var_decl] [[DEP]]
+// CHECK-LABEL: } // end sil function '$s4test26bv_force_unwrap_temp_localyyF'
+func bv_force_unwrap_temp_local() {
+  let bv = makeOptionalHolder()!.getBV()
+  use(bv)
+}
+
+// The dependence is on the try_apply result.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s4test16bv_throwing_tempyyKF : $@convention(thin) () -> @error any Error {
+// CHECK: try_apply %{{.*}}() : $@convention(thin) () -> (@owned CHolder, @error any Error), normal [[NORMAL:bb[0-9]+]], error bb{{[0-9]+}}
+// CHECK: [[NORMAL]]([[HOLDER:%.*]] : @owned $CHolder):
+// CHECK: [[BV:%.*]] = apply %{{.*}}([[HOLDER]]) : $@convention(method) (@guaranteed CHolder) -> @lifetime(borrow 0) @owned BV
+// CHECK: mark_dependence [unresolved] [[BV]] on [[HOLDER]]
+// CHECK-LABEL: } // end sil function '$s4test16bv_throwing_tempyyKF'
+func bv_throwing_temp() throws {
+  use(try makeHolderThrows().getBV())
+}
+
+// The destructure_tuple consumes the tuple. The dependence is on the trivial element.
+//
+// CHECK-LABEL: sil hidden [ossa] @$s4test24bv_trivial_tuple_elementyyF : $@convention(thin) () -> () {
+// CHECK: ([[PTR:%.*]], %{{.*}}) = destructure_tuple
+// CHECK: [[BV:%.*]] = apply %{{.*}}([[PTR]], %{{.*}}, %{{.*}}) : $@convention(method) (UnsafeRawPointer, Int, @thin BV.Type) -> @lifetime(borrow 0) @owned BV
+// CHECK: mark_dependence [unresolved] [[BV]] on [[PTR]]
+// CHECK-LABEL: } // end sil function '$s4test24bv_trivial_tuple_elementyyF'
+func bv_trivial_tuple_element() {
+  use(BV(makePointerAndObject().0, 0))
+}
+
+// =============================================================================
 // Builtin.addressOfBorrow
 // =============================================================================
 
