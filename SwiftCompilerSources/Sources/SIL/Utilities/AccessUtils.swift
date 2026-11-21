@@ -70,6 +70,9 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   case tail(RefTailAddrInst)
 
   /// An indirect function argument, like `@inout`.
+  ///
+  /// With opaque values, a guaranteed address-only argument is an object until AddressLowering. Its address is
+  /// `value_to_address` of the argument, which is also an `argument` base.
   case argument(FunctionArgument)
   
   /// An indirect result of a `begin_apply`.
@@ -109,6 +112,13 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case let mvr as MultipleValueInstructionResult:
       if mvr.parentInstruction is BeginApplyInst && baseAddress.type.isAddress {
         self = .yield(mvr)
+      } else {
+        self = .unidentified
+      }
+    case let vta as ValueToAddressInst:
+      // The address of an indirect argument that opaque values represent as an object.
+      if let arg = vta.operand.value as? FunctionArgument {
+        self = .argument(arg)
       } else {
         self = .unidentified
       }

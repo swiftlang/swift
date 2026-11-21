@@ -1,0 +1,89 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-sil-opt %t/accepted.sil -enable-sil-opaque-values -lifetime-dependence-diagnostics -address-lowering -sil-verify-all -enable-experimental-feature Lifetimes | %FileCheck %s
+// RUN: not %target-sil-opt %t/escapes-local-variable.sil -enable-sil-opaque-values -lifetime-dependence-diagnostics -sil-verify-all -enable-experimental-feature Lifetimes 2>&1 | %FileCheck %s --check-prefix=LOCAL
+
+// REQUIRES: swift_feature_Lifetimes
+
+// With opaque values, SILGen gives the address of a guaranteed indirect argument
+// as value_to_address of the argument. The lifetime dependence diagnostics run
+// before AddressLowering, so they must see that a dependence on that address is a
+// dependence on the argument, whose scope is in the caller. A dependence on a
+// local copy is still local.
+
+//--- accepted.sil
+sil_stage raw
+
+import Builtin
+import Swift
+
+struct NE: ~Escapable {
+  var p: UnsafeRawPointer
+}
+
+sil @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+// The dependence is on the address of the argument.
+//
+// CHECK-LABEL: sil hidden [ossa] @borrowSelf :
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NOT:     value_to_address
+// CHECK:         [[DEP:%.*]] = mark_dependence [nonescaping] {{%.*}} on %0
+// CHECK:         return [[DEP]]
+// CHECK-LABEL: } // end sil function 'borrowSelf'
+sil hidden [ossa] [opaque] @borrowSelf : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE {
+bb0(%0 : @guaranteed $T):
+  %2 = value_to_address %0 : $T
+  %3 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3<T>(%0) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  return %5
+}
+
+// The same when the address is wrapped for a no-implicit-copy argument.
+//
+// CHECK-LABEL: sil hidden [ossa] @borrowWrappedSelf :
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NOT:     value_to_address
+// CHECK:         [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr %0
+// CHECK:         [[BASE:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]]
+// CHECK:         [[DEP:%.*]] = mark_dependence [nonescaping] {{%.*}} on [[BASE]]
+// CHECK:         return [[DEP]]
+// CHECK-LABEL: } // end sil function 'borrowWrappedSelf'
+sil hidden [ossa] [opaque] @borrowWrappedSelf : $@convention(thin) <T> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE {
+bb0(%0 : @guaranteed $T):
+  %2 = value_to_address %0 : $T
+  %3 = copyable_to_moveonlywrapper_addr %2 : $*T
+  %4 = mark_unresolved_non_copyable_value [no_consume_or_assign] %3 : $*@moveOnly T
+  %5 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %6 = apply %5<T>(%0) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %7 = mark_dependence [unresolved] %6 on %4
+  return %7
+}
+
+//--- escapes-local-variable.sil
+sil_stage raw
+
+import Builtin
+import Swift
+
+struct NE: ~Escapable {
+  var p: UnsafeRawPointer
+}
+
+sil @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+// A local copy of the argument ends with the function.
+//
+// LOCAL: error: lifetime-dependent value escapes its scope
+sil hidden [ossa] [opaque] @escapesLocalVariable : $@convention(thin) <T> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = move_value [var_decl] %1 : $T
+  %3 = value_to_address %2 : $T
+  %4 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = apply %4<T>(%2) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %3
+  destroy_value %2 : $T
+  return %6
+}
