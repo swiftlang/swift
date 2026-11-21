@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend -disable-type-layout %s -emit-ir | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 // REQUIRES: optimized_stdlib
 // UNSUPPORTED: CPU=powerpc64le
+// UNSUPPORTED: CPU=wasm32
 
 public struct BigStruct {
   var i0 : Int32 = 0
