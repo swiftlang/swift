@@ -389,10 +389,10 @@ struct UnrollablePackLoopInfo {
 /// expansions. These are the headers of candidate loops for Pack Loop
 /// Unrolling.
 ///
-/// Ignore `open_pack_element` instructions where the opened Pack types are
-/// homogeneous (all elements the same) and contain more than one element.
-/// PackTypeElimination can eliminate these without unrolling the loop, so doing
-/// so would just increase code size unnecessarily.
+/// TODO: Avoid unrolling loops over homogeneous packs when possible. We must
+/// unroll even loops over homogeneous packs in some cases; for example,
+/// unrolling is necessary to eliminate `tuple_pack_element_addr` instructions
+/// that use the dynamic pack index.
 ///
 /// Returns an array containing each loop header and its depth.
 static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
@@ -423,26 +423,19 @@ static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
         if (!indexArg || !LoopInfo->isLoopHeader(indexArg->getParent()))
           continue;
 
-        // Check if every opened Pack type contains a list of distinct non-pack
-        // expansion (scalar) types.
-        bool heterogeneousScalar = true;
+        // Check if every opened Pack type contains a list of non-pack expansion
+        // (scalar) types.
+        bool allScalar = true;
         ope->getOpenedGenericEnvironment()->forEachPackElementBinding(
             [&](ElementArchetypeType *elementArchetype, PackType *pack) {
-              if (!heterogeneousScalar)
+              if (!allScalar)
                 return;
 
-              const auto numElements = pack->getNumElements();
-              if (numElements == 0 || pack->containsPackExpansionType() ||
-                  (numElements > 1 &&
-                   llvm::all_equal(llvm::map_range(
-                       pack->getElementTypes(), [](const auto &type) {
-                         return type->getCanonicalType();
-                       })))) {
-                heterogeneousScalar = false;
-              }
+              if (pack->getNumElements() == 0 || pack->containsPackExpansionType())
+                allScalar = false;
             });
 
-        if (heterogeneousScalar &&
+        if (allScalar &&
             !collectedBlocks.contains(indexArg->getParent())) {
           collectedBlocks.insert(indexArg->getParent());
           packLoopHeaders.push_back(
