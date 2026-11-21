@@ -968,6 +968,10 @@ extension Dictionary {
     get {
       return self[key, default: defaultValue()]
     }
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtcis")
+    set {
+      self[key, default: defaultValue()] = newValue
+    }
     @_silgen_name("$sSD_7defaultq_x_q_yXKtciM")
     _modify {
       yield &self[key, default: defaultValue()]

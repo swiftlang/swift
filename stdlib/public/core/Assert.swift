@@ -55,6 +55,24 @@ public func assert(
   }
 }
 
+// ABI: Preserves the entry point from before `condition` and `message` were at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func assert(
+    _ condition: @autoclosure () -> Bool,
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi_assert(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) {
+  assert(condition(), message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func assert(
@@ -119,6 +137,24 @@ public func precondition(
     Builtin.condfail_message(error._value,
       StaticString("precondition failure").unsafeRawPointer)
   }
+}
+
+// ABI: Preserves the entry point from before `condition` and `message` were at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func precondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi_precondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) {
+  precondition(condition(), message(), file: file, line: line)
 }
 
 #if $Embedded
@@ -257,6 +293,22 @@ public func preconditionFailure(
   _conditionallyUnreachable()
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func preconditionFailure(
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  ) -> Never
+)
+@usableFromInline
+internal func __abi_preconditionFailure(
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) -> Never {
+  preconditionFailure(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func preconditionFailure(
@@ -305,6 +357,22 @@ public func fatalError(
 #endif
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func fatalError(
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  ) -> Never
+)
+@usableFromInline
+internal func __abi_fatalError(
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) -> Never {
+  fatalError(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func fatalError(
@@ -342,6 +410,24 @@ internal func _precondition(
     let error = !condition()
     Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
+}
+
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _precondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__precondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _precondition(condition(), message, file: file, line: line)
 }
 
 @usableFromInline @_transparent
@@ -400,6 +486,24 @@ internal func _debugPrecondition(
 #endif
 }
 
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _debugPrecondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__debugPrecondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _debugPrecondition(condition(), message, file: file, line: line)
+}
+
 @usableFromInline @_transparent
 internal func _debugPreconditionFailure(
   _ message: StaticString = StaticString(),
@@ -432,6 +536,24 @@ internal func _internalInvariant(
       flags: _fatalErrorFlags())
   }
 #endif
+}
+
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _internalInvariant(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__internalInvariant(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _internalInvariant(condition(), message, file: file, line: line)
 }
 
 // Only perform the invariant check on Swift 5.1 and later

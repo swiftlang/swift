@@ -6,10 +6,6 @@
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -606,3 +602,90 @@ Added: _swift_continuation_resumeOnExecutors
 // shared by its inlinable overloads.
 Added: _$sScC20_resumeSynchronously8throwing__yq_n_BeBetF
 Added: _$sScC20_resumeSynchronously9returning__yxn_BeBetF
+
+// Once functions: the closure parameters of these entry points are
+// exactly-once or at-most-once. The previous entry points are preserved.
+
+// (extension in Swift):Swift.Actor.assertIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$sScAsE14assertIsolated_4file4lineySSyXKn_s12StaticStringVSutF
+
+// (extension in Swift):Swift.Actor.preconditionIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$sScAsE20preconditionIsolated_4file4lineySSyXKn_s12StaticStringVSutF
+
+// (extension in Swift):Swift.SerialExecutor.assertIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$sScfsE14assertIsolated_4file4lineySSyXKn_s12StaticStringVSutF
+
+// (extension in Swift):Swift.SerialExecutor.preconditionIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$sScfsE20preconditionIsolated_4file4lineySSyXKn_s12StaticStringVSutF
+
+// Swift.ExecutorJob.withUnsafeExecutorPrivateData<A, B where B: Swift.Error>(body: __owned (Swift.UnsafeMutableRawBufferPointer) throws(B) -> A) throws(B) -> A
+Added: _$ss11ExecutorJobV010withUnsafeA11PrivateData4bodyxxSwq_YKXEn_tq_YKs5ErrorR_r0_lF
+
+// static (extension in Swift):Swift.GlobalActor.assertIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss11GlobalActorPsE14assertIsolated_4file4lineySSyXKn_s12StaticStringVSutFZ
+
+// static (extension in Swift):Swift.GlobalActor.preconditionIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss11GlobalActorPsE20preconditionIsolated_4file4lineySSyXKn_s12StaticStringVSutFZ
+
+// Swift.withDeadline<A, B, C where B: Swift.Error, C: Swift.Identifiable, C: Swift.Clock, A: ~Swift.Copyable>(_: C.Swift.Clock.Instant, tolerance: C.Swift.Clock.Duration?, clock: C, operation: __owned nonisolated(nonsending) () async throws(B) -> A) async throws(B) -> A
+Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEntYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lF
+
+// async function pointer to Swift.withDeadline<A, B, C where B: Swift.Error, C: Swift.Identifiable, C: Swift.Clock, A: ~Swift.Copyable>(_: C.Swift.Clock.Instant, tolerance: C.Swift.Clock.Duration?, clock: C, operation: __owned nonisolated(nonsending) () async throws(B) -> A) async throws(B) -> A
+Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEntYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lFTu
+
+// Swift.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.TaskGroup<A>) async -> B) async -> B
+Added: _$ss13withTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_ScGyxGzYaXEntYas8SendableRzr0_lF
+
+// async function pointer to Swift.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.TaskGroup<A>) async -> B) async -> B
+Added: _$ss13withTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_ScGyxGzYaXEntYas8SendableRzr0_lFTu
+
+// Swift.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B
+Added: _$ss21withThrowingTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_Scgyxs5Error_pGzYaKXEntYaKs8SendableRzr0_lF
+
+// async function pointer to Swift.withThrowingTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.ThrowingTaskGroup<A, Swift.Error>) async throws -> B) async throws -> B
+Added: _$ss21withThrowingTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_Scgyxs5Error_pGzYaKXEntYaKs8SendableRzr0_lFTu
+
+// Swift.withUnsafeCurrentTask<A>(body: __owned (Swift.UnsafeCurrentTask?) throws -> A) throws -> A
+Added: _$ss21withUnsafeCurrentTask4bodyxxSctSgKXEn_tKlF
+
+// Swift.withDiscardingTaskGroup<A>(returning: A.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.DiscardingTaskGroup) async -> A) async -> A
+Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEntYalF
+
+// async function pointer to Swift.withDiscardingTaskGroup<A>(returning: A.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.DiscardingTaskGroup) async -> A) async -> A
+Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEntYalFTu
+
+// Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: __owned () async throws(B) -> A) async throws(B) -> A
+Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEntYaq_YKs5ErrorR_r0_lF
+
+// async function pointer to Swift.withTaskExecutorPreference<A, B where B: Swift.Error>(_: Swift.TaskExecutor?, isolation: isolated Swift.Actor?, operation: __owned () async throws(B) -> A) async throws(B) -> A
+Added: _$ss26withTaskExecutorPreference_9isolation9operationxSch_pSg_ScA_pSgYixyYaq_YKXEntYaq_YKs5ErrorR_r0_lFTu
+
+// Swift.withTaskCancellationHandler<A>(operation: __owned () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Actor?) async throws -> A
+Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXEn_yyYbXEScA_pSgYitYaKlF
+
+// async function pointer to Swift.withTaskCancellationHandler<A>(operation: __owned () async throws -> A, onCancel: @Sendable () -> (), isolation: isolated Swift.Actor?) async throws -> A
+Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXEn_yyYbXEScA_pSgYitYaKlFTu
+
+// Swift.withThrowingDiscardingTaskGroup<A>(returning: A.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.ThrowingDiscardingTaskGroup<Swift.Error>) async throws -> A) async throws -> A
+Added: _$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEntYaKlF
+
+// async function pointer to Swift.withThrowingDiscardingTaskGroup<A>(returning: A.Type, isolation: isolated Swift.Actor?, body: __owned (inout Swift.ThrowingDiscardingTaskGroup<Swift.Error>) async throws -> A) async throws -> A
+Added: _$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEntYaKlFTu
+
+// (extension in Swift):Swift.Clock.measure(__owned () throws -> ()) throws -> A.Duration
+Added: _$ss5ClockPsE7measurey8DurationQzyyKXEnKF
+
+// Swift.TaskLocal.withValueImpl<A>(_: __owned A, operation: __owned () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEnScA_pSgYiSSSutYaKlF
+
+// async function pointer to Swift.TaskLocal.withValueImpl<A>(_: __owned A, operation: __owned () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEnScA_pSgYiSSSutYaKlFTu
+
+// Swift.TaskLocal.withValue<A>(_: A, operation: __owned () throws -> A1, file: Swift.String, line: Swift.UInt) throws -> A1
+Added: _$ss9TaskLocalC9withValue_9operation4file4lineqd__x_qd__yKXEnSSSutKlF
+
+// Swift.TaskLocal.withValue<A>(_: A, operation: __owned () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEnScA_pSgYiSSSutYaKlF
+
+// async function pointer to Swift.TaskLocal.withValue<A>(_: A, operation: __owned () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
+Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEnScA_pSgYiSSSutYaKlFTu

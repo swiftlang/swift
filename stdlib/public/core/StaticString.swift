@@ -213,6 +213,20 @@ public struct StaticString: Sendable {
       #endif
     }
   }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUTF8Buffer<R>(
+      _ body: (UnsafeBufferPointer<UInt8>) -> R
+    ) -> R
+  )
+  @usableFromInline
+  internal func __abi_withUTF8Buffer<R>(
+    _ body: (UnsafeBufferPointer<UInt8>) -> R
+  ) -> R {
+    return withUTF8Buffer(body)
+  }
 }
 
 extension StaticString: _ExpressibleByBuiltinUnicodeScalarLiteral {

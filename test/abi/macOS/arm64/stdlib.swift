@@ -7,10 +7,6 @@
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
 // REQUIRES: backtracing
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -1398,3 +1394,126 @@ Added: _$ss9ConstCellVMn
 
 // Removed: _createOffsetBasedKeyPath
 Removed: _$ss25_createOffsetBasedKeyPath4root5value6offsets03AnydE0CypXp_ypXpSitF
+
+// Once functions: the closure parameters of these entry points are
+// exactly-once or at-most-once. The previous entry points are preserved.
+
+// Swift.Dictionary.subscript.modify : (_: A, default: __owned @autoclosure () -> B) -> B
+Added: _$sSD_7defaultq_x_q_yXKntciM
+
+// Swift.Dictionary.subscript.getter : (_: A, default: __owned @autoclosure () -> B) -> B
+Added: _$sSD_7defaultq_x_q_yXKntcig
+
+// Swift.Dictionary.subscript.setter : (_: A, default: __owned @autoclosure () -> B) -> B
+Added: _$sSD_7defaultq_x_q_yXKntcis
+
+// Swift.UnsafeBufferPointer.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSR32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEnKlF
+
+// Swift.String.UTF8View.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<Swift.UInt8>) throws -> A) throws -> A?
+Added: _$sSS8UTF8ViewV32withContiguousStorageIfAvailableyxSgxSRys5UInt8VGKXEnKlF
+
+// Swift.Array.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1
+Added: _$sSa15withUnsafeBytesyqd__qd__SWKXEnKlF
+
+// Swift.Array.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1
+Added: _$sSa22withUnsafeMutableBytesyqd__qd__SwKXEnKlF
+
+// Swift.Array.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSa32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEnKlF
+
+// Swift.Array.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSa39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.Array._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSa42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEnKlF
+
+// static Swift.Bool.&& infix(Swift.Bool, __owned @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool
+Added: _$sSb2aaoiyS2b_SbyKXKntKFZ
+
+// static Swift.Bool.|| infix(Swift.Bool, __owned @autoclosure () throws -> Swift.Bool) throws -> Swift.Bool
+Added: _$sSb2oooiyS2b_SbyKXKntKFZ
+
+// Swift.UnsafeMutableBufferPointer.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSr32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEnKlF
+
+// Swift.UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSr39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.UnsafeMutableBufferPointer._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$sSr42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.ArraySlice.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1
+Added: _$ss10ArraySliceV15withUnsafeBytesyqd__qd__SWKXEnKlF
+
+// Swift.ArraySlice.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1
+Added: _$ss10ArraySliceV22withUnsafeMutableBytesyqd__qd__SwKXEnKlF
+
+// Swift.ArraySlice.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss10ArraySliceV32withContiguousStorageIfAvailableyqd__Sgqd__SRyxGKXEnKlF
+
+// Swift.ArraySlice.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss10ArraySliceV39withContiguousMutableStorageIfAvailableyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.ArraySlice._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss10ArraySliceV42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift._undefined<A>(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> A
+Added: _$ss10_undefined_4file4linexSSyXKn_s12StaticStringVSutlF
+
+// Swift.fatalError(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never
+Added: _$ss10fatalError_4file4lines5NeverOSSyXKn_s12StaticStringVSutF
+
+// Swift.withVaList<A>([Swift.CVarArg], __owned (Swift.CVaListPointer) -> A) -> A
+Added: _$ss10withVaListyxSays7CVarArg_pG_xs03CVaC7PointerVXEntlF
+
+// Swift._withVaList<A>(Swift.__VaListBuilder, __owned (Swift.CVaListPointer) -> A) -> A
+Added: _$ss11_withVaListyxs02__bC7BuilderC_xs03CVaC7PointerVXEntlF
+
+// Swift.StaticString.withUTF8Buffer<A>(__owned (Swift.UnsafeBufferPointer<Swift.UInt8>) -> A) -> A
+Added: _$ss12StaticStringV14withUTF8BufferyxxSRys5UInt8VGXEnlF
+
+// Swift.precondition(_: __owned @autoclosure () -> Swift.Bool, _: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss12precondition__4file4lineySbyXKn_SSyXKns12StaticStringVSutF
+
+// static Swift.ManagedBuffer.create(minimumCapacity: Swift.Int, makingHeaderWith: __owned (Swift.ManagedBuffer<A, B>) throws -> A) throws -> Swift.ManagedBuffer<A, B>
+Added: _$ss13ManagedBufferC6create15minimumCapacity16makingHeaderWithAByxq_GSi_xAFKXEntKFZ
+
+// Swift._precondition(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss13_precondition__4file4lineySbyXKn_s12StaticStringVAESutF
+
+// Swift.ContiguousArray.withContiguousStorageIfAvailable<A>(__owned (Swift.UnsafeBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss15ContiguousArrayV04withA18StorageIfAvailableyqd__Sgqd__SRyxGKXEnKlF
+
+// Swift.ContiguousArray.withContiguousMutableStorageIfAvailable<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss15ContiguousArrayV04withA25MutableStorageIfAvailableyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.ContiguousArray.withUnsafeBytes<A>(__owned (Swift.UnsafeRawBufferPointer) throws -> A1) throws -> A1
+Added: _$ss15ContiguousArrayV15withUnsafeBytesyqd__qd__SWKXEnKlF
+
+// Swift.ContiguousArray.withUnsafeMutableBytes<A>(__owned (Swift.UnsafeMutableRawBufferPointer) throws -> A1) throws -> A1
+Added: _$ss15ContiguousArrayV22withUnsafeMutableBytesyqd__qd__SwKXEnKlF
+
+// Swift.ContiguousArray._withUnsafeMutableBufferPointerIfSupported<A>(__owned (inout Swift.UnsafeMutableBufferPointer<A>) throws -> A1) throws -> A1?
+Added: _$ss15ContiguousArrayV42_withUnsafeMutableBufferPointerIfSupportedyqd__Sgqd__SryxGzKXEnKlF
+
+// Swift.assertionFailure(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss16assertionFailure_4file4lineySSyXKn_s12StaticStringVSutF
+
+// Swift._debugPrecondition(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss18_debugPrecondition__4file4lineySbyXKn_s12StaticStringVAESutF
+
+// Swift._internalInvariant(_: __owned @autoclosure () -> Swift.Bool, _: Swift.StaticString, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss18_internalInvariant__4file4lineySbyXKn_s12StaticStringVAESutF
+
+// Swift.preconditionFailure(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> Swift.Never
+Added: _$ss19preconditionFailure_4file4lines5NeverOSSyXKn_s12StaticStringVSutF
+
+// Swift.assert(_: __owned @autoclosure () -> Swift.Bool, _: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$ss6assert__4file4lineySbyXKn_SSyXKns12StaticStringVSutF
+
+// static Swift.Unicode.UTF32.encode(_: Swift.Unicode.Scalar, into: __owned (Swift.UInt32) -> ()) -> ()
+Added: _$ss7UnicodeO5UTF32O6encode_4intoyAB6ScalarV_ys6UInt32VXEntFZ
+
+// Swift.Unmanaged._withUnsafeGuaranteedRef<A>(__owned (A) throws -> A1) throws -> A1
+Added: _$ss9UnmanagedV24_withUnsafeGuaranteedRefyqd__qd__xKXEnKlF

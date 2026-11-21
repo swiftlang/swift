@@ -235,6 +235,20 @@ public struct Unmanaged<Instance: AnyObject> {
                                                              &tmp._value))
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _withUnsafeGuaranteedRef<Result>(
+      _ body: (Instance) throws -> Result
+    ) rethrows -> Result
+  )
+  @usableFromInline
+  internal func __abi__withUnsafeGuaranteedRef<Result>(
+    _ body: (Instance) throws -> Result
+  ) rethrows -> Result {
+    return try unsafe _withUnsafeGuaranteedRef(body)
+  }
+
   /// Performs an unbalanced retain of the object.
   @_transparent
   public func retain() -> Unmanaged {

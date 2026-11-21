@@ -691,6 +691,20 @@ extension String.UTF8View {
     guard _guts.isFastUTF8 else { return nil }
     return try _guts.withFastUTF8(body)
   }
+
+  // ABI: Preserves the entry point from before `body` was at-most-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
+  }
 }
 
 extension String.UTF8View {

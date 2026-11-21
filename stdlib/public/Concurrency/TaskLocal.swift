@@ -373,6 +373,30 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     return try await operation()
   }
 
+  // ABI: Preserves the entry point from before `operation` was exactly-once.
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withValueImpl<R>(
+      _ valueDuringOperation: __owned Value,
+      operation: () async throws -> R,
+      isolation: isolated (any Actor)?,
+      file: String, line: UInt
+    ) async rethrows -> R
+  )
+  @usableFromInline
+  internal func __abi_withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)?,
+    file: String, line: UInt
+  ) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation, operation: operation, isolation: isolation,
+      file: file, line: line)
+  }
+
   @_silgen_name("$ss9TaskLocalC13withValueImpl_9operation4file4lineqd__xn_qd__yYaKXESSSutYaKlF")
   @inlinable
   @discardableResult

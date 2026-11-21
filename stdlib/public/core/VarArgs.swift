@@ -234,6 +234,22 @@ internal func _withVaList<R>(
   return result
 }
 
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _withVaList<R>(
+    _ builder: __VaListBuilder,
+    _ body: (CVaListPointer) -> R
+  ) -> R
+)
+@usableFromInline
+internal func __abi__withVaList<R>(
+  _ builder: __VaListBuilder,
+  _ body: (CVaListPointer) -> R
+) -> R {
+  return unsafe _withVaList(builder, body)
+}
+
 #if _runtime(_ObjC)
 // Excluded due to use of dynamic casting and Builtin.autorelease, neither
 // of which correctly work without the ObjC Runtime right now.

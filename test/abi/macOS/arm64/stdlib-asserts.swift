@@ -8,10 +8,6 @@
 // REQUIRES: backtracing
 // REQUIRES: runtime_function_counters
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!

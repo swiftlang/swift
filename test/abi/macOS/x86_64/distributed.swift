@@ -6,10 +6,6 @@
 // REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: STDLIB_VARIANT=macosx-x86_64
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -137,3 +133,9 @@ Added: _swift_distributed_execute_target_with_isolation
 Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF
 // async function pointer to (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetNonsending<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
 Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lFTu
+
+// Once functions: the closure parameters of these entry points are
+// exactly-once or at-most-once. The previous entry points are preserved.
+
+// (extension in Distributed):Distributed.DistributedActor.assertIsolated(_: __owned @autoclosure () -> Swift.String, file: Swift.StaticString, line: Swift.UInt) -> ()
+Added: _$s11Distributed0A5ActorPAAE14assertIsolated_4file4lineySSyXKn_s12StaticStringVSutF

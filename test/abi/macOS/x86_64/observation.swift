@@ -7,10 +7,6 @@
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
 // REQUIRES: observation
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!
@@ -244,3 +240,24 @@ Added: _$s11Observation014withContinuousA07options5applyAA0A8TrackingV5TokenVAF7
 
 // Observation.withObservationTracking<A, B where B: Swift.Error, A: ~Swift.Copyable>(options: Observation.ObservationTracking.Options, _: () throws(B) -> A, onChange: @Sendable (Observation.ObservationTracking.Event) -> ()) throws(B) -> A
 Added: _$s11Observation04withA8Tracking7options_8onChangexAA0aC0V7OptionsV_xyq_YKXEyAF5EventVYbctq_YKs5ErrorR_Ri_zr0_lF
+
+// Once functions: the closure parameters of these entry points are
+// exactly-once or at-most-once. The previous entry points are preserved.
+
+// Observation.withObservationTracking<A, B where B: Swift.Error, A: ~Swift.Copyable>(options: Observation.ObservationTracking.Options, _: __owned () throws(B) -> A, onChange: @Sendable (Observation.ObservationTracking.Event) -> ()) throws(B) -> A
+Added: _$s11Observation04withA8Tracking7options_8onChangexAA0aC0V7OptionsV_xyq_YKXEnyAF5EventVYbctq_YKs5ErrorR_Ri_zr0_lF
+
+// Observation.withObservationTracking<A>(_: __owned () -> A, didSet: @Sendable (Observation.ObservationTracking) -> ()) -> A
+Added: _$s11Observation04withA8Tracking_6didSetxxyXEn_yAA0aC0VYbctlF
+
+// Observation.withObservationTracking<A>(_: __owned () -> A, willSet: @Sendable (Observation.ObservationTracking) -> (), didSet: @Sendable (Observation.ObservationTracking) -> ()) -> A
+Added: _$s11Observation04withA8Tracking_7willSet03didE0xxyXEn_yAA0aC0VYbcyAFYbctlF
+
+// Observation.withObservationTracking<A>(_: __owned () -> A, willSet: @Sendable (Observation.ObservationTracking) -> ()) -> A
+Added: _$s11Observation04withA8Tracking_7willSetxxyXEn_yAA0aC0VYbctlF
+
+// Observation.withObservationTracking<A>(_: __owned () -> A, onChange: __owned @autoclosure () -> @Sendable () -> ()) -> A
+Added: _$s11Observation04withA8Tracking_8onChangexxyXEn_yyYbcyXKntlF
+
+// Observation.ObservationRegistrar.withMutation<A, B, C where A: Observation.Observable>(of: A, keyPath: Swift.KeyPath<A, B>, _: __owned () throws -> C) throws -> C
+Added: _$s11Observation0A9RegistrarV12withMutation2of7keyPath_q0_x_s03KeyG0Cyxq_Gq0_yKXEntKAA10ObservableRzr1_lF

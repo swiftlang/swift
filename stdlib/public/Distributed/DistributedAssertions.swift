@@ -118,6 +118,23 @@ extension DistributedActor {
       return
     }
   }
+
+  // ABI: Preserves the entry point from before `message` was at-most-once.
+  @available(SwiftStdlib 5.9, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    nonisolated func assertIsolated(
+        _ message: @autoclosure () -> String,
+        file: StaticString, line: UInt
+    )
+  )
+  @usableFromInline
+  internal nonisolated func __abi_assertIsolated(
+      _ message: @autoclosure () -> String,
+      file: StaticString, line: UInt
+  ) {
+    assertIsolated(message(), file: file, line: line)
+  }
 }
 
 

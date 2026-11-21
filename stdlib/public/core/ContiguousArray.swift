@@ -1039,6 +1039,21 @@ extension ContiguousArray: RangeReplaceableCollection {
     }
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @available(*, deprecated)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal mutating func __abi__withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try unsafe _withUnsafeMutableBufferPointerIfSupported(body)
+  }
+
   @inlinable
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(

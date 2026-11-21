@@ -446,6 +446,25 @@ public func withObservationTracking<Result: ~Copyable, Failure: Error>(
   return accessListResult.result
 }
 
+// ABI: Preserves the entry point from before `apply` was exactly-once.
+@available(SwiftStdlib 6.4, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withObservationTracking<Result: ~Copyable, Failure: Error>(
+    options: ObservationTracking.Options,
+    _ apply: () throws(Failure) -> Result,
+    onChange: @escaping @Sendable (borrowing ObservationTracking.Event) -> Void
+  ) throws(Failure) -> Result
+)
+@usableFromInline
+internal func __abi_withObservationTracking<Result: ~Copyable, Failure: Error>(
+  options: ObservationTracking.Options,
+  _ apply: () throws(Failure) -> Result,
+  onChange: @escaping @Sendable (borrowing ObservationTracking.Event) -> Void
+) throws(Failure) -> Result {
+  return try withObservationTracking(options: options, apply, onChange: onChange)
+}
+
 
 /// Tracks access to properties.
 ///
@@ -540,6 +559,23 @@ public func withObservationTracking<T>(
   let accessListResult = generateAccessList(apply)
   ObservationTracking._installTracking(ObservationTracking(accessListResult.accessList), willSet: willSet, didSet: nil)
   return accessListResult.result
+}
+
+// ABI: Preserves the entry point from before `apply` was exactly-once.
+@available(SwiftStdlib 5.9, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withObservationTracking<T>(
+    _ apply: () -> T,
+    willSet: @escaping @Sendable (ObservationTracking) -> Void
+  ) -> T
+)
+@usableFromInline
+internal func __abi_withObservationTracking<T>(
+  _ apply: () -> T,
+  willSet: @escaping @Sendable (ObservationTracking) -> Void
+) -> T {
+  return withObservationTracking(apply, willSet: willSet)
 }
 
 @available(SwiftStdlib 5.9, *)

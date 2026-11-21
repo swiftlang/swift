@@ -7,10 +7,6 @@
 // REQUIRES: STDLIB_VARIANT=macosx-arm64
 // REQUIRES: distributed
 
-// FIXME: Adopting once functions in the stdlib changes the ABI and API of the
-// annotated functions on purpose.
-// XFAIL: *
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment below.)
 
 // Welcome, Build Wrangler!

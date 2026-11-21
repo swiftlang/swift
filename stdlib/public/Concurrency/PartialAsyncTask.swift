@@ -343,6 +343,21 @@ public struct ExecutorJob: Sendable, ~Copyable {
                                                          count: size))
   }
 
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @available(StdlibDeploymentTarget 6.3, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withUnsafeExecutorPrivateData<R, E>(
+      body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+    ) throws(E) -> R
+  )
+  @usableFromInline
+  internal func __abi_withUnsafeExecutorPrivateData<R, E>(
+    body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    return try withUnsafeExecutorPrivateData(body: body)
+  }
+
   /// Kinds of schedulable jobs
   @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
