@@ -2276,7 +2276,7 @@ void BindingSet::promoteBindings() {
       opts.SolverEnableEnumerateSupertypes;
 
   // FIXME: Get this working in diagnostic mode too.
-  if (CS.shouldAttemptFixes())
+  if (CS.inSalvageMode())
     return;
 
   // Can't do anything if this type variable appears in invariant position
@@ -2289,6 +2289,9 @@ void BindingSet::promoteBindings() {
 
   unsigned subtypeCount = 0;
   std::optional<PotentialBinding> promotedSubtype;
+
+  unsigned fallbackVoidCount = 0;
+  std::optional<PotentialBinding> promotedVoidFallback;
 
   bool considerSupertypes =
       Info.SupertypeOf.empty() &&
@@ -2316,46 +2319,59 @@ void BindingSet::promoteBindings() {
 
   for (const auto binding : Bindings) {
     switch (binding.Kind) {
-    case AllowedBindingKind::Supertypes:
-      if (considerSupertypes) {
-        // FIXME: Also check if Optional<T> conforms to all protocols
-        // and satisfies the subtype binding
-        if (conformsToAll(binding)) {
-          if (beConservativeWithSuperclassBindings &&
-              !isSupertypeEligibleForPromotionWhenHacksAreOn(binding.BindingType)) {
-            LLVM_DEBUG(llvm::dbgs() << "Binding not eligible for promotion "
-                                    << "because we might have to enumerate supertypes");
-            return;
+      case AllowedBindingKind::Supertypes:
+        if (considerSupertypes) {
+          // FIXME: Also check if Optional<T> conforms to all protocols
+          // and satisfies the subtype binding
+          if (conformsToAll(binding)) {
+            if (beConservativeWithSuperclassBindings &&
+                !isSupertypeEligibleForPromotionWhenHacksAreOn(binding.BindingType)) {
+              LLVM_DEBUG(llvm::dbgs() << "Binding not eligible for promotion "
+                         << "because we might have to enumerate supertypes");
+              return;
+            }
+
+            ++supertypeCount;
+            promotedSupertype = binding;
           }
-
-          ++supertypeCount;
-          promotedSupertype = binding;
         }
-      }
-      break;
+        break;
 
-    case AllowedBindingKind::Subtypes:
-      if (considerSubtypes) {
-        // FIXME: If T = Optional<U>, check if U conforms to all protocols
-        // and satisfies the supertype binding
-        if (conformsToAll(binding)) {
-          ++subtypeCount;
-          promotedSubtype = binding;
+      case AllowedBindingKind::Subtypes:
+        if (considerSubtypes) {
+          // FIXME: If T = Optional<U>, check if U conforms to all protocols
+          // and satisfies the supertype binding
+          if (conformsToAll(binding)) {
+            ++subtypeCount;
+            promotedSubtype = binding;
+          }
         }
-      }
 
-      break;
+        break;
 
-    case AllowedBindingKind::Exact:
-    case AllowedBindingKind::Fallback:
-      break;
+      case AllowedBindingKind::Fallback:
+        if (binding.BindingType->isVoid()) {
+          ++fallbackVoidCount;
+          promotedVoidFallback = binding;
+        }
+        break;
+
+      case AllowedBindingKind::Exact:
+        break;
     }
   }
 
   auto promoteBinding = [&](PotentialBinding &&binding) {
     // This binding will subsume all existing non-fallback bindings.
+    // but we clear them to save the work of comparing each binding
+    // Note: we could consider an assert here if we are concerned of
+    // promotion introducing a conflict.
+    Bindings.clear();
     binding.Kind = AllowedBindingKind::Exact;
     addBinding(binding);
+
+    if (binding.BindingType->isVoid())
+      return;
 
     // If this is a type variable representing closure result,
     // which is on the right-side of some relational constraint
@@ -2387,6 +2403,13 @@ void BindingSet::promoteBindings() {
     promoteBinding(*std::move(promotedSubtype));
   };
 
+  auto promoteFallbackBinding = [&](const char *reason) {
+    LLVM_DEBUG(llvm::dbgs() << "Promote fallback to exact, " << reason << "\n";
+               dump(llvm::dbgs(), 0);
+               llvm::dbgs() << "\n");
+    promoteBinding(*std::move(promotedVoidFallback));
+  };
+
   // This is in service of a hack, see below.
   auto labelsMismatch = [&](TupleType *lhsTuple, TupleType *rhsTuple) -> bool {
     if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
@@ -2404,7 +2427,13 @@ void BindingSet::promoteBindings() {
     return false;
   };
 
-  if (subtypeCount == 1) {
+  if (fallbackVoidCount == 1) {
+    if (considerSupertypes) {
+      promoteFallbackBinding("voidOverOthers");
+      return;
+    }
+  } else if (subtypeCount == 1) {
+    // Then consider cases where potential fallbacks are not relevant
     // First, handle the case where we have both a subtype and a supertype binding.
     if (supertypeCount == 1) {
       // If we have something like this:
