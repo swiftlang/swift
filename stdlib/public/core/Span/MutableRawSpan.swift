@@ -759,7 +759,7 @@ extension MutableRawSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: Range<Int>,
-    repeating repeatedByte: UInt8,
+    repeating repeatedByte: UInt8
   ) {
     var span = self._mutatingExtracting(subrange)
     span.updateAll(repeating: repeatedByte)
@@ -775,7 +775,7 @@ extension MutableRawSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: some RangeExpression<Int>,
-    repeating repeatedByte: UInt8,
+    repeating repeatedByte: UInt8
   ) {
     updateSubrange(subrange.relative(to: byteOffsets), repeating: repeatedByte)
   }
@@ -789,7 +789,7 @@ extension MutableRawSpan {
   @_lifetime(self: copy self)
   public mutating func updateSubrange(
     _ subrange: UnboundedRange,
-    repeating repeatedByte: UInt8,
+    repeating repeatedByte: UInt8
   ) {
     updateAll(repeating: repeatedByte)
   }
@@ -965,7 +965,7 @@ extension MutableRawSpan {
     try updateElements(startingAt: &byteOffset, copyingFrom: &iterator)
     let next = try iterator.nextSpan()
     _precondition(
-      next.isEmpty, "Source has more bytes than the destination can contain."
+      next.isEmpty, "Source has more bytes than the destination can contain"
     )
   }
 
@@ -1017,8 +1017,7 @@ extension MutableRawSpan {
   public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    startingAt byteOffset: inout Int,
-    copyingFrom source: inout I
+    startingAt byteOffset: inout Int, copyingFrom source: inout I
   ) throws(I.Failure) where I.Element == UInt8 {
     _precondition(
       UInt(bitPattern: byteOffset) <= UInt(bitPattern: _count),
