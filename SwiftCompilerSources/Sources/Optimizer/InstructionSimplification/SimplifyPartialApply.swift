@@ -22,17 +22,20 @@ extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst })
 
     let optimizedApplyOfPartialApply: Bool
-    if keepForDebugInfo && !type.isImplicitlyDestroyable(in: parentFunction) {
-      // Combining the calls of a closure that can't be destroyed implicitly is correct only if the
-      // closure is then deleted. The combiner checks that the closure can be deleted, but it
-      // expects debug uses to be salvaged. Here the closure is kept for its debug info instead, so
-      // keep its calls.
+    if keepForDebugInfo && (!type.isImplicitlyDestroyable(in: parentFunction) || isConsumedByCall) {
+      // Combining the calls of a closure that can't be destroyed implicitly, or whose call consumes
+      // it, is correct only if the closure is then deleted, which would lose its debug info. Here
+      // the closure is kept for its debug info instead, so keep its calls.
       optimizedApplyOfPartialApply = false
     } else {
       optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
     }
     if optimizedApplyOfPartialApply {
       context.notifyInvalidatedStackNesting()
+      // Combining the calls of a closure that its call consumes deletes the closure.
+      if isDeleted {
+        return
+      }
     }
 
     if keepForDebugInfo {
@@ -50,6 +53,10 @@ extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
 }
 
 private extension PartialApplyInst {
+  /// True if calling the closure consumes it, which is true for an at-most-once or exactly-once
+  /// closure that is `@callee_owned`. See `isClosureConsumedByCall` in InstOptUtils.h.
+  var isConsumedByCall: Bool { type.isMoveOnly && calleeConvention == .directOwned }
+
   /// A partial_apply without any substitutions or arguments is just a thin_to_thick_function.
   func tryReplaceWithThinToThickFunction(_ context: SimplifyContext) -> Bool {
     guard numArguments == 0,
