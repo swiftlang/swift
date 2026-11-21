@@ -263,6 +263,10 @@ MetadataDependency MetadataDependencyCollector::finish(IRGenFunction &IGF) {
   return result;
 }
 
+static bool irgenNeedsExtendedExistentialMetadata(const ExistentialLayout &layout) {
+  return !layout.getParameterizedProtocols().empty();
+}
+
 llvm::Constant *IRGenModule::getAddrOfStringForMetadataRef(
     StringRef symbolName,
     unsigned alignment,
@@ -2102,7 +2106,7 @@ namespace {
 
       // Existential metatypes for extended existentials don't use
       // ExistentialMetatypeMetadata.
-      if (type->getExistentialLayout().needsExtendedShape()) {
+      if (irgenNeedsExtendedExistentialMetadata(type->getExistentialLayout())) {
         auto metadata = emitExtendedExistentialTypeMetadata(type);
         return setLocal(type, MetadataResponse::forComplete(metadata));
       }
@@ -3272,7 +3276,7 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
     void visitExistentialMetatypeType(CanExistentialMetatypeType meta) {
       // Extended existential metatypes just emit a different shape
       // and don't do any wrapping.
-      if (meta->getExistentialLayout().needsExtendedShape()) {
+      if (irgenNeedsExtendedExistentialMetadata(meta->getExistentialLayout())) {
         // return visit(unwrapExistentialMetatype(meta));
       }
 
