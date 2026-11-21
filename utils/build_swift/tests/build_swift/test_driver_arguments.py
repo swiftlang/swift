@@ -571,6 +571,16 @@ class TestDriverArgumentParser(
         namespace = self.parse_default_args(['--lldb-assertions'])
         self.assertTrue(namespace.build_lldb)
 
+    def test_implied_defaults_lldb_compiler_dylib(self):
+        namespace = self.parse_default_args(
+            ['--lldb-link-against-compiler-dylib-at-path', sys.executable])
+        self.assertTrue(namespace.build_lldb)
+        self.assertEqual(namespace.lldb_link_against_compiler_dylib_at_path,
+                         sys.executable)
+
+        namespace = self.parse_default_args(['--lldb'])
+        self.assertIsNone(namespace.lldb_link_against_compiler_dylib_at_path)
+
     def test_implied_defaults_build_variant(self):
         namespace = self.parse_default_args(['--debug'])
 
