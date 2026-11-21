@@ -148,6 +148,73 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
       }
       triggerTaskEscalationHandler()
 
+      func triggerSyncTaskEscalationHandler() {
+        let sem1 = DispatchSemaphore(value: 0)
+        let sem2 = DispatchSemaphore(value: 0)
+        let semEscalated = DispatchSemaphore(value: 0)
+        let installCalls = DispatchSemaphore(value: 0)
+
+        // A synchronous function, so this uses the synchronous overload.
+        func blockUntilEscalated() {
+          withTaskPriorityEscalationHandler {
+            p("in sync withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            sem1.signal()
+            semEscalated.wait()
+            p("in sync withTaskPriorityEscalationHandler, after escalation, Task.currentPriority = \(Task.currentPriority)")
+          } onPriorityEscalated: { oldPriority, newPriority in
+            if oldPriority == newPriority {
+              // The call made when the handler is installed.
+              precondition(newPriority == .background, "installed at priority: \(newPriority)")
+              installCalls.signal()
+              return
+            }
+            p("in sync onPriorityEscalated oldPriority = \(oldPriority)")
+            precondition(oldPriority == .background, "old Priority was: \(oldPriority)")
+            p("in sync onPriorityEscalated newPriority = \(newPriority)")
+            precondition(newPriority == .default, "new Priority was: \(newPriority)")
+            semEscalated.signal()
+          }
+        }
+
+        let task = Task(priority: .background) {
+          let _ = expectedBasePri(priority: .background)
+          blockUntilEscalated()
+          precondition(installCalls.wait(timeout: .now()) == .success,
+                       "handler was not called when installed")
+          p("after sync withTaskPriorityEscalationHandler")
+          sem2.signal()
+        }
+
+        // Wait till the task runs the operation, then escalate it.
+        sem1.wait()
+        task.escalatePriority(to: .default)
+        sem2.wait()
+      }
+      triggerSyncTaskEscalationHandler()
+
+      func syncTaskEscalationHandlerWithoutTask() {
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+          withUnsafeCurrentTask { precondition($0 == nil, "expected no current task") }
+          // Without a task there's nothing that could be escalated, so the
+          // handlers are never called, not even when they're installed.
+          let result = withTaskPriorityEscalationHandler {
+            withTaskPriorityEscalationHandler {
+              42
+            } onPriorityEscalated: { oldPriority, newPriority in
+              fatalError("unexpected call without a task: \(oldPriority) -> \(newPriority)")
+            }
+          } onPriorityEscalated: { oldPriority, newPriority in
+            fatalError("unexpected call without a task: \(oldPriority) -> \(newPriority)")
+          }
+          precondition(result == 42, "unexpected result: \(result)")
+          p("after sync withTaskPriorityEscalationHandler without a task")
+          done.signal()
+        }
+        done.wait()
+      }
+      syncTaskEscalationHandlerWithoutTask()
+
       func triggerTwice_escalateToMediumAndThenAgainToHigh() {
         let sem1 = DispatchSemaphore(value: 0)
         let semEscalatedMedium = DispatchSemaphore(value: 0)
