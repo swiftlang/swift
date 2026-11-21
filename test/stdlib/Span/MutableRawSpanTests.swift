@@ -416,7 +416,9 @@ suite.test("updateAll(copying:) count mismatch")
   let source = ContiguousArray<UInt8>([1, 2, 3])
   var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
   var span = MutableRawSpan(elements: a.mutableSpan)
-  expectCrashLater()
+  expectCrashLater(
+    withDebugMessage: "Source must have as many bytes as the destination"
+  )
   span.updateAll(copying: source.span.bytes)
 }
 
@@ -525,7 +527,9 @@ suite.test("updateAll(moving:) count mismatch")
 
   var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
   var span = MutableRawSpan(elements: a.mutableSpan)
-  expectCrashLater()
+  expectCrashLater(
+    withDebugMessage: "Source must have as many bytes as the destination"
+  )
   span.updateAll(moving: &source)
 }
 

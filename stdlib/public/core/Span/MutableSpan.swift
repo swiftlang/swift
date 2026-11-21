@@ -729,7 +729,10 @@ extension MutableSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(copying source: Span<Element>) {
-    _precondition(source.count == self.count)
+    _precondition(
+      source.count == self.count,
+      "Source must have as many elements as the destination"
+    )
     if self.isEmpty { return }
     withUnsafeMutableBufferPointer { destination in
       source.withUnsafeBufferPointer {
@@ -903,7 +906,10 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(moving source: inout OutputSpan<Element>) {
-    _precondition(source.count == self.count)
+    _precondition(
+      source.count == self.count,
+      "Source must have as many elements as the destination"
+    )
     if self.isEmpty { return }
     withUnsafeMutableBufferPointer { destination in
       unsafe source.withUnsafeMutableBufferPointer {
