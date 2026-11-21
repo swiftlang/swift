@@ -29,6 +29,7 @@ final class SendableKlass : Sendable {}
 
 sil @transferSendableKlass : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
 sil @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+sil @useInt : $@convention(thin) (Int) -> ()
 
 final class KlassContainingKlasses {
   let nsImmutable : NonSendableKlass
@@ -473,6 +474,30 @@ sil [ossa] @mark_dependence_test_base_is_a_require : $@convention(thin) @async (
   end_borrow %1a : $NonSendableKlass
   destroy_value %0 : $NonSendableKlass
   destroy_value %1 : $NonSendableKlass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// A nonescaping mark_dependence result remains tied to its base even when the
+// result type is Sendable.
+sil [ossa] @mark_dependence_nonescaping_use_result_after_sending_base : $@convention(thin) @async () -> () {
+bb0:
+  %0 = alloc_ref $NonSendableKlass
+  %1 = integer_literal $Builtin.Int64, 0
+  %2 = struct $Int (%1)
+  %3 = mark_dependence [nonescaping] %2 : $Int on %0 : $NonSendableKlass
+
+  %transferNonSendableKlass = function_ref @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transferNonSendableKlass(%0) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{}}
+  // expected-note @-2 {{}}
+
+  %useInt = function_ref @useInt : $@convention(thin) (Int) -> ()
+  apply %useInt(%3) : $@convention(thin) (Int) -> ()
+  // expected-note @-1 {{access can happen concurrently}}
+
+  destroy_value %0 : $NonSendableKlass
 
   %9999 = tuple ()
   return %9999 : $()
