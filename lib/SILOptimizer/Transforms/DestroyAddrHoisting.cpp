@@ -1027,6 +1027,8 @@ void DestroyAddrHoisting::hoistDestroys(
   for (auto *uncastArg : getFunction()->getArguments()) {
     auto *arg = cast<SILFunctionArgument>(uncastArg);
     if (arg->getType().isAddress()) {
+      if (arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed))
+        continue;
       if (!continueWithNextSubpassRun(arg))
         return;
       auto convention = arg->getArgumentConvention();

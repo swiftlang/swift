@@ -13,6 +13,15 @@ class D {
   @_hasStorage var x: Int { get set }
 }
 
+protocol P {}
+
+struct MO : ~Copyable {
+  var x: Int
+  deinit
+}
+
+sil_global @globalInt : $Int
+
 // CHECK-LABEL: sil @remove_conversion :
 // CHECK-NOT:     address_to_pointer
 // CHECK-NOT:     pointer_to_address
@@ -377,4 +386,550 @@ bb0(%0 : $Unmanaged<C>):
   %7 = load [trivial] %6
   end_borrow %3
   return %7
+}
+
+sil @takeInoutAny : $@convention(thin) (@inout Any) -> ()
+sil @takeGuaranteedAny : $@convention(thin) (@in_guaranteed Any) -> ()
+sil @takeInoutUInt : $@convention(thin) (@inout UInt) -> ()
+sil @takeInoutGeneric : $@convention(thin) <T> (@inout T) -> ()
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_inout :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         apply {{%.*}}([[A]])
+// CHECK:       } // end sil function 'in_guaranteed_inout'
+sil [ossa] @in_guaranteed_inout : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = function_ref @takeInoutAny : $@convention(thin) (@inout Any) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@inout Any) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_inout_mismatching_type :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK-NOT:     unchecked_addr_cast
+// CHECK:         apply {{%.*}}([[A]])
+// CHECK:       } // end sil function 'in_guaranteed_inout_mismatching_type'
+sil [ossa] @in_guaranteed_inout_mismatching_type : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*UInt
+  %3 = function_ref @takeInoutUInt : $@convention(thin) (@inout UInt) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@inout UInt) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_destroy_init :
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         destroy_addr [[A]]
+// CHECK:         copy_addr %1 to [init] [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_destroy_init'
+sil [ossa] @in_guaranteed_destroy_init : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> () {
+bb0(%0 : $*Any, %1 : $*Any):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*Any
+  destroy_addr %3
+  copy_addr %1 to [init] %3
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_store :
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[E:%.*]] = tuple_element_addr [[A]], 1
+// CHECK:         store %1 to [trivial] [[E]]
+// CHECK:       } // end sil function 'in_guaranteed_store'
+sil [ossa] @in_guaranteed_store : $@convention(thin) (@in_guaranteed (Any, Int), Int) -> () {
+bb0(%0 : $*(Any, Int), %1 : $Int):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*(Any, Int)
+  %4 = tuple_element_addr %3, 1
+  store %1 to [trivial] %4
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_inout_through_cast :
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[C:%.*]] = unchecked_addr_cast [[A]]
+// CHECK:         apply {{%.*}}([[C]])
+// CHECK:       } // end sil function 'in_guaranteed_inout_through_cast'
+sil [ossa] @in_guaranteed_inout_through_cast : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Int
+  %3 = unchecked_addr_cast %2 to $*UInt
+  %4 = function_ref @takeInoutUInt : $@convention(thin) (@inout UInt) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@inout UInt) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_index_addr_store :
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[I:%.*]] = index_addr [[A]], %1
+// CHECK:         store %2 to [trivial] [[I]]
+// CHECK:       } // end sil function 'in_guaranteed_index_addr_store'
+sil [ossa] @in_guaranteed_index_addr_store : $@convention(thin) (@in_guaranteed Int, Builtin.Word, Int) -> () {
+bb0(%0 : $*Int, %1 : $Builtin.Word, %2 : $Int):
+  %3 = address_to_pointer %0 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  %5 = index_addr %4, %1
+  store %2 to [trivial] %5
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_read_only :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:       } // end sil function 'in_guaranteed_read_only'
+sil [ossa] @in_guaranteed_read_only : $@convention(thin) (@in_guaranteed (Any, Int)) -> Int {
+bb0(%0 : $*(Any, Int)):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*(Any, Int)
+  %3 = tuple_element_addr %2, 0
+  %4 = function_ref @takeGuaranteedAny : $@convention(thin) (@in_guaranteed Any) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@in_guaranteed Any) -> ()
+  %6 = alloc_stack $Any
+  copy_addr %3 to [init] %6
+  destroy_addr %6
+  dealloc_stack %6
+  %10 = tuple_element_addr %2, 1
+  %11 = load [trivial] %10
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @inout_store :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         store %1 to [trivial] %0
+// CHECK:       } // end sil function 'inout_store'
+sil [ossa] @inout_store : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*Int
+  store %1 to [trivial] %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @open_existential_immutable_inout :
+// CHECK:         [[O:%.*]] = open_existential_addr immutable_access
+// CHECK:         [[P:%.*]] = address_to_pointer [[O]]
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         apply {{%.*}}<{{.*}}>([[A]])
+// CHECK:       } // end sil function 'open_existential_immutable_inout'
+sil [ossa] @open_existential_immutable_inout : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = alloc_stack $any P
+  copy_addr %0 to [init] %1
+  %3 = open_existential_addr immutable_access %1 to $*@opened(1, any P) Self
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = pointer_to_address %4 to [strict] $*@opened(1, any P) Self
+  %6 = function_ref @takeInoutGeneric : $@convention(thin) <T> (@inout T) -> ()
+  %7 = apply %6<@opened(1, any P) Self>(%5) : $@convention(thin) <T> (@inout T) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @read_access_store :
+// CHECK:         [[B:%.*]] = begin_access [read] [dynamic]
+// CHECK:         [[P:%.*]] = address_to_pointer [[B]]
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         store %0 to [trivial] [[A]]
+// CHECK:       } // end sil function 'read_access_store'
+sil [ossa] @read_access_store : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_addr @globalInt : $*Int
+  %2 = begin_access [read] [dynamic] %1
+  %3 = address_to_pointer %2 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*Int
+  store %0 to [trivial] %4
+  end_access %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_cast_before_inout :
+// CHECK:         [[C:%.*]] = unchecked_addr_cast %0
+// CHECK:         [[P:%.*]] = address_to_pointer [[C]]
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         apply {{%.*}}([[A]])
+// CHECK:       } // end sil function 'in_guaranteed_cast_before_inout'
+sil [ossa] @in_guaranteed_cast_before_inout : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0 : $*Int):
+  %1 = unchecked_addr_cast %0 to $*UInt
+  %2 = address_to_pointer %1 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*UInt
+  %4 = function_ref @takeInoutUInt : $@convention(thin) (@inout UInt) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@inout UInt) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_index_addr_before_store :
+// CHECK:         [[I:%.*]] = index_addr %0, %1
+// CHECK:         [[P:%.*]] = address_to_pointer [[I]]
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         store %2 to [trivial] [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_index_addr_before_store'
+sil [ossa] @in_guaranteed_index_addr_before_store : $@convention(thin) (@in_guaranteed Int, Builtin.Word, Int) -> () {
+bb0(%0 : $*Int, %1 : $Builtin.Word, %2 : $Int):
+  %3 = index_addr %0, %1
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  %5 = pointer_to_address %4 to [strict] $*Int
+  store %2 to [trivial] %5
+  %7 = tuple ()
+  return %7
+}
+
+sil @takeGuaranteedGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_read_access :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         begin_access [read] [unsafe] %0
+// CHECK:       } // end sil function 'in_guaranteed_read_access'
+sil [ossa] @in_guaranteed_read_access : $@convention(thin) (@in_guaranteed Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Int
+  %3 = begin_access [read] [unsafe] %2
+  %4 = load [trivial] %3
+  end_access %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_modify_access :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         begin_access [modify] [unsafe] [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_modify_access'
+sil [ossa] @in_guaranteed_modify_access : $@convention(thin) (@in_guaranteed Int) -> () {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Int
+  %3 = begin_access [modify] [unsafe] %2
+  end_access %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_load_take :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         load [take] [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_load_take'
+sil [ossa] @in_guaranteed_load_take : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*C
+  %3 = load [take] %2
+  destroy_value %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_mutable_open_existential :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         open_existential_addr mutable_access [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_mutable_open_existential'
+sil [ossa] @in_guaranteed_mutable_open_existential : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*any P
+  %3 = open_existential_addr mutable_access %2 to $*@opened(1, any P) Self
+  %4 = function_ref @takeGuaranteedGeneric : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %5 = apply %4<@opened(1, any P) Self>(%3) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+sil @closureTakeIn : $@convention(thin) (@in Any) -> ()
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_copy_take_source :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         copy_addr [take] [[A]] to [init]
+// CHECK:       } // end sil function 'in_guaranteed_copy_take_source'
+sil [ossa] @in_guaranteed_copy_take_source : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = alloc_stack $Any
+  copy_addr [take] %2 to [init] %3
+  destroy_addr %3
+  dealloc_stack %3
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_copy_destination :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         copy_addr %1 to [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_copy_destination'
+sil [ossa] @in_guaranteed_copy_destination : $@convention(thin) (@in_guaranteed Any, @in_guaranteed Any) -> () {
+bb0(%0 : $*Any, %1 : $*Any):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*Any
+  copy_addr %1 to %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_init_enum_data :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         init_enum_data_addr [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_init_enum_data'
+sil [ossa] @in_guaranteed_init_enum_data : $@convention(thin) (@in_guaranteed Optional<Int>) -> Int {
+bb0(%0 : $*Optional<Int>):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Optional<Int>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_take_enum_data :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         unchecked_take_enum_data_addr [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_take_enum_data'
+sil [ossa] @in_guaranteed_take_enum_data : $@convention(thin) (@in_guaranteed Optional<Int>) -> Int {
+bb0(%0 : $*Optional<Int>):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Optional<Int>
+  %3 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_init_existential :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         init_existential_addr [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_init_existential'
+sil [ossa] @in_guaranteed_init_existential : $@convention(thin) (@in_guaranteed Any) -> Int {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = init_existential_addr %2, $Int
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_partial_apply_capture :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         partial_apply [callee_guaranteed] {{%.*}}([[A]])
+// CHECK:       } // end sil function 'in_guaranteed_partial_apply_capture'
+sil [ossa] @in_guaranteed_partial_apply_capture : $@convention(thin) (@in_guaranteed Any) -> () {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = function_ref @closureTakeIn : $@convention(thin) (@in Any) -> ()
+  %4 = partial_apply [callee_guaranteed] %3(%2) : $@convention(thin) (@in Any) -> ()
+  destroy_value %4
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_yield_inout :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         yield [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_yield_inout'
+sil [ossa] @in_guaranteed_yield_inout : $@yield_once @convention(thin) (@in_guaranteed Any) -> @yields @inout Any {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  yield %2 : $*Any, resume bb1, unwind bb2
+
+bb1:
+  %5 = tuple ()
+  return %5
+
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_tail_addr_read :
+// CHECK-NOT:     pointer_to_address
+// CHECK:         tail_addr %0
+// CHECK:       } // end sil function 'in_guaranteed_tail_addr_read'
+sil [ossa] @in_guaranteed_tail_addr_read : $@convention(thin) (@in_guaranteed UInt, Builtin.Word) -> Int {
+bb0(%0 : $*UInt, %1 : $Builtin.Word):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*UInt
+  %4 = tail_addr %3 : $*UInt, %1 : $Builtin.Word, $Int
+  %5 = load [trivial] %4
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_tail_addr_store :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         [[T:%.*]] = tail_addr [[A]]
+// CHECK:         store %2 to [trivial] [[T]]
+// CHECK:       } // end sil function 'in_guaranteed_tail_addr_store'
+sil [ossa] @in_guaranteed_tail_addr_store : $@convention(thin) (@in_guaranteed UInt, Builtin.Word, Int) -> () {
+bb0(%0 : $*UInt, %1 : $Builtin.Word, %2 : $Int):
+  %3 = address_to_pointer %0 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*UInt
+  %5 = tail_addr %4 : $*UInt, %1 : $Builtin.Word, $Int
+  store %2 to [trivial] %5
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_checked_cast_addr_copy :
+// CHECK-NOT:     pointer_to_address
+// CHECK:         checked_cast_addr_br copy_on_success Any in %0 to Int
+// CHECK:       } // end sil function 'in_guaranteed_checked_cast_addr_copy'
+sil [ossa] @in_guaranteed_checked_cast_addr_copy : $@convention(thin) (@in_guaranteed Any, Int) -> Int {
+bb0(%0 : $*Any, %4 : $Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = alloc_stack $Int
+  checked_cast_addr_br copy_on_success Any in %2 : $*Any to Int in %3 : $*Int, bb1, bb2
+
+bb1:
+  %5 = load [trivial] %3
+  dealloc_stack %3
+  br bb3(%5 : $Int)
+
+bb2:
+  dealloc_stack %3
+  br bb3(%4 : $Int)
+
+bb3(%10 : $Int):
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_checked_cast_addr_test_only :
+// CHECK-NOT:     pointer_to_address
+// CHECK:         checked_cast_addr_br test_only Any in %0 to Int
+// CHECK:       } // end sil function 'in_guaranteed_checked_cast_addr_test_only'
+sil [ossa] @in_guaranteed_checked_cast_addr_test_only : $@convention(thin) (@in_guaranteed Any, Int, Int) -> Int {
+bb0(%0 : $*Any, %3 : $Int, %4 : $Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  checked_cast_addr_br test_only Any in %2 : $*Any to Int, bb1, bb2
+
+bb1:
+  br bb3(%3 : $Int)
+
+bb2:
+  br bb3(%4 : $Int)
+
+bb3(%10 : $Int):
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_checked_cast_addr_take :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         checked_cast_addr_br take_always Any in [[A]] to Int
+// CHECK:       } // end sil function 'in_guaranteed_checked_cast_addr_take'
+sil [ossa] @in_guaranteed_checked_cast_addr_take : $@convention(thin) (@in_guaranteed Any, Int) -> Int {
+bb0(%0 : $*Any, %4 : $Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = alloc_stack $Int
+  checked_cast_addr_br take_always Any in %2 : $*Any to Int in %3 : $*Int, bb1, bb2
+
+bb1:
+  %5 = load [trivial] %3
+  dealloc_stack %3
+  br bb3(%5 : $Int)
+
+bb2:
+  dealloc_stack %3
+  br bb3(%4 : $Int)
+
+bb3(%10 : $Int):
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_checked_cast_addr_dest :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         checked_cast_addr_br copy_on_success Int in {{%.*}} to Any in [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_checked_cast_addr_dest'
+sil [ossa] @in_guaranteed_checked_cast_addr_dest : $@convention(thin) (@in_guaranteed Any, Int) -> () {
+bb0(%0 : $*Any, %1 : $Int):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*Any
+  %4 = alloc_stack $Int
+  store %1 to [trivial] %4
+  checked_cast_addr_br copy_on_success Int in %4 : $*Int to Any in %3 : $*Any, bb1, bb2
+
+bb1:
+  dealloc_stack %4
+  br bb3
+
+bb2:
+  dealloc_stack %4
+  br bb3
+
+bb3:
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_unconditional_checked_cast_addr_copy :
+// CHECK-NOT:     pointer_to_address
+// CHECK:         unconditional_checked_cast_addr [copy] Any in %0 to Int
+// CHECK:       } // end sil function 'in_guaranteed_unconditional_checked_cast_addr_copy'
+sil [ossa] @in_guaranteed_unconditional_checked_cast_addr_copy : $@convention(thin) (@in_guaranteed Any) -> Int {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = alloc_stack $Int
+  unconditional_checked_cast_addr [copy] Any in %2 : $*Any to Int in %3 : $*Int
+  %5 = load [trivial] %3
+  dealloc_stack %3
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_unconditional_checked_cast_addr_take :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         unconditional_checked_cast_addr Any in [[A]] to Int
+// CHECK:       } // end sil function 'in_guaranteed_unconditional_checked_cast_addr_take'
+sil [ossa] @in_guaranteed_unconditional_checked_cast_addr_take : $@convention(thin) (@in_guaranteed Any) -> Int {
+bb0(%0 : $*Any):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Any
+  %3 = alloc_stack $Int
+  unconditional_checked_cast_addr Any in %2 : $*Any to Int in %3 : $*Int
+  %5 = load [trivial] %3
+  dealloc_stack %3
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_drop_deinit :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         drop_deinit [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_drop_deinit'
+sil [ossa] @in_guaranteed_drop_deinit : $@convention(thin) (@in_guaranteed MO) -> Int {
+bb0(%0 : $*MO):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*MO
+  %3 = drop_deinit %2 : $*MO
+  %4 = struct_element_addr %3 : $*MO, #MO.x
+  %5 = load [trivial] %4
+  return %5
 }

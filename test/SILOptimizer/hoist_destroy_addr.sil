@@ -1627,3 +1627,33 @@ bb0(%0 : $*Vector, %1 : @owned $AnyObject):
   %8 = tuple ()
   return %8
 }
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_onto_in_guaranteed_store :
+// CHECK-NOT:     destroy_addr
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         store %1 to [assign] [[A]]
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_hoist_destroy_onto_in_guaranteed_store'
+sil [ossa] @dont_hoist_destroy_onto_in_guaranteed_store : $@convention(thin) (@in_guaranteed AnyObject, @owned AnyObject) -> () {
+bb0(%0 : $*AnyObject, %1 : @owned $AnyObject):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*AnyObject
+  store %1 to [assign] %3
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_onto_in_guaranteed_copy :
+// CHECK-NOT:     destroy_addr
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         copy_addr [take] %1 to [[A]]
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_hoist_destroy_onto_in_guaranteed_copy'
+sil [ossa] @dont_hoist_destroy_onto_in_guaranteed_copy : $@convention(thin) (@in_guaranteed AnyObject, @in AnyObject) -> () {
+bb0(%0 : $*AnyObject, %1 : $*AnyObject):
+  %2 = address_to_pointer %0 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to [strict] $*AnyObject
+  copy_addr [take] %1 to %3
+  %5 = tuple ()
+  return %5
+}

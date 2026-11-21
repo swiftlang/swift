@@ -50,7 +50,8 @@ private func removeAddressToPointerToAddressPair(
   _ context: SimplifyContext
 ) -> Bool {
   guard let addr2Ptr = ptr2Addr.pointer as? AddressToPointerInst,
-        !ptr2Addr.hasIllegalUsesAfterLifetime(of: addr2Ptr, context)
+        !ptr2Addr.hasIllegalUsesAfterLifetime(of: addr2Ptr, context),
+        !ptr2Addr.hasIllegalMutatingOrConsumingUses(of: addr2Ptr.address)
   else {
     return false
   }
@@ -232,6 +233,19 @@ private extension PointerToAddressInst {
       }
       return addressUses.hasUsesOutside(of: lifetimeFrontier, beginInstruction: baseAddress)
     }
+  }
+
+  /// Checks if `baseAddress` is read-only and the `pointer_to_address` has uses which may mutate
+  /// or consume the memory. In such a case removing the `address_to_pointer`-`pointer_to_address`
+  /// pair would result in invalid SIL. For example:
+  /// ```
+  ///   bb0(%0 : $*T):                  // @in_guaranteed
+  ///   %1 = address_to_pointer %0
+  ///   %2 = pointer_to_address %1
+  ///   apply %f(%2)                    // @inout
+  /// ```
+  func hasIllegalMutatingOrConsumingUses(of baseAddress: Value) -> Bool {
+    baseAddress.isReadOnlyAddress && hasMutatingOrConsumingUses
   }
 }
 
