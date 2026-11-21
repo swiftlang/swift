@@ -74,6 +74,17 @@ target_link_libraries(swift-frontend
 
 add_swift_parser_link_libraries(swift-frontend)
 
+# Suppress unnecessary exported symbols.
+# See swift-frontend-unexported-symbols.txt for the list and rationale.
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(swift_frontend_unexported_symbols
+    "${CMAKE_CURRENT_SOURCE_DIR}/swift-frontend-unexported-symbols.txt")
+  target_link_options(swift-frontend PRIVATE
+    "LINKER:-unexported_symbols_list,${swift_frontend_unexported_symbols}")
+  set_property(TARGET swift-frontend APPEND PROPERTY
+    LINK_DEPENDS "${swift_frontend_unexported_symbols}")
+endif()
+
 # Create a `swift-driver` executable adjacent to the `swift-frontend` executable
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
 swift_create_early_driver_copies(swift-frontend)

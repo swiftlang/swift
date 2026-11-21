@@ -1,0 +1,11 @@
+# Symbols that swift-frontend should not export (ld64 -unexported_symbols_list).
+#
+# Exported weak definitions in an executable are coalesced by dyld at launch,
+# which is a significant part of swift-frontend startup time. Nothing outside
+# the executable binds to the statically linked Clang libraries or to the
+# compiler's own C++ code, so hide them. Keep LLVM symbols exported: pass
+# plugins loaded with -load-pass-plugin resolve them from the executable.
+__ZN5clang*
+__ZNK5clang*
+__ZN5swift*
+__ZNK5swift*
