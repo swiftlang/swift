@@ -564,6 +564,93 @@ diagnoseUnqualifiedInit(UnresolvedDeclRefExpr *initExpr, DeclContext *dc,
                         initExpr->getNameLoc(), /*implicit=*/true);
 }
 
+/// Build the implicit base expression for a reference to a member found by
+/// unqualified lookup from \p DC, given the result's base declaration and
+/// declaration context.
+static Expr *buildImplicitMemberBaseExpr(ValueDecl *Base, DeclContext *BaseDC,
+                                         DeclNameLoc NameLoc, DeclContext *DC) {
+  auto &Context = DC->getASTContext();
+  if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
+    auto selfParam = PD->getGenericParams()->getParams().front();
+    return TypeExpr::createImplicitForDecl(
+        NameLoc, selfParam,
+        /*DC*/ nullptr,
+        DC->mapTypeIntoEnvironment(selfParam->getInterfaceType()));
+  }
+  if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
+    return TypeExpr::createImplicitForDecl(
+        NameLoc, NTD, BaseDC,
+        DC->mapTypeIntoEnvironment(NTD->getInterfaceType()));
+  }
+  return new (Context) DeclRefExpr(Base, NameLoc, /*Implicit=*/true);
+}
+
+/// If unqualified lookup of \p UDRE found nothing, but it is in a context
+/// with an implicit 'self' whose type is `@dynamicMemberLookup`, form an
+/// implicit 'self.<name>' reference so the solver can resolve it through
+/// dynamic member lookup, the same as an explicit 'self.<name>'.
+///
+/// This is limited to key path based `subscript(dynamicMember:)`, which only
+/// accepts names of members of the key path's root type. A string based
+/// subscript accepts any name, so it would turn every unresolved name in the
+/// type into a dynamic member reference.
+static Expr *resolveImplicitSelfDynamicMemberRef(UnresolvedDeclRefExpr *UDRE,
+                                                 DeclContext *DC,
+                                                 NLOptions lookupOptions) {
+  DeclNameRef Name = UDRE->getName();
+  if (!Name.isSimpleName() || Name.isSpecial() || Name.isOperator() ||
+      Name.hasModuleSelector() || UDRE->getRefKind() != DeclRefKind::Ordinary ||
+      UDRE->getLoc().isInvalid())
+    return nullptr;
+
+  // Look up the dynamic member subscripts through the same implicit 'self'
+  // that an unqualified reference to a member would use.
+  auto Lookup = TypeChecker::lookupUnqualified(
+      DC, DeclNameRef::createSubscript(), UDRE->getLoc(), lookupOptions);
+
+  ValueDecl *Base = nullptr;
+  DeclContext *BaseDC = nullptr;
+  for (auto Result : Lookup) {
+    auto *SD = dyn_cast<SubscriptDecl>(Result.getValueDecl());
+    if (!SD)
+      continue;
+
+    auto Kind = SD->getDynamicMemberLookupKind();
+    if (!Kind)
+      continue;
+
+    auto *ThisBase = Result.getBaseDecl();
+    if (!ThisBase || isa<ModuleDecl>(ThisBase))
+      continue;
+
+    // Only consider the innermost base.
+    if (Base && ThisBase != Base)
+      break;
+
+    if (Kind != SubscriptDecl::DynamicMemberLookupKind::KeyPath)
+      return nullptr;
+
+    Base = ThisBase;
+    BaseDC = Result.getDeclContext();
+  }
+
+  if (!Base)
+    return nullptr;
+
+  // Dynamic member lookup only applies to types with the attribute. The
+  // result's context is where 'self' comes from, e.g. a method.
+  auto *TypeDC = BaseDC->getInnermostTypeContext();
+  auto *NTD = TypeDC ? TypeDC->getSelfNominalTypeDecl() : nullptr;
+  if (!NTD ||
+      !NTD->getDeclaredInterfaceType()->hasDynamicMemberLookupAttribute())
+    return nullptr;
+
+  auto *BaseExpr =
+      buildImplicitMemberBaseExpr(Base, BaseDC, UDRE->getNameLoc(), DC);
+  return new (DC->getASTContext()) UnresolvedDotExpr(
+      BaseExpr, SourceLoc(), Name, UDRE->getNameLoc(), UDRE->isImplicit());
+}
+
 /// Bind an UnresolvedDeclRefExpr by performing name lookup using the given
 /// options and returning the resultant expression. `DC` is the DeclContext
 /// used for the lookup. If the lookup doesn't find any results, returns
@@ -863,21 +950,8 @@ static Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC,
   }
 
   if (AllMemberRefs) {
-    Expr *BaseExpr;
-    if (auto PD = dyn_cast<ProtocolDecl>(Base)) {
-      auto selfParam = PD->getGenericParams()->getParams().front();
-      BaseExpr = TypeExpr::createImplicitForDecl(
-          UDRE->getNameLoc(), selfParam,
-          /*DC*/ nullptr,
-          DC->mapTypeIntoEnvironment(selfParam->getInterfaceType()));
-    } else if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
-      BaseExpr = TypeExpr::createImplicitForDecl(
-          UDRE->getNameLoc(), NTD, BaseDC,
-          DC->mapTypeIntoEnvironment(NTD->getInterfaceType()));
-    } else {
-      BaseExpr = new (Context) DeclRefExpr(Base, UDRE->getNameLoc(),
-                                           /*Implicit=*/true);
-    }
+    Expr *BaseExpr =
+        buildImplicitMemberBaseExpr(Base, BaseDC, UDRE->getNameLoc(), DC);
 
     auto isInClosureContext = [&](ValueDecl *decl) -> bool {
       auto *DC = decl->getDeclContext();
@@ -947,6 +1021,10 @@ Expr *TypeChecker::resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE,
 
   if (result)
     return result;
+
+  if (auto *dynamicMemberRef =
+          resolveImplicitSelfDynamicMemberRef(UDRE, DC, lookupOptions))
+    return dynamicMemberRef;
 
   // We didn't find any results. Look for common mistakes to diagnose.
   DeclNameRef Name = UDRE->getName();
