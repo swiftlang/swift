@@ -16,13 +16,18 @@
 #include "swift/Frontend/FrontendInputsAndOutputs.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "llvm/CAS/ActionCache.h"
+#include "llvm/CAS/CASExportingOutputBackend.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/VirtualOutputFile.h"
 
 namespace swift::cas {
 
-class SwiftCASOutputBackend : public llvm::vfs::OutputBackend {
+/// Stores the compiler outputs in the CAS, and writes them on disk by exporting
+/// them from the CAS, which can clone files. Outputs that aren't cached are
+/// only written on disk, like the object file with MCCAS, whose MCCAS object is
+/// stored instead.
+class SwiftCASOutputBackend : public llvm::cas::CASExportingOutputBackend {
   void anchor() override;
 
 protected:
@@ -32,11 +37,17 @@ protected:
   createFileImpl(llvm::StringRef ResolvedPath,
                  std::optional<llvm::vfs::OutputConfig> Config) override;
 
+  llvm::Error recordOutput(llvm::StringRef Path,
+                           llvm::cas::ObjectRef Object) override;
+
   virtual llvm::Error storeImpl(llvm::StringRef Path, llvm::StringRef Bytes,
                                 unsigned InputIndex, file_types::ID OutputKind);
 
 private:
   file_types::ID getOutputFileType(llvm::StringRef Path) const;
+
+  /// Return true if the output for \p Path is stored in the CAS.
+  bool isCachedOutput(llvm::StringRef Path) const;
 
   /// Return true if the file type is stored into CAS Backend directly.
   static bool isStoredDirectly(file_types::ID Kind);
@@ -48,7 +59,7 @@ public:
                         const FrontendInputsAndOutputs &InputsAndOutputs,
                         const FrontendOptions &Opts,
                         FrontendOptions::ActionType Action,
-                        bool WriteOutputHashXAttr);
+                        bool WriteOutputHashXAttr, bool UseCASBackend);
   ~SwiftCASOutputBackend();
 
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,
