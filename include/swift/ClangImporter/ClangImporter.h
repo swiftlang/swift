@@ -952,6 +952,22 @@ classifyCxxReferenceParameter(clang::QualType type);
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
 
+/// The declaration whose swift_attrs apply to \p decl. That is \p decl itself,
+/// except for a class template specialization that has not been instantiated
+/// yet: it carries none of the attributes of its template, so they are read
+/// from the template's pattern instead. This is only done when that pattern is
+/// known, i.e. when the template has no partial specializations; otherwise the
+/// pattern is only decided on instantiation, and \p decl is returned as is.
+///
+/// A partial specialization that only becomes visible after the answer was
+/// used (e.g. from a module imported later) is not accounted for.
+const clang::Decl *getSwiftAttrSource(const clang::Decl *decl);
+
+/// The swift_attrs that apply to \p decl; see getSwiftAttrSource.
+inline auto getSwiftAttrs(const clang::Decl *decl) {
+  return getSwiftAttrSource(decl)->specific_attrs<clang::SwiftAttrAttr>();
+}
+
 /// Whether any declaration of \p decl carries one of the given swift_attrs.
 /// Within a translation unit a swift_attr propagates to later redeclarations
 /// only, and a chain assembled across modules is not merged at all, so an
@@ -1104,7 +1120,7 @@ matchSwiftAttr(const clang::Decl *decl,
   if (!decl)
     return std::nullopt;
 
-  for (const auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+  for (const auto *swiftAttr : getSwiftAttrs(decl)) {
     for (const auto &p : patterns) {
       if (swiftAttr->getAttribute() == p.first)
         return p.second;

@@ -3028,7 +3028,7 @@ namespace {
         }
 
         // Escapability annotations have no effect on a foreign reference type.
-        for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
+        for (auto *swiftAttr : getSwiftAttrs(decl)) {
           if (swiftAttr->getAttribute() == "Escapable" ||
               swiftAttr->getAttribute().starts_with("escapable_if:"))
             Impl.diagnose(HeaderLoc(decl->getLocation()),
@@ -3834,7 +3834,7 @@ namespace {
         // indirectly (e.g. through std::shared_ptr), so do not warn then.
         bool hasEscapabilityAnnotation =
             hasEscapableAttr(decl) ||
-            llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+            llvm::any_of(getSwiftAttrs(decl),
                          [](const clang::SwiftAttrAttr *attr) {
                            return attr->getAttribute().starts_with(
                                "escapable_if:");
@@ -10357,7 +10357,7 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
     // __attribute__((swift_attr("attribute")))
     //
     std::optional<bool> seenUnsafe;
-    for (auto swiftAttr : ClangDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+    for (auto swiftAttr : getSwiftAttrs(ClangDecl)) {
       // FIXME: Hard-code @MainActor and @UIActor, because we don't have a
       // point at which to do name lookup for imported entities.
       if (isMainActorAttr(swiftAttr)) {
@@ -10662,8 +10662,7 @@ void ClangImporter::Implementation::addExplicitProtocolConformancesFromBases(
 
   if (isBase) {
     llvm::SmallSet<ProtocolDecl *, 4> alreadyAdded;
-    for (auto *swiftAttr :
-         cxxRecordDecl->specific_attrs<clang::SwiftAttrAttr>()) {
+    for (auto *swiftAttr : getSwiftAttrs(cxxRecordDecl)) {
       if (swiftAttr->getAttribute().starts_with(conformsToPrefix))
         addExplicitProtocolConformance(nominal, swiftAttr, alreadyAdded);
     }
