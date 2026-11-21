@@ -264,7 +264,10 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
 
   // Attach a result builder attribute if needed.
   if (resultBuilderType) {
-    auto typeExpr = TypeExpr::createImplicit(resultBuilderType, ctx);
+    // The type of a custom attribute is a contextual type, while
+    // `getResultBuilderType` returns an interface type.
+    auto typeExpr = TypeExpr::createImplicit(
+        DC->mapTypeIntoEnvironment(resultBuilderType), ctx);
     auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ arg,
                                    /*implicit=*/true);
     arg->addAttribute(attr);
