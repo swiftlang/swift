@@ -334,7 +334,12 @@ void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
 SWIFT_RUNTIME_EXPORT
 void swift_generic_instantiateLayoutString(const uint8_t *layoutStr, Metadata *type);
 
-constexpr size_t layoutStringHeaderSize = sizeof(uint64_t) + sizeof(size_t);
+template <typename Runtime>
+constexpr size_t targetLayoutStringHeaderSize =
+    sizeof(uint64_t) + sizeof(typename Runtime::StoredSize);
+
+constexpr size_t layoutStringHeaderSize =
+    targetLayoutStringHeaderSize<InProcess>;
 
 } // namespace swift
 
