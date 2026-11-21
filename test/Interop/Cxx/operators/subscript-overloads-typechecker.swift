@@ -35,7 +35,7 @@ u[num] = val // expected-error {{cannot convert value of type 'Num' to expected 
 
 
 let _: Float = v[float]
-v[float] = val // expected-error {{no exact matches in call to subscript}}
+v[float] = val // expected-error {{cannot convert argument #1 with type 'Float' to any of 'CUnsignedInt', 'Num' in call to 'subscript'}}
                // FIXME: ^this should complain about 'u' being a 'let' constant
 
 let _: Float = u[float]
@@ -94,7 +94,7 @@ let getValPtr = Overloaded.GetValPtr(index: 0)
 let vGetPtr: CUnsignedInt = v[getPtr]
 v[getPtr] = vGetPtr
 let uGetPtr: CUnsignedInt = u[getPtr] // expected-error {{cannot use mutating getter on immutable value: 'u' is a 'let' constant}}
-u[getPtr] = uGetPtr // expected-error {{no exact matches in call to subscript}}
+u[getPtr] = uGetPtr // expected-error {{cannot convert argument #1 with type 'Overloaded.GetPtr' to any of 'Overloaded.GetPtrRef', 'Overloaded.GetRefVal' in call to 'subscript'}}
                     // FIXME: ^this should complain about 'u' being a 'let' constant
 
 let vGetRef: UnsafeMutablePointer<UInt32>? = v[getRef]
