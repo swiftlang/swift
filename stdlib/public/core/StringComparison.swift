@@ -366,7 +366,7 @@ extension _StringGutsSlice {
 
     // Otherwise, one of these strings has more scalars, so the one with less
     // scalars is considered "less" than.
-    if end < other.end {
+    if scalar1 == nil {
       return expecting == .less
     }
 
