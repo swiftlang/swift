@@ -300,6 +300,92 @@ extension AccessBase {
   }
 }
 
+extension Value {
+  /// True if the memory at this address must not be mutated or consumed: it is derived from an
+  /// `@in_guaranteed` argument or an `open_existential_addr immutable_access`, or it is inside a
+  /// `begin_access [read]` scope.
+  var isReadOnlyAddress: Bool {
+    var finder = ReadOnlyBaseFinder()
+    return finder.walkUp(address: self, path: UnusedWalkingPath()) == .abortWalk
+  }
+
+  /// True if a use of this address, or of an address derived from it, may mutate or consume the memory.
+  var hasMutatingOrConsumingUses: Bool {
+    var finder = MutatingOrConsumingUseFinder()
+    return finder.walkDownUses(ofAddress: self, path: UnusedWalkingPath()) == .abortWalk
+  }
+}
+
+private struct ReadOnlyBaseFinder : AddressUseDefWalker {
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    switch address {
+    case let openExistential as OpenExistentialAddrInst where openExistential.isImmutable:
+      return .abortWalk
+    case let beginAccess as BeginAccessInst where beginAccess.accessKind == .read:
+      return .abortWalk
+    case let indexing as IndexingInstruction:
+      return walkUp(address: indexing.base, path: path)
+    case let addrCast as UncheckedAddrCastInst:
+      return walkUp(address: addrCast.fromAddress, path: path)
+    default:
+      return walkUpDefault(address: address, path: path)
+    }
+  }
+
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    AddressWithAccessPath(address).isImmutable ? .abortWalk : .continueWalk
+  }
+}
+
+private struct MutatingOrConsumingUseFinder : AddressDefUseWalker {
+  mutating func walkDown(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    switch address.instruction {
+    case let openExistential as OpenExistentialAddrInst where !openExistential.isImmutable:
+      return .abortWalk
+    case let beginAccess as BeginAccessInst where beginAccess.accessKind != .read:
+      return .abortWalk
+    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst, is InitExistentialAddrInst,
+         is MarkUninitializedInst, is DropDeinitInst:
+      return .abortWalk
+    default:
+      return walkDownDefault(address: address, path: path)
+    }
+  }
+
+  mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    switch address.instruction {
+    case let load as LoadInst:
+      return load.loadOwnership == .take ? .abortWalk : .continueWalk
+    case let copy as SourceDestAddrInstruction:
+      return address == copy.sourceOperand && !copy.isTakeOfSource ? .continueWalk : .abortWalk
+    case let partialApply as PartialApplyInst:
+      return partialApply.isOnStack && partialApply.convention(of: address)?.isGuaranteed == true
+        ? .continueWalk : .abortWalk
+    case let cast as CheckedCastAddrBranchInst:
+      switch cast.consumptionKind {
+      case .CopyOnSuccess, .TestOnly:
+        return address == cast.sourceOperand ? .continueWalk : .abortWalk
+      case .TakeAlways, .TakeOnSuccess:
+        return .abortWalk
+      }
+    case let apply as FullApplySite:
+      return apply.convention(of: address)?.isGuaranteed == true ? .continueWalk : .abortWalk
+    case let yield as YieldInst:
+      return yield.convention(of: address).isGuaranteed ? .continueWalk : .abortWalk
+    case let indexing as IndexingInstruction:
+      return walkDownUses(ofAddress: indexing, path: path)
+    case let addrCast as UncheckedAddrCastInst:
+      return walkDownUses(ofAddress: addrCast, path: path)
+    case is LoadBorrowInst, is DebugValueInst, is FixLifetimeInst, is IgnoredUseInst,
+         is AddressToPointerInst, is SwitchEnumAddrInst, is SelectEnumAddrInst,
+         is ValueMetatypeInst, is ExistentialMetatypeInst, is MarkDependenceAddrInst:
+      return .continueWalk
+    default:
+      return .abortWalk
+    }
+  }
+}
+
 // Walk the address def-use paths to find a single initialization.
 //
 // Implements AddressUseVisitor to guarantee that we can't miss any

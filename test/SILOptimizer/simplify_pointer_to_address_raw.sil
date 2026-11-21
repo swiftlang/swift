@@ -1,0 +1,21 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=pointer_to_address | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: sil [ossa] @in_guaranteed_mark_uninitialized :
+// CHECK:         [[P:%.*]] = address_to_pointer %0
+// CHECK:         [[A:%.*]] = pointer_to_address [[P]]
+// CHECK:         mark_uninitialized [var] [[A]]
+// CHECK:       } // end sil function 'in_guaranteed_mark_uninitialized'
+sil [ossa] @in_guaranteed_mark_uninitialized : $@convention(thin) (@in_guaranteed Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Int
+  %3 = mark_uninitialized [var] %2 : $*Int
+  %4 = load [trivial] %3
+  return %4
+}
