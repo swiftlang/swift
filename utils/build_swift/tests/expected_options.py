@@ -266,6 +266,7 @@ EXPECTED_DEFAULTS = {
     'llvm_ninja_targets_for_cross_compile_hosts': [],
     'llvm_max_parallel_lto_link_jobs':
         defaults.LLVM_MAX_PARALLEL_LTO_LINK_JOBS,
+    'llvm_source_dirname': 'llvm-project',
     'llvm_targets_to_build':
         'X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR;BPF',
     'tsan_libdispatch_test': False,
@@ -865,6 +866,7 @@ EXPECTED_OPTIONS = [
     StrOption('--darwin-xcrun-toolchain'),
     StrOption('--host-target'),
     StrOption('--lit-args'),
+    StrOption('--llvm-source-dirname'),
     StrOption('--llvm-targets-to-build'),
     StrOption('--stdlib-deployment-targets'),
     StrOption('--caching-depscan-socket'),

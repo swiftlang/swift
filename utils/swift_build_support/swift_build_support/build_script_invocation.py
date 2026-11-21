@@ -32,6 +32,7 @@ from swift_build_support.swift_build_support.productpipeline_list_builder \
     import ProductPipelineListBuilder
 from swift_build_support.swift_build_support.products.ninja \
     import get_ninja_path
+from swift_build_support.swift_build_support.products.product import Product
 from swift_build_support.swift_build_support.targets \
     import StdlibDeploymentTarget
 from swift_build_support.swift_build_support.utils import clear_log_time
@@ -48,6 +49,8 @@ class BuildScriptInvocation(object):
     def __init__(self, toolchain, args):
         self.toolchain = toolchain
         self.args = args
+
+        Product.llvm_source_dirname = args.llvm_source_dirname
 
         self.workspace = workspace.Workspace(
             source_root=SWIFT_SOURCE_ROOT,
@@ -155,6 +158,7 @@ class BuildScriptInvocation(object):
                 args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
             "--swift-source-dirname", products.Swift.product_source_name(),
+            "--llvm-source-dirname", args.llvm_source_dirname,
         ]
 
         if self._env_supports_end_of_options():
