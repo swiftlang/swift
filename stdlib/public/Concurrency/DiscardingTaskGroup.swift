@@ -212,6 +212,14 @@ public struct DiscardingTaskGroup {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `DiscardingTaskGroup.isCancelled` on a cancelled `DiscardingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
+  ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `DiscardingTaskGroup.isCancelled`
   public func cancelAll() {
@@ -222,6 +230,14 @@ public struct DiscardingTaskGroup {
   /// `CancellationError.Reason`.
   ///
   /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `DiscardingTaskGroup.isCancelled` on a cancelled `DiscardingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
   @export(implementation)
   @available(SwiftStdlib 6.5, *)
   public func cancelAll(reason: CancellationError.Reason) {
@@ -548,6 +564,14 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `ThrowingDiscardingTaskGroup.isCancelled` on a cancelled `ThrowingDiscardingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
+  ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingDiscardingTaskGroup.isCancelled`
   public func cancelAll() {
@@ -558,6 +582,14 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// `CancellationError.Reason`.
   ///
   /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `ThrowingDiscardingTaskGroup.isCancelled` on a cancelled `ThrowingDiscardingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
   @export(implementation)
   @available(SwiftStdlib 6.5, *)
   public func cancelAll(reason: CancellationError.Reason) {

@@ -488,6 +488,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `TaskGroup.isCancelled` on a cancelled `TaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
+  ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`
   public func cancelAll() {
@@ -501,6 +509,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// propagated as the cancellation reason for each child task (readable via
   /// `Task.cancellationReason` from inside those tasks). First-cancel-wins
   /// on the reason for each child task individually.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `TaskGroup.isCancelled` on a cancelled `TaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
   ///
   /// - SeeAlso: `cancelAll()`
   /// - SeeAlso: `CancellationError.Reason`
@@ -890,6 +906,14 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `ThrowingTaskGroup.isCancelled` on a cancelled `ThrowingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
+  ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
   public func cancelAll() {
@@ -900,6 +924,14 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// `CancellationError.Reason`.
   ///
   /// See ``TaskGroup/cancelAll(reason:)`` for details.
+  ///
+  /// ### Interaction with Task Cancellation Shields
+  ///
+  /// If cancellation has been suppressed by a task cancellation shield,
+  /// reading `ThrowingTaskGroup.isCancelled` on a cancelled `ThrowingTaskGroup`
+  /// returns `true`.
+  ///
+  /// Refer to ``isCancelled`` documentation for detailed semantics.
   @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
