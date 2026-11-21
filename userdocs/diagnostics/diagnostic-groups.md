@@ -53,6 +53,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:unstable-global-actor-shared>
+- <doc:prefix-mapped-file-path>
 - <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
@@ -119,6 +120,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:exclusivity-violation>
 - <doc:performance-hints>
 - <doc:unstable-global-actor-shared>
+- <doc:prefix-mapped-file-path>
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
