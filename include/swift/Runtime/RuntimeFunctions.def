@@ -2635,32 +2635,27 @@ FUNCTION(ContinuationThrowingResumeWithError,
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// SplitContinuation *swift_continuation_createSplit(const Metadata *resultType);
-FUNCTION(ContinuationCreateSplit,
-         _Concurrency, swift_continuation_createSplit, SwiftCC,
+// void swift_continuation_initSplit(SplitContinuation *continuation,
+//                                   OpaqueValue *result);
+FUNCTION(ContinuationInitSplit,
+         _Concurrency, swift_continuation_initSplit, SwiftCC,
          SplitContinuationAvailability,
-         RETURNS(Int8PtrTy),
-         ARGS(TypeMetadataPtrTy),
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, OpaquePtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_continuation_awaitSplit(SplitContinuation *continuation);
+// void swift_continuation_awaitSplit(SplitContinuation *continuation,
+//     void *cancellationRecord, void *cancellationHandler,
+//     void *cancellationContext, void *escalationRecord,
+//     void *escalationHandler, void *escalationContext, size_t handlers);
 FUNCTION(ContinuationAwaitSplit,
          _Concurrency, swift_continuation_awaitSplit, SwiftAsyncCC,
          SplitContinuationAvailability,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
-         ATTRS(NoUnwind),
-         EFFECT(RuntimeEffect::Concurrency),
-         UNKNOWN_MEMEFFECTS)
-
-// void swift_continuation_destroySplit(SplitContinuation *continuation);
-FUNCTION(ContinuationDestroySplit,
-         _Concurrency, swift_continuation_destroySplit, SwiftCC,
-         SplitContinuationAvailability,
-         RETURNS(VoidTy),
-         ARGS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy,
+              Int8PtrTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)

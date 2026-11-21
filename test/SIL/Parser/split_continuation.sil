@@ -22,14 +22,14 @@ bb0(%v : $Builtin.Int32):
   return %t : $()
 }
 
-// CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
-sil @split_await : $@async (Builtin.RawUnsafeContinuation) -> () {
-// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
-entry(%continuation : $Builtin.RawUnsafeContinuation):
+// CHECK-LABEL: sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation, @guaranteed @noescape @callee_guaranteed (UInt8) -> (), @guaranteed @noescape @callee_guaranteed (UInt8, UInt8) -> (), Builtin.Word) -> () {
+sil @split_await : $@async (Builtin.RawUnsafeContinuation, @guaranteed @noescape @callee_guaranteed (UInt8) -> (), @guaranteed @noescape @callee_guaranteed (UInt8, UInt8) -> (), Builtin.Word) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation,
+entry(%continuation : $Builtin.RawUnsafeContinuation, %onCancel : $@noescape @callee_guaranteed (UInt8) -> (), %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), %handlers : $Builtin.Word):
   // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
   %a = alloc_stack $Builtin.Int32
-  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
-  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32, {{%.*}} : $@noescape @callee_guaranteed (UInt8) -> (), {{%.*}} : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), {{%.*}} : $Builtin.Word) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, %onCancel : $@noescape @callee_guaranteed (UInt8) -> (), %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), %handlers : $Builtin.Word) : $Builtin.RawUnsafeContinuation
   // The line ends after the resume successor, i.e. there is no error successor.
   // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]] // id:
   await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
@@ -40,14 +40,14 @@ bb1:
   return undef : $()
 }
 
-// CHECK-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
-sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation) -> () {
-// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation):
-entry(%continuation : $Builtin.RawUnsafeContinuation):
+// CHECK-LABEL: sil @split_await_throws : $@convention(thin) @async (Builtin.RawUnsafeContinuation, @guaranteed @noescape @callee_guaranteed (UInt8) -> (), @guaranteed @noescape @callee_guaranteed (UInt8, UInt8) -> (), Builtin.Word) -> () {
+sil @split_await_throws : $@async (Builtin.RawUnsafeContinuation, @guaranteed @noescape @callee_guaranteed (UInt8) -> (), @guaranteed @noescape @callee_guaranteed (UInt8, UInt8) -> (), Builtin.Word) -> () {
+// CHECK: bb0([[TOK:%.*]] : $Builtin.RawUnsafeContinuation,
+entry(%continuation : $Builtin.RawUnsafeContinuation, %onCancel : $@noescape @callee_guaranteed (UInt8) -> (), %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), %handlers : $Builtin.Word):
   // CHECK: [[SLOT:%.*]] = alloc_stack $Builtin.Int32
   %a = alloc_stack $Builtin.Int32
-  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
-  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  // CHECK: [[CONT:%.*]] = builtin "getSplitContinuationAddr"<Builtin.Int32>([[TOK]] : $Builtin.RawUnsafeContinuation, [[SLOT]] : $*Builtin.Int32, {{%.*}} : $@noescape @callee_guaranteed (UInt8) -> (), {{%.*}} : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), {{%.*}} : $Builtin.Word) : $Builtin.RawUnsafeContinuation
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, %onCancel : $@noescape @callee_guaranteed (UInt8) -> (), %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> (), %handlers : $Builtin.Word) : $Builtin.RawUnsafeContinuation
   // CHECK: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
   // CHECK: [[RESUME]]:

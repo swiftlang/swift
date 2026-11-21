@@ -2189,14 +2189,16 @@ static ManagedValue emitBuiltinAwaitSplitThrowingContinuation(
   // Builtin.RawUnsafeContinuation).
   SILValue unboundContinuation = args[0].getValue();
 
-  // Bind the continuation to this frame's resume buffer.
+  // Bind the continuation to this frame's resume buffer, together with the
+  // handlers to install while it is suspended.
   // `getSplitContinuationAddr` takes the same single generic parameter as
   // this builtin, so the substitutions carry over unchanged.
   auto &ctx = SGF.getASTContext();
   auto continuation = SGF.B.createBuiltin(
       loc, BuiltinNames::GetSplitContinuationAddr,
       SILType::getPrimitiveObjectType(ctx.TheRawUnsafeContinuationType), subs,
-      {unboundContinuation, resumeBuf});
+      {unboundContinuation, resumeBuf, args[1].getValue(), args[2].getValue(),
+       args[3].getValue()});
 
   SILBasicBlock *resumeBlock = SGF.createBasicBlock();
   SILBasicBlock *errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);

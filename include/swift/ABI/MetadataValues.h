@@ -71,6 +71,18 @@ enum {
   /// The number of words in a task deadline record.
   NumWords_TaskDeadline = 16,
 
+  /// The number of words in the storage of a split continuation, which the
+  /// compiler allocates in the frame of the function that creates it.
+  NumWords_SplitContinuation = 32,
+
+  /// The number of words in the record of a cancellation handler, which the
+  /// compiler allocates in the frame of the function that installs it.
+  NumWords_TaskCancellationHandler = 8,
+
+  /// The number of words in the record of a priority escalation handler, which
+  /// the compiler allocates in the frame of the function that installs it.
+  NumWords_TaskEscalationHandler = 8,
+
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,
 
@@ -161,6 +173,15 @@ const size_t Alignment_AsyncLet = MaximumAlignment;
 
 /// The alignment of a TaskDeadline record slot.
 const size_t Alignment_TaskDeadline = MaximumAlignment;
+
+/// The alignment of the storage of a split continuation.
+const size_t Alignment_SplitContinuation = MaximumAlignment;
+
+/// The alignment of the record of a cancellation handler.
+const size_t Alignment_TaskCancellationHandler = MaximumAlignment;
+
+/// The alignment of the record of a priority escalation handler.
+const size_t Alignment_TaskEscalationHandler = MaximumAlignment;
 
 /// Flags stored in the value-witness table.
 template <typename int_type>

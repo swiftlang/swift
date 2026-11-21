@@ -62,6 +62,7 @@ import CodableTest
 import Combos
 import ContiguousArrayTests
 import ContinuationResume
+import SplitContinuation
 import CountAlgo
 import CreateObjects
 import CxxAssignment
@@ -288,6 +289,7 @@ register(CodableTest.benchmarks)
 register(Combos.benchmarks)
 register(ContiguousArrayTests.benchmarks)
 register(ContinuationResume.benchmarks)
+register(SplitContinuation.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(ClockMeasure.benchmarks)

@@ -174,7 +174,9 @@ final class Box<Value: Sendable>: Sendable {
 
     let earlyResult = await earlyTask.value
     precondition(earlyResult == 9, "continuation did not resume: \(earlyResult)")
-    precondition(earlyPriorities.value == [[.medium, .medium]],
+    // The continuation was resumed before the wait, so the wait doesn't suspend
+    // and the handler doesn't run.
+    precondition(earlyPriorities.value.isEmpty,
                  "escalation handler saw \(earlyPriorities.value)")
     // CHECK: OK
     print("OK")

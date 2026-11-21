@@ -1161,30 +1161,53 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
 
-/// Opaque handle to a split continuation, returned by
-/// swift_continuation_createSplit and consumed by the other
-/// swift_continuation_*Split entry points.
+/// Opaque handle to a split continuation: NumWords_SplitContinuation words,
+/// aligned to Alignment_SplitContinuation, that the compiler allocates in the
+/// frame of the function that creates the continuation.
 struct SplitContinuation;
 
-/// Create a *split* continuation for a result of the given type.
+/// Initialize a *split* continuation in `continuation`, whose result is
+/// delivered into `result`.
 ///
 /// Unlike swift_continuation_init, this does not bind the continuation to the
-/// current task or touch the task's execution state. It allocates the
-/// continuation's ContinuationAsyncContext (state Pending) and result storage
-/// sized for the resultType, and returns the split continuation.
+/// current task or touch the task's execution state. It initializes the
+/// continuation's ContinuationAsyncContext (state Pending). The continuation
+/// and `result` must stay valid until the await has consumed the result. The
+/// runtime doesn't need to be told when they go away.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-SplitContinuation *
-swift_continuation_createSplit(const Metadata *resultType);
+void swift_continuation_initSplit(SplitContinuation *continuation,
+                                  OpaqueValue *result);
 
-/// Await a split continuation from the current task.
+/// The handlers that swift_continuation_awaitSplit installs.
+///
+/// Every await passes both handlers since we can't express non-escapable
+/// optional closures. These bits tell the runtime which of them are real and
+/// not just empty closures. Without the bits, a wait without handlers would
+/// install records that do nothing.
+enum SplitContinuationAwaitHandlers : size_t {
+  SplitContinuationCancellationHandler = 1 << 0,
+  SplitContinuationEscalationHandler = 1 << 1,
+};
+
+/// Await a split continuation from the current task, with the handlers in
+/// `handlers` installed for the duration of the suspension. They must stay
+/// valid until the await resumes; the others are ignored. If the continuation
+/// was already resumed, the await doesn't suspend and no handler runs.
+///
+/// The records of the handlers are built in `cancellationRecord` and
+/// `escalationRecord`, the buffers of NumWords_TaskCancellationHandler and
+/// NumWords_TaskEscalationHandler words, aligned to
+/// Alignment_TaskCancellationHandler and Alignment_TaskEscalationHandler, that
+/// the compiler allocates in the waiting frame. The runtime doesn't release
+/// them.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_continuation_awaitSplit(SplitContinuation *continuation);
-
-/// Destroy a split continuation created by swift_continuation_createSplit,
-/// after its result has been consumed by the await.  Frees the context and its
-/// result storage.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_continuation_destroySplit(SplitContinuation *continuation);
+void swift_continuation_awaitSplit(
+    SplitContinuation *continuation, void *cancellationRecord,
+    CancellationNotificationStatusRecord::FunctionTypeWithReason
+        *cancellationHandler,
+    void *cancellationContext, void *escalationRecord,
+    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
+    void *escalationContext, size_t handlers);
 
 /// Resume a continuation, offering the current thread to run the resumed task
 /// instead of enqueuing it.

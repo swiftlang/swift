@@ -2362,13 +2362,34 @@ static ValueDecl *getCreateSplitContinuation(ASTContext &ctx,
                             _rawUnsafeContinuation);
 }
 
+/// The handlers a split continuation is awaited with:
+///   (UInt8) -> (), (UInt8, UInt8) -> (), Builtin.Word
+static void addSplitContinuationHandlerParameters(
+    ASTContext &ctx, BuiltinFunctionBuilder &builder) {
+  auto noEscape = ASTExtInfoBuilder().withNoEscape().build();
+  AnyFunctionType::Param cancellationParams[] = {
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
+  };
+  builder.addParameter(makeConcrete(FunctionType::get(
+      cancellationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape)));
+  AnyFunctionType::Param escalationParams[] = {
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
+  };
+  builder.addParameter(makeConcrete(FunctionType::get(
+      escalationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape)));
+  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+}
+
 // awaitSplitThrowingContinuation<T> :
-//   (Builtin.RawUnsafeContinuation) async throws -> sending T
+//   (Builtin.RawUnsafeContinuation, (UInt8) -> (), (UInt8, UInt8) -> (),
+//    Builtin.Word) async throws -> sending T
 static ValueDecl *getAwaitSplitThrowingContinuation(ASTContext &ctx,
                                                        Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
 
   builder.addParameter(makeConcrete(ctx.TheRawUnsafeContinuationType));
+  addSplitContinuationHandlerParameters(ctx, builder);
 
   auto resultTy = makeGenericParam();
   builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
@@ -2382,7 +2403,8 @@ static ValueDecl *getAwaitSplitThrowingContinuation(ASTContext &ctx,
 }
 
 // getSplitContinuationAddr<T> :
-//   (Builtin.RawUnsafeContinuation, T*) -> Builtin.RawUnsafeContinuation
+//   (Builtin.RawUnsafeContinuation, T*, (UInt8) -> (), (UInt8, UInt8) -> (),
+//    Builtin.Word) -> Builtin.RawUnsafeContinuation
 static ValueDecl *getGetSplitContinuationAddr(ASTContext &ctx,
                                                  Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
@@ -2390,6 +2412,7 @@ static ValueDecl *getGetSplitContinuationAddr(ASTContext &ctx,
   auto resumeTy = makeGenericParam();
   builder.addConformanceRequirement(resumeTy, KnownProtocolKind::Escapable);
   builder.addParameter(resumeTy, ParamSpecifier::InOut);
+  addSplitContinuationHandlerParameters(ctx, builder);
   builder.setResult(makeConcrete(ctx.TheRawUnsafeContinuationType));
   return builder.build(id);
 }
