@@ -728,6 +728,14 @@ public:
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;
 
+  void collectDeclarationUSRs(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+      std::optional<unsigned> Length, bool CancelOnSubsequentRequest,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<DeclarationUSRsInFile> &)>
+          Receiver) override;
+
   void semanticRefactoring(StringRef PrimaryFilePath,
                            SemanticRefactoringInfo Info,
                            ArrayRef<const char *> Args,

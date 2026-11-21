@@ -28,6 +28,7 @@
 #include <functional>
 #include <memory>
 #include <optional>
+#include <string>
 #include <unordered_set>
 #include <variant>
 
@@ -164,6 +165,22 @@ struct VariableTypesInFile {
   /// `Results`. Entries in `Results` refer to their types by using
   /// an offset into this string.
   StringRef TypeBuffer;
+};
+
+struct DeclarationUSR {
+  /// The declaration identifier's offset in the file.
+  unsigned Offset;
+  /// The declaration identifier's length.
+  unsigned Length;
+  /// The SourceKit declaration kind.
+  UIdent Kind;
+  /// The declaration's USR.
+  std::string USR;
+};
+
+struct DeclarationUSRsInFile {
+  /// The declarations in the file that have a USR.
+  std::vector<DeclarationUSR> Results;
 };
 
 class CodeCompletionConsumer {
@@ -1274,6 +1291,19 @@ public:
       bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
+          Receiver) = 0;
+
+  /// Collects the USRs of declarations whose names overlap the byte range
+  /// defined by `Offset` and `Length` in the source file. If neither is set,
+  /// the entire file is searched. A missing `Offset` defaults to the start of
+  /// the file and a missing `Length` to the rest of the file. The range is
+  /// clamped to the file, and a zero `Length` returns no declarations.
+  virtual void collectDeclarationUSRs(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+      std::optional<unsigned> Length, bool CancelOnSubsequentRequest,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<DeclarationUSRsInFile> &)>
           Receiver) = 0;
 
   virtual void getDocInfo(llvm::MemoryBuffer *InputBuf,

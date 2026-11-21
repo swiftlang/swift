@@ -49,6 +49,7 @@
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include <limits>
 #include <mutex>
 #include <optional>
 
@@ -259,6 +260,10 @@ static void reportExpressionTypeInfo(const RequestResult<ExpressionTypesInFile> 
 static void
 reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
                        ResponseReceiver Rec);
+
+static void
+reportDeclarationUSRInfo(const RequestResult<DeclarationUSRsInFile> &Result,
+                         ResponseReceiver Rec);
 
 static void reportRangeInfo(const RequestResult<RangeInfo> &Result, ResponseReceiver Rec);
 
@@ -1880,6 +1885,67 @@ handleRequestCollectVariableType(const RequestDict &Req,
 }
 
 static void
+handleRequestCollectDeclarationUSR(const RequestDict &Req,
+                                   SourceKitCancellationToken CancellationToken,
+                                   ResponseReceiver Rec) {
+  if (checkVFSNotSupported(Req, Rec))
+    return;
+
+  handleSemanticRequest(Req, Rec, [Req, CancellationToken, Rec]() {
+    LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
+
+    std::optional<StringRef> PrimaryFilePath =
+        getPrimaryFilePathForRequestOrEmitError(Req, Rec);
+    if (!PrimaryFilePath)
+      return;
+
+    StringRef InputBufferName = getInputBufferNameForRequest(Req, Rec);
+
+    SmallVector<const char *, 8> Args;
+    if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
+      return;
+
+    std::optional<int64_t> RequestedOffset = Req.getOptionalInt64(KeyOffset);
+    std::optional<int64_t> RequestedLength = Req.getOptionalInt64(KeyLength);
+    auto validateUnsignedRequestValue = [&](std::optional<int64_t> Value,
+                                            StringRef KeyName)
+        -> std::optional<unsigned> {
+      if (!Value)
+        return std::nullopt;
+      if (*Value < 0 || *Value > std::numeric_limits<unsigned>::max()) {
+        std::string Error;
+        llvm::raw_string_ostream OS(Error);
+        OS << '\'' << KeyName << "' must be a non-negative 32-bit integer";
+        Rec(createErrorRequestInvalid(OS.str()));
+        return std::nullopt;
+      }
+      return unsigned(*Value);
+    };
+    std::optional<unsigned> Offset =
+        validateUnsignedRequestValue(RequestedOffset, "key.offset");
+    if (RequestedOffset && !Offset)
+      return;
+    std::optional<unsigned> Length =
+        validateUnsignedRequestValue(RequestedLength, "key.length");
+    if (RequestedLength && !Length)
+      return;
+
+    // For backwards compatibility with other semantic batch requests, the
+    // default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
+    return Lang.collectDeclarationUSRs(
+        *PrimaryFilePath, InputBufferName, Args, Offset, Length,
+        CancelOnSubsequentRequest, CancellationToken,
+        [Rec](const RequestResult<DeclarationUSRsInFile> &Result) {
+          reportDeclarationUSRInfo(Result, Rec);
+        });
+  });
+}
+
+static void
 handleRequestFindLocalRenameRanges(const RequestDict &Req,
                                    SourceKitCancellationToken CancellationToken,
                                    ResponseReceiver Rec) {
@@ -2313,6 +2379,8 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
   HANDLE_REQUEST(RequestCollectExpressionType,
                  handleRequestCollectExpressionType)
   HANDLE_REQUEST(RequestCollectVariableType, handleRequestCollectVariableType)
+  HANDLE_REQUEST(RequestCollectDeclarationUSR,
+                 handleRequestCollectDeclarationUSR)
   HANDLE_REQUEST(RequestFindLocalRenameRanges,
                  handleRequestFindLocalRenameRanges)
   HANDLE_REQUEST(RequestNameTranslation, handleRequestNameTranslation)
@@ -3083,6 +3151,30 @@ reportVariableTypeInfo(const RequestResult<VariableTypesInFile> &Result,
     ArrBuilder.add(R);
   }
   Dict.setCustomBuffer(KeyVariableTypeList, ArrBuilder.createBuffer());
+  Rec(Builder.createResponse());
+}
+
+//===----------------------------------------------------------------------===//
+// ReportDeclarationUSRInfo
+//===----------------------------------------------------------------------===//
+
+static void
+reportDeclarationUSRInfo(const RequestResult<DeclarationUSRsInFile> &Result,
+                         ResponseReceiver Rec) {
+  if (Result.isCancelled())
+    return Rec(createErrorRequestCancelled());
+  if (Result.isError())
+    return Rec(createErrorRequestFailed(Result.getError()));
+
+  const DeclarationUSRsInFile &Info = Result.value();
+
+  ResponseBuilder Builder;
+  auto Dict = Builder.getDictionary();
+  DeclarationsArrayBuilder ArrBuilder;
+  for (const auto &R : Info.Results) {
+    ArrBuilder.add(R.Kind, R.Offset, R.Length, R.USR);
+  }
+  Dict.setCustomBuffer(KeyDeclarations, ArrBuilder.createBuffer());
   Rec(Builder.createResponse());
 }
 
