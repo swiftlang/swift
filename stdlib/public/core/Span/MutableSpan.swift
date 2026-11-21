@@ -801,7 +801,8 @@ extension MutableSpan {
   /// every element of the source.
   ///
   /// This span must have enough space from `index` to its end
-  /// (`index..<count`) for every element provided by `source`.
+  /// (`index..<count`) for every element provided by `source`. If `source`
+  /// has fewer elements, the remaining elements of this span are unchanged.
   ///
   /// If reading from `source` throws an error, the elements copied before
   /// the error occurred remain in this span, and `index` is updated to
@@ -833,7 +834,8 @@ extension MutableSpan {
   /// every element of the source.
   ///
   /// This span must have enough space from `index` to its end
-  /// (`index..<count`) for every element provided by `source`.
+  /// (`index..<count`) for every element provided by `source`. If `source`
+  /// has fewer elements, the remaining elements of this span are unchanged.
   ///
   /// - Parameters:
   ///   - index: The index at which to start copying. It must be a valid
