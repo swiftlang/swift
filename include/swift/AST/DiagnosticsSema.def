@@ -4087,6 +4087,9 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_with_more_effects,none,
       "cannot override non-%1 %kindonly0 with %1 %kindonly0",
       (const ValueDecl *, StringRef))
+ERROR(override_lifetime_dependence_mismatch,none,
+      "%kind0 has a lifetime dependence that does not match the overridden "
+      "declaration", (const ValueDecl *))
 ERROR(override_typed_throws,none,
       "%kindonly0 that throws %1 cannot override one that throws %2",
       (const AbstractFunctionDecl *, Type, Type))

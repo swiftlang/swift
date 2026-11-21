@@ -27,6 +27,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -1942,6 +1943,38 @@ checkOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   return result;
 }
 
+/// Get the (Params...) -> Result function type of a function declaration,
+/// dropping the 'self' clause of methods.
+static AnyFunctionType *getInnerFunctionType(AbstractFunctionDecl *fn) {
+  auto *fnType = fn->getInterfaceType()->getAs<AnyFunctionType>();
+  if (fnType && fn->hasImplicitSelfDecl())
+    fnType = fnType->getResult()->getAs<AnyFunctionType>();
+  return fnType;
+}
+
+/// Determine whether the lifetime dependencies of an override match those of
+/// the overridden declaration. Matching follows protocol witness matching: the
+/// override's dependencies must convert to the base's, and the base's must
+/// convert to the override's.
+///
+/// A caller dispatching through the base relies its dependencies, so a more
+/// restrictive override can lead to use-after-free. Less restrictive overrides
+/// are safe but also rejected for now.
+static bool overrideLifetimesMatch(AbstractFunctionDecl *overrideFn,
+                                   AbstractFunctionDecl *baseFn) {
+  auto *overrideType = getInnerFunctionType(overrideFn);
+  auto *baseType = getInnerFunctionType(baseFn);
+  if (!overrideType || !baseType)
+    return true;
+  if (overrideType->getNumParams() != baseType->getNumParams())
+    return true; // Only in already ill-formed code.
+
+  LifetimeDependentInterface overrideInterface(overrideFn, overrideType);
+  LifetimeDependentInterface baseInterface(baseFn, baseType);
+  return overrideInterface.canConvertTo(baseInterface) &&
+         baseInterface.canConvertTo(overrideInterface);
+}
+
 static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
   // This can happen with circular inheritance.
   // FIXME: This shouldn't be possible once name lookup goes through the
@@ -2181,6 +2214,13 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
         !cast<AbstractFunctionDecl>(base)->hasAsync()) {
       diags.diagnose(override, diag::override_with_more_effects, override,
                      "async");
+      diags.diagnose(base, diag::overridden_here);
+    }
+
+    // The override's lifetime dependencies must match the base's.
+    if (!overrideLifetimesMatch(overrideFn, baseFn)) {
+      diags.diagnose(override, diag::override_lifetime_dependence_mismatch,
+                     override);
       diags.diagnose(base, diag::overridden_here);
     }
 
