@@ -364,7 +364,9 @@ suite.test("updateAll(copying:) count mismatch")
   let source = ContiguousArray([1, 2, 3])
   var b = ContiguousArray([0, 0, 0, 0])
   var span = b.mutableSpan
-  expectCrashLater()
+  expectCrashLater(
+    withDebugMessage: "Source must have as many elements as the destination"
+  )
   span.updateAll(copying: source.span)
 }
 
@@ -524,7 +526,9 @@ suite.test("updateAll(moving:) count mismatch")
   var destination = UniqueArray<Int>(copying: 0..<4)
   var source = UniqueArray<Int>(copying: 0..<3)
   var span = destination.mutableSpan
-  expectCrashLater()
+  expectCrashLater(
+    withDebugMessage: "Source must have as many elements as the destination"
+  )
   source.edit {
     span.updateAll(moving: &$0)
   }
