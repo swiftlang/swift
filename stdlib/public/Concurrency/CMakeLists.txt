@@ -289,6 +289,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+    -Xfrontend -enable-sil-opaque-values
   ${swift_concurrency_options}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
@@ -430,6 +431,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       SWIFT_COMPILE_FLAGS
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+        -Xfrontend -enable-sil-opaque-values
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
         -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
@@ -475,6 +477,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         DEPENDS
           "embedded-concurrency-${mod}"
 
+        SWIFT_COMPILE_FLAGS
+          -Xfrontend -enable-sil-opaque-values
         C_COMPILE_FLAGS
           ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
           -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
