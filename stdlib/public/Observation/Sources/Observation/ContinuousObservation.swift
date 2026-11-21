@@ -11,6 +11,21 @@
 
 import _Concurrency
 
+/// Continuously tracks access to properties and informs on the first change given a specific
+/// set of options.
+///
+/// Unlike the other `withObservationTracking` functions this method continuously tracks changes
+/// defined by transactional changes. The `apply` closure is guaranteed to be invoked in the
+/// same isolation as the invocation of the `withContinuousObservation` function. This means
+/// that if the `withContinuousObservation` function is called on the main actor then the
+/// transactional events are invoked for the `apply` closure on the main actor as well.
+///
+/// - Parameters:
+///     - options: Options to specify how observe specific changes and which changes to observe.
+///     - apply: A closure that contains properties to track and re-invoked when transactions end
+///              that were started by property changes.
+///
+/// - Returns: A token representing the observation used for cancellation. 
 @available(SwiftStdlib 6.4, *)
 public func withContinuousObservation(
   options: ObservationTracking.Options,
