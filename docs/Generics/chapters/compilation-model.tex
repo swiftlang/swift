@@ -336,7 +336,7 @@ $ swiftc cycle.swift -Xfrontend -debug-cycles
 \paragraph{Performance analysis.} A handful of command-line flags are provided to help with understanding compile-time performance. The \IndexFlag{stats-output-dir}\texttt{-stats-output-dir} flag is followed by the name of a directory, which must already exist. Each frontend job writes a new JSON file to this directory, with various counters and timers. When used in conjunction with the \IndexFlag{fine-grained-timers}\texttt{-fine-grained-timers} flag, the compiler will count the number of request evaluations, and the total time spent in request evaluation, broken down into each kind of request. The output can be sliced and diced in various ways; one can actually make pretty effective use of ``\Index{awk@\texttt{awk}}\texttt{awk}'' \cite{awk} for example, despite the \index{JSON}JSON format:
 \begin{Verbatim}
 $ mkdir /tmp/stats
-$ swiftc -stats-output-dir -fine-grained-timers /tmp/stats ...
+$ swiftc -stats-output-dir /tmp/stats -fine-grained-timers ...
 $ awk -f '/InterfaceTypeRequest.wall/ { x += $2 } END { print x }' \
     /tmp/stats/*.json
 \end{Verbatim}

@@ -1002,7 +1002,7 @@ Word 7:&\ldots\\
 \end{minipage}
 \end{wrapfigure}
 
-\IndexDefinition{opaque existential}\paragraph{Opaque existentials.} This representation (no relation to opaque result types---``opaque'' is a somewhat term overloaded in Swift) consists of a three-word buffer, \index{runtime type metadata!existential type}runtime type metadata for the concrete type, followed by zero or more witness tables. If the concrete type is word \index{alignment}aligned and its \index{size of value}size fits in the three-word buffer, the value is stored directly in the buffer. Otherwise, the first word of the buffer stores a pointer to a copy-on-write heap-allocated box.
+\IndexDefinition{opaque existential}\paragraph{Opaque existentials.} This representation (no relation to opaque result types---``opaque'' is a somewhat term overloaded in Swift) consists of a three-word buffer, \index{runtime type metadata!existential type}runtime type metadata for the concrete type, followed by zero or more witness tables. If the concrete type is word \index{alignment of value}aligned and its \index{size of value}size fits in the three-word buffer, the value is stored directly in the buffer. Otherwise, the first word of the buffer stores a pointer to a copy-on-write heap-allocated box.
 
 \bigskip
 
