@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import platform
 
 from . import cmark
 from . import foundation
@@ -76,11 +75,8 @@ class SwiftInspect(product.Product):
 
 
 def run_build_script_helper(host_target, product, args):
-    toolchain_path = args.install_destdir
-    if platform.system() == 'Darwin':
-        # The prefix is an absolute path, so concatenate without os.path.
-        toolchain_path += \
-            targets.darwin_toolchain_prefix(args.install_prefix)
+    toolchain_path = targets.toolchain_path(args.install_destdir,
+                                            args.install_prefix)
 
     # Our source_dir is expected to be './$SOURCE_ROOT/benchmarks'. That is due
     # the assumption that each product is in its own build directory. This
