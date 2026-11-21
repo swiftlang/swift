@@ -39,6 +39,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/ParameterList.h"
@@ -1595,16 +1597,82 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
-                                                FuncDecl *fn,
-                                                CanType fromCollection,
-                                                CanType toCollection,
-                                                ManagedValue mv,
-                                                SGFContext C) {
-  SmallVector<Type, 4> replacementTypes;
+static bool elementConversionNeedsThunk(CanType fromType, CanType toType);
+static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               CanType fromType,
+                                               CanType toType);
 
+RValue SILGenFunction::emitCollectionConversion(
+    SILLocation loc, CanType fromCollection, CanType toCollection,
+    ManagedValue mv, CollectionCastKind castKind, SGFContext C) {
   auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
   auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
+
+  FuncDecl *fn = nullptr;
+  ManagedValue keyConversion;
+  ManagedValue valueConversion;
+
+  bool isArray = fromCollection->isArray();
+  bool isDictionary = fromCollection->isDictionary();
+  bool isSet = fromCollection->isSet();
+  assert((isArray || isDictionary || isSet) &&
+         "unsupported collection type");
+
+  switch (castKind) {
+  case CollectionCastKind::Upcast: {
+    // Determine element types and whether thunks are needed.
+    if (isArray) {
+      CanType fromElem = fromArgs[0]->getCanonicalType();
+      CanType toElem = toArgs[0]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromElem, toElem)) {
+        fn = SGM.getArrayWitnessCast(loc);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromElem, toElem);
+      } else {
+        fn = SGM.getArrayForceCast(loc);
+      }
+    } else if (isDictionary) {
+      CanType fromKey = fromArgs[0]->getCanonicalType();
+      CanType toKey = toArgs[0]->getCanonicalType();
+      CanType fromVal = fromArgs[1]->getCanonicalType();
+      CanType toVal = toArgs[1]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromKey, toKey) ||
+          elementConversionNeedsThunk(fromVal, toVal)) {
+        fn = SGM.getDictionaryWitnessCast(loc);
+        keyConversion = createValueConversionThunk(*this, loc, fromKey, toKey);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromVal, toVal);
+      } else {
+        fn = SGM.getDictionaryUpCast(loc);
+      }
+    } else {
+      CanType fromElem = fromArgs[0]->getCanonicalType();
+      CanType toElem = toArgs[0]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromElem, toElem)) {
+        fn = SGM.getSetWitnessCast(loc);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromElem, toElem);
+      } else {
+        fn = SGM.getSetUpCast(loc);
+      }
+    }
+    break;
+  }
+  case CollectionCastKind::ForceDowncast:
+    if (isArray) fn = SGM.getArrayForceCast(loc);
+    else if (isDictionary) fn = SGM.getDictionaryDownCast(loc);
+    else fn = SGM.getSetDownCast(loc);
+    break;
+  case CollectionCastKind::ConditionalDowncast:
+    if (isArray) fn = SGM.getArrayConditionalCast(loc);
+    else if (isDictionary) fn = SGM.getDictionaryDownCastConditional(loc);
+    else fn = SGM.getSetDownCastConditional(loc);
+    break;
+  }
+
+  // Build substitution map.
+  SmallVector<Type, 4> replacementTypes;
   replacementTypes.insert(replacementTypes.end(),
                           fromArgs.begin(), fromArgs.end());
   replacementTypes.insert(replacementTypes.end(),
@@ -1615,36 +1683,321 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
   auto subMap =
     SubstitutionMap::get(genericSig, replacementTypes,
                          LookUpConformanceInModule());
-  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
+
+  SmallVector<ManagedValue, 3> args = { mv };
+  unsigned argIndex = 1;
+  for (ManagedValue thunk : {keyConversion, valueConversion}) {
+    if (!thunk)
+      continue;
+
+    CanType origParamType = fn->getParameters()
+                                ->get(argIndex)
+                                ->getInterfaceType()
+                                ->getCanonicalType();
+    CanType substParamType = origParamType.subst(subMap)->getCanonicalType();
+
+    // Reabstract the thunk to the stdlib function's expected abstraction
+    // pattern.
+    AbstractionPattern origParam(
+        fn->getGenericSignature().getCanonicalSignature(), origParamType);
+
+    auto value = emitSubstToOrigValue(loc, thunk, origParam, substParamType);
+    args.push_back(value);
+    argIndex++;
+  }
+
+  return emitApplyOfLibraryIntrinsic(loc, fn, subMap, args, C);
+}
+
+/// Check whether the conversion between two types involves a function type
+/// change at any nesting level that swift_dynamicCast cannot handle.
+static bool elementConversionNeedsThunk(CanType fromType, CanType toType) {
+  if (fromType == toType)
+    return false;
+
+  // Function type conversions cannot be performed by the runtime.
+  if (isa<AnyFunctionType>(fromType) && isa<AnyFunctionType>(toType))
+    return true;
+
+  // Check tuple elements.
+  if (auto fromTuple = dyn_cast<TupleType>(fromType)) {
+    if (auto toTuple = dyn_cast<TupleType>(toType)) {
+      for (unsigned i = 0, n = fromTuple->getNumElements(); i != n; ++i) {
+        if (elementConversionNeedsThunk(
+                fromTuple.getElementType(i),
+                toTuple.getElementType(i)))
+          return true;
+      }
+      return false;
+    }
+  }
+
+  // Check optional wrapped type.
+  if (auto fromObj = fromType.getOptionalObjectType()) {
+    if (auto toObj = toType.getOptionalObjectType())
+      return elementConversionNeedsThunk(fromObj, toObj);
+  }
+
+  // Check nested collection element types.
+  if (auto fromNom = dyn_cast<NominalType>(fromType)) {
+    if (auto toNom = dyn_cast<NominalType>(toType)) {
+      if (fromNom->getDecl() == toNom->getDecl()) {
+        auto fromArgs = fromNom->getGenericArgs();
+        auto toArgs = toNom->getGenericArgs();
+        for (unsigned i = 0, n = fromArgs.size(); i != n; ++i) {
+          if (elementConversionNeedsThunk(
+                  fromArgs[i]->getCanonicalType(),
+                  toArgs[i]->getCanonicalType()))
+            return true;
+        }
+        return false;
+      }
+    }
+  }
+
+  return false;
+}
+
+static ManagedValue convertFunctionRepresentation(SILGenFunction &SGF,
+                                                  SILLocation loc,
+                                                  ManagedValue source,
+                                            CanAnyFunctionType sourceFormalTy,
+                                            CanAnyFunctionType resultFormalTy);
+
+/// Build the body of a value conversion thunk that converts a value of
+/// fromType to toType using emitTransformedValue.
+static void buildValueConversionThunkBody(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          CanType fromType,
+                                          CanType toType) {
+  FullExpr scope(SGF.Cleanups, CleanupLocation(loc));
+
+  SmallVector<ManagedValue, 1> params;
+  SmallVector<ManagedValue, 1> indirectResults;
+  SGF.collectThunkParams(loc, params, &indirectResults);
+
+  ManagedValue input = params[0];
+
+  ManagedValue output;
+  auto fromFnType = dyn_cast<AnyFunctionType>(fromType);
+  auto toFnType = dyn_cast<AnyFunctionType>(toType);
+
+  if (fromFnType && toFnType &&
+      fromFnType->getRepresentation() != toFnType->getRepresentation()) {
+    // Cross-representation function conversion: decompose into signature
+    // change + representation bridge, mirroring visitFunctionConversionExpr.
+    switch (fromFnType->getRepresentation()) {
+    case AnyFunctionType::Representation::Swift:
+    case AnyFunctionType::Representation::Thin: {
+      // Native source: adjust signature first, then bridge representation.
+      auto adjustedDestType = Lowering::adjustFunctionType(
+          toFnType, fromFnType->getRepresentation(),
+          fromFnType->getClangTypeInfo());
+      if (fromFnType != adjustedDestType)
+        input = SGF.emitTransformedValue(loc, input, fromType,
+                                         adjustedDestType);
+      output = convertFunctionRepresentation(SGF, loc, input,
+                                             adjustedDestType, toFnType);
+      break;
+    }
+    case AnyFunctionType::Representation::Block:
+    case AnyFunctionType::Representation::CFunctionPointer: {
+      // Foreign source: bridge representation first, then adjust signature.
+      auto adjustedSrcType = Lowering::adjustFunctionType(
+          fromFnType, toFnType->getRepresentation(),
+          toFnType->getClangTypeInfo());
+      if (fromFnType != adjustedSrcType)
+        input = convertFunctionRepresentation(SGF, loc, input,
+                                              fromFnType, adjustedSrcType);
+      output = SGF.emitTransformedValue(loc, input, adjustedSrcType, toType);
+      break;
+    }
+    }
+  } else {
+    output = SGF.emitTransformedValue(loc, input, fromType, toType);
+  }
+
+  if (!indirectResults.empty()) {
+    output.forwardInto(SGF, loc, indirectResults[0].getLValueAddress());
+    scope.pop();
+    SGF.B.createReturn(loc, SGF.emitEmptyTuple(loc));
+  } else {
+    SILValue result = output.forward(SGF);
+    scope.pop();
+    SGF.B.createReturn(loc, result);
+  }
+}
+
+/// Create a SIL thunk that converts a value of fromType to toType and
+/// return a ManagedValue for a thick function reference to it.
+static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               CanType fromType,
+                                               CanType toType) {
+  auto &SGM = SGF.SGM;
+  auto &ctx = SGF.getASTContext();
+
+  auto loweredFromTy = SGF.getLoweredType(fromType);
+  auto loweredToTy = SGF.getLoweredType(toType);
+
+  // Build parameter info. Use owned convention because the thunk body
+  // may consume the input (e.g., when creating a function conversion thunk).
+  auto paramConvention = loweredFromTy.isAddressOnly(SGF.F)
+    ? ParameterConvention::Indirect_In
+    : ParameterConvention::Direct_Owned;
+  SILParameterInfo param(loweredFromTy.getASTType(), paramConvention);
+
+  // Build result info.
+  SmallVector<SILResultInfo, 1> results;
+  auto resultConvention = loweredToTy.isAddressOnly(SGF.F)
+    ? ResultConvention::Indirect
+    : ResultConvention::Owned;
+  results.push_back({loweredToTy.getASTType(), resultConvention});
+
+  // Build the thin noescape function type for the thunk.
+  auto extInfo = SILFunctionType::ExtInfo::getThin();
+
+  // Handle generic signature if types involve archetypes.
+  CanGenericSignature genericSig;
+  GenericEnvironment *genericEnv = nullptr;
+  SubstitutionMap interfaceSubs;
+  CanType manglingFromType = fromType;
+  CanType manglingToType = toType;
+
+  bool hasArchetypes = fromType->hasArchetype() || toType->hasArchetype();
+  if (hasArchetypes) {
+    SmallVector<GenericEnvironment *, 2> capturedEnvs;
+    auto collectLocalArchetypes = [&](CanType t) {
+      if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+        auto *env = local->getGenericEnvironment();
+        if (std::find(capturedEnvs.begin(), capturedEnvs.end(), env)
+              == capturedEnvs.end())
+          capturedEnvs.push_back(env);
+      }
+    };
+    fromType.visit(collectLocalArchetypes);
+    toType.visit(collectLocalArchetypes);
+
+    auto baseGenericSig = SGF.F.getLoweredFunctionType()
+        ->getInvocationGenericSignature();
+
+    if (capturedEnvs.empty()) {
+      genericSig = baseGenericSig;
+      genericEnv = SGF.F.getGenericEnvironment();
+      interfaceSubs = SGF.F.getForwardingSubstitutionMap();
+    } else {
+      genericSig = buildGenericSignatureWithCapturedEnvironments(
+          ctx, baseGenericSig, capturedEnvs).getCanonicalSignature();
+      genericEnv = genericSig.getGenericEnvironment();
+      interfaceSubs = buildSubstitutionMapWithCapturedEnvironments(
+          SGF.F.getForwardingSubstitutionMap(), genericSig, capturedEnvs);
+    }
+
+    auto mapToInterface = [&](CanType t) -> CanType {
+      auto mapped = mapLocalArchetypesOutOfContext(
+          t, baseGenericSig, capturedEnvs);
+      if (mapped->hasArchetype())
+        mapped = mapped->mapTypeOutOfEnvironment();
+      return mapped->getCanonicalType();
+    };
+    manglingFromType = mapToInterface(fromType);
+    manglingToType = mapToInterface(toType);
+
+    auto interfaceFromTy = SGF.getLoweredType(
+        AbstractionPattern(genericSig, manglingFromType), fromType);
+    auto interfaceToTy = SGF.getLoweredType(
+        AbstractionPattern(genericSig, manglingToType), toType);
+
+    auto interfaceFromLowered =
+        SGF.SGM.Types
+            .getLoweredType(AbstractionPattern(genericSig, manglingFromType),
+                            manglingFromType, TypeExpansionContext::minimal())
+            .getASTType();
+    auto interfaceToLowered =
+        SGF.SGM.Types
+            .getLoweredType(AbstractionPattern(genericSig, manglingToType),
+                            manglingToType, TypeExpansionContext::minimal())
+            .getASTType();
+
+    param = {interfaceFromLowered,
+             interfaceFromTy.isAddressOnly(SGF.F)
+                 ? ParameterConvention::Indirect_In
+                 : ParameterConvention::Direct_Owned};
+    auto resConv = interfaceToTy.isAddressOnly(SGF.F)
+        ? ResultConvention::Indirect
+        : ResultConvention::Owned;
+    results.clear();
+    results.push_back({interfaceToLowered, resConv});
+  }
+
+  auto thunkType = SILFunctionType::get(
+      genericSig, extInfo, SILCoroutineKind::None,
+      ParameterConvention::Direct_Unowned, {param}, /*yields*/ {},
+      results, /*errorResult*/ std::nullopt,
+      SubstitutionMap(), SubstitutionMap(), ctx);
+
+  SILFunction *thunk = SGM.getOrCreateConversionThunk(
+      thunkType, manglingFromType, manglingToType);
+
+  // Fill the body if it's newly created.
+  if (thunk->empty()) {
+    if (genericEnv)
+      thunk->setGenericEnvironment(genericEnv);
+
+    // Map types into the thunk's generic environment so that opened
+    // existential archetypes from the outer scope become archetypes of
+    // the thunk's own generic environment.
+    CanType thunkFromType = fromType;
+    CanType thunkToType = toType;
+    if (genericEnv) {
+      thunkFromType = genericEnv->mapTypeIntoEnvironment(manglingFromType)
+                          ->getCanonicalType();
+      thunkToType = genericEnv->mapTypeIntoEnvironment(manglingToType)
+                        ->getCanonicalType();
+    }
+
+    SILGenFunction thunkSGF(SGM, *thunk, SGF.FunctionDC);
+    auto thunkLoc = RegularLocation::getAutoGeneratedLocation();
+    buildValueConversionThunkBody(thunkSGF, thunkLoc, thunkFromType,
+                                  thunkToType);
+    SGM.emitLazyConformancesForFunction(thunk);
+  }
+
+  // Create a reference to the thunk.
+  auto thunkRef = SGF.B.createFunctionRef(loc, thunk);
+
+  if (hasArchetypes) {
+    // For generic thunks, partial_apply to capture type metadata.
+    return SGF.B.createPartialApply(
+        loc, thunkRef, interfaceSubs, ArrayRef<ManagedValue>{},
+        ParameterConvention::Direct_Guaranteed);
+  }
+
+  // For non-generic thunks, thin_to_thick_function to get a thick escaping
+  // function, then convert_escape_to_noescape.
+  auto escapingThickType = thunkType->getWithExtInfo(
+      thunkType->getExtInfo()
+          .withRepresentation(SILFunctionTypeRepresentation::Thick));
+  auto thickRef = SGF.B.createThinToThickFunction(
+      loc, thunkRef, SILType::getPrimitiveObjectType(escapingThickType));
+  auto escapingMV = SGF.emitManagedRValueWithCleanup(thickRef);
+
+  auto noescapeType = escapingThickType->getWithExtInfo(
+      escapingThickType->getExtInfo().withNoEscape());
+  return SGF.B.createConvertEscapeToNoEscape(
+      loc, escapingMV, SILType::getPrimitiveObjectType(noescapeType));
 }
 
 RValue RValueEmitter::
 visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                     SGFContext C) {
-  
   SILLocation loc = RegularLocation(E);
-  
-  // Get the sub expression argument as a managed value
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  
-  // Compute substitutions for the intrinsic call.
   auto fromCollection = E->getSubExpr()->getType()->getCanonicalType();
   auto toCollection = E->getType()->getCanonicalType();
-
-  // Get the intrinsic function.
-  FuncDecl *fn = nullptr;
-  if (fromCollection->isArray()) {
-    fn = SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->isDictionary()) {
-    fn = SGF.SGM.getDictionaryUpCast(loc);
-  } else if (fromCollection->isSet()) {
-    fn = SGF.SGM.getSetUpCast(loc);
-  } else {
-    llvm_unreachable("unsupported collection upcast kind");
-  }
-
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      mv, C);
+  return SGF.emitCollectionConversion(
+      loc, fromCollection, toCollection, mv,
+      SILGenFunction::CollectionCastKind::Upcast, C);
 }
 
 RValue
