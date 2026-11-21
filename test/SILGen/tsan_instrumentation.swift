@@ -115,3 +115,31 @@ func testInstrumentNonEmptyStruct() {
 // CHECK-LLVM-IR: tsan_external_write
   s.mutate()
 }
+
+// Regression test for https://github.com/swiftlang/swift/issues/83309.
+// Projecting a stored property from a borrowed value can produce an object
+// rather than an address. Only instrument the address of the pointee.
+struct NoncopyablePointerWrapper: ~Copyable {
+  let underlying: UnsafeMutablePointer<NoncopyablePointee>
+
+  // CHECK-LABEL: sil hidden [ossa] {{.*}}NoncopyablePointerWrapperV6mutate
+  // CHECK: struct_extract {{%.*}} : $NoncopyablePointerWrapper, #NoncopyablePointerWrapper.underlying
+  // CHECK-NOT: builtin "tsanInoutAccess"
+  // CHECK: [[POINTEE:%.*]] = pointer_to_address {{%.*}} : $Builtin.RawPointer to [strict] $*NoncopyablePointee
+  // CHECK: [[DEPENDENT:%.*]] = mark_dependence [unresolved] [[POINTEE]] : $*NoncopyablePointee
+  // CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[DEPENDENT]] : $*NoncopyablePointee
+  // CHECK: [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ACCESS]] : $*NoncopyablePointee
+  // CHECK: builtin "tsanInoutAccess"([[MARKED]] : $*NoncopyablePointee)
+  // CHECK: function_ref {{.*}}NoncopyablePointeeV6mutate
+  func mutate() throws {
+    underlying.pointee.mutate()
+  }
+}
+
+struct NoncopyablePointee: ~Copyable {
+  var value: Int
+
+  mutating func mutate() {
+    value += 1
+  }
+}
