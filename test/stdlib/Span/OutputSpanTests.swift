@@ -80,6 +80,32 @@ suite.test("Create OutputSpan")
   expectEqual(initialized, 0)
 }
 
+suite.test("init with invalid initializedCount")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { b.deallocate() }
+
+  expectCrashLater(
+    withDebugMessage: "OutputSpan count is invalid or greater than capacity"
+  )
+  _ = unsafe OutputSpan(buffer: b, initializedCount: -1)
+}
+
+suite.test("init with invalid buffer")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  // cause an internal initializer to return an invalid UMBP
+  let invalid = UnsafeMutableBufferPointer<Int>(_uncheckedStart: nil, count: 1)
+
+  expectCrashLater()
+  _ = unsafe OutputSpan(buffer: invalid, initializedCount: 0)
+}
+
 suite.test("deinit without relinquishing memory")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
@@ -287,21 +313,56 @@ suite.test("InlineArray initialization throws")
 suite.test("OutputSpan.withUnsafeMutableBufferPointer")
 .require(.stdlib_6_2).code {
   let c = 10
-  var a = Allocation(of: c, [Int].self)
+  var a = Allocation(of: c, LifetimeTracked.self)
   a.initialize {
-    $0.withUnsafeMutableBufferPointer {
+    let result = unsafe $0.withUnsafeMutableBufferPointer {
       expectEqual($0.count, c)
-      for i in $0.indices {
-        $0.initializeElement(at: i, to: .init(repeating: i, count: i))
+      expectEqual($1, 0)
+      for i in 0..<c - 1 {
+        $0.initializeElement(at: i, to: LifetimeTracked(i))
         $1 += 1
       }
+      return "initialized \($1)"
     }
+    expectEqual(result, "initialized \(c - 1)")
+    expectEqual($0.count, c - 1)
+    expectEqual(LifetimeTracked.instances, c - 1)
+
+    do throws(MyTestError) {
+      try unsafe $0.withUnsafeMutableBufferPointer {
+        (buffer, count) throws(MyTestError) -> Void in
+        buffer.initializeElement(at: count, to: LifetimeTracked(-1))
+        count += 1
+        throw MyTestError.error
+      }
+      expectUnreachable("withUnsafeMutableBufferPointer should have thrown")
+    } catch {
+      expectEqual(error, MyTestError.error)
+    }
+    expectEqual($0.count, c)
+    expectEqual(LifetimeTracked.instances, c)
   }
   a.withSpan {
     expectEqual($0.count, c)
-    for i in $0.indices {
-      expectEqual($0[i], Array(repeating: i, count: i))
+    for i in 0..<c - 1 {
+      expectEqual($0[i].value, i)
     }
+    expectEqual($0[c - 1].value, -1)
+  }
+  _ = consume a
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("OutputSpan.withUnsafeMutableBufferPointer capacity overflow")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { b.deallocate() }
+
+  var span = OutputSpan(buffer: b, initializedCount: 0)
+  expectCrashLater(withDebugMessage: "OutputSpan capacity overflow")
+  unsafe span.withUnsafeMutableBufferPointer { buffer, count in
+    count = buffer.count + 1
   }
 }
 
@@ -633,4 +694,224 @@ suite.test("ContiguousArray.append underflow")
     $0.removeAll()
   }
   expectUnreachable("ContiguousArray.append should have trapped.")
+}
+
+private struct NCTracked: ~Copyable {
+  let tracked: LifetimeTracked
+  init(_ value: Int) { tracked = LifetimeTracked(value) }
+  var value: Int { tracked.value }
+}
+
+suite.test("OutputSpan.consumeAll()")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  do {
+    var input = output.consumeAll()
+    expectEqual(input.count, 5)
+    expectEqual(input.capacity, 5)
+    expectTrue(input.isFull)
+    expectEqual(input.removeFirst().value, 0)
+    expectEqual(input.removeFirst().value, 1)
+    expectEqual(input[0].value, 2)
+    expectEqual(LifetimeTracked.instances, 3)
+    _ = consume input
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
+
+suite.test("OutputSpan.consumeAll() on an empty span")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var nothing = OutputSpan<Int>()
+  do {
+    let input = nothing.consumeAll()
+    expectTrue(input.isEmpty)
+    expectEqual(input.capacity, 0)
+  }
+
+  let buffer = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { buffer.deallocate() }
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  do {
+    let input = output.consumeAll()
+    expectTrue(input.isEmpty)
+    expectEqual(input.capacity, 0)
+  }
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  var calls = 0
+  let remaining = output.consumeAll {
+    (input: consuming InputSpan<NCTracked>) -> [Int] in
+    calls += 1
+    expectEqual(input.count, 5)
+    expectEqual(input.capacity, 5)
+    expectEqual(input.removeFirst().value, 0)
+    expectEqual(input.removeFirst().value, 1)
+    expectEqual(input[0].value, 2)
+    expectEqual(LifetimeTracked.instances, 3)
+    var values: [Int] = []
+    for i in input.indices {
+      values.append(input[i].value)
+    }
+    return values
+  }
+  expectEqual(calls, 1)
+  expectEqual(remaining, [2, 3, 4])
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:) returning a noncopyable value")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  let first = output.consumeAll {
+    (input: consuming InputSpan<NCTracked>) -> NCTracked in
+    input.removeFirst()
+  }
+  expectEqual(first.value, 0)
+  expectEqual(LifetimeTracked.instances, 1)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+  _ = consume first
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("OutputSpan.consumeAll(consumingWith:) throwing")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<5 {
+    output.append(NCTracked(i))
+  }
+
+  do throws(MyTestError) {
+    try output.consumeAll {
+      (input: consuming InputSpan<NCTracked>) throws(MyTestError) in
+      expectEqual(input.removeFirst().value, 0)
+      expectEqual(LifetimeTracked.instances, 4)
+      throw MyTestError.error
+    }
+    expectUnreachable("consumeAll should have thrown")
+  } catch {
+    expectEqual(error, MyTestError.error)
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+}
+
+suite.test("OutputSpan.consumeSuffix(maxCount:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<6 {
+    output.append(NCTracked(i))
+  }
+
+  do {
+    var suffix = output.consumeSuffix(maxCount: 3)
+    expectEqual(suffix.count, 3)
+    expectEqual(suffix.capacity, 3)
+    expectEqual(suffix.removeFirst().value, 3)
+    expectEqual(suffix[0].value, 4)
+    expectEqual(LifetimeTracked.instances, 5)
+  }
+  expectEqual(LifetimeTracked.instances, 3)
+  expectEqual(output.count, 3)
+  expectEqual(output[0].value, 0)
+  expectEqual(output[2].value, 2)
+
+  do {
+    let rest = output.consumeSuffix(maxCount: .max)
+    expectEqual(rest.count, 3)
+    expectEqual(rest[0].value, 0)
+  }
+  expectTrue(output.isEmpty)
+  expectEqual(output.freeCapacity, 8)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  var empty = OutputSpan<Int>()
+  let none = empty.consumeSuffix(maxCount: 4)
+  expectEqual(none.count, 0)
+}
+
+suite.test("OutputSpan.consumeSuffix(maxCount:) negative count")
+.require(.crashTesting)
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var output = OutputSpan<Int>()
+  expectCrashLater(withDebugMessage: "Can't consume a negative number")
+  _ = output.consumeSuffix(maxCount: -1)
+}
+
+suite.test("OutputSpan.consumeSuffix(maxCount:consumingWith:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let buffer = UnsafeMutableBufferPointer<NCTracked>.allocate(capacity: 8)
+  defer { buffer.deallocate() }
+
+  var output = OutputSpan(buffer: buffer, initializedCount: 0)
+  for i in 0..<6 {
+    output.append(NCTracked(i))
+  }
+
+  var calls = 0
+  let first = output.consumeSuffix(maxCount: 4) {
+    (input: consuming InputSpan<NCTracked>) -> NCTracked in
+    calls += 1
+    expectEqual(input.count, 4)
+    expectEqual(input[0].value, 2)
+    return input.removeFirst()
+  }
+  expectEqual(calls, 1)
+  expectEqual(first.value, 2)
+  expectEqual(LifetimeTracked.instances, 3)
+  expectEqual(output.count, 2)
+  _ = consume first
+  output.removeAll()
+  expectEqual(LifetimeTracked.instances, 0)
 }

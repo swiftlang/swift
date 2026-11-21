@@ -493,3 +493,121 @@ suite.test("OutputRawSpan Sendability")
 .require(.stdlib_6_2).code {
   send(OutputRawSpan())
 }
+
+suite.test("OutputRawSpan.consumeSuffix(maxByteCount:)")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    for i in 0..<UInt8(6) {
+      $0.append(i)
+    }
+    do {
+      var suffix = $0.consumeSuffix(maxByteCount: 3)
+      expectEqual(suffix.byteCount, 3)
+      expectEqual(suffix.capacity, 3)
+      // the bytes keep their order
+      expectEqual(suffix[0], 3)
+      expectEqual(suffix[2], 5)
+    }
+    expectEqual($0.byteCount, 3)
+    expectEqual($0[0], 0)
+    expectEqual($0[2], 2)
+
+    // `maxByteCount` exceeds `byteCount`: everything is consumed
+    do {
+      let rest = $0.consumeSuffix(maxByteCount: .max)
+      expectEqual(rest.byteCount, 3)
+      expectEqual(rest[0], 0)
+    }
+    expectTrue($0.isEmpty)
+    expectEqual($0.freeCapacity, 16)
+  }
+
+  // a span that doesn't reference any memory
+  var nothing = OutputRawSpan()
+  let none = nothing.consumeSuffix(maxByteCount: 4)
+  expectEqual(none.byteCount, 0)
+}
+
+suite.test("OutputRawSpan.consumeSuffix(maxByteCount:) negative count")
+.require(.crashTesting)
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var output = OutputRawSpan()
+  expectCrashLater(withDebugMessage: "Can't consume a negative number")
+  _ = output.consumeSuffix(maxByteCount: -1)
+}
+
+suite.test("OutputRawSpan.consumeSuffix(maxByteCount:consumingWith:) throwing")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    for i in 0..<UInt8(6) {
+      $0.append(i)
+    }
+    do throws(MyTestError) {
+      try $0.consumeSuffix(maxByteCount: 4) {
+        (input: consuming InputRawSpan) throws(MyTestError) in
+        expectEqual(input.byteCount, 4)
+        expectEqual(input[0], 2)
+        throw MyTestError.error
+      }
+      expectUnreachable("consumeSuffix should have thrown")
+    } catch {
+      expectEqual(error, MyTestError.error)
+    }
+    // the prefix is untouched
+    expectEqual($0.byteCount, 2)
+    expectEqual($0[1], 1)
+  }
+}
+
+suite.test("OutputRawSpan.consumeAll")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    for i in 0..<UInt8(5) {
+      $0.append(i)
+    }
+    do {
+      let input = $0.consumeAll()
+      expectEqual(input.byteCount, 5)
+      expectEqual(input.capacity, 5)
+    }
+    expectTrue($0.isEmpty)
+
+    for i in 0..<UInt8(4) {
+      $0.append(i)
+    }
+    let count = $0.consumeAll {
+      (input: consuming InputRawSpan) -> Int in
+      expectEqual(input.byteCount, 4)
+      return input.byteCount
+    }
+    expectEqual(count, 4)
+    expectTrue($0.isEmpty)
+  }
+}
+
+suite.test("OutputRawSpan.popLast()")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  var a = Allocation(byteCount: 16)
+  a.initialize {
+    expectNil($0.popLast())
+    $0.append(1)
+    $0.append(2)
+    expectEqual($0.popLast(), 2)
+    expectEqual($0.byteCount, 1)
+    expectEqual($0.popLast(), 1)
+    expectNil($0.popLast())
+  }
+}

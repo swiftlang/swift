@@ -189,6 +189,8 @@ split_embedded_sources(
   EMBEDDED SliceBuffer.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
+  EMBEDDED Span/InputRawSpan.swift
+  EMBEDDED Span/InputSpan.swift
   EMBEDDED Span/MutableRawSpan.swift
   EMBEDDED Span/MutableSpan.swift
   EMBEDDED Span/OutputRawSpan.swift

@@ -124,3 +124,44 @@ extension _RigidArray where Element: ~Copyable {
     return removeLast()
   }
 }
+
+@available(SwiftStdlib 6.5, *)
+extension _RigidArray where Element: ~Copyable {
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of the array.
+  ///
+  /// The `InputSpan` returned by this function represents a mutation of the
+  /// array, and the array cannot be used until the `InputSpan` is consumed or
+  /// destroyed. When it goes out of scope, any elements it still holds are
+  /// deinitialized.
+  ///
+  /// The returned input span has a `capacity` equal to the number of elements
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
+  ///     all elements are consumed.
+  /// - Returns: An `InputSpan` containing the consumed elements, in their
+  ///     original order.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  internal mutating func consumeSuffix(
+    maxCount n: Int
+  ) -> InputSpan<Element> {
+    _precondition(
+      n >= 0, "Can't consume a negative number of elements"
+    )
+    let c = Swift.min(n, _count)
+    let buffer = unsafe _storage.extracting(
+      Range(uncheckedBounds: (_count &- c, _count))
+    )
+    let result = unsafe InputSpan<Element>(
+      _uncheckedBuffer: buffer, initializedCount: c
+    )
+    _count &-= c
+    return unsafe _overrideLifetime(result, mutating: &self)
+  }
+}

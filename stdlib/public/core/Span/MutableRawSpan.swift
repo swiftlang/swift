@@ -1341,8 +1341,99 @@ extension MutableRawSpan {
 }
 
 #if !SPAN_COMPATIBILITY_STUB
+extension MutableRawSpan {
+  /// Overwrites every byte of this span by moving the bytes
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameter source: The bytes to move into this span.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  @_lifetime(source: copy source)
+  public mutating func updateAll(moving source: inout InputRawSpan) {
+    _precondition(
+      source.byteCount == byteCount,
+      "Source byte count doesn't match target byte count"
+    )
+    guard byteCount > 0 else { return }
+    unsafe _start().copyMemory(from: source._front(), byteCount: byteCount)
+    source.removeAll()
+  }
+
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to move into `subrange`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  @_lifetime(source: copy source)
+  public mutating func updateSubrange(
+    _ subrange: Range<Int>, moving source: inout InputRawSpan
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(moving: &source)
+  }
+
+  /// Overwrites the bytes within a range of offsets by moving
+  /// the bytes from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of offsets. Every offset in this range
+  ///      must be within the bounds of this `MutableRawSpan`.
+  ///   - source: The bytes to move into `subrange`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  @_lifetime(source: copy source)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Int>,
+    moving source: inout InputRawSpan
+  ) {
+    updateSubrange(subrange.relative(to: byteOffsets), moving: &source)
+  }
+
+  /// Overwrites every byte of this span by moving the bytes
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized bytes as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every offset of this span.
+  ///   - source: The bytes to move into this span.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  @_lifetime(source: copy source)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout InputRawSpan
+  ) {
+    updateAll(moving: &source)
+  }
+}
+
 @available(SwiftStdlib 6.4, *)
 extension MutableRawSpan: Iterable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<UInt8>.BorrowingIterator
+
   @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
