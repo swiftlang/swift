@@ -25,6 +25,7 @@ function(includeSwiftSyntax)
   set(SWIFT_MODULE_ABI_NAME_PREFIX "_Compiler")
   set(SWIFTSYNTAX_TARGET_NAMESPACE "_Compiler")
   set(SWIFTSYNTAX_EMIT_MODULE OFF)
+  set(SWIFTSYNTAX_NO_STRUCTURE_REFLECTION ON)
 
   file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
   FetchContent_Declare(CompilerSwiftSyntax SOURCE_DIR "${swift_syntax_path}")
