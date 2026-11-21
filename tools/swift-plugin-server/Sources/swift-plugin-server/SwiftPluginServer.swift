@@ -14,12 +14,18 @@
 @_spi(PluginMessage) import SwiftLibraryPluginProvider
 
 @main
-final class SwiftPluginServer {
+enum SwiftPluginServer {
   static func main() throws {
     let connection = try StandardIOMessageConnection()
+    let libraryHandler = PluginProviderMessageHandler(provider: LibraryPluginProvider.shared)
+    #if SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
+    let messageHandler = WasmInterceptingMessageHandler(base: libraryHandler)
+    #else
+    let messageHandler = libraryHandler
+    #endif
     let listener = CompilerPluginMessageListener(
       connection: connection,
-      provider: LibraryPluginProvider.shared
+      messageHandler: messageHandler
     )
     try listener.main()
   }
