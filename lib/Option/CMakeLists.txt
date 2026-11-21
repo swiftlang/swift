@@ -1,6 +1,7 @@
 add_swift_host_library(swiftOption STATIC
   Options.cpp
-  SanitizerOptions.cpp)
+  SanitizerOptions.cpp
+  SerializedDiagnosticsOptions.cpp)
 add_dependencies(swiftOption
   SwiftOptions)
 target_link_libraries(swiftOption PRIVATE

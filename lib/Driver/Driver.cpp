@@ -21,6 +21,7 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -35,6 +36,7 @@
 #include "swift/Driver/ToolChain.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Option/SerializedDiagnosticsOptions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/APInt.h"
@@ -381,6 +383,14 @@ static void validateLinkArgs(DiagnosticEngine &diags, const ArgList &args) {
   }
 }
 
+static void validateSerializedDiagnosticsArgs(DiagnosticEngine &diags,
+                                              const ArgList &args) {
+  diagnosticsSerializationFormat(args, [&](const Arg &A) {
+    diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
+                   A.getOption().getPrefixedName(), A.getValue());
+  });
+}
+
 /// Perform miscellaneous early validation of arguments.
 static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
                          const llvm::Triple &T) {
@@ -393,6 +403,7 @@ static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
   validateLinkArgs(diags, args);
+  validateSerializedDiagnosticsArgs(diags, args);
 }
 
 std::unique_ptr<ToolChain>
@@ -2436,8 +2447,27 @@ static void addAuxiliaryOutput(
   output.setAdditionalOutputForType(outputType, path);
 }
 
+/// The file type diagnostics are serialized to, or \c std::nullopt if they
+/// are not serialized.
+static std::optional<file_types::ID>
+serializedDiagnosticsType(const llvm::opt::ArgList &Args,
+                          const DiagnosticEngine &Diags) {
+  // An invalid format is ignored, as if the argument were absent. In normal
+  // runs validateArgs has already diagnosed it; when errors are allowed we
+  // can get here with one and continue.
+  auto format = diagnosticsSerializationFormat(Args, [&](const Arg &) {
+    ASSERT(Diags.hadAnyError() &&
+           "an unknown -serialize-diagnostics= format must have been "
+           "diagnosed by validateArgs");
+  });
+  if (!format)
+    return std::nullopt;
+  return DiagnosticOptions::fileTypeForSerializedFormat(*format);
+}
+
 static void addDiagFileOutputForPersistentPCHAction(
-    Compilation &C, const GeneratePCHJobAction *JA, CommandOutput &output,
+    Compilation &C, const GeneratePCHJobAction *JA,
+    file_types::ID diagnosticsType, CommandOutput &output,
     const TypeToPathMap *outputMap, StringRef workingDirectory) {
   assert(JA->isPersistentPCH());
 
@@ -2450,8 +2480,7 @@ static void addDiagFileOutputForPersistentPCHAction(
   StringRef pchOutDir = JA->getPersistentPCHDir();
   StringRef headerPath = output.getBaseInput(JA->getInputIndex());
   StringRef stem = llvm::sys::path::stem(headerPath);
-  StringRef suffix =
-      file_types::getExtension(file_types::TY_SerializedDiagnostics);
+  StringRef suffix = file_types::getExtension(diagnosticsType);
   SmallString<256> outPathBuf;
 
   if (const Arg *A = C.getArgs().getLastArg(options::OPT_emit_module_path)) {
@@ -2481,8 +2510,8 @@ static void addDiagFileOutputForPersistentPCHAction(
   }
 
   if (!outPathBuf.empty()) {
-    addAuxiliaryOutput(C, output, file_types::TY_SerializedDiagnostics,
-                       outputMap, workingDirectory, outPathBuf.str());
+    addAuxiliaryOutput(C, output, diagnosticsType, outputMap, workingDirectory,
+                       outPathBuf.str());
   }
 }
 
@@ -2597,9 +2626,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   if (isa<CompileJobAction>(JA) || isa<GeneratePCHJobAction>(JA)) {
     // Choose the serialized diagnostics output path.
-    if (C.getArgs().hasArg(options::OPT_serialize_diagnostics))
-      chooseSerializedDiagnosticsPath(C, JA, OutputMap, workingDirectory,
-                                      Output.get());
+    if (auto diagnosticsType =
+            serializedDiagnosticsType(C.getArgs(), C.getDiags()))
+      chooseSerializedDiagnosticsPath(C, JA, *diagnosticsType, OutputMap,
+                                      workingDirectory, Output.get());
   }
 
   if (isa<CompileJobAction>(JA)) {
@@ -2958,26 +2988,29 @@ void Driver::chooseModuleSummaryPath(Compilation &C,
 
 void Driver::chooseSerializedDiagnosticsPath(Compilation &C,
                                              const JobAction *JA,
+                                             file_types::ID diagnosticsType,
                                              const TypeToPathMap *OutputMap,
                                              StringRef workingDirectory,
                                              CommandOutput *Output) const {
-  if (C.getArgs().hasArg(options::OPT_serialize_diagnostics)) {
-    auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
-    if (pchJA && pchJA->isPersistentPCH()) {
-      addDiagFileOutputForPersistentPCHAction(C, pchJA, *Output, OutputMap,
-                                              workingDirectory);
-    } else {
-      addAuxiliaryOutput(C, *Output, file_types::TY_SerializedDiagnostics,
-                         OutputMap, workingDirectory);
-    }
+  ASSERT(serializedDiagnosticsType(C.getArgs(), C.getDiags()) ==
+             diagnosticsType &&
+         "this must only be called when diagnostics are serialized and "
+         "diagnosticsType must match the requested format");
 
-    // Remove any existing diagnostics files so that clients can detect their
-    // presence to determine if a command was run.
-    StringRef OutputPath =
-        Output->getAnyOutputForType(file_types::TY_SerializedDiagnostics);
-    if (llvm::sys::fs::is_regular_file(OutputPath))
-      llvm::sys::fs::remove(OutputPath);
+  auto pchJA = dyn_cast<GeneratePCHJobAction>(JA);
+  if (pchJA && pchJA->isPersistentPCH()) {
+    addDiagFileOutputForPersistentPCHAction(C, pchJA, diagnosticsType, *Output,
+                                            OutputMap, workingDirectory);
+  } else {
+    addAuxiliaryOutput(C, *Output, diagnosticsType, OutputMap,
+                       workingDirectory);
   }
+
+  // Remove any existing diagnostics files so that clients can detect their
+  // presence to determine if a command was run.
+  StringRef OutputPath = Output->getAnyOutputForType(diagnosticsType);
+  if (llvm::sys::fs::is_regular_file(OutputPath))
+    llvm::sys::fs::remove(OutputPath);
 }
 
 void Driver::chooseDependenciesOutputPaths(Compilation &C,

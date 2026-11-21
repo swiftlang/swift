@@ -13,10 +13,14 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSwitch.h"
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -46,6 +50,30 @@ public:
     /// The Static Analysis Results Interchange Format, a JSON-based standard.
     SARIF,
   };
+
+  /// The format named by the value of -serialize-diagnostics=<format>, or
+  /// \c std::nullopt if it names no known format.
+  static std::optional<SerializedFormat>
+  serializedFormatFromString(llvm::StringRef value) {
+    return llvm::StringSwitch<std::optional<SerializedFormat>>(value)
+        .Case("dia", SerializedFormat::LLVMBitcode)
+        .Case("sarif", SerializedFormat::SARIF)
+        .Default(std::nullopt);
+  }
+
+  /// The file type of a diagnostics log in \p format.
+  static file_types::ID fileTypeForSerializedFormat(SerializedFormat format) {
+    auto type = file_types::TY_SerializedDiagnostics;
+    switch (format) {
+    case SerializedFormat::LLVMBitcode:
+      type = file_types::TY_SerializedDiagnostics;
+      break;
+    case SerializedFormat::SARIF:
+      type = file_types::TY_SARIFDiagnostics;
+      break;
+    }
+    return type;
+  }
 
   /// Indicates whether to allow diagnostics for \c <unknown> locations if
   /// \c VerifyMode is not \c NoVerify.
