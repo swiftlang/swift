@@ -83,6 +83,7 @@ target_link_libraries(swiftIRGen INTERFACE
   clangAST)
 target_link_libraries(swiftIRGen PRIVATE
   swiftAST
+  swiftFrontend
   swiftLLVMPasses
   swiftSIL
   swiftSILGen
