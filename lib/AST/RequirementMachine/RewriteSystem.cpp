@@ -251,6 +251,13 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
 
   Rules.emplace_back(Term::get(lhs, Context), Term::get(rhs, Context));
 
+  // Identity conformance rules [P].[P] => [P] don't appear in the requirements
+  // of a protocol, so if we end up adding one, mark it as permanent to remove
+  // it not consider it in the minimization algorithm.
+  if (Rules[newRuleID].isIdentityConformanceRule()) {
+    Rules[newRuleID].markPermanent();
+  }
+
   if (path) {
     // We have a rewrite path from the simplified lhs to the simplified rhs;
     // add a rewrite step applying the new rule in reverse to close the loop.
@@ -297,8 +304,14 @@ bool RewriteSystem::addPermanentRule(MutableTerm lhs, MutableTerm rhs) {
 /// Add a new rule, marking it explicit.
 bool RewriteSystem::addExplicitRule(MutableTerm lhs, MutableTerm rhs) {
   bool added = addRule(std::move(lhs), std::move(rhs));
-  if (added)
-    Rules.back().markExplicit();
+  if (added) {
+    auto &rule = Rules.back();
+
+    // Identity conformance rules are marked permanent by addRule(), and
+    // permanent rules cannot be explicit.
+    if (!rule.isIdentityConformanceRule())
+      rule.markExplicit();
+  }
 
   return added;
 }

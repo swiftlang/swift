@@ -208,21 +208,30 @@ AssociatedTypeDecl *PropertyBag::getAssociatedType(Identifier name) {
 
   AssociatedTypeDecl *assocType = nullptr;
 
-  for (auto *proto : ConformsTo) {
-    auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
-      otherAssocType = otherAssocType->getAssociatedTypeAnchor();
+  auto checkOtherAssocType = [&](AssociatedTypeDecl *otherAssocType) {
+    otherAssocType = otherAssocType->getAssociatedTypeAnchor();
 
-      if (otherAssocType->getName() == name &&
-          (assocType == nullptr ||
-           TypeDecl::compare(otherAssocType->getProtocol(),
-                             assocType->getProtocol()) < 0)) {
-        assocType = otherAssocType;
-      }
-    };
+    if (otherAssocType->getName() == name &&
+        (assocType == nullptr ||
+         TypeDecl::compare(otherAssocType->getProtocol(),
+                           assocType->getProtocol()) < 0)) {
+      assocType = otherAssocType;
+    }
+  };
 
+  auto checkOtherProtocol = [&](const ProtocolDecl *proto) {
     for (auto *otherAssocType : proto->getAssociatedTypeMembers()) {
       checkOtherAssocType(otherAssocType);
     }
+  };
+
+  if (Key.size() == 1 &&
+      Key[0].getKind() == Symbol::Kind::Protocol) {
+    checkOtherProtocol(Key[0].getProtocol());
+  }
+
+  for (auto *proto : ConformsTo) {
+    checkOtherProtocol(proto);
   }
 
   ASSERT(assocType != nullptr && "Need to look harder");
@@ -358,7 +367,7 @@ getTypeForSymbolRange(const Symbol *begin, const Symbol *end,
 
     // Assert that the associated type's protocol appears among the set
     // of protocols that the prefix conforms to.
-    if (CONDITIONAL_ASSERT_enabled()) {
+    if (begin != iter && CONDITIONAL_ASSERT_enabled()) {
       auto conformsTo = props->getConformsTo();
       ASSERT(std::find(conformsTo.begin(), conformsTo.end(),
                        symbol.getProtocol())
