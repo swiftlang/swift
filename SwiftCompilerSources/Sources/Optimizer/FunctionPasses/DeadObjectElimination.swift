@@ -284,6 +284,10 @@ private struct UseCollector : AddressDefUseWalker {
   // there are also loads, because a trivial store has no ownership consequences.
   private var hasTrivialStoresToUnknownStorage = false
 
+  // True if the lifetime of a promoted value can be constrained by an outer lifetime, e.g. because a
+  // `partial_apply [on_stack]` that borrows its captures is stored, or because of a `mark_dependence_addr`.
+  private var hasLifetimeConstrainedValues = false
+
   init(of startInstruction: SingleValueInstruction, _ context: FunctionPassContext) {
     self.context = context
     self.allocation = startInstruction
@@ -425,6 +429,9 @@ private struct UseCollector : AddressDefUseWalker {
         }
       }
       accessTree.append((projectionPath, .store(store)))
+      if store.needDestroy && isLifetimeConstrained(store.source) {
+        hasLifetimeConstrainedValues = true
+      }
       return .continueWalk
 
     case let load as LoadInst:
@@ -494,6 +501,10 @@ private struct UseCollector : AddressDefUseWalker {
         return .abortWalk
       }
       accessTree.append((SmallProjectionPath(), .markDependenceAddr(markDep)))
+      if markDep.base != allocation {
+        // The `mark_dependence_addr` is rewritten to a `mark_dependence` of the promoted value on `base`.
+        hasLifetimeConstrainedValues = true
+      }
       return .continueWalk
 
     default:
@@ -901,11 +912,18 @@ private struct UseCollector : AddressDefUseWalker {
   private func insertMissingLifetimeEnds(for placeholders: some Sequence<PlaceholderInst>,
                                          ssaUpdater: inout SSAUpdater)
   {
+    // Ending lifetimes at the liveness boundary must be decided for all values at once: when a lifetime
+    // is ended at an `unreachable`, the `SSAUpdater` can create a phi which consumes another value
+    // whose lifetime already ended at its liveness boundary.
+    let atLivenessBoundary = hasLifetimeConstrainedValues &&
+      placeholders.allSatisfy { hasCompleteLiveness($0) } &&
+      ssaUpdater.insertedPhis.allSatisfy { hasCompleteLiveness($0.value) }
+
     for placeholder in placeholders {
-      insertMissingLifetimeEnds(for: placeholder, &ssaUpdater)
+      insertMissingLifetimeEnds(for: placeholder, atLivenessBoundary: atLivenessBoundary, &ssaUpdater)
     }
     for phi in ssaUpdater.insertedPhis {
-      insertMissingLifetimeEnds(for: phi.value, &ssaUpdater)
+      insertMissingLifetimeEnds(for: phi.value, atLivenessBoundary: atLivenessBoundary, &ssaUpdater)
     }
   }
 
@@ -915,18 +933,20 @@ private struct UseCollector : AddressDefUseWalker {
   ///    -> we need to insert `end_lifetime`s at liverange exit blocks.
   /// 2. Due to dead-end blocks. Memory locations may be missing destroys (and even `dealloc_stack`s)
   ///    in dead-end regions.
-  ///    -> we need to insert `destroy_value [dead_end]` at `unreachable`s.
+  ///    -> we need to insert `destroy_value [dead_end]` at `unreachable`s, or at the liveness boundary
+  ///       if `atLivenessBoundary` is true.
   ///
   /// If a missing destroy is within the `objectLiverange` (i.e. backward reachable from the object
   /// deallocation), we know it's case 1.
   /// Otherwise the destroy - including the object deallocation! - was cut off by an `unreachable`
   /// and it's case 2.
-  private func insertMissingLifetimeEnds(for value: Value, _ ssaUpdater: inout SSAUpdater) {
+  private func insertMissingLifetimeEnds(for value: Value, atLivenessBoundary: Bool,
+                                         _ ssaUpdater: inout SSAUpdater) {
     guard value.ownership == .owned else {
       return
     }
     insertMissingLifetimeEndsInObjectLiverange(for: value)
-    insertMissingLifetimeEndsInDeadEndBlocks(for: value, &ssaUpdater)
+    insertMissingLifetimeEndsInDeadEndBlocks(for: value, atLivenessBoundary: atLivenessBoundary, &ssaUpdater)
   }
 
   private func insertMissingLifetimeEndsInObjectLiverange(for value: Value) {
@@ -962,14 +982,92 @@ private struct UseCollector : AddressDefUseWalker {
     }
   }
 
-  private func insertMissingLifetimeEndsInDeadEndBlocks(for value: Value, _ ssaUpdater: inout SSAUpdater) {
+  /// The outer lifetime which constrains a promoted value can end in a dead-end region before the
+  /// `unreachable`. Therefore, if `atLivenessBoundary` is true, end the lifetime in dead-end blocks
+  /// where the value stops being live: after its last use, after its definition if it has no uses,
+  /// or at the beginning of the first block in which it isn't live anymore.
+  /// Because critical edges are not allowed, the value dominates all of those points.
+  private func insertMissingLifetimeEndsInDeadEndBlocks(for value: Value, atLivenessBoundary: Bool,
+                                                        _ ssaUpdater: inout SSAUpdater) {
+    // Computed on demand, because most values don't reach a dead-end block without a lifetime end.
+    var liverange: InstructionRange? = nil
+    defer { liverange?.deinitialize() }
+
+    // FIXME: Inside MandatoryPerformanceOptimizations the analysis can be stale, because inlining
+    // can create new dead-end blocks. Then the lifetime is ended at the `unreachable` instead.
+    let deadEndBlocks = context.deadEndBlocks
+
+    func getDeadEnd(_ block: BasicBlock) -> Instruction? {
+      if atLivenessBoundary && deadEndBlocks.isDeadEnd(block) {
+        if liverange == nil {
+          liverange = InteriorLivenessResult.compute(for: value, visitInnerUses: true, context).acquireRange
+        }
+        let range = liverange!
+        if let lastUse = range.ends.first(where: { $0.parentBlock == block }) {
+          // If the last use is a terminator, the value isn't live in the successor blocks.
+          return lastUse.next
+        }
+        if block == value.parentBlock {
+          if range.ends.isEmpty {
+            return value.nextInstruction
+          }
+        } else if !range.blockRange.inclusiveRangeContains(block) {
+          return block.instructions.first!
+        }
+      }
+      return block.terminator as? UnreachableInst
+    }
+
     completeLifetime(
       ofOwned: value,
       createEnd: { builder in
-        let v = ssaUpdater.getValue(before: builder.insertionBlock!.terminator)
-        builder.createDestroyValue(operand: v, isDeadEnd: true)
+        if atLivenessBoundary {
+          builder.createDestroyValue(operand: value, isDeadEnd: true)
+        } else {
+          let v = ssaUpdater.getValue(before: builder.insertionBlock!.terminator)
+          builder.createDestroyValue(operand: v, isDeadEnd: true)
+        }
       },
+      getDeadEnd: getDeadEnd,
       context)
+  }
+
+  /// True if the interior liveness of `value` contains all of its uses.
+  private func hasCompleteLiveness(_ value: Value) -> Bool {
+    if value.ownership != .owned {
+      return true
+    }
+    var walker = InteriorUseWalker(definingValue: value, ignoreEscape: false, visitInnerUses: true, context) { _ in
+      .continueWalk
+    }
+    defer { walker.deinitialize() }
+    return walker.visitUses() == .continueWalk
+  }
+
+  /// True if the lifetime of `value` can be constrained by an outer lifetime, e.g. if it's a
+  /// `partial_apply [on_stack]` which borrows its captures or a `mark_dependence`, or if it's
+  /// forwarded from such a value.
+  private func isLifetimeConstrained(_ value: Value) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(value)
+
+    while let v = worklist.pop() {
+      if !v.mayEscape || v is MarkDependenceInst {
+        return true
+      }
+      if let phi = Phi(v) {
+        worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+      } else if let ownershipTransition = v.definingInstruction as? OwnershipTransitionInstruction {
+        // E.g. a `move_value` or `copy_value`.
+        worklist.pushIfNotVisited(ownershipTransition.operand.value)
+      } else if let forwardingInst = v.definingInstructionOrTerminator as? ForwardingInstruction {
+        worklist.pushIfNotVisited(contentsOf: forwardingInst.forwardedOperands.values.filter {
+          $0.ownership == .owned
+        })
+      }
+    }
+    return false
   }
 }
 
