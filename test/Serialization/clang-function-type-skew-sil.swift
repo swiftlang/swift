@@ -5,9 +5,6 @@
 // RUN: %target-swift-frontend -emit-sil -O %t/Client.swift -I %t \
 // RUN:   -use-clang-function-types -sil-verify-all | %FileCheck %s
 
-// Temporarily disabled for rebranch
-// REQUIRES: rdar188269750
-
 // A client can request Clang function types when a dependency was built
 // without them. Reconstruct a dependency's derivable C function types while
 // deserializing its serialized SIL body.
