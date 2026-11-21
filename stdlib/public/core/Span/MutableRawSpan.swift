@@ -938,7 +938,8 @@ extension MutableRawSpan {
   /// every byte of the source.
   ///
   /// This span must have enough space from `byteOffset` to its end
-  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`. If
+  /// `source` has fewer bytes, the remaining bytes of this span are unchanged.
   ///
   /// If reading from `source` throws an error, the bytes copied before
   /// the error occurred remain in this span, and `byteOffset` is updated to
@@ -970,7 +971,8 @@ extension MutableRawSpan {
   /// every byte of the source.
   ///
   /// This span must have enough space from `byteOffset` to its end
-  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  /// (`byteOffset..<byteCount`) for every byte provided by `source`. If
+  /// `source` has fewer bytes, the remaining bytes of this span are unchanged.
   ///
   /// - Parameters:
   ///   - byteOffset: The offset at which to start copying. It must be a valid
