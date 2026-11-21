@@ -6,9 +6,6 @@
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // UNSUPPORTED: back_deployment_runtime
 
-// WasmKit rounds each sleep down to whole milliseconds.
-// XFAIL: OS=wasip1
-
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
