@@ -592,6 +592,16 @@ namespace {
                                    const ClangFieldInfo &field) const {
       llvm_unreachable("non-fixed field in Clang type?");
     }
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // Imported noncopyable records can have a Swift deinit even when
+      // their Clang fields are trivially destroyable.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T))
+        return;
+
+      StructTypeInfoBase::consume(IGF, explosion, atomicity, T);
+    }
+
     bool hasReferenceField() const { return HasReferenceField; }
   };
 
