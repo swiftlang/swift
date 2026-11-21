@@ -3209,7 +3209,9 @@ llvm::Constant *irgen::emitGlobalBlock(IRGenModule &IGM,
       llvm::ConstantExpr::getBitCast(invokeFunction, IGM.FunctionPtrTy),
       IGM.getOptions().PointerAuth.BlockInvocationFunctionPointers,
       invokeTy);
-  header.add(descriptor);
+  header.addSignedPointer(descriptor,
+                          IGM.getOptions().PointerAuth.BlockDescriptorPointers,
+                          PointerAuthEntity());
   header.finishAndAddTo(blockFields);
 
   blockFields.addAlignmentPadding(storageTL.getFixedAlignment());
@@ -3250,8 +3252,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                       IGF.IGM.FunctionPtrTy);
 
-  auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
-                                                      IGF.IGM.Int8PtrTy);
+  llvm::Value *descriptorVal =
+      llvm::ConstantExpr::getBitCast(descriptor, IGF.IGM.Int8PtrTy);
 
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
@@ -3272,8 +3274,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   }
   IGF.Builder.CreateStore(invokeVal, invokeAddr);
 
-  IGF.Builder.CreateStore(descriptorVal,
-                          IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
+  auto descriptorAddr = IGF.Builder.CreateStructGEP(headerAddr, 4, layout);
+  if (auto &schema = IGF.getOptions().PointerAuth.BlockDescriptorPointers) {
+    auto descriptorAuthInfo = PointerAuthInfo::emit(
+        IGF, schema, descriptorAddr.getAddress(), PointerAuthEntity());
+    descriptorVal = emitPointerAuthSign(IGF, descriptorVal, descriptorAuthInfo);
+  }
+  IGF.Builder.CreateStore(descriptorVal, descriptorAddr);
 }
 
 llvm::Value *IRGenFunction::popAsyncContext(llvm::Value *calleeContext) {
