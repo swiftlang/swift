@@ -1,12 +1,12 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
-// RUN: %FileCheck %s < %t/structs.h
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-%target-ptrsize %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: sed -e 's/^public struct/@frozen public struct/' %s > %t/small-structs-frozen.swift
 // RUN: %target-swift-frontend %t/small-structs-frozen.swift -enable-library-evolution -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/small-structs-frozen.h -D RESILIENT
-// RUN: %FileCheck --check-prefixes=CHECK,RESILIENT %s < %t/small-structs-frozen.h
+// RUN: %FileCheck --check-prefixes=CHECK,CHECK-%target-ptrsize,RESILIENT %s < %t/small-structs-frozen.h
 
 public struct StructOneI64 {
     let x: Int64
@@ -49,17 +49,32 @@ public struct StructI64AndFiveBytes {
     public var a, b, c, d, e: Int8
 }
 
-// CHECK: swift_interop_passDirect_Structs_uint64_t_0_8_uint64_t_8_13(const char * _Nonnull value) {
-// CHECK-NEXT:   struct swift_interop_passStub_Structs_uint64_t_0_8_uint64_t_8_13 result;
-// CHECK-NEXT:   memcpy(&result._1, value + 0, 8);
-// CHECK-NEXT:   memcpy(&result._2, value + 8, 5);
+// CHECK-64: swift_interop_passDirect_Structs_uint64_t_0_8_uint64_t_8_13(const char * _Nonnull value) {
+// CHECK-64-NEXT:   struct swift_interop_passStub_Structs_uint64_t_0_8_uint64_t_8_13 result;
+// CHECK-64-NEXT:   memcpy(&result._1, value + 0, 8);
+// CHECK-64-NEXT:   memcpy(&result._2, value + 8, 5);
 
-// CHECK: swift_interop_returnDirect_Structs_uint64_t_0_6(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_6 value) {
-// CHECK-NEXT:   memcpy(result + 0, &value._1, 6);
+// CHECK-32: swift_interop_passDirect_Structs_uint64_t_0_8_uint32_t_8_12_uint8_t_12_13(const char * _Nonnull value) {
+// CHECK-32-NEXT:   struct swift_interop_passStub_Structs_uint64_t_0_8_uint32_t_8_12_uint8_t_12_13 result;
+// CHECK-32-NEXT:   memcpy(&result._1, value + 0, 8);
+// CHECK-32-NEXT:   memcpy(&result._2, value + 8, 4);
+// CHECK-32-NEXT:   memcpy(&result._3, value + 12, 1);
 
-// CHECK: swift_interop_passDirect_Structs_uint64_t_0_6(const char * _Nonnull value) {
-// CHECK-NEXT:   struct swift_interop_passStub_Structs_uint64_t_0_6 result;
-// CHECK-NEXT:   memcpy(&result._1, value + 0, 6);
+// CHECK-64: swift_interop_returnDirect_Structs_uint64_t_0_6(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_6 value) {
+// CHECK-64-NEXT:   memcpy(result + 0, &value._1, 6);
+
+// CHECK-32: swift_interop_returnDirect_Structs_uint32_t_0_4_uint16_t_4_6(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint32_t_0_4_uint16_t_4_6 value) {
+// CHECK-32-NEXT:   memcpy(result + 0, &value._1, 4);
+// CHECK-32-NEXT:   memcpy(result + 4, &value._2, 2);
+
+// CHECK-64: swift_interop_passDirect_Structs_uint64_t_0_6(const char * _Nonnull value) {
+// CHECK-64-NEXT:   struct swift_interop_passStub_Structs_uint64_t_0_6 result;
+// CHECK-64-NEXT:   memcpy(&result._1, value + 0, 6);
+
+// CHECK-32: swift_interop_passDirect_Structs_uint32_t_0_4_uint16_t_4_6(const char * _Nonnull value) {
+// CHECK-32-NEXT:   struct swift_interop_passStub_Structs_uint32_t_0_4_uint16_t_4_6 result;
+// CHECK-32-NEXT:   memcpy(&result._1, value + 0, 4);
+// CHECK-32-NEXT:   memcpy(&result._2, value + 4, 2);
 
 // CHECK: swift_interop_returnDirect_Structs_uint32_t_0_3(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint32_t_0_3 value) {
 // CHECK-NEXT:   memcpy(result + 0, &value._1, 3);
@@ -72,9 +87,14 @@ public struct StructI64AndFiveBytes {
 // CHECK: SWIFT_EXTERN void $s7Structs25inoutStructDoubleAndFloatyyAA0cdeF0VzF(void * _Nonnull s) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructDoubleAndFloat(_:)
 // CHECK: SWIFT_EXTERN void $s7Structs020inoutStructOneI16AnddC0yyAA0cdefdC0Vz_AA0C6TwoI32VtF(void * _Nonnull s, struct swift_interop_passStub_Structs_[[StructTwoI32:[0-9a-z_]+]] s2) SWIFT_NOEXCEPT SWIFT_CALL; // inoutStructOneI16AndOneStruct(_:_:)
 
-// CHECK: swift_interop_returnDirect_Structs_uint64_t_0_8_uint64_t_8_13(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8_uint64_t_8_13 value) {
-// CHECK-NEXT:   memcpy(result + 0, &value._1, 8);
-// CHECK-NEXT:   memcpy(result + 8, &value._2, 5);
+// CHECK-64: swift_interop_returnDirect_Structs_uint64_t_0_8_uint64_t_8_13(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8_uint64_t_8_13 value) {
+// CHECK-64-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-64-NEXT:   memcpy(result + 8, &value._2, 5);
+
+// CHECK-32: swift_interop_returnDirect_Structs_uint64_t_0_8_uint32_t_8_12_uint8_t_12_13(char * _Nonnull result, struct swift_interop_returnStub_Structs_uint64_t_0_8_uint32_t_8_12_uint8_t_12_13 value) {
+// CHECK-32-NEXT:   memcpy(result + 0, &value._1, 8);
+// CHECK-32-NEXT:   memcpy(result + 8, &value._2, 4);
+// CHECK-32-NEXT:   memcpy(result + 12, &value._3, 1);
 
 // CHECK: class SWIFT_SYMBOL("s:7Structs20StructDoubleAndFloatV") StructDoubleAndFloat final {
 
@@ -238,7 +258,8 @@ public func printStructI64AndFiveBytes(_ x: StructI64AndFiveBytes) {
 
 // CHECK: SWIFT_INLINE_THUNK StructSixBytes passThroughStructSixBytes(const StructSixBytes& x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:  return Structs::_impl::_impl_StructSixBytes::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:    Structs::_impl::swift_interop_returnDirect_Structs_uint64_t_0_6(result, Structs::_impl::$s7Structs25passThroughStructSixBytesyAA0deF0VADF(Structs::_impl::swift_interop_passDirect_Structs_uint64_t_0_6(Structs::_impl::_impl_StructSixBytes::getOpaquePointer(x))));
+// CHECK-64-NEXT:    Structs::_impl::swift_interop_returnDirect_Structs_uint64_t_0_6(result, Structs::_impl::$s7Structs25passThroughStructSixBytesyAA0deF0VADF(Structs::_impl::swift_interop_passDirect_Structs_uint64_t_0_6(Structs::_impl::_impl_StructSixBytes::getOpaquePointer(x))));
+// CHECK-32-NEXT:    Structs::_impl::swift_interop_returnDirect_Structs_uint32_t_0_4_uint16_t_4_6(result, Structs::_impl::$s7Structs25passThroughStructSixBytesyAA0deF0VADF(Structs::_impl::swift_interop_passDirect_Structs_uint32_t_0_4_uint16_t_4_6(Structs::_impl::_impl_StructSixBytes::getOpaquePointer(x))));
 // CHECK-NEXT:  });
 // CHECK-NEXT: }
 

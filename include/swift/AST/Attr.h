@@ -192,7 +192,6 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD_FULL(AlignmentAttr, DeclAttribute, 32,
-      : NumPadBits,
       // The alignment value.
       Value : 32
     );
@@ -281,7 +280,6 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
-      : NumPadBits,
       Inverted : 1,
 
       NumFeatures : 31
@@ -4647,7 +4645,6 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD_FULL(OpaqueReturnTypeOfTypeAttr, TypeAttribute, 32,
-      : NumPadBits,
       Index : 32
     );
 
@@ -4656,7 +4653,6 @@ protected:
     );
 
     SWIFT_INLINE_BITFIELD_FULL(ScopedTypeAttr, TypeAttribute, 32,
-      : NumPadBits,
       NumRestrictions : 32
     );
   } Bits;
