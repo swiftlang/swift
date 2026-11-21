@@ -2349,6 +2349,20 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
+bool TypeChecker::diagnoseExperimentalAnyReference(SourceLoc loc,
+                                                   const DeclContext *dc) {
+  auto &ctx = dc->getASTContext();
+  auto *sourceFile = dc->getParentSourceFile();
+  if (ctx.LangOpts.hasFeature(Feature::AnyReference) ||
+      (sourceFile && (sourceFile->Kind == SourceFileKind::Interface ||
+                      sourceFile->Kind == SourceFileKind::SIL)))
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::type_requires_experimental_feature,
+                     "_AnyReference", "AnyReference");
+  return true;
+}
+
 static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
                                            const DeclContext *dc) {
   if (loc.isInvalid())
@@ -2360,6 +2374,11 @@ static void diagnoseExperimentalStdlibTypes(TypeDecl *typeDecl, SourceLoc loc,
 
   ASTContext &ctx = typeDecl->getASTContext();
   auto nameString = typeDecl->getName().str();
+
+  if (nameString == "_AnyReference" && isa<TypeAliasDecl>(typeDecl)) {
+    TypeChecker::diagnoseExperimentalAnyReference(loc, dc);
+  }
+
   auto diag = [&](StringRef featureName) {
     // Don't require this in the standard library or _Concurrency library.
     auto module = dc->getParentModule();

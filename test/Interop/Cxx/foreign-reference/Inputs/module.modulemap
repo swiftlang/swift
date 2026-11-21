@@ -179,3 +179,8 @@ module MultiPayloadEnum {
   header "multi-payload-enum.h"
   requires cplusplus
 }
+
+module AnyReferenceFRTs {
+  header "any-reference.h"
+  requires cplusplus
+}

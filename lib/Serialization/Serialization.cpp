@@ -1795,6 +1795,9 @@ void Serializer::serializeGenericRequirements(
       case LayoutConstraintKind::TrivialOfAtMostSize:
         rawKind = LayoutRequirementKind::TrivialOfAtMostSize;
         break;
+      case LayoutConstraintKind::ObjectReference:
+        rawKind = LayoutRequirementKind::ObjectReference;
+        break;
       case LayoutConstraintKind::Class:
         rawKind = LayoutRequirementKind::Class;
         break;
@@ -6528,7 +6531,8 @@ public:
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, composition->hasExplicitAnyObject(),
-        inverseCopyable, inverseEscapable, inverseDeinitable, protocols);
+        composition->hasExplicitAnyReference(), inverseCopyable,
+        inverseEscapable, inverseDeinitable, protocols);
   }
 
   void

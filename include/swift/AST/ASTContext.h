@@ -731,6 +731,12 @@ public:
   /// Retrieve the type Swift.AnyObject as an existential type.
   CanType getAnyObjectType() const;
 
+  /// Retrieve the type Swift.AnyReference as a constraint.
+  CanType getAnyReferenceConstraint() const;
+
+  /// Retrieve the type Swift.AnyReference as an existential type.
+  CanType getAnyReferenceType() const;
+
 #define KNOWN_SDK_TYPE_DECL(MODULE, NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** Retrieve the declaration of MODULE.NAME. */ \
   DECL_CLASS *get##NAME##Decl() const; \
