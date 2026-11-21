@@ -6,6 +6,7 @@ func foo() {}
 
 #if FOO
   foo() // expected-error {{expressions are not allowed at the top level}}
+  // expected-note@-1 {{top-level code is only allowed in 'main.swift'}}
 #else
   if true { foo() } // expected-error {{statements are not allowed at the top level}}
 #endif

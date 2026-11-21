@@ -167,6 +167,10 @@ public:
   bool InSwiftKeyPath = false;
   bool InFreestandingMacroArgument = false;
 
+  /// Whether we've already explained where top-level code is allowed after
+  /// diagnosing illegal top-level code in this file.
+  bool DiagnosedTopLevelCodeMainFileNote = false;
+
   /// Whether we should delay parsing nominal type, extension, and function
   /// bodies.
   bool isDelayedParsingEnabled() const;

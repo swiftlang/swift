@@ -1095,6 +1095,9 @@ ERROR(illegal_top_level_stmt,none,
       "statements are not allowed at the top level", ())
 ERROR(illegal_top_level_expr,none,
       "expressions are not allowed at the top level", ())
+NOTE(top_level_code_main_file,none,
+     "top-level code is only allowed in 'main.swift' or a single-file module; "
+     "use '@main' to define an entry point elsewhere", ())
 ERROR(illegal_semi_stmt,none,
       "';' statements are not allowed", ())
 ERROR(statement_begins_with_closure,none,
