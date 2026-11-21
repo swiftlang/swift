@@ -1552,24 +1552,32 @@ func useAfterFreeClosureTests() {
 
 func identity<T>(_ t: T) -> T { t }
 
+// Since we merge the result of 'f' into the task-isolated region of 'f', we
+// diagnose sending a task-isolated value instead of the use of 'x'.
 func useAfterSendClosureParameterResult(_ f: (KlassNonsendable) -> KlassNonsendable) {
   let x = KlassNonsendable()
   sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
-  // expected-note @-1 {{'f' used after being passed as a 'sending' parameter; Later uses could race}}
-  useValue(x) // expected-note {{access can happen concurrently}}
+  // expected-note @-1 {{'f' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
+  useValue(x)
 }
 
 func sendClosureParameterResultTaskIsolatedArgument(_ f: (KlassNonsendable) -> KlassNonsendable, _ x: KlassNonsendable) {
   sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
   // expected-note @-1 {{'f' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 // The closure is called through a reabstraction thunk.
 func useAfterSendReabstractedClosureResult() {
   let x = KlassNonsendable()
   let f = identity({ (y: KlassNonsendable) in y })
+  // We would emit this error without merging in the called closure, but the
+  // region of the result was formed by merging in a called closure, so we
+  // explain how to suppress it as well.
   sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
   // expected-note @-1 {{'f' used after being passed as a 'sending' parameter; Later uses could race}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 

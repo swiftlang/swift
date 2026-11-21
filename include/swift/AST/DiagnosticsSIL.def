@@ -1410,6 +1410,17 @@ GROUPED_NOTE(regionbasedisolation_chain_value_exposed_to_isolated_named,
      "accessible to %select{%4 code|code in the current isolation context}5",
      (Identifier, bool, Identifier, bool, StringRef, bool))
 
+NOTE(regionbasedisolation_closure_callee_merge_workaround, none,
+     "if this data race cannot be fixed yet, this error can be suppressed by "
+     "compiling in the Swift 5 language mode or by storing the sent value in "
+     "a 'nonisolated(unsafe)' variable",
+     ())
+NOTE(regionbasedisolation_closure_callee_merge_block_listed, none,
+     "module '%0' is blocklisted to downgrade errors found by merging the "
+     "regions of called closures with the regions of their arguments and "
+     "results to warnings",
+     (StringRef))
+
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())

@@ -148,6 +148,24 @@ enum class RegionMergeReason : uint8_t {
   Last = Cast,
 };
 
+/// A feature of a region that can be used to associate some semantic
+/// information with an individual region and propagate that through
+/// any of the region manipulation operations.
+enum class RegionFeature : uint8_t {
+  /// The region was formed by merging the region of a called closure (i.e. its
+  /// captures) with the regions of the call's non-'sending' arguments and
+  /// results.
+  ///
+  /// Errors about such regions are downgraded to warnings in modules that the
+  /// DowngradeClosureCalleeRegionErrors blocklist action applies to.
+  ClosureCalleeMerge = 0x1,
+};
+
+using RegionFeatures = OptionSet<RegionFeature>;
+
+/// Print \p features as a comma separated list.
+void printRegionFeatures(llvm::raw_ostream &os, RegionFeatures features);
+
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
 ///
@@ -786,6 +804,11 @@ private:
 
   uint8_t options;
 
+  /// The features that applying this op adds to the region that it produces.
+  ///
+  /// Only used by merges which propagate forward any features from their components.
+  RegionFeatures features;
+
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind opKind, Element arg1,
               SILInstruction *sourceInst = nullptr, Options options = {})
@@ -880,11 +903,17 @@ public:
     return PartitionOp(PartitionOpKind::UndoSend, tgt, unsendingInst);
   }
 
+  /// Merge the regions of \p destElement and \p srcElement.
+  ///
+  /// If the two regions are distinct, the merged region gains \p features.
   static PartitionOp Merge(Element destElement, Element srcElement,
                            RegionMergeReason reason,
-                           Operand *sourceOperand = nullptr) {
-    return PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
-                       sourceOperand, {}, reason);
+                           Operand *sourceOperand = nullptr,
+                           RegionFeatures features = {}) {
+    auto op = PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
+                          sourceOperand, {}, reason);
+    op.features = features;
+    return op;
   }
 
   static PartitionOp Require(Element tgt, SILInstruction *sourceInst = nullptr,
@@ -912,7 +941,8 @@ public:
   bool operator==(const PartitionOp &other) const {
     return opKind == other.opKind && opArg1 == other.opArg1 &&
            opArg2 == other.opArg2 && opArg3 == other.opArg3 &&
-           source == other.source && options == other.options;
+           source == other.source && options == other.options &&
+           features.toRaw() == other.features.toRaw();
   };
 
   bool operator<(const PartitionOp &other) const {
@@ -953,10 +983,15 @@ public:
       return source < other.source;
     }
 
-    return options < other.options;
+    if (options != other.options)
+      return options < other.options;
+
+    return features.toRaw() < other.features.toRaw();
   }
 
   PartitionOpKind getKind() const { return opKind; }
+
+  RegionFeatures getRegionFeatures() const { return features; }
 
   Element getOpArg1() const { return opArg1.value(); }
   Element getOpArg2() const { return opArg2.value(); }
@@ -1032,6 +1067,12 @@ private:
   /// NOTE: This should never be touched directly without canonicalizing!
   llvm::SmallMapVector<Region, SendingOperandSet *, 2> regionToSendingOpMap;
 
+  /// A map from a region number to the features of that region. Regions
+  /// without any associated features are not present in the map.
+  ///
+  /// NOTE: This should never be touched directly without canonicalizing!
+  llvm::SmallMapVector<Region, RegionFeatures, 2> regionToFeaturesMap;
+
   /// Label each index with a non-negative (unsigned) label if it is associated
   /// with a valid region.
   ///
@@ -1081,7 +1122,14 @@ public:
                  auto sndIter = snd.regionToSendingOpMap.find(p.first);
                  return sndIter != snd.regionToSendingOpMap.end() &&
                         sndIter->second == p.second;
-               });
+               }) &&
+           fst.regionToFeaturesMap.size() == snd.regionToFeaturesMap.size() &&
+           llvm::all_of(fst.regionToFeaturesMap,
+                        [&snd](const std::pair<Region, RegionFeatures> &p) {
+                          auto sndIter = snd.regionToFeaturesMap.find(p.first);
+                          return sndIter != snd.regionToFeaturesMap.end() &&
+                                 sndIter->second.toRaw() == p.second.toRaw();
+                        });
   }
 
   bool isTrackingElement(Element val) const {
@@ -1115,6 +1163,23 @@ public:
     canonicalize();
     return elementToRegionMap.at(elt);
   }
+
+  /// Return the features of the region of \p elt.
+  RegionFeatures getRegionFeatures(Element elt) const {
+    return getRegionFeatures(getRegion(elt));
+  }
+
+  /// Return the features of \p region.
+  RegionFeatures getRegionFeatures(Region region) const {
+    canonicalize();
+    auto iter = regionToFeaturesMap.find(region);
+    if (iter == regionToFeaturesMap.end())
+      return {};
+    return iter->second;
+  }
+
+  /// Add \p features to the features of the region of \p elt.
+  void addRegionFeatures(Element elt, RegionFeatures features);
 
   using iterator = std::map<Element, Region>::iterator;
   using const_iterator = std::map<Element, Region>::const_iterator;
@@ -1277,8 +1342,8 @@ public:
     return set;
   }
 
-  /// Validate that all regions in the regionToSentOpMap exist in the
-  /// elementToRegionMap.
+  /// Validate that all regions in the regionToSentOpMap and the
+  /// regionToFeaturesMap exist in the elementToRegionMap.
   ///
   /// Asserts when NDEBUG is set. Does nothing otherwise.
   void validateRegionToSendingOpMapRegions() {
@@ -1289,6 +1354,9 @@ public:
       regions.insert(regionNo);
     }
     for (auto [regionNo, opSet] : regionToSendingOpMap) {
+      assert(regions.contains(regionNo) && "Region doesn't exist?!");
+    }
+    for (auto [regionNo, features] : regionToFeaturesMap) {
       assert(regions.contains(regionNo) && "Region doesn't exist?!");
     }
 #endif
@@ -1423,6 +1491,9 @@ public:
     Element sentElement;
     Operand *sendingOp;
 
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
+
     LocalUseAfterSendError(const PartitionOp &op, Element elt,
                            Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
@@ -1445,6 +1516,9 @@ public:
     /// The partition at the point where the error was emitted, for isolation
     /// history rewinding. None when history recording is off for this function.
     std::optional<Partition> partition;
+
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
 
     SentNeverSendableError(const PartitionOp &op, Element sentElement,
                            SILDynamicMergedIsolationInfo isolationRegionInfo,
@@ -1474,6 +1548,9 @@ public:
     /// when history recording is off for this function.
     std::optional<Partition> partition;
 
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
+
     AssignNeverSendableIntoSendingResultError(
         const PartitionOp &op, Element destElement,
         SILFunctionArgument *destValue, Element srcElement, SILValue srcValue,
@@ -1501,6 +1578,9 @@ public:
     Element sentElement;
     Operand *sendingOp;
 
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
+
     InOutSendingNotInitializedAtExitError(const PartitionOp &op, Element elt,
                                           Operand *sendingOp)
         : op(&op), sentElement(elt), sendingOp(sendingOp) {}
@@ -1525,6 +1605,9 @@ public:
     /// The partition at the exiting terminator, for isolation history
     /// rewinding. None when history recording is off for this function.
     std::optional<Partition> partition;
+
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
 
     InOutSendingNotDisconnectedAtExitError(
         const PartitionOp &op, Element elt,
@@ -1565,6 +1648,9 @@ public:
     /// rewinding. None when history recording is off for this function.
     std::optional<Partition> partition;
 
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
+
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
                               Element returnedValue,
@@ -1601,6 +1687,9 @@ public:
     /// The partition at the exiting terminator, for isolation history
     /// rewinding. None when history recording is off for this function.
     std::optional<Partition> partition;
+
+    /// The features of the region that the error is about.
+    RegionFeatures regionFeatures;
 
     InOutSendingParametersInSameRegionError(
         const PartitionOp &op, Element firstInoutSendingParam,
@@ -2067,9 +2156,14 @@ public:
       return;
     }
 
-    handleError(AssignNeverSendableIntoSendingResultError(
+    AssignNeverSendableIntoSendingResultError error(
         op, op.getOpArg1(), fArg, op.getOpArg2(), rep, dynamicRegionIsolation,
-        getSnapshotForIsolationHistory()));
+        getSnapshotForIsolationHistory());
+    // This error occurs as a result of applying op, and so we should include
+    // its features even though they haven't yet been added to the region.
+    error.regionFeatures =
+        p.getRegionFeatures(srcRegion) | op.getRegionFeatures();
+    handleError(std::move(error));
   }
 
   /// Apply \p op to the partition op.
@@ -2352,10 +2446,8 @@ public:
       }
 
       // Then perform the actual merge.
-      //
-      // NOTE: This does not emit any errors on purpose. We rely on requires and
-      // other instructions to emit errors.
       p.merge(srcElement, destElement);
+      p.addRegionFeatures(destElement, op.getRegionFeatures());
       return;
     }
     case PartitionOpKind::Require:
@@ -2376,8 +2468,10 @@ public:
       // they need to reinitialize the 'inout sending' parameter.
       if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
         for (auto sentOperand : sentOperandSet->data()) {
-          handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
-                                                            sentOperand));
+          InOutSendingNotInitializedAtExitError error(op, op.getOpArg1(),
+                                                      sentOperand);
+          error.regionFeatures = p.getRegionFeatures(op.getOpArg1());
+          handleError(std::move(error));
         }
         return;
       }
@@ -2413,17 +2507,21 @@ public:
           // determining element identity. When that changes, this code will
           // need to be updated to look through loads.
           if (*elt == op.getOpArg1()) {
-            handleError(InOutSendingReturnedError(
-                op, op.getOpArg1(), dynamicRegionIsolation,
-                getSnapshotForIsolationHistory()));
+            InOutSendingReturnedError error(op, op.getOpArg1(),
+                                            dynamicRegionIsolation,
+                                            getSnapshotForIsolationHistory());
+            error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
+            handleError(std::move(error));
             continue;
           }
 
           // Otherwise, we need to refer to a different value in the same region
           // as the 'inout sending' parameter. Emit a special error. For that.
-          handleError(InOutSendingReturnedError(
-              op, op.getOpArg1(), *elt, dynamicRegionIsolation,
-              getSnapshotForIsolationHistory()));
+          InOutSendingReturnedError error(op, op.getOpArg1(), *elt,
+                                          dynamicRegionIsolation,
+                                          getSnapshotForIsolationHistory());
+          error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
+          handleError(std::move(error));
         }
 
         return emittedDiagnostic;
@@ -2439,9 +2537,11 @@ public:
         // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
-          handleError(InOutSendingReturnedError(
+          InOutSendingReturnedError error(
               op, op.getOpArg1(), getElement(outParam).value(),
-              dynamicRegionIsolation, getSnapshotForIsolationHistory()));
+              dynamicRegionIsolation, getSnapshotForIsolationHistory());
+          error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
+          handleError(std::move(error));
           return;
         }
 
@@ -2451,9 +2551,11 @@ public:
           return;
 
         // Otherwise, we emit the normal not disconnected at exit error.
-        handleError(InOutSendingNotDisconnectedAtExitError(
+        InOutSendingNotDisconnectedAtExitError error(
             op, op.getOpArg1(), dynamicRegionIsolation,
-            getSnapshotForIsolationHistory()));
+            getSnapshotForIsolationHistory());
+        error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
+        handleError(std::move(error));
         return;
       }
 
@@ -2463,9 +2565,11 @@ public:
       SmallVector<Element, 1> foundInOutSendingElts;
       if (findOtherInOutSendingParameters(inoutSendingRegion, op.getOpArg1(),
                                           foundInOutSendingElts)) {
-        handleError(InOutSendingParametersInSameRegionError(
+        InOutSendingParametersInSameRegionError error(
             op, op.getOpArg1(), std::move(foundInOutSendingElts),
-            getSnapshotForIsolationHistory()));
+            getSnapshotForIsolationHistory());
+        error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
+        handleError(std::move(error));
         return;
       }
 
@@ -2496,6 +2600,7 @@ public:
                                         dynamicRegionIsolation,
                                         getSnapshotForIsolationHistory());
         error.downgradeToWarning = true;
+        error.regionFeatures = p.getRegionFeatures(inoutSendingRegion);
         handleError(std::move(error));
         return;
       }
@@ -2662,7 +2767,9 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(LocalUseAfterSendError(op, elt, sentOp));
+    LocalUseAfterSendError error(op, elt, sentOp);
+    error.regionFeatures = p.getRegionFeatures(elt);
+    return handleError(std::move(error));
   }
 
   // Private helper that squelches the error if our send instruction and our
@@ -2706,8 +2813,10 @@ private:
     }
 
     // Ok, we actually need to emit a call to the callback.
-    return handleError(SentNeverSendableError(
-        op, elt, dynamicMergedIsolationInfo, getSnapshotForIsolationHistory()));
+    SentNeverSendableError error(op, elt, dynamicMergedIsolationInfo,
+                                 getSnapshotForIsolationHistory());
+    error.regionFeatures = p.getRegionFeatures(elt);
+    return handleError(std::move(error));
   }
 };
 
