@@ -921,7 +921,7 @@ extension MutableSpan {
   ) throws(I.Failure) where I.Element == Element {
     var iterator = source.makeBorrowingIterator()
     try updateElements(startingAt: &index, copyingFrom: &iterator)
-    let next = try iterator.nextSpan()
+    let next = try iterator.nextSpan(maxCount: 1)
     _precondition(
       next.isEmpty, "Source has more elements than the destination can contain"
     )

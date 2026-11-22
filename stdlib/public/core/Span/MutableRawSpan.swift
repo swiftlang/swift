@@ -964,7 +964,7 @@ extension MutableRawSpan {
   ) throws(I.Failure) where I.Element == UInt8 {
     var iterator = source.makeBorrowingIterator()
     try updateElements(startingAt: &byteOffset, copyingFrom: &iterator)
-    let next = try iterator.nextSpan()
+    let next = try iterator.nextSpan(maxCount: 1)
     _precondition(
       next.isEmpty, "Source has more bytes than the destination can contain"
     )
