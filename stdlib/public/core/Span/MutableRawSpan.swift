@@ -322,7 +322,7 @@ extension MutableRawSpan {
   @_transparent
   @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
-    _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
+    _ body: @once (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: _count))
   }
@@ -346,7 +346,7 @@ extension MutableRawSpan {
   @_lifetime(self: copy self)
   @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
-    _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+    _ body: @once (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: _count))
   }

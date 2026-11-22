@@ -469,7 +469,7 @@ public class Sub : Base {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
   // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error any Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
-  // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
+  // CHECK:     = partial_apply [called_at_most_once] [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '$s7dynamic3SubC1xSbvg'
 

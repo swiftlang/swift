@@ -21,7 +21,7 @@ extension Result where Success: ~Copyable {
   /// - Parameter body: A potentially throwing async closure to evaluate.
   @export(implementation)
   public nonisolated(nonsending) init(
-    catching body: nonisolated(nonsending) () async throws(Failure) -> Success
+    catching body: nonisolated(nonsending) @once () async throws(Failure) -> Success
   ) async {
     // FIXME: this may also require similar changes as the synchronous Result.init(catching:) support non-escapable types.
     do {

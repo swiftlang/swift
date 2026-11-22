@@ -157,9 +157,15 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
     return false;
 
   for (SILBasicBlock &block : *function) {
-    // Exclude fatal-error blocks.
+    // Exclude fatal-error blocks, including a block that branches to a block
+    // that ends in an `unreachable`, such as one that ends the lifetimes of
+    // values on the paths of several fatal errors.
     if (isa<UnreachableInst>(block.getTerminator()))
       continue;
+    if (auto *br = dyn_cast<BranchInst>(block.getTerminator())) {
+      if (isa<UnreachableInst>(br->getDestBB()->getTerminator()))
+        continue;
+    }
 
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, perfConstr, parentLoc)) {
@@ -241,37 +247,6 @@ bool PerformanceDiagnostics::checkClosureArguments(ApplySite as,
     }
   }
   return false;
-}
-
-/// If \p value is loaded from a stack slot that holds nothing but the value
-/// that a single `store` initializes it with, returns the stored value.
-static SILValue getStoredValueOfLoadedStackSlot(SILValue value) {
-  auto *load = dyn_cast<LoadInst>(value);
-  if (!load)
-    return SILValue();
-  SILValue address = load->getOperand();
-  if (auto *access = dyn_cast<BeginAccessInst>(address))
-    address = access->getSource();
-  auto *slot = dyn_cast<AllocStackInst>(address);
-  if (!slot)
-    return SILValue();
-
-  StoreInst *singleStore = nullptr;
-  SmallVector<Operand *, 8> worklist(slot->getUses());
-  while (!worklist.empty()) {
-    SILInstruction *user = worklist.pop_back_val()->getUser();
-    if (auto *access = dyn_cast<BeginAccessInst>(user)) {
-      worklist.append(access->getUses().begin(), access->getUses().end());
-    } else if (auto *store = dyn_cast<StoreInst>(user)) {
-      if (singleStore)
-        return SILValue();
-      singleStore = store;
-    } else if (!isa<LoadInst, EndAccessInst, DestroyAddrInst, DeallocStackInst,
-                    DebugValueInst>(user)) {
-      return SILValue();
-    }
-  }
-  return singleStore ? singleStore->getSrc() : SILValue();
 }
 
 bool PerformanceDiagnostics::checkClosureValue(SILValue closure,

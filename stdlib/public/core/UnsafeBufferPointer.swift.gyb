@@ -215,13 +215,27 @@ extension Unsafe${Mutable}BufferPointer: @unsafe Sequence {
   @inlinable @_transparent
   @safe
   public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
 %if Mutable:
     return try unsafe body(UnsafeBufferPointer(self))
 %else:
     return try unsafe body(self)
 %end
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func withContiguousStorageIfAvailable<R>(
+      _ body: (UnsafeBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal func __abi_withContiguousStorageIfAvailable<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousStorageIfAvailable(body)
   }
 }
 
@@ -1029,15 +1043,30 @@ extension Unsafe${Mutable}BufferPointer:
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   @safe
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     return try unsafe body(&self)
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @available(*, deprecated)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal mutating func __abi__withUnsafeMutableBufferPointerIfSupported<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try _withUnsafeMutableBufferPointerIfSupported(body)
   }
 
   @inlinable @_transparent
   @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     let (oldBase, oldCount) = (self.baseAddress, self.count)
     defer {
@@ -1045,6 +1074,20 @@ extension Unsafe${Mutable}BufferPointer:
       "UnsafeMutableBufferPointer.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
     }
     return try unsafe body(&self)
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    mutating func withContiguousMutableStorageIfAvailable<R>(
+      _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    ) rethrows -> R?
+  )
+  @usableFromInline
+  internal mutating func __abi_withContiguousMutableStorageIfAvailable<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? {
+    return try withContiguousMutableStorageIfAvailable(body)
   }
 %  end
 }
@@ -1714,7 +1757,7 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @export(implementation) @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (_ buffer: ${Self}<T>) throws(E) -> Result
+    _ body: @once (_ buffer: ${Self}<T>) throws(E) -> Result
   ) throws(E) -> Result {
     guard let base = _position?._rawValue else {
       return try unsafe body(.init(start: nil, count: 0))

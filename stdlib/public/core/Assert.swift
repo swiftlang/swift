@@ -42,8 +42,8 @@
 @_disfavoredOverload
 #endif
 public func assert(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = String(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
@@ -55,11 +55,29 @@ public func assert(
   }
 }
 
+// ABI: Preserves the entry point from before `condition` and `message` were at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func assert(
+    _ condition: @autoclosure () -> Bool,
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi_assert(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) {
+  assert(condition(), message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func assert(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only assert in debug mode.
@@ -104,8 +122,8 @@ public func assert(
 @_disfavoredOverload
 #endif
 public func precondition(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> String = String(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -121,11 +139,29 @@ public func precondition(
   }
 }
 
+// ABI: Preserves the entry point from before `condition` and `message` were at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func precondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi_precondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) {
+  precondition(condition(), message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func precondition(
-  _ condition: @autoclosure () -> Bool,
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool,
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -167,7 +203,7 @@ public func precondition(
 @_disfavoredOverload
 #endif
 public func assertionFailure(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
@@ -180,10 +216,24 @@ public func assertionFailure(
   }
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func assertionFailure(
+    _ message: @autoclosure () -> String, file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi_assertionFailure(
+  _ message: @autoclosure () -> String, file: StaticString, line: UInt
+) {
+  assertionFailure(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func assertionFailure(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   if _isDebugAssertConfiguration() {
@@ -229,7 +279,7 @@ public func assertionFailure(
 @_disfavoredOverload
 #endif
 public func preconditionFailure(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
@@ -243,10 +293,26 @@ public func preconditionFailure(
   _conditionallyUnreachable()
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func preconditionFailure(
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  ) -> Never
+)
+@usableFromInline
+internal func __abi_preconditionFailure(
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) -> Never {
+  preconditionFailure(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func preconditionFailure(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   // Only check in debug and release mode.  In release mode just trap.
@@ -273,7 +339,7 @@ public func preconditionFailure(
 @_disfavoredOverload
 #endif
 public func fatalError(
-  _ message: @autoclosure () -> String = String(),
+  _ message: @autoclosure @callable(once) () -> String = String(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
 #if !$Embedded
@@ -291,10 +357,26 @@ public func fatalError(
 #endif
 }
 
+// ABI: Preserves the entry point from before `message` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func fatalError(
+    _ message: @autoclosure () -> String,
+    file: StaticString, line: UInt
+  ) -> Never
+)
+@usableFromInline
+internal func __abi_fatalError(
+  _ message: @autoclosure () -> String,
+  file: StaticString, line: UInt
+) -> Never {
+  fatalError(message(), file: file, line: line)
+}
+
 #if $Embedded
 @_transparent
 public func fatalError(
-  _ message: @autoclosure () -> StaticString = StaticString(),
+  _ message: @autoclosure @callable(once) () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) -> Never {
   if _isDebugAssertConfiguration() {
@@ -315,7 +397,7 @@ public func fatalError(
 /// and abort.
 @usableFromInline @_transparent
 internal func _precondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
   // Only check in debug and release mode. In release mode just trap.
@@ -328,6 +410,24 @@ internal func _precondition(
     let error = !condition()
     Builtin.condfail_message(error._value, message.unsafeRawPointer)
   }
+}
+
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _precondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__precondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _precondition(condition(), message, file: file, line: line)
 }
 
 @usableFromInline @_transparent
@@ -370,7 +470,7 @@ public func _overflowChecked<T>(
 /// all possible errors.
 @usableFromInline @_transparent
 internal func _debugPrecondition(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE
@@ -384,6 +484,24 @@ internal func _debugPrecondition(
     }
   }
 #endif
+}
+
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _debugPrecondition(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__debugPrecondition(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _debugPrecondition(condition(), message, file: file, line: line)
 }
 
 @usableFromInline @_transparent
@@ -409,7 +527,7 @@ internal func _debugPreconditionFailure(
 /// call to this function is a noop.
 @usableFromInline @_transparent
 internal func _internalInvariant(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
@@ -420,11 +538,29 @@ internal func _internalInvariant(
 #endif
 }
 
+// ABI: Preserves the entry point from before `condition` was at-most-once.
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func _internalInvariant(
+    _ condition: @autoclosure () -> Bool,
+    _ message: StaticString,
+    file: StaticString, line: UInt
+  )
+)
+@usableFromInline
+internal func __abi__internalInvariant(
+  _ condition: @autoclosure () -> Bool,
+  _ message: StaticString,
+  file: StaticString, line: UInt
+) {
+  _internalInvariant(condition(), message, file: file, line: line)
+}
+
 // Only perform the invariant check on Swift 5.1 and later
 @export(implementation) // Swift 5.1
 @_transparent
 internal func _internalInvariant_5_1(
-  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  _ condition: @autoclosure @callable(once) () -> Bool, _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {
 #if INTERNAL_CHECKS_ENABLED
@@ -449,7 +585,7 @@ internal func _internalInvariant_5_1(
 @_transparent
 internal func _precondition(
   ifLinkedOnOrAfter version: _SwiftStdlibVersion,
-  _ condition: @autoclosure () -> Bool,
+  _ condition: @autoclosure @callable(once) () -> Bool,
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line
 ) {

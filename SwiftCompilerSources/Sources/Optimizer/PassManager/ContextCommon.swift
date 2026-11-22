@@ -130,11 +130,13 @@ extension MutatingContext {
   func notifyInvalidatedStackNesting() { bridgedPassContext.notifyInvalidatedStackNesting() }
 
   func tryOptimizeApplyOfPartialApply(closure: PartialApplyInst) -> Bool {
+    // The closure may be deleted.
+    let callee = closure.callee
     if bridgedPassContext.tryOptimizeApplyOfPartialApply(closure.bridged) {
       notifyInstructionsChanged()
       notifyCallsChanged()
 
-      for use in closure.callee.uses {
+      for use in callee.uses {
         if use.instruction is FullApplySite {
           notifyInstructionChanged(use.instruction)
         }

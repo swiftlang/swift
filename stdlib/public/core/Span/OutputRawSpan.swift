@@ -494,7 +494,7 @@ extension OutputRawSpan {
   @_lifetime(self: copy self)
   @unsafe
   public mutating func withUnsafeMutableBytes<E: Error, R: ~Copyable>(
-    _ body: (
+    _ body: @once (
       UnsafeMutableRawBufferPointer,
       _ initializedCount: inout Int
     ) throws(E) -> R

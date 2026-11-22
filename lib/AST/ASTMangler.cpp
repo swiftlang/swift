@@ -1050,31 +1050,36 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   return finalize();
 }
 
-std::string ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
+LocalTypeDeclManglings ASTMangler::mangleLocalTypeDecl(const TypeDecl *type) {
   if (auto abiType = getABIDecl(type)) {
     return mangleLocalTypeDecl(abiType);
   }
 
-  beginManglingWithoutPrefix();
   AllowNamelessEntities = true;
   OptimizeProtocolNames = false;
 
-  // Local types are not ABI anyway. To avoid problems with the ASTDemangler,
-  // don't respect @_originallyDefinedIn here, since we don't respect it
-  // when mangling DWARF types for debug info.
-  RespectOriginallyDefinedIn = false;
+  auto mangle = [&](bool respectOriginallyDefinedIn) {
+    beginManglingWithoutPrefix();
+    RespectOriginallyDefinedIn = respectOriginallyDefinedIn;
 
-  if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
-    appendAnyGenericType(GTD);
-  } else {
-    assert(isa<AssociatedTypeDecl>(type));
-    BaseEntitySignature nullBase(nullptr);
-    appendContextOf(type, nullBase);
-    appendDeclName(type);
-    appendOperator("Qa");
-  }
+    if (auto GTD = dyn_cast<GenericTypeDecl>(type)) {
+      appendAnyGenericType(GTD);
+    } else {
+      assert(isa<AssociatedTypeDecl>(type));
+      BaseEntitySignature nullBase(nullptr);
+      appendContextOf(type, nullBase);
+      appendDeclName(type);
+      appendOperator("Qa");
+    }
 
-  return finalize();
+    return finalize();
+  };
+
+  // Local types are looked up by remangling the demangled name of their type,
+  // which might be the mangling used by debug info or by USRs.
+  auto mangling = mangle(/*respectOriginallyDefinedIn=*/true);
+  auto usrMangling = mangle(/*respectOriginallyDefinedIn=*/false);
+  return LocalTypeDeclManglings(std::move(mangling), std::move(usrMangling));
 }
 
 std::string ASTMangler::mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl) {

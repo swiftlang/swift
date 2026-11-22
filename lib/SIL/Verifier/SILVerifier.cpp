@@ -68,6 +68,11 @@ using Lowering::AbstractionPattern;
 
 // This flag controls the default behaviour when hitting a verification
 // failure (abort/exit).
+static llvm::cl::opt<bool> VerifyExactlyOnceDestroys(
+    "sil-verify-exactly-once-destroys", llvm::cl::init(false),
+    llvm::cl::desc("Verify that optimizations don't destroy exactly-once "
+                   "closures, outside of paths that end in a trap"));
+
 static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
@@ -3940,6 +3945,7 @@ public:
       require(getDeadEndBlocks().isDeadEnd(I->getParentBlock()),
               "a dead_end destroy_value must be in a dead-end block");
     }
+    checkNotDestroyingExactlyOnceClosure(I, I->getOperand());
   }
 
   void checkReleaseValueInst(ReleaseValueInst *I) {
@@ -3947,6 +3953,7 @@ public:
             "Source value should be an object value");
     require(!F.hasOwnership(),
             "release_value is only in functions with unqualified ownership");
+    checkNotDestroyingExactlyOnceClosure(I, I->getOperand());
   }
 
   void checkReleaseValueAddrInst(ReleaseValueAddrInst *I) {
@@ -4308,6 +4315,22 @@ public:
     requireReferenceValue(RI->getOperand(), "Operand of release");
     require(!F.hasOwnership(),
             "strong_release is only in functions with unqualified ownership");
+    checkNotDestroyingExactlyOnceClosure(RI, RI->getOperand());
+  }
+
+  /// Once the program has been checked, nothing may destroy an exactly-once
+  /// closure without calling it, except on a path that ends in a trap.
+  void checkNotDestroyingExactlyOnceClosure(SILInstruction *inst,
+                                            SILValue value) {
+    if (!VerifyExactlyOnceDestroys || F.getFunctionStage() == SILStage::Raw ||
+        isa<SILUndef>(value))
+      return;
+    auto fnTy = value->getType().getAs<SILFunctionType>();
+    if (!fnTy || fnTy->getExecutionSemantics() != ExecutionSemantics::Once)
+      return;
+    if (getDeadEndBlocks().isDeadEnd(inst->getParent()))
+      return;
+    require(false, "exactly-once closure destroyed without being called");
   }
 
   void checkDeallocStackInst(DeallocStackInst *DI) {

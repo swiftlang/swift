@@ -56,7 +56,7 @@ extension TaskPriority {
 @available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
 public func withTaskCancellationHandler<T>(
   handler: @Sendable () -> Void,
-  operation: () async throws -> T
+  operation: @once () async throws -> T
 ) async rethrows -> T {
   try await withTaskCancellationHandler(operation: operation, onCancel: handler)
 }
@@ -81,7 +81,7 @@ extension Task where Success == Never, Failure == Never {
   @export(implementation)
   public static func withCancellationHandler<T>(
     handler: @Sendable () -> Void,
-    operation: () async throws -> T
+    operation: @once () async throws -> T
   ) async rethrows -> T {
     try await withTaskCancellationHandler(operation: operation, onCancel: handler)
   }
@@ -97,7 +97,7 @@ extension Task where Success == Never, Failure == Never {
   public static func withGroup<TaskResult: Sendable, BodyResult>(
     resultType: TaskResult.Type,
     returning returnType: BodyResult.Type = BodyResult.self,
-    body: (inout Task.Group<TaskResult>) async throws -> BodyResult
+    body: @once (inout Task.Group<TaskResult>) async throws -> BodyResult
   ) async rethrows -> BodyResult {
     try await withThrowingTaskGroup(of: resultType) { group in
       try await body(&group)

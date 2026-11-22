@@ -809,8 +809,8 @@ private struct SpecializationInfo {
       // non-Copyable capture to the new direct call, it can't copy it, so it leaves `Undef` in
       // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
       // would still run its destructor at runtime, which would release whatever garbage is left
-      // in that now-`Undef`'d capture slot.
-      if clonedRootClosure.isNoncopyable {
+      // in that now-`Undef`'d capture slot. (The fold deletes a closure whose call consumes it.)
+      if !clonedRootClosure.isDeleted && clonedRootClosure.isNoncopyable {
         _ = cloner.context.tryDeleteDeadClosure(closure: clonedRootClosure, needKeepArgsAlive: !argsAreKeptAlive)
       }
     }

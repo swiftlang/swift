@@ -43,7 +43,7 @@ extension ConstCell where Value: ~Copyable {
   @export(implementation)
   @_transparent
   public func withUnsafePointer<Result: ~Copyable, E>(
-    _ body: (UnsafePointer<Value>) throws(E) -> Result
+    _ body: @once (UnsafePointer<Value>) throws(E) -> Result
   ) throws(E) -> Result {
     unsafe try body(UnsafePointer(_address))
   }

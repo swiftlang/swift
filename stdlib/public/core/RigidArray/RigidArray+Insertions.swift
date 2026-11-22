@@ -88,7 +88,7 @@ extension _RigidArray where Element: ~Copyable {
   internal mutating func insert<E: Error>(
     addingCount newItemCount: Int,
     at index: Int,
-    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+    initializingWith initializer: @once (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
     _checkValidIndex(index)
     _precondition(newItemCount >= 0, "Cannot add a negative number of items")

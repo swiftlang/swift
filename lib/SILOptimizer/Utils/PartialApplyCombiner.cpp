@@ -36,7 +36,10 @@ class PartialApplyCombiner {
 
   bool copyArgsToTemporaries(ArrayRef<FullApplySite> applies);
 
-  void processSingleApply(FullApplySite ai);
+  void processSingleApply(FullApplySite ai, bool deletesClosure);
+
+  void combineCallsOfConsumedClosure(ArrayRef<FullApplySite> applies,
+                                     ArrayRef<SILInstruction *> closureUses);
 
 public:
   PartialApplyCombiner(PartialApplyInst *pai, SILBuilderContext &builderCtxt,
@@ -180,7 +183,11 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
 
 /// Process an apply instruction which uses a partial_apply
 /// as its callee.
-void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
+/// If \p deletesClosure is true, `pai` is deleted after its calls are combined
+/// (see isClosureConsumedByCall()), so the captures need no copies, and
+/// `pai` isn't destroyed after the new apply.
+void PartialApplyCombiner::processSingleApply(FullApplySite paiAI,
+                                              bool deletesClosure) {
   // The arguments of the final apply instruction.
   SmallVector<SILValue, 8> argList;
   // First, add the arguments of ther original ApplyInst args.
@@ -205,11 +212,11 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
       arg = argToTmpCopy.lookup(arg);
 
     // A move-only `arg` cannot be copied, so it is moved into the combined
-    // apply instead. `pai`'s own operand is severed once every apply is
-    // combined (see combine()).
+    // apply instead. Unless `pai` is deleted, its own operand is severed once
+    // every apply is combined (see combine()).
     if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
             .isConsumedInCaller() &&
-        !arg->getType().isMoveOnly()) {
+        !deletesClosure && !arg->getType().isMoveOnly()) {
       if (arg->getType().isAddress()) {
         // Copy the argument as the callee may consume it.
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
@@ -257,8 +264,8 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   //
   // FIXME: The partial_apply of a begin_apply isn't destroyed
   // (rdar://192326109).
-  bool destroyClosure =
-      !pai->hasCalleeGuaranteedContext() && !isa<BeginApplyInst>(newAI);
+  bool destroyClosure = !deletesClosure && !pai->hasCalleeGuaranteedContext() &&
+                        !isa<BeginApplyInst>(newAI);
   if (!destroyClosure && argCopies.empty())
     return;
   newAI.insertAfterApplication([&](SILBuilder &builder) {
@@ -267,6 +274,19 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     for (auto *argCopy : llvm::reverse(argCopies))
       builder.createDeallocStack(destroyloc, argCopy);
   });
+}
+
+/// Combines the calls \p applies of `pai`, which its call consumes, and deletes
+/// `pai`. \p closureUses holds the other uses of `pai`. See
+/// isClosureConsumedByCall().
+void PartialApplyCombiner::combineCallsOfConsumedClosure(
+    ArrayRef<FullApplySite> applies, ArrayRef<SILInstruction *> closureUses) {
+  makeCapturesOwnedByClosureLexical(pai, callbacks);
+  for (FullApplySite ai : applies) {
+    destroyUnconsumedCapturesAfterCall(pai, ai, callbacks);
+    processSingleApply(ai, /*deletesClosure=*/true);
+  }
+  deleteClosureOfReplacedCalls(pai, closureUses, callbacks);
 }
 
 /// Adds the uses of all struct_extracts of field `fieldIdx` of `si` to
@@ -388,6 +408,18 @@ bool PartialApplyCombiner::combine() {
   if (foundApplySites.empty())
     return false;
 
+  if (isClosureConsumedByCall(pai)) {
+    SmallVector<SILInstruction *, 8> closureUses;
+    if (canReplaceCallsOfConsumedClosure(pai, foundApplySites, closureUses)) {
+      combineCallsOfConsumedClosure(foundApplySites, closureUses);
+      return true;
+    }
+    // Otherwise, the closure outlives the combined calls, which need copies
+    // of its captures.
+    if (!canCopyCapturesOfConsumedClosure(pai))
+      return false;
+  }
+
   // A combined call doesn't call the closure, so an exactly-once closure traps
   // when it's destroyed afterwards. It has to be deleted instead, which
   // requires that its other uses go away with it.
@@ -405,7 +437,7 @@ bool PartialApplyCombiner::combine() {
     return false;
 
   for (FullApplySite ai : foundApplySites) {
-    processSingleApply(ai);
+    processSingleApply(ai, /*deletesClosure=*/false);
   }
 
   // Sever `pai`'s operand for each move-only capture that was transferred to

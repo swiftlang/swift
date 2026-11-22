@@ -52,7 +52,7 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
-  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+  body: @once (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
   #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
 
@@ -70,6 +70,29 @@ public func withTaskGroup<ChildTaskResult, GroupResult>(
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
   #endif
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@available(SwiftStdlib 5.1, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+  ) async -> GroupResult
+)
+@usableFromInline
+internal func __abi_withTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult {
+  return await withTaskGroup(
+    of: childTaskResultType, returning: returnType, isolation: isolation,
+    body: body)
 }
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
@@ -176,7 +199,7 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
   isolation: isolated (any Actor)? = #isolation,
-  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+  body: @once (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
   #if compiler(>=5.5) && $BuiltinTaskGroupWithArgument
 
@@ -203,6 +226,29 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
   #endif
+}
+
+// ABI: Preserves the entry point from before `body` was exactly-once.
+@available(SwiftStdlib 5.1, *)
+@_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+@abi(
+  func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+    of childTaskResultType: ChildTaskResult.Type,
+    returning returnType: GroupResult.Type,
+    isolation: isolated (any Actor)?,
+    body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+  ) async rethrows -> GroupResult
+)
+@usableFromInline
+internal func __abi_withThrowingTaskGroup<ChildTaskResult, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type,
+  returning returnType: GroupResult.Type,
+  isolation: isolated (any Actor)?,
+  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult {
+  return try await withThrowingTaskGroup(
+    of: childTaskResultType, returning: returnType, isolation: isolation,
+    body: body)
 }
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions

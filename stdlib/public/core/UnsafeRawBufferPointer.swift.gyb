@@ -1131,7 +1131,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @export(implementation) @_transparent
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
+    _ body: @once (_ buffer: Unsafe${Mutable}BufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     guard let s = unsafe _position else {
       return try unsafe body(.init(start: nil, count: 0))
@@ -1183,7 +1183,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @export(implementation)
   @_transparent
   public func withContiguousMutableStorageIfAvailable<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     try unsafe withMemoryRebound(to: Element.self) { b in
       var buffer = unsafe b
@@ -1201,7 +1201,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @export(implementation)
   @_transparent
   public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+    _ body: @once (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     try unsafe withMemoryRebound(to: Element.self) {
       try unsafe body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
@@ -1524,7 +1524,7 @@ extension Unsafe${Mutable}RawBufferPointer: ConvertibleToBytes {}
 @safe
 public func withUnsafeMutableBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
-  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   unsafe _overrideLifetime(&value, borrowing: ())
   let pointer = UnsafeMutableRawPointer(Builtin.addressof(&value))
@@ -1558,7 +1558,7 @@ public func _withUnprotectedUnsafeMutableBytes<
   T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
   of value: inout T,
-  _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeMutableRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   unsafe _overrideLifetime(&value, borrowing: ())
 #if $BuiltinUnprotectedAddressOf
@@ -1596,7 +1596,7 @@ public func _withUnprotectedUnsafeMutableBytes<
 @safe
 public func withUnsafeBytes<T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable>(
   of value: inout T,
-  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   unsafe _overrideLifetime(&value, borrowing: ())
   let address = UnsafeRawPointer(Builtin.addressof(&value))
@@ -1629,7 +1629,7 @@ public func _withUnprotectedUnsafeBytes<
   T: ~Copyable & ~Escapable, E: Error, Result: ~Copyable
 >(
   of value: inout T,
-  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   unsafe _overrideLifetime(&value, borrowing: ())
 #if $BuiltinUnprotectedAddressOf
@@ -1669,7 +1669,7 @@ public func withUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   of value: borrowing T,
-  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
   let addr = UnsafeRawPointer(Builtin.addressOfBorrow(value))
   return try unsafe body(unsafe .init(start: addr, count: MemoryLayout<T>.size))
@@ -1705,7 +1705,7 @@ public func _withUnprotectedUnsafeBytes<
   T: ~Copyable, E: Error, Result: ~Copyable
 >(
   of value: borrowing T,
-  _ body: (UnsafeRawBufferPointer) throws(E) -> Result
+  _ body: @once (UnsafeRawBufferPointer) throws(E) -> Result
 ) throws(E) -> Result {
 #if $BuiltinUnprotectedAddressOf
   let addr = UnsafeRawPointer(Builtin.unprotectedAddressOfBorrow(value))

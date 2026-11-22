@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Utils/PartitionUtils.h"
+#include "llvm/ADT/SmallBitVector.h"
 
 #include <optional>
 
@@ -518,7 +519,7 @@ class RegionAnalysisFunctionInfo {
 
   SendingOperandToStateMap sendingOperandToStateMap;
 
-  // This is a cache for \c wasValueEverSent(SILValue), memoizing both
+  // This is a cache for \c wereValuesEverSent, memoizing both
   // positive and negative results.
   llvm::DenseMap<SILValue, bool> sentValuesCache;
 
@@ -633,15 +634,18 @@ public:
 
   bool isClosureCaptured(SILValue value, Operand *op);
 
-  /// Returns true if \p value's underlying tracked value is ever the target
-  /// of a `send` operation anywhere in this function's body.
+  /// Returns a bit for each of \p values that is set if the value's underlying
+  /// tracked value is ever the target of a `send` operation anywhere in this
+  /// function's body, if the function merges it into an actor's region, or if
+  /// the function hands it back to its caller through an `inout sending`
+  /// parameter or a `sending` result.
   ///
-  /// This replays the partition-op evaluation over every live block,
+  /// This replays the partition-op evaluation over every live block once,
   /// so "sent" here matches what SendNonSendable would report, as
   /// opposed to a purely syntactic search for `Send` operation,
   /// which would not account for elision (e.g. `nonisolated(unsafe)`,
-  /// same-actor sends). The result is cached in \c sentValuesCache.
-  bool wasValueEverSent(SILValue value);
+  /// same-actor sends). The results are cached in \c sentValuesCache.
+  llvm::SmallBitVector wereValuesEverSent(ArrayRef<SILValue> values);
 
   SILValue getUnderlyingTrackedValue(SILValue value) {
     return getValueMap().getRepresentative(value);

@@ -34,10 +34,17 @@ extension ThinToThickFunctionInst : Simplifiable, SILCombineSimplifiable {
       .getFunctionType(withRepresentation: type.functionTypeRepresentation)
       .getFunctionType(withNoEscape: type.isNoEscapeFunction)
       .getFunctionType(withCalleeConvention: type.calleeConvention)
+      // A conversion can't form a noncopyable function.
+      .getFunctionType(withExecutionSemantics: type.executionSemantics)
 
     let builder = Builder(before: self, context)
     let newThinToThick = builder.createThinToThickFunction(thinFunction: conversion.fromFunction,
                                                            resultType: thickType)
+    // The conversion doesn't change the thickened type, so it isn't needed.
+    if thickType == type {
+      replace(with: newThinToThick, context)
+      return
+    }
     let newConversion = builder.createConvertFunction(originalFunction: newThinToThick,
                                                       resultType: type,
                                                       kind: conversion.conversionKind)

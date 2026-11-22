@@ -290,7 +290,7 @@ fileprivate class _Lock {
 
 
   @discardableResult
-  func withLock<T>(_ body: () -> T) -> T {
+  func withLock<T>(_ body: @once () -> T) -> T {
     #if os(anyAppleOS)
     unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)

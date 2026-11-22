@@ -274,7 +274,7 @@ extension Slice where Base == UnsafeMutableRawBufferPointer {
   @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Result
+    _ body: @once (UnsafeMutableBufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     let buffer = unsafe Base(rebasing: self)
     return try unsafe buffer.withMemoryRebound(to: T.self, body)
@@ -507,7 +507,7 @@ extension Slice where Base == UnsafeRawBufferPointer {
   @export(implementation)
   public func withMemoryRebound<T: ~Copyable, E: Error, Result: ~Copyable>(
     to type: T.Type,
-    _ body: (UnsafeBufferPointer<T>) throws(E) -> Result
+    _ body: @once (UnsafeBufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     let buffer = unsafe Base(rebasing: self)
     return try unsafe buffer.withMemoryRebound(to: T.self, body)
@@ -681,7 +681,7 @@ extension Slice {
     T: ~Copyable, E: Error, Result: ~Copyable, Element
   >(
     to type: T.Type,
-    _ body: (UnsafeBufferPointer<T>) throws(E) -> Result
+    _ body: @once (UnsafeBufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result
   where Base == UnsafeBufferPointer<Element>
   {
@@ -1113,7 +1113,7 @@ extension Slice {
     T: ~Copyable, E: Error, Result: ~Copyable, Element
   >(
     to type: T.Type,
-    _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Result
+    _ body: @once (UnsafeMutableBufferPointer<T>) throws(E) -> Result
   ) throws(E) -> Result
   where Base == UnsafeMutableBufferPointer<Element>
   {
@@ -1122,7 +1122,7 @@ extension Slice {
 
   @export(implementation)
   public func withContiguousMutableStorageIfAvailable<R, Element>(
-    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+    _ body: @once (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
     try unsafe base.withContiguousStorageIfAvailable { buffer in
       let start = unsafe base.baseAddress?.advanced(by: startIndex)

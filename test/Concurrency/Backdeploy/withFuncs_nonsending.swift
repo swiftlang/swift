@@ -104,5 +104,5 @@ func testClockMeasure() async {
 // BACKDEPLOY-NO-EXTERNAL-REF-NOT: declare {{.*}}Nonsending
 // NEW-NO-EXTERNAL-REF-NOT: declare {{.*}}Nonsending
 
-// BACKDEPLOY: define linkonce_odr hidden swifttailcc void @"$ss43withUnsafeCurrentTaskNonsendingExportedImpl4bodyxxSctSgYaKYCXE_tYaKlF"
-// NEW: define linkonce_odr hidden swifttailcc void @"$ss43withUnsafeCurrentTaskNonsendingExportedImpl4bodyxxSctSgYaKYCXE_tYaKlF"
+// BACKDEPLOY: define linkonce_odr hidden swifttailcc void @"$ss43withUnsafeCurrentTaskNonsendingExportedImpl4bodyxxSctSgYaKYCXEn_tYaKlF"
+// NEW: define linkonce_odr hidden swifttailcc void @"$ss43withUnsafeCurrentTaskNonsendingExportedImpl4bodyxxSctSgYaKYCXEn_tYaKlF"

@@ -222,7 +222,7 @@ public struct Unmanaged<Instance: AnyObject> {
   @inlinable // unsafe-performance
   @_transparent
   public func _withUnsafeGuaranteedRef<Result>(
-    _ body: (Instance) throws -> Result
+    _ body: @once (Instance) throws -> Result
   ) rethrows -> Result {
     var tmp = unsafe self
     // Builtin.convertUnownedUnsafeToGuaranteed expects to have a base value
@@ -233,6 +233,20 @@ public struct Unmanaged<Instance: AnyObject> {
     let fakeBase: Int? = nil
     return try unsafe body(Builtin.convertUnownedUnsafeToGuaranteed(fakeBase,
                                                              &tmp._value))
+  }
+
+  // ABI: Preserves the entry point from before `body` was exactly-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func _withUnsafeGuaranteedRef<Result>(
+      _ body: (Instance) throws -> Result
+    ) rethrows -> Result
+  )
+  @usableFromInline
+  internal func __abi__withUnsafeGuaranteedRef<Result>(
+    _ body: (Instance) throws -> Result
+  ) rethrows -> Result {
+    return try unsafe _withUnsafeGuaranteedRef(body)
   }
 
   /// Performs an unbalanced retain of the object.

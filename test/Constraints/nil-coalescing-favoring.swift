@@ -23,7 +23,7 @@ do {
     let dict: Dictionary<Int, Sub>
     let sup: Super
 
-    // CHECK: declref_expr type="(consuming Super?, @autoclosure () throws -> Super) throws -> Super" {{.*}} decl="Swift.(file).??
+    // CHECK: declref_expr type="(consuming Super?, consuming @autoclosure @callable(once) () throws -> Super) throws -> Super" {{.*}} decl="Swift.(file).??
     let x = flatMap { dict[$0] } ?? sup // Ok
     let _: Super = x
   }
@@ -68,6 +68,6 @@ extension Int {
 }
 
 func test_optional_chaining(v: Int?, defaultV: Int) {
-  // CHECK: declref_expr type="(consuming Int?, @autoclosure () throws -> Int?) throws -> Int?" {{.*}} decl="Swift.(file).??
+  // CHECK: declref_expr type="(consuming Int?, consuming @autoclosure @callable(once) () throws -> Int?) throws -> Int?" {{.*}} decl="Swift.(file).??
   _ = (v ?? defaultV)?.test() // Ok (no warnings)
 }

@@ -936,7 +936,7 @@ extension Dictionary {
   ///   `defaultValue`.
   @inlinable
   public subscript(
-    key: Key, default defaultValue: @autoclosure () -> Value
+    key: Key, default defaultValue: @autoclosure @callable(once) () -> Value
   ) -> Value {
     @inline(__always)
     get {
@@ -953,6 +953,28 @@ extension Dictionary {
       let address = unsafe native._values + bucket.offset
       defer { _fixLifetime(self) }
       yield unsafe &address.pointee
+    }
+  }
+
+  // ABI: Preserves the accessors from before `defaultValue` was at-most-once.
+  // FIXME: Use `@abi` instead of `@_silgen_name` on the accessors once `@abi`
+  // supports storage with a `_modify` accessor (rdar://193376739).
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal subscript(
+    __abi key: Key, __abi_default defaultValue: @autoclosure () -> Value
+  ) -> Value {
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtcig")
+    get {
+      return self[key, default: defaultValue()]
+    }
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtcis")
+    set {
+      self[key, default: defaultValue()] = newValue
+    }
+    @_silgen_name("$sSD_7defaultq_x_q_yXKtciM")
+    _modify {
+      yield &self[key, default: defaultValue()]
     }
   }
 

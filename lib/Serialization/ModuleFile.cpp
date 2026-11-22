@@ -1090,9 +1090,13 @@ ModuleFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl *> &results) {
   if (!Core->LocalTypeDecls)
     return;
 
+  // A local type can be recorded under more than one mangled name.
+  llvm::SmallPtrSet<TypeDecl *, 8> seen;
   for (auto DeclID : Core->LocalTypeDecls->data()) {
     auto TD = cast<TypeDecl>(getDecl(DeclID));
     if (!ABIRoleInfo(TD).providesAPI()) // FIXME: flags
+      continue;
+    if (!seen.insert(TD).second)
       continue;
     results.push_back(TD);
   }

@@ -496,6 +496,71 @@ static bool knownToNotUseGenericMetadata(ApplySite &as) {
   return false;
 }
 
+SILValue swift::getStoredValueOfStackSlot(AllocStackInst *slot) {
+  StoreInst *singleStore = nullptr;
+  SmallVector<Operand *, 8> worklist(slot->getUses());
+  while (!worklist.empty()) {
+    SILInstruction *user = worklist.pop_back_val()->getUser();
+    if (auto *access = dyn_cast<BeginAccessInst>(user)) {
+      worklist.append(access->getUses().begin(), access->getUses().end());
+    } else if (auto *store = dyn_cast<StoreInst>(user)) {
+      if (singleStore)
+        return SILValue();
+      singleStore = store;
+    } else if (!isa<LoadInst, EndAccessInst, DestroyAddrInst, DeallocStackInst,
+                    DebugValueInst>(user)) {
+      return SILValue();
+    }
+  }
+  return singleStore ? singleStore->getSrc() : SILValue();
+}
+
+SILValue swift::getStoredValueOfLoadedStackSlot(SILValue value) {
+  auto *load = dyn_cast<LoadInst>(value);
+  if (!load)
+    return SILValue();
+  SILValue address = load->getOperand();
+  if (auto *access = dyn_cast<BeginAccessInst>(address))
+    address = access->getSource();
+  auto *slot = dyn_cast<AllocStackInst>(address);
+  if (!slot)
+    return SILValue();
+  return getStoredValueOfStackSlot(slot);
+}
+
+/// Returns true if destroying \p closure only ends the lifetime of the context
+/// of an on-stack noncopyable closure that owns no nontrivial value. Since a
+/// stack-allocated context isn't freed, that doesn't release or deallocate
+/// anything.
+static bool isOnStackClosureWithTrivialCaptures(SILValue closure) {
+  while (true) {
+    if (isa<MoveValueInst, BeginBorrowInst, ConvertFunctionInst,
+            ConvertEscapeToNoEscapeInst>(closure)) {
+      closure = cast<SingleValueInstruction>(closure)->getOperand(0);
+    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(closure)) {
+      closure = mdi->getValue();
+    } else if (SILValue stored = getStoredValueOfLoadedStackSlot(closure)) {
+      // A noncopyable closure that's passed to a `consuming` parameter lives
+      // in the parameter's stack slot.
+      closure = stored;
+    } else {
+      break;
+    }
+  }
+  auto *pai = dyn_cast<PartialApplyInst>(closure);
+  if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
+    return false;
+  ApplySite site(pai);
+  return llvm::all_of(pai->getArgumentOperands(), [&](Operand &argOp) {
+    SILType type = argOp.get()->getType();
+    // The context captures an address without owning the value, except for
+    // a noncopyable value that the closure consumes.
+    if (type.isAddress())
+      return !site.hasContextOwnedAddressArgument(argOp);
+    return type.isTrivial(*pai->getFunction());
+  });
+}
+
 RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType) {
   auto ifNonTrivial = [&](SILType type, RuntimeEffect effect) -> RuntimeEffect {
     // Nonescaping closures are modeled with ownership to track borrows, but
@@ -895,6 +960,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isTrivial(*inst->getFunction()))
       return RuntimeEffect::NoEffect;
+    // The stack slot of a `consuming` closure parameter.
+    if (auto *slot = dyn_cast<AllocStackInst>(inst->getOperand(0))) {
+      SILValue stored = getStoredValueOfStackSlot(slot);
+      if (stored && isOnStackClosureWithTrivialCaptures(stored))
+        return RuntimeEffect::NoEffect;
+    }
     if (!impactType.isLoadable(*inst->getFunction()))
       return RuntimeEffect::Releasing | RuntimeEffect::MetaData;
     return RuntimeEffect::Releasing;
@@ -978,12 +1049,15 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = inst->getOperand(0)->getType();
     if (impactType.isBlockPointerCompatible())
       return RuntimeEffect::ObjectiveC | RuntimeEffect::Releasing;
-    if (impactType.isMoveOnly() &&
+    if (impactType.isMoveOnly() && !impactType.is<SILFunctionType>() &&
         !isa<DropDeinitInst>(lookThroughOwnershipInsts(inst->getOperand(0)))) {
       // Not de-virtualized value type deinits can require metatype in case the
-      // deinit needs to be called via the value witness table.
+      // deinit needs to be called via the value witness table. A noncopyable
+      // function has no deinit to call.
       return RuntimeEffect::MetaData | RuntimeEffect::Releasing;
     }
+    if (isOnStackClosureWithTrivialCaptures(inst->getOperand(0)))
+      return RuntimeEffect::NoEffect;
     return ifNonTrivial(inst->getOperand(0)->getType(),
                         RuntimeEffect::Releasing);
 

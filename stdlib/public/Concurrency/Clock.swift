@@ -52,11 +52,26 @@ extension Clock {
   ///          someWork()
   ///       }
   @available(StdlibDeploymentTarget 5.7, *)
-  public func measure(_ work: () throws -> Void) rethrows -> Instant.Duration {
+  public func measure(_ work: @once () throws -> Void) rethrows -> Instant.Duration {
     let start = now
     try work()
     let end = now
     return start.duration(to: end)
+  }
+
+  // ABI: Preserves the entry point from before `work` was exactly-once.
+  @available(StdlibDeploymentTarget 5.7, *)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func measure(
+      _ work: () throws -> Void
+    ) rethrows -> Instant.Duration
+  )
+  @usableFromInline
+  internal func __abi_measure(
+    _ work: () throws -> Void
+  ) rethrows -> Instant.Duration {
+    return try measure(work)
   }
 
   /// Measure the elapsed time to execute an asynchronous closure.
@@ -68,7 +83,7 @@ extension Clock {
   @available(StdlibDeploymentTarget 5.7, *)
   @export(implementation)
   public nonisolated(nonsending) func measure(
-    _ work: nonisolated(nonsending) () async throws -> Void
+    _ work: nonisolated(nonsending) @once () async throws -> Void
   ) async rethrows -> Instant.Duration {
     let start = now
     try await work()
@@ -81,7 +96,7 @@ extension Clock {
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
-    _ work: () async throws -> Void
+    _ work: @once () async throws -> Void
   ) async rethrows -> Instant.Duration {
     let start = now
     try await work()

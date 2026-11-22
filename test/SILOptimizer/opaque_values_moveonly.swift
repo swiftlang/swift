@@ -124,10 +124,12 @@ func readInDefer<T: ~Copyable>(_ a: consuming T) {
   n = a
 }
 
+// The right-hand side of && is an at-most-once autoclosure, which can consume
+// its capture.
 func consumeInAutoclosure<T: ~Copyable>(_ a: consuming T, _ c: Bool) -> Bool {
-  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  let n: T
   n = a
-  return c && take(n) // expected-note {{consumed here}}
+  return c && take(n)
 }
 
 func consumeInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {

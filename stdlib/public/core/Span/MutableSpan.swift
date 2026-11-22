@@ -551,7 +551,7 @@ extension MutableSpan where Element: ~Copyable {
   @_transparent
   @safe
   public func withUnsafeBufferPointer<E: Error, Result: ~Copyable>(
-    _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
+    _ body: @once (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     try Span(_mutableSpan: self).withUnsafeBufferPointer(body)
   }
@@ -577,7 +577,7 @@ extension MutableSpan where Element: ~Copyable {
   public mutating func withUnsafeMutableBufferPointer<
     E: Error, Result: ~Copyable
   >(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
+    _ body: @once (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
       start: _pointer, count: _count &* MemoryLayout<Element>.stride
@@ -612,7 +612,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   @_transparent
   @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
-    _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
+    _ body: @once (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe RawSpan(_mutableSpan: self).withUnsafeBytes(body)
   }
@@ -637,7 +637,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   @_lifetime(self: copy self)
   @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
-    _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
+    _ body: @once (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     let bytes = unsafe UnsafeMutableRawBufferPointer(
       start: _pointer, count: _count &* MemoryLayout<Element>.stride

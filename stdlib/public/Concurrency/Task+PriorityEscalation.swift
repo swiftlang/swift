@@ -130,7 +130,7 @@ extension UnsafeCurrentTask {
 @export(implementation)
 @available(SwiftStdlib 6.2, *)
 public nonisolated(nonsending) func withTaskPriorityEscalationHandler<T, E>(
-  operation: nonisolated(nonsending)  () async throws(E) -> T,
+  operation: nonisolated(nonsending) @once () async throws(E) -> T,
   onPriorityEscalated handler: @Sendable (TaskPriority, TaskPriority) -> Void
 ) async throws(E) -> T {
   return try await __withTaskPriorityEscalationHandler0(
@@ -164,7 +164,7 @@ public func _isolatedParameter_withTaskPriorityEscalationHandler<T, E>(
 @available(SwiftStdlib 6.2, *)
 @export(implementation)
 nonisolated(nonsending) func __withTaskPriorityEscalationHandler0<T, E>(
-  operation: nonisolated(nonsending) () async throws(E) -> T,
+  operation: nonisolated(nonsending) @once () async throws(E) -> T,
   onPriorityEscalated handler0: @Sendable (UInt8, UInt8) -> Void
 ) async throws(E) -> T {
 #if $BuiltinConcurrencyStackNesting

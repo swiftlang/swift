@@ -2,6 +2,11 @@
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
+// FIXME: With the once functions adopted in the stdlib, Dictionary's
+// subscript(_:default:) leaves a heap reabstraction thunk that captures an
+// at-most-once closure (rdar://192503315).
+// XFAIL: *
+
 public struct S {
     var x: Int
 

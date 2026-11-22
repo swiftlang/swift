@@ -226,7 +226,7 @@ extension String {
   @export(implementation)
   @safe
   public mutating func withUTF8<R, E: Error>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
     makeContiguousUTF8()
     return try _guts.withFastUTF8(body)
@@ -294,7 +294,7 @@ extension Substring {
   @export(implementation)
   @safe
   public mutating func withUTF8<R, E: Error>(
-    _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R
+    _ body: @once (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
     makeContiguousUTF8()
     return try _wholeGuts.withFastUTF8(range: _offsetRange, body)

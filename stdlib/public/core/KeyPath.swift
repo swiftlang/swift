@@ -159,7 +159,7 @@ public class AnyKeyPath: _AppendKeyPath {
   @_unavailableInEmbedded
   internal static func _create(
     capacityInBytes bytes: Int,
-    initializedBy body: (UnsafeMutableRawBufferPointer) -> Void
+    initializedBy body: @once (UnsafeMutableRawBufferPointer) -> Void
   ) -> Self {
     _internalInvariant(bytes > 0 && bytes % 4 == 0,
                  "capacity must be multiple of 4 bytes")
@@ -203,7 +203,7 @@ public class AnyKeyPath: _AppendKeyPath {
     return result
   }
   
-  final internal func withBuffer<T>(_ f: (KeyPathBuffer) throws -> T) rethrows -> T {
+  final internal func withBuffer<T>(_ f: @once (KeyPathBuffer) throws -> T) rethrows -> T {
     defer { _fixLifetime(self) }
     
     let base = UnsafeRawPointer(Builtin.projectTailElems(self, Int32.self))

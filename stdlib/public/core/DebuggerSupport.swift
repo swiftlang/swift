@@ -113,8 +113,8 @@ public enum _DebuggerSupport {
   
   private static func checkValue<T>(
     _ value: Any,
-    ifClass: (AnyObject) -> T,
-    otherwise: () -> T
+    ifClass: @callable(once) (AnyObject) -> T,
+    otherwise: @callable(once) () -> T
   ) -> T {
     if isClass(value) {
       return ifClass(_unsafeDowncastToAnyObject(fromAny: value))
@@ -389,7 +389,7 @@ public func _debuggerTestingCheckExpect(_: String, _: String) { }
 @export(implementation) @_transparent
 internal func _withHeapObject<R>(
   of object: AnyObject,
-  _ body: (UnsafeMutableRawPointer) -> R
+  _ body: @once (UnsafeMutableRawPointer) -> R
 ) -> R {
   defer { _fixLifetime(object) }
   let unmanaged = unsafe Unmanaged.passUnretained(object)

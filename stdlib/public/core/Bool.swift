@@ -276,9 +276,21 @@ extension Bool {
   ///   - rhs: The right-hand side of the operation.
   @_transparent
   @inline(__always)
-  public static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func && (lhs: Bool, rhs: @autoclosure @callable(once) () throws -> Bool) rethrows
       -> Bool {
     return lhs ? try rhs() : false
+  }
+
+  // ABI: Preserves the entry point from before `rhs` was at-most-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    static func && (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows -> Bool
+  )
+  @usableFromInline
+  internal static func __abi_and(
+    lhs: Bool, rhs: @autoclosure () throws -> Bool
+  ) rethrows -> Bool {
+    return try lhs && rhs()
   }
 
   /// Performs a logical OR operation on two Boolean values.
@@ -316,9 +328,21 @@ extension Bool {
   ///   - rhs: The right-hand side of the operation.
   @_transparent
   @inline(__always)
-  public static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows
+  public static func || (lhs: Bool, rhs: @autoclosure @callable(once) () throws -> Bool) rethrows
       -> Bool {
     return lhs ? true : try rhs()
+  }
+
+  // ABI: Preserves the entry point from before `rhs` was at-most-once.
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    static func || (lhs: Bool, rhs: @autoclosure () throws -> Bool) rethrows -> Bool
+  )
+  @usableFromInline
+  internal static func __abi_or(
+    lhs: Bool, rhs: @autoclosure () throws -> Bool
+  ) rethrows -> Bool {
+    return try lhs || rhs()
   }
 }
 

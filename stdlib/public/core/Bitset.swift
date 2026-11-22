@@ -361,7 +361,7 @@ extension _UnsafeBitset {
 #endif
   internal static func _withTemporaryUninitializedBitset<R, E: Error>(
     wordCount: Int,
-    body: (_UnsafeBitset) throws(E) -> R
+    body: @once (_UnsafeBitset) throws(E) -> R
   ) throws(E) -> R {
     try withUnsafeTemporaryAllocation(
       of: _UnsafeBitset.Word.self, capacity: wordCount
@@ -376,7 +376,7 @@ extension _UnsafeBitset {
   @inline(__always)
   internal static func withTemporaryBitset<R, E: Error>(
     capacity: Int,
-    body: (_UnsafeBitset) throws(E) -> R
+    body: @once (_UnsafeBitset) throws(E) -> R
   ) throws(E) -> R {
     let wordCount = Swift.max(1, Self.wordCount(forCapacity: capacity))
     return try unsafe _withTemporaryUninitializedBitset(
@@ -393,7 +393,7 @@ extension _UnsafeBitset {
   @inline(__always)
   internal static func withTemporaryCopy<R, E: Error>(
     of original: _UnsafeBitset,
-    body: (_UnsafeBitset) throws(E) -> R
+    body: @once (_UnsafeBitset) throws(E) -> R
   ) throws(E) -> R {
     try unsafe _withTemporaryUninitializedBitset(
       wordCount: original.wordCount

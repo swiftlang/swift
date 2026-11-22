@@ -299,7 +299,7 @@ public struct AsyncStream<Element> {
   public init(
     _ elementType: Element.Type = Element.self,
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
-    _ build: (Continuation) -> Void
+    _ build: @once (Continuation) -> Void
   ) {
     let storage: _Storage = .create(limit: limit)
     context = _Context(storage: storage, produce: storage.next)

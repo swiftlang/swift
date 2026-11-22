@@ -336,7 +336,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
   public init(
     _ elementType: Element.Type = Element.self,
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded,
-    _ build: (Continuation) -> Void
+    _ build: @once (Continuation) -> Void
   ) where Failure == Error {
     let storage: _Storage = .create(limit: limit)
     context = _Context(storage: storage, produce: storage.next)

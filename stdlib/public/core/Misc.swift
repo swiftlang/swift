@@ -169,7 +169,7 @@ internal func _getTypeByMangledNameInContextQuiet(
 @export(implementation)
 @_semantics("no_performance_analysis")
 @unsafe
-public func _unsafePerformance<T>(_ c: () -> T) -> T {
+public func _unsafePerformance<T>(_ c: @once () -> T) -> T {
   return c()
 }
 
@@ -178,7 +178,7 @@ public func _unsafePerformance<T>(_ c: () -> T) -> T {
 // and vice-versa.
 @export(implementation)
 @inline(__always)
-func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
+func _rethrowsViaClosure(_ fn: @once () throws -> ()) rethrows {
   try fn()
 }
 
