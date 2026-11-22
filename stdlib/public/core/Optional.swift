@@ -415,7 +415,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Optional where Wrapped: ~Copyable & Escapable {
-  @available(*, deprecated, renamed: "span")
+  @available(*, deprecated, renamed: "getter:span()")
   @export(implementation)
   @_addressableSelf
   @_lifetime(borrow self)
