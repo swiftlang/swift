@@ -458,6 +458,10 @@ OptionalTests.test("Span from Optional.some")
     expectNotEqual(span[0], b, "accessed mysterious memory location")
   }
   o = nil
+
+  let n: LifetimeTracked?? = .some(nil)
+  expectEqual(n.span.count, 1)
+  expectNil(n.span[0])
 }
 
 OptionalTests.test("Span from Optional as a function argument")
@@ -493,12 +497,12 @@ OptionalTests.test("Optional.edit shadows the wrapped type's edit")
 .require(.minimumStdlib(.stdlib_6_5)).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  var iou: UniqueArray<Int>! = .init(copying: [1, 2, 3])
-  iou.edit {
+  var iuo: UniqueArray<Int>! = .init(copying: [1, 2, 3])
+  iuo.edit {
     expectEqual($0.count, 1)
   }
 
-  iou!.edit {
+  iuo!.edit {
     expectEqual($0.count, 3)
   }
 }
@@ -532,19 +536,21 @@ struct TestError: Error, Equatable {}
 
 OptionalTests.test("edit")
 .require(.minimumStdlib(.stdlib_6_5)).code {
-  var o = Optional<LifetimeTracked>.none
+  var o = Optional<LifetimeTracked?>.none
   o.edit {
     expectEqual($0.count, 0)
     expectEqual($0.capacity, 1)
   }
   expectNil(o)
+  let count = o.edit { $0.count }
+  expectEqual(count, 0)
 
   o = LifetimeTracked(1)
   o.edit {
     expectEqual($0.count, 1)
     expectEqual($0.capacity, 1)
   }
-  expectEqual(o?.value, 1)
+  expectEqual(o??.value, 1)
 
   o.edit {
     $0.removeAll()
@@ -557,12 +563,28 @@ OptionalTests.test("edit")
     $0.removeAll()
     $0.append(LifetimeTracked(3))
   }
-  expectEqual(o?.value, 3)
+  expectEqual(o??.value, 3)
   expectEqual(LifetimeTracked.instances, 1)
   o = nil
 
-  let count = o.edit { $0.count }
-  expectEqual(count, 0)
+  o.edit {
+    $0.append(LifetimeTracked(4))
+    _ = $0.removeLast()
+    // count returned to 0, but the storage was used and must now be cleared.
+  }
+  expectNil(o)
+  expectEqual(LifetimeTracked.instances, 0)
+
+  o.edit { $0.append(nil) }
+  expectNotNil(o)
+  expectNil(o!)
+  o.edit { $0[0].edit { $0.removeAll() } }
+  expectNotNil(o)
+  expectNil(o!)
+  o.edit { expectEqual($0.count, 1) }
+  expectNotNil(o)
+  expectNil(o!)
+  expectEqual(LifetimeTracked.instances, 0)
 }
 
 OptionalTests.test("edit with throwing closure")
@@ -576,19 +598,19 @@ OptionalTests.test("edit with throwing closure")
     }
     expectUnreachable()
   } catch {
-    expectTrue(error == TestError())
+    expectEqual(error, TestError())
   }
   expectNil(o)
 
   do throws(TestError) {
     try o.edit {
-      span throws(TestError)  in
+      span throws(TestError) in
       span.append(LifetimeTracked(2))
       throw TestError()
     }
     expectUnreachable()
   } catch {
-    expectTrue(error == TestError())
+    expectEqual(error, TestError())
   }
   expectEqual(o?.value, 2)
   o = nil
@@ -599,6 +621,7 @@ OptionalTests.test("edit: wrapped type without spare bits")
   var o = Optional<Int>.none
   o.edit { $0.append(42) }
   expectEqual(o, 42)
+  expectNotNil(o)
   o.edit { $0.removeAll() }
   expectNil(o)
   o.edit { _ in }
@@ -618,23 +641,40 @@ OptionalTests.test("edit: noncopyable wrapped type")
   expectNil(o)
   expectEqual(LifetimeTracked.instances, 0)
 
+  expectEqual(o.span.count, 0)
+  expectEqual(o.mutableSpan.count, 0)
+
   o.edit { $0.append(NCInt(2)) }
   o.edit { expectEqual($0.count, 1) }
+  expectEqual(LifetimeTracked.instances, 1)
+
+  expectEqual(o.span.count, 1)
+  expectEqual(o.span[0].tracker.value, 2)
+
+  var mutableSpan = o.mutableSpan
+  expectEqual(mutableSpan.count, 1)
+  mutableSpan[0] = NCInt(3)
+  _ = consume mutableSpan
+  expectEqual(o.span[0].tracker.value, 3)
   expectEqual(LifetimeTracked.instances, 1)
 
   // the worst way to write o.take()
   let nci = o.edit { $0.removeLast() }
   expectNil(o)
-  expectEqual(nci.tracker.value, 2)
+  expectEqual(nci.tracker.value, 3)
   _ = consume nci
+  expectEqual(LifetimeTracked.instances, 0)
 }
 
 OptionalTests.test("edit: capacity is one")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
+.skip(.custom(
+  { _isFastAssertConfiguration() },
+  reason: "this trap is not guaranteed to happen in -Ounchecked"))
 .code {
   var o = Optional<Int>.none
-  expectCrashLater()
+  expectCrashLater(withDebugMessage: "OutputSpan capacity overflow")
   o.edit {
     $0.append(1)
     $0.append(2)
