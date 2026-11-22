@@ -500,7 +500,7 @@ extension Optional where Wrapped: ~Copyable & Escapable {
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///   argument.
   @export(implementation)
-  mutating public func edit<E: Error, R: ~Copyable>(
+  public mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Wrapped>) throws(E) -> R
   ) throws(E) -> R {
     let count = (self == nil) ? 0 : 1
