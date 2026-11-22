@@ -382,24 +382,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
-    if("${arch}" MATCHES "wasm32")
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        ExecutorImpl.swift
-        PlatformExecutorCooperative.swift
-      )
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
-        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-        ExecutorImpl.cpp
-      )
-    else()
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        PlatformExecutorNone.swift
-      )
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
-        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-      )
-    endif()
-
     # Restrict each call below to the current triple by temporarily narrowing
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
@@ -417,9 +399,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       swift_Concurrency
       IS_STDLIB
 
-      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
-      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
+      PlatformExecutorNone.swift
       EmbeddedMainExecutor.swift
 
       GYB_SOURCES

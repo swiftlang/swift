@@ -12,9 +12,11 @@
 // 256 is above WasmKit's limit of 64 threads.
 // RUN: %if wasi_threads %{ env %env-SWIFT_HARDWARE_CONCURRENCY=256 %target-run %t/pool.out | %FileCheck %s --check-prefixes=CHECK,POOL,TWO %}
 // RUN: %if wasi_threads %{ %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/after.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-cxx-lib -lswift_Concurrency -lswift_ConcurrencyThreadPoolExecutor %target-embedded-concurrency-threading-shim %target-embedded-synchronization -dead_strip %}
-// RUN: %if wasi_threads %{ %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/cooperative.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-cxx-lib -lswift_Concurrency %target-embedded-concurrency-threading-shim %target-embedded-synchronization -dead_strip %}
-// RUN: %if wasi_threads %{ env %env-SWIFT_HARDWARE_CONCURRENCY=1 %target-run %t/after.out | %FileCheck %s --check-prefixes=CHECK,COOPERATIVE,ONE %}
+// RUN: %if wasi_threads %{ %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/cooperative.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-cxx-lib -lswift_ConcurrencyDefaultExecutor -lswift_Concurrency %target-embedded-concurrency-threading-shim %target-embedded-synchronization -dead_strip %}
+// RUN: %if wasi_threads %{ env %env-SWIFT_HARDWARE_CONCURRENCY=1 %target-run %t/after.out | %FileCheck %s --check-prefixes=CHECK,POOL,ONE %}
 // RUN: %if wasi_threads %{ env %env-SWIFT_HARDWARE_CONCURRENCY=1 %target-run %t/cooperative.out | %FileCheck %s --check-prefixes=CHECK,COOPERATIVE,ONE %}
+// RUN: %if wasi_threads %{ %target-embedded-link %target-clang-resource-dir-opt %t/main.o -o %t/both.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-cxx-lib -lswift_ConcurrencyThreadPoolExecutor -lswift_ConcurrencyDefaultExecutor -lswift_Concurrency %target-embedded-concurrency-threading-shim %target-embedded-synchronization -dead_strip %}
+// RUN: %if wasi_threads %{ env %env-SWIFT_HARDWARE_CONCURRENCY=1 %target-run %t/both.out | %FileCheck %s --check-prefixes=CHECK,POOL,ONE %}
 // RUN: %if wasi_threads %{ %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -wmo -import-bridging-header %t/BridgingHeader.h %t/Main.swift -c -o %t/noworkers.o -D NO_WORKERS %}
 // RUN: %if wasi_threads %{ %target-embedded-link %target-clang-resource-dir-opt %t/noworkers.o -o %t/noworkers.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-cxx-lib -lswift_ConcurrencyThreadPoolExecutor -lswift_Concurrency %target-embedded-concurrency-threading-shim %target-embedded-synchronization -dead_strip %}
 // RUN: %if wasi_threads %{ %target-run %t/noworkers.out | %FileCheck %s --check-prefix=NO-WORKERS %}

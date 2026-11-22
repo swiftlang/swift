@@ -600,6 +600,9 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
+///
+/// Embedded Swift does not enqueue jobs on a factory's executors. It enqueues
+/// them through the Concurrency PAL (`SwiftPlatform/Concurrency.h`).
 @_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 public protocol ExecutorFactory {
@@ -621,9 +624,9 @@ typealias DefaultExecutorFactory = PlatformExecutorFactory
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
-  #if os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #if !$Embedded && (os(WASI) || os(Emscripten) || !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   MainActor._executor = factory.mainExecutor
-  #endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  #endif // !$Embedded && (os(WASI) || os(Emscripten) || !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
   Task._defaultExecutor = factory.defaultExecutor
 }
 
@@ -635,7 +638,7 @@ func _createDefaultExecutors() {
   }
 }
 
-#if os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+#if !$Embedded && (os(WASI) || os(Emscripten) || !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 extension MainActor {
   @available(StdlibDeploymentTarget 6.3, *)
   static var _executor: (any MainExecutor)? = nil
@@ -660,7 +663,14 @@ extension MainActor {
     return unsafe UnownedSerialExecutor(ordinary: _executor!)
   }
 }
-#endif // os(WASI) || os(Emscripten) || (!$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+#elseif $Embedded && (os(WASI) || os(Emscripten))
+extension MainActor {
+  /// The main executor of the Concurrency PAL.
+  @_spi(ExperimentalCustomExecutors)
+  @available(StdlibDeploymentTarget 6.3, *)
+  public static var executor: any MainExecutor { EmbeddedMainExecutor.shared }
+}
+#endif // !$Embedded && (os(WASI) || os(Emscripten) || !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
 
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.3, *)

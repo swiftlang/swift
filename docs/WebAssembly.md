@@ -12,9 +12,11 @@ available yet, specifically:
   3. A preview of multi-threading and atomics is available in some browsers and stand-alone
   WebAssembly hosts. The multi-threading feature is available for `wasm32-unknown-wasip1-threads` triple, but it's not
     in the `wasm32-unknown-wasip1` triple.
-    Embedded Swift programs for `wasm32-unknown-wasip1-threads` run every task on the main thread unless they
-    link `libswift_ConcurrencyThreadPoolExecutor.a` (`-lswift_ConcurrencyThreadPoolExecutor`) before
-    `libswift_Concurrency.a`. With the pool executor, main-actor jobs run on the main thread and other jobs
+    Embedded Swift programs that use `Task` or `MainActor` link an executor archive. Swift SDKs add
+    `libswift_ConcurrencyDefaultExecutor.a`, which runs every task on the main thread. Programs for
+    `wasm32-unknown-wasip1-threads` run tasks on the pool executor when they list
+    `libswift_ConcurrencyThreadPoolExecutor.a` (`-lswift_ConcurrencyThreadPoolExecutor`) before
+    `libswift_ConcurrencyDefaultExecutor.a`. With the pool executor, main-actor jobs run on the main thread and other jobs
     on a pool of threads. Such a program needs a host that implements the `wasi` `thread-spawn` import and
     lets the main thread block while it waits for work, which browsers do not allow on their main thread.
     WASI cannot report the processor count. The pool has as many threads as the `SWIFT_HARDWARE_CONCURRENCY`

@@ -21,11 +21,21 @@ internal final class EmbeddedMainExecutor: SerialExecutor {
   }
 }
 
-// On wasm32, ExecutorImpl.swift defines swift_task_getMainExecutorImpl.
-#if !arch(wasm32)
+#if os(WASI) || os(Emscripten)
+@available(StdlibDeploymentTarget 6.3, *)
+extension EmbeddedMainExecutor: MainExecutor {
+  func run() throws {
+    _asyncMainDrainQueue()
+  }
+
+  func stop() {
+    fatalError("The main executor of the Concurrency PAL cannot be stopped")
+  }
+}
+#endif
+
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
 internal func getMainExecutor() -> UnownedSerialExecutor {
   return unsafe EmbeddedMainExecutor.shared.asUnownedSerialExecutor()
 }
-#endif

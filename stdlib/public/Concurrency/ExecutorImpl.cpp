@@ -18,11 +18,6 @@
 #include "ExecutorBridge.h"
 #include "swift/Runtime/Casting.h"
 
-#if SWIFT_CONCURRENCY_EMBEDDED
-#include "ExecutorImpl.h"
-#include "SwiftPlatform/Concurrency.h"
-#endif
-
 using namespace swift;
 
 #pragma clang diagnostic push
@@ -46,33 +41,6 @@ int8_t _swift_task_isIsolatingCurrentContextSwift(
   const Metadata *executorType,
   const SerialExecutorWitnessTable *witnessTable
 );
-
-#if SWIFT_CONCURRENCY_EMBEDDED
-
-extern "C" __attribute__((weak))
-void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
-  swift_task_enqueueGlobalImpl(job);
-}
-
-extern "C"
-void swift_task_enqueueMainExecutorDefault(SwiftJob *job) {
-  swift_task_enqueueMainExecutorImpl(job);
-}
-
-extern "C" __attribute__((weak, alias("swift_task_enqueueMainExecutorDefault")))
-void _swift_concurrency_enqueueMainExecutor(SwiftJob *job);
-
-extern "C" SWIFT_CC(swift) bool swift_task_isMainEnqueueReplaced(void) {
-  return &_swift_concurrency_enqueueMainExecutor !=
-         &swift_task_enqueueMainExecutorDefault;
-}
-
-extern "C" __attribute__((weak))
-void _swift_concurrency_asyncMain(void) {
-  swift_task_asyncMainDrainQueueImpl();
-}
-
-#else
 
 extern "C" SWIFT_CC(swift) void swift_task_checkIsolatedImpl(
     SerialExecutorRef executor) {
@@ -118,5 +86,3 @@ extern "C" SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(
              identity, swift_getObjectType(identity),
              executor.getSerialExecutorWitnessTable());
 }
-
-#endif
