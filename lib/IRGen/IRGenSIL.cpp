@@ -6134,6 +6134,25 @@ void IRGenSILFunction::visitLoadInst(swift::LoadInst *i) {
   }
   setLoweredExplosion(i, lowered);
 }
+
+/// Return the address of \p alloca as an address of a value of type \p TI.
+///
+/// The peepholes below forward an alloca that was created for the coercion
+/// of a value to or from its native explosion (see allocateForCoercion).
+/// Such an alloca is only aligned for the LLVM types of the coercion. Swift
+/// storage types are packed structs, so the alignment of the Swift type can be
+/// larger (16 for a struct holding a SIMD4<Float>), and the returned address
+/// claims that alignment. Raise the alignment of the alloca to match, otherwise
+/// a copy through the returned address may use an instruction that requires it
+/// (e.g. movaps on x86_64) on a misaligned stack slot.
+static Address getAllocaAddressForType(const TypeInfo &TI,
+                                       llvm::AllocaInst *alloca) {
+  Alignment alignment = TI.getBestKnownAlignment();
+  if (alloca->getAlign().value() < alignment.getValue())
+    alloca->setAlignment(llvm::Align(alignment.getValue()));
+  return TI.getAddressForPointer(alloca);
+}
+
 static Address isSafeForMemCpyPeephole(const TypeInfo &TI, SILArgument *arg,
                                        Explosion &argSrc, AllocStackInst *dst,
                                        Address storeDst,
@@ -6207,7 +6226,7 @@ static Address isSafeForMemCpyPeephole(const TypeInfo &TI, SILArgument *arg,
   // alloca marked by the lifetime intrinsic.
   insertPt = load;
 
-  return TI.getAddressForPointer(alloca);
+  return getAllocaAddressForType(TI, alloca);
 }
 
 static Address canForwardIndirectResultAlloca(const TypeInfo &TI,
@@ -6252,7 +6271,7 @@ static Address canForwardIndirectResultAlloca(const TypeInfo &TI,
   // alloca marked by the lifetime intrinsic.
   insertPt = load;
 
-  return TI.getAddressForPointer(alloca);
+  return getAllocaAddressForType(TI, alloca);
 }
 
 void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
