@@ -8378,13 +8378,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // UnsafeMutablePointer can be converted from an inout reference to a
         // scalar or array.
         if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
-          // With SubscriptParametersWithOwnership, a subscript index declared
-          // `inout` takes the exclusive access itself, and these implicit
-          // pointer conversions do not apply in that position.
-          bool inoutSubscriptArg =
-              getASTContext().LangOpts.hasFeature(
-                  Feature::SubscriptParametersWithOwnership) &&
-              isArgumentOfSubscript(locator);
+          // A subscript index declared `inout` takes the exclusive access
+          // itself, and these implicit pointer conversions do not apply in
+          // that position.
+          bool inoutSubscriptArg = isArgumentOfSubscript(locator);
           if (!isAutoClosureArgument && !inoutSubscriptArg) {
             auto inoutBaseType = getFixedTypeRecursive(
                 inoutType1->getInOutObjectType(), /*wantRValue=*/true);
