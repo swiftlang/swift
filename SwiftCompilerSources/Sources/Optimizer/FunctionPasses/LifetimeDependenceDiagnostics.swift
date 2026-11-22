@@ -341,8 +341,10 @@ private class DiagnoseDependence {
     }
   }
 
+  // If the error is inside a compiler-generated initializer or accessor, point that out, since the source location
+  // is otherwise misleading. Explicitly written functions don't need the note.
   func diagnoseImplicitFunction() {
-    guard let funcLoc = function.location.sourceLoc else {
+    guard function.isImplicit, let funcLoc = function.location.sourceLoc else {
       return
     }
     if let kindName = {
