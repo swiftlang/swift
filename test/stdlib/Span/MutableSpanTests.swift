@@ -288,34 +288,23 @@ suite.test("withUnsafeMutableBytes")
   expectEqual(Int(a[i]), i+1)
 }
 
-private class ID {
-  let id: Int
-  init(id: Int) {
-    self.id = id
-  }
-  deinit {
-    // print(id)
-  }
-}
-
-suite.test("update(repeating:)")
-.require(.minimumStdlib(.stdlib_6_2))
-.code {
-  var a = ContiguousArray((0..<8).map(ID.init(id:)))
-  expectEqual(a.map(\.id).contains(.max), false)
-  var span = a.mutableSpan
-  span.update(repeating: ID(id: .max))
-  expectEqual(a.allSatisfy({ $0.id == .max }), true)
-}
-
 suite.test("updateAll(repeating:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
-  var a = ContiguousArray((0..<8).map(ID.init(id:)))
-  expectEqual(a.map(\.id).contains(.max), false)
+  let capacity = 8
+  let originalInstances = LifetimeTracked.instances
+  var a = ContiguousArray((0..<capacity).map { LifetimeTracked($0) })
+  expectEqual(LifetimeTracked.instances, originalInstances + capacity)
+
   var span = a.mutableSpan
-  span.updateAll(repeating: ID(id: .max))
-  expectEqual(a.allSatisfy({ $0.id == .max }), true)
+  span.updateAll(repeating: LifetimeTracked(100))
+  expectEqual(LifetimeTracked.instances, originalInstances + 1)
+  expectEqual(a.allSatisfy({ $0.value == 100 }), true)
+
+  span = a.mutableSpan
+  span.update(repeating: LifetimeTracked(200))
+  expectEqual(LifetimeTracked.instances, originalInstances + 1)
+  expectEqual(a.allSatisfy({ $0.value == 200 }), true)
 
   var empty = MutableSpan<Int>()
   empty.updateAll(repeating: .max)
@@ -329,9 +318,21 @@ suite.test("updateSubrange(_:repeating:)")
   var a = ContiguousArray(0..<capacity)
   var span = a.mutableSpan
   span.updateSubrange(2..<6, repeating: -1)
-  let i = Int.random(in: 0...span.count)
-  span.updateSubrange(i..<i, repeating: .min)
+  for i in 0...span.count {
+    span.updateSubrange(i..<i, repeating: .min)
+  }
   expectEqual(a, [0, 1, -1, -1, -1, -1, 6, 7])
+}
+
+suite.test("updateSubrange(_:repeating:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var a = ContiguousArray(0..<4)
+  var span = a.mutableSpan
+  let range = Bool.random() ? -1..<span.count : 0..<(span.count + 1)
+  expectCrashLater(withDebugMessage: "Index range out of bounds")
+  span.updateSubrange(range, repeating: 0)
 }
 
 suite.test("updateAll(copying:)")
@@ -346,10 +347,9 @@ suite.test("updateAll(copying:)")
 
     var span = a.mutableSpan
     span.updateAll(copying: source.span)
-    // the elements that were overwritten have been released
     expectEqual(LifetimeTracked.instances, originalInstances + capacity)
     expectEqual(a.map(\.value), Array(100..<(100+capacity)))
-    expectTrue(a.indices.allSatisfy({ a[$0] === source[$0] }))
+    expectEqual(a.indices.allSatisfy({ a[$0] === source[$0] }), true)
   }
   expectEqual(LifetimeTracked.instances, originalInstances)
 
@@ -362,8 +362,10 @@ suite.test("updateAll(copying:) count mismatch")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
 .code {
-  let source = ContiguousArray([1, 2, 3])
-  var b = ContiguousArray([0, 0, 0, 0])
+  let count = 4
+  let badCount = Bool.random() ? count - 1 : count + 1
+  let source = ContiguousArray(0..<badCount)
+  var b = ContiguousArray(repeating: 0, count: count)
   var span = b.mutableSpan
   expectCrashLater(
     withDebugMessage: "Source must have as many elements as the destination"
@@ -411,6 +413,18 @@ suite.test("updateSubrange(_:) with other range expressions")
   expectEqual(a, [0, 1, 2, 3, 4, 5, 6, 7])
 }
 
+suite.test("updateSubrange(_:copying:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var a = ContiguousArray(0..<4)
+  var span = a.mutableSpan
+  let range = Bool.random() ? -1..<span.count : 0..<(span.count + 1)
+  let source = ContiguousArray(0..<(span.count + 1))
+  expectCrashLater(withDebugMessage: "Index range out of bounds")
+  span.updateSubrange(range, copying: source.span)
+}
+
 private struct NC: ~Copyable {
   let tracker: LifetimeTracked
   var value: Int { tracker.value }
@@ -418,7 +432,6 @@ private struct NC: ~Copyable {
     self.tracker = LifetimeTracked(value)
   }
   deinit {
-    // Track deinits to observe rdar://187733648
     NC.deinitializations += 1
   }
   static var deinitializations = 0
@@ -457,6 +470,13 @@ suite.test("updateAll(moving:)")
     expectEqual(NC.deinitializations, originalDeinits + capacity)
   }
   expectEqual(LifetimeTracked.instances, originalInstances)
+
+  var empty = MutableSpan<NC>()
+  var emptySource = UniqueArray<NC>()
+  emptySource.edit {
+    empty.updateAll(moving: &$0)
+  }
+  expectEqual(emptySource.isEmpty, true)
 }
 
 suite.test("updateSubrange(_:moving:)")
@@ -487,7 +507,6 @@ suite.test("updateSubrange(_:moving:)")
     expectEqual(span[3].value, 21)
     expectEqual(span[4].value, 4)
 
-    // two elements in the subrange were destroyed
     expectEqual(LifetimeTracked.instances, originalInstances + capacity)
     expectEqual(NC.deinitializations, originalDeinits + 2)
 
@@ -514,10 +533,35 @@ suite.test("updateSubrange(_:moving:)")
     }
     expectEqual(source.count, 0)
 
+    source.edit {
+      span.updateSubrange(3..<3, moving: &$0)
+    }
+    source.edit {
+      span.updateSubrange(capacity..., moving: &$0)
+    }
+    expectEqual(span[3].value, 43)
+    expectEqual(source.count, 0)
+
     expectEqual(LifetimeTracked.instances, originalInstances + capacity)
     expectEqual(NC.deinitializations, originalDeinits + 2 + 2 + capacity)
   }
   expectEqual(LifetimeTracked.instances, originalInstances)
+}
+
+suite.test("updateSubrange(_:moving:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var destination = UniqueArray<Int>(copying: 0..<4)
+  var span = destination.mutableSpan
+  let range = Bool.random() ? -1..<span.count : 0..<(span.count + 1)
+  var source = UniqueArray<Int>(copying: 0..<(span.count + 1))
+  expectCrashLater(withDebugMessage: "Index range out of bounds")
+  source.edit {
+    span.updateSubrange(range, moving: &$0)
+  }
 }
 
 suite.test("updateAll(moving:) count mismatch")
@@ -526,8 +570,10 @@ suite.test("updateAll(moving:) count mismatch")
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  var destination = UniqueArray<Int>(copying: 0..<4)
-  var source = UniqueArray<Int>(copying: 0..<3)
+  let count = 4
+  let badCount = Bool.random() ? count - 1 : count + 1
+  var destination = UniqueArray<Int>(copying: 0..<count)
+  var source = UniqueArray<Int>(copying: 0..<badCount)
   var span = destination.mutableSpan
   expectCrashLater(
     withDebugMessage: "Source must have as many elements as the destination"
@@ -582,15 +628,12 @@ suite.test("updateElements(startingAt:copyingAll:), returning the end index")
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 8, 9])
 }
 
-struct IterableSequence: Sequence, Iterable {
+private struct IterableSequence: Sequence, Iterable {
   typealias Element = Int
 
-  let bound: Int
-  init(capacity: Int) {
-    bound = capacity
-  }
+  let count: Int
   func makeIterator() -> Range<Int>.Iterator {
-    (0..<bound).makeIterator()
+    (0..<count).makeIterator()
   }
 }
 
@@ -600,7 +643,7 @@ suite.test("updateElements(startingAt:copyingAll:), with Sequence as Iterable")
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let capacity = 8
-  let sequence = IterableSequence(capacity: capacity)
+  let sequence = IterableSequence(count: capacity)
 
   var a = ContiguousArray(repeating: -1, count: capacity)
   var span = a.mutableSpan
@@ -622,6 +665,22 @@ suite.test("updateElements(startingAt:copyingFrom:), bad index")
   var index = 5
   let empty = Span<Int>()
   var iterator = empty.makeBorrowingIterator()
+  expectCrashLater(withDebugMessage: "Index out of bounds")
+  span.updateElements(startingAt: &index, copyingFrom: &iterator)
+}
+
+suite.test("updateElements(startingAt:copyingFrom:), negative index")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var a = ContiguousArray(repeating: 0, count: 4)
+  var span = a.mutableSpan
+  var index = -1
+  let source = ContiguousArray(0..<4)
+  let elements = source.span
+  var iterator = elements.makeBorrowingIterator()
   expectCrashLater(withDebugMessage: "Index out of bounds")
   span.updateElements(startingAt: &index, copyingFrom: &iterator)
 }
@@ -713,10 +772,8 @@ suite.test("updateElements(startingAt:copyingFrom:), source throws")
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let values = ContiguousArray(0..<10)
-  // provides 0..<5 as spans of 2, 2 and 1 elements, then throws
   let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
 
-  // the destination has room for every element provided before the error
   var a = ContiguousArray(repeating: -1, count: 8)
   var span = a.mutableSpan
   var index = 2
@@ -756,7 +813,7 @@ suite.test("updateElements(startingAt:copyingAll:), source longer than destinati
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
-  let source: [8 of Int] = [0, 1, 2, 3, 4, 5, 6, 7]
+  let source: [5 of Int] = [0, 1, 2, 3, 4]
   var a = ContiguousArray(repeating: -1, count: 6)
   var span = a.mutableSpan
   var index = 2
@@ -772,7 +829,6 @@ suite.test("updateElements(startingAt:copyingAll:), source throws when checking 
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let values = ContiguousArray(0..<10)
-  // provides 0..<5 as spans of 2, 2 and 1 elements, then throws
   let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
 
   var a = ContiguousArray(repeating: -1, count: 7)
