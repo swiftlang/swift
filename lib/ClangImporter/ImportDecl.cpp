@@ -10654,7 +10654,8 @@ void ClangImporter::Implementation::addExplicitProtocolConformance(
     }
 
     decl->addAttribute(new (SwiftContext) SynthesizedProtocolAttr(
-        protocol, this, /*isUnchecked=*/false, /*isSuppressed=*/false));
+        protocol, this, /*isUnchecked=*/false, /*isSuppressed=*/false,
+        /*isFromConformsTo=*/true));
   } else {
     HeaderLoc attrLoc((conformsToAttr)->getLocation());
     diagnose(attrLoc, diag::conforms_to_not_protocol, result,
