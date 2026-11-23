@@ -2510,6 +2510,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)operand->getType().getCategory(), addValueRef(operand));
     break;
   }
+  case SILInstructionKind::ValueToAddressInst:
+    // Only valid with opaque values, before AddressLowering, and SIL with
+    // opaque values is not serialized.
+    llvm_unreachable("not supported");
 
   case SILInstructionKind::EndAccessInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];

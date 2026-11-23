@@ -5851,6 +5851,53 @@ public:
                     "bridge_object_to_word must produce a Word");
   }
 
+  void checkValueToAddressInst(ValueToAddressInst *VAI) {
+    require(!F.hasLoweredAddresses(),
+            "value_to_address is only valid in opaque values");
+
+    auto isVariable = [](SILValue value) {
+      if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+        return arg->getArgumentConvention().isIndirectConvention();
+      if (auto *borrow = dyn_cast<BeginBorrowInst>(value))
+        return bool(borrow->isFromVarDecl());
+      if (auto *move = dyn_cast<MoveValueInst>(value))
+        return bool(move->isFromVarDecl());
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        // Before AddressLowering, the conventions don't report a
+        // @guaranteed_address result as an address, so look at the callee type.
+        auto results = apply->getSubstCalleeType()->getResults();
+        return results.size() == 1 && results[0].getConvention() ==
+                                          ResultConvention::GuaranteedAddress;
+      }
+      if (isa_and_nonnull<BeginApplyInst>(value->getDefiningInstruction()))
+        return value->getOwnershipKind() == OwnershipKind::Guaranteed;
+      return false;
+    };
+    SILValue root = VAI->getOperand();
+    // The operand may be behind a nested borrow. A temporary has no
+    // stable address.
+    while (!isVariable(root)) {
+      auto *borrow = dyn_cast<BeginBorrowInst>(root);
+      if (!borrow)
+        break;
+      root = borrow->getOperand();
+    }
+    require(isVariable(root),
+            "value_to_address operand must be an indirect argument, a "
+            "[var_decl] move_value or begin_borrow, a borrow accessor result, "
+            "or a guaranteed coroutine yield");
+
+    // AddressLowering resolves the address of a loadable value only for a
+    // guaranteed indirect argument, whose address is the argument itself.
+    if (!VAI->getOperand()->getType().isAddressOnly(F)) {
+      auto *arg = dyn_cast<SILFunctionArgument>(VAI->getOperand());
+      require(arg && arg->getArgumentConvention() ==
+                         SILArgumentConvention::Indirect_In_Guaranteed,
+              "value_to_address of a loadable value must be a guaranteed "
+              "indirect argument");
+    }
+  }
+
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
                                   "convert_function operand");

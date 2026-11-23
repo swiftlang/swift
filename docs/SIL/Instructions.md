@@ -4651,6 +4651,37 @@ The `alignment` integer value specifies the byte alignment of the
 address. `alignment=0` is the default, indicating the natural alignment
 of `T`.
 
+### value_to_address
+
+```
+sil-instruction ::= 'value_to_address' sil-operand
+
+%1 = value_to_address %0 : $T
+// %0 must be an object of address-only type $T, or a guaranteed indirect
+// function argument of loadable type $T
+// %1 will be of type $*T
+```
+
+Produces the address of the storage of an opaque value.
+
+With opaque values, an address-only value is an SSA object. It has no
+address in SIL until AddressLowering assigns it storage. Some operations
+need the address of a particular value, such as a lifetime dependence on
+the address of an addressable argument or variable.
+
+This instruction does not allocate. Its result is the address of the
+operand's own storage, which is an [alloc_stack](#alloc_stack) or an indirect
+function argument that AddressLowering assigned, or a projection of one.
+AddressLowering guarantees that `value_to_address` of the same operand
+always resolves to the same address, and asserts that the storage is one of
+those.
+
+The operand may have any ownership. The result is an interior pointer into
+the operand: every use of the address must be within the lifetime of the
+operand. The operand's root must be a variable, not a temporary.
+
+Only valid in opaque values mode, before AddressLowering.
+
 ### unchecked_ref_cast
 
 ```

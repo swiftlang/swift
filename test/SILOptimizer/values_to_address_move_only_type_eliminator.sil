@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -module-name Swift -sil-move-only-type-eliminator -address-lowering -sil-verify-all %s | %FileCheck %s
+//
+// The module name must be Swift so that declarations like Error are parsed as the correct loadable type.
+
+// The address that value_to_address produces is the argument's own address, so
+// removing the move-only wrapper types before AddressLowering must not give the
+// callee the address of a copy of the argument.
+
+import Builtin
+
+sil_stage raw
+
+sil @take : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @take64 : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+
+// CHECK-LABEL: sil [ossa] @forwards_generic : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK: bb0(%0 : $*T):
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply {{%.*}}<T>(%0)
+// CHECK-LABEL: } // end sil function 'forwards_generic'
+sil [ossa] @forwards_generic : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = value_to_address %0 : $T
+  %2 = copyable_to_moveonlywrapper_addr %1 : $*T
+  %3 = load_borrow %2 : $*@moveOnly T
+  %4 = moveonlywrapper_to_copyable [guaranteed] %3 : $@moveOnly T
+  %5 = function_ref @take : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %6 = apply %5<T>(%4) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  end_borrow %3 : $@moveOnly T
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The same for a loadable argument.
+//
+// CHECK-LABEL: sil [ossa] @forwards_loadable : $@convention(thin) (@in_guaranteed Builtin.Int64) -> () {
+// CHECK: bb0(%0 : $*Builtin.Int64):
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply {{%.*}}(%0)
+// CHECK-LABEL: } // end sil function 'forwards_loadable'
+sil [ossa] @forwards_loadable : $@convention(thin) (@in_guaranteed Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = value_to_address %0 : $Builtin.Int64
+  %2 = copyable_to_moveonlywrapper_addr %1 : $*Builtin.Int64
+  %3 = load_borrow %2 : $*@moveOnly Builtin.Int64
+  %4 = moveonlywrapper_to_copyable [guaranteed] %3 : $@moveOnly Builtin.Int64
+  %5 = function_ref @take64 : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  end_borrow %3 : $@moveOnly Builtin.Int64
+  %7 = tuple ()
+  return %7 : $()
+}
