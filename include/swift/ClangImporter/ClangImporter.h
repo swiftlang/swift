@@ -121,18 +121,6 @@ enum OptionalTypeKind : unsigned {
 };
 enum { NumOptionalTypeKinds = 2 };
 
-/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
-/// decide whether to apply libkern's ownership convention.
-///
-/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
-enum class LibkernSubclass {
-  None,
-  OSObject,
-  /// OSIterator derives from OSObject, so a type that derives from OSIterator
-  /// also derives from OSObject.
-  OSIterator,
-};
-
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
 ///
@@ -848,9 +836,6 @@ public:
 
   UnusableForeignType exposesUnusableForeignType(Type type) override;
 
-  /// Classify \p decl against libkern's OSObject hierarchy.
-  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
-
   const clang::CXXMethodDecl *
   lookupCXXAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
 
@@ -1123,10 +1108,9 @@ std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 /// Determines the ownership convention of functions that return libkern's
-/// OSObject or one of its subclasses.
+/// OSMetaClassBase or one of its subclasses.
 ///
-/// - Methods which start with "get" or "Get" and which are not returning
-///   a subclass of OSIterator are assumed to be getters.
+/// - Methods which start with "get" or "Get" are assumed to be getters.
 ///   They return at "+0" and the caller is not responsible for releasing the
 ///   returned object.
 ///

@@ -1104,14 +1104,6 @@ public:
   /// Returns the unusable foreign type exposed by values of \p type, if any.
   UnusableForeignType exposesUnusableForeignType(Type type);
 
-  /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
-  /// libkern's OSObject hierarchy.
-  llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
-      libkernSubclasses;
-
-  /// Classify \p decl against libkern's OSObject hierarchy.
-  LibkernSubclass getLibkernSubclass(const clang::CXXRecordDecl *decl);
-
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because
   /// it will populate the conformance too early. To avoid the need for that we
