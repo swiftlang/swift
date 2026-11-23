@@ -151,7 +151,7 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bo
   collectedUses.insertNonDestroyingEnds(into: &liverange)
 
   if copy.fromValue.ownership == .owned {
-    if !liverange.isFullyContainedIn(scopeOf: copy.fromValue) {
+    if !liverange.isFullyContainedIn(scopeOf: copy.fromValue, context) {
       return false
     }
   } else {

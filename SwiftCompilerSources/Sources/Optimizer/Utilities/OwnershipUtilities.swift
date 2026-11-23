@@ -13,24 +13,31 @@
 import SIL
 
 extension InstructionRange {
-  /// Returns true if this instruction range is fully contained in the liverange of `value`.
-  public func isFullyContainedIn(scopeOf value: Value) -> Bool {
+  /// Returns true if this instruction range is fully contained in the liverange of `value`, i.e. if
+  /// `value` is alive at all instructions of the range.
+  ///
+  /// For an owned value this is the case if its lifetime doesn't end within the range. For a guaranteed
+  /// value - including forwarded guaranteed values - none of the borrow scopes of its borrow introducers
+  /// must end within the range.
+  ///
+  /// The begin of the range must be located within the liverange of `value`, e.g. it's an instruction
+  /// which uses `value`.
+  /// The end instructions are not part of the range: the lifetime of `value` may end at an end
+  /// instruction. To check if `value` is still alive _behind_ an instruction, the range must end at the
+  /// instruction which follows it.
+  public func isFullyContainedIn(scopeOf value: Value, _ context: some Context) -> Bool {
     switch value.ownership {
     case .owned:
-      return value.uses.endingLifetime.allSatisfy {
-        !self.contains($0.instruction)
-      }
+      return !value.uses.endingLifetime.contains { self.contains($0.instruction) }
     case .guaranteed:
-      guard let beginBorrow = BeginBorrowValue(value.lookThroughForwardingInstructions) else {
-        return false
+      // Introducers without a local scope, e.g. guaranteed function arguments, are alive in the whole
+      // function.
+      for introducer in value.getBorrowIntroducers(context) where introducer.hasLocalScope {
+        if introducer.scopeEndingOperands.contains(where: { self.contains($0.instruction) }) {
+          return false
+        }
       }
-      if case .functionArgument = beginBorrow {
-        // The lifetime of a guaranteed function argument spans over the whole function.
-        return true
-      }
-      return beginBorrow.scopeEndingOperands.allSatisfy {
-        !self.contains($0.instruction)
-      }
+      return true
     case .none, .unowned:
       return false
     }

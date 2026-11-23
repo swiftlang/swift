@@ -386,30 +386,6 @@ private func removeUses(of copy: SingleValueInstruction,
   })
 }
 
-/// Returns true if the source of `copy` is still alive at `endInstruction` which is located
-/// in the same block as `copy`.
-private func sourceIsAlive(of copy: CopyValueInst, until endInstruction: Instruction,
-                           _ context: FunctionPassContext) -> Bool
-{
-  let source = copy.fromValue
-  switch source.ownership {
-  case .owned:
-    for inst in InstructionList(first: copy.next!) {
-      if inst == endInstruction {
-        return true
-      }
-      if inst.operands.contains(where: { $0.value == source && $0.endsLifetime }) {
-        return false
-      }
-    }
-    fatalError("endInstruction not in the same block as copy")
-  case .guaranteed:
-    return isContainedInBorrowScope(from: copy, to: endInstruction, context)
-  case .none, .unowned:
-    return false
-  }
-}
-
 private func trySinkCopiesOverPhi(phi: Phi, _ context: FunctionPassContext) -> Bool {
   // Before address lowering, an address-only phi can't be guaranteed.
   let function = phi.value.parentFunction
@@ -421,7 +397,7 @@ private func trySinkCopiesOverPhi(phi: Phi, _ context: FunctionPassContext) -> B
     guard let copy = incomingOp.value as? CopyValueInst,
           copy.uses.isSingleUse,
           copy.fromValue.ownership == .guaranteed,
-          isContainedInBorrowScope(from: copy, to: incomingOp.instruction, context)
+          sourceIsAlive(of: copy, until: incomingOp.instruction, context)
     else {
       return false
     }
@@ -612,15 +588,16 @@ private func tryRemoveCopyOfOwnedValue(consumedBy cast: CheckedCastBranchInst,
   return true
 }
 
-private func isContainedInBorrowScope(from copy: CopyValueInst,
-                                      to toInstruction: Instruction,
-                                      _ context: FunctionPassContext) -> Bool
+/// Returns true if the source of `copy` is alive in the range from `copy` to `endInstruction`.
+/// The source's lifetime may end at `endInstruction`.
+private func sourceIsAlive(of copy: CopyValueInst,
+                           until endInstruction: Instruction,
+                           _ context: FunctionPassContext) -> Bool
 {
-  var liveRange = InstructionRange(begin: copy, context)
+  var liveRange = InstructionRange(begin: copy, ends: [endInstruction], context)
   defer { liveRange.deinitialize() }
 
-  liveRange.insert(toInstruction)
-  return liveRange.isFullyContainedIn(scopeOf: copy.fromValue)
+  return liveRange.isFullyContainedIn(scopeOf: copy.fromValue, context)
 }
 
 
