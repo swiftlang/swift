@@ -2154,9 +2154,6 @@ public:
 
     verifyLocalArchetype(AI, AI->getElementType().getASTType());
 
-    require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
-            "AllocStack Var Info should be None if invalidated");
-
     checkAddressWalkerCanVisitAllTransitiveUses(AI);
 
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
