@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -122,6 +123,14 @@ createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
   // Here we set the AST-benign CodeGenOpts options only. Set the
   // AST-affecting ones early in ClangImporter::create.
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
+  // Clang's frontend instrumentation (-Xcc -fprofile-instr-generate) is only
+  // lowered when Swift's own profiling is enabled. The options are shared, so
+  // this warns once.
+  if (!Opts.GenerateProfile && CGO.hasProfileClangInstr()) {
+    CGO.setProfileInstr(clang::CodeGenOptions::ProfileInstrKind::ProfileNone);
+    Context.Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                           "-Xcc -fprofile-instr-generate", "-profile-generate");
+  }
   switch (Opts.DebugInfoFormat) {
   case IRGenDebugInfoFormat::None:
     break;
