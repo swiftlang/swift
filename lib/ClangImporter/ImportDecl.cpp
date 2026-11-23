@@ -1022,8 +1022,11 @@ static bool shouldEagerlyImportClangRecordMember(const clang::NamedDecl *decl,
                                                  const LangOptions &LangOpts) {
   // Look through using decls to determine whether to import decl
   while (auto *usd = dyn_cast<clang::UsingShadowDecl>(decl)) {
-    // VisitUsingShadowDecl() only imports types and non-constructor methods,
-    // so we mirror that logic here.
+    // Using-declared fields are loaded with the record's inherited storage.
+    if (isa<clang::FieldDecl>(usd->getTargetDecl()))
+      return false;
+    // VisitUsingShadowDecl() only imports types, non-constructor methods, and
+    // fields, so we mirror that logic here.
     if (!isa<clang::TypeDecl, clang::CXXMethodDecl>(usd->getTargetDecl()))
       break;
     if (isa<clang::CXXConstructorDecl>(usd->getTargetDecl()))
@@ -1177,10 +1180,9 @@ public:
     return Visit(decl->getAsFunction());
   }
 
-  // A using-declaration of a method is imported as a clone of the base method,
-  // so it needs a legacy projection if the base method does. (A using-declared
-  // type is imported as a typealias, which doesn't, and other targets aren't
-  // imported at all.)
+  // A using-declaration of a method or field is imported as a clone of the base
+  // member, so it needs a legacy projection if the base member does.
+  // (A using-declared type is imported as a typealias, which doesn't.)
   CArrayProjection VisitUsingShadowDecl(const clang::UsingShadowDecl *decl) {
     return Visit(decl->getTargetDecl());
   }
@@ -5964,8 +5966,9 @@ namespace {
       // Only import:
       //   1. Types
       //   2. C++ methods from privately inherited base classes
-      if (!isa<clang::TypeDecl>(decl->getTargetDecl()) &&
-          !isa<clang::CXXMethodDecl>(decl->getTargetDecl()))
+      //   3. Fields
+      if (!isa<clang::TypeDecl, clang::CXXMethodDecl, clang::FieldDecl>(
+              decl->getTargetDecl()))
         return nullptr;
       // Constructors (e.g. `using BaseClass::BaseClass`) are handled in
       // VisitCXXRecordDecl, since we need them to determine whether a struct
@@ -6055,6 +6058,20 @@ namespace {
           return nullptr;
 
         return clonedMethod;
+      }
+      if (auto field = dyn_cast<clang::FieldDecl>(decl->getTargetDecl())) {
+        auto version =
+            getActiveSwiftVersion().withCArrayProjection(getCArrayProjection());
+        auto *importedBaseField =
+            dyn_cast_or_null<VarDecl>(Impl.importDecl(field, version));
+        if (!importedBaseField)
+          return nullptr;
+
+        // The clone's accessors take on its access when they are created, so
+        // it must be cloned with the access of the using-declaration.
+        return Impl.importBaseMemberDecl(
+            importedBaseField, importedDC, ClangInheritanceInfo(),
+            getCArrayProjection(), getAccessLevel(decl));
       }
       return nullptr;
     }
@@ -11315,10 +11332,10 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (Result &&
       (!Result->getDeclContext()->isModuleScopeContext() ||
        isa<ClangModuleUnit>(Result->getDeclContext()))) {
-    // For using declarations that expose a method of a base class, the Clang
-    // decl is synthesized lazily when the method is actually used from Swift.
-    bool hasSynthesizedClangNode =
-        isa<clang::UsingShadowDecl>(ClangDecl) && isa<FuncDecl>(Result);
+    // For using declarations that expose a base method or field, the Clang decl
+    // is synthesized lazily when the member is actually used from Swift.
+    bool hasSynthesizedClangNode = isa<clang::UsingShadowDecl>(ClangDecl) &&
+                                   isa<FuncDecl, VarDecl>(Result);
 
     // Either the Swift declaration was from stdlib,
     // or we imported the underlying decl of the typedef,
@@ -12066,9 +12083,12 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
         cast<clang::FieldDecl>(m)->isUnnamedBitField())
       continue;
 
-    // Skip this member if caller asked for storage and this isn't a field,
-    // or vice versa.
-    if (storage != isa<clang::FieldDecl>(m))
+    // Skip this member if caller asked for storage and this isn't a field
+    // (including using-declared fields), or vice versa.
+    auto *usd = dyn_cast<clang::UsingShadowDecl>(m);
+    bool isField = isa<clang::FieldDecl>(m) ||
+                   (usd && isa<clang::FieldDecl>(usd->getTargetDecl()));
+    if (storage != isField)
       continue;
 
     // Make sure we always pull in record fields. Everything else had better

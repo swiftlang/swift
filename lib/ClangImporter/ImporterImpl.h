@@ -1011,9 +1011,13 @@ public:
 
   /// Like three-arg \c importBaseMemberDecl() , but clones only the indicated
   /// \p projection .
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
-                                  ClangInheritanceInfo inherit,
-                                  CArrayProjection projection);
+  /// If \p memberAccess is given, it is used in place of the access \p decl
+  /// was declared with.
+  ValueDecl *
+  importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                       ClangInheritanceInfo inherit,
+                       CArrayProjection projection,
+                       std::optional<AccessLevel> memberAccess = std::nullopt);
 
   /// Returns the operator that was synthesized from \p decl , a function
   /// imported from a C++ operator (so its name starts with `__operator`), or
