@@ -7049,7 +7049,36 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
         clang::SourceLocation(), {fieldExpr}, clang::SourceLocation());
     if (!retainCall.isUsable())
       return nullptr;
-    body.push_back(retainCall.get());
+    clang::Stmt *retainStmt = retainCall.get();
+    // A pointer field may be null; only retain the object it points to,
+    // unless the field is non-null or the retain function accepts null.
+    auto hasNullability = [](clang::QualType ty, clang::NullabilityKind kind) {
+      auto nullability = ty->getNullability();
+      return nullability && *nullability == kind;
+    };
+    // Clang propagates parameter nullability to later redeclarations, so the
+    // most recent one has it even if the declaration we found doesn't.
+    auto *retainDecl = retainFn->getMostRecentDecl();
+    bool retainAcceptsNull =
+        retainDecl->getNumParams() == 1 &&
+        hasNullability(retainDecl->getParamDecl(0)->getType(),
+                       clang::NullabilityKind::Nullable);
+    if (field->getType()->isPointerType() &&
+        !hasNullability(field->getType(), clang::NullabilityKind::NonNull) &&
+        !retainAcceptsNull) {
+      auto nullCheckField = createFieldAccess();
+      if (!nullCheckField)
+        return nullptr;
+      auto cond = clangSema.CheckBooleanCondition(clang::SourceLocation(),
+                                                  nullCheckField);
+      if (!cond.isUsable())
+        return nullptr;
+      retainStmt = clang::IfStmt::Create(
+          clangCtx, clang::SourceLocation(), clang::IfStatementKind::Ordinary,
+          /*Init=*/nullptr, /*Var=*/nullptr, cond.get(),
+          clang::SourceLocation(), clang::SourceLocation(), retainStmt);
+    }
+    body.push_back(retainStmt);
   }
 
   // Construct the method's body.
