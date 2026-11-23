@@ -1217,6 +1217,10 @@ public:
   /// clang::AS_none) if this ClangInheritanceInfo::isInheriting() is \c false.
   AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
 
+  /// Like \c accessForBaseDecl(), but for a base member with \p memberAccess
+  /// in its own class. Returns \p memberAccess if not inheriting.
+  AccessLevel accessForBaseMember(AccessLevel memberAccess) const;
+
   /// Marks \param clonedDecl as unavailable (using \c @available) if it
   /// cannot be accessed from the derived class, either because \param baseDecl
   /// was declared as private in the base class, or because \param clonedDecl
