@@ -688,11 +688,6 @@ LANGUAGE_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, 0,
 /// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
 LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
 
-/// Infer the return ownership of C++ methods that return libkern's OSObject or
-/// one of its subclasses from the method's name, following libkern's
-/// conventions.
-EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
-
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 

@@ -380,9 +380,12 @@ public:
                                                   /*primarySuperclass=*/nullptr,
                                                   /*isValid=*/rrInfo.isValid());
       else
-        return ForeignReferenceTypeInfo::Shared(checkedDecl,
-                                                /*primarySuperclass=*/nullptr,
-                                                /*isValid=*/rrInfo.isValid());
+        return ForeignReferenceTypeInfo::Shared(
+            checkedDecl, /*primarySuperclass=*/nullptr,
+            /*isLibkernObject=*/
+            importer::hasSwiftAttributeOnAnyRedecl(
+                checkedDecl, {"libkern_ownership_convention"}),
+            /*isValid=*/rrInfo.isValid());
     }
 
     const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
@@ -437,6 +440,7 @@ public:
       // type, albeit an invalid one (due to ambiguity).
       //
       // return ForeignReferenceTypeInfo::Shared(FRTBase, nullptr,
+      //                                         isLibkernObject(FRTBase),
       //                                         /*isValid=*/false);
       //
       // However, to honor the existing behavior, (for now) we will report
@@ -447,7 +451,10 @@ public:
     if (seenImmortal)
       return ForeignReferenceTypeInfo::Immortal(FRTBase, primarySuperclass);
 
-    return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
+    return ForeignReferenceTypeInfo::Shared(
+        FRTBase, primarySuperclass,
+        importer::hasSwiftAttributeOnAnyRedecl(
+            FRTBase, {"libkern_ownership_convention"}));
   }
 };
 } // namespace
@@ -499,6 +506,7 @@ importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
     else
       return ForeignReferenceTypeInfo::Shared(decl,
                                               /*primarySuperclass=*/nullptr,
+                                              /*isLibkernObject=*/false,
                                               /*isValid=*/rrInfo.isValid());
   }
 
@@ -607,7 +615,7 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
           info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
 
-  // If this returns OSObject or one of its subclasses, rely on libkern's
+  // If this returns OSMetaClassBase or one of its subclasses, rely on libkern's
   // ownership rules.
   if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc, ctx))
     return;
@@ -626,43 +634,6 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
 void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
                                              SourceLoc callSiteLoc) {
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
-}
-
-/// Whether \p record is the top-level libkern class named \p name.
-static bool isLibkernClass(const clang::CXXRecordDecl *record, StringRef name) {
-  return record && record->getIdentifier() && record->getName() == name &&
-         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
-}
-
-LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
-    const clang::CXXRecordDecl *record) {
-  if (!record || !record->hasDefinition())
-    return LibkernSubclass::None;
-
-  record = record->getDefinition();
-  auto it = libkernSubclasses.find(record);
-  if (it != libkernSubclasses.end())
-    return it->second;
-
-  // OSIterator is the strongest answer there is, so no base can change it.
-  if (isLibkernClass(record, "OSIterator")) {
-    libkernSubclasses[record] = LibkernSubclass::OSIterator;
-    return LibkernSubclass::OSIterator;
-  }
-
-  auto result = isLibkernClass(record, "OSObject") ? LibkernSubclass::OSObject
-                                                   : LibkernSubclass::None;
-
-  for (const auto &base : record->bases()) {
-    auto baseSubclass =
-        getLibkernSubclass(base.getType()->getAsCXXRecordDecl());
-    result = std::max(result, baseSubclass);
-    if (result == LibkernSubclass::OSIterator)
-      break;
-  }
-
-  libkernSubclasses[record] = result;
-  return result;
 }
 
 std::optional<ResultConvention>
@@ -709,9 +680,6 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
 std::optional<ResultConvention>
 swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
                                                   ASTContext &ctx) {
-  if (!ctx.LangOpts.hasFeature(Feature::LibkernOwnershipConventions))
-    return std::nullopt;
-
   auto *func = dyn_cast<clang::FunctionDecl>(decl);
   if (!func)
     return std::nullopt;
@@ -720,9 +688,13 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
   if (!recordDecl)
     return std::nullopt;
 
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  auto libkernSubclass = importer->getLibkernSubclass(recordDecl);
-  if (libkernSubclass == LibkernSubclass::None)
+  recordDecl = recordDecl->getDefinition();
+  if (!recordDecl)
+    return std::nullopt;
+
+  auto info = evaluateOrDefault(
+      ctx.evaluator, ForeignReferenceTypeInfoRequest({recordDecl}), {});
+  if (!info.isLibkernObject())
     return std::nullopt;
 
   if (!func->getIdentifier())
@@ -755,8 +727,7 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
   if (funcName.ends_with("Matching"))
     return std::nullopt;
 
-  if ((!funcName.starts_with("get") && !funcName.starts_with("Get")) ||
-      libkernSubclass == LibkernSubclass::OSIterator)
+  if (!funcName.starts_with("get") && !funcName.starts_with("Get"))
     return ResultConvention::Owned;
 
   return ResultConvention::Unowned;
