@@ -515,7 +515,7 @@ extension Optional where Wrapped: ~Copyable & Escapable {
 
       let sp = unsafe UnsafeMutablePointer<Self>(address)
       if initializedCount == 0 {
-        // storage was deinitialized, reinitialize it with `nil`.
+        // overwrite the storage with `nil` regardless of the previous state.
         unsafe sp.initialize(to: nil)
       } else {
         let newValue = unsafe storage.moveElement(from: 0)
