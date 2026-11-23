@@ -13,36 +13,7 @@
 #ifndef SWIFT_AST_HIDDENTYPELAYOUT_H
 #define SWIFT_AST_HIDDENTYPELAYOUT_H
 
-#include "swift/AST/Type.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/STLExtras.h"
-
 namespace swift {
-
-class Decl;
-class FileUnit;
-class ModuleDecl;
-class NominalTypeDecl;
-class ValueDecl;
-
-enum class HiddenTypeLayoutOrigin {
-  ImplementationOnly,
-  InternalBridgingHeader,
-  RecoveredHiddenType,
-};
-
-struct HiddenTypeLayoutRequirement {
-  const Decl *LayoutDecl;
-  Type HiddenType;
-  HiddenTypeLayoutOrigin Origin;
-  NominalTypeDecl *ABIExposedType;
-  ValueDecl *LayoutAffectingStorage;
-};
-
-/// Find hidden types that contribute to this module's client-visible ABI.
-void forEachRequiredHiddenTypeLayout(
-    const ModuleDecl *module, ArrayRef<const FileUnit *> files,
-    llvm::function_ref<void(const HiddenTypeLayoutRequirement &)> callback);
 
 } // end namespace swift
 

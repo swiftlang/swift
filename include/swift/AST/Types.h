@@ -99,7 +99,6 @@ class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
-class HiddenTypeLayoutInfoDecl;
 enum class EffectKind : uint8_t;
 class EnumDecl;
 class EnumElementDecl;
@@ -8479,28 +8478,20 @@ class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   AbstractTypeLayout *Layout;
-  HiddenTypeLayoutInfoDecl *LegacyLayoutInfoDecl;
   CanType Parent;
 
-  HiddenType(AbstractTypeLayout *layout,
-             HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl, CanType parent,
-             const ASTContext &ctx)
+  HiddenType(AbstractTypeLayout *layout, CanType parent, const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx,
                  parent ? parent->getRecursiveProperties()
                         : RecursiveTypeProperties()),
-        Layout(layout), LegacyLayoutInfoDecl(legacyLayoutInfoDecl),
-        Parent(parent) {}
+        Layout(layout), Parent(parent) {}
 
 public:
   static HiddenType *
-  get(const ASTContext &ctx, AbstractTypeLayout *layout, CanType parent,
-      HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl = nullptr);
+  get(const ASTContext &ctx, AbstractTypeLayout *layout, CanType parent);
 
   StringRef getMangledName() const;
   AbstractTypeLayout *getLayout() const { return Layout; }
-  HiddenTypeLayoutInfoDecl *getLegacyLayoutInfoDecl() const {
-    return LegacyLayoutInfoDecl;
-  }
   CanType getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {

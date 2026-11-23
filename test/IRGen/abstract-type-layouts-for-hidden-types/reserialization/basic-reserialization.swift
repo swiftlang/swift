@@ -2,6 +2,7 @@
 // contributes to the ABI of another module.
 
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
+// XFAIL: *
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t

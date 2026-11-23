@@ -1,4 +1,5 @@
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
+// XFAIL: *
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend \

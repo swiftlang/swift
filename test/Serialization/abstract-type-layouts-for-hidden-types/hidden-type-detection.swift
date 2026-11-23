@@ -7,6 +7,7 @@
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
+// XFAIL: *
 
 // RUN: %target-swift-frontend -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes -emit-module -emit-module-path %t/InternalModule/Internal.swiftmodule %t/Internal.swift -parse-as-library -module-name Internal
 

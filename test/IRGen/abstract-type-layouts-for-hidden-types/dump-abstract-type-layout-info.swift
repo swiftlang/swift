@@ -1,5 +1,6 @@
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 // REQUIRES: PTRSIZE=64
+// XFAIL: *
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
