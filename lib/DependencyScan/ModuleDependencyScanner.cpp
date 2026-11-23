@@ -1900,7 +1900,6 @@ void ModuleDependencyScanner::resolveHeaderDependenciesForModule(
   PrettyStackTraceStringAction trace(
       "Resolving header dependencies of Swift module", moduleID.ModuleName);
   std::vector<std::string> allClangModules;
-  llvm::StringSet<> alreadyKnownModules;
   auto moduleDependencyInfo = DependencyCache.findKnownDependency(moduleID);
 
   bool isTextualModuleWithABridgingHeader =

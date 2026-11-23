@@ -285,7 +285,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
             getStringArray(bridgingModuleDependenciesArrayID);
         if (!bridgingModuleDeps)
           llvm::report_fatal_error("Bad bridging module dependencies");
-        llvm::StringSet<> alreadyAdded;
         std::vector<ModuleDependencyID> bridgingModuleDepIDs;
         for (const auto &mod : *bridgingModuleDeps)
           bridgingModuleDepIDs.push_back(
@@ -764,7 +763,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!headerModuleDependencies)
         llvm::report_fatal_error("Bad binary direct dependencies: no header "
                                  "import module dependencies");
-      llvm::StringSet<> alreadyAdded;
 
       std::vector<ModuleDependencyID> clangHeaderDependencyIDs;
       for (const auto &headerDepName : *headerModuleDependencies)
