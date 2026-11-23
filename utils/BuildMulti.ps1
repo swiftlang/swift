@@ -33,8 +33,9 @@ that it waits for as the step writes it, and the logs of the background
 processes in one piece once they end, between lines of the other logs, so that
 they do not interleave. When nothing was printed for a minute, it prints the
 last line that the processes that it waits for logged. After a failure, it
-also prints the logs of the processes that it stops, then, before the error,
-the lines of the logs of the processes that failed that report their failures.
+also prints the logs of the processes that it stops. At the end, after the
+summary, it prints the lines of the logs of the processes that failed that
+report their failures, then the error.
 
 See BuildSequential.ps1 for the parameters.
 #>
@@ -186,6 +187,7 @@ $SelectedWindowsSDKArchitectures = @(if ($Windows) { $WindowsSDKArchitectures })
 $SelectedAndroidSDKArchitectures = @(if ($Android) { $AndroidSDKArchitectures })
 
 $JobLogs = "$BinaryCache\BuildMulti"
+$BuildFailure = $null
 $Jobs = New-Object System.Collections.ArrayList
 $FailedJobs = New-Object System.Collections.ArrayList
 # The logs are printed as the jobs wrote them, without decoding them.
@@ -423,11 +425,17 @@ function Stop-BuildJobs {
 }
 
 # What the build and test tools print about failures.
-$FailurePattern = "recorded an issue|failed after .* with \d+ issues?|^error: |: (fatal )?error: |\berror (LNK|C)\d+:|^FAILED: |^(FAIL|XPASS|UNRESOLVED|TIMEOUT): |^(Failed|Timed Out|Unresolved) Tests \(|^Test Case .* failed|^Error: |CMake Error"
+$FailurePattern = "recorded an issue|failed after .* with \d+ issues?|^error: |: (fatal )?error: |\berror (LNK|C)\d+:|^FAILED: |^(FAIL|XPASS|UNRESOLVED|TIMEOUT): |^Test Case .* failed|^Error: |CMake Error"
+# lit lists the tests that failed at the end of its output, under these lines.
+$LitListPattern = "^(Failed|Unexpectedly Passed|Unresolved|Timed Out) Tests \(\d+\):$"
+$LitResultPattern = "^(FAIL|XPASS|UNRESOLVED|TIMEOUT): (.+) \(\d+ of \d+(, \d+ of \d+ attempts)?\)$"
+# lit prints the output of each of these tests between these lines.
+$LitOutputPattern = "^\*{20} TEST '(.+)' FAILED \*{20}$"
 
-# Prints the lines of the logs of the jobs that failed that report failures,
-# with the lines that follow them, as these logs may be far above the error
-# that ends the output. Without such lines, it prints the end of the log.
+# Prints the lists of the tests that failed and the lines that report failures
+# in the logs of the jobs that failed, with the lines that follow these, as the
+# logs may be far above the error that ends the output. Without such lines, it
+# prints the end of the log.
 function Write-BuildJobFailures {
   foreach ($Job in $FailedJobs) {
     $Name = "$($Job.Name) ($($Job.Process.StartTime.ToString("HH:mm:ss")) to $($Job.Process.ExitTime.ToString("HH:mm:ss")))"
@@ -438,11 +446,38 @@ function Write-BuildJobFailures {
       Write-Host -ForegroundColor Red "===== $Name exited with code $($Job.Process.ExitCode), and its log could not be read: $_"
       continue
     }
+
+    # The tests that lit lists, which are not shown again.
+    $Listed = New-Object System.Collections.Generic.HashSet[string]
+    for ($Index = 0; $Index -lt $Lines.Count; $Index++) {
+      if ($Lines[$Index] -cmatch $LitListPattern) {
+        for ($Line = $Index + 1; $Line -lt $Lines.Count -and $Lines[$Line].StartsWith("  "); $Line++) {
+          [void]$Listed.Add($Lines[$Line].Trim())
+        }
+      }
+    }
+
     $Shown = New-Object System.Collections.Generic.List[string]
     $Next = 0
     $Found = 0
-    for ($Index = 0; $Index -lt $Lines.Count -and $Found -lt 50; $Index++) {
-      if ($Lines[$Index] -cmatch $FailurePattern) {
+    for ($Index = 0; $Index -lt $Lines.Count; $Index++) {
+      if ($Lines[$Index] -cmatch $LitListPattern) {
+        # The list, with at most 200 tests.
+        $End = $Index + 1
+        while ($End -lt $Lines.Count -and $Lines[$End].StartsWith("  ") -and $End -le $Index + 200) { $End++ }
+        for ($Line = [Math]::Max($Index, $Next); $Line -lt $End; $Line++) {
+          $Shown.Add($Lines[$Line])
+        }
+        if ($End -lt $Lines.Count -and $Lines[$End].StartsWith("  ")) {
+          $Shown.Add("  ...")
+        }
+        $Next = [Math]::Max($Next, $End)
+        $Found++
+      } elseif ($Lines[$Index] -cmatch $LitOutputPattern -and $Listed.Contains($Matches[1])) {
+        # The output of a listed test, which a search for its name finds.
+        while ($Index + 1 -lt $Lines.Count -and $Lines[$Index + 1] -cne "********************") { $Index++ }
+      } elseif ($Found -lt 50 -and $Lines[$Index] -cmatch $FailurePattern) {
+        if ($Lines[$Index] -cmatch $LitResultPattern -and $Listed.Contains($Matches[2])) { continue }
         $Found++
         for ($Line = [Math]::Max($Index, $Next); $Line -le [Math]::Min($Index + 3, $Lines.Count - 1); $Line++) {
           $Shown.Add($Lines[$Line])
@@ -750,9 +785,7 @@ if ($Failure) {
 
 } catch {
   Stop-BuildJobs
-  Write-BuildJobFailures
-  Write-BuildError $_
-  exit 1
+  $BuildFailure = $_
 } finally {
   if ($Summary) {
     Write-Summary
@@ -762,4 +795,11 @@ if ($Failure) {
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
     Write-TimingTrace "$TimingTraceDir\build-timings.json" -TrackPerStep
   }
+}
+
+# The failures end the output, where they are easy to find.
+if ($BuildFailure) {
+  Write-BuildJobFailures
+  Write-BuildError $BuildFailure
+  exit 1
 }
