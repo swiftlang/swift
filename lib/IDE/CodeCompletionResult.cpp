@@ -206,7 +206,6 @@ getDeclNameForDiagnostics(const Decl *D, CodeCompletionResultSink &Sink) {
     llvm::SmallString<64> Name;
     llvm::raw_svector_ostream NameOS(Name);
     NameOS << "'";
-    llvm::SmallString<64> Scratch;
     VD->getName().printPretty(NameOS);
     NameOS << "'";
     return NullTerminatedStringRef(NameOS.str(), Sink.getAllocator());
