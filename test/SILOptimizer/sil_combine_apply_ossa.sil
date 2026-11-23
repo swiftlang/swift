@@ -1747,3 +1747,25 @@ bb1(%4 : $()):
 bb2(%7 : @owned $any Error):
   throw %7 : $any Error
 }
+
+sil @guaranteedNoncopyableAddressClosure : $@convention(thin) (@in_guaranteed NoncopyableCapture) -> Int
+
+// A store_borrow of a move-only value, which ends in a dead-end block, cannot
+// be extended. It must not be copied either (rdar://193035212).
+//
+// CHECK-LABEL: sil [ossa] @test_noncopyable_store_borrow_in_dead_end :
+// CHECK-NOT:     copy_addr
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function 'test_noncopyable_store_borrow_in_dead_end'
+sil [ossa] @test_noncopyable_store_borrow_in_dead_end : $@convention(thin) (@guaranteed NoncopyableCapture) -> () {
+bb0(%0 : @guaranteed $NoncopyableCapture):
+  %1 = alloc_stack $NoncopyableCapture
+  %2 = store_borrow %0 to %1
+  %3 = function_ref @guaranteedNoncopyableAddressClosure : $@convention(thin) (@in_guaranteed NoncopyableCapture) -> Int
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@in_guaranteed NoncopyableCapture) -> Int
+  %5 = mark_dependence [nonescaping] %4 on %2
+  %6 = apply %5() : $@noescape @callee_guaranteed () -> Int
+  destroy_value %5
+  unreachable
+}
