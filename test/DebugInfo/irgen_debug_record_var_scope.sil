@@ -70,6 +70,19 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return %2 : $(), loc "a.swift":23:3, scope 10
 }
 
+// The lifetime-extending use of a variable in an async function should have
+// a compiler-generated location.
+sil_scope 13 { loc "a.swift":30:6 parent @async_fake_use : $@convention(thin) @async (Builtin.Int64) -> () }
+
+// CHECK-LABEL: define {{.*}} @async_fake_use(
+// CHECK:         call void asm sideeffect "", "r"(ptr {{.*}}), !dbg ![[FAKE_USE_LOC:[0-9]+]]
+sil @async_fake_use : $@convention(thin) @async (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, name "v", loc "a.swift":31:7, scope 13
+  %1 = tuple (), loc "a.swift":32:3, scope 13
+  return %1 : $(), loc "a.swift":32:3, scope 13
+}
+
 // The variables are in scope 5.
 // CHECK-DAG: ![[X]] = !DILocalVariable(name: "x", scope: ![[SCOPE:[0-9]+]], {{.*}}line: 2,
 // CHECK-DAG: ![[Y]] = !DILocalVariable(name: "y", scope: ![[SCOPE]], {{.*}}line: 3,
@@ -80,3 +93,5 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK-DAG: ![[CALL]] = distinct !DILocation(line: 2, column: 3, scope: ![[FUNC_SCOPE]])
 
 // CHECK-DAG: ![[Z]] = !DILocalVariable(name: "z",
+
+// CHECK-DAG: ![[FAKE_USE_LOC]] = !DILocation(line: 0, scope:
