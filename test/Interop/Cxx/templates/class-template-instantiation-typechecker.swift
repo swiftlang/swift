@@ -1,15 +1,23 @@
 // RUN: not %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck %s -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s --check-prefix=NONTYPE
 
 import ClassTemplateInstantiationErrors
+import ClassTemplateNonTypeParameter
 
-// CHECK: class-template-instantiation-typechecker.swift:7:11: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'MagicWrapper' could not be converted: Optional<_>
+// CHECK: class-template-instantiation-typechecker.swift:9:11: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'MagicWrapper' could not be converted: Optional<_>
 func swiftTemplateArgNotSupported() {
   var _ = MagicWrapper<Optional>(t: "asdf")
 }
 
-// CHECK: class-template-instantiation-typechecker.swift:12:11: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'MagicWrapperWithExplicitCtor' could not be converted: String
+// CHECK: class-template-instantiation-typechecker.swift:14:11: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'MagicWrapperWithExplicitCtor' could not be converted: String
 func swiftTemplateArgNotSupportedExplicitCtor() {
   var _ = MagicWrapperWithExplicitCtor<String>("asdf")
+}
+
+// Only type template parameters can be substituted from Swift.
+// NONTYPE: class-template-instantiation-typechecker.swift:[[@LINE+2]]:10: error: could not generate C++ types from the generic Swift types provided; the following Swift type(s) provided to 'MagicArray' could not be converted: CInt
+func swiftArgForNonTypeTemplateParam() {
+  let _: MagicArray<CInt, CInt>? = nil
 }
 
 // CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
