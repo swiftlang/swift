@@ -4080,7 +4080,6 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::CanBeObjCClass:
   case BuiltinValueKind::CopyArray:
   case BuiltinValueKind::CreateAsyncTask:
-  case BuiltinValueKind::CreateSplitContinuation:
   case BuiltinValueKind::CreateTaskGroup:
   case BuiltinValueKind::CreateTaskGroupWithFlags:
   case BuiltinValueKind::DeallocRawTyped:
@@ -4122,6 +4121,7 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
 
   case BuiltinValueKind::AddTaskLocalValue:
   case BuiltinValueKind::AddressOfRawLayout:
+  case BuiltinValueKind::CreateSplitContinuation:
   case BuiltinValueKind::GetEnumTag:
   case BuiltinValueKind::GetSplitContinuationAddr:
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:

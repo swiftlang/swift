@@ -72,8 +72,10 @@ enum {
   NumWords_TaskDeadline = 16,
 
   /// The number of words in the storage of a split continuation, which the
-  /// compiler allocates in the frame of the function that creates it.
-  NumWords_SplitContinuation = 32,
+  /// compiler allocates in the frame of the function that creates it. The
+  /// storage needs 18 words on 64-bit platforms today. We leave a bit more room
+  /// to grow for the future.
+  NumWords_SplitContinuation = 24,
 
   /// The number of words in the record of a cancellation handler, which the
   /// compiler allocates in the frame of the function that installs it.
@@ -82,6 +84,20 @@ enum {
   /// The number of words in the record of a priority escalation handler, which
   /// the compiler allocates in the frame of the function that installs it.
   NumWords_TaskEscalationHandler = 8,
+
+  /// The words of the record of a cancellation handler at which the compiler
+  /// stores the handler's function and context before a split continuation
+  /// await. The function is signed with the address of its word and
+  /// SpecialPointerAuthDiscriminators::CancellationNotificationWithReasonFunction.
+  WordOffset_TaskCancellationHandlerFunction = 2,
+  WordOffset_TaskCancellationHandlerContext = 3,
+
+  /// The words of the record of a priority escalation handler at which the
+  /// compiler stores the handler's function and context before a split
+  /// continuation await. The function is signed with the address of its word
+  /// and SpecialPointerAuthDiscriminators::EscalationNotificationFunction.
+  WordOffset_TaskEscalationHandlerFunction = 2,
+  WordOffset_TaskEscalationHandlerContext = 3,
 
   /// The size of a unique hash.
   NumBytes_UniqueHash = 16,

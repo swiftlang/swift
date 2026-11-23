@@ -1178,36 +1178,24 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_initSplit(SplitContinuation *continuation,
                                   OpaqueValue *result);
 
-/// The handlers that swift_continuation_awaitSplit installs.
+/// Await a split continuation from the current task, with the handlers whose
+/// records are passed installed for the duration of the suspension. A null
+/// record means that the await has no such handler. If the continuation was
+/// already resumed, the await doesn't suspend and no handler runs.
 ///
-/// Every await passes both handlers since we can't express non-escapable
-/// optional closures. These bits tell the runtime which of them are real and
-/// not just empty closures. Without the bits, a wait without handlers would
-/// install records that do nothing.
-enum SplitContinuationAwaitHandlers : size_t {
-  SplitContinuationCancellationHandler = 1 << 0,
-  SplitContinuationEscalationHandler = 1 << 1,
-};
-
-/// Await a split continuation from the current task, with the handlers in
-/// `handlers` installed for the duration of the suspension. They must stay
-/// valid until the await resumes; the others are ignored. If the continuation
-/// was already resumed, the await doesn't suspend and no handler runs.
-///
-/// The records of the handlers are built in `cancellationRecord` and
-/// `escalationRecord`, the buffers of NumWords_TaskCancellationHandler and
-/// NumWords_TaskEscalationHandler words, aligned to
-/// Alignment_TaskCancellationHandler and Alignment_TaskEscalationHandler, that
-/// the compiler allocates in the waiting frame. The runtime doesn't release
-/// them.
+/// `cancellationRecord` and `escalationRecord` are buffers of
+/// NumWords_TaskCancellationHandler and NumWords_TaskEscalationHandler words,
+/// aligned to Alignment_TaskCancellationHandler and
+/// Alignment_TaskEscalationHandler, that the compiler allocates in the waiting
+/// frame. The compiler has stored the function and context of each handler at
+/// WordOffset_TaskCancellationHandlerFunction and
+/// WordOffset_TaskEscalationHandlerFunction, and the runtime builds the
+/// records around them. The buffers must stay valid until the await resumes.
+/// The runtime doesn't release them.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_continuation_awaitSplit(
-    SplitContinuation *continuation, void *cancellationRecord,
-    CancellationNotificationStatusRecord::FunctionTypeWithReason
-        *cancellationHandler,
-    void *cancellationContext, void *escalationRecord,
-    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
-    void *escalationContext, size_t handlers);
+void swift_continuation_awaitSplit(SplitContinuation *continuation,
+                                   void *cancellationRecord,
+                                   void *escalationRecord);
 
 /// Resume a continuation, offering the current thread to run the resumed task
 /// instead of enqueuing it.

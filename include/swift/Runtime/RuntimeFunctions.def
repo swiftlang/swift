@@ -2647,15 +2647,13 @@ FUNCTION(ContinuationInitSplit,
          UNKNOWN_MEMEFFECTS)
 
 // void swift_continuation_awaitSplit(SplitContinuation *continuation,
-//     void *cancellationRecord, void *cancellationHandler,
-//     void *cancellationContext, void *escalationRecord,
-//     void *escalationHandler, void *escalationContext, size_t handlers);
+//                                    void *cancellationRecord,
+//                                    void *escalationRecord);
 FUNCTION(ContinuationAwaitSplit,
          _Concurrency, swift_continuation_awaitSplit, SwiftAsyncCC,
          SplitContinuationAvailability,
          RETURNS(VoidTy),
-         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy,
-              Int8PtrTy, SizeTy),
+         ARGS(Int8PtrTy, Int8PtrTy, Int8PtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)

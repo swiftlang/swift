@@ -562,10 +562,8 @@ llvm::Function *IRGenModule::getAwaitSplitContinuationFn() {
 
   // The parameters here match the extra arguments passed to
   // @llvm.coro.suspend.async by emitAwaitSplitContinuation: the split
-  // continuation, the record buffer, function and context of each handler, and
-  // the handler flags.
-  llvm::Type *argTys[] = {Int8PtrTy, Int8PtrTy, Int8PtrTy, Int8PtrTy,
-                          Int8PtrTy, Int8PtrTy, Int8PtrTy, SizeTy};
+  // continuation and the record of each handler, or null.
+  llvm::Type *argTys[] = {Int8PtrTy, Int8PtrTy, Int8PtrTy};
   auto *suspendFnTy =
     llvm::FunctionType::get(VoidTy, argTys, false /*vaargs*/);
 
@@ -662,39 +660,30 @@ static llvm::Value *addOptionRecord(IRGenFunction &IGF,
                                 std::forward<Args>(args)...);
 }
 
-/// Add a task option record to the options list if the given value
-/// is present.
-template <class RecordTraits>
-static llvm::Value *maybeAddOptionRecord(IRGenFunction &IGF,
-                                         llvm::Value *curRecordPointer,
-                                         const RecordTraits &traits,
-                                         OptionalExplosion &value) {
-  // We can completely avoid doing any work if the value is statically nil.
-  if (value.isNone()) return curRecordPointer;
-
-  // Otherwise, allocate the option record.
-  auto recordAddr = allocateOptionRecord(IGF, traits);
-
-  // If the value is statically non-nil, we can unconditionally
-  // initialize the record and add it to the chain.
-  if (value.isSome()) {
-    return initializeOptionRecord(IGF, recordAddr, curRecordPointer,
-                                  traits, value.getSomeExplosion());
-  }
+/// Produce `emit(value)` if the optional `input`, whose payload has type
+/// `valueType`, is present, and `defaultOutput` if it isn't. We avoid the branch
+/// when it is known statically whether `input` is present.
+static llvm::Value *
+emitIfPresent(IRGenFunction &IGF, llvm::Value *defaultOutput,
+              OptionalExplosion &input, SILType valueType,
+              const llvm::Twine &label,
+              llvm::function_ref<llvm::Value *(Explosion &value)> emit) {
+  if (input.isNone())
+    return defaultOutput;
+  if (input.isSome())
+    return emit(input.getSomeExplosion());
 
   // Otherwise, we have to check whether the value is nil dynamically.
-  llvm::BasicBlock *contBB = IGF.createBasicBlock(traits.getLabel() + ".cont");
-  llvm::BasicBlock *someBB = IGF.createBasicBlock(traits.getLabel() + ".some");
+  llvm::BasicBlock *contBB = IGF.createBasicBlock(label + ".cont");
+  llvm::BasicBlock *someBB = IGF.createBasicBlock(label + ".some");
 
   auto &ctx = IGF.IGM.Context;
-
-  SILType optionalType =
-    IGF.IGM.getLoweredType(traits.getValueType(ctx).wrapInOptionalType());
+  SILType optionalType = valueType.wrapInOptionalType();
   auto &optionalStrategy = getEnumImplStrategy(IGF.IGM, optionalType);
 
   // Branch based on whether the value is nil.  We're going to use the
   // value twice, so borrow it the first time.
-  value.getOptionalExplosion().borrowing([&](Explosion &borrowedValue) {
+  input.getOptionalExplosion().borrowing([&](Explosion &borrowedValue) {
     optionalStrategy.emitValueSwitch(IGF, borrowedValue,
                                      {{ctx.getOptionalSomeDecl(), someBB},
                                       {ctx.getOptionalNoneDecl(), contBB}},
@@ -706,27 +695,227 @@ static llvm::Value *maybeAddOptionRecord(IRGenFunction &IGF,
   IGF.Builder.emitBlock(someBB);
 
   // Project the payload from the optional value.
-  Explosion objectValue;
-  optionalStrategy.emitValueProject(IGF, value.getOptionalExplosion(),
-                                    ctx.getOptionalSomeDecl(),
-                                    objectValue);
-
-  // Initialize the record.
-  llvm::Value *someRecordPointer =
-    initializeOptionRecord(IGF, recordAddr, curRecordPointer,
-                           traits, objectValue);
+  Explosion value;
+  optionalStrategy.emitValueProject(IGF, input.getOptionalExplosion(),
+                                    ctx.getOptionalSomeDecl(), value);
+  llvm::Value *someOutput = emit(value);
 
   auto someOriginBB = IGF.Builder.GetInsertBlock();
   IGF.Builder.CreateBr(contBB);
 
   // Enter the continuation block and create a phi to merge the two cases.
   IGF.Builder.emitBlock(contBB);
-  auto recordPointerPHI =
-    IGF.Builder.CreatePHI(IGF.IGM.SwiftTaskOptionRecordPtrTy, /*num cases*/ 2);
-  recordPointerPHI->addIncoming(curRecordPointer, noneOriginBB);
-  recordPointerPHI->addIncoming(someRecordPointer, someOriginBB);
+  auto outputPHI =
+      IGF.Builder.CreatePHI(defaultOutput->getType(), /*num cases*/ 2);
+  outputPHI->addIncoming(defaultOutput, noneOriginBB);
+  outputPHI->addIncoming(someOutput, someOriginBB);
+  return outputPHI;
+}
 
-  return recordPointerPHI;
+/// Add a task option record to the options list if the given value
+/// is present.
+template <class RecordTraits>
+static llvm::Value *maybeAddOptionRecord(IRGenFunction &IGF,
+                                         llvm::Value *curRecordPointer,
+                                         const RecordTraits &traits,
+                                         OptionalExplosion &value) {
+  SILType valueType =
+      IGF.IGM.getLoweredType(traits.getValueType(IGF.IGM.Context));
+  std::optional<Address> recordAddr;
+  if (!value.isNone())
+    recordAddr = allocateOptionRecord(IGF, traits);
+  return emitIfPresent(IGF, curRecordPointer, value, valueType,
+                       traits.getLabel(), [&](Explosion &value) {
+                         return initializeOptionRecord(
+                             IGF, *recordAddr, curRecordPointer, traits, value);
+                       });
+}
+
+/// If `handler` may be present, allocate the record buffer of a split
+/// continuation handler, and store the handler's function and context at the
+/// words where the runtime expects them. Produce the address of the buffer if
+/// the handler is present, and null if it isn't.
+static llvm::Value *emitSplitContinuationHandlerRecord(
+    IRGenFunction &IGF, OptionalExplosion &handler, SILType handlerType,
+    unsigned numWords, size_t alignment, unsigned functionWord,
+    unsigned contextWord, const PointerAuthSchema &functionSchema,
+    const llvm::Twine &label, std::optional<StackAddress> &buffer) {
+  auto &IGM = IGF.IGM;
+  if (!handler.isNone())
+    buffer = IGF.emitStaticArrayAlloca(
+        IGM.Int8PtrTy, IGM.getPointerSize(), IGM.getSize(Size(numWords)),
+        Alignment(alignment), label + ".record");
+
+  SILType functionType = handlerType.getOptionalObjectType();
+  auto *none = llvm::ConstantPointerNull::get(IGM.PtrTy);
+  return emitIfPresent(
+      IGF, none, handler, functionType, label, [&](Explosion &closure) {
+        llvm::Value *function = closure.claimNext();
+        llvm::Value *context = closure.claimNext();
+        Address record = buffer->getAddress();
+
+        // The closure's function is signed for its type, but the runtime
+        // expects it signed with the address of its word in the record, like
+        // the field of the record it builds there.
+        Address functionAddr = IGF.Builder.CreateConstArrayGEP(
+            record, functionWord, IGM.getPointerSize());
+        if (functionSchema) {
+          auto oldAuth = PointerAuthInfo::forFunctionPointer(
+              IGM, functionType.castTo<SILFunctionType>());
+          auto newAuth = PointerAuthInfo::emit(
+              IGF, functionSchema, functionAddr.getAddress(),
+              PointerAuthEntity());
+          function = emitPointerAuthResign(IGF, function, oldAuth, newAuth);
+        }
+        IGF.Builder.CreateStore(
+            IGF.Builder.CreateBitOrPointerCast(function, IGM.Int8PtrTy),
+            functionAddr);
+
+        Address contextAddr = IGF.Builder.CreateConstArrayGEP(
+            record, contextWord, IGM.getPointerSize());
+        IGF.Builder.CreateStore(
+            IGF.Builder.CreateBitOrPointerCast(context, IGM.Int8PtrTy),
+            contextAddr);
+        return record.getAddress();
+      });
+}
+
+void IRGenFunction::emitAwaitSplitContinuation(
+    llvm::Value *continuation, OptionalExplosion &cancellationHandler,
+    SILType cancellationHandlerType, OptionalExplosion &escalationHandler,
+    SILType escalationHandlerType, Address resumeBuffer, SILType resumeTy,
+    llvm::BasicBlock *normalBB, llvm::PHINode *optionalErrorResult,
+    llvm::BasicBlock *optionalErrorBB) {
+  // The records of the handlers live in this frame, in buffers of a fixed size
+  // that the runtime builds them in. The task removes them again when it
+  // resumes, before the code below runs. A handler that is known statically to
+  // be nil needs no buffer.
+  auto &schemas = IGM.getOptions().PointerAuth;
+  std::optional<StackAddress> cancellationBuffer;
+  llvm::Value *cancellationRecord = emitSplitContinuationHandlerRecord(
+      *this, cancellationHandler, cancellationHandlerType,
+      NumWords_TaskCancellationHandler, Alignment_TaskCancellationHandler,
+      WordOffset_TaskCancellationHandlerFunction,
+      WordOffset_TaskCancellationHandlerContext,
+      schemas.CancellationNotificationWithReasonFunction,
+      "split.cancellation", cancellationBuffer);
+  std::optional<StackAddress> escalationBuffer;
+  llvm::Value *escalationRecord = emitSplitContinuationHandlerRecord(
+      *this, escalationHandler, escalationHandlerType,
+      NumWords_TaskEscalationHandler, Alignment_TaskEscalationHandler,
+      WordOffset_TaskEscalationHandlerFunction,
+      WordOffset_TaskEscalationHandlerContext,
+      schemas.EscalationNotificationFunction, "split.escalation",
+      escalationBuffer);
+
+  // This continuation was created separately (in another frame) via
+  // swift_continuation_initSplit. It is shaped like a task, so its context
+  // is loaded out of it exactly as it would be out of a task.
+  llvm::Value *continuationAsTask =
+      Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
+  Address continuationContext =
+      emitLoadOfContinuationContext(*this, continuationAsTask);
+  AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
+
+  // Bind the resume-point to this function. Create did not bind anything, so
+  // we store the current async context as Parent and a fresh
+  // @llvm.coro.async.resume as ResumeParent; the runtime's
+  // swift_continuation_awaitSplit re-establishes task->ResumeContext from
+  // these immediately before the Pending->Awaited CAS.
+  auto contextBase = Builder.CreateStructGEP(continuationContext, 0, Size(0));
+  auto parentContextAddr = Builder.CreateStructGEP(contextBase, 0, Size(0));
+  llvm::Value *asyncContextValue =
+      Builder.CreateBitCast(getAsyncContext(), IGM.SwiftContextPtrTy);
+  if (auto schema = schemas.AsyncContextParent) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          parentContextAddr.getAddress(),
+                                          PointerAuthEntity());
+    asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
+  }
+  Builder.CreateStore(asyncContextValue, parentContextAddr);
+
+  auto coroResume =
+      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
+  auto resumeFunctionAddr =
+      Builder.CreateStructGEP(contextBase, 1, IGM.getPointerSize());
+  llvm::Value *coroResumeValue = Builder.CreateBitOrPointerCast(
+      coroResume, IGM.TaskContinuationFunctionPtrTy);
+  if (auto schema = schemas.AsyncContextResume) {
+    auto authInfo = PointerAuthInfo::emit(*this, schema,
+                                          resumeFunctionAddr.getAddress(),
+                                          PointerAuthEntity());
+    coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
+  }
+  Builder.CreateStore(coroResumeValue, resumeFunctionAddr);
+
+  assert(AsyncCoroutineCurrentResume == nullptr &&
+         "Don't support nested await_split_continuation");
+  AsyncCoroutineCurrentResume = coroResume;
+
+  {
+    // Set up the suspend point, using swift_continuation_awaitSplit as the
+    // await function.
+    SmallVector<llvm::Value *, 8> arguments;
+    unsigned swiftAsyncContextIndex = 0;
+    arguments.push_back(IGM.getInt32(swiftAsyncContextIndex));
+    arguments.push_back(AsyncCoroutineCurrentResume);
+    auto resumeProjFn = getOrCreateResumePrjFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
+    auto awaitFnPtr = IGM.getAwaitSplitContinuationFn();
+    arguments.push_back(
+        Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
+    for (auto *value :
+         {continuationAsTask, cancellationRecord, escalationRecord})
+      arguments.push_back(Builder.CreateBitOrPointerCast(value, IGM.Int8PtrTy));
+
+    auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
+                                          false /*packed*/);
+    emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
+  }
+
+  if (cancellationBuffer)
+    emitDeallocateStaticAlloca(*cancellationBuffer);
+  if (escalationBuffer)
+    emitDeallocateStaticAlloca(*escalationBuffer);
+
+  // If the continuation is throwing, load the error and branch on it.
+  if (optionalErrorBB) {
+    auto normalContBB = createBasicBlock("await.split.normal");
+    auto contErrResultAddr =
+        emitAddrOfContinuationErrorResultPointer(*this, continuationContext);
+    auto errorRes = Builder.CreateLoad(contErrResultAddr);
+    auto nullError = llvm::Constant::getNullValue(errorRes->getType());
+    auto hasError = Builder.CreateICmpNE(errorRes, nullError);
+    optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    hasError = getSILModule().getOptions().EnableThrowsPrediction
+                   ? Builder.CreateExpectCond(IGM, hasError, false)
+                   : hasError;
+
+    Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
+    Builder.emitBlock(normalContBB);
+  }
+
+  // Normal path: the resumer stored the value into the context's own result
+  // storage (NormalResult was bound to it at create time). Move it into the
+  // caller-provided resume buffer.  Using initializeWithTake handles both
+  // loadable and address-only result types uniformly.
+  {
+    auto contResultAddrAddr =
+        emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
+    auto resultAddrVal = Builder.CreateLoad(contResultAddrAddr);
+    auto &resumeTI = getTypeInfo(resumeTy);
+    Address srcAddr = resumeTI.getAddressForPointer(
+        Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy));
+    resumeTI.initializeWithTake(*this, resumeBuffer, srcAddr, resumeTy,
+                                /*outlined*/ false,
+                                /*zeroizeIfSensitive=*/false);
+  }
+
+  Builder.CreateBr(normalBB);
+  AsyncCoroutineCurrentResume = nullptr;
+  AsyncCoroutineCurrentContinuationContext = nullptr;
 }
 
 namespace {

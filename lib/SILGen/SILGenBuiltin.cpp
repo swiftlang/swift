@@ -2197,8 +2197,8 @@ static ManagedValue emitBuiltinAwaitSplitThrowingContinuation(
   auto continuation = SGF.B.createBuiltin(
       loc, BuiltinNames::GetSplitContinuationAddr,
       SILType::getPrimitiveObjectType(ctx.TheRawUnsafeContinuationType), subs,
-      {unboundContinuation, resumeBuf, args[1].getValue(), args[2].getValue(),
-       args[3].getValue()});
+      {unboundContinuation, resumeBuf, args[1].getValue(),
+       args[2].getValue()});
 
   SILBasicBlock *resumeBlock = SGF.createBasicBlock();
   SILBasicBlock *errorBlock = SGF.createBasicBlock(FunctionSection::Postmatter);
@@ -2592,6 +2592,101 @@ static ManagedValue emitApplyIgnoringIsolation(SILGenFunction &SGF,
                  SubstitutionMap(), fnArgs, calleeTypeInfo, options, C,
                  std::nullopt)
       .getAsSingleValue(SGF, loc);
+}
+
+namespace {
+/// Destroys a split continuation when its scope exits, on both the normal and
+/// the error path.
+class DestroySplitContinuationCleanup : public Cleanup {
+  SILValue continuation;
+
+public:
+  DestroySplitContinuationCleanup(SILValue continuation)
+      : continuation(continuation) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation loc,
+            ForUnwind_t forUnwind) override {
+    SGF.B.createBuiltin(loc, BuiltinNames::DestroySplitContinuation,
+                        SILType::getEmptyTupleType(SGF.getASTContext()),
+                        SubstitutionMap(), {continuation});
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroySplitContinuationCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Continuation:" << continuation << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+/// withSplitContinuation allocates the result buffer of the continuation with
+/// an ordinary alloc_stack, so the continuation itself is only a scope:
+///
+///   %buf  = alloc_stack $T
+///   %cont = builtin "createSplitContinuation"<T>(%buf)
+///   try_apply %fn(%cont)
+///   builtin "destroySplitContinuation"(%cont)
+///   dealloc_stack %buf
+static ManagedValue emitBuiltinWithSplitContinuation(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    ArrayRef<ManagedValue> args, SGFContext C) {
+  assert(args.size() == 2 && "expected (T.Type, fn)");
+  auto &ctx = SGF.getASTContext();
+
+  // The resumers and the await use the result at the opaque abstraction.
+  auto substResultType = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto opaqueResultType =
+      SGF.getLoweredType(AbstractionPattern::getOpaque(), substResultType);
+  auto resultBuf = SGF.emitTemporaryAllocation(loc, opaqueResultType);
+
+  auto *createDecl = cast<FuncDecl>(
+      getBuiltinValueDecl(ctx, BuiltinNames::CreateSplitContinuation));
+  auto createSubs = SubstitutionMap::get(createDecl->getGenericSignature(),
+                                         {substResultType},
+                                         LookUpConformanceInModule());
+  SILValue continuation = SGF.B.createBuiltin(
+      loc, BuiltinNames::CreateSplitContinuation,
+      SILType::getPrimitiveObjectType(ctx.TheRawUnsafeContinuationType),
+      createSubs, {resultBuf});
+  SGF.Cleanups.pushCleanup<DestroySplitContinuationCleanup>(continuation);
+  auto destroyCleanup = SGF.Cleanups.getTopCleanup();
+
+  // The function inherits the caller's isolation, so pass it the current
+  // isolation as its implicit leading argument.
+  ManagedValue fn = args[1];
+  auto fnType = fn.getType().castTo<SILFunctionType>();
+  SmallVector<ManagedValue, 2> fnArgs;
+  if (auto isolated = fnType->maybeGetIsolatedParameter();
+      isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto executor = SGF.emitExpectedExecutor(loc);
+    auto erasedActor =
+        SGF.emitActorInstanceIsolation(loc, executor,
+                                       executor.getType().getASTType())
+            .borrow(SGF, loc);
+    fnArgs.push_back(SGF.B.convertToImplicitActor(loc, erasedActor));
+  }
+  fnArgs.push_back(ManagedValue::forObjectRValueWithoutOwnership(continuation));
+
+  // The result is the builtin's second generic parameter, `R`.
+  auto substBodyResultType = subs.getReplacementTypes()[1]->getCanonicalType();
+  CalleeTypeInfo calleeTypeInfo(fnType, AbstractionPattern::getOpaque(),
+                                substBodyResultType);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(SGF, calleeTypeInfo, loc, C);
+  ArgumentScope argScope(SGF, loc);
+  ApplyOptions options;
+  if (!SGF.ThrowDest.isValid())
+    options |= ApplyFlags::DoesNotThrow;
+  auto result = SGF.emitApply(std::move(resultPlan), std::move(argScope), loc,
+                              fn, SubstitutionMap(), fnArgs, calleeTypeInfo,
+                              options, C, std::nullopt)
+                    .getAsSingleValue(SGF, loc);
+
+  SGF.Cleanups.popAndEmitCleanup(destroyCleanup, CleanupLocation(loc),
+                                 NotForUnwind);
+  return result;
 }
 
 static ManagedValue

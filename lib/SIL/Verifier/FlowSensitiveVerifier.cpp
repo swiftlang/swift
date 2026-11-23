@@ -247,6 +247,7 @@ static SILValue getScopeEndingValueOfScopeInst(SILInstruction *i) {
     if (auto bk = bi->getBuiltinKind()) {
       switch (*bk) {
       case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+      case BuiltinValueKind::CreateSplitContinuation:
         return bi->getResult(0);
 
       default:
@@ -267,6 +268,7 @@ static bool isScopeEndingInst(SILInstruction *i) {
     if (auto bk = bi->getBuiltinKind()) {
       switch (*bk) {
       case BuiltinValueKind::FinishAsyncLet:
+      case BuiltinValueKind::DestroySplitContinuation:
         return true;
 
       default:

@@ -575,19 +575,27 @@ BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 /// the continuation is resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinuation", Special)
 
+/// withSplitContinuation<T: ~Copyable, R: ~Copyable, E: Error> :
+///   (T.Type, nonisolated(nonsending) (Builtin.RawUnsafeContinuation)
+///    async throws(E) -> R) async throws(E) -> R
+///
+/// Create a split continuation for a result of type T, pass it to the given
+/// function, and destroy it when the function returns. SILGen allocates the
+/// result buffer with an alloc_stack around the call, so createSplitContinuation
+/// and destroySplitContinuation are only a scope in SIL.
+BUILTIN_SIL_OPERATION(WithSplitContinuation, "withSplitContinuation", Special)
+
 /// awaitSplitThrowingContinuation<T> :
-///   (Builtin.RawUnsafeContinuation, (UInt8) -> (), (UInt8, UInt8) -> (),
-///    Builtin.Word) async throws -> sending T
+///   (Builtin.RawUnsafeContinuation, ((UInt8) -> ())?, ((UInt8, UInt8) -> ())?)
+///   async throws -> sending T
 ///
 /// Await a *split* continuation (created by createSplitContinuation and
 /// possibly resumed from another function/thread), binding the resume-point to
 /// the current function. Returns a value of type T, or throws an error, when the
 /// continuation is resumed.
 ///
-/// The cancellation and priority escalation handlers are installed for the
-/// duration of the suspension. The word parameter selects which of them are
-/// used, with the bits of SplitContinuationAwaitHandlers in Concurrency.h. This
-/// word is needed since we can't express optional non-escaping closures.
+/// The cancellation and priority escalation handlers that aren't nil are
+/// installed for the duration of the suspension.
 BUILTIN_SIL_OPERATION(AwaitSplitThrowingContinuation, "awaitSplitThrowingContinuation", Special)
 
 /// Force the current task to be rescheduled on the specified actor.
@@ -907,18 +915,23 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
 
-/// Create a split continuation for a result of type T. The continuation it
-/// returns is shared by both halves of a split continuation and must be
-/// awaited (awaitSplitThrowingContinuation) and resumed exactly once, then
-/// destroyed when the creating scope returns.
+/// createSplitContinuation<T> : (inout T) -> Builtin.RawUnsafeContinuation
 ///
-/// IRGen allocates NumWords_SplitContinuation words for the continuation and a
-/// buffer for its result in the current frame, and has the runtime initialize
-/// them.
+/// Create a split continuation whose result is written to the given buffer.
+/// Only SILGen emits it, for withSplitContinuation. The continuation it returns
+/// is shared by both halves of a split continuation and must be awaited
+/// (awaitSplitThrowingContinuation) and resumed exactly once, then destroyed.
+///
+/// IRGen allocates NumWords_SplitContinuation words for the continuation in the
+/// current frame, and has the runtime initialize them.
 BUILTIN_MISC_OPERATION(CreateSplitContinuation,
                        "createSplitContinuation", "", Special)
 
 
+/// getSplitContinuationAddr<T> :
+///   (Builtin.RawUnsafeContinuation, inout T, ((UInt8) -> ())?,
+///    ((UInt8, UInt8) -> ())?) -> Builtin.RawUnsafeContinuation
+///
 /// Bind a split continuation, created elsewhere by
 /// createSplitContinuation, to the *current* function: the second operand is
 /// the address of the buffer in this frame that receives the resumed value.
@@ -926,8 +939,8 @@ BUILTIN_MISC_OPERATION(GetSplitContinuationAddr,
                        "getSplitContinuationAddr", "", Special)
 
 /// Destroy a split continuation created by createSplitContinuation,
-/// after its result has been consumed by the await. IRGen releases the result
-/// buffer and ends the storage's lifetime.
+/// after its result has been consumed by the await. IRGen ends the storage's
+/// lifetime.
 /// destroySplitContinuation : (Builtin.RawUnsafeContinuation) -> ()
 BUILTIN_MISC_OPERATION(DestroySplitContinuation,
                        "destroySplitContinuation", "", Special)

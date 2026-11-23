@@ -307,6 +307,12 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::TaskCancellationShieldPop:
           callVisitUse(op);
           continue;
+        // The continuation keeps the address of its result buffer, and its
+        // resumer writes the result there.
+        case BuiltinValueKind::CreateSplitContinuation:
+          recordEscape(op);
+          callVisitUse(op);
+          continue;
         default:
           break;
         }

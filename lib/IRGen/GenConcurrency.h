@@ -162,6 +162,19 @@ llvm::Value *emitBuiltinTaskCancellationScopePush(IRGenFunction &IGF);
 /// Emit IR for the taskCancellationScopePop builtin.
 void emitBuiltinTaskCancellationScopePop(IRGenFunction &IGF, llvm::Value *record);
 
+/// Load the context of a continuation, which is a task or a split
+/// continuation.
+Address emitLoadOfContinuationContext(IRGenFunction &IGF,
+                                      llvm::Value *continuation);
+
+/// The address of the pointer to the normal result in a continuation context.
+Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
+                                                  Address context);
+
+/// The address of the error result in a continuation context.
+Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
+                                                 Address context);
+
 } // end namespace irgen
 } // end namespace swift
 

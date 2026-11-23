@@ -2349,41 +2349,75 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
   return builder.build(id);
 }
 
-// createSplitContinuation<T> : (T.Type) -> Builtin.RawUnsafeContinuation
+// createSplitContinuation<T> : (inout T) -> Builtin.RawUnsafeContinuation
 static ValueDecl *getCreateSplitContinuation(ASTContext &ctx,
                                                 Identifier id) {
-  return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted,
-                                      _conformsTo(
-                                        _typeparam(0), _escapable)
-                                        // we allow ~Copyable results
-                                      ),
-                            _parameters(_metatype(_typeparam(0))),
-                            _rawUnsafeContinuation);
+  BuiltinFunctionBuilder builder(ctx);
+  // We allow ~Copyable results.
+  auto resultTy = makeGenericParam();
+  builder.addConformanceRequirement(resultTy, KnownProtocolKind::Escapable);
+  builder.addParameter(resultTy, ParamSpecifier::InOut);
+  builder.setResult(makeConcrete(ctx.TheRawUnsafeContinuationType));
+  return builder.build(id);
 }
 
-/// The handlers a split continuation is awaited with:
-///   (UInt8) -> (), (UInt8, UInt8) -> (), Builtin.Word
+// withSplitContinuation<T: ~Copyable, R: ~Copyable, E: Error> :
+//   (T.Type, nonisolated(nonsending) (Builtin.RawUnsafeContinuation)
+//    async throws(E) -> R) async throws(E) -> R
+static ValueDecl *getWithSplitContinuation(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx, /* genericParamCount */ 3);
+
+  auto T = makeGenericParam(0);
+  auto R = makeGenericParam(1);
+  auto E = makeGenericParam(2);
+  builder.addConformanceRequirement(T, KnownProtocolKind::Escapable);
+  builder.addConformanceRequirement(R, KnownProtocolKind::Escapable);
+  builder.addConformanceRequirement(E, KnownProtocolKind::Error);
+
+  // The function runs on the caller's isolation, like the body of
+  // withContinuation.
+  auto extInfo = ASTExtInfoBuilder()
+      .withNoEscape()
+      .withAsync()
+      .withThrows(/* throws */ true, E.build(builder))
+      .withIsolation(FunctionTypeIsolation::forNonisolatedNonsending())
+      .build();
+  auto fnParamTy = FunctionType::get(
+      {FunctionType::Param::bodyAccess(ctx.TheRawUnsafeContinuationType)},
+      /* yields */ {}, R.build(builder), extInfo);
+
+  builder.addParameter(makeMetatype(T));
+  builder.addParameter(makeConcrete(fnParamTy));
+  builder.setResult(R);
+  builder.setAsync();
+  builder.setThrows();
+  builder.setThrownError(E);
+
+  return builder.build(id);
+}
+
+/// The handlers a split continuation is awaited with, which are nil if the
+/// await has no such handler:
+///   ((UInt8) -> ())?, ((UInt8, UInt8) -> ())?
 static void addSplitContinuationHandlerParameters(
     ASTContext &ctx, BuiltinFunctionBuilder &builder) {
   auto noEscape = ASTExtInfoBuilder().withNoEscape().build();
   AnyFunctionType::Param cancellationParams[] = {
       AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
-  builder.addParameter(makeConcrete(FunctionType::get(
-      cancellationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape)));
+  builder.addParameter(makeConcrete(OptionalType::get(FunctionType::get(
+      cancellationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape))));
   AnyFunctionType::Param escalationParams[] = {
       AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
       AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
-  builder.addParameter(makeConcrete(FunctionType::get(
-      escalationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape)));
-  builder.addParameter(makeConcrete(BuiltinIntegerType::getWordType(ctx)));
+  builder.addParameter(makeConcrete(OptionalType::get(FunctionType::get(
+      escalationParams, /* yields */ {}, ctx.TheEmptyTupleType, noEscape))));
 }
 
 // awaitSplitThrowingContinuation<T> :
-//   (Builtin.RawUnsafeContinuation, (UInt8) -> (), (UInt8, UInt8) -> (),
-//    Builtin.Word) async throws -> sending T
+//   (Builtin.RawUnsafeContinuation, ((UInt8) -> ())?, ((UInt8, UInt8) -> ())?)
+//   async throws -> sending T
 static ValueDecl *getAwaitSplitThrowingContinuation(ASTContext &ctx,
                                                        Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
@@ -2403,8 +2437,8 @@ static ValueDecl *getAwaitSplitThrowingContinuation(ASTContext &ctx,
 }
 
 // getSplitContinuationAddr<T> :
-//   (Builtin.RawUnsafeContinuation, T*, (UInt8) -> (), (UInt8, UInt8) -> (),
-//    Builtin.Word) -> Builtin.RawUnsafeContinuation
+//   (Builtin.RawUnsafeContinuation, inout T, ((UInt8) -> ())?,
+//    ((UInt8, UInt8) -> ())?) -> Builtin.RawUnsafeContinuation
 static ValueDecl *getGetSplitContinuationAddr(ASTContext &ctx,
                                                  Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
@@ -3862,6 +3896,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::CreateSplitContinuation:
     return getCreateSplitContinuation(Context, Id);
+
+  case BuiltinValueKind::WithSplitContinuation:
+    return getWithSplitContinuation(Context, Id);
 
   case BuiltinValueKind::AwaitSplitThrowingContinuation:
     return getAwaitSplitThrowingContinuation(Context, Id);

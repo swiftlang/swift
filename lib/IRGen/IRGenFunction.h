@@ -57,6 +57,7 @@ namespace swift {
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
+  class OptionalExplosion;
   class FunctionRef;
   class HeapLayout;
   class HeapNonFixedOffsets;
@@ -72,17 +73,6 @@ namespace irgen {
 enum AllowsTaskAlloc_t : bool {
   DoesNotAllowTaskAlloc = false,
   AllowsTaskAlloc = true,
-};
-
-/// The handlers a split continuation is awaited with including the function and
-/// context of each handler closure, and the word of
-/// SplitContinuationAwaitHandlers bits that selects which of them are used.
-struct SplitContinuationHandlers {
-  llvm::Value *cancellationFunction = nullptr;
-  llvm::Value *cancellationContext = nullptr;
-  llvm::Value *escalationFunction = nullptr;
-  llvm::Value *escalationContext = nullptr;
-  llvm::Value *flags = nullptr;
 };
 
 /// IRGenFunction - Primary class for emitting LLVM instructions for a
@@ -246,13 +236,17 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  /// Defined in GenConcurrency.cpp. Each handler is an optional closure of the
+  /// given optional type.
   void emitAwaitSplitContinuation(llvm::Value *continuation,
-                                     const SplitContinuationHandlers &handlers,
-                                     Address resumeBuffer,
-                                     SILType resumeTy,
-                                     llvm::BasicBlock *normalBB,
-                                     llvm::PHINode *optionalErrorPhi,
-                                     llvm::BasicBlock *optionalErrorBB);
+                                  OptionalExplosion &cancellationHandler,
+                                  SILType cancellationHandlerType,
+                                  OptionalExplosion &escalationHandler,
+                                  SILType escalationHandlerType,
+                                  Address resumeBuffer, SILType resumeTy,
+                                  llvm::BasicBlock *normalBB,
+                                  llvm::PHINode *optionalErrorPhi,
+                                  llvm::BasicBlock *optionalErrorBB);
 
 
   void emitClearSensitive(Address address, llvm::Value *size);

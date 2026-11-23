@@ -249,12 +249,17 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   /// call does not suspend at all and returns the value immediately.
   @export(implementation)
   public nonisolated(nonsending) consuming func wait() async throws(Failure) -> sending Success {
-    try await Self._wait(
-      context: _takeContext(),
-      onCancel: { _ in },
-      onPriorityEscalated: { _, _ in },
-      handlers: 0
-    )
+    #if $BuiltinSplitContinuations
+    do {
+      return try await Builtin.awaitSplitThrowingContinuation(
+        _takeContext(), nil, nil)
+    } catch {
+      // Matches the cast Continuation.resume uses.
+      throw error as! Failure
+    }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a cancellation
@@ -302,17 +307,26 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   ) async throws(Failure) -> sending Success {
     // The handlers are wrapped so the runtime can hand them a raw reason and
     // raw priorities.
-    try await Self._wait(
-      context: _takeContext(),
-      onCancel: {
-        handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
-      },
-      onPriorityEscalated: {
-        handlePriorityEscalation(
-          TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
-      },
-      handlers: Self._cancellationHandler() | Self._escalationHandler()
-    )
+    #if $BuiltinSplitContinuations
+    do {
+      return try await Builtin.awaitSplitThrowingContinuation(
+        _takeContext(),
+        { reason in
+          handleCancellation(
+            CancellationError.Reason(_rawValue: reason) ?? .unspecified)
+        },
+        { oldPriority, newPriority in
+          handlePriorityEscalation(
+            TaskPriority(rawValue: oldPriority),
+            TaskPriority(rawValue: newPriority))
+        })
+    } catch {
+      // Matches the cast Continuation.resume uses.
+      throw error as! Failure
+    }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
@@ -334,14 +348,22 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
     onCancel handleCancellation: sending (CancellationError.Reason) -> Void
   ) async throws(Failure) -> sending Success {
     // The handler is wrapped so the runtime can hand it a raw reason.
-    try await Self._wait(
-      context: _takeContext(),
-      onCancel: {
-        handleCancellation(CancellationError.Reason(_rawValue: $0) ?? .unspecified)
-      },
-      onPriorityEscalated: { _, _ in },
-      handlers: Self._cancellationHandler()
-    )
+    #if $BuiltinSplitContinuations
+    do {
+      return try await Builtin.awaitSplitThrowingContinuation(
+        _takeContext(),
+        { reason in
+          handleCancellation(
+            CancellationError.Reason(_rawValue: reason) ?? .unspecified)
+        },
+        nil)
+    } catch {
+      // Matches the cast Continuation.resume uses.
+      throw error as! Failure
+    }
+    #else
+    fatalError("Swift compiler is incompatible with this SDK version")
+    #endif
   }
 
   /// Suspend until the paired ``Continuation`` is resumed, with a
@@ -379,43 +401,16 @@ public struct ContinuationWaiter<Success: ~Copyable, Failure: Error>: ~Copyable,
   ) async throws(Failure) -> sending Success {
     // The escalation handler is wrapped so the runtime can hand it raw
     // priorities.
-    try await Self._wait(
-      context: _takeContext(),
-      onCancel: { _ in },
-      onPriorityEscalated: {
-        handlePriorityEscalation(
-          TaskPriority(rawValue: $0), TaskPriority(rawValue: $1))
-      },
-      handlers: Self._escalationHandler()
-    )
-  }
-
-  // The bits of SplitContinuationAwaitHandlers in Concurrency.h, for the
-  // `handlers` argument of `_wait`. They are functions so they add no
-  // symbols to the ABI.
-  @export(implementation)
-  static func _cancellationHandler() -> UInt { 1 << 0 }
-
-  @export(implementation)
-  static func _escalationHandler() -> UInt { 1 << 1 }
-
-  // TODO: Pass optional handlers and remove `handlers` once Optional can hold
-  // a non-escaping closure. Right now `handlers` tells the runtime which
-  // handlers are actually set, with `_cancellationHandler()` and
-  // `_escalationHandler()`.
-  @export(implementation)
-  nonisolated(nonsending) static func _wait(
-    context: Builtin.RawUnsafeContinuation,
-    onCancel handleCancellation: sending (UInt8) -> Void,
-    onPriorityEscalated handlePriorityEscalation:
-      @Sendable (UInt8, UInt8) -> Void,
-    handlers: UInt
-  ) async throws(Failure) -> sending Success {
     #if $BuiltinSplitContinuations
     do {
       return try await Builtin.awaitSplitThrowingContinuation(
-        context, handleCancellation, handlePriorityEscalation,
-        handlers._builtinWordValue)
+        _takeContext(),
+        nil,
+        { oldPriority, newPriority in
+          handlePriorityEscalation(
+            TaskPriority(rawValue: oldPriority),
+            TaskPriority(rawValue: newPriority))
+        })
     } catch {
       // Matches the cast Continuation.resume uses.
       throw error as! Failure
@@ -473,11 +468,12 @@ public nonisolated(nonsending) func withContinuation<
   //
   // The compiler allocates the continuation's storage and its result buffer in
   // this frame.
-  let rawContinuation = Builtin.createSplitContinuation(Success.self)
-  defer { Builtin.destroySplitContinuation(rawContinuation) }
-  let continuation = Continuation<Success, Failure>(rawContinuation)
-  let waiter = ContinuationWaiter<Success, Failure>(context: rawContinuation)
-  return try await body(consume continuation, consume waiter)
+  return try await Builtin.withSplitContinuation(Success.self) {
+    (rawContinuation) async throws(BodyFailure) -> BodyResult in
+    let continuation = Continuation<Success, Failure>(rawContinuation)
+    let waiter = ContinuationWaiter<Success, Failure>(context: rawContinuation)
+    return try await body(consume continuation, consume waiter)
+  }
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
   #endif

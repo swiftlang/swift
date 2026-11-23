@@ -41,10 +41,11 @@ using namespace swift;
 //     works for both.
 //   * await (swift_continuation_awaitSplit): binds the resume-point to the
 //     *current* task, records the awaiting task on the context, and performs
-//     the Pending->Awaited transition. The cancellation and escalation
-//     handlers it is passed are built in buffers in the waiting frame,
-//     published in the same status update that suspends the task, and removed
-//     by the task when it resumes.
+//     the Pending->Awaited transition. The records of the cancellation and
+//     escalation handlers are built in buffers in the waiting frame, around the
+//     function and context the compiler stored in them, published in the same
+//     status update that suspends the task, and removed by the task when it
+//     resumes.
 //   * resume: the regular swift_continuation_resume* entry points, and
 //     swift_continuation_resumeOnExecutors, which read the marker word and
 //     route to the split implementation. The resume works *by context* (the
@@ -64,6 +65,20 @@ struct SplitContinuationHandlers {
   EscalationNotificationStatusRecord *Escalation;
 };
 
+/// The fields of a split continuation that live in front of `ResumeContext`.
+struct SplitContinuationPrefix {
+  /// Distinguishes this from a task.
+  uintptr_t Marker;
+
+  /// The task awaiting the continuation, recorded at await time so that a
+  /// resume-by-context can make it runnable. Null until then, which is also how
+  /// we recognize a resume that races ahead of the await.
+  AsyncTask *AwaitingTask;
+
+  /// The handler records the wait published.
+  SplitContinuationHandlers PublishedHandlers;
+};
+
 /// The storage backing a split continuation. A raw continuation referring to a
 /// split continuation is the address of one of these. The compiler allocates
 /// NumWords_SplitContinuation words for it in the frame of the function that
@@ -72,29 +87,20 @@ struct SplitContinuationHandlers {
 /// The layout makes a split continuation resumable by *any* code that can
 /// resume a regular one, including code compiled before split continuations
 /// existed. `ResumeContext` sits at exactly the offset at which an AsyncTask
-/// keeps its own.
+/// keeps its own. Resumers only read the marker and `ResumeContext`, so the
+/// other fields use the words in front of it that a task uses for its header.
 ///
 /// AsyncTask isn't standard-layout, so `offsetof` on it warns; we rely on its
 /// layout deliberately and assert it below.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
-struct SplitContinuationStorage {
-  /// Distinguishes this from a task.
-  uintptr_t Marker;
-
+struct SplitContinuationStorage : SplitContinuationPrefix {
   /// Padding placing `ResumeContext` where a task keeps its own.
-  char TaskPrefixPadding[offsetof(AsyncTask, ResumeContext) - sizeof(uintptr_t)];
+  char TaskPrefixPadding[offsetof(AsyncTask, ResumeContext) -
+                         sizeof(SplitContinuationPrefix)];
 
   /// Points at the ContinuationAsyncContext that follows in this storage.
   AsyncContext * __ptrauth_swift_task_resume_context ResumeContext;
-
-  /// The task awaiting the continuation, recorded at await time so that a
-  /// resume-by-context can make it runnable. Null until then, which is also how
-  /// a resume that races ahead of the await is recognised.
-  AsyncTask *AwaitingTask;
-
-  /// The handler records the wait published.
-  SplitContinuationHandlers PublishedHandlers;
 };
 
 /// Written into `SplitContinuationStorage::Marker`, where a task keeps its
@@ -140,6 +146,39 @@ static_assert(alignof(EscalationNotificationStatusRecord) <=
                   Alignment_TaskEscalationHandler,
               "an escalation handler record needs more than "
               "Alignment_TaskEscalationHandler");
+
+/// The function and context of a cancellation handler, which the compiler
+/// stores in the record buffer before the await.
+struct SplitContinuationCancellationHandler {
+  void *Header[WordOffset_TaskCancellationHandlerFunction];
+  CancellationNotificationStatusRecord::FunctionTypeWithReason
+      *__ptrauth_swift_cancellation_notification_with_reason_function Function;
+  void *Context;
+};
+
+/// The function and context of a priority escalation handler, which the
+/// compiler stores in the record buffer before the await.
+struct SplitContinuationEscalationHandler {
+  void *Header[WordOffset_TaskEscalationHandlerFunction];
+  EscalationNotificationStatusRecord::FunctionType
+      *__ptrauth_swift_escalation_notification_function Function;
+  void *Context;
+};
+
+static_assert(offsetof(SplitContinuationCancellationHandler, Context) ==
+                  WordOffset_TaskCancellationHandlerContext * sizeof(void *),
+              "the compiler stores the cancellation handler's context at "
+              "WordOffset_TaskCancellationHandlerContext");
+static_assert(offsetof(SplitContinuationEscalationHandler, Context) ==
+                  WordOffset_TaskEscalationHandlerContext * sizeof(void *),
+              "the compiler stores the escalation handler's context at "
+              "WordOffset_TaskEscalationHandlerContext");
+static_assert(sizeof(SplitContinuationCancellationHandler) <=
+                  NumWords_TaskCancellationHandler * sizeof(void *),
+              "the cancellation handler doesn't fit its record buffer");
+static_assert(sizeof(SplitContinuationEscalationHandler) <=
+                  NumWords_TaskEscalationHandler * sizeof(void *),
+              "the escalation handler doesn't fit its record buffer");
 
 /// Whether `continuation` is a split continuation rather than a task.
 static bool isSplitContinuation(const void *continuation) {
@@ -317,13 +356,9 @@ static void split_continuation_remove_handlers_resume_adapter(
 }
 
 SWIFT_CC(swiftasync)
-void swift::swift_continuation_awaitSplit(
-    SplitContinuation *continuation, void *cancellationRecord,
-    CancellationNotificationStatusRecord::FunctionTypeWithReason
-        *cancellationHandler,
-    void *cancellationContext, void *escalationRecord,
-    EscalationNotificationStatusRecord::FunctionType *escalationHandler,
-    void *escalationContext, size_t handlers) {
+void swift::swift_continuation_awaitSplit(SplitContinuation *continuation,
+                                          void *cancellationRecord,
+                                          void *escalationRecord) {
   auto *storage =
       reinterpret_cast<SplitContinuationStorage *>(continuation);
   auto *context = contextOfStorage(storage);
@@ -362,22 +397,26 @@ void swift::swift_continuation_awaitSplit(
     return context->ResumeParent(context);
 
   // Build the records of the handlers in the buffers the compiler allocated
-  // for them in the waiting frame.
+  // for them in the waiting frame, around the function and context it stored
+  // there. We read them out first, because the record overwrites the buffer.
   CancellationNotificationStatusRecord *cancellation = nullptr;
-  if (handlers & SplitContinuationCancellationHandler)
+  if (cancellationRecord) {
+    auto *handler =
+        static_cast<SplitContinuationCancellationHandler *>(cancellationRecord);
+    auto *function = handler->Function;
+    auto *functionContext = handler->Context;
     cancellation = ::new (cancellationRecord)
-        CancellationNotificationStatusRecord(
-            swift_auth_code(cancellationHandler,
-                            SpecialPointerAuthDiscriminators::
-                                CancellationNotificationWithReasonFunction),
-            cancellationContext);
+        CancellationNotificationStatusRecord(function, functionContext);
+  }
   EscalationNotificationStatusRecord *escalation = nullptr;
-  if (handlers & SplitContinuationEscalationHandler)
-    escalation = ::new (escalationRecord) EscalationNotificationStatusRecord(
-        swift_auth_code(
-            escalationHandler,
-            SpecialPointerAuthDiscriminators::EscalationNotificationFunction),
-        escalationContext);
+  if (escalationRecord) {
+    auto *handler =
+        static_cast<SplitContinuationEscalationHandler *>(escalationRecord);
+    auto *function = handler->Function;
+    auto *functionContext = handler->Context;
+    escalation = ::new (escalationRecord)
+        EscalationNotificationStatusRecord(function, functionContext);
+  }
   bool hasHandlers = cancellation || escalation;
 
   // The handlers run inline for what happened before their records are

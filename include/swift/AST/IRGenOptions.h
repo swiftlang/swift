@@ -211,6 +211,14 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// The async context stored in AsyncTask.
   PointerAuthSchema TaskResumeContext;
 
+  /// The function of a cancellation handler with a reason, which the compiler
+  /// stores in the handler's record before a split continuation await.
+  PointerAuthSchema CancellationNotificationWithReasonFunction;
+
+  /// The function of a priority escalation handler, which the compiler stores
+  /// in the handler's record before a split continuation await.
+  PointerAuthSchema EscalationNotificationFunction;
+
   /// The swift async context entry in the extended frame info.
   PointerAuthSchema AsyncContextExtendedFrameEntry;
 

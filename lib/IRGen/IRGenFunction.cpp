@@ -26,6 +26,7 @@
 
 #include "Callee.h"
 #include "Explosion.h"
+#include "GenConcurrency.h"
 #include "GenPointerAuth.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -692,7 +693,7 @@ static llvm::Value *emitLoadOfResumeContextFromTask(IRGenFunction &IGF,
   return resumeContext;
 }
 
-static Address emitLoadOfContinuationContext(IRGenFunction &IGF,
+Address irgen::emitLoadOfContinuationContext(IRGenFunction &IGF,
                                              llvm::Value *continuation) {
   auto ptr = emitLoadOfResumeContextFromTask(IGF, continuation);
   ptr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.ContinuationAsyncContextPtrTy);
@@ -700,14 +701,14 @@ static Address emitLoadOfContinuationContext(IRGenFunction &IGF,
                  IGF.IGM.getAsyncContextAlignment());
 }
 
-static Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
+Address irgen::emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
                                                          Address context) {
   assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
   auto offset = 5 * IGF.IGM.getPointerSize();
   return IGF.Builder.CreateStructGEP(context, 4, offset);
 }
 
-static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
+Address irgen::emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
                                                         Address context) {
   assert(context.getType() == IGF.IGM.ContinuationAsyncContextPtrTy);
   auto offset = 4 * IGF.IGM.getPointerSize();
@@ -983,142 +984,6 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
       IGM.getContinuationThrowingResumeWithErrorFunctionPointer(),
       {continuation, error});
   call->setCallingConv(IGM.SwiftCC);
-}
-
-void IRGenFunction::emitAwaitSplitContinuation(
-    llvm::Value *continuation, const SplitContinuationHandlers &handlers,
-    Address resumeBuffer, SILType resumeTy,
-    llvm::BasicBlock *normalBB, llvm::PHINode *optionalErrorResult,
-    llvm::BasicBlock *optionalErrorBB) {
-  // This continuation was created separately (in another frame) via
-  // swift_continuation_createSplit. It is shaped like a task, so its context
-  // is loaded out of it exactly as it would be out of a task.
-  llvm::Value *continuationAsTask =
-      Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
-  Address continuationContext = emitLoadOfContinuationContext(*this, continuationAsTask);
-  AsyncCoroutineCurrentContinuationContext = continuationContext.getAddress();
-
-  // Bind the resume-point to this function. Create did not bind anything, so
-  // we store the current async context as Parent and a fresh
-  // @llvm.coro.async.resume as ResumeParent; the runtime's
-  // swift_continuation_awaitSplit re-establishes task->ResumeContext from
-  // these immediately before the Pending->Awaited CAS.
-  auto contextBase = Builder.CreateStructGEP(continuationContext, 0, Size(0));
-  auto parentContextAddr = Builder.CreateStructGEP(contextBase, 0, Size(0));
-  llvm::Value *asyncContextValue =
-      Builder.CreateBitCast(getAsyncContext(), IGM.SwiftContextPtrTy);
-  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextParent) {
-    auto authInfo = PointerAuthInfo::emit(*this, schema,
-                                          parentContextAddr.getAddress(),
-                                          PointerAuthEntity());
-    asyncContextValue = emitPointerAuthSign(*this, asyncContextValue, authInfo);
-  }
-  Builder.CreateStore(asyncContextValue, parentContextAddr);
-
-  auto coroResume =
-      Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_async_resume, {});
-  auto resumeFunctionAddr =
-      Builder.CreateStructGEP(contextBase, 1, IGM.getPointerSize());
-  llvm::Value *coroResumeValue = Builder.CreateBitOrPointerCast(
-      coroResume, IGM.TaskContinuationFunctionPtrTy);
-  if (auto schema = IGM.getOptions().PointerAuth.AsyncContextResume) {
-    auto authInfo = PointerAuthInfo::emit(*this, schema,
-                                          resumeFunctionAddr.getAddress(),
-                                          PointerAuthEntity());
-    coroResumeValue = emitPointerAuthSign(*this, coroResumeValue, authInfo);
-  }
-  Builder.CreateStore(coroResumeValue, resumeFunctionAddr);
-
-  assert(AsyncCoroutineCurrentResume == nullptr &&
-         "Don't support nested await_split_continuation");
-  AsyncCoroutineCurrentResume = coroResume;
-
-  // The records of the handlers live in this frame, in buffers of a fixed size
-  // that the runtime builds them in. The task removes them again when it
-  // resumes, before the code below runs.
-  auto makeRecordBuffer = [&](unsigned numWords, size_t alignment,
-                              const llvm::Twine &name) {
-    Address buffer =
-        createAlloca(llvm::ArrayType::get(IGM.Int8PtrTy, numWords),
-                     Alignment(alignment), name);
-    Builder.CreateLifetimeStart(buffer);
-    return buffer;
-  };
-  Address cancellationRecord = makeRecordBuffer(
-      NumWords_TaskCancellationHandler, Alignment_TaskCancellationHandler,
-      "split.cancellation.record");
-  Address escalationRecord = makeRecordBuffer(
-      NumWords_TaskEscalationHandler, Alignment_TaskEscalationHandler,
-      "split.escalation.record");
-
-  {
-    // Set up the suspend point, using swift_continuation_awaitSplit as the
-    // await function.
-    SmallVector<llvm::Value *, 12> arguments;
-    unsigned swiftAsyncContextIndex = 0;
-    arguments.push_back(IGM.getInt32(swiftAsyncContextIndex));
-    arguments.push_back(AsyncCoroutineCurrentResume);
-    auto resumeProjFn = getOrCreateResumePrjFn();
-    arguments.push_back(
-        Builder.CreateBitOrPointerCast(resumeProjFn, IGM.Int8PtrTy));
-    auto awaitFnPtr = IGM.getAwaitSplitContinuationFn();
-    arguments.push_back(
-        Builder.CreateBitOrPointerCast(awaitFnPtr, IGM.Int8PtrTy));
-    arguments.push_back(Builder.CreateBitOrPointerCast(continuationAsTask, IGM.Int8PtrTy));
-    for (auto *value : {cancellationRecord.getAddress(),
-                        handlers.cancellationFunction,
-                        handlers.cancellationContext,
-                        escalationRecord.getAddress(),
-                        handlers.escalationFunction,
-                        handlers.escalationContext})
-      arguments.push_back(Builder.CreateBitOrPointerCast(value, IGM.Int8PtrTy));
-    arguments.push_back(handlers.flags);
-
-    auto resultTy = llvm::StructType::get(IGM.getLLVMContext(), {IGM.Int8PtrTy},
-                                           false /*packed*/);
-    emitSuspendAsyncCall(swiftAsyncContextIndex, resultTy, arguments);
-  }
-
-  Builder.CreateLifetimeEnd(cancellationRecord);
-  Builder.CreateLifetimeEnd(escalationRecord);
-
-  // If the continuation is throwing, load the error and branch on it.
-  if (optionalErrorBB) {
-    auto normalContBB = createBasicBlock("await.split.normal");
-    auto contErrResultAddr =
-        emitAddrOfContinuationErrorResultPointer(*this, continuationContext);
-    auto errorRes = Builder.CreateLoad(contErrResultAddr);
-    auto nullError = llvm::Constant::getNullValue(errorRes->getType());
-    auto hasError = Builder.CreateICmpNE(errorRes, nullError);
-    optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
-
-    hasError = getSILModule().getOptions().EnableThrowsPrediction
-                   ? Builder.CreateExpectCond(IGM, hasError, false)
-                   : hasError;
-
-    Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
-    Builder.emitBlock(normalContBB);
-  }
-
-  // Normal path: the resumer stored the value into the context's own result
-  // storage (NormalResult was bound to it at create time). Move it into the
-  // caller-provided resume buffer.  Using initializeWithTake handles both
-  // loadable and address-only result types uniformly.
-  {
-    auto contResultAddrAddr =
-        emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
-    auto resultAddrVal = Builder.CreateLoad(contResultAddrAddr);
-    auto &resumeTI = getTypeInfo(resumeTy);
-    Address srcAddr = resumeTI.getAddressForPointer(
-        Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy));
-    resumeTI.initializeWithTake(*this, resumeBuffer, srcAddr, resumeTy,
-                                /*outlined*/ false,
-                                /*zeroizeIfSensitive=*/false);
-  }
-
-  Builder.CreateBr(normalBB);
-  AsyncCoroutineCurrentResume = nullptr;
-  AsyncCoroutineCurrentContinuationContext = nullptr;
 }
 
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
