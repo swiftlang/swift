@@ -107,6 +107,7 @@ private:
   const TypeInfo *FirstType;
   
   const LoadableTypeInfo *NativeObjectTI = nullptr;
+  const LoadableTypeInfo *NonTransferableNativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
@@ -133,10 +134,12 @@ private:
     OpaqueStorageTypes;
 
   const LoadableTypeInfo *NonFixedBoxTI = nullptr;
+  const LoadableTypeInfo *NonTransferableNonFixedBoxTI = nullptr;
   const LoadableTypeInfo *EmptyBoxTI = nullptr;
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
+                         *NonTransferableSwiftRetainablePointerBoxTI = nullptr,
                          *UnknownObjectRetainablePointerBoxTI = nullptr;
 
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
@@ -177,7 +180,7 @@ private:
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
   const TypeInfo *convertPackType(SILPackType *T);
-  const LoadableTypeInfo *convertBuiltinNativeObject();
+  const LoadableTypeInfo *convertBuiltinNativeObject(bool isNonTransferable);
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
   const TypeInfo *convertResilientStruct(IsCopyable_t copyable,
@@ -202,9 +205,16 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
+  /// Whether values of the given type can never be 'Transferable', however its
+  /// archetypes are bound. Unlike '!isTransferable()', this is false when an
+  /// archetype could make the type 'Transferable'.
+  static bool isNeverTransferable(CanType type);
+
   const TypeLayoutEntry
   &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  /// A native object that can never be 'Transferable'.
+  const LoadableTypeInfo &getNonTransferableNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getImplicitActorTypeInfo();
@@ -227,10 +237,13 @@ public:
                                                    Alignment storageAlign);
   const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-#define REF_STORAGE(Name, ...) \
-  const TypeInfo *create##Name##StorageType(llvm::Type *valueType, \
-                                            ReferenceCounting style, \
-                                            bool isOptional);
+#define CHECKED_REF_STORAGE(Name, ...)                                         \
+  const TypeInfo *create##Name##StorageType(                                   \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional,         \
+      bool isNonTransferable);
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  const TypeInfo *create##Name##StorageType(                                   \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
   llvm::Type *getExistentialType(unsigned numWitnessTables);

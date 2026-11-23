@@ -624,6 +624,8 @@ Type ASTBuilder::createFunctionType(
                    getExecutionSemantics(extFlags.getExecutionSemantics()))
                    .withAsync(flags.isAsync())
                    .withSendable(flags.isSendable())
+                   .withNonTransferable(extFlags.getInvertedProtocols().contains(
+                       InvertibleProtocolKind::Transferable))
                    .build();
 
   return FunctionType::get(funcParams, /* yields */ {}, output, einfo);
@@ -884,7 +886,8 @@ Type ASTBuilder::createImplFunctionType(
   auto einfo =
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
-          flags.isSendable(), flags.isAsync(), unimplementable,
+          flags.isSendable(), flags.isNonTransferable(), flags.isAsync(),
+          unimplementable,
           getExecutionSemantics(flags.getExecutionSemantics()),
           isolation, diffKind, clangFnType,
           /*LifetimeDependenceInfo*/ {})

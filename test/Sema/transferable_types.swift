@@ -1,0 +1,756 @@
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple -language-mode 6 -enable-experimental-feature NontransferableTypes -verify-ignore-unrelated
+
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_NontransferableTypes
+
+struct NonTransferable: ~Transferable {
+// expected-note@-1 3 {{struct 'NonTransferable' explicitly suppresses conformance to 'Sendable' protocol}}
+  func use() {}
+}
+
+class NonTransferableClass: ~Transferable {
+  func use() {}
+}
+
+func takesTransferable(_: () -> Void) {}
+func takesEscapingTransferable(_: @escaping () -> Void) {}
+func takesNontransferable(_: @nontransferable () -> Void) {}
+func takesSendableClosure(_: @Sendable () -> Void) {}
+func takesEscapingNontransferable(_: @escaping @nontransferable () -> Void) {}
+
+func requiresTransferable<T>(_: T.Type) {}
+// expected-note@-1 {{required by global function 'requiresTransferable' where 'T' = '@nontransferable () -> Void'}}
+// expected-note@-2 {{'where T: Transferable' is implicit here}}
+func requiresTransferableValue<T>(_: T) {}
+// expected-note@-1 2 {{required by global function 'requiresTransferableValue' where 'T' = '@nontransferable () -> ()'}}
+
+// MARK: - Nominal types
+
+// Sendable implies Transferable, so ~Transferable types don't get an implicit
+// Sendable conformance.
+
+func takesSendable<T: Sendable>(_: T.Type) {}
+
+struct NT: ~Transferable {}
+// expected-note@-1 4 {{struct 'NT' explicitly suppresses conformance to 'Sendable' protocol}}
+// expected-note@-2 2 {{struct 'NT' has '~Transferable' constraint preventing 'Transferable' conformance}}
+
+enum NTEnum: ~Transferable {
+  // expected-note@-1 {{enum 'NTEnum' explicitly suppresses conformance to 'Sendable' protocol}}
+  case a
+}
+
+final class NTClass: ~Transferable {}
+// expected-note@-1 2 {{class 'NTClass' explicitly suppresses conformance to 'Sendable' protocol}}
+
+struct ExplicitNT: ~Transferable {
+  // expected-note@-1 {{struct 'ExplicitNT' explicitly suppresses conformance to 'Sendable' protocol}}
+  var nt: NT
+}
+
+struct ImplicitNT {
+  // expected-note@-1 {{consider adding '~Transferable' to struct 'ImplicitNT'}}
+  // expected-note@-2 {{consider making struct 'ImplicitNT' conform to the 'Sendable' protocol}}
+  let nt: NT
+  // expected-error@-1 {{stored property 'nt' of 'Transferable'-conforming struct 'ImplicitNT' has non-'Transferable' type 'NT'}}
+}
+
+struct ExplcitSendableWithNT: Sendable {
+  // expected-note@-1 {{consider adding '~Transferable' to struct 'ExplcitSendableWithNT'}}
+  let v: Int // Sendable
+  let nt: NT
+  // expected-error@-1 {{stored property 'nt' of 'Transferable'-conforming struct 'ExplcitSendableWithNT' has non-'Transferable' type 'NT'}}
+  // expected-error@-2 {{stored property 'nt' of 'Sendable'-conforming struct 'ExplcitSendableWithNT' has non-Sendable type 'NT'}}
+}
+
+// Global actor isolation doesn't make a ~Transferable type Sendable either.
+@MainActor struct MainActorNT: ~Transferable {}
+// expected-note@-1 {{struct 'MainActorNT' explicitly suppresses conformance to 'Sendable' protocol}}
+
+@MainActor final class MainActorNTClass: ~Transferable {}
+// expected-note@-1 {{class 'MainActorNTClass' explicitly suppresses conformance to 'Sendable' protocol}}
+
+// A subclass of a ~Transferable class isn't Transferable, so it isn't Sendable
+// even with global actor isolation.
+class NTRoot: ~Transferable {}
+@MainActor class MainActorSubOfNTRoot: NTRoot {}
+// expected-note@-1 {{class 'MainActorSubOfNTRoot' does not conform to the 'Sendable' protocol}}
+
+// A generic that's always Transferable is still inferred to be Sendable, even
+// when its argument is ~Transferable.
+struct Phantom<T: ~Transferable> {}
+
+// Like any other generic type, Box doesn't get a conditional conformance to
+// Sendable inferred from its storage.
+struct Box<T: ~Transferable>: ~Transferable { var t: T }
+// expected-note@-1 2 {{generic struct 'Box' explicitly suppresses conformance to 'Sendable' protocol}}
+extension Box: Transferable where T: Transferable {}
+
+// An implicit conformance to Sendable would be unconditional, so a
+// conditionally Transferable type doesn't get one even when its storage is
+// Sendable.
+struct PhantomNT<T: ~Transferable>: ~Transferable {}
+// expected-note@-1 {{generic struct 'PhantomNT' explicitly suppresses conformance to 'Sendable' protocol}}
+extension PhantomNT: Transferable where T: Transferable {}
+
+func checkInference() {
+  takesSendable(NT.self) // expected-error {{type 'NT' does not conform to the 'Sendable' protocol}}
+  takesSendable(NTEnum.self) // expected-error {{type 'NTEnum' does not conform to the 'Sendable' protocol}}
+  takesSendable(NTClass.self) // expected-error {{type 'NTClass' does not conform to the 'Sendable' protocol}}
+  takesSendable(ExplicitNT.self) // expected-error {{type 'ExplicitNT' does not conform to the 'Sendable' protocol}}
+  takesSendable(ImplicitNT.self) // expected-error {{type 'ImplicitNT' does not conform to the 'Sendable' protocol}}
+  takesSendable(MainActorNT.self) // expected-error {{type 'MainActorNT' does not conform to the 'Sendable' protocol}}
+  takesSendable(MainActorNTClass.self) // expected-error {{type 'MainActorNTClass' does not conform to the 'Sendable' protocol}}
+  takesSendable(MainActorSubOfNTRoot.self) // expected-error {{type 'MainActorSubOfNTRoot' does not conform to the 'Sendable' protocol}}
+  takesSendable(Phantom<Int>.self)
+  takesSendable(Phantom<NT>.self)
+  takesSendable(Box<Int>.self) // expected-error {{type 'Box<Int>' does not conform to the 'Sendable' protocol}}
+  takesSendable(Box<NT>.self) // expected-error {{type 'Box<NT>' does not conform to the 'Sendable' protocol}}
+  takesSendable(PhantomNT<Int>.self) // expected-error {{type 'PhantomNT<Int>' does not conform to the 'Sendable' protocol}}
+}
+
+// An explicit conformance to Sendable requires Transferable.
+
+struct ExplicitlySendableNT: ~Transferable, Sendable {}
+// expected-error@-1 {{type 'ExplicitlySendableNT' does not conform to protocol 'Transferable'}}
+
+struct UncheckedSendableNT: ~Transferable, @unchecked Sendable {}
+// expected-error@-1 {{type 'UncheckedSendableNT' does not conform to protocol 'Transferable'}}
+
+// A conditional conformance is fine when its conditions make the type
+// Transferable.
+struct ConditionallySendable<T: ~Transferable>: ~Transferable { var t: T }
+extension ConditionallySendable: Transferable where T: Transferable {}
+extension ConditionallySendable: Sendable where T: Sendable {}
+
+struct ExplicitlySendablePhantomNT<T: ~Transferable>: ~Transferable {}
+extension ExplicitlySendablePhantomNT: Transferable where T: Transferable {}
+extension ExplicitlySendablePhantomNT: Sendable where T: Transferable {}
+// expected-note@-1 {{requirement from conditional conformance of 'ExplicitlySendablePhantomNT<NT>' to 'Sendable'}}
+
+func checkExplicit() {
+  takesSendable(ConditionallySendable<Int>.self)
+  takesSendable(ConditionallySendable<NT>.self) // expected-error {{type 'NT' does not conform to the 'Sendable' protocol}}
+  takesSendable(ExplicitlySendablePhantomNT<Int>.self)
+  takesSendable(ExplicitlySendablePhantomNT<NT>.self) // expected-error {{global function 'takesSendable' requires that 'NT' conform to 'Transferable'}}
+}
+
+// Values of ~Transferable types can't be captured by @Sendable closures.
+
+func useSendable(_ f: @Sendable () -> Void) {}
+
+func checkCaptures(nt: NT, c: NTClass) {
+  useSendable { _ = nt }
+  // expected-error@-1 {{capture of 'nt' with non-Sendable type 'NT' in a '@Sendable' closure}}
+  // expected-error@-2 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  useSendable { _ = c }
+  // expected-error@-1 {{capture of 'c' with non-Sendable type 'NTClass' in a '@Sendable' closure}}
+  // expected-error@-2 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'c'}}
+}
+
+// A metatype can be Sendable without values of its type being Transferable,
+// so SendableMetatype doesn't imply Transferable, but Sendable still does.
+
+func usesSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+// expected-note@-1 {{'where T: Transferable' is implicit here}}
+
+func usesNontransferableSendableMetatype<T: SendableMetatype & ~Transferable>(_: T.Type) {
+  requiresTransferable(T.self) // expected-error {{global function 'requiresTransferable' requires that 'T' conform to 'Transferable'}}
+}
+
+func nontransferableSendable<T: Sendable & ~Transferable>(_: T.Type) {}
+// expected-error@-1 {{composition cannot contain '~Transferable' when another member requires 'Transferable'}}
+
+func checkSendableMetatype() {
+  usesSendableMetatype(NT.self) // expected-error {{global function 'usesSendableMetatype' requires that 'NT' conform to 'Transferable'}}
+  usesNontransferableSendableMetatype(NT.self)
+}
+
+// MARK: - Function types
+
+// Contextual type
+do {
+  func fn() {}
+
+  let _: @nontransferable () -> Void = fn // Ok
+  let nontransferable: @nontransferable () -> Void = {} // Ok
+
+  let _: () -> Void = nontransferable
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+
+  /* FIXME: Optionals don't support ~Transferable yet
+  let nontransferableOpt: (@nontransferable () -> Void)? = fn // Ok
+  let _: (() -> Void)? = nontransferableOpt // Error
+  */
+}
+
+func testArgumentConversions(fn: @escaping () -> Void,
+                             ntFn: @escaping @nontransferable () -> Void) {
+  takesNontransferable(fn) // Ok
+  takesNontransferable(ntFn) // Ok
+  takesTransferable(fn) // Ok
+  takesTransferable(ntFn)
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+}
+
+func joins(cond: Bool, fn: @escaping () -> Void, ntFn: @escaping @nontransferable () -> Void) {
+  let joined = cond ? fn : ntFn // Ok (joins into @nontransferable)
+  let _: @nontransferable () -> Void = joined // Ok
+  let _: () -> Void = joined
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+}
+
+struct Storage { // expected-note {{consider adding '~Transferable' to struct 'Storage'}}
+  let nt: @nontransferable () -> Void
+  // expected-error@-1 {{stored property 'nt' of 'Transferable'-conforming struct 'Storage' has non-'Transferable' type '@nontransferable () -> Void'}}
+}
+
+struct NTStorage: ~Transferable {
+  let nt: @nontransferable () -> Void // Ok
+}
+
+func testConformanceRequirements() {
+  requiresTransferable((() -> Void).self) // Ok
+  requiresTransferable((@nontransferable () -> Void).self)
+  // expected-error@-1 {{type '@nontransferable () -> Void' cannot conform to 'Transferable'}}
+}
+
+func testSendableImpliesTransferable(
+  _: @Sendable @nontransferable () -> Void,
+  // expected-error@-1 {{'@Sendable' attribute is not allowed on non-'Transferable' types}}
+  _: @nontransferable @Sendable () -> Void
+  // expected-error@-1 {{'@Sendable' attribute is not allowed on non-'Transferable' types}}
+) {
+  let _ = { @Sendable @nontransferable in // expected-error {{'@Sendable' attribute is not allowed on non-'Transferable' types}}
+  }
+
+  let _: @nontransferable () -> Void = { @Sendable in // Ok
+  }
+}
+
+func testConventions(
+  _: @convention(c) @nontransferable () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@nontransferable' types}}
+  _: @nontransferable @convention(thin) () -> Void,
+  // expected-error@-1 {{'@convention' attribute is not allowed on '@nontransferable' types}}
+  _: @convention(swift) @nontransferable () -> Void // Ok
+) {}
+
+// Global actor isolated function types and closures are inferred to be
+// Sendable, unless they are @nontransferable.
+@MainActor func testGlobalActorIsolated(
+  ntFn: @escaping @MainActor @nontransferable () -> Void, // Ok
+  nt: NonTransferable
+) {
+  let _: any Sendable = ntFn
+  // expected-error@-1 {{type '@MainActor @nontransferable () -> ()' does not conform to the 'Sendable' protocol}}
+
+  let explicit = { @MainActor @nontransferable in nt.use() } // Ok
+  let _: any Sendable = explicit
+  // expected-error@-1 {{type '@MainActor @nontransferable () -> ()' does not conform to the 'Sendable' protocol}}
+
+  // The contextual type wins over the inferred Sendable, but not over an
+  // explicit one.
+  let _: @MainActor @nontransferable () -> Void = { @MainActor in nt.use() } // Ok
+  let _: @MainActor @nontransferable () -> Void = { nt.use() } // Ok
+  let _: @MainActor @nontransferable () -> Void = { @Sendable @MainActor in } // Ok
+  let _: @MainActor @nontransferable () -> Void = { @Sendable @MainActor in nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+}
+
+// MARK: - Captures
+
+func testCaptures(nt: NonTransferable, ntc: NonTransferableClass, value: Int) {
+  takesTransferable { nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { [nt] in nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { [x = nt] in x.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  takesEscapingTransferable { ntc.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesEscapingTransferable { [ntc] in ntc.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // The closure owns a capture list entry even if it's never used.
+  takesTransferable { [nt] in () }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // A closure is inferred @nontransferable from its captures even with a
+  // contextual function type.
+  let _: () -> Void = { nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = { [nt] in nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  _ = { nt.use() } // Ok (inferred from the capture)
+  _ = { [nt] in nt.use() } // Ok (inferred from the capture)
+
+  // A Sendable closure isn't inferred @nontransferable.
+  takesTransferable { @Sendable [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  // expected-error@-2 {{capture of 'nt' with non-Sendable type 'NonTransferable' in a '@Sendable' closure}}
+  takesSendableClosure { nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  // expected-error@-2 {{capture of 'nt' with non-Sendable type 'NonTransferable' in a '@Sendable' closure}}
+  takesSendableClosure { [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+  // expected-error@-2 {{capture of 'nt' with non-Sendable type 'NonTransferable' in a '@Sendable' closure}}
+
+  takesNontransferable { nt.use() } // Ok
+  takesNontransferable { [nt] in nt.use() } // Ok
+  takesEscapingNontransferable { ntc.use() } // Ok
+  takesEscapingNontransferable { [ntc] in ntc.use() } // Ok
+  let _: @nontransferable () -> Void = { nt.use() } // Ok
+  let _: @nontransferable () -> Void = { [nt] in nt.use() } // Ok
+
+  takesTransferable { _ = value } // Ok
+  takesTransferable { [value] in _ = value } // Ok
+  takesNontransferable { _ = value } // Ok
+  takesNontransferable { [value] in _ = value } // Ok
+}
+
+func transferableValue(of _: borrowing NonTransferable) -> Int { 0 }
+
+// A closure is @nontransferable if it captures a non-'Transferable' value.
+func testCaptureInference(nt: NonTransferable, value: Int) {
+  let inferred = { nt.use() } // Ok
+  let _: @nontransferable () -> Void = inferred // Ok
+  takesTransferable(inferred)
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  let fromCaptureList = { [nt] in nt.use() } // Ok
+  let _: @nontransferable () -> Void = fromCaptureList // Ok
+
+  // A capture list entry's type is only known with the closure body.
+  let initializedInCaptureList = { [x = NonTransferable()] in x.use() } // Ok
+  let _: @nontransferable () -> Void = initializedInCaptureList // Ok
+
+  let multiStatement = { [nt] in
+    nt.use()
+    nt.use()
+  }
+  let _: @nontransferable () -> Void = multiStatement // Ok
+
+  let initializedInMultiStatementCaptureList = { [x = NonTransferable()] in
+    x.use()
+    x.use()
+  }
+  let _: @nontransferable () -> Void =
+    initializedInMultiStatementCaptureList // Ok
+
+  let transferableMultiStatement = { [value] in
+    _ = value
+    _ = value
+  }
+  takesTransferable(transferableMultiStatement) // Ok
+
+  // A nested closure's captures are captures of the outer closure too.
+  let nested = { let inner = { nt.use() }; inner() } // Ok
+  let _: @nontransferable () -> Void = nested // Ok
+
+  // The capture list initializer is evaluated outside of the closure.
+  let initializedFromCaptureList = { [n = transferableValue(of: nt)] in _ = n }
+  takesTransferable(initializedFromCaptureList) // Ok
+
+  let transferable = { _ = value }
+  takesTransferable(transferable) // Ok
+
+  let empty = {}
+  takesTransferable(empty) // Ok
+
+  requiresTransferableValue({ nt.use() })
+  // expected-error@-1 {{type '@nontransferable () -> ()' cannot conform to 'Transferable'}}
+}
+
+// Unused captures aren't diagnosed in a function with type checking errors.
+func testUnusedCaptureListEntryInference(nt: NonTransferable) {
+  let unusedCaptureListEntry = { [nt] in () }
+  // expected-warning@-1 {{capture 'nt' was never used}}
+  let _: @nontransferable () -> Void = unusedCaptureListEntry // Ok
+}
+
+extension NonTransferable {
+  func testSelfCaptureInference() {
+    let explicitSelf = { self.use() } // Ok
+    let _: @nontransferable () -> Void = explicitSelf // Ok
+    let implicitSelf = { use() } // Ok
+    let _: @nontransferable () -> Void = implicitSelf // Ok
+  }
+}
+
+// A global actor isolated closure is inferred Sendable, and Sendable closures
+// aren't inferred @nontransferable, it has to be explicit.
+@MainActor func testGlobalActorCaptureInference(nt: NonTransferable) {
+  let _ = { @MainActor in nt.use() }
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  let _ = { @MainActor [nt] in nt.use() }
+  // expected-error@-1 {{capture list entry 'nt' of 'Transferable'-conforming closure has non-'Transferable' type 'NonTransferable'}}
+
+  let explicit = { @nontransferable @MainActor in nt.use() } // Ok
+  let _: @MainActor @nontransferable () -> Void = explicit // Ok
+  let _: any Sendable = explicit
+  // expected-error@-1 {{type '@MainActor @nontransferable () -> ()' does not conform to the 'Sendable' protocol}}
+}
+
+// Implicitly main actor-isolated, since this file is in script mode.
+var mainActorNT = NonTransferable()
+
+// Global variables are referenced, not captured.
+@MainActor func testGlobalReferences() {
+  mainActorNT.use() // Ok
+  takesTransferable { mainActorNT.use() } // Ok
+  takesEscapingTransferable { mainActorNT.use() } // Ok
+  takesNontransferable { mainActorNT.use() } // Ok
+
+  func localFn() { mainActorNT.use() } // Ok
+  takesTransferable { localFn() } // Ok
+}
+
+func testAutoclosureCaptures(nt: NonTransferable) {
+  func takesAutoclosure(_: @autoclosure () -> Void) {}
+  func takesNontransferableAutoclosure(_: @autoclosure @nontransferable () -> Void) {}
+
+  takesAutoclosure(nt.use())
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  takesNontransferableAutoclosure(nt.use()) // Ok
+}
+
+func testInoutCaptures(nt: inout NonTransferable) {
+  takesTransferable { nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { [nt] in nt.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { nt.use() } // Ok
+  takesNontransferable { [nt] in nt.use() } // Ok
+}
+
+func testFunctionCaptures(fn: @escaping () -> Void,
+                          ntFn: @escaping @nontransferable () -> Void) {
+  takesTransferable { ntFn() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { [ntFn] in ntFn() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> Void' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { ntFn() } // Ok
+  takesNontransferable { [ntFn] in ntFn() } // Ok
+
+  takesTransferable { fn() } // Ok
+  takesTransferable { [fn] in fn() } // Ok
+}
+
+func testGenericCaptures<T: ~Transferable, U>(t: T, u: U) {
+  takesTransferable { _ = t }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { [t] in _ = t }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { _ = t } // Ok
+  takesNontransferable { [t] in _ = t } // Ok
+
+  takesTransferable { _ = u } // Ok
+  takesTransferable { [u] in _ = u } // Ok
+}
+
+extension NonTransferable {
+  func testSelfCaptures() {
+    takesTransferable { self.use() }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+    takesTransferable { use() }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+    takesTransferable { [self] in use() }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+    takesNontransferable { use() } // Ok
+    takesNontransferable { [self] in use() } // Ok
+  }
+}
+
+extension NonTransferableClass {
+  func testSelfCaptures() {
+    takesEscapingTransferable { self.use() }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+    takesEscapingTransferable { [self] in use() }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+    takesEscapingNontransferable { self.use() } // Ok
+    takesEscapingNontransferable { [self] in use() } // Ok
+  }
+}
+
+func testNestedCaptures(nt: NonTransferable) {
+  takesTransferable { takesNontransferable { nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesTransferable { takesNontransferable { [nt] in nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { takesNontransferable { nt.use() } } // Ok
+  takesNontransferable { takesNontransferable { [nt] in nt.use() } } // Ok
+
+  takesNontransferable { takesTransferable { nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { takesTransferable { [nt] in nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+}
+
+func testNestedCaptureListEntries(nt: NonTransferable) {
+  takesNontransferable { [x = nt] in takesEscapingTransferable { x.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  takesNontransferable { [x = nt] in
+    takesEscapingNontransferable { takesTransferable { x.use() } }
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  }
+  takesNontransferable { [x = nt] in takesNontransferable { x.use() } } // Ok
+
+  // Only the entry itself is diagnosed in the closure that owns it.
+  takesTransferable { [x = nt] in takesNontransferable { x.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+}
+
+// A `defer` body runs in place with the isolation of its enclosing context, so
+// its captures never cross an isolation boundary.
+func testDeferCaptures(nt: NonTransferable) {
+  defer { nt.use() } // Ok
+  defer { takesNontransferable { nt.use() } } // Ok
+  defer { takesTransferable { nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  nt.use()
+}
+
+func asyncWork() async {}
+
+func testAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  defer { takesTransferable { nt.use() } }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  nt.use()
+}
+
+actor DeferIsolation {
+  func isolated(nt: NonTransferable) async {
+    defer { await asyncWork(); nt.use() } // Ok
+    nt.use()
+  }
+}
+
+@MainActor func testMainActorAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
+nonisolated(nonsending) func testCallerIsolatedAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
+@concurrent func testConcurrentAsyncDeferCaptures(nt: NonTransferable) async {
+  defer { await asyncWork(); nt.use() } // Ok
+  nt.use()
+}
+
+func testAsyncLetAndTaskCaptures(nt: NonTransferable, ntc: NonTransferableClass) async {
+  Task { ntc.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '@isolated(any) () async -> ()'}}
+  Task { [ntc] in ntc.use() }
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '@isolated(any) () async -> ()'}}
+
+  async let x: Void = nt.use()
+  // expected-error@-1 {{'Transferable'-conforming closure cannot capture non-'Transferable' value 'nt'}}
+  _ = await x
+}
+
+// MARK: - Unapplied member references
+
+// An unapplied reference to an instance member captures its base, so it's
+// @nontransferable when the base is ~Transferable.
+
+protocol HasUse: ~Transferable {
+  func use()
+}
+
+extension NonTransferable: HasUse {
+  static func staticUse() {}
+}
+
+extension NonTransferableClass: HasUse {}
+
+func testUnappliedMemberReferences(nt: NonTransferable, ntc: NonTransferableClass) {
+  let _: @nontransferable () -> Void = nt.use // Ok
+  let _: @nontransferable () -> Void = ntc.use // Ok
+  let _: () -> Void = nt.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = ntc.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  let ref = nt.use
+  let _: @nontransferable () -> Void = ref // Ok
+  let _: () -> Void = ref
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  takesNontransferable(nt.use) // Ok
+  takesTransferable(nt.use)
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // A fully unapplied reference captures nothing itself, but the function it
+  // returns captures the base.
+  let _: (NonTransferable) -> @nontransferable () -> Void = NonTransferable.use // Ok
+  let _: (NonTransferable) -> () -> Void = NonTransferable.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  // A static member captures the metatype, which is Transferable.
+  let _: () -> Void = NonTransferable.staticUse // Ok
+}
+
+func testUnappliedGenericMemberReferences<T: HasUse & ~Transferable, U: HasUse>(t: T, u: U) {
+  let _: @nontransferable () -> Void = t.use // Ok
+  let _: () -> Void = t.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = u.use // Ok
+}
+
+struct ConditionallyTransferable<T: ~Transferable>: ~Transferable {
+  var t: T
+  func use() {}
+}
+
+extension ConditionallyTransferable: Transferable where T: Transferable {}
+
+// Whether the base is Transferable may only be known once its generic
+// arguments are bound.
+func testUnappliedConditionalMemberReferences(nt: NonTransferable) {
+  let _: () -> Void = ConditionallyTransferable(t: 42).use // Ok
+  let _: @nontransferable () -> Void = ConditionallyTransferable(t: 42).use // Ok
+  let _: @nontransferable () -> Void = ConditionallyTransferable(t: nt).use // Ok
+  let _: () -> Void = ConditionallyTransferable(t: nt).use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+
+  requiresTransferableValue(ConditionallyTransferable(t: 42).use) // Ok
+  requiresTransferableValue(ConditionallyTransferable(t: nt).use)
+  // expected-error@-1 {{type '@nontransferable () -> ()' cannot conform to 'Transferable'}}
+}
+
+func testUnappliedMemberReferenceJoins(nt: NonTransferable, cond: Bool) {
+  let joined = cond ? nt.use : ConditionallyTransferable(t: 42).use
+  let _: @nontransferable () -> Void = joined // Ok
+  let _: () -> Void = joined
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+}
+
+func testUnappliedExistentialMemberReferences(nt: any HasUse & ~Transferable,
+                                              t: any HasUse) {
+  let _: @nontransferable () -> Void = nt.use // Ok
+  let _: () -> Void = nt.use
+  // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  let _: () -> Void = t.use // Ok
+}
+
+extension NonTransferable {
+  func testUnappliedImplicitSelfReferences() {
+    let _: @nontransferable () -> Void = use // Ok
+    let _: () -> Void = use
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  }
+}
+
+extension NonTransferableClass {
+  func testUnappliedImplicitSelfReferences() {
+    let _: @nontransferable () -> Void = use // Ok
+    let _: () -> Void = use
+    // expected-error@-1 {{invalid conversion from non-'Transferable' function of type '@nontransferable () -> ()' to 'Transferable' function type '() -> Void'}}
+  }
+}
+
+// MARK: - sending
+
+func sendingParams(
+  _: sending NonTransferable,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: sending NonTransferableClass,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferableClass'}}
+  _: sending @nontransferable () -> Void,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type '@nontransferable () -> Void'}}
+  _: sending (Int, NonTransferable),
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type '(Int, NonTransferable)'}}
+  _: sending ConditionallyTransferable<NonTransferable>,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<NonTransferable>'}}
+  _: sending ConditionallyTransferable<Int>, // Ok
+  _: sending () -> Void // Ok
+) {}
+
+func sendingResult() -> sending NonTransferable { fatalError() }
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+func sendingGenericParams<T: ~Transferable, U>(
+  _: sending T,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'T'}}
+  _: sending U, // Ok
+  _: sending ConditionallyTransferable<T>
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<T>'}}
+) {}
+
+func sendingNested(
+  _: (sending NonTransferable) -> Void,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: () -> sending NonTransferable,
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _: (sending Int) -> sending Int // Ok
+) {}
+
+struct SendingSubscripts {
+  subscript(_: sending NonTransferable) -> Int { 0 }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  subscript(_: Int) -> sending NonTransferable { fatalError() }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}
+
+protocol SendsSelf: ~Transferable {
+  func send(_: sending Self)
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'Self'}}
+}
+
+extension ConditionallyTransferable {
+  func send(_: sending Self) {} // Ok
+}
+
+extension ConditionallyTransferable where T: ~Transferable {
+  func sendNonTransferable(_: sending Self) {}
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'ConditionallyTransferable<T>'}}
+}
+
+struct SendsItself: ~Transferable {
+  func send(_: sending SendsItself) {}
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'SendsItself'}}
+}
+
+typealias SendingNonTransferable = (sending NonTransferable) -> Void
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+func usesSendingAlias(_ fn: SendingNonTransferable) {
+  let inferred = fn
+  _ = inferred
+}
+
+struct StoresSendingFunction {
+  var fn: (sending NonTransferable) -> Void
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}
+
+func takesSendingNonTransferable<T: ~Transferable>(_: borrowing T, _: (sending T) -> Void) {}
+// expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'T'}}
+
+func sendingInExpressions(nt: NonTransferable, any: Any) {
+  let _: (sending NonTransferable) -> Void = { _ in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+
+  _ = { (_: sending NonTransferable) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { () -> sending NonTransferable in fatalError() }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { (_: (sending NonTransferable) -> Void) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = { (_: sending ConditionallyTransferable<Int>) in } // Ok
+
+  takesSendingNonTransferable(nt) { (_: sending _) in }
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  takesSendingNonTransferable(nt) { _ in }
+
+  _ = Optional<(sending NonTransferable) -> Void>.self
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+  _ = any as? (sending NonTransferable) -> Void
+  // expected-error@-1 {{'sending' cannot be applied to non-'Transferable' type 'NonTransferable'}}
+}

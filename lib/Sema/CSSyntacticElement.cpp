@@ -177,8 +177,14 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   // because e.g. whole body is an `#if` statement or it only has
   // declarations that are checked during solution application.
   // In such cases, let's avoid creating a conjunction.
-  if (constraints.empty())
+  if (constraints.empty()) {
+    // There is nothing in the body to solve before captures are known.
+    if (locator->directlyAt<ClosureExpr>()) {
+      cs.resolveClosureTransferability(
+          castToExpr<ClosureExpr>(locator->getAnchor()));
+    }
     return;
+  }
 
   referencedVars.insert(paramCollector.getTypeVars().begin(),
                         paramCollector.getTypeVars().end());

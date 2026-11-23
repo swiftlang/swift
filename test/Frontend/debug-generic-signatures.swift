@@ -37,6 +37,7 @@ struct Basic: P1 {
 // CHECK-NEXT: (builtin_conformance type="Recur" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Recur" protocol="Escapable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Recur" protocol="Deinitable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Recur" protocol="Transferable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="Recur" protocol="P2"
 // CHECK-NEXT:   (assoc_type req="A" type="Recur")
 // CHECK-NEXT:   (assoc_type req="B" type="Recur")
@@ -44,6 +45,8 @@ struct Basic: P1 {
 // CHECK-NEXT:     (builtin_conformance type="Recur" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Recur" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="Recur" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:     (normal_conformance type="Recur" protocol="P2"{{.*}} <details printed above>))
 // CHECK-NEXT:   (assoc_conformance type="Self.B" proto="P2"
@@ -59,6 +62,7 @@ struct Recur: P2 {
 // CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Escapable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Deinitable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="NonRecur" protocol="Transferable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="NonRecur" protocol="P2"
 // CHECK-NEXT:   (assoc_type req="A" type="Recur")
 // CHECK-NEXT:   (assoc_type req="B" type="Recur")
@@ -66,6 +70,8 @@ struct Recur: P2 {
 // CHECK-NEXT:     (builtin_conformance type="NonRecur" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="NonRecur" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="NonRecur" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:     (normal_conformance type="Recur" protocol="P2"
 // CHECK-NEXT:       (assoc_type req="A" type="Recur")
@@ -74,6 +80,8 @@ struct Recur: P2 {
 // CHECK-NEXT:         (builtin_conformance type="Recur" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:       (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:         (builtin_conformance type="Recur" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:       (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:         (builtin_conformance type="Recur" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:       (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:         (normal_conformance type="Recur" protocol="P2"{{.*}} <details printed above>))
 // CHECK-NEXT:       (assoc_conformance type="Self.B" proto="P2"
@@ -99,10 +107,14 @@ struct Generic<T> {}
 // CHECK-NEXT:     (builtin_conformance type="Generic<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Generic<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="Generic<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="Copyable"
 // CHECK-NEXT:     (abstract_conformance type="T" protocol="Copyable"))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="Escapable"
 // CHECK-NEXT:     (abstract_conformance type="T" protocol="Escapable"))
+// CHECK-NEXT:   (assoc_conformance type="Self.A" proto="Transferable"
+// CHECK-NEXT:     (abstract_conformance type="T" protocol="Transferable"))
 // CHECK-NEXT:   (requirement "T" conforms_to "P1"))
 extension Generic: P1 where T: P1 {
     typealias A = T
@@ -124,6 +136,8 @@ class Super<T, U> {}
 // CHECK-NEXT:     (builtin_conformance type="Super<T, U>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Super<T, U>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="Super<T, U>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:     (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:   (assoc_conformance type="Self.B" proto="P2"
@@ -140,6 +154,7 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT: (builtin_conformance type="Sub" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Sub" protocol="Escapable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Sub" protocol="Deinitable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Sub" protocol="Transferable"{{.*}})
 // CHECK-NEXT: (inherited_conformance type="Sub" protocol="P2"
 // CHECK-NEXT:   (specialized_conformance type="Super<NonRecur, Recur>" protocol="P2"
 // CHECK-NEXT:     (substitution_map generic_signature=<T, U where T : P2, U : P2>
@@ -155,6 +170,8 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:             (builtin_conformance type="NonRecur" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:           (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:             (builtin_conformance type="NonRecur" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:           (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:             (builtin_conformance type="NonRecur" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:           (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:             (normal_conformance type="Recur" protocol="P2"
 // CHECK-NEXT:               (assoc_type req="A" type="Recur")
@@ -163,6 +180,8 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:                 (builtin_conformance type="Recur" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:               (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:                 (builtin_conformance type="Recur" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:               (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:                 (builtin_conformance type="Recur" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:               (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:                 (normal_conformance type="Recur" protocol="P2"{{.*}} <details printed above>))
 // CHECK-NEXT:               (assoc_conformance type="Self.B" proto="P2"
@@ -179,6 +198,8 @@ extension Super: P2 where T: P2, U: P2 {
 // CHECK-NEXT:         (builtin_conformance type="Super<T, U>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:       (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:         (builtin_conformance type="Super<T, U>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:       (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:         (builtin_conformance type="Super<T, U>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:       (assoc_conformance type="Self.A" proto="P2"
 // CHECK-NEXT:         (abstract_conformance type="T" protocol="P2"))
 // CHECK-NEXT:       (assoc_conformance type="Self.B" proto="P2"
@@ -194,12 +215,15 @@ class Sub: Super<NonRecur, Recur> {}
 // CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Escapable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Deinitable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="RecurGeneric<T>" protocol="Transferable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="RecurGeneric<T>" protocol="P3"
 // CHECK-NEXT:   (assoc_type req="A" type="RecurGeneric<T>")
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Copyable"
 // CHECK-NEXT:     (builtin_conformance type="RecurGeneric<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="RecurGeneric<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="RecurGeneric<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P3"
 // CHECK-NEXT:     (normal_conformance type="RecurGeneric<T>" protocol="P3"{{.*}} <details printed above>)))
 struct RecurGeneric<T: P3>: P3 {
@@ -210,12 +234,15 @@ struct RecurGeneric<T: P3>: P3 {
 // CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Copyable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Escapable"{{.*}})
 // CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Deinitable"{{.*}})
+// CHECK-NEXT: (builtin_conformance type="Specialize" protocol="Transferable"{{.*}})
 // CHECK-NEXT: (normal_conformance type="Specialize" protocol="P3"
 // CHECK-NEXT:   (assoc_type req="A" type="RecurGeneric<Specialize>")
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Copyable"
 // CHECK-NEXT:     (builtin_conformance type="Specialize" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:     (builtin_conformance type="Specialize" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:   (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:     (builtin_conformance type="Specialize" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:   (assoc_conformance type="Self.A" proto="P3"
 // CHECK-NEXT:     (specialized_conformance type="Specialize.A" protocol="P3"
 // CHECK-NEXT:       (substitution_map generic_signature=<T where T : P3>
@@ -229,6 +256,8 @@ struct RecurGeneric<T: P3>: P3 {
 // CHECK-NEXT:           (builtin_conformance type="RecurGeneric<T>" protocol="Copyable"{{.*}}))
 // CHECK-NEXT:         (assoc_conformance type="Self" proto="Escapable"
 // CHECK-NEXT:           (builtin_conformance type="RecurGeneric<T>" protocol="Escapable"{{.*}}))
+// CHECK-NEXT:         (assoc_conformance type="Self" proto="Transferable"
+// CHECK-NEXT:           (builtin_conformance type="RecurGeneric<T>" protocol="Transferable"{{.*}}))
 // CHECK-NEXT:         (assoc_conformance type="Self.A" proto="P3"
 // CHECK-NEXT:           (normal_conformance type="RecurGeneric<T>" protocol="P3"{{.*}} <details printed above>))))))
 struct Specialize: P3 {

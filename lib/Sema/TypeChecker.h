@@ -609,6 +609,15 @@ void checkIsolatedConformancesInType(Type type, SourceLoc loc);
 /// that prohibits it.
 void checkIsolatedConfromancesInDecl(Decl *D);
 
+/// Diagnose `sending` parameters and results of non-Transferable type written
+/// in the signature of \p D.
+void checkSendingTransferabilityInDecl(Decl *D);
+
+/// Diagnose `sending` parameters and results of non-Transferable type in the
+/// function types that occur in \p type, written at \p loc.
+void checkSendingTransferabilityInType(Type type, const DeclContext *dc,
+                                       SourceLoc loc);
+
 /// Checks whether the generic requirements imposed on the nested type
 /// declaration \p decl (if present) are in agreement with the substitutions
 /// that are needed to spell it as a member of the given parent type

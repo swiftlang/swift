@@ -6448,6 +6448,10 @@ TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
   return canConformTo(InvertibleProtocolKind::Escapable);
 }
 
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeTransferable() const {
+  return canConformTo(InvertibleProtocolKind::Transferable);
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();
@@ -7674,6 +7678,9 @@ bool ClassDecl::canSuppressInvertible(InvertibleProtocolKind ip) const {
   switch (ip) {
   case InvertibleProtocolKind::Copyable:
     return getASTContext().LangOpts.hasFeature(Feature::MoveOnlyClasses);
+  case InvertibleProtocolKind::Transferable:
+    // Actors are always Sendable, which implies Transferable.
+    return !isAnyActor();
   case InvertibleProtocolKind::Escapable:
   case InvertibleProtocolKind::Deinitable:
     return false;

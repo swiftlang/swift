@@ -786,7 +786,7 @@ Types
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
-  function-signature ::= result-type params-type async? sendable? throws? differentiable? function-isolation? sending-result? // results and parameters
+  function-signature ::= result-type params-type async? sendable? nontransferable? throws? differentiable? function-isolation? sending-result? // results and parameters
 
   result-type ::= type
   result-type ::= empty-list                 // shortcut for ()
@@ -809,6 +809,9 @@ Types
   #endif
   #if SWIFT_RUNTIME_VERSION >= 6.2
     function-isolation :== 'YC'              // nonisolated(nonsending) on function type
+  #endif
+  #if SWIFT_RUNTIME_VERSION >= 6.5
+    nontransferable ::= 'Yd'                 // @nontransferable on function types
   #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
@@ -890,7 +893,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? CALLED-ONCE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUB? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? CALLED-ONCE? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? NONTRANSFERABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -939,6 +942,10 @@ mangled in to disambiguate.
 
   #if SWIFT_RUNTIME_VERSION >= 6.0
     SENDING-RESULT ::= 'T'                   // sending result
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 6.5
+    NONTRANSFERABLE ::= 'D'                  // @nontransferable
   #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in

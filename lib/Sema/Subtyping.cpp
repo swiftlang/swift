@@ -537,6 +537,12 @@ checkExtInfoConversion(ConformanceCache &cache,
   if (lhsInfo.isAsync() && !rhsInfo.isAsync())
     return ConflictFlag::FunctionAsync;
 
+  // The destination might become non-Transferable once its dependence is
+  // resolved.
+  if (lhsInfo.isNonTransferable() && !rhsInfo.isNonTransferable() &&
+      !rhsInfo.getTypeDependencyFor(TypeDependenceKind::Transferable))
+    return ConflictFlag::FunctionNonTransferable;
+
   auto lhsThrows = lhsFunc->getEffectiveThrownErrorType();
   auto rhsThrows = rhsFunc->getEffectiveThrownErrorType();
   if (lhsThrows.has_value() && !rhsThrows.has_value()) {
@@ -1168,6 +1174,8 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
       return info.isSendable();
     case TypeDependenceKind::ExecutionSemantics:
       return !info.hasCalledAtMostOnceSemantics();
+    case TypeDependenceKind::Transferable:
+      return !info.isNonTransferable();
     }
     llvm_unreachable("unhandled kind");
   };
@@ -1181,6 +1189,9 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
     case TypeDependenceKind::ExecutionSemantics:
       result = result.withExecutionSemantics(std::nullopt);
       break;
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(false);
+      break;
     }
     result = result.withTypeDependency(kind, type);
   };
@@ -1193,6 +1204,9 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
       break;
     case TypeDependenceKind::ExecutionSemantics:
       result = result.withExecutionSemantics(from.getExecutionSemantics());
+      break;
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(from.isNonTransferable());
       break;
     }
     result = result.withTypeDependency(kind, Type());
@@ -1220,6 +1234,12 @@ joinMeetTypeDependencies(Operation op, AnyFunctionType::ExtInfo lhsInfo,
           getExecutionSemanticsSuppressing(inverses));
       break;
     }
+    case TypeDependenceKind::Transferable:
+      result = result.withNonTransferable(
+          op == Operation::Join
+              ? lhsInfo.isNonTransferable() || rhsInfo.isNonTransferable()
+              : lhsInfo.isNonTransferable() && rhsInfo.isNonTransferable());
+      break;
     }
   };
 
@@ -1979,4 +1999,6 @@ void swift::constraints::simple_display(llvm::raw_ostream &out,
     out << " function_sendable";
   if (reason.contains(ConflictFlag::FunctionTupleSplat))
     out << " function_tuple_splat";
+  if (reason.contains(ConflictFlag::FunctionNonTransferable))
+    out << " function_non_transferable";
 }

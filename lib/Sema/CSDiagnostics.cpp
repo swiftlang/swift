@@ -763,7 +763,8 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
       if (auto known = protoDecl->getKnownProtocolKind()) {
         switch (*known) {
         case KnownProtocolKind::Sendable:
-          emitSpecializedNote(diag::nonsendable_function_type);
+          if (nonConformingType->isTransferable())
+            emitSpecializedNote(diag::nonsendable_function_type);
           break;
 
         case KnownProtocolKind::Escapable:
@@ -772,6 +773,7 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
 
         case KnownProtocolKind::Copyable:
         case KnownProtocolKind::Deinitable:
+        case KnownProtocolKind::Transferable:
           emitCanNeverConformNote = false;
           break;
 
@@ -7768,6 +7770,12 @@ bool AsyncFunctionConversionFailure::diagnoseAsError() {
   }
 
   emitDiagnostic(diag::async_functiontype_mismatch, getFromType(),
+                 getToType());
+  return true;
+}
+
+bool NonTransferableFunctionConversionFailure::diagnoseAsError() {
+  emitDiagnostic(diag::non_transferable_functiontype_mismatch, getFromType(),
                  getToType());
   return true;
 }

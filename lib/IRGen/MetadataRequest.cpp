@@ -1474,6 +1474,13 @@ getFunctionTypeFlags(CanFunctionType type) {
         InvertedProtocols.insert(invertibleKind);
       break;
     }
+    case InvertibleProtocolKind::Transferable: {
+      auto proto =
+          type->getASTContext().getProtocol(KnownProtocolKind::Transferable);
+      if (proto && lookupConformance(type, proto).isInvalid())
+        InvertedProtocols.insert(invertibleKind);
+      break;
+    }
     }
   }
 

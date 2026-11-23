@@ -211,8 +211,9 @@ const ValueWitnessTable swift::METATYPE_VALUE_WITNESS_SYM(Bo) =
 
 namespace {
   // @escaping function types.
-  struct ThickFunctionBox
-    : AggregateBox<FunctionPointerBox, SwiftRetainableBox> {
+  template <class ContextBox>
+  struct ThickFunctionBoxImpl
+    : AggregateBox<FunctionPointerBox, ContextBox> {
 
     static constexpr unsigned numExtraInhabitants =
       FunctionPointerBox::numExtraInhabitants;
@@ -225,6 +226,11 @@ namespace {
       return FunctionPointerBox::getExtraInhabitantTag((void * const *) src);
     }
   };
+  using ThickFunctionBox = ThickFunctionBoxImpl<SwiftRetainableBox>;
+  /// @escaping @nontransferable function types, whose contexts are confined to
+  /// a single isolation domain.
+  using NonTransferableThickFunctionBox =
+      ThickFunctionBoxImpl<NonAtomicSwiftRetainableBox>;
   /// @noescape function types.
   struct TrivialThickFunctionBox
       : AggregateBox<FunctionPointerBox, RawPointerBox> {
@@ -260,6 +266,9 @@ namespace {
 const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
+
+const ValueWitnessTable swift::NonTransferableThickFunctionValueWitnesses =
+  ValueWitnessTableForBox<NonTransferableThickFunctionBox>::table;
 
 const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING) =

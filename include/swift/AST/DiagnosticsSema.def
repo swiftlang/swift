@@ -3109,6 +3109,9 @@ ERROR(inverse_type_not_invertible,none,
       "type %0 cannot be suppressed", (Type))
 ERROR(deinitable_reserved,none,
       "'Deinitable' is reserved for use by the compiler", ())
+ERROR(transferable_protocol_requires_feature,none,
+      "'Transferable' requires '-enable-experimental-feature "
+      "NontransferableTypes'", ())
 ERROR(deinitable_inverse_requires_noncopyable,none,
       "%0 cannot suppress 'Deinitable' without also suppressing 'Copyable'",
       (Type))
@@ -6637,6 +6640,33 @@ NOTE(in_derived_witness, none,
 ERROR(non_sendable_arg_into_actor,none,
       "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_arg_into_actor,none,
+      "non-'Transferable' type %0 cannot be sent into %2 context in call to "
+      "%kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_arg_exits_actor,none,
+      "non-'Transferable' type %0 cannot exit %2 context in call to "
+      "nonisolated %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_result_into_actor,none,
+      "non-'Transferable' result type %0 cannot be sent from %2 context in "
+      "call to %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_result_exits_actor,none,
+      "non-'Transferable' result type %0 cannot exit %2 context in call to "
+      "nonisolated %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_crosses_isolation,none,
+      "non-'Transferable' %select{type|result type}0 %1 cannot cross from %2 "
+      "to %3 context",
+      (bool, Type, ActorIsolation, ActorIsolation))
+ERROR(non_transferable_isolated_capture,none,
+      "capture of %1 with non-'Transferable' type %0 in a %2 closure",
+      (Type, DeclName, ActorIsolation))
+ERROR(converting_non_transferable_func_changes_isolation,none,
+      "converting non-'Transferable' function value of type %0 to %1 would "
+      "change its isolation",
+      (Type, Type))
 GROUPED_ERROR(non_sendable_arg_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
@@ -7186,6 +7216,9 @@ ERROR(invalid_isolated_and_convention_attributes,none,
 ERROR(invalid_execution_semantics_and_attr_attributes,none,
       "%0 attribute is not allowed on '%1' types",
       (TypeAttribute *, StringRef))
+ERROR(invalid_use_of_nontransferable_and_sendable_attributes,none,
+      "'@Sendable' attribute is not allowed on non-'Transferable' types",
+      ())
 GROUPED_ERROR(unreferenced_generic_parameter,NoUsage,NoUsage,
       "generic parameter '%0' is not used in function signature", (StringRef))
 ERROR(non_inferrable_opaque_generic_parameter,none,
@@ -7919,6 +7952,16 @@ ERROR(availability_typed_throws_only_version_newer, none,
 
 ERROR(availability_variadic_type_only_version_newer, none,
       "parameter packs in generic types are only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_transferable_generics_casting_only_version_newer, none,
+      "runtime support for casting types with non-transferable generic "
+      "arguments is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+ERROR(availability_transferable_existential_casting_only_version_newer, none,
+      "runtime support for casting a non-'Transferable' existential "
+      "is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
 
 NOTE(availability_guard_with_version_check, none,
@@ -9042,6 +9085,12 @@ GROUPED_WARNING(legacy_suppressed_assoc_types, OldSuppressedAssociatedTypes, non
 ERROR(inverse_on_class, none,
       "%select{classes|actors}1 cannot be '~%0'",
       (StringRef, bool))
+ERROR(transferable_inverse_on_subclass, none,
+      "class %0 cannot be '~Transferable' because its superclass %1 can be "
+      "'Transferable'", (const ClassDecl *, const ClassDecl *))
+ERROR(transferable_conformance_on_subclass, none,
+      "conformance of class %0 to 'Transferable' must be inherited from its "
+      "superclass %1", (const ClassDecl *, const ClassDecl *))
 ERROR(inverse_with_class_constraint, none,
       "composition involving %select{class requirement %2|'AnyObject'}0 "
       "cannot contain '~%1'",
@@ -9985,6 +10034,31 @@ ERROR(non_sendable_type_suppressed,none,
 ERROR(conformance_repression_only_on_struct_class_enum,none,
       "conformance to %0 can only be suppressed on structs, classes, and enums",
       (const ProtocolDecl *))
+
+//===----------------------------------------------------------------------===//
+// MARK: `~Transferable`
+//===----------------------------------------------------------------------===//
+
+ERROR(non_transferable_functiontype_mismatch,none,
+      "invalid conversion from non-'Transferable' function of type %0 to "
+      "'Transferable' function type %1", (Type, Type))
+
+ERROR(invalid_non_transferable_and_attr_combination,none,
+      "%0 attribute is not allowed on '@nontransferable' types",
+      (TypeAttribute *))
+
+ERROR(non_transferable_capture_list_entry_in_transferable_closure,none,
+      "capture list entry %0 of 'Transferable'-conforming closure has "
+      "non-'Transferable' type %1",
+      (ValueDecl *, Type))
+
+ERROR(non_transferable_capture_in_transferable_closure,none,
+      "'Transferable'-conforming closure cannot capture non-'Transferable' "
+      "value %0",
+      (ValueDecl *))
+
+ERROR(sending_non_transferable_type,none,
+      "'sending' cannot be applied to non-'Transferable' type %0", (Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: Swift Performance hints

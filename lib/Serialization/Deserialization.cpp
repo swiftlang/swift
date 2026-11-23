@@ -8130,7 +8130,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
                                            StringRef blobData, bool isGeneric) {
   TypeID resultID;
   uint8_t rawRepresentation, rawDiffKind, rawExecutionSemantics;
-  bool noescape = false, sendable, async, throws, hasSendingResult, coro;
+  bool noescape = false, sendable, async, throws, hasSendingResult, coro, nontransferable;
   TypeID thrownErrorID;
   GenericSignature genericSig;
   TypeID clangTypeID;
@@ -8140,13 +8140,13 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     decls_block::FunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, clangTypeID, noescape, sendable,
         async, throws, thrownErrorID, rawDiffKind, rawIsolation,
-        hasSendingResult, rawExecutionSemantics, coro);
+        hasSendingResult, rawExecutionSemantics, coro, nontransferable);
   } else {
     GenericSignatureID rawGenericSig;
     decls_block::GenericFunctionTypeLayout::readRecord(
         scratch, resultID, rawRepresentation, sendable, async, throws,
         thrownErrorID, rawDiffKind, rawIsolation, hasSendingResult,
-        rawExecutionSemantics, coro, rawGenericSig);
+        rawExecutionSemantics, coro, nontransferable, rawGenericSig);
     genericSig = MF.getGenericSignature(rawGenericSig);
     clangTypeID = 0;
   }
@@ -8208,6 +8208,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
           .withSendable(sendable)
           .withAsync(async)
           .withCoroutine(coro)
+          .withNonTransferable(nontransferable)
           .build();
 
   auto resultTy = MF.getTypeChecked(resultID);
@@ -8540,12 +8541,12 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
   bool hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
-      hasInverseDeinitable;
+      hasInverseDeinitable, hasInverseTransferable;
   ArrayRef<uint64_t> rawProtocolIDs;
 
   decls_block::ProtocolCompositionTypeLayout::readRecord(
       scratch, hasExplicitAnyObject, hasInverseCopyable, hasInverseEscapable,
-      hasInverseDeinitable, rawProtocolIDs);
+      hasInverseDeinitable, hasInverseTransferable, rawProtocolIDs);
 
   SmallVector<Type, 4> protocols;
   for (TypeID protoID : rawProtocolIDs) {
@@ -8562,6 +8563,8 @@ Expected<Type> DESERIALIZE_TYPE(PROTOCOL_COMPOSITION_TYPE)(
     inverses.insert(InvertibleProtocolKind::Escapable);
   if (hasInverseDeinitable)
     inverses.insert(InvertibleProtocolKind::Deinitable);
+  if (hasInverseTransferable)
+    inverses.insert(InvertibleProtocolKind::Transferable);
 
   return ProtocolCompositionType::get(MF.getContext(), protocols, inverses,
                                       hasExplicitAnyObject);
@@ -8739,6 +8742,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   bool pseudogeneric = false;
   bool unimplementable;
   bool sendable;
+  bool nontransferable;
   bool noescape;
   uint8_t rawExecutionSemantics;
   uint8_t rawIsolation;
@@ -8753,7 +8757,8 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
   ClangTypeID clangFunctionTypeID;
 
   decls_block::SILFunctionTypeLayout::readRecord(
-      scratch, sendable, async, rawCoroutineKind, rawCalleeConvention,
+      scratch, sendable, nontransferable, async, rawCoroutineKind,
+      rawCalleeConvention,
       rawRepresentation, pseudogeneric, noescape, unimplementable,
       rawExecutionSemantics, rawIsolation, rawDiffKind, hasErrorResult,
       numParams, numYields, numResults, rawInvocationGenericSig,
@@ -8787,8 +8792,9 @@ Expected<Type> DESERIALIZE_TYPE(SIL_FUNCTION_TYPE)(
     return MF.diagnoseFatal();
 
   auto extInfo = SILFunctionType::ExtInfoBuilder(
-                     *representation, pseudogeneric, noescape, sendable, async,
-                     unimplementable, *executionSemantics, *isolation,
+                     *representation, pseudogeneric, noescape, sendable,
+                     nontransferable, async, unimplementable,
+                     *executionSemantics, *isolation,
                      *diffKind, clangFunctionType,
                      /*LifetimeDependenceInfo*/ {})
                      .build();

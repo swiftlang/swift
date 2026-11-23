@@ -3649,6 +3649,7 @@ static bool isFunctionAttribute(const TypeAttribute *attr) {
       TypeAttrKind::Once,
       TypeAttrKind::Callable,
       TypeAttrKind::ScopeParams,
+      TypeAttrKind::NonTransferable,
   };
   return llvm::any_of(FunctionAttrs,
                       [attrKind = attr->getKind()](TypeAttrKind functionAttr) {
@@ -4727,7 +4728,8 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
-  bool sendable = claim<SendableTypeAttr>(attrs);
+  const bool isExplicitlySendable = claim<SendableTypeAttr>(attrs);
+  bool sendable = isExplicitlySendable;
   bool coroutine = claim<YieldOnceTypeAttr>(attrs);
 
   auto isolation = FunctionTypeIsolation::forNonIsolated();
@@ -5041,6 +5043,32 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  bool isNonTransferable = false;
+  if (auto nontransferable = claim<NonTransferableTypeAttr>(attrs)) {
+    if (ctx.LangOpts.hasFeature(Feature::NontransferableTypes)) {
+      if (isExplicitlySendable) {
+        diagnoseInvalid(
+            repr, nontransferable->getAtLoc(),
+            diag::invalid_use_of_nontransferable_and_sendable_attributes);
+      }
+
+      if (representation != FunctionTypeRepresentation::Swift) {
+        diagnoseInvalid(repr, conventionAttr->getAtLoc(),
+                        diag::invalid_non_transferable_and_attr_combination,
+                        conventionAttr);
+        representation = FunctionType::Representation::Swift;
+        parsedClangFunctionType = nullptr;
+      }
+
+      isNonTransferable = true;
+      sendable = false;
+    } else {
+      diagnoseInvalid(repr, nontransferable->getAttrLoc(),
+                      diag::requires_experimental_feature, "@nontransferable",
+                      false, Feature::NontransferableTypes.getName());
+    }
+  }
+
   FunctionType::ExtInfoBuilder extInfoBuilder(
       FunctionTypeRepresentation::Swift, noescape, repr->isThrowing(), thrownTy,
       diffKind, /*clangFunctionType*/ nullptr, isolation,
@@ -5061,6 +5089,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                      .withClangFunctionType(clangFnType)
                      .withCoroutine(coroutine)
                      .withScopeSignature(scopeSignature)
+                     .withNonTransferable(isNonTransferable)
                      .build();
 
   // SIL uses polymorphic function types to resolve overloaded member functions.
@@ -5284,6 +5313,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool pseudogeneric = claim<PseudogenericTypeAttr>(attrs);
   bool noescape = claim<NoEscapeTypeAttr>(attrs);
   bool sendable = claim<SendableTypeAttr>(attrs);
+  bool nontransferable = claim<NonTransferableTypeAttr>(attrs);
   bool async = claim<AsyncTypeAttr>(attrs);
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
   auto isolation = SILFunctionTypeIsolation::forUnknown();
@@ -5324,9 +5354,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   }
 
   auto extInfoBuilder = SILFunctionType::ExtInfoBuilder(
-      representation, pseudogeneric, noescape, sendable, async, unimplementable,
-      executionSemantics, isolation, diffKind, clangFnType,
-      /*LifetimeDependenceInfo*/ {});
+      representation, pseudogeneric, noescape, sendable, nontransferable,
+      async, unimplementable, executionSemantics, isolation, diffKind,
+      clangFnType, /*LifetimeDependenceInfo*/ {});
 
   // Resolve parameter and result types using the function's generic
   // environment.
@@ -5859,6 +5889,20 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
         !canSuppressDeinitable(options, getDeclContext())) {
       if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
         diagnose(repr->getNameLoc(), diag::deinitable_reserved);
+      repr->setInvalid();
+      return ErrorType::get(getASTContext());
+    }
+
+    // SIL prints Transferable requirements, so it has to parse them back.
+    // The stdlib is allowed to adopt Transferable without the feature flag.
+    if (protoTy->getDecl()->isSpecificProtocol(
+            KnownProtocolKind::Transferable) &&
+        !(isSILSourceFile() ||
+          getDeclContext()->getParentModule()->isStdlibModule() ||
+          getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes))) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(),
+                 diag::transferable_protocol_requires_feature);
       repr->setInvalid();
       return ErrorType::get(getASTContext());
     }

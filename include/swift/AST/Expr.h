@@ -4182,6 +4182,9 @@ public:
   /// Whether calling this closure consumes it.
   bool isCallConsuming() const;
 
+  /// Whether this closure is ~Transferable.
+  bool isNonTransferable() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 

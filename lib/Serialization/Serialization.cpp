@@ -6339,7 +6339,7 @@ public:
         isolation, fnTy->hasSendingResult(),
         getRawStableFunctionTypeExecutionSemantics(
             fnTy->getExecutionSemantics()),
-        fnTy->isCoroutine());
+        fnTy->isCoroutine(), fnTy->isNonTransferable());
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6365,7 +6365,8 @@ public:
         isolation, fnTy->hasSendingResult(),
         getRawStableFunctionTypeExecutionSemantics(
             fnTy->getExecutionSemantics()),
-        fnTy->isCoroutine(), S.addGenericSignatureRef(genericSig));
+        fnTy->isCoroutine(), fnTy->isNonTransferable(),
+        S.addGenericSignatureRef(genericSig));
 
     serializeFunctionTypeParams(fnTy);
     serializeFunctionTypeYields(fnTy);
@@ -6453,7 +6454,8 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[SILFunctionTypeLayout::Code];
     SILFunctionTypeLayout::emitRecord(
-        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(), fnTy->isAsync(),
+        S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
+        fnTy->isNonTransferable(), fnTy->isAsync(),
         stableCoroutineKind, stableCalleeConvention, stableRepresentation,
         fnTy->isPseudogeneric(), fnTy->isNoEscape(), fnTy->isUnimplementable(),
         getRawStableFunctionTypeExecutionSemantics(
@@ -6509,7 +6511,7 @@ public:
       protocols.push_back(S.addTypeRef(proto));
 
     bool inverseCopyable = false, inverseEscapable = false,
-         inverseDeinitable = false;
+         inverseDeinitable = false, inverseTransferable = false;
     for (auto ip : composition->getInverses()) {
       switch (ip) {
       case InvertibleProtocolKind::Copyable:
@@ -6521,6 +6523,9 @@ public:
       case InvertibleProtocolKind::Deinitable:
         inverseDeinitable = true;
         break;
+      case InvertibleProtocolKind::Transferable:
+        inverseTransferable = true;
+        break;
       };
     }
 
@@ -6528,7 +6533,8 @@ public:
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, composition->hasExplicitAnyObject(),
-        inverseCopyable, inverseEscapable, inverseDeinitable, protocols);
+        inverseCopyable, inverseEscapable, inverseDeinitable,
+        inverseTransferable, protocols);
   }
 
   void

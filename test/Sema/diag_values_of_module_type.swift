@@ -81,6 +81,7 @@ var badGlobal1 = Swift // expected-error {{expected module member name after mod
 class BadClass1 {
   var instanceVar1 = Swift // expected-error {{expected module member name after module name}}
   // expected-error@-1 {{stored property 'instanceVar1' of 'Deinitable'-conforming class 'BadClass1' has non-'Deinitable' type 'module<Swift>'}}
+  // expected-error@-2 {{stored property 'instanceVar1' of 'Transferable'-conforming class 'BadClass1' has non-'Transferable' type 'module<Swift>'}}
   func instanceFunc1() {
     instanceVar1 = Swift // expected-error {{expected module member name after module name}}
   }

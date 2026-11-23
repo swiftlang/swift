@@ -2324,10 +2324,43 @@ const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
 
 const LoadableTypeInfo &TypeConverter::getNativeObjectTypeInfo() {
   if (NativeObjectTI) return *NativeObjectTI;
-  NativeObjectTI = convertBuiltinNativeObject();
+  NativeObjectTI = convertBuiltinNativeObject(/*isNonTransferable=*/false);
   NativeObjectTI->NextConverted = FirstType;
   FirstType = NativeObjectTI;
   return *NativeObjectTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getNonTransferableNativeObjectTypeInfo() {
+  return Types.getNonTransferableNativeObjectTypeInfo();
+}
+
+const LoadableTypeInfo &
+TypeConverter::getNonTransferableNativeObjectTypeInfo() {
+  if (NonTransferableNativeObjectTI)
+    return *NonTransferableNativeObjectTI;
+  NonTransferableNativeObjectTI =
+      convertBuiltinNativeObject(/*isNonTransferable=*/true);
+  NonTransferableNativeObjectTI->NextConverted = FirstType;
+  FirstType = NonTransferableNativeObjectTI;
+  return *NonTransferableNativeObjectTI;
+}
+
+bool TypeConverter::isNeverTransferable(CanType type) {
+  if (auto *nominal = type->getAnyNominal()) {
+    switch (nominal->canBeTransferable()) {
+    case TypeDecl::CanBeInvertible::Never:
+      return true;
+    case TypeDecl::CanBeInvertible::Always:
+      return false;
+    case TypeDecl::CanBeInvertible::Conditionally:
+      break;
+    }
+  }
+
+  if (type->hasArchetype() || type->hasOpaqueArchetype())
+    return false;
+
+  return !type->isTransferable();
 }
 
 const LoadableTypeInfo &IRGenModule::getUnknownObjectTypeInfo() {
@@ -3110,12 +3143,25 @@ namespace {
     bool visitEnumDecl(EnumDecl *decl) {
       if (IGM.isResilient(decl, ResilienceExpansion::Maximal))
         return true;
+
+      // The boxes of indirect payloads of a conditionally `Transferable` enum
+      // use different reference counting depending on how it's instantiated.
+      bool isConditionallyTransferable =
+          decl->canBeTransferable() == TypeDecl::CanBeInvertible::Conditionally;
+
       if (decl->isIndirect())
-        return false;
+        return isConditionallyTransferable;
 
       for (auto elt : decl->getAllElements()) {
-        if (!elt->hasAssociatedValues() || elt->isIndirect())
+        if (!elt->hasAssociatedValues())
           continue;
+
+        if (elt->isIndirect()) {
+          if (isConditionallyTransferable)
+            return true;
+
+          continue;
+        }
 
         if (visit(elt->getPayloadInterfaceType()->getCanonicalType()))
           return true;

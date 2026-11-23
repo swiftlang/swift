@@ -2935,7 +2935,13 @@ TypeConverter::convertClassType(CanType type, ClassDecl *D) {
 
   return new ClassTypeInfo(IGM.PtrTy, IGM.getPointerSize(),
                            std::move(spareBits), IGM.getPointerAlignment(), D,
-                           refcount, ST);
+                           refcount, ST, type);
+}
+
+bool ClassTypeInfo::isNonTransferable() const {
+  // Not computed up front: IRGen's fake Objective-C runtime base classes
+  // aren't in a file, so conformances can't be looked up for them.
+  return TypeConverter::isNeverTransferable(ClassType);
 }
 
 /// Lazily declare a fake-looking class to represent an ObjC runtime base class.

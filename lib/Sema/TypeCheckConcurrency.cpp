@@ -18,6 +18,7 @@
 #include "../AST/AbstractConformance.h"
 #include "MiscDiagnostics.h"
 #include "NonisolatedNonsendingByDefaultMigration.h"
+#include "TypeCheckDeclInterface.h"
 #include "TypeCheckDistributed.h"
 #include "TypeCheckInvertible.h"
 #include "TypeCheckProtocol.h"
@@ -46,6 +47,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -1048,15 +1050,18 @@ static bool diagnoseSingleNonSendableType(
                          inDerivedConformance);
     }
 
-    if (type->is<FunctionType>()) {
-      ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
+    if (auto *funcType = type->getAs<FunctionType>()) {
+      if (funcType->isTransferable())
+        ctx.Diags.diagnose(loc, diag::nonsendable_function_type);
     } else if (nominal &&
                nominal->suppressesConformance(KnownProtocolKind::Sendable)) {
       nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);
     } else if (nominal && nominal->getParentModule() == module) {
       // If the nominal type is in the current module, suggest adding
       // `Sendable` if it might make sense. Otherwise, just complain.
-      if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
+      if (nominal->suppressesConformance(KnownProtocolKind::Transferable)) {
+        nominal->diagnose(diag::sendable_conformance_is_suppressed, nominal);
+      } else if (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal)) {
         auto note =
             nominal->diagnose(diag::add_nominal_sendable_conformance, nominal);
         addSendableFixIt(nominal, note, /*unchecked=*/false);
@@ -1379,6 +1384,9 @@ inferSendableFromInstanceStorage(NominalTypeDecl *nominal,
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
     return std::nullopt;
 
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
+    return std::nullopt;
+
   class Visitor : public StorageVisitor {
   public:
     NominalTypeDecl *nominal;
@@ -1479,6 +1487,10 @@ void swift::diagnoseMissingExplicitSendable(NominalTypeDecl *nominal) {
 
   // If `Sendable` conformance is explicitly suppressed, do nothing.
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return;
+
+  // `~Transferable` suppresses `Sendable` conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
     return;
 
   // If the conformance is explicitly stated, do nothing.
@@ -2103,6 +2115,13 @@ static ActorIsolation getInnermostIsolatedContext(
   llvm_unreachable("covered switch");
 }
 
+/// Whether a function of type \p fnType runs in the isolation of its caller.
+static bool inheritsCallerIsolation(const AnyFunctionType *fnType) {
+  auto isolation = fnType->getIsolation();
+  return isolation.isNonisolatedNonsending() ||
+         (isolation.isNonIsolated() && !fnType->isAsync());
+}
+
 AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
     const DeclContext *dc) {
   for (; dc; dc = dc->getParent()) {
@@ -2397,6 +2416,106 @@ static ClosureExpr *getWithoutActuallyEscapingOrDeinitingBody(Expr *expr) {
   return nullptr;
 }
 
+/// A ~Transferable value always shares the isolation of its context, so it can
+/// never be sent.
+static void diagnoseSendingNonTransferable(Type type, const DeclContext *dc,
+                                           SourceLoc loc) {
+  if (type->hasTypeParameter())
+    type = dc->mapTypeIntoEnvironment(type);
+  if (!type->hasError() && !type->isTransferable())
+    dc->getASTContext().Diags.diagnose(loc, diag::sending_non_transferable_type,
+                                       type);
+}
+
+void TypeChecker::checkSendingTransferabilityInType(Type type,
+                                                    const DeclContext *dc,
+                                                    SourceLoc loc) {
+  if (!type || type->hasError() || loc.isInvalid())
+    return;
+
+  class Walker : public TypeWalker {
+    const DeclContext *dc;
+    SourceLoc loc;
+
+  public:
+    Walker(const DeclContext *dc, SourceLoc loc) : dc(dc), loc(loc) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Not `getAs`: a type alias is checked where it's declared.
+      auto *fnTy = dyn_cast<AnyFunctionType>(ty.getPointer());
+      if (!fnTy)
+        return Action::Continue;
+
+      for (auto &param : fnTy->getParams()) {
+        if (param.getParameterFlags().isSending())
+          diagnoseSendingNonTransferable(param.getPlainType(), dc, loc);
+      }
+      if (fnTy->hasExtInfo() && fnTy->hasSendingResult())
+        diagnoseSendingNonTransferable(fnTy->getResult(), dc, loc);
+      return Action::Continue;
+    }
+  };
+
+  type.walk(Walker(dc, loc));
+}
+
+namespace {
+class SendingTransferabilityChecker
+    : public DeclInterfaceTypeChecker<SendingTransferabilityChecker> {
+public:
+  void visitExtensionDecl(ExtensionDecl *ED) {
+    for (TypeLoc inherited : ED->getInherited().getEntries())
+      checkType(inherited.getType(), inherited.getTypeRepr(), ED);
+
+    if (ED->getTrailingWhereClause()) {
+      WhereClauseOwner(ED).forAllRequirementTypes(
+          [&](Type type, TypeRepr *typeRepr) { checkType(type, typeRepr, ED); });
+    }
+  }
+
+  void checkType(Type type, const TypeRepr *typeRepr, const Decl *context) {
+    // Inferred types come from written ones, which are checked where they're
+    // written.
+    if (!typeRepr)
+      return;
+    TypeChecker::checkSendingTransferabilityInType(
+        type, const_cast<Decl *>(context)->getInnermostDeclContext(),
+        typeRepr->getLoc());
+  }
+
+  void checkAdditional(Decl *D) {
+    auto checkParams = [&](ParameterList *params, const DeclContext *dc) {
+      for (auto *param : *params) {
+        // Synthesized parameters, e.g. of distributed thunks, take their
+        // types from parameters that are checked themselves.
+        auto *repr = param->getTypeRepr();
+        if (param->isSending() && repr)
+          diagnoseSendingNonTransferable(param->getInterfaceType(), dc,
+                                         repr->getLoc());
+      }
+    };
+
+    if (auto *fn = dyn_cast<AbstractFunctionDecl>(D)) {
+      checkParams(fn->getParameters(), fn);
+      if (auto *func = dyn_cast<FuncDecl>(fn);
+          func && func->hasSendingResult() && func->getResultTypeRepr())
+        diagnoseSendingNonTransferable(func->getResultInterfaceType(), func,
+                                       func->getResultTypeRepr()->getLoc());
+    } else if (auto *subscript = dyn_cast<SubscriptDecl>(D)) {
+      checkParams(subscript->getIndices(), subscript);
+      if (auto *elementRepr = subscript->getElementTypeRepr();
+          elementRepr && isa<SendingTypeRepr>(elementRepr))
+        diagnoseSendingNonTransferable(subscript->getElementInterfaceType(),
+                                       subscript, elementRepr->getLoc());
+    }
+  }
+};
+} // end anonymous namespace
+
+void TypeChecker::checkSendingTransferabilityInDecl(Decl *D) {
+  SendingTransferabilityChecker().visit(D);
+}
+
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -2635,6 +2754,39 @@ namespace {
       return false;
     }
 
+    /// Whether converting a function value of type \p fromType that is used in
+    /// the current context to \p toType makes it run outside of the isolation
+    /// domain of this context.
+    bool conversionChangesIsolation(const FunctionType *fromType,
+                                    const FunctionType *toType) {
+      // Unless it runs in the isolation of its caller, a function keeps its
+      // isolation through a conversion.
+      if (!inheritsCallerIsolation(fromType) || inheritsCallerIsolation(toType))
+        return false;
+
+      auto *dc = getDeclContext();
+      auto contextIsolation =
+          getInnermostIsolatedContext(dc, getClosureActorIsolation);
+      auto toIsolation = toType->getIsolation();
+      switch (toIsolation.getKind()) {
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        return !(contextIsolation.isGlobalActor() &&
+                 contextIsolation.getGlobalActor()->isEqual(
+                     toIsolation.getGlobalActorType()));
+
+      case FunctionTypeIsolation::Kind::NonIsolated:
+        return !isNonisolatedConcurrentContext(dc);
+
+      // Where these run is only known dynamically.
+      case FunctionTypeIsolation::Kind::Erased:
+      case FunctionTypeIsolation::Kind::Parameter:
+        return true;
+
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+        ABORT("runs in the isolation of its caller");
+      }
+    }
+
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
     void checkFunctionConversion(ImplicitConversionExpr *funcConv,
@@ -2687,6 +2839,17 @@ namespace {
         if (auto toFnType = toType->getAs<FunctionType>()) {
           auto fromIsolation = fromFnType->getIsolation();
           auto toIsolation = toFnType->getIsolation();
+
+          // A non-'Transferable' function value belongs to the isolation
+          // domain of the current context.
+          if (fromFnType->isNonTransferable() &&
+              conversionChangesIsolation(fromFnType, toFnType)) {
+            ctx.Diags.diagnose(
+                funcConv->getLoc(),
+                diag::converting_non_transferable_func_changes_isolation,
+                fromType, toType);
+            return;
+          }
 
           if (auto fromActor = fromFnType->getGlobalActor()) {
             if (!toFnType->hasGlobalActor()) {
@@ -2983,6 +3146,65 @@ namespace {
       expr->setImplicitlyAsync();
     }
 
+    /// Whether code in \p dc is asynchronous and isolated neither to an actor
+    /// nor to its caller, so it runs on the generic executor.
+    bool isNonisolatedConcurrentContext(const DeclContext *dc) {
+      auto isolation = getActorIsolationOfContext(
+          const_cast<DeclContext *>(dc), getClosureActorIsolation);
+      return !isolation.isActorIsolated() &&
+             !isolation.isNonisolatedNonsending() && dc->isAsyncContext();
+    }
+
+    /// Whether \p closure runs in the isolation context that it is formed in.
+    bool isSameIsolationContextAsParent(AbstractClosureExpr *closure) {
+      auto closureIsolation =
+          getActorIsolationOfContext(closure, getClosureActorIsolation);
+      auto *closureType = closure->getType()->castTo<AnyFunctionType>();
+
+      // These run on the executor of their caller, and a non-'Transferable'
+      // closure can only be called in the context it is formed in.
+      if (closureIsolation.isNonisolatedNonsending() ||
+          (!closureIsolation.isActorIsolated() && !closureType->isAsync()))
+        return true;
+
+      auto *parent = closure->getParent();
+      auto parentIsolation =
+          getActorIsolationOfContext(parent, getClosureActorIsolation);
+      if (closureIsolation.isActorIsolated())
+        return closureIsolation == parentIsolation;
+
+      // An asynchronous nonisolated closure runs on the generic executor.
+      return isNonisolatedConcurrentContext(parent);
+    }
+
+    /// A non-'Transferable' value can't change its isolation domain, so a
+    /// closure can only capture one if it runs in the isolation of its parent.
+    bool diagnoseNonTransferableCapture(AbstractClosureExpr *closure,
+                                        const CapturedValue &capture) {
+      // Other closures can't capture non-'Transferable' values at all, which
+      // is diagnosed when their captures are computed.
+      auto *closureType = closure->getType()->getAs<AnyFunctionType>();
+      if (!closureType || !closureType->isNonTransferable())
+        return false;
+
+      auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+      if (!var)
+        return false;
+
+      Type type = getDeclContext()
+                      ->mapTypeIntoEnvironment(var->getInterfaceType())
+                      ->getReferenceStorageReferent();
+      if (type->hasError() || type->isTransferable() ||
+          isSameIsolationContextAsParent(closure))
+        return false;
+
+      ctx.Diags.diagnose(
+          capture.getLoc(), diag::non_transferable_isolated_capture, type,
+          var->getName(),
+          getActorIsolationOfContext(closure, getClosureActorIsolation));
+      return true;
+    }
+
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
       auto *dc = getDeclContext();
@@ -3024,6 +3246,9 @@ namespace {
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
+
+        if (closure && diagnoseNonTransferableCapture(closure, capture))
+          continue;
 
         // 'nonisolated' local variables are always okay to capture in
         // 'Sendable' closures because they can be accessed from anywhere.
@@ -3320,12 +3545,16 @@ namespace {
         if (!T->isImplicit()) {
           checkIsolatedConformancesInType(T->getType(), T->getTypeRepr(),
                                           expr->getLoc());
+          TypeChecker::checkSendingTransferabilityInType(
+              T->getType(), getDeclContext(), expr->getLoc());
         }
       }
 
       if (auto *cast = dyn_cast<ExplicitCastExpr>(expr)) {
         checkIsolatedConformancesInType(
             cast->getCastType(), cast->getCastTypeRepr(), expr->getLoc());
+        TypeChecker::checkSendingTransferabilityInType(
+            cast->getCastType(), getDeclContext(), expr->getLoc());
       }
 
       if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
@@ -3372,6 +3601,27 @@ namespace {
             checkIsolatedConformancesInType(param->getInterfaceType(),
                                             param->getTypeRepr(),
                                             expr->getLoc());
+
+            // The type of a `sending` parameter may only be known now, e.g.
+            // `{ (x: sending _) in }`.
+            if (auto *repr = param->getTypeRepr()) {
+              if (param->isSending())
+                diagnoseSendingNonTransferable(param->getInterfaceType(),
+                                               explicitClosure, repr->getLoc());
+              TypeChecker::checkSendingTransferabilityInType(
+                  param->getInterfaceType(), explicitClosure, repr->getLoc());
+            }
+          }
+
+          if (explicitClosure->hasExplicitResultType()) {
+            auto *resultRepr = explicitClosure->getExplicitResultTypeRepr();
+            if (isa<SendingTypeRepr>(resultRepr))
+              diagnoseSendingNonTransferable(explicitClosure->getResultType(),
+                                             explicitClosure,
+                                             resultRepr->getLoc());
+            TypeChecker::checkSendingTransferabilityInType(
+                explicitClosure->getResultType(), explicitClosure,
+                resultRepr->getLoc());
           }
 
           if (auto *thrownTypeRepr =
@@ -4368,10 +4618,55 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
+      // A ~Transferable value can never cross an isolation boundary.
+      diagnoseNonTransferableArgumentsAndResult(apply, fnType, calleeDecl,
+                                                getContextIsolation(),
+                                                *unsatisfiedIsolation);
+
       // Sendable checking for arguments and results are deferred to region
       // isolation.
 
       return false;
+    }
+
+    void diagnoseNonTransferableArgumentsAndResult(
+        ApplyExpr *apply, FunctionType *fnType, ValueDecl *calleeDecl,
+        ActorIsolation contextIsolation, ActorIsolation calleeIsolation) {
+      bool exits = !calleeIsolation.isActorIsolated();
+      // A synchronous nonisolated callee runs on the caller's executor.
+      if (exits && !fnType->isAsync())
+        return;
+
+      auto diagnose = [&](Type type, SourceLoc loc, bool isResult) {
+        type = type->getWithoutSpecifierType();
+        if (type->hasError() || type->isTransferable())
+          return;
+
+        auto isolation = exits ? contextIsolation : calleeIsolation;
+        if (!calleeDecl) {
+          ctx.Diags.diagnose(loc, diag::non_transferable_crosses_isolation,
+                             isResult, type, contextIsolation, calleeIsolation);
+          return;
+        }
+
+        auto diag = isResult
+                        ? (exits ? diag::non_transferable_result_exits_actor
+                                 : diag::non_transferable_result_into_actor)
+                        : (exits ? diag::non_transferable_arg_exits_actor
+                                 : diag::non_transferable_arg_into_actor);
+        ctx.Diags.diagnose(loc, diag, type, calleeDecl, isolation);
+      };
+
+      if (auto *selfApply = dyn_cast<SelfApplyExpr>(
+              apply->getFn()->getValueProvidingExpr())) {
+        auto *base = selfApply->getBase();
+        diagnose(getType(base), base->getStartLoc(), /*isResult=*/false);
+      }
+
+      for (auto arg : *apply->getArgs())
+        diagnose(getType(arg.getExpr()), arg.getStartLoc(), /*isResult=*/false);
+
+      diagnose(fnType->getResult(), apply->getLoc(), /*isResult=*/true);
     }
 
     Expr *getCurrentContextIsolation(Expr *expr) {
@@ -8148,6 +8443,10 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
   // An explicit use `~Sendable` suppresses the conformance.
   if (nominal->suppressesConformance(KnownProtocolKind::Sendable))
+    return nullptr;
+
+  // An explicit use `~Transferable` suppresses the conformance.
+  if (nominal->suppressesConformance(KnownProtocolKind::Transferable))
     return nullptr;
 
   // Actor types are always Sendable; they don't get it via this path.

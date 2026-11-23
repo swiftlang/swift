@@ -1182,6 +1182,20 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
     auto resultIsolation =
         (hasErasedIsolation ? SILFunctionTypeIsolation::forErased()
                             : SILFunctionTypeIsolation::forUnknown());
+
+    // Converting the closure would wrap it in a thunk, which costs an extra
+    // allocation and call and leaves the captures' context counted atomically.
+    // The callee has no context, so it can be made `@nontransferable` instead.
+    if (typeContext.ExpectedLoweredType->isNonTransferable()) {
+      auto fnTy = functionRef->getType().castTo<SILFunctionType>();
+      ASSERT(!fnTy->getExtInfo().hasContext());
+      if (!fnTy->isNonTransferable())
+        functionRef = B.createConvertFunction(
+            loc, functionRef,
+            SILType::getPrimitiveObjectType(fnTy->getWithExtInfo(
+                fnTy->getExtInfo().withNonTransferable())));
+    }
+
     auto toClosure = B.createPartialApply(
         loc, functionRef, subs, forwardedArgs, calleeConvention,
         resultIsolation, PartialApplyInst::OnStackKind::NotOnStack,

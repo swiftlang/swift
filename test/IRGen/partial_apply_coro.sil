@@ -371,10 +371,10 @@ bb0(%0 : $Float):
   store %0 to [trivial] %temp : $*Float
   %pa = partial_apply [callee_guaranteed] %coro<Float>(%temp) : $@yield_once @convention(thin) <T> (@in T) -> (@yields @in T)
 
-  (%value, %token) = begin_apply %pa() : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T) for <Float>
+  (%value, %token) = begin_apply %pa() : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable, T : Transferable> () -> (@yields @in T) for <Float>
 
   end_apply %token as $()
-  destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T) for <Float>
+  destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable, T : Transferable> () -> (@yields @in T) for <Float>
 
   dealloc_stack %temp : $*Float
   %r = tuple ()
@@ -508,10 +508,10 @@ bb0(%0 : $Float):
   %pa = partial_apply [callee_guaranteed] %coro<Float>(%temp) : $@yield_once @convention(thin) <T where T : Copyable, T : Escapable> (@in T) -> (@yields @in T, @out T)
 
   %out = alloc_stack $Float
-  (%f1, %token) = begin_apply %pa(%out) : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
+  (%f1, %token) = begin_apply %pa(%out) : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable, T : Transferable> () -> (@yields @in T, @out T) for <Float>
 
   %f2 = end_apply %token as $()
-  destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> () -> (@yields @in T, @out T) for <Float>
+  destroy_value %pa : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable, T : Transferable> () -> (@yields @in T, @out T) for <Float>
 
   dealloc_stack %out : $*Float
   dealloc_stack %temp : $*Float
@@ -935,11 +935,11 @@ entry(%i : $*T, %io : $*T):
 // CHECK:   ret void
 // CHECK: }
 //
-sil @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @yield_once @callee_guaranteed  @substituted <T where T : Copyable, T : Escapable> (@in T) -> @yields @in T for <T> {
+sil @partial_apply_open_generic_capture : $@convention(thin) <T> (@inout T) -> @yield_once @callee_guaranteed  @substituted <T where T : Copyable, T : Escapable, T : Transferable> (@in T) -> @yields @in T for <T> {
 entry(%a : $*T):
   %f = function_ref @generic_captured_and_open_param : $@yield_once @convention(thin) <U> (@in U, @inout U) -> (@yields @in U)
   %p = partial_apply [callee_guaranteed] %f<T>(%a) : $@yield_once @convention(thin) <U> (@in U, @inout U) -> (@yields @in U)
-  return %p : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable> (@in T) -> @yields @in T for <T>
+  return %p : $@yield_once @callee_guaranteed @substituted <T where T : Copyable, T : Escapable, T : Transferable> (@in T) -> @yields @in T for <T>
 }
 
 /*****************************************************************************/
@@ -1533,11 +1533,11 @@ entry(%o : $*A, %i : $*A):
   unreachable
 }
 
-sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> (@out T, @yields @in T) for <T> {
+sil @partial_apply_with_out_param : $@convention(thin) <T> (@in T) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> (@out T, @yields @in T) for <T> {
 bb0(%x : $*T):
   %f = function_ref @captured_dependent_out_param : $@yield_once @convention(thin) <B> (@in B) -> (@out B, @yields @in B)
   %p = partial_apply [callee_guaranteed] %f<T>(%x) : $@yield_once @convention(thin) <C> (@in C) -> (@out C, @yields @in C)
-  return %p : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> (@out T, @yields @in T) for <T>
+  return %p : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> (@out T, @yields @in T) for <T>
 }
 
 
@@ -1898,7 +1898,7 @@ sil @partial_apply_with_generic_type : $@convention(thin) <U: P2> () -> () {
 bb0:
   %fn = function_ref @generic_function : $@yield_once @convention(thin) <T> () -> (@yields @in T)
   %pa = partial_apply %fn <ComplexBoundedType<U>>() : $@yield_once @convention(thin) <T> () -> (@yields @in T)
-  (%yield, %token) = begin_apply %pa() : $@yield_once @callee_owned @substituted <T where T: Copyable, T: Escapable> () -> (@yields @in T) for <ComplexBoundedType<U>>
+  (%yield, %token) = begin_apply %pa() : $@yield_once @callee_owned @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> (@yields @in T) for <ComplexBoundedType<U>>
   end_apply %token as $()
   %result = tuple ()
   return %result : $()
@@ -1927,11 +1927,11 @@ entry(%i : $Int):
 // CHECK:   ret { ptr, ptr } %[[RET]]
 // CHECK: }
 
-sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum<T> for <Int> {
+sil @partial_apply_generic_indirect_return : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> @owned GenericEnum<T> for <Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return :$@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
   %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T> (Int) -> @owned GenericEnum<T>
-  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum<T> for <Int>
+  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> @owned GenericEnum<T> for <Int>
 }
 
 enum GenericEnum2<T> {
@@ -1956,11 +1956,11 @@ entry(%i : $Int):
 // CHECK:   ret { ptr, ptr } %[[RET]]
 // CHECK: }
 
-sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum2<T> for <Int> {
+sil @partial_apply_generic_indirect_return2 : $@convention(thin) (Int) -> @yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> @owned GenericEnum2<T> for <Int> {
   bb0(%0 : $Int):
   %fn = function_ref @generic_indirect_return2 :$@yield_once @convention(thin) <T where T: Copyable, T: Escapable> (Int) -> @owned GenericEnum2<T>
   %pa = partial_apply [callee_guaranteed] %fn<Int> (%0) : $@yield_once @convention(thin) <T where T: Copyable, T: Escapable> (Int) -> @owned GenericEnum2<T>
-  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable> () -> @owned GenericEnum2<T> for <Int>
+  return %pa : $@yield_once @callee_guaranteed @substituted <T where T: Copyable, T: Escapable, T: Transferable> () -> @owned GenericEnum2<T> for <Int>
 }
 
 struct SwiftStruct {}
@@ -2428,7 +2428,7 @@ entry(%0 : $EmptyType, %1: $*SomeType, %3: $FixedType):
   %34 = alloc_stack $SomeType
   copy_addr %1 to [init] %34 : $*SomeType // id: %35
   %36 = partial_apply [callee_guaranteed] %31<FixedType, EmptyType, SomeType>(%7, %32, %34) : $@yield_once @convention(thin) <T0, T1, T2> (@in_guaranteed T0, @in_guaranteed T1, @in_guaranteed T2) -> (@yields @in T0, @out T1, @out T2)
-  release_value %36: $@yield_once @callee_guaranteed @substituted <T0, T1, T2 where T0: Copyable, T0: Escapable, T1: Copyable, T1: Escapable, T2: Copyable, T2: Escapable> () -> (@yields @in T0, @out T1, @out T2) for <FixedType, EmptyType, SomeType>
+  release_value %36: $@yield_once @callee_guaranteed @substituted <T0, T1, T2 where T0: Copyable, T0: Escapable, T0: Transferable, T1: Copyable, T1: Escapable, T1: Transferable, T2: Copyable, T2: Escapable, T2: Transferable> () -> (@yields @in T0, @out T1, @out T2) for <FixedType, EmptyType, SomeType>
   dealloc_stack %34 : $*SomeType
   dealloc_stack %32 : $*EmptyType
   dealloc_stack %7 : $*FixedType

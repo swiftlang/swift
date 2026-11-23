@@ -3023,6 +3023,52 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   return SolutionKind::Solved;
 }
 
+ConstraintSystem::SolutionKind ConstraintSystem::matchFunctionTransferability(
+    FunctionType *func1, FunctionType *func2, ConstraintKind kind,
+    TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  auto formUnsolved = [&]() {
+    // If we're supposed to generate constraints, do so.
+    if (flags.contains(TMF_GenerateConstraints)) {
+      auto *constraint = Constraint::create(*this, kind, func1, func2,
+                                            getConstraintLocator(locator));
+      addUnsolvedConstraint(constraint);
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
+  auto typeDependencies = getBoundTypeDependencies(
+      *this, func1, func2, TypeDependenceKind::Transferable);
+  if (!typeDependencies)
+    return formUnsolved();
+  auto [dep1, dep2] = *typeDependencies;
+
+  auto func1NonTransferable =
+      dep1 ? !dep1->isTransferable() : func1->isNonTransferable();
+  auto func2NonTransferable =
+      dep2 ? !dep2->isTransferable() : func2->isNonTransferable();
+
+  // A Transferable function can be a subtype of a non-Transferable function.
+  if (func1NonTransferable != func2NonTransferable &&
+      (func1NonTransferable || kind < ConstraintKind::Subtype)) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    // The fix requires both sides to be resolved.
+    if (dep1)
+      func1 = simplifyType(func1)->castTo<FunctionType>();
+    if (dep2)
+      func2 = simplifyType(func2)->castTo<FunctionType>();
+
+    auto *fix = DropNonTransferableAttribute::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+      return SolutionKind::Error;
+  }
+
+  return SolutionKind::Solved;
+}
+
 static bool isWitnessMatching(ConstraintLocatorBuilder locator) {
   SmallVector<LocatorPathElt, 4> path;
   (void) locator.getLocatorParts(path);
@@ -3281,8 +3327,8 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
-  // If the locator is for a @Sendable or execution semantics match, that's all
-  // we want to do.
+  // If the locator is for a @Sendable, execution semantics or Transferable
+  // match, that's all we want to do.
   if (auto last = locator.last()) {
     if (last->is<LocatorPathElt::FunctionSendability>())
       return matchFunctionSendability(func1, func2, kind, flags, locator);
@@ -3290,6 +3336,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (last->is<LocatorPathElt::FunctionExecutionSemantics>())
       return matchFunctionExecutionSemantics(func1, func2, kind, flags,
                                              locator);
+
+    if (last->is<LocatorPathElt::FunctionTransferability>())
+      return matchFunctionTransferability(func1, func2, kind, flags, locator);
   }
 
   // Match the 'throws' effect.
@@ -3350,6 +3399,12 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     if (recordFix(fix))
       return SolutionKind::Error;
   }
+
+  auto transferableResult = matchFunctionTransferability(
+      func1, func2, kind, TMF_GenerateConstraints,
+      locator.withPathElement(ConstraintLocator::FunctionTransferability));
+  if (transferableResult == SolutionKind::Error)
+    return transferableResult;
 
   // () -> sending T can be a subtype of () -> T... but not vis-a-versa.
   if (func1->hasSendingResult() != func2->hasSendingResult() &&
@@ -9124,6 +9179,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable) ||
              protocol->isSpecificProtocol(KnownProtocolKind::Deinitable))
       dependenceKind = TypeDependenceKind::ExecutionSemantics;
+    else if (protocol->isSpecificProtocol(KnownProtocolKind::Transferable))
+      dependenceKind = TypeDependenceKind::Transferable;
 
     if (dependenceKind) {
       if (fnTy->hasTypeDependencyFor(*dependenceKind)) {
@@ -9635,6 +9692,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
   }
 
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
+
+  // Whether a function type conforms can depend on a type that's
+  // not resolved yet.
+  if (auto *fnTy = resolvedTy->getAs<FunctionType>();
+      fnTy && fnTy->hasTypeDependencyFor(protocol)) {
+    resolvedTy = simplifyType(fnTy);
+    if (resolvedTy->castTo<FunctionType>()->hasTypeDependencyFor(protocol))
+      return formUnsolved();
+  }
 
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
@@ -12396,6 +12462,71 @@ void ConstraintSystem::removePreconcurrencyClosure(
   ASSERT(erased);
 }
 
+/// Collect the types of the values that \p closure captures: its capture list
+/// entries and the declarations from outside of it that it references. The
+/// captures of local functions it references are diagnosed when captures are
+/// computed.
+static void collectCaptureTypes(
+    ConstraintSystem &cs, ClosureExpr *closure,
+    SmallVectorImpl<TupleTypeElt> &types,
+    llvm::function_ref<bool(Type)> isSuitable = [](auto) { return true; }) {
+  auto addType = [&](VarDecl *var) {
+    Type type;
+    if (auto csType = cs.getTypeIfAvailable(var))
+      type = cs.simplifyType(csType);
+    else if (var->hasInterfaceType())
+      type = var->getTypeInContext();
+    else
+      return;
+
+    type = type->getWithoutSpecifierType()->getReferenceStorageReferent();
+    if (!type->hasError() && isSuitable(type))
+      types.push_back(type);
+  };
+
+  // The closure owns its capture list entries even if it doesn't use them.
+  if (auto *captureList =
+          getAsExpr<CaptureListExpr>(cs.getParentExpr(closure))) {
+    for (auto &entry : captureList->getCaptureList())
+      addType(entry.getVar());
+  }
+
+  TypeVarRefCollector collector(cs, closure, cs.getConstraintLocator(closure));
+  closure->walk(collector);
+  for (auto *var : collector.getReferencedVars()) {
+    auto *varDC = var->getDeclContext();
+    if (var->isLocalCapture() && varDC != closure &&
+        !varDC->isChildContextOf(closure))
+      addType(var);
+  }
+}
+
+void ConstraintSystem::resolveClosureTransferability(ClosureExpr *closure) {
+  auto *closureType = simplifyType(getType(closure))->castTo<FunctionType>();
+  auto dependency =
+      closureType->getTypeDependencyFor(TypeDependenceKind::Transferable);
+  auto *transferability =
+      dependency ? dependency->getAs<TypeVariableType>() : nullptr;
+  if (!transferability)
+    return;
+
+  ASSERT(transferability->getImpl()
+             .getLocator()
+             ->isLastElement<LocatorPathElt::ClosureTransferability>());
+
+  SmallVector<TupleTypeElt, 4> captureTypes;
+  collectCaptureTypes(
+      *this, closure, captureTypes, [&transferability](Type captureTy) {
+        SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
+        captureTy->getTypeVariables(referencedTypeVars);
+        return !referencedTypeVars.count(transferability);
+      });
+
+  addConstraint(ConstraintKind::Bind, transferability,
+                TupleType::get(captureTypes, getASTContext()),
+                transferability->getImpl().getLocator());
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -12673,6 +12804,39 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
         closureExtInfo = closureExtInfo.withExecutionSemantics(semantics);
       }
     }
+
+    // ~Transferable cannot be Sendable at the same time but an explicitly
+    // Sendable closure could be converted to a ~Transferable one. Inferred
+    // Sendable (e.g. for global actor isolated closures) yields to the
+    // contextual type. Sendable-dependent types are not an issue here because
+    // they are used for partial applications and ~Transferable base type is
+    // non-Sendable.
+    if (auto transferableTy = contextualFnType->getTypeDependencyFor(
+            TypeDependenceKind::Transferable)) {
+      // Inferred Sendable can't yield to a type that's not resolved yet, so
+      // such closures stay Transferable.
+      if (!closureExtInfo.isSendable() && !closureExtInfo.isNonTransferable())
+        closureExtInfo = closureExtInfo.withTypeDependency(
+            TypeDependenceKind::Transferable, transferableTy);
+    } else if (contextualFnType->isNonTransferable() &&
+               !closure->getAttrs().hasAttribute<SendableAttr>()) {
+      closureExtInfo = closureExtInfo.withSendable(false).withNonTransferable();
+    }
+  }
+
+  // Attempt to infer transferability of the closure based on its captures.
+  // If the closure is already either ~Transferable or @Sendable, there is
+  // nothing to do here.
+  if (getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes) &&
+      !(closureExtInfo.isNonTransferable() || closureExtInfo.isSendable())) {
+    // Some captures, e.g. capture list entries, only get types with the body
+    // of the closure, which binds this once they are all known.
+    auto *transferability = createTypeVariable(
+        getConstraintLocator(closure,
+                             ConstraintLocator::ClosureTransferability),
+        /*options=*/0);
+    closureExtInfo = closureExtInfo.withTypeDependency(
+        TypeDependenceKind::Transferable, transferability);
   }
 
   // Propagate sending result from the contextual type to the closure.
@@ -12705,7 +12869,17 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   setTargetFor(closure, target);
 
   // Generate constraints from the body of this closure.
-  return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+  if (generateConstraints(AnyFunctionRef{closure}, closure->getBody()))
+    return false;
+
+  // The body of a single-expression closure, including its capture list, is
+  // generated here, otherwise it's solved as a conjunction.
+  if (!getAppliedResultBuilderTransform(AnyFunctionRef{closure}) &&
+      closure->hasSingleExpressionBody()) {
+    resolveClosureTransferability(closure);
+  }
+
+  return true;
 }
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
@@ -16456,6 +16630,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddSendableAttribute:
   case FixKind::DropThrowsAttribute:
   case FixKind::DropAsyncAttribute:
+  case FixKind::DropNonTransferableAttribute:
   case FixKind::AllowSwiftToCPointerConversion:
   case FixKind::AllowTupleLabelMismatch:
   case FixKind::AddExplicitExistentialCoercion:

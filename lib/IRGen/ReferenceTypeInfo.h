@@ -39,11 +39,11 @@ protected:
 public:
   /// Strongly retains a value.
   virtual void strongRetain(IRGenFunction &IGF, Explosion &in,
-                            Atomicity atomicity) const = 0;
+                            Atomicity defaultAtomicity) const = 0;
 
   /// Strongly releases a value.
   virtual void strongRelease(IRGenFunction &IGF, Explosion &in,
-                             Atomicity atomicity) const = 0;
+                             Atomicity defaultAtomicity) const = 0;
 
   virtual ReferenceCounting getReferenceCountingType() const {
     llvm_unreachable("not supported");
@@ -61,16 +61,16 @@ public:
                            Address dest, bool isOptional) const = 0; \
   virtual void name##Assign(IRGenFunction &IGF, Explosion &in, \
                              Address dest, bool isOptional) const = 0;
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
-  virtual void strongRetain##Name(IRGenFunction &IGF, Explosion &in, \
-                                  Atomicity atomicity) const = 0; \
-  virtual void strongRetain##Name##Release(IRGenFunction &IGF, \
-                                           Explosion &in, \
-                                           Atomicity atomicity) const = 0; \
-  virtual void name##Retain(IRGenFunction &IGF, Explosion &in, \
-                             Atomicity atomicity) const = 0; \
-  virtual void name##Release(IRGenFunction &IGF, Explosion &in, \
-                              Atomicity atomicity) const = 0;
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name)                 \
+  virtual void strongRetain##Name(IRGenFunction &IGF, Explosion &in,           \
+                                  Atomicity defaultAtomicity) const = 0;       \
+  virtual void strongRetain##Name##Release(IRGenFunction &IGF, Explosion &in,  \
+                                           Atomicity defaultAtomicity)         \
+      const = 0;                                                               \
+  virtual void name##Retain(IRGenFunction &IGF, Explosion &in,                 \
+                            Atomicity defaultAtomicity) const = 0;             \
+  virtual void name##Release(IRGenFunction &IGF, Explosion &in,                \
+                             Atomicity defaultAtomicity) const = 0;
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name) \
   REF_STORAGE_HELPER(Name)

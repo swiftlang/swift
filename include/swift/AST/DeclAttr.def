@@ -976,7 +976,13 @@ DECL_ATTR(_tailAllocated, TailAllocated,
   184)
 DECL_ATTR_FEATURE_REQUIREMENT(TailAllocated, TailAllocatedAttribute)
 
-LAST_DECL_ATTR(TailAllocated)
+SIMPLE_DECL_ATTR(nontransferable, NonTransferable,
+  /*Requirements=*/0,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | NotSerialized | UnconstrainedInABIAttr,
+  185)
+DECL_ATTR_FEATURE_REQUIREMENT(NonTransferable, NontransferableTypes)
+
+LAST_DECL_ATTR(NonTransferable)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

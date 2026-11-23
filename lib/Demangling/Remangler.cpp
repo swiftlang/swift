@@ -2262,6 +2262,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
                             .Case("@Sendable", 'h')
+                            .Case("@nontransferable", 'D')
                             .Case("@async", 'H')
                             .Default(0);
         if (!FuncAttr) {
@@ -3667,6 +3668,12 @@ ManglingError Remangler::mangleFullObjCResilientClassStub(Node *node,
 ManglingError Remangler::mangleConcurrentFunctionType(Node *node,
                                                       unsigned depth) {
   Buffer << "Yb";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleNonTransferableFunctionType(Node *node,
+                                                           unsigned depth) {
+  Buffer << "Yd";
   return ManglingError::Success;
 }
 

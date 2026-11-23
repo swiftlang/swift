@@ -706,10 +706,14 @@ static llvm::Constant *getNoncopyableTrapFunction(IRGenModule &IGM) {
 /// retaining assignWithCopy on the first two: it loads a pointer from
 /// the second, retains it, loads a pointer from the first, stores the
 /// new pointer in the first, and releases the old pointer.
-static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
+static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM,
+                                                       Atomicity atomicity) {
   auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
-  return IGM.getOrCreateHelperFunction("__swift_assignWithCopy_strong",
+  auto name = atomicity == Atomicity::NonAtomic
+                  ? "__swift_assignWithCopy_nonatomic_strong"
+                  : "__swift_assignWithCopy_strong";
+  return IGM.getOrCreateHelperFunction(name,
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
@@ -717,10 +721,10 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.RefCountedPtrTy, IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue, IGF.getDefaultAtomicity());
+    IGF.emitNativeStrongRetain(newValue, atomicity);
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue, IGF.getDefaultAtomicity());
+    IGF.emitNativeStrongRelease(oldValue, atomicity);
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -730,10 +734,14 @@ static llvm::Constant *getAssignWithCopyStrongFunction(IRGenModule &IGM) {
 /// retaining assignWithTake on the first two: it loads a pointer from
 /// the second, retains it, loads a pointer from the first, stores the
 /// new pointer in the first, and releases the old pointer.
-static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
+static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM,
+                                                       Atomicity atomicity) {
   auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
-  return IGM.getOrCreateHelperFunction("__swift_assignWithTake_strong",
+  auto name = atomicity == Atomicity::NonAtomic
+                  ? "__swift_assignWithTake_nonatomic_strong"
+                  : "__swift_assignWithTake_strong";
+  return IGM.getOrCreateHelperFunction(name,
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
@@ -743,7 +751,7 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
     llvm::Value *oldValue = IGF.Builder.CreateLoad(dest, "old");
     IGF.Builder.CreateStore(newValue, dest);
-    IGF.emitNativeStrongRelease(oldValue, IGF.getDefaultAtomicity());
+    IGF.emitNativeStrongRelease(oldValue, atomicity);
 
     IGF.Builder.CreateRet(dest.getAddress());
   });
@@ -752,10 +760,14 @@ static llvm::Constant *getAssignWithTakeStrongFunction(IRGenModule &IGM) {
 /// Return a function which takes three pointer arguments and does a
 /// retaining initWithCopy on the first two: it loads a pointer from
 /// the second, retains it, and stores that in the first.
-static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
+static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM,
+                                                     Atomicity atomicity) {
   auto *ptrPtrTy = IGM.PtrTy;
   llvm::Type *argTys[] = { ptrPtrTy, ptrPtrTy, IGM.WitnessTablePtrTy };
-  return IGM.getOrCreateHelperFunction("__swift_initWithCopy_strong",
+  auto name = atomicity == Atomicity::NonAtomic
+                  ? "__swift_initWithCopy_nonatomic_strong"
+                  : "__swift_initWithCopy_strong";
+  return IGM.getOrCreateHelperFunction(name,
                                        ptrPtrTy, argTys,
                                        [&](IRGenFunction &IGF) {
     auto it = IGF.CurFn->arg_begin();
@@ -763,7 +775,7 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
     Address src(&*(it++), IGM.RefCountedPtrTy, IGM.getPointerAlignment());
 
     llvm::Value *newValue = IGF.Builder.CreateLoad(src, "new");
-    IGF.emitNativeStrongRetain(newValue, IGF.getDefaultAtomicity());
+    IGF.emitNativeStrongRetain(newValue, atomicity);
     IGF.Builder.CreateStore(newValue, dest);
 
     IGF.Builder.CreateRet(dest.getAddress());
@@ -771,15 +783,18 @@ static llvm::Constant *getInitWithCopyStrongFunction(IRGenModule &IGM) {
 }
 
 /// Return a function which takes two pointer arguments, loads a
-/// pointer from the first, and calls swift_release on it immediately.
-static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM) {
+/// pointer from the first, and releases it immediately.
+static llvm::Constant *getDestroyStrongFunction(IRGenModule &IGM,
+                                                Atomicity atomicity) {
   llvm::Type *argTys[] = { IGM.Int8PtrPtrTy, IGM.WitnessTablePtrTy };
+  auto name = atomicity == Atomicity::NonAtomic
+                  ? "__swift_destroy_nonatomic_strong"
+                  : "__swift_destroy_strong";
   return IGM.getOrCreateHelperFunction(
-      "__swift_destroy_strong", IGM.VoidTy, argTys, [&](IRGenFunction &IGF) {
+      name, IGM.VoidTy, argTys, [&](IRGenFunction &IGF) {
         Address arg(&*IGF.CurFn->arg_begin(), IGM.Int8PtrTy,
                     IGM.getPointerAlignment());
-        IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg),
-                                    IGF.getDefaultAtomicity());
+        IGF.emitNativeStrongRelease(IGF.Builder.CreateLoad(arg), atomicity);
         IGF.Builder.CreateRetVoid();
       });
 }
@@ -1037,6 +1052,12 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
   };
 
+  bool usesStandardStrongWitnesses =
+      concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal);
+  auto strongAtomicity = concreteTI.usesNonAtomicReferenceCounting()
+                             ? Atomicity::NonAtomic
+                             : IGM.getDefaultAtomicity();
+
   // Copyable and noncopyable types share a value witness table layout. It
   // should normally be statically impossible to generate a call to a copy
   // value witness, but if somebody manages to dynamically get hold of metadata
@@ -1052,8 +1073,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::Destroy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return addFunction(getDestroyStrongFunction(IGM));
+    } else if (usesStandardStrongWitnesses) {
+      return addFunction(getDestroyStrongFunction(IGM, strongAtomicity));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
@@ -1079,8 +1100,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     if (packing == FixedPacking::OffsetZero) {
       if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return addFunction(getMemCpyFunction(IGM, concreteTI));
-      } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-        return addFunction(getInitWithCopyStrongFunction(IGM));
+      } else if (usesStandardStrongWitnesses) {
+        return addFunction(getInitWithCopyStrongFunction(IGM, strongAtomicity));
       }
     }
 
@@ -1139,8 +1160,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return addFunction(getAssignWithCopyStrongFunction(IGM));
+    } else if (usesStandardStrongWitnesses) {
+      return addFunction(getAssignWithCopyStrongFunction(IGM, strongAtomicity));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
@@ -1166,8 +1187,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::AssignWithTake:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return addFunction(getAssignWithTakeStrongFunction(IGM));
+    } else if (usesStandardStrongWitnesses) {
+      return addFunction(getAssignWithTakeStrongFunction(IGM, strongAtomicity));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
@@ -1193,8 +1214,8 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::InitializeWithCopy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-      return addFunction(getInitWithCopyStrongFunction(IGM));
+    } else if (usesStandardStrongWitnesses) {
+      return addFunction(getInitWithCopyStrongFunction(IGM, strongAtomicity));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
       auto ty = boundGenericCharacteristics ? boundGenericCharacteristics->concreteType : concreteType;
@@ -1505,7 +1526,8 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
       break;
     }
   } else if (fixedTI->isSingleRetainablePointer(ResilienceExpansion::Maximal,
-                                                &refCounting)) {
+                                                &refCounting) &&
+             !fixedTI->usesNonAtomicReferenceCounting()) {
     switch (refCounting) {
     case ReferenceCounting::Native:
       witnessSurrogate = C.TheNativeObjectType;

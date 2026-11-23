@@ -3609,13 +3609,24 @@ public:
     (void) getDirectlyInheritedNominalTypeDecls(decl, inverses, anyObject);
 
     for (auto ip : inverses) {
-      if (decl->canSuppressInvertible(ip))
+      if (!decl->canSuppressInvertible(ip)) {
+        ctx.Diags.diagnose(decl->getLoc(),
+                           diag::inverse_on_class,
+                           getProtocolName(getKnownProtocolKind(ip)),
+                           decl->isAnyActor());
         continue;
+      }
 
-      ctx.Diags.diagnose(decl->getLoc(),
-                         diag::inverse_on_class,
-                         getProtocolName(getKnownProtocolKind(ip)),
-                         decl->isAnyActor());
+      // Only a root class can be ~Transferable; subclasses inherit it.
+      if (ip == InvertibleProtocolKind::Transferable) {
+        if (auto *superclassDecl = decl->getSuperclassDecl()) {
+          if (superclassDecl->canConformTo(ip) !=
+              TypeDecl::CanBeInvertible::Never)
+            ctx.Diags.diagnose(decl->getLoc(),
+                               diag::transferable_inverse_on_subclass,
+                               decl, superclassDecl);
+        }
+      }
     }
   }
 
@@ -4599,6 +4610,7 @@ public:
   void checkDeclCommon(Decl *D) {
     checkAccessControl(D);
     TypeChecker::checkIsolatedConfromancesInDecl(D);
+    TypeChecker::checkSendingTransferabilityInDecl(D);
   }
 };
 } // end anonymous namespace

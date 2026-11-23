@@ -1066,6 +1066,29 @@ FunctionType *ConstraintSystem::adjustFunctionTypeForConcurrency(
     }
   }
 
+  // A partially applied instance method captures its base, so it can't be
+  // transferred if the base can't be.
+  if (isa<AbstractFunctionDecl>(decl) && decl->isInstanceMember() &&
+      numApplies < decl->getNumCurryLevels()) {
+    ASSERT(baseType);
+    auto baseObjTy =
+        simplifyType(baseType->getRValueType()->getMetatypeInstanceType());
+    auto *referenceTy = adjustedTy->getResult()->castTo<FunctionType>();
+
+    std::optional<AnyFunctionType::ExtInfo> newExtInfo;
+    if (baseObjTy->hasTypeVariable())
+      newExtInfo = referenceTy->getExtInfo().withTypeDependency(
+          TypeDependenceKind::Transferable, baseObjTy);
+    else if (!baseObjTy->isTransferable())
+      newExtInfo = referenceTy->getExtInfo().withNonTransferable();
+
+    if (newExtInfo) {
+      adjustedTy = FunctionType::get(adjustedTy->getParams(), /* yields */ {},
+                                     referenceTy->withExtInfo(*newExtInfo),
+                                     adjustedTy->getExtInfo());
+    }
+  }
+
   return adjustedTy->castTo<FunctionType>();
 }
 

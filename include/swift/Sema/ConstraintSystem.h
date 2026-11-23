@@ -2542,6 +2542,12 @@ public:
   bool resolveClosure(TypeVariableType *typeVar, Type contextualType,
                       ConstraintLocatorBuilder locator);
 
+  /// Bind the type variable that stands for whether \p closure is
+  /// Transferable, if it has one, to the types of its captures.
+  /// This is done once constraints are generated for (or solved in)
+  /// the body of the closure.
+  void resolveClosureTransferability(ClosureExpr *closure);
+
   /// Used by the above to update isolatedParams and record a change in
   /// the trail.
   void recordIsolatedParam(ParamDecl *param);
@@ -3167,6 +3173,13 @@ public:
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
                                   ConstraintLocatorBuilder locator);
+
+  /// Match the @nontransferable bit between two functions.
+  SolutionKind matchFunctionTransferability(FunctionType *func1,
+                                            FunctionType *func2,
+                                            ConstraintKind kind,
+                                            TypeMatchOptions flags,
+                                            ConstraintLocatorBuilder locator);
 
   /// Subroutine of \c matchTypes(), which matches up two function
   /// types.
@@ -4437,6 +4450,7 @@ class TypeVarRefCollector : public ASTWalker {
   ConstraintLocator *Locator;
 
   SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
+  llvm::SmallSetVector<VarDecl *, 4> ReferencedVars;
   unsigned DCDepth = 0;
 
 public:
@@ -4464,6 +4478,10 @@ public:
 
   ArrayRef<TypeVariableType *> getTypeVars() const {
     return TypeVars.getArrayRef();
+  }
+
+  ArrayRef<VarDecl *> getReferencedVars() const {
+    return ReferencedVars.getArrayRef();
   }
 };
 
