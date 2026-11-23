@@ -3481,6 +3481,8 @@ llvm::Error SILDeserializer::readSILInstruction(
     ResultInst = Builder.createCopyableToMoveOnlyWrapperAddr(Loc, op);
     break;
   }
+  case SILInstructionKind::ValueToAddressInst:
+    llvm_unreachable("not supported");
   case SILInstructionKind::EndAccessInst: {
     SILValue op = getLocalValue(
         Builder.maybeGetFunction(), ValID,

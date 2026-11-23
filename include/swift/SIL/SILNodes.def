@@ -383,6 +383,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(PointerToAddressInst, pointer_to_address,
                       SingleValueInstruction, None, DoesNotRelease)
+    SINGLE_VALUE_INST(ValueToAddressInst, value_to_address,
+                      SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedRefCastInst, unchecked_ref_cast,
                       SingleValueInstruction, None, DoesNotRelease)
     SINGLE_VALUE_INST(UncheckedAddrCastInst, unchecked_addr_cast,

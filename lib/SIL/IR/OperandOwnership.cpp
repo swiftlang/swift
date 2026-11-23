@@ -353,6 +353,7 @@ OPERAND_OWNERSHIP(ForwardingConsume, Thunk)
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
 OPERAND_OWNERSHIP(InteriorPointer, RefTailAddr)
 OPERAND_OWNERSHIP(InteriorPointer, OpenExistentialBox)
+OPERAND_OWNERSHIP(AnyInteriorPointer, ValueToAddress)
 OPERAND_OWNERSHIP(InstantaneousUse, HopToExecutor)
 OPERAND_OWNERSHIP(PointerEscape, ExtractExecutor)
 

@@ -4227,6 +4227,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::ValueToAddressInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!Val->getType().isObject()) {
+      P.diagnose(InstLoc.getSourceLoc(), diag::sil_operand_not_object,
+                 "operand", OpcodeName);
+      return true;
+    }
+
+    ResultVal = B.createValueToAddress(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::LoadInst: {
     std::optional<LoadOwnershipQualifier> Qualifier;
     SourceLoc AddrLoc;
