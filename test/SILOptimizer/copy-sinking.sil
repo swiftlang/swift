@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -copy-sinking %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -copy-sinking %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -126,8 +126,10 @@ bb3(%8 : @owned $C, %9 : @owned $C):
 // CHECK-NEXT:    br bb3(%1, %1)
 // CHECK:       bb3({{%.*}} : @guaranteed $C, [[P:%.*]] : @guaranteed $C):
 // CHECK-NEXT:    [[BF:%.*]] = borrowed [[P]] from (%1, %0)
+// CHECK-NEXT:    borrowed {{%.*}} from (%1, %0)
+// CHECK-NEXT:    fix_lifetime
 // CHECK-NEXT:    [[C:%.*]] = copy_value [[BF]]
-// CHECK:         return [[C]]
+// CHECK-NEXT:    return [[C]]
 // CHECK:       } // end sil function 'sink_copies_of_guaranteed_phi'
 sil [ossa] @sink_copies_of_guaranteed_phi : $@convention(thin) (@guaranteed C, @guaranteed C) -> @owned C {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
@@ -142,7 +144,7 @@ bb2:
   br bb3(%1, %4)
 
 bb3(%6 : @guaranteed $C, %7 : @owned $C):
-  %8 = borrowed %6 from ()
+  %8 = borrowed %6 from (%1, %0)
   fix_lifetime %8
   return %7
 }
@@ -159,8 +161,8 @@ bb3(%6 : @guaranteed $C, %7 : @owned $C):
 // CHECK-NEXT:    br bb3([[B2]], [[B2]])
 // CHECK:       bb3([[RB:%.*]] : @reborrow $C, [[P:%.*]] : @guaranteed $C):
 // CHECK-NEXT:    [[BF:%.*]] = borrowed [[P]] from ([[RB]])
-// CHECK-NEXT:    [[BFRB:%.*]] = borrowed [[RB]] from (%0)
 // CHECK-NEXT:    [[C:%.*]] = copy_value [[BF]]
+// CHECK-NEXT:    [[BFRB:%.*]] = borrowed [[RB]] from (%0)
 // CHECK-NEXT:    end_borrow [[BFRB]]
 // CHECK:         return [[C]]
 // CHECK:       } // end sil function 'sink_copies_of_reborrow_phi'

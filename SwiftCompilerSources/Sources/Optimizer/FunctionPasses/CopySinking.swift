@@ -197,54 +197,32 @@ let copySinking = FunctionPass(name: "copy-sinking") {
     return
   }
 
-  var changed = false
-
   for block in function.blocks {
     if !context.continueWithNextSubpassRun(for: block.terminator) {
       return
     }
 
     for arg in block.arguments.reversed() {
-      if let phi = Phi(arg) {
-        if trySinkCopiesOverPhi(phi: phi, context) {
-          changed = true
-        } else if trySinkCopiesOfPhiOverPhi(phi: phi, context) {
-          changed = true
-        }
+      if let phi = Phi(arg), !trySinkCopiesOverPhi(phi: phi, context) {
+        trySinkCopiesOfPhiOverPhi(phi: phi, context)
       }
     }
-    if sinkCopiesToTheirUses(in: block, context) {
-      changed = true
-    }
-    if sinkCopiesIntoSuccessors(of: block, context) {
-      changed = true
-    }
+    sinkCopiesToTheirUses(in: block, context)
+    sinkCopiesIntoSuccessors(of: block, context)
     switch block.terminator {
     case let switchEnum as SwitchEnumInst:
-      if trySinkCopiesOver(terminator: switchEnum, context) {
-        changed = true
-      }
+      trySinkCopiesOver(terminator: switchEnum, context)
     case let cast as CheckedCastBranchInst:
-      if tryRemoveCopyOfOwnedValue(consumedBy: cast, context) {
-        changed = true
-        break
-      }
-      guard cast.preservesReferenceCounts else {
-        break
-      }
-      if trySinkCopiesOver(terminator: cast, context) {
-        changed = true
+      if !tryRemoveCopyOfOwnedValue(consumedBy: cast, context) && cast.preservesReferenceCounts {
+        trySinkCopiesOver(terminator: cast, context)
       }
     default:
       break
     }
   }
-
-  if changed {
-    updateBorrowedFrom(in: function, context)
-  }
 }
 
+@discardableResult
 private func sinkCopiesToTheirUses(in block: BasicBlock, _ context: FunctionPassContext) -> Bool {
   var changed = false
   // Iterate in reverse order, so that moving a copy doesn't affect the iteration.
@@ -265,6 +243,7 @@ private func sinkCopiesToTheirUses(in block: BasicBlock, _ context: FunctionPass
 /// Sinks `copy_value`s of guaranteed values and `load [copy]`s in `block` into the successor block
 /// which dominates all their uses, if on the paths through the other successors the copy is only
 /// destroyed (case 6 in the pass description).
+@discardableResult
 private func sinkCopiesIntoSuccessors(of block: BasicBlock, _ context: FunctionPassContext) -> Bool {
   guard block.successors.count >= 2 else {
     return false
@@ -409,12 +388,17 @@ private func trySinkCopiesOverPhi(phi: Phi, _ context: FunctionPassContext) -> B
   }
 
   phi.value.set(ownership: .guaranteed, context)
-  let newCopy = Builder(atBeginOf: phi.value.parentBlock, context).createCopyValue(operand: phi.value)
-  phi.value.uses.ignore(user: newCopy).replaceAll(with: newCopy, context)
+  // Create the `borrowed` instruction right away, because subsequent transformations in this pass need
+  // to compute the borrow introducers of the new copy's source.
+  updateBorrowedFrom(for: CollectionOfOne(phi), context)
+  let borrowedFrom = phi.borrowedFrom!
+  let newCopy = Builder(after: borrowedFrom, context).createCopyValue(operand: borrowedFrom)
+  borrowedFrom.uses.ignore(user: newCopy).replaceAll(with: newCopy, context)
 
   return true
 }
 
+@discardableResult
 private func trySinkCopiesOfPhiOverPhi(phi: Phi, _ context: FunctionPassContext) -> Bool {
   let block = phi.value.parentBlock
   var copiedFrom: Phi? = nil
@@ -464,6 +448,7 @@ private extension Value {
   }
 }
 
+@discardableResult
 private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruction & TermInst,
                                _ context: FunctionPassContext) -> Bool
 {
@@ -599,7 +584,6 @@ private func sourceIsAlive(of copy: CopyValueInst,
 
   return liveRange.isFullyContainedIn(scopeOf: copy.fromValue, context)
 }
-
 
 private func extendBorrowScope(of value: Value,
                                from copy: SingleValueInstruction,
