@@ -51,7 +51,7 @@ final class Expectation: @unchecked Sendable {
 
 @MainActor func testUnfoldingInitAnyError() {
   // `onCancel` is missing from the `Failure == any Error` overload.
-  // `adopts` will use the new typed throws overload to supply an `onCancel` closure.
+  // Adopters will use the new typed throws overload to supply an `onCancel` closure.
   _ = AsyncThrowingStream<Void, Error>.init(unfolding: {})
   _ = AsyncThrowingStream.init(unfolding: {
     return Void()
