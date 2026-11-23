@@ -1326,8 +1326,8 @@ extension Type {
   }
 }
 
-/// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
-/// `copy_addr` and `load`-`store`-pairs.
+/// Used by LoopInvariantCodeMotion, TempLValueElimination and TempRValueElimination to make the optimization work
+/// by both, `copy_addr` and `load`-`store`-pairs.
 protocol CopyLikeInstruction: Instruction {
   var sourceAddress: Value { get }
   var destinationAddress: Value { get }
