@@ -29,9 +29,9 @@ in separate processes:
 The background processes that nothing waits for soon run at a lower priority.
 The steps after SetupDependencies.ps1 log to
 <BinaryCache>\BuildMulti\<name>.log. This script prints the log of the step
-that it waits for as the step writes it, and the logs of the background
-processes in one piece once they end, between lines of the other logs, so that
-they do not interleave. When nothing was printed for a minute, it prints the
+that it waits for as the step writes it, and the log of each background
+process in one piece once the process ended and that step is done, so that no
+log is split by another. When nothing was printed for a minute, it prints the
 last line that the processes that it waits for logged. After a failure, it
 also prints the logs of the processes that it stops. At the end, after the
 summary, it prints the lines of the logs of the processes that failed that
@@ -359,9 +359,10 @@ function Complete-BuildJob([PSCustomObject] $Job) {
 $JobHeartbeat = [TimeSpan]::FromMinutes(1)
 
 # Waits for background jobs, printing the log of $Follow as it is written, and
-# the logs of the other jobs that end meanwhile, and throws if any of the jobs
-# that it waited for failed. It reports the jobs that it waits for when nothing
-# was printed for a while, so that the build does not look stuck.
+# the logs of the other jobs that end meanwhile, after it so that they do not
+# split it, and throws if any of the jobs that it waited for failed. It reports
+# the jobs that it waits for when nothing was printed for a while, so that the
+# build does not look stuck.
 function Wait-BuildJobs([Object[]] $Wait, [PSCustomObject] $Follow = $null) {
   $Heartbeat = [DateTime]::Now + $JobHeartbeat
   while ($true) {
@@ -369,7 +370,9 @@ function Wait-BuildJobs([Object[]] $Wait, [PSCustomObject] $Follow = $null) {
     if ($Follow -and (Write-BuildJobOutput $Follow)) {
       $Heartbeat = [DateTime]::Now + $JobHeartbeat
     }
-    Write-EndedBuildJobs
+    if (-not $Follow) {
+      Write-EndedBuildJobs
+    }
     if (-not $Running) { break }
 
     if ([DateTime]::Now -ge $Heartbeat) {
@@ -383,6 +386,7 @@ function Wait-BuildJobs([Object[]] $Wait, [PSCustomObject] $Follow = $null) {
   }
   if ($Follow) {
     Write-BuildJobLog $Follow
+    Write-EndedBuildJobs
   }
 
   $Failed = @()
@@ -498,8 +502,8 @@ function Write-BuildJobFailures {
 }
 
 # Runs one of the build scripts like Invoke-BuildScript, but in the background,
-# so that this script prints its log as it runs, with the logs of the jobs that
-# end meanwhile between its lines.
+# so that this script prints its log as it runs, then the logs of the jobs that
+# ended meanwhile.
 function Invoke-FollowedBuildScript([string] $Name, [string] $Script, [Hashtable] $Overrides = @{}) {
   Record-OperationTime $BuildPlatform $Name {
     $Job = Start-BuildJob $Name $Script $Overrides -Followed
