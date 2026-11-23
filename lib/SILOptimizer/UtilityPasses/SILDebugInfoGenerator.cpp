@@ -151,6 +151,8 @@ class SILDebugInfoGenerator : public SILModuleTransform {
             }
             if (auto *ASI = dyn_cast<AllocStackInst>(I))
               ASI->invalidateVarInfo();
+            else if (auto *ABI = dyn_cast<AllocBoxInst>(I))
+              ABI->invalidateVarInfo();
 
             SILLocation Loc = I->getLoc();
             auto *filePos = SILLocation::FilenameAndLocation::alloc(
