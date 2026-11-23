@@ -1589,3 +1589,44 @@ bb5(%13 : $()):
   %14 = builtin "add_Word"(%5 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Word
   br bb1(%14 : $Builtin.Word)
 }
+
+// The terminator of the early exit uses the stack allocation, so unrolling
+// would merge the per-iteration allocations with a phi.
+// CHECK-LABEL: sil [ossa] @dont_unroll_loop_with_terminator_using_alloc_ref_stack :
+// CHECK:         = alloc_ref [stack]
+// CHECK-NOT:     = alloc_ref [stack]
+// CHECK-LABEL: } // end sil function 'dont_unroll_loop_with_terminator_using_alloc_ref_stack'
+sil [ossa] @dont_unroll_loop_with_terminator_using_alloc_ref_stack : $@convention(thin) () -> () {
+bb0:
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = integer_literal $Builtin.Word, 3
+  %5 = function_ref @pred : $@convention(thin) () -> Builtin.Int1
+  br bb1(%1 : $Builtin.Word)
+
+bb1(%6 : $Builtin.Word):
+  %7 = alloc_ref [stack] $B
+  %8 = apply %5() : $@convention(thin) () -> Builtin.Int1
+  cond_br %8, bb2, bb3
+
+bb2:
+  br bb5(%7 : $B)
+
+bb3:
+  dealloc_ref %7 : $B
+  dealloc_stack_ref %7 : $B
+  %12 = builtin "add_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Word
+  %13 = builtin "cmp_eq_Word"(%12 : $Builtin.Word, %3 : $Builtin.Word) : $Builtin.Int1
+  cond_br %13, bb4, bb6
+
+bb4:
+  %16 = tuple ()
+  return %16 : $()
+
+bb6:
+  br bb1(%12 : $Builtin.Word)
+
+bb5(%20 : @owned $B):
+  dealloc_ref %20 : $B
+  unreachable
+}
