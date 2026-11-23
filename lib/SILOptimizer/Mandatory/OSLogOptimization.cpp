@@ -424,6 +424,18 @@ static std::optional<SymbolicValue> collectConstants(FoldState &foldState) {
     // Initialize string info from this instruction if possible.
     foldState.stringInfo.extractStringInfoFromInstruction(currInst);
 
+    // The memory of an indirect result is uninitialized before the call, so
+    // its alloc_stack can be evaluated lazily. AddressLowering may place that
+    // alloc_stack before the beginning of the interpolation, where it would
+    // otherwise never be evaluated.
+    if (auto *apply = dyn_cast<ApplyInst>(currInst)) {
+      for (SILValue result : apply->getIndirectSILResults()) {
+        auto *alloc = dyn_cast<AllocStackInst>(result);
+        if (alloc && !constantEvaluator.lookupConstValue(alloc))
+          constantEvaluator.evaluate(alloc->getIterator());
+      }
+    }
+
     std::optional<SymbolicValue> errorInfo = std::nullopt;
     std::optional<SILBasicBlock::iterator> nextI = std::nullopt;
 
