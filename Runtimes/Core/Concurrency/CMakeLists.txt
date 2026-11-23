@@ -133,6 +133,7 @@ target_compile_options(swift_Concurrency PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature IsolatedAny>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BackDeployFrozenValueTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   # NOTE: enable the async frame pointer on Darwin to faciliate debugging.
   $<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:C,CXX>>:-fswift-async-fp=always>
   "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -swift-async-frame-pointer=always>"
