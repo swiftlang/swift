@@ -1469,3 +1469,76 @@ bb0(%0 : $*B, %1 : $B):
   return %r
 }
 
+
+class CastBase {}
+
+final class CastSibling1 : CastBase {
+  @_hasStorage var x: Int
+}
+
+final class CastSibling2 : CastBase {
+  @_hasStorage var y: Int
+}
+
+final class CastSibling3 : CastBase {
+  @_hasStorage var z: Int32
+}
+
+// Properties of sibling classes with the same field index are different properties, even if the
+// class references are derived from the same root value.
+// CHECK-LABEL: sil @dont_forward_sibling_class_property_same_type :
+// CHECK:         [[C1:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling1
+// CHECK:         [[X:%.*]] = ref_element_addr [[C1]] : $CastSibling1, #CastSibling1.x
+// CHECK:         load [[X]]
+// CHECK:         [[C2:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling2
+// CHECK:         [[Y:%.*]] = ref_element_addr [[C2]] : $CastSibling2, #CastSibling2.y
+// CHECK:         load [[Y]]
+// CHECK-LABEL: } // end sil function 'dont_forward_sibling_class_property_same_type'
+sil @dont_forward_sibling_class_property_same_type : $@convention(thin) (@guaranteed CastBase) -> (Int, Int) {
+bb0(%0 : $CastBase):
+  %1 = unconditional_checked_cast %0 to CastSibling1
+  %2 = ref_element_addr %1, #CastSibling1.x
+  %3 = load %2
+  %4 = unconditional_checked_cast %0 to CastSibling2
+  %5 = ref_element_addr %4, #CastSibling2.y
+  %6 = load %5
+  %7 = tuple (%3, %6)
+  return %7
+}
+
+// CHECK-LABEL: sil @dont_forward_sibling_class_property_different_type :
+// CHECK:         [[C1:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling1
+// CHECK:         [[X:%.*]] = ref_element_addr [[C1]] : $CastSibling1, #CastSibling1.x
+// CHECK:         load [[X]]
+// CHECK:         [[C3:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling3
+// CHECK:         [[Z:%.*]] = ref_element_addr [[C3]] : $CastSibling3, #CastSibling3.z
+// CHECK:         load [[Z]]
+// CHECK-LABEL: } // end sil function 'dont_forward_sibling_class_property_different_type'
+sil @dont_forward_sibling_class_property_different_type : $@convention(thin) (@guaranteed CastBase) -> (Int, Int32) {
+bb0(%0 : $CastBase):
+  %1 = unconditional_checked_cast %0 to CastSibling1
+  %2 = ref_element_addr %1, #CastSibling1.x
+  %3 = load %2
+  %4 = unconditional_checked_cast %0 to CastSibling3
+  %5 = ref_element_addr %4, #CastSibling3.z
+  %6 = load %5
+  %7 = tuple (%3, %6)
+  return %7
+}
+
+// The same property, accessed via two casts, can be forwarded.
+// CHECK-LABEL: sil @forward_same_class_property_via_casts :
+// CHECK:         load
+// CHECK-NOT:     load
+// CHECK-LABEL: } // end sil function 'forward_same_class_property_via_casts'
+sil @forward_same_class_property_via_casts : $@convention(thin) (@guaranteed CastBase) -> (Int, Int) {
+bb0(%0 : $CastBase):
+  %1 = unconditional_checked_cast %0 to CastSibling1
+  %2 = ref_element_addr %1, #CastSibling1.x
+  %3 = load %2
+  %4 = unconditional_checked_cast %0 to CastSibling1
+  %5 = ref_element_addr %4, #CastSibling1.x
+  %6 = load %5
+  %7 = tuple (%3, %6)
+  return %7
+}
