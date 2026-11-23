@@ -9,6 +9,11 @@ struct DoesNotConformToProtocol {
   int returnFortyTwo() { return 42; }
 };
 
+struct HasStaticFactory {
+  int value;
+  static HasStaticFactory make() { return {42}; }
+};
+
 struct DummyStruct {};
 
 struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
