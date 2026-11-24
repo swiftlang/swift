@@ -12,6 +12,10 @@ with the Stage1 compilers and the macros that BuildToolchain.ps1 -Mode Bootstrap
 built. Installs them in the platform root of the image, and the Windows runtime
 next to the toolchain.
 
+The architectures install some files to the same paths, so builds of different
+architectures that run at the same time need their own platform roots, which
+can be merged afterwards.
+
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
 been cloned.
@@ -41,9 +45,18 @@ The architectures to build the SDK for: X64, X86 and Arm64 for Windows, and
 aarch64, armv7, i686 and x86_64 for Android.
 Default: the architecture of the host for Windows, all of them for Android.
 
+.PARAMETER SupportedArchitectures
+The architectures that the SDK settings list, when other invocations build the
+other architectures.
+Default: Architectures
+
 .PARAMETER LinkModes
 The kinds of runtime libraries to build: dynamic, static or both.
 Default: dynamic, static
+
+.PARAMETER PlatformRoot
+The directory of the platform to install the SDK into.
+Default: <BuildRoot>\Program Files\Swift\Platforms\<Platform>.platform
 
 .PARAMETER EnableCaching
 Enable build caching using LLVM CAS to speed up rebuilds.
@@ -98,8 +111,10 @@ param
   [ValidateSet("Windows", "Android")]
   [string] $Platform = "Windows",
   [string[]] $Architectures = @(),
+  [string[]] $SupportedArchitectures = @(),
   [ValidatePattern("^(dynamic|static)(,(dynamic|static))*$")]
   [string[]] $LinkModes = @("dynamic", "static"),
+  [string] $PlatformRoot = "",
 
   [switch] $EnableCaching,
 
@@ -126,6 +141,8 @@ $WindowsSxSAssemblyPublicKeyToken = $WindowsSxSAssemblyPublicKeyToken.ToLowerInv
 # Work around limitations of cmd passing in array arguments via powershell.exe -File
 if ($Architectures.Length -eq 1) { $Architectures = $Architectures[0].Split(",") }
 
+if ($SupportedArchitectures.Length -eq 1) { $SupportedArchitectures = $SupportedArchitectures[0].Split(",") }
+
 if ($LinkModes.Length -eq 1) { $LinkModes = $LinkModes[0].Split(",") }
 
 if ($UseHostToolchain -is [string]) {
@@ -143,6 +160,10 @@ if (-not $Architectures) {
     Windows { if ($HostArchName -eq "ARM64") { @("Arm64") } else { @("X64") } }
     Android { @("aarch64", "armv7", "i686", "x86_64") }
   }
+}
+
+if (-not $SupportedArchitectures) {
+  $SupportedArchitectures = $Architectures
 }
 
 if ($OS -eq [OS]::Android -and ($HostPlatform -ne $KnownPlatforms["WindowsX64"])) {
@@ -172,14 +193,23 @@ function Get-AndroidSDKBuilds([string[]] $Architectures) {
   })
 }
 
-# The architectures to build.
+# The architectures to build, and the ones that the SDK supports.
 if ($OS -eq [OS]::Windows) {
   $SDKBuilds = @(Get-WindowsSDKBuilds $Architectures)
+  $SupportedSDKBuilds = @(Get-WindowsSDKBuilds $SupportedArchitectures)
 } else {
   $SDKBuilds = @(Get-AndroidSDKBuilds $Architectures)
+  $SupportedSDKBuilds = @(Get-AndroidSDKBuilds $SupportedArchitectures)
 }
 foreach ($Build in $SDKBuilds) {
   $Build.LinkModes = $LinkModes
+}
+
+# Install into -PlatformRoot when it is set.
+if ($PlatformRoot) {
+  function Get-PlatformRoot([OS] $OS) {
+    return $PlatformRoot
+  }
 }
 
 # ds2 and its generator build with the compilers of the host, like the tools in
@@ -195,6 +225,22 @@ function Get-FlexExecutable {
 
 function Get-BisonExecutable {
   return (Get-DependencyManifest).FlexBison.Bison
+}
+
+# Runs a block while no other build script runs a block of the same name.
+function Invoke-Exclusively([string] $Name, [ScriptBlock] $Block) {
+  $Mutex = New-Object System.Threading.Mutex($false, "Global\swift-build-$Name")
+  try {
+    try {
+      [void]$Mutex.WaitOne()
+    } catch [System.Threading.AbandonedMutexException] {
+      # The previous owner died; the mutex is ours now.
+    }
+    & $Block
+  } finally {
+    $Mutex.ReleaseMutex()
+    $Mutex.Dispose()
+  }
 }
 
 function ConvertTo-ThickLayout([Hashtable] $Platform, [string] $Resources, [string[]] $Filter) {
@@ -551,13 +597,13 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
       $SDKSettings.SupportedTargets.windows.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.windows.LLVMTargetSys = "windows"
       $SDKSettings.SupportedTargets.windows.LLVMTargetTripleEnvironment = "msvc"
-      $SDKSettings.SupportedTargets.windows.Archs = $SDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.windows.Archs = $SupportedSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
     Android {
       $SDKSettings.SupportedTargets.android.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.android.LLVMTargetSys = "linux"
       $SDKSettings.SupportedTargets.android.LLVMTargetTripleEnvironment = "android${AndroidAPILevel}"
-      $SDKSettings.SupportedTargets.android.Archs = $SDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      $SDKSettings.SupportedTargets.android.Archs = $SupportedSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
     }
   }
   $SDKSettings | ConvertTo-JSON -Depth 4 | Out-FIle -FilePath "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\SDKSettings.json"
@@ -793,15 +839,19 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
 
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
+  # TODO: remove this once the migration is completed. Resync writes into the
+  # source tree, which the builds of other architectures share.
+  Invoke-Exclusively "Resync" {
+    Invoke-IsolatingEnvVars {
+      Invoke-VsDevShell $BuildPlatform
+
+      Push-Location "${SourceCache}\swift\Runtimes"
+      $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+      $CMakeBin = (Get-CMake).Path
+      Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+      Pop-Location
+    }
   }
 
   Invoke-IsolatingEnvVars {
@@ -1277,7 +1327,10 @@ function Build-Inspect([Hashtable] $Platform,
 try {
 
 if ($IncludeDS2) {
-  Invoke-BuildStep Build-RegsGen2 $BuildPlatform
+  # The builds of the other platforms share the build tree of this tool.
+  Invoke-Exclusively "RegsGen2" {
+    Invoke-BuildStep Build-RegsGen2 $BuildPlatform
+  }
 }
 
 if ($OS -eq [OS]::Windows) {
