@@ -32,8 +32,8 @@ func test(nc1: borrowing NC) throws {
 
 // CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion17testLocalVariableyyF : $@convention(thin) () -> () {
 // CHECK: [[NC_STACK:%.*]] = alloc_stack [lexical] [var_decl] $NC, let, name "nc1"
+// CHECK: [[NC:%.*]] = apply
 // CHECK: [[CLOSURE:%.*]] = function_ref @$s33once_attr_closure_stack_promotion17testLocalVariableyyFyyXEfU_
-// CHECK: [[NC:%.*]] = load [[NC_STACK]]
 // CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_once] [[CLOSURE]]([[NC]]) : $@convention(thin) (@guaranteed NC) -> ()
 // CHECK: [[DEP:%.*]] = mark_dependence [[PA]] on [[NC]]
 // CHECK: [[CALLEE:%.*]] = function_ref @$s33once_attr_closure_stack_promotion17calledExactlyOnceyyyyXEnF

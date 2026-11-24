@@ -1,0 +1,117 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %t/test.sil -I %t -enable-experimental-cxx-interop -redundant-load-elimination | %FileCheck %s
+
+// Test that RLE doesn't try to split a struct with unreferenceable storage.
+
+//--- module.modulemap
+
+module CXXModule {
+  header "cxx-header.h"
+  requires cplusplus
+}
+
+//--- cxx-header.h
+
+struct __attribute__((swift_attr("import_reference")))
+       __attribute__((swift_attr("retain:retainRefCounted")))
+       __attribute__((swift_attr("release:releaseRefCounted"))) RefCounted {
+  int refCount;
+};
+
+void retainRefCounted(RefCounted *_Nonnull);
+void releaseRefCounted(RefCounted *_Nonnull);
+
+// A loadable, non-trivial struct which has unreferenceable storage (because of the bitfield).
+struct NonTrivialWithBitfield {
+  RefCounted *_Nonnull ref;
+  int bits : 3;
+};
+
+//--- test.sil
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import CXXModule
+
+// CHECK-LABEL: sil [ossa] @take_field_of_stored_struct :
+// CHECK:         store %0 to [init] [[S:%.*]] :
+// CHECK:         [[F:%.*]] = struct_element_addr [[S]]
+// CHECK:         [[L:%.*]] = load [take] [[F]]
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'take_field_of_stored_struct'
+sil [ossa] @take_field_of_stored_struct : $@convention(thin) (@owned NonTrivialWithBitfield) -> @owned RefCounted {
+bb0(%0 : @owned $NonTrivialWithBitfield):
+  %1 = alloc_stack $NonTrivialWithBitfield
+  store %0 to [init] %1
+  %3 = struct_element_addr %1, #NonTrivialWithBitfield.ref
+  %4 = load [take] %3
+  dealloc_stack %1
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_field_of_stored_struct :
+// CHECK:         store %0 to [init] [[S:%.*]] :
+// CHECK:         [[F:%.*]] = struct_element_addr [[S]]
+// CHECK:         destroy_addr [[F]]
+// CHECK-LABEL: } // end sil function 'destroy_field_of_stored_struct'
+sil [ossa] @destroy_field_of_stored_struct : $@convention(thin) (@owned NonTrivialWithBitfield) -> () {
+bb0(%0 : @owned $NonTrivialWithBitfield):
+  %1 = alloc_stack $NonTrivialWithBitfield
+  store %0 to [init] %1
+  %3 = struct_element_addr %1, #NonTrivialWithBitfield.ref
+  destroy_addr %3
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @take_field_of_loaded_struct :
+// CHECK:         [[C:%.*]] = load [copy] %0
+// CHECK:         [[F:%.*]] = struct_element_addr %0
+// CHECK:         [[L:%.*]] = load [take] [[F]]
+// CHECK:         tuple ([[C]] : {{.*}}, [[L]] : {{.*}})
+// CHECK-LABEL: } // end sil function 'take_field_of_loaded_struct'
+sil [ossa] @take_field_of_loaded_struct : $@convention(thin) (@in NonTrivialWithBitfield) -> (@owned NonTrivialWithBitfield, @owned RefCounted) {
+bb0(%0 : $*NonTrivialWithBitfield):
+  %1 = load [copy] %0
+  %2 = struct_element_addr %0, #NonTrivialWithBitfield.ref
+  %3 = load [take] %2
+  %4 = tuple (%1, %3)
+  return %4
+}
+
+// A `load [copy]` doesn't need to split the available value. It can still be optimized.
+// CHECK-LABEL: sil [ossa] @copy_field_of_stored_struct :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[E:%.*]] = struct_extract [[B]] : $NonTrivialWithBitfield, #NonTrivialWithBitfield.ref
+// CHECK:         [[C:%.*]] = copy_value [[E]]
+// CHECK-NOT:     load
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_field_of_stored_struct'
+sil [ossa] @copy_field_of_stored_struct : $@convention(thin) (@owned NonTrivialWithBitfield) -> @owned RefCounted {
+bb0(%0 : @owned $NonTrivialWithBitfield):
+  %1 = alloc_stack $NonTrivialWithBitfield
+  store %0 to [init] %1
+  %3 = struct_element_addr %1, #NonTrivialWithBitfield.ref
+  %4 = load [copy] %3
+  destroy_addr %1
+  dealloc_stack %1
+  return %4
+}
+
+// A `destroy_addr` of a struct with unreferenceable storage cannot be split.
+// CHECK-LABEL: sil [ossa] @dont_split_destroy_addr :
+// CHECK:         store %1 to [assign] %2
+// CHECK-NEXT:    destroy_addr %0 : $*NonTrivialWithBitfield
+// CHECK-LABEL: } // end sil function 'dont_split_destroy_addr'
+sil [ossa] @dont_split_destroy_addr : $@convention(thin) (@in NonTrivialWithBitfield, @owned RefCounted) -> () {
+bb0(%0 : $*NonTrivialWithBitfield, %1 : @owned $RefCounted):
+  %2 = struct_element_addr %0, #NonTrivialWithBitfield.ref
+  store %1 to [assign] %2
+  destroy_addr %0
+  %4 = tuple ()
+  return %4
+}

@@ -58,6 +58,11 @@ struct X {
   init()
 }
 
+class RefHolder {
+  var c : B
+  init()
+}
+
 struct Agg2 {
   var t : (Builtin.Int64, Builtin.Int32)
 }
@@ -157,6 +162,12 @@ sil @use_a : $@convention(thin) (A) -> ()
 sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
 sil @consumeB : $@convention(thin) (@owned B) -> ()
+sil @getB : $@convention(thin) (@owned B) -> @owned B
+sil @useB : $@convention(thin) (@guaranteed B) -> ()
+sil @writeB : $@convention(thin) (@inout B) -> ()
+sil @useX : $@convention(thin) (@guaranteed X) -> ()
+sil @throwingWriteB : $@convention(thin) (@inout B) -> (@owned B, @error Error)
+sil @writeHolder : $@convention(thin) (@guaranteed RefHolder) -> ()
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -1215,6 +1226,21 @@ bb0(%0 : @owned $B, %1 : @guaranteed $B, %2 : @guaranteed $B):
   return %7
 }
 
+// CHECK-LABEL: sil [ossa] @destroy_addr :
+// CHECK:         %1 = alloc_stack $B
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    dealloc_stack %1
+// CHECK-LABEL: } // end sil function 'destroy_addr'
+sil [ossa] @destroy_addr : $@convention(thin) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = alloc_stack $B
+  store %0 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
 // CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
 sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
@@ -1634,9 +1660,9 @@ bb0(%0 : $UInt64):
 
 // CHECK-LABEL: sil [ossa] @struct_of_optional_none :
 // CHECK:         [[E:%.*]] = enum
-// CHECK:         [[S:%.*]] = struct $S ([[E]] : $Optional<String>)
-// CHECK:         [[F:%.*]] = struct_extract [[S]] : $S, #S.e
-// CHECK:         return [[F]]
+// CHECK-NOT:     struct $S
+// CHECK-NOT:     destructure_struct
+// CHECK:         return [[E]]
 // CHECK-LABEL: } // end sil function 'struct_of_optional_none'
 sil [ossa] @struct_of_optional_none : $@convention(thin) () -> @owned Optional<String> {
 bb0:
@@ -1652,9 +1678,9 @@ bb0:
 
 // CHECK-LABEL: sil [ossa] @tuple_of_optional_none :
 // CHECK:         [[E:%.*]] = enum
-// CHECK:         [[T:%.*]] = tuple ([[E]] : $Optional<String>, %0 : $Int)
-// CHECK:         [[F:%.*]] = tuple_extract [[T]] : $(Optional<String>, Int), 0
-// CHECK:         return [[F]]
+// CHECK-NOT:     tuple (
+// CHECK-NOT:     destructure_tuple
+// CHECK:         return [[E]]
 // CHECK-LABEL: } // end sil function 'tuple_of_optional_none'
 sil [ossa] @tuple_of_optional_none : $@convention(thin) (Int) -> @owned Optional<String> {
 bb0(%0 : $Int):
@@ -1808,7 +1834,6 @@ bb0(%0 : @owned $NC, %1 : @owned $AnyObject):
 // CHECK-NEXT:    ([[A:%.*]], [[B:%.*]]) = destructure_struct [[DD]]
 // CHECK:         [[BADDR:%.*]] = struct_element_addr %1 : $*NC, #NC.b
 // CHECK:         store [[B]] to [trivial] [[BADDR]]
-// CHECK:           = struct_element_addr %1 : $*NC, #NC.a
 // CHECK:         [[AADDR:%.*]] = struct_element_addr %1 : $*NC, #NC.a
 // CHECK:         store %2 to [init] [[AADDR]]
 // CHECK:         return [[A]]
@@ -1881,4 +1906,598 @@ bb0(%0 : $*AccessorOuter, %1 : $Int):
   %11 = load [trivial] %10
   %12 = tuple (%4, %11)
   return %12
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_and_debug_value :
+// CHECK-NOT:      store
+// CHECK-NOT:      load
+// CHECK:          return %0
+// CHECK-LABEL: } // end sil function 'load_take_and_debug_value'
+sil [ossa] @load_take_and_debug_value : $@convention(thin) (@owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $AnyObject):
+  %1 = alloc_stack $AnyObject
+  store %0 to [init] %1
+  debug_value %1, var, name "x", expr op_deref
+  %4 = load [take] %1
+  dealloc_stack %1
+  return %4
+}
+
+
+// A `load [take]` which is not preceded by an available value can still be hoisted to the
+// begin of its liverange - which is the function entry here - if this allows to remove
+// `load_borrow`s.
+// CHECK-LABEL: sil [ossa] @hoist_load_take_over_load_borrows :
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         [[B1:%.*]] = begin_borrow [[L]]
+// CHECK:         end_borrow [[B1]]
+// CHECK:         [[B2:%.*]] = begin_borrow [[L]]
+// CHECK:         end_borrow [[B2]]
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_take_over_load_borrows'
+sil [ossa] @hoist_load_take_over_load_borrows : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %2
+  %5 = load_borrow %0
+  %6 = apply %1(%5) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %5
+  %8 = load [take] %0
+  %9 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@owned B) -> ()
+  %11 = alloc_ref $B
+  store %11 to [init] %0
+  %13 = tuple ()
+  return %13
+}
+
+// Same as above, but for a `load [copy]`.
+// CHECK-LABEL: sil [ossa] @hoist_load_copy_over_load_borrow :
+// CHECK:         [[L:%.*]] = load [copy] %0
+// CHECK:         [[B:%.*]] = begin_borrow [[L]]
+// CHECK:         end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_copy_over_load_borrow'
+sil [ossa] @hoist_load_copy_over_load_borrow : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %2
+  %5 = load [copy] %0
+  %6 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8
+}
+
+// The begin of the liverange is the instruction which overwrites the memory.
+// CHECK-LABEL: sil [ossa] @hoist_load_take_to_overwriting_instruction :
+// CHECK:         apply {{%[0-9]+}}(%0) : $@convention(thin) (@inout B) -> ()
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK:         [[B:%.*]] = begin_borrow [[L]]
+// CHECK:         end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_take_to_overwriting_instruction'
+sil [ossa] @hoist_load_take_to_overwriting_instruction : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout B) -> ()
+  %3 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %4 = load_borrow %0
+  %5 = apply %3(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4
+  %7 = load [take] %0
+  %8 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned B) -> ()
+  %10 = alloc_ref $B
+  store %10 to [init] %0
+  %12 = tuple ()
+  return %12
+}
+
+// The removed `load_borrow` loads a projected address of the hoisted `load [take]`.
+// CHECK-LABEL: sil [ossa] @hoist_load_take_over_projected_load_borrow :
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         [[B:%.*]] = begin_borrow [[L]]
+// CHECK-NEXT:    [[E:%.*]] = struct_extract [[B]] : $X, #X.c
+// CHECK-NEXT:    apply {{%[0-9]+}}([[E]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         destroy_value [[L]]
+// CHECK-LABEL: } // end sil function 'hoist_load_take_over_projected_load_borrow'
+sil [ossa] @hoist_load_take_over_projected_load_borrow : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = struct_element_addr %0, #X.c
+  %3 = load_borrow %2
+  %4 = apply %1(%3) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %3
+  %6 = load [take] %0
+  destroy_value %6
+  %8 = alloc_ref $B
+  %9 = struct $X (%8 : $B)
+  store %9 to [init] %0
+  %11 = tuple ()
+  return %11
+}
+
+// The `load [take]` is hoisted to the function entry, which is in a different block than
+// the removed `load_borrow`.
+// CHECK-LABEL: sil [ossa] @hoist_load_take_over_load_borrow_in_other_block :
+// CHECK:       bb0(%0 : $*B, %1 : $Builtin.Int1):
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK:       bb1:
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[L]]
+// CHECK:         end_borrow [[B]]
+// CHECK:       bb3:
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_take_over_load_borrow_in_other_block'
+sil [ossa] @hoist_load_take_over_load_borrow_in_other_block : $@convention(thin) (@inout B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $Builtin.Int1):
+  %2 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = load_borrow %0
+  %5 = apply %2(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = load [take] %0
+  %10 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@owned B) -> ()
+  %12 = alloc_ref $B
+  store %12 to [init] %0
+  %14 = tuple ()
+  return %14
+}
+
+// Without a `load_borrow` in the liverange there is nothing to gain by hoisting the load.
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_take_without_load_borrow :
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}(%0) : $@convention(thin) (@inout B) -> ()
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}(%0) : $@convention(thin) (@inout B) -> ()
+// CHECK:         load [take] %0
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_take_without_load_borrow'
+sil [ossa] @dont_hoist_load_take_without_load_borrow : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout B) -> ()
+  %3 = apply %1(%0) : $@convention(thin) (@inout B) -> ()
+  %4 = load [take] %0
+  %5 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@owned B) -> ()
+  %7 = alloc_ref $B
+  store %7 to [init] %0
+  %9 = tuple ()
+  return %9
+}
+
+// The address cannot be re-materialized at the begin of the liverange - the function entry
+// here - because the base of the access is not available at that point.
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_take_if_base_not_available :
+// CHECK:         load_borrow
+// CHECK:         end_borrow
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_take_if_base_not_available'
+sil [ossa] @dont_hoist_load_take_if_base_not_available : $@convention(thin) (@guaranteed RefHolder) -> () {
+bb0(%0 : @guaranteed $RefHolder):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = ref_element_addr %0, #RefHolder.c
+  %3 = load_borrow %2
+  %4 = apply %1(%3) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %3
+  %6 = load [take] %2
+  %7 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned B) -> ()
+  %9 = alloc_ref $B
+  store %9 to [init] %2
+  %11 = tuple ()
+  return %11
+}
+
+// It does not matter that the base of the access is only valid within a local ownership
+// scope: the border of the liverange is always covered by that scope, because it is located
+// between the base address and the load.
+// CHECK-LABEL: sil [ossa] @hoist_load_take_with_local_ownership_base :
+// CHECK:         apply {{%[0-9]+}}(%0) : $@convention(thin) (@guaranteed RefHolder) -> ()
+// CHECK-NEXT:    [[L:%.*]] = load [take] %1
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[L]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}([[L]])
+// CHECK-LABEL: } // end sil function 'hoist_load_take_with_local_ownership_base'
+sil [ossa] @hoist_load_take_with_local_ownership_base : $@convention(thin) (@guaranteed RefHolder) -> () {
+bb0(%0 : @guaranteed $RefHolder):
+  %1 = ref_element_addr %0, #RefHolder.c
+  %2 = function_ref @writeHolder : $@convention(thin) (@guaranteed RefHolder) -> ()
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed RefHolder) -> ()
+  %4 = load_borrow %1
+  end_borrow %4
+  %6 = load [take] %1
+  %7 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned B) -> ()
+  %9 = alloc_ref $B
+  store %9 to [init] %1
+  %11 = tuple ()
+  return %11
+}
+
+// A `load_borrow` cannot be replaced with a value which is re-loaded at the liverange border,
+// because that would not remove any `load_borrow`.
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_borrow_to_liverange_border :
+// CHECK:         load_borrow %0
+// CHECK:         apply {{%[0-9]+}}(%0) : $@convention(thin) (@inout B) -> ()
+// CHECK:         load_borrow %0
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_borrow_to_liverange_border'
+sil [ossa] @dont_hoist_load_borrow_to_liverange_border : $@convention(thin) (@inout B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $Builtin.Int1):
+  %2 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = load_borrow %0
+  %5 = apply %2(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4
+  br bb3
+
+bb2:
+  %8 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %9 = apply %8(%0) : $@convention(thin) (@inout B) -> ()
+  br bb3
+
+bb3:
+  %11 = load_borrow %0
+  %12 = apply %2(%11) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %11
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_from_preceding_load_borrow :
+// CHECK:         [[L:%.*]] = load_borrow %2
+// CHECK-NEXT:    [[UO:%.*]] = unchecked_ownership [[L]]
+// CHECK:         end_borrow [[L]]
+// CHECK:         load_borrow %8 : $*B, value_hint [[UO]]
+// CHECK-LABEL: } // end sil function 'load_borrow_from_preceding_load_borrow'
+sil [ossa] @load_borrow_from_preceding_load_borrow : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = begin_access [read] [dynamic] %0
+  %3 = load_borrow %2
+  %4 = apply %1(%3) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %3
+  end_access %2
+  %7 = begin_access [read] [dynamic] %0
+  %8 = load_borrow %7
+  %9 = apply %1(%8) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %8
+  end_access %7
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_from_preceding_projected_load_borrow :
+// CHECK:         [[L:%.*]] = load_borrow %0
+// CHECK-NEXT:    [[UO:%.*]] = unchecked_ownership [[L]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[UO]] : $X, #X.c
+// CHECK:         end_borrow [[L]]
+// CHECK:         load_borrow {{%[0-9]+}} : $*B, value_hint [[SE]]
+// CHECK-LABEL: } // end sil function 'load_borrow_from_preceding_projected_load_borrow'
+sil [ossa] @load_borrow_from_preceding_projected_load_borrow : $@convention(thin) (@inout X) -> () {
+bb0(%0 : $*X):
+  %1 = function_ref @useX : $@convention(thin) (@guaranteed X) -> ()
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed X) -> ()
+  end_borrow %2
+  %5 = struct_element_addr %0, #X.c
+  %6 = load_borrow %5
+  %7 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %6
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @dont_load_borrow_from_overwritten_load_borrow :
+// CHECK:         load_borrow %0 : $*B
+// CHECK:         load_borrow %0 : $*B
+// CHECK-NOT:     value_hint
+// CHECK-LABEL: } // end sil function 'dont_load_borrow_from_overwritten_load_borrow'
+sil [ossa] @dont_load_borrow_from_overwritten_load_borrow : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %2
+  %5 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@inout B) -> ()
+  %7 = load_borrow %0
+  %8 = apply %1(%7) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %7
+  %10 = tuple ()
+  return %10
+}
+
+// The memory must be re-initialized before the overwriting instruction, even if that
+// instruction is the first one of its block.
+// CHECK-LABEL: sil [ossa] @store_back_before_overwriting_first_instruction :
+// CHECK:       bb0(%0 : $*B, %1 : $Builtin.Int1):
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK:       bb1:
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[L]]
+// CHECK:         br bb3([[L]] : $B)
+// CHECK:       bb2:
+// CHECK-NEXT:    store [[L]] to [init] %0
+// CHECK-NEXT:    apply {{%[0-9]+}}(%0) : $@convention(thin) (@inout B) -> ()
+// CHECK-NEXT:    [[L2:%.*]] = load [take] %0
+// CHECK-NEXT:    br bb3([[L2]] : $B)
+// CHECK-LABEL: } // end sil function 'store_back_before_overwriting_first_instruction'
+sil [ossa] @store_back_before_overwriting_first_instruction : $@convention(thin) (@inout B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $Builtin.Int1):
+  %2 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %3 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = load_borrow %0
+  %6 = apply %3(%5) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %5
+  br bb3
+
+bb2:
+  %9 = apply %2(%0) : $@convention(thin) (@inout B) -> ()
+  br bb3
+
+bb3:
+  %11 = load [take] %0
+  %12 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (@owned B) -> ()
+  %14 = alloc_ref $B
+  store %14 to [init] %0
+  %16 = tuple ()
+  return %16
+}
+
+// The successors of an overwriting terminator are not liverange exits: the value is dead in the
+// error block, because the memory is stored back before the `try_apply`.
+// CHECK-LABEL: sil [ossa] @no_exit_after_overwriting_terminator :
+// CHECK:       bb0(%0 : $*B, %1 : $Builtin.Int1):
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK:       bb2:
+// CHECK-NEXT:    store [[L]] to [init] %0
+// CHECK:         try_apply
+// CHECK:       bb4({{%[0-9]+}} : @owned $any Error):
+// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'no_exit_after_overwriting_terminator'
+sil [ossa] @no_exit_after_overwriting_terminator : $@convention(thin) (@inout B, Builtin.Int1) -> () {
+bb0(%0 : $*B, %1 : $Builtin.Int1):
+  %2 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = load_borrow %0
+  %5 = apply %2(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4
+  br bb5
+
+bb2:
+  %8 = function_ref @throwingWriteB : $@convention(thin) (@inout B) -> (@owned B, @error Error)
+  try_apply %8(%0) : $@convention(thin) (@inout B) -> (@owned B, @error Error), normal bb3, error bb4
+
+bb3(%10 : @owned $B):
+  destroy_value %10
+  br bb5
+
+bb4(%12 : @owned $Error):
+  destroy_value %12
+  unreachable
+
+bb5:
+  %15 = load [take] %0
+  %16 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %17 = apply %16(%15) : $@convention(thin) (@owned B) -> ()
+  %18 = alloc_ref $B
+  store %18 to [init] %0
+  %20 = tuple ()
+  return %20
+}
+
+// An overwriting terminator must not get a border on a successor which begins with an
+// available value: that store provides the value for this path already.
+// CHECK-LABEL: sil [ossa] @no_border_on_successor_with_available_value :
+// CHECK:       bb1([[A:%.*]] : @owned $B):
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    br bb3([[A]] : $B)
+// CHECK:       bb2({{%[0-9]+}} : @owned $any Error):
+// CHECK-NEXT:    [[L:%.*]] = load [take] %0
+// CHECK-LABEL: } // end sil function 'no_border_on_successor_with_available_value'
+sil [ossa] @no_border_on_successor_with_available_value : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = function_ref @throwingWriteB : $@convention(thin) (@inout B) -> (@owned B, @error Error)
+  try_apply %1(%0) : $@convention(thin) (@inout B) -> (@owned B, @error Error), normal bb1, error bb2
+
+bb1(%3 : @owned $B):
+  store %3 to [assign] %0
+  br bb3
+
+bb2(%6 : @owned $Error):
+  destroy_value %6
+  %8 = load_borrow %0
+  %9 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %8
+  br bb3
+
+bb3:
+  %13 = load [take] %0
+  %14 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (@owned B) -> ()
+  %16 = alloc_ref $B
+  store %16 to [init] %0
+  %18 = tuple ()
+  return %18
+}
+
+// Access scope instructions don't read or write memory. They must not prevent a `load [take]`
+// from being replaced with the value of a preceding store in another access scope.
+// CHECK-LABEL: sil [ossa] @take_across_access_scopes :
+// CHECK:         begin_access [modify] [dynamic] %1
+// CHECK-NEXT:    destroy_addr
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    begin_access [modify] [dynamic] %1
+// CHECK-NEXT:    alloc_ref
+// CHECK-NEXT:    store
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    return %0
+// CHECK-LABEL: } // end sil function 'take_across_access_scopes'
+sil [ossa] @take_across_access_scopes : $@convention(thin) (@owned B, @inout B) -> @owned B {
+bb0(%0 : @owned $B, %1 : $*B):
+  %2 = begin_access [modify] [dynamic] %1
+  store %0 to [assign] %2
+  end_access %2
+  %5 = begin_access [modify] [dynamic] %1
+  %6 = load [take] %5
+  %7 = alloc_ref $B
+  store %7 to [init] %5
+  end_access %5
+  return %6
+}
+
+// A `load_borrow` from a non-aliasing memory location must not prevent the `load [take]` from
+// being replaced.
+// CHECK-LABEL: sil [ossa] @take_across_unrelated_load_borrow :
+// CHECK-NOT:     load [take]
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'take_across_unrelated_load_borrow'
+sil [ossa] @take_across_unrelated_load_borrow : $@convention(thin) (@owned B, @inout B, @inout B) -> @owned B {
+bb0(%0 : @owned $B, %1 : $*B, %2 : $*B):
+  store %0 to [assign] %1
+  %4 = load_borrow %2
+  %5 = function_ref @useB : $@convention(thin) (@guaranteed B) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed B) -> ()
+  end_borrow %4
+  %8 = load [take] %1
+  %9 = alloc_ref $B
+  store %9 to [init] %1
+  return %8
+}
+
+// The available `load [copy]` is located in a read access scope. Turning it into a `load [take]`
+// would mutate memory which is protected from mutation by that scope.
+// CHECK-LABEL: sil [ossa] @dont_take_in_read_access_scope :
+// CHECK:         load [copy]
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'dont_take_in_read_access_scope'
+sil [ossa] @dont_take_in_read_access_scope : $@convention(thin) (@inout B) -> @owned B {
+bb0(%0 : $*B):
+  %1 = begin_access [read] [dynamic] %0
+  %2 = load [copy] %1
+  end_access %1
+  %4 = begin_access [modify] [dynamic] %0
+  %5 = load [take] %4
+  destroy_value %5
+  %7 = alloc_ref $B
+  store %7 to [init] %4
+  end_access %4
+  return %2
+}
+
+// The only liverange exit block begins with the `end_access` of the access scope which is used as
+// materialization base. The re-initializing store can still be inserted there - just before the
+// `end_access`.
+// CHECK-LABEL: sil [ossa] @take_in_loop_with_exit_at_end_access :
+// CHECK:         br bb1(%0 : $B)
+// CHECK:       bb1(%{{[0-9]+}} : @owned $B):
+// CHECK-NOT:     load [take]
+// CHECK:       bb3:
+// CHECK-NEXT:    store %{{[0-9]+}} to [init] %2
+// CHECK-NEXT:    end_access %2
+// CHECK-LABEL: } // end sil function 'take_in_loop_with_exit_at_end_access'
+sil [ossa] @take_in_loop_with_exit_at_end_access : $@convention(thin) (@owned B, @inout B) -> () {
+bb0(%0 : @owned $B, %1 : $*B):
+  %2 = begin_access [modify] [dynamic] %1
+  store %0 to [assign] %2
+  br bb1
+
+bb1:
+  %4 = load [take] %2
+  %5 = function_ref @getB : $@convention(thin) (@owned B) -> @owned B
+  %6 = apply %5(%4) : $@convention(thin) (@owned B) -> @owned B
+  store %6 to [init] %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  end_access %2
+  %10 = tuple ()
+  return %10
+}
+
+// The materialization base is a `project_box` of an owned box. Re-creating the address at the
+// liverange border is not supported for such a base.
+// CHECK-LABEL: sil [ossa] @dont_hoist_load_take_with_box_base :
+// CHECK:         load_borrow %1
+// CHECK:         load [take] %1
+// CHECK-LABEL: } // end sil function 'dont_hoist_load_take_with_box_base'
+sil [ossa] @dont_hoist_load_take_with_box_base : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var B }
+  %1 = project_box %0, 0
+  %2 = alloc_ref $B
+  store %2 to [init] %1
+  %4 = function_ref @writeB : $@convention(thin) (@inout B) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout B) -> ()
+  %6 = load_borrow %1
+  end_borrow %6
+  %8 = load [take] %1
+  %9 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %10 = apply %9(%8) : $@convention(thin) (@owned B) -> ()
+  %11 = alloc_ref $B
+  store %11 to [init] %1
+  destroy_value %0
+  %14 = tuple ()
+  return %14
+}
+
+// A `destroy_addr` of a trivial type is not optimized.
+// CHECK-LABEL: sil [ossa] @dont_optimize_trivial_destroy_addr :
+// CHECK:         store %0 to [trivial] %1
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-LABEL: } // end sil function 'dont_optimize_trivial_destroy_addr'
+sil [ossa] @dont_optimize_trivial_destroy_addr : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %5 = tuple ()
+  return %5
+}
+
+// A store of `undef` doesn't provide an available value.
+// CHECK-LABEL: sil [ossa] @dont_forward_stored_undef :
+// CHECK:         [[L:%.*]] = load [trivial] %0
+// CHECK-NEXT:    return [[L]]
+// CHECK-LABEL: } // end sil function 'dont_forward_stored_undef'
+sil [ossa] @dont_forward_stored_undef : $@convention(thin) (@inout Int) -> Int {
+bb0(%0 : $*Int):
+  store undef to [trivial] %0
+  %2 = load [trivial] %0
+  return %2
 }

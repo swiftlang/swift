@@ -836,10 +836,9 @@ class FailableDerivedClass : FailableBaseClass {
 // CHECK:       bb0([[SELF:%.*]] : $FailableDerivedClass):
 // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack [var_decl] $FailableDerivedClass
 // CHECK:         store [[SELF]] to [[SELF_BOX]]
-// CHECK:         [[LD:%.*]] = load [[SELF_BOX]]
 // CHECK:         [[CANARY_FUN:%.*]] = function_ref @$s35definite_init_failable_initializers6CanaryCACycfC :
 // CHECK:         [[CANARY:%.*]] = apply [[CANARY_FUN]](
-// CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr [[LD]]
+// CHECK-NEXT:    [[MEMBER_ADDR:%.*]] = ref_element_addr [[SELF]]
 // CHECK-NEXT:    [[WRITE:%.*]] = begin_access [init] [static] [[MEMBER_ADDR]] : $*Canary
 // CHECK-NEXT:    store [[CANARY]] to [[WRITE]]
 // CHECK-NEXT:    end_access [[WRITE]] : $*Canary
