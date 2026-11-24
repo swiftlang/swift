@@ -83,6 +83,11 @@ struct SILDebugVariable {
   /// or nullptr if we don't have one.
   VarDecl *getDecl() const;
 
+  /// The type described by the fragments of `DIExpr`, narrowed from `Type`.
+  /// Returns null if the fragments or type is invalid.
+  /// TODO: Use `Type` directly once fragments are removed.
+  std::optional<SILType> getFragmentType(SILFunction &F) const;
+
   // DIExpr is compared (and hashed) so that, e.g., different fragments of the
   // same source variable are distinct keys.  Use withoutDIExpr() to compare
   // just the underlying variable.

@@ -752,8 +752,9 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
     bridged.DebugValue_getDecl().getAs(VarDecl.self)
   }
 
+  // The debug variable cannot be nil for a DebugValueInst.
   public var debugVariable: DebugVariable? {
-    return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
+    return bridged.DebugValue_getVarInfo()
   }
 
   /// The type of the variable: the stored variable type, the return type of the debug

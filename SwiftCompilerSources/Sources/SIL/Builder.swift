@@ -525,6 +525,12 @@ public struct Builder {
     return notifyNew(bridged.createDebugValue(value.bridged, debugVariable).getAs(DebugValueInst.self))
   }
 
+  /// Creates a debug value which describes `debugVariable` as optimized out. The variable must have a type.
+  @discardableResult
+  public func createKilledDebugValue(debugVariable: DebugVariableInstruction.DebugVariable) -> DebugValueInst {
+    return notifyNew(bridged.createKilledDebugValue(debugVariable).getAs(DebugValueInst.self))
+  }
+
   @discardableResult
   public func createDebugStep() -> DebugStepInst {
     return notifyNew(bridged.createDebugStep().getAs(DebugStepInst.self))

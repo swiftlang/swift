@@ -666,6 +666,22 @@ DebugValueInst *SILBuilder::createDebugValue(SILLocation Loc,
                                        moved, trace));
 }
 
+DebugValueInst *
+SILBuilder::createKilledDebugValue(SILLocation Loc, SILDebugVariable Var,
+                                   UsesMoveableValueDebugInfo_t wasMoved) {
+  SILFunction &F = getFunction();
+  std::optional<SILType> type = Var.getFragmentType(F);
+  ASSERT(type && "The fragments must match the variable type");
+
+  DebugValueInst *debugValue =
+      createDebugValue(Loc, SILUndef::get(F, *type), Var, wasMoved);
+  if (!debugValue)
+    return nullptr;
+  // Rewrite the undef placeholder to use an undef of the correct type.
+  debugValue->killOperand(0, *type);
+  return debugValue;
+}
+
 DebugValueInst *SILBuilder::createVoidVariableDebugValue(
     SILLocation Loc, SILDebugVariable Var,
     UsesMoveableValueDebugInfo_t wasMoved, bool trace) {

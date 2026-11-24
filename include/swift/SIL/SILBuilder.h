@@ -1108,6 +1108,12 @@ public:
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false);
 
+  /// Create a debug_value which describes \p Var as optimized out. \p Var must
+  /// be complete.
+  DebugValueInst *createKilledDebugValue(
+      SILLocation Loc, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo);
+
   /// Create a debug_value for an undef empty tuple. Used when the type of the
   /// variable cannot be represented.
   DebugValueInst *createVoidVariableDebugValue(
