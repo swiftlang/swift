@@ -1084,6 +1084,27 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     // be the initialization point.
     if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand))
       operand = c->getOperand();
+
+    // Under opaque values, an address-only argument that has not been address
+    // lowered yet is an object, and its address is formed with
+    // `value_to_address`. Its convention is still the function type's `@in` or
+    // `@in_guaranteed`, so it is initialized for the whole function exactly
+    // like the in/in_guaranteed arguments below.
+    if (auto *vta = dyn_cast<ValueToAddressInst>(operand)) {
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(vta->getOperand())) {
+        auto convention = fArg->getArgumentConvention();
+        if (convention == swift::SILArgumentConvention::Indirect_In ||
+            convention ==
+                swift::SILArgumentConvention::Indirect_In_Guaranteed) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "Found value_to_address of an opaque in/in_guaranteed "
+                        "argument... adding mark_unresolved_non_copyable_value "
+                        "as init!\n");
+          return true;
+        }
+      }
+    }
+
     if (auto *fArg = dyn_cast<SILFunctionArgument>(operand)) {
       switch (fArg->getArgumentConvention()) {
       case swift::SILArgumentConvention::Indirect_In:
