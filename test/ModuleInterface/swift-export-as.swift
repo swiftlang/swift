@@ -7,7 +7,7 @@
 
 /// Build exportee.
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -export-as PublicLib \
 // RUN:   -o %t/PrivateLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/PrivateLib.swiftinterface \
@@ -20,7 +20,7 @@
 
 /// Build exporter.
 // RUN: %target-swift-frontend -emit-module %t/PublicLib.swift -I %t \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -o %t/PublicLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/PublicLib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/PublicLib.private.swiftinterface
@@ -32,7 +32,7 @@
 
 /// Build client.
 // RUN: %target-swift-frontend -emit-module %t/ClientLib.swift -I %t \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -o %t/ClientLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/ClientLib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientLib.private.swiftinterface
@@ -44,7 +44,7 @@
 /// Build client against private swiftinterfaces.
 // RUN: rm -f %t/PrivateLib.swiftmodule %t/PublicLib.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/ClientLib.swift -I %t \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -o %t/ClientLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/ClientLib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientLib.private.swiftinterface
@@ -56,7 +56,7 @@
 /// Build client against public swiftinterfaces, for the same result.
 // RUN: rm -f %t/PrivateLib.private.swiftinterface %t/PublicLib.private.swiftinterface
 // RUN: %target-swift-frontend -emit-module %t/ClientLib.swift -I %t \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -o %t/ClientLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/ClientLib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/ClientLib.private.swiftinterface

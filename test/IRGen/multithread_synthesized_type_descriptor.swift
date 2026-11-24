@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Multi-threaded WMO: emit one LLVM module per source file. The macro-attached
 // type (and thus the synthesized nested `Cases` type) lives in a file that is

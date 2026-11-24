@@ -3,7 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: cp -r %S/Inputs/lib-templates/* %t/
 
-// RUN: %target-swift-frontend -enable-cross-import-overlays -I %t/lib/swift -typecheck %s -module-name main -swift-version 5 -emit-loaded-module-trace-path - | %FileCheck %s
+// RUN: %target-swift-frontend -enable-cross-import-overlays -I %t/lib/swift -typecheck %s -module-name main -emit-loaded-module-trace-path - | %FileCheck %s
 
 import DeclaringLibrary
 import BystandingLibrary

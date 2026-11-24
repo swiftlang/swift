@@ -2,11 +2,11 @@
 // include Error, such as `any Error & AnyObject` and `any Base & Error`.
 // RUN: %empty-directory(%t)
 //
-// RUN: %target-build-swift -swift-version 5 -g -Onone -module-name a %s -o %t/a.Onone.out
+// RUN: %target-build-swift -g -Onone -module-name a %s -o %t/a.Onone.out
 // RUN: %target-codesign %t/a.Onone.out
 // RUN: %target-run %t/a.Onone.out
 //
-// RUN: %target-build-swift -swift-version 5 -g -O -module-name a %s -o %t/a.O.out
+// RUN: %target-build-swift -g -O -module-name a %s -o %t/a.O.out
 // RUN: %target-codesign %t/a.O.out
 // RUN: %target-run %t/a.O.out
 //

@@ -10,9 +10,9 @@
 // RUN: %empty-directory(%t/stats)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(UniqueNameMacros) -module-name=UniqueNameMacros %t/UniqueNameMacros.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(UniqueNameMacros) -module-name=UniqueNameMacros %t/UniqueNameMacros.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(UniqueNameMacros) -stats-output-dir %t/stats -fine-grained-timers -print-zero-stats -primary-file %t/a.swift %t/b.swift %t/c.swift %t/macros.swift
+// RUN: %target-swift-frontend -typecheck -load-plugin-library %t/%target-library-name(UniqueNameMacros) -stats-output-dir %t/stats -fine-grained-timers -print-zero-stats -primary-file %t/a.swift %t/b.swift %t/c.swift %t/macros.swift
 
 // Only the primary file's two macros should be resolved, and only its
 // freestanding macro should be expanded.

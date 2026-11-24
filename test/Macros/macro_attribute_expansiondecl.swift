@@ -8,7 +8,6 @@
 
 //#-- Prepare the macro dylib plugin.
 // RUN: %host-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-library -o %t/plugins/%target-library-name(MacroDefinition) \
 // RUN:   -module-name MacroDefinition \
 // RUN:   %t/src/MacroDefinition.swift \

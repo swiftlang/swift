@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-library-evolution -enable-testing
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-testing
+// RUN: %target-typecheck-verify-swift -enable-library-evolution
+// RUN: %target-typecheck-verify-swift -enable-library-evolution -enable-testing
 @inlinable struct TestInlinableStruct {}
 // expected-error@-1 {{'@inlinable' attribute cannot be applied to this declaration}}
 

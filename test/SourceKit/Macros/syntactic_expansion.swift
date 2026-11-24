@@ -49,7 +49,7 @@ struct Generic<Element> {
 // RUN: split-file %s %t
 
 //##-- Prepare the macro plugin.
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/plugins/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/plugins/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: %sourcekitd-test \
 // RUN:   -shell -- echo '### 1' \

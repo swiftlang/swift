@@ -5,7 +5,6 @@
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     -disable-implicit-concurrency-module-import \
 // RUN:     -disable-implicit-string-processing-module-import \
 // RUN:     %s

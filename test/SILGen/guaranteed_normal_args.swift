@@ -204,7 +204,7 @@ public func forwardIntoMemory(fromNative x: AnyObject, y: Builtin.Word) -> Built
 }
 
 public struct StructWithOptionalAddressOnlyField<T> {
-  public let newValue: T?
+  let newValue: T?
 }
 
 func useStructWithOptionalAddressOnlyField<T>(t: T) -> StructWithOptionalAddressOnlyField<T> {

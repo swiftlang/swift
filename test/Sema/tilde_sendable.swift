@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -swift-version 5 -Wwarning ExplicitSendable
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -Wwarning ExplicitSendable
 
 protocol P: ~Sendable { // expected-error {{conformance to 'Sendable' can only be suppressed on structs, classes, and enums}}
 }

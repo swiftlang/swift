@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -swift-version 5 %t/Library.swift -emit-module -module-name Library -o %t -package-name Library 
-// RUN: %target-swift-frontend -swift-version 5 %t/OtherLibrary.swift -emit-module -module-name OtherLibrary -o %t -package-name Library
-// RUN: %target-swift-frontend -swift-version 5 %t/ExternalLibrary.swift -emit-module -module-name ExternalLibrary -o %t
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -module-name Client -verify -swift-version 5 -I %t -package-name Library
+// RUN: %target-swift-frontend %t/Library.swift -emit-module -module-name Library -o %t -package-name Library 
+// RUN: %target-swift-frontend %t/OtherLibrary.swift -emit-module -module-name OtherLibrary -o %t -package-name Library
+// RUN: %target-swift-frontend %t/ExternalLibrary.swift -emit-module -module-name ExternalLibrary -o %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -module-name Client -verify -I %t -package-name Library
 
 //--- Library.swift
 

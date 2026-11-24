@@ -2,12 +2,10 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -typecheck -module-name MyModule \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/MyModule.swiftmodule \
 // RUN:     %t/MyModuleOk.swift -I%t
 
 // RUN: %target-swift-frontend -typecheck -module-name MyModule \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/MyModule.swiftmodule \
 // RUN:     %t/MyModule.swift -I%t \
 // RUN:     -module-alias Mod___MyModule=MyModule

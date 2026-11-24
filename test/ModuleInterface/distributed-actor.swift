@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -module-name Library \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/Library.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface \
 // RUN:     %t/Library.swift
@@ -12,13 +12,11 @@
 
 /// Verify that we can build from the Library.swiftmodule
 // RUN: %target-swift-frontend -typecheck -module-name Client \
-// RUN:     -swift-version 5 \
 // RUN:     %t/Client.swift -I%t
 
 /// Verify what we can build from a swiftinterface, when swiftmodule was deleted
 // RUN: rm %t/Library.swiftmodule
 // RUN: %target-swift-frontend -typecheck -module-name Client \
-// RUN:     -swift-version 5 \
 // RUN:     %t/Client.swift -I%t
 
 // REQUIRES: distributed

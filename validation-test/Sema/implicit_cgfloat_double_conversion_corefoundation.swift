@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature Lifetimes \
 // RUN:     -o %t/lifetime_underscored_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_underscored_dependence.swiftinterface \

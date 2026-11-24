@@ -1,11 +1,11 @@
 // Default: the child group's diagnostic is a warning in language mode 5.
-// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -swift-version 5 -verify -verify-additional-prefix warnonly-
+// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify -verify-additional-prefix warnonly-
 
 // Ensure escalated with `-Werror` on the child group.
-// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -swift-version 5 -Werror SendingRisksDataRace -verify -verify-additional-prefix erronly-
+// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -Werror SendingRisksDataRace -verify -verify-additional-prefix erronly-
 
 // Ensure escalated with `-Werror` on the parent group.
-// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -swift-version 5 -Werror RegionIsolation -verify -verify-additional-prefix erronly-
+// RUN: %target-swift-frontend -emit-sil -o /dev/null %s -target %target-swift-5.1-abi-triple -strict-concurrency=complete -Werror RegionIsolation -verify -verify-additional-prefix erronly-
 
 // REQUIRES: concurrency
 

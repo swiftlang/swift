@@ -5,9 +5,9 @@
 
 /// Build the libraries.
 // RUN: %target-swift-frontend -emit-module %t/PackageImportedLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/PackageLib.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution -I %t \
+// RUN:   -enable-library-evolution -I %t \
 // RUN:   -package-name MyPackage
 
 /// A client in the same package builds fine.

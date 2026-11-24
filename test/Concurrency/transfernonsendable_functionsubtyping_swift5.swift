@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 // READ THIS! This file only contains tests that validate how the relevant
 // function subtyping rules for sending work in swift 5 mode

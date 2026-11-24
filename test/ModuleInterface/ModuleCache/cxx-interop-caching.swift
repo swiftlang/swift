@@ -5,7 +5,7 @@
 // RUN: %target-swift-frontend -parse-stdlib -emit-module \
 // RUN:   -o %t/Lib.swiftmodule %t/Lib.swift \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
-// RUN:   -swift-version 5 -enable-library-evolution -module-name Lib
+// RUN:   -enable-library-evolution -module-name Lib
 
 /// Distributed scenario with only the swiftinterface
 // RUN: rm %t/Lib.swiftmodule

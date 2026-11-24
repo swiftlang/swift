@@ -4,14 +4,14 @@
 /// Middle library WITHOUT clang function types: the serialized cross-reference
 /// to S.fp records a function type with NO Clang type.
 // RUN: %target-swift-frontend -emit-module %t/LibWithXRef.swift -I %t \
-// RUN:   -module-name LibWithXRef -o %t/LibWithXRef.swiftmodule -swift-version 5
+// RUN:   -module-name LibWithXRef -o %t/LibWithXRef.swiftmodule
 
 /// Client WITH clang function types: re-importing S.fp yields a function type
 /// that DOES carry a Clang type. Expected (no cType) vs found (cType present)
 /// differ only in Clang-type presence — the relaxed near-match must tolerate it
 /// instead of aborting deserialization.
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -use-clang-function-types -validate-tbd-against-ir=none -swift-version 5 2>&1 \
+// RUN:   -use-clang-function-types -validate-tbd-against-ir=none 2>&1 \
 // RUN:   | %FileCheck %s --allow-empty
 
 // CHECK-NOT: *** DESERIALIZATION FAILURE ***

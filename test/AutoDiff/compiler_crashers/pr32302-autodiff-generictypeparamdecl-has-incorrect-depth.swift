@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: not --crash %target-build-swift -emit-module -module-name pr32302 -emit-module-path %t/pr32302.swiftmodule -swift-version 5 -c %S/pr32302-autodiff-generictypeparamdecl-has-incorrect-depth.swift
+// RUN: not --crash %target-build-swift -emit-module -module-name pr32302 -emit-module-path %t/pr32302.swiftmodule -c %S/pr32302-autodiff-generictypeparamdecl-has-incorrect-depth.swift
 // XFAIL: *
 
 // pr32302 / pr32343 / pr38745 : reproduce assert with _Differentiation where

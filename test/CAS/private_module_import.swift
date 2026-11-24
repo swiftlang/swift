@@ -13,7 +13,7 @@
 // RUN:   -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   -parse-stdlib \
-// RUN:   %t/TestLib.swift -o %t/deps.json -swift-version 5 \
+// RUN:   %t/TestLib.swift -o %t/deps.json \
 // RUN:   -cache-compile-job -cas-path %t/cas \
 // RUN:   -sdk %t/sdk \
 // RUN:   -I %t/sdk/System/Library/Frameworks/swift \

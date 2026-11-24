@@ -1,7 +1,7 @@
 /// Check that SPI declarations can be exported from an SPI module.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5 -library-level spi
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -library-level spi
 
 @_spi(S) public func spiFunc() {}
 @_spi(S) public class SPIClass {

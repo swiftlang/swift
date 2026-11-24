@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -target %target-swift-5.1-abi-triple
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 protocol P { }
 

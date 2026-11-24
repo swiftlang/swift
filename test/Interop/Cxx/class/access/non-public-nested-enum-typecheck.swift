@@ -35,7 +35,7 @@ extension Base {
     let _: Enum = Base.Enum.Foo
     let _: Base.Enum = Enum.Foo
 
-    switch e {
+    switch e { // expected-warning {{switch covers known cases, but 'Base.Enum' may have additional unknown values; this is an error in the Swift 6 language mode}} expected-note {{handle unknown values using "@unknown default"}}
       case .Bar: return
       case .Foo: return
     }
@@ -55,7 +55,7 @@ func switches() {
     case Base.Enum.Bar: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
     case Base.Enum.Foo: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
   }
-  switch b.makeEnum() {
+  switch b.makeEnum() { // expected-warning {{switch covers known cases, but 'Base.Enum' may have additional unknown values; this is an error in the Swift 6 language mode}} expected-note {{handle unknown values using "@unknown default"}}
     case .Bar: return // OK as long as the user does not refer to Enum itself
     case .Foo: return // (NOTE: arguably this should not be allowed)
   }
@@ -63,7 +63,7 @@ func switches() {
     case Derived.Enum.Bar: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
     case Derived.Enum.Foo: return // expected-error {{'Enum' is inaccessible due to 'private' protection level}}
   }
-  switch d.makeEnum() {
+  switch d.makeEnum() { // expected-warning {{switch covers known cases, but 'Base.Enum' may have additional unknown values; this is an error in the Swift 6 language mode}} expected-note {{handle unknown values using "@unknown default"}}
     case .Bar: return // OK as long as the user does not refer to Enum itself
     case .Foo: return // (NOTE: arguably this should not be allowed)
   }
@@ -108,7 +108,7 @@ extension Derived {
     let _: Enum = Base.Enum.Foo      // expected-error    {{'Enum' is inaccessible due to 'private' protection level}}
     let _: Base.Enum = Enum.Foo      // expected-error    {{'Enum' is inaccessible due to 'private' protection level}}
 
-    switch e {
+    switch e { // expected-warning {{switch covers known cases, but 'Derived.Enum' (aka 'Base.Enum') may have additional unknown values; this is an error in the Swift 6 language mode}} expected-note {{handle unknown values using "@unknown default"}}
       case .Bar: return
       case .Foo: return
     }

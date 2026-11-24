@@ -3,9 +3,9 @@
 
 /// Build 2 libs.
 // RUN: %target-swift-frontend -emit-module %t/empty.swift -o %t/SwiftModuleA.swiftmodule \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/empty.swift -o %t/SwiftModuleB.swiftmodule \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 /// Build a client with and without library-evolution.
 // RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t \
@@ -17,7 +17,7 @@
 /// Some imports are exempt.
 // RUN: %target-swift-frontend -emit-module %t/empty.swift \
 // RUN:   -o %t/CCryptoBoringSSL.swiftmodule \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 // RUN: %target-swift-frontend -typecheck %t/Crypto.swift -I %t -verify \
 // RUN:   -module-name Crypto
 
@@ -26,7 +26,7 @@
 // RUN:   -verify \
 // RUN:   -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes
 // RUN: %target-swift-frontend -typecheck %t/client-resilient.swift -I %t -verify \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 // REQUIRES: swift_feature_SerializeAbstractTypeLayoutForHiddenTypes
 

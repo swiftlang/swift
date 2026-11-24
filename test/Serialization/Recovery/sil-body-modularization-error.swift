@@ -5,21 +5,21 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
-// RUN:   -module-name Lib -o %t/Lib.swiftmodule -swift-version 5
+// RUN:   -module-name Lib -o %t/Lib.swiftmodule
 
 /// Build client fine in the expected behavior.
 // RUN: %target-swift-frontend -c -Onone %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o
+// RUN:   -o %t/Client.o
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o
+// RUN:   -o %t/Client.o
 
 /// Remove the case `b` referenced from the body of `f`.
 // RUN: cp %t/A_Changed.h %t/A.h
 // RUN: not %target-swift-frontend -c -Onone %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o -diagnostic-style llvm 2>&1 \
+// RUN:   -o %t/Client.o -diagnostic-style llvm 2>&1 \
 // RUN:   | %FileCheck %s
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o -diagnostic-style llvm 2>&1 \
+// RUN:   -o %t/Client.o -diagnostic-style llvm 2>&1 \
 // RUN:   | %FileCheck %s
 
 // CHECK: error: reference to declaration 'E.b' broken by a context change; 'E.b' is not found, it was expected to be in 'A'

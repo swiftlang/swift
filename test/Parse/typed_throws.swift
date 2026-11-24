@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
+// RUN: %target-typecheck-verify-swift -module-name test
 
 // Parsing support for typed throws.
 

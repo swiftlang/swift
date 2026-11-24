@@ -124,7 +124,7 @@ class transparentOnClassVar2 {
 @thin  // expected-error {{attribute can only be applied to types, not declarations}}
 func testThinDecl() -> () {}
 
-protocol Class : class {}
+protocol Class : AnyObject {}
 protocol NonClass {}
 
 @objc

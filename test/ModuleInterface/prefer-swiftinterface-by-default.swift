@@ -7,35 +7,35 @@
 /// Setup the SDK and local modules.
 //// SDK module in S/L/F.
 // RUN: %target-swift-frontend -emit-module -module-name SDKModule %t/Empty.swift \
-// RUN:   -enable-library-evolution -swift-version 5 -parse-stdlib \
+// RUN:   -enable-library-evolution -parse-stdlib \
 // RUN:   -emit-module-path %t/sdk/System/Library/Frameworks/SDKModule.framework/Modules/SDKModule.swiftmodule/%target-swiftmodule-name \
 // RUN:   -emit-module-interface-path %t/sdk/System/Library/Frameworks/SDKModule.framework/Modules/SDKModule.swiftmodule/%target-swiftinterface-name
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/System/Library/Frameworks/SDKModule.framework/Modules/SDKModule.swiftmodule/%target-swiftinterface-name) -module-name SDKModule
 
 //// SDK module not in S/L/F.
 // RUN: %target-swift-frontend -emit-module -module-name SDKModuleAtUnusualPath %t/Empty.swift \
-// RUN:   -enable-library-evolution -swift-version 5 -parse-stdlib \
+// RUN:   -enable-library-evolution -parse-stdlib \
 // RUN:   -emit-module-path %t/sdk/System/Library/OtherFrameworks/SDKModuleAtUnusualPath.framework/Modules/SDKModuleAtUnusualPath.swiftmodule/%target-swiftmodule-name \
 // RUN:   -emit-module-interface-path %t/sdk/System/Library/OtherFrameworks/SDKModuleAtUnusualPath.framework/Modules/SDKModuleAtUnusualPath.swiftmodule/%target-swiftinterface-name
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/System/Library/OtherFrameworks/SDKModuleAtUnusualPath.framework/Modules/SDKModuleAtUnusualPath.swiftmodule/%target-swiftinterface-name) -module-name SDKModuleAtUnusualPath
 
 //// Local module.
 // RUN: %target-swift-frontend -emit-module -module-name LocalModule %t/Empty.swift \
-// RUN:   -enable-library-evolution -swift-version 5 -parse-stdlib \
+// RUN:   -enable-library-evolution -parse-stdlib \
 // RUN:   -emit-module-path %t/not_sdk/LocalModule.swiftmodule \
 // RUN:   -emit-module-interface-path %t/not_sdk/LocalModule.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/not_sdk/LocalModule.swiftinterface) -module-name LocalModule
 
 //// Host resource-dir module.
 // RUN: %target-swift-frontend -emit-module -module-name HostResourceDirModule %t/Empty.swift \
-// RUN:   -enable-library-evolution -swift-version 5 -parse-stdlib \
+// RUN:   -enable-library-evolution -parse-stdlib \
 // RUN:   -emit-module-path %t/res/host/HostResourceDirModule.swiftmodule \
 // RUN:   -emit-module-interface-path %t/res/host/HostResourceDirModule.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/res/host/HostResourceDirModule.swiftinterface) -module-name HostResourceDirModule
 
 //// Blocklisted module.
 // RUN: %target-swift-frontend -emit-module -module-name BlocklistedModule %t/Empty.swift \
-// RUN:   -enable-library-evolution -swift-version 5 -parse-stdlib \
+// RUN:   -enable-library-evolution -parse-stdlib \
 // RUN:   -emit-module-path %t/sdk/System/Library/Frameworks/BlocklistedModule.framework/Modules/BlocklistedModule.swiftmodule/%target-swiftmodule-name \
 // RUN:   -emit-module-interface-path %t/sdk/System/Library/Frameworks/BlocklistedModule.framework/Modules/BlocklistedModule.swiftmodule/%target-swiftinterface-name
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/System/Library/Frameworks/BlocklistedModule.framework/Modules/BlocklistedModule.swiftmodule/%target-swiftinterface-name) -module-name BlocklistedModule

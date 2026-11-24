@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s -swift-version 5 > %t.dump 2>&1
+// RUN: %target-swift-frontend -typecheck -dump-availability-scopes %s > %t.dump 2>&1
 // RUN: %FileCheck --strict-whitespace %s < %t.dump
 
 // CHECK: {{^}}(root

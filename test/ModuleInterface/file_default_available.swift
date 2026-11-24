@@ -3,7 +3,6 @@
 
 // RUN: %target-swift-frontend -emit-module -module-name Legacy \
 // RUN:     -enable-library-evolution \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/Legacy.swiftmodule \
 // RUN:     -emit-module-interface-path %t/Legacy.swiftinterface \
 // RUN:     %t/legacy.swift
@@ -14,7 +13,6 @@
 // RUN: %empty-directory(%t/top)
 // RUN: %target-swift-frontend -emit-module -module-name Ordering \
 // RUN:     -enable-library-evolution \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/top/Ordering.swiftmodule \
 // RUN:     -emit-module-interface-path %t/top/Ordering.swiftinterface \
 // RUN:     -DTOP %t/ordering.swift
@@ -24,7 +22,6 @@
 // RUN: %empty-directory(%t/bottom)
 // RUN: %target-swift-frontend -emit-module -module-name Ordering \
 // RUN:     -enable-library-evolution \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/bottom/Ordering.swiftmodule \
 // RUN:     -emit-module-interface-path %t/bottom/Ordering.swiftinterface \
 // RUN:     -DBOTTOM %t/ordering.swift
@@ -37,7 +34,6 @@
 // RUN: %empty-directory(%t/neither)
 // RUN: %target-swift-frontend -emit-module -module-name Ordering \
 // RUN:     -enable-library-evolution \
-// RUN:     -swift-version 5 \
 // RUN:     -o %t/neither/Ordering.swiftmodule \
 // RUN:     -emit-module-interface-path %t/neither/Ordering.swiftinterface \
 // RUN:     %t/ordering.swift

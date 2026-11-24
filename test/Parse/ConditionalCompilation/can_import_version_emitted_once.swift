@@ -12,7 +12,7 @@
 // RUN: echo "public func foo() {}" > %t/Foo.swift
 
 // RUN: %target-swift-frontend -emit-module %t/Foo.swift \
-// RUN:   -module-name NoUserModuleVersion -swift-version 5 \
+// RUN:   -module-name NoUserModuleVersion \
 // RUN:   -disable-implicit-concurrency-module-import \
 // RUN:   -emit-module-interface-path %t/textual/NoUserModuleVersion.swiftinterface \
 // RUN:   -enable-library-evolution \

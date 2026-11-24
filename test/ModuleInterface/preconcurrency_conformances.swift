@@ -3,13 +3,13 @@
 
 /// Build the library A
 // RUN: %target-swift-frontend -emit-module %t/src/A.swift \
-// RUN:   -module-name A -swift-version 5 -enable-library-evolution \
+// RUN:   -module-name A -enable-library-evolution \
 // RUN:   -emit-module-path %t/A.swiftmodule \
 // RUN:   -emit-module-interface-path %t/A.swiftinterface
 
 // Build the client and check the interface
 // RUN: %target-swift-frontend -emit-module %t/src/Client.swift \
-// RUN:   -module-name Client -I %t -swift-version 5 -enable-library-evolution \
+// RUN:   -module-name Client -I %t -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
 // RUN:   -enable-upcoming-feature DynamicActorIsolation \

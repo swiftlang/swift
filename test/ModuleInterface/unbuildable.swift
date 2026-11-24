@@ -5,7 +5,7 @@
 // some invalid syntax to it:
 //
 // RUN: %empty-directory(%t)
-// RUN: echo "" | %target-swift-frontend -typecheck -emit-module-interface-path %t/UnbuildableCurrent.swiftinterface -enable-library-evolution -swift-version 5 -module-name UnbuildableCurrent -
+// RUN: echo "" | %target-swift-frontend -typecheck -emit-module-interface-path %t/UnbuildableCurrent.swiftinterface -enable-library-evolution -module-name UnbuildableCurrent -
 // RUN: echo "public func fn(_: String = #somethingYouveNeverHeardOf)" >> %t/UnbuildableCurrent.swiftinterface
 //
 // Next, modify a version of it so it looks like it was built with a different Swift compiler:

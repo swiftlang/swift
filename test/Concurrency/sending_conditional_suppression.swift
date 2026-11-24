@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -enable-upcoming-feature SendingArgsAndResults -swift-version 5 -enable-library-evolution -module-name test -emit-module -o %t/test.swiftmodule -emit-module-interface-path - -target %target-swift-5.1-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-upcoming-feature SendingArgsAndResults -enable-library-evolution -module-name test -emit-module -o %t/test.swiftmodule -emit-module-interface-path - -target %target-swift-5.1-abi-triple %s | %FileCheck %s
 
 // REQUIRES: swift_feature_SendingArgsAndResults
 // REQUIRES: asserts

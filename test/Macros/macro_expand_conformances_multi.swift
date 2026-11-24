@@ -1,10 +1,10 @@
 // REQUIRES: swift_swift_parser
 
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Make sure we see the conformances from another file.
-// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -swift-version 5 -primary-file %S/Inputs/macro_expand_conformances_other.swift -DDISABLE_TOP_LEVEL_CODE
+// RUN: %target-typecheck-verify-swift -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -primary-file %S/Inputs/macro_expand_conformances_other.swift -DDISABLE_TOP_LEVEL_CODE
 
 @attached(conformance)
 macro Equatable() = #externalMacro(module: "MacroDefinition", type: "EquatableMacro")

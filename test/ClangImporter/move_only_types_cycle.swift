@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -import-objc-header %S/Inputs/move_only_types_cycle.h
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -import-objc-header %S/Inputs/move_only_types_cycle.h
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 

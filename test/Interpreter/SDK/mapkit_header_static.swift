@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t/cache)
-// RUN: %target-run-simple-swift(-module-cache-path %t/cache) | %FileCheck %s
+// RUN: %target-run-simple-swift(-language-mode 4 -module-cache-path %t/cache) | %FileCheck %s
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop

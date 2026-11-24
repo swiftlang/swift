@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
 // RUN:   -module-name Lib -package-name pkg \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -O -wmo -experimental-allow-non-resilient-access -experimental-package-cmo \
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule
 // RUN: %target-sil-opt %t/Lib.swiftmodule -o %t/Lib.sil

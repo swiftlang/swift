@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 %s -module-name lazy_typecheck -enable-library-evolution -parse-as-library -emit-module -emit-module-path /dev/null -experimental-lazy-typecheck -experimental-skip-non-inlinable-function-bodies -experimental-skip-non-exportable-decls
+// RUN: %target-swift-frontend %s -module-name lazy_typecheck -enable-library-evolution -parse-as-library -emit-module -emit-module-path /dev/null -experimental-lazy-typecheck -experimental-skip-non-inlinable-function-bodies -experimental-skip-non-exportable-decls
 
 public protocol P {
   func req()

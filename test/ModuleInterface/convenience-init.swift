@@ -7,7 +7,7 @@
 // RUN: %FileCheck --check-prefixes=CHECK %s < %t/TestSingle.swiftinterface
 
 // Check we can consume the interface without issue
-// RUN: %target-swift-frontend -swift-version 5 -compile-module-from-interface -o %t/Test.swiftmodule %t/TestSingle.swiftinterface
+// RUN: %target-swift-frontend -compile-module-from-interface -o %t/Test.swiftmodule %t/TestSingle.swiftinterface
 
 public class Base {
   let x: Int

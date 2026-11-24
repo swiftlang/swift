@@ -5,26 +5,26 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/C.swift -module-name C \
-// RUN:   -o %t/C.swiftmodule -I %t -swift-version 5
+// RUN:   -o %t/C.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %t/B.swift -module-name B \
-// RUN:   -o %t/B.swiftmodule -I %t -swift-version 5
+// RUN:   -o %t/B.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -module-name Lib \
-// RUN:   -o %t/Lib.swiftmodule -I %t -swift-version 5
+// RUN:   -o %t/Lib.swiftmodule -I %t
 
 /// Build client fine in the expected behavior.
 // RUN: %target-swift-frontend -c -Onone %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o
+// RUN:   -o %t/Client.o
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o
+// RUN:   -o %t/Client.o
 
 /// Rebuild B without re-exporting C, so clients of Lib no longer load C.
 // RUN: %target-swift-frontend -emit-module %t/B_Changed.swift -module-name B \
-// RUN:   -o %t/B.swiftmodule -I %t -swift-version 5
+// RUN:   -o %t/B.swiftmodule -I %t
 // RUN: not %target-swift-frontend -c -Onone %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o -diagnostic-style llvm 2>&1 \
+// RUN:   -o %t/Client.o -diagnostic-style llvm 2>&1 \
 // RUN:   | %FileCheck %s
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -o %t/Client.o -diagnostic-style llvm 2>&1 \
+// RUN:   -o %t/Client.o -diagnostic-style llvm 2>&1 \
 // RUN:   | %FileCheck %s
 
 // CHECK: error: cannot deserialize the body of '{{.*}}f(_:)' from module 'Lib'; it references module 'C', which is not loaded

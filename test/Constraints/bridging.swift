@@ -348,7 +348,7 @@ func forceBridgeDiag(_ obj: BridgedClass!) -> BridgedStruct {
 
 struct KnownUnbridged {}
 class KnownClass {}
-protocol KnownClassProtocol: class {}
+protocol KnownClassProtocol: AnyObject {}
 
 func forceUniversalBridgeToAnyObject<T, U: KnownClassProtocol>(a: T, b: U, c: Any, d: KnownUnbridged, e: KnownClass, f: KnownClassProtocol, g: AnyObject, h: String) {
   var z: AnyObject

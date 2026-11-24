@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -swift-version 5 %t/OtherLibrary.swift -emit-module -module-name OtherLibrary -o %t
-// RUN: %target-swift-frontend -typecheck %t/Library.swift -module-name Library -verify -swift-version 5 -import-underlying-module -I %t
-// RUN: %target-swift-frontend -typecheck %t/Library.swift -module-name Library -verify -swift-version 5 -DEXPLICIT_IMPORT -I %t
+// RUN: %target-swift-frontend %t/OtherLibrary.swift -emit-module -module-name OtherLibrary -o %t
+// RUN: %target-swift-frontend -typecheck %t/Library.swift -module-name Library -verify -import-underlying-module -I %t
+// RUN: %target-swift-frontend -typecheck %t/Library.swift -module-name Library -verify -DEXPLICIT_IMPORT -I %t
 
 // REQUIRES: objc_interop
 

@@ -125,7 +125,6 @@ public class PublicBase {
 @usableFromInline
 @_fixed_layout
 class UFIBase {
-  @usableFromInline
   @inlinable
   init(horse: Horse) {}
 }

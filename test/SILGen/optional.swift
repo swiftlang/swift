@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name optional %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name optional %s | %FileCheck %s --check-prefixes=CHECK,SWIFT5
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name optional %s -language-mode 4 | %FileCheck %s --check-prefixes=CHECK,SWIFT4
 
 func testCall(_ f: (() -> ())?) {
   f?()
@@ -171,13 +172,17 @@ func implicit_iuo_unwrap_sourceLocation(_ value: Int!) {
 // CHECK:  bb0:
 // CHECK:    [[MEM:%.*]] = alloc_stack $Any
 // CHECK:    [[ADDR:%.*]] = init_existential_addr [[MEM]] : $*Any, $Optional<Int>
-// CHECK:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
-// CHECK:    [[CLOSURE:%.*]] = function_ref @$s8optional0A20_to_existential_castyyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
-// CHECK:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
+// SWIFT5:    [[CLOSURE:%.*]] = function_ref @$s8optional0A20_to_existential_castyyFSiSgyKXEfU_ : $@convention(thin) () -> (Optional<Int>, @error any Error)
+// SWIFT5:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Optional<Int>, @error any Error), normal bb1, error bb3
+// SWIFT4:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// SWIFT4:    [[CLOSURE:%.*]] = function_ref @$s8optional0A20_to_existential_castyyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
+// SWIFT4:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
 
-// CHECK:  bb1([[RESULT:%.*]] : $Int):
-// CHECK:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
-// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// SWIFT5:  bb1([[RESULT:%.*]] : $Optional<Int>):
+// SWIFT5:    store [[RESULT]] to [trivial] [[ADDR]] : $*Optional<Int>
+// SWIFT4:  bb1([[RESULT:%.*]] : $Int):
+// SWIFT4:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
+// SWIFT4:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:    br bb2
 
 // CHECK:      bb2:
@@ -198,13 +203,17 @@ func optional_to_existential_cast() {
 // CHECK-LABEL: sil hidden [ossa] @$s8optional0A29_to_existential_cast_RETURNEDypyF : $@convention(thin) () -> @out Any {
 // CHECK:  bb0([[MEM:%.*]] : $*Any):
 // CHECK:    [[ADDR:%.*]] = init_existential_addr [[MEM]] : $*Any, $Optional<Int>
-// CHECK:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
-// CHECK:    [[CLOSURE:%.*]] = function_ref @$s8optional0A29_to_existential_cast_RETURNEDypyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
-// CHECK:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
+// SWIFT5:    [[CLOSURE:%.*]] = function_ref @$s8optional0A29_to_existential_cast_RETURNEDypyFSiSgyKXEfU_ : $@convention(thin) () -> (Optional<Int>, @error any Error)
+// SWIFT5:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Optional<Int>, @error any Error), normal bb1, error bb3
+// SWIFT4:    [[PAYLOAD_ADDR:%.*]] = init_enum_data_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// SWIFT4:    [[CLOSURE:%.*]] = function_ref @$s8optional0A29_to_existential_cast_RETURNEDypyFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error)
+// SWIFT4:    try_apply [[CLOSURE]]() : $@convention(thin) () -> (Int, @error any Error), normal bb1, error bb3
 
-// CHECK:  bb1([[RESULT:%.*]] : $Int):
-// CHECK:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
-// CHECK:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
+// SWIFT5:  bb1([[RESULT:%.*]] : $Optional<Int>):
+// SWIFT5:    store [[RESULT]] to [trivial] [[ADDR]] : $*Optional<Int>
+// SWIFT4:  bb1([[RESULT:%.*]] : $Int):
+// SWIFT4:    store [[RESULT]] to [trivial] [[PAYLOAD_ADDR]] : $*Int
+// SWIFT4:    inject_enum_addr [[ADDR]] : $*Optional<Int>, #Optional.some!enumelt
 // CHECK:    br bb2
 
 // CHECK:      bb2:

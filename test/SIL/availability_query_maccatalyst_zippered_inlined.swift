@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module %t/Library.swift -swift-version 5 -enable-library-evolution -module-name Library -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -o %t -emit-module-interface-path %t/Library.swiftinterface
+// RUN: %target-swift-frontend -emit-module %t/Library.swift -enable-library-evolution -module-name Library -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -o %t -emit-module-interface-path %t/Library.swiftinterface
 // RUN: %target-swift-frontend -emit-sil %t/main.swift -target %target-cpu-apple-macosx13 -target-variant %target-cpu-apple-ios16-macabi -I %t | %FileCheck %t/main.swift
 
 // Remove the .swiftmodule and test again with the library module built from interface.

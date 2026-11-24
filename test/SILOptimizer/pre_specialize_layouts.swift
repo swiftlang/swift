@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module_layouts.swiftinterface %S/Inputs/pre_specialized_module_layouts.swift -module-name pre_specialized_module_layouts
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module_layouts.swiftinterface %S/Inputs/pre_specialized_module_layouts.swift -module-name pre_specialized_module_layouts
 // RUN: %target-swift-frontend -I %t -O -Xllvm -sil-disable-pass=function-signature-opts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=OPT
 
 import pre_specialized_module_layouts

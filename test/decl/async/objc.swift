@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s -swift-version 5  -target %target-swift-5.1-abi-triple
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module -swift-version 5  | %FileCheck %s
+// RUN: %target-swift-frontend -disable-objc-attr-requires-foundation-module -typecheck -verify %s  -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module  | %FileCheck %s
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
 import Foundation

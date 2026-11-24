@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s -swift-version 5 -import-objc-header %S/Inputs/objc_protocol_sendable.h | %IRGenFileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -import-objc-header %S/Inputs/objc_protocol_sendable.h | %IRGenFileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency

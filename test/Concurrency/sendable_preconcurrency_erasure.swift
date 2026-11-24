@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -verify | %FileCheck %s
 
 // REQUIRES: concurrency
 

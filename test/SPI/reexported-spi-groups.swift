@@ -3,7 +3,7 @@
 
 /// Build lib defining SPIs
 // RUN: %target-swift-frontend -emit-module %t/Exported.swift \
-// RUN:   -module-name Exported -swift-version 5 -I %t \
+// RUN:   -module-name Exported -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exported.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exported.swiftinterface \
@@ -13,7 +13,7 @@
 
 /// Build lib reexporting SPIs
 // RUN: %target-swift-frontend -emit-module %t/Exporter.swift \
-// RUN:   -module-name Exporter -swift-version 5 -I %t \
+// RUN:   -module-name Exporter -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exporter.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exporter.swiftinterface \
@@ -22,7 +22,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/Exporter.private.swiftinterface) -module-name Exporter -I %t
 
 // RUN: %target-swift-frontend -emit-module %t/NonExportedAs.swift \
-// RUN:   -module-name NonExportedAs -swift-version 5 -I %t \
+// RUN:   -module-name NonExportedAs -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/NonExportedAs.swiftmodule \
 // RUN:   -emit-module-interface-path %t/NonExportedAs.swiftinterface \
@@ -32,7 +32,7 @@
 
 /// Build lib not reexporting SPIs (a normal import)
 // RUN: %target-swift-frontend -emit-module %t/NonExporter.swift \
-// RUN:   -module-name NonExporter -swift-version 5 -I %t \
+// RUN:   -module-name NonExporter -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/NonExporter.swiftmodule \
 // RUN:   -emit-module-interface-path %t/NonExporter.swiftinterface \
@@ -42,7 +42,7 @@
 
 /// Build client of transitive SPIs and its swiftinterfaces
 // RUN: %target-swift-frontend -emit-module %t/ClientLib.swift \
-// RUN:   -module-name ClientLib -swift-version 5 -I %t \
+// RUN:   -module-name ClientLib -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/ClientLib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/ClientLib.swiftinterface \
@@ -53,30 +53,30 @@
 /// Test diagnostics of a multifile client
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/Client_FileA.swift %t/Client_FileB.swift\
-// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
+// RUN:   -I %t -verify -verify-ignore-unrelated
 
 /// SPIs are now reexported by any `@_exported` from Swift modules, no matter
 /// if `export_as` is present or not.
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/NonExportedAsClient.swift \
-// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
+// RUN:   -I %t -verify -verify-ignore-unrelated
 
 /// Test that SPIs don't leak when not reexported
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/NonExporterClient.swift \
-// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
+// RUN:   -I %t -verify -verify-ignore-unrelated
 
 /// Test diagnostics against private swiftinterfaces
 // RUN: rm %t/Exported.swiftmodule %t/Exporter.swiftmodule
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/Client_FileA.swift %t/Client_FileB.swift\
-// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
+// RUN:   -I %t -verify -verify-ignore-unrelated
 
 /// Test diagnostics against public swiftinterfaces
 // RUN: rm %t/Exported.private.swiftinterface %t/Exporter.private.swiftinterface
 // RUN: %target-swift-frontend -typecheck \
 // RUN:   %t/PublicClient.swift \
-// RUN:   -swift-version 5 -I %t -verify -verify-ignore-unrelated
+// RUN:   -I %t -verify -verify-ignore-unrelated
 
 //--- module.modulemap
 module Exported {

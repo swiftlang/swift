@@ -4,21 +4,21 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -module-name ExportedLib \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/ExportedLib.swiftmodule \
 // RUN:     -emit-module-interface-path %t/ExportedLib.swiftinterface \
 // RUN:     %t/ExportedLib.swift
 // RUN: %target-swift-typecheck-module-from-interface(%t/ExportedLib.swiftinterface)
 
 // RUN: %target-swift-frontend -emit-module -module-name AmbiguousLib \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/AmbiguousLib.swiftmodule \
 // RUN:     -emit-module-interface-path %t/AmbiguousLib.swiftinterface \
 // RUN:     %t/AmbiguousLib.swift -I%t
 // RUN: %target-swift-typecheck-module-from-interface(%t/AmbiguousLib.swiftinterface) -I%t
 
 // RUN: %target-swift-frontend -emit-module -module-name AmbiguousClientName \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/AmbiguousClientName.swiftmodule \
 // RUN:     -emit-module-interface-path %t/AmbiguousClientName.swiftinterface \
 // RUN:     %t/AmbiguousClientName.swift -I%t \
@@ -26,7 +26,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/AmbiguousClientName.swiftinterface) -I%t
 
 // RUN: %target-swift-frontend -emit-module -module-name OverlayClient \
-// RUN:     -swift-version 5 -enable-library-evolution \
+// RUN:     -enable-library-evolution \
 // RUN:     -o %t/OverlayClient.swiftmodule \
 // RUN:     -emit-module-interface-path %t/OverlayClient.swiftinterface \
 // RUN:     %t/OverlayClient.swift -I%t \

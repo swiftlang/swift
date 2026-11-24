@@ -38,7 +38,7 @@ public func testFullyCoveredSwitch(_ e: HasUnavailableElement) {
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function '$s4Test31testFullyCoveredSwitchResilientyy14resilient_enum0F23EnumWithUnavailableCaseOF'
 public func testFullyCoveredSwitchResilient(_ e: ResilientEnumWithUnavailableCase) {
-  switch e {
+  switch e { // expected-warning {{switch covers known cases, but 'ResilientEnumWithUnavailableCase' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .available: ()
   case .unavailable: ()
   }
@@ -81,7 +81,7 @@ public func testUnavailableElementSkippedSwitch(_ e: HasUnavailableElement) {
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function '$s4Test44testUnavailableElementSkippedSwitchResilientyy14resilient_enum0g8EnumWithC4CaseOF'
 public func testUnavailableElementSkippedSwitchResilient(_ e: ResilientEnumWithUnavailableCase) {
-  switch e {
+  switch e { // expected-warning {{switch covers known cases, but 'ResilientEnumWithUnavailableCase' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .available: ()
   }
 }
@@ -201,7 +201,7 @@ public func testFullyCoveredSwitchWithPayload(_ e: HasUnavailableElementAndPaylo
 // CHECK-NEXT:    unreachable
 // CHECK:       } // end sil function '$s4Test42testFullyCoveredSwitchWithPayloadResilientyy14resilient_enum0h4Enumf18UnavailableCaseAndG0OF'
 public func testFullyCoveredSwitchWithPayloadResilient(_ e: ResilientEnumWithUnavailableCaseAndPayload) {
-  switch e {
+  switch e { // expected-warning {{switch covers known cases, but 'ResilientEnumWithUnavailableCaseAndPayload' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .int(_): ()
   case .double(_): ()
   }

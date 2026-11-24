@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 5 -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: VENDOR=apple
 // REQUIRES: optimized_stdlib

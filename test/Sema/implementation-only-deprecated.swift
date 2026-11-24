@@ -2,17 +2,17 @@
 // RUN: split-file %s %t --leading-lines
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -verify
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -verify
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
 // RUN:   -warnings-as-errors -Wwarning ImplementationOnlyDeprecated \
 // RUN:   -verify

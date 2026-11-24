@@ -7,7 +7,6 @@
 // CHECK: func unknown()
 
 // CHECK: struct X {
-// CHECK-NEXT:  @usableFromInline
 // CHECK-NEXT:  @inlinable func test()
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
@@ -31,7 +30,6 @@
 // SIB-CHECK: func unknown()
 
 // SIB-CHECK: struct X {
-// SIB-CHECK-NEXT:  @usableFromInline
 // SIB-CHECK-NEXT:  @inlinable func test()
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }

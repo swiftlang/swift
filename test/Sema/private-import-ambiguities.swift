@@ -3,18 +3,18 @@
 
 /// Build libraries
 // RUN: %target-swift-frontend -emit-module %t/LibShared.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibShared.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/LibWithPublicFoo.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibWithPublicFoo.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %t/LibWithInternalFoo.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibWithInternalFoo.swiftmodule -I %t
 
 /// Build client
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 //--- LibShared.swift
 public struct Struct {

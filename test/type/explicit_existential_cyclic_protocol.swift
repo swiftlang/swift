@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -verify-additional-prefix no-explicit-any-
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any-
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix no-explicit-any-
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any-
 
 // REQUIRES: swift_feature_ExistentialAny
 

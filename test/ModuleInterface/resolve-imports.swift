@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -parse-as-library -enable-library-evolution -module-name resolve_imports -resolve-imports %s -emit-module-interface-path %t/resolve_imports.swiftinterface
+// RUN: %target-swift-frontend -parse-as-library -enable-library-evolution -module-name resolve_imports -resolve-imports %s -emit-module-interface-path %t/resolve_imports.swiftinterface
 // RUN: %FileCheck %s < %t/resolve_imports.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/resolve_imports.swiftinterface)
 

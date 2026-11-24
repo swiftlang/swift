@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) -emit-module -emit-module-path %t/Library.swiftmodule -module-name Library -parse-as-library %t/Library.swift -swift-version 5 -enable-library-evolution
-// RUN: %target-build-swift-dylib(%t/%target-library-name(ClientLibrary)) %t/ClientA.swift %t/ClientB.swift -I%t -L%t -swift-version 5 -lLibrary
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Library)) -emit-module -emit-module-path %t/Library.swiftmodule -module-name Library -parse-as-library %t/Library.swift -enable-library-evolution
+// RUN: %target-build-swift-dylib(%t/%target-library-name(ClientLibrary)) %t/ClientA.swift %t/ClientB.swift -I%t -L%t -lLibrary
 
 //--- Library.swift
 

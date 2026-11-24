@@ -8,7 +8,7 @@
 // than generated macro buffer.
 
 // Create a plugin that adds a new function as a member
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
 // Prepare a test module that uses the macro in a struct
 // RUN: %target-swift-frontend -emit-module -emit-module-source-info -module-name TestModule -o %t/mods -load-plugin-library %t/%target-library-name(MacroPlugin) %t/TestModule.swift -index-store-path %t/idx

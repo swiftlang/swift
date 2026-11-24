@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
 @available(anyAppleOS 26, *)
 func availableIn26Short() { }

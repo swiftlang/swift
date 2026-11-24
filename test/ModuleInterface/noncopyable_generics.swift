@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -o %t/NoncopyableGenerics_Misc.swiftmodule \
 // RUN:     -emit-module-interface-path %t/NoncopyableGenerics_Misc.swiftinterface \
 // RUN:     %S/Inputs/NoncopyableGenerics_Misc.swift
 
-// RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature SuppressedAssociatedTypesWithDefaults \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -o %t/Swiftskell.swiftmodule \

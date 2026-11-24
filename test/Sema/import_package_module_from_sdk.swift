@@ -9,7 +9,6 @@
 // RUN:     -module-name LibInSDK \
 // RUN:     -package-name libPkg \
 // RUN:     -o %t/SDK/Frameworks/LibInSDK.framework/Modules/LibInSDK.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     %t/Lib.swift
 
 // RUN: test -f %t/SDK/Frameworks/LibInSDK.framework/Modules/LibInSDK.swiftmodule/%module-target-triple.swiftmodule

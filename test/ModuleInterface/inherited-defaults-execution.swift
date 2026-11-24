@@ -33,7 +33,7 @@
 // 5) Build and run the executable, checking the defaulted arguments resulted in
 //    the correct values being stored
 //
-// RUN: %target-build-swift -I%t -L%t -lInherited -o %t/main %target-rpath(%t) %t/main.swift -swift-version 5
+// RUN: %target-build-swift -I%t -L%t -lInherited -o %t/main %target-rpath(%t) %t/main.swift
 // RUN: %target-codesign %t/main %t/%target-library-name(Inherited)
 // RUN: %target-run %t/main %t/%target-library-name(Inherited) | %FileCheck --check-prefix=OUTPUT %s
 //

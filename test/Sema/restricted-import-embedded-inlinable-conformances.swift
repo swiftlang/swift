@@ -1,22 +1,22 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule \
 // RUN:   %S/Inputs/implementation-only-import-in-decls-public-helper.swift \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule \
 // RUN:   %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
 /// Access-level on imports allow references from implicitly inlinable code.
 // RUN: %target-typecheck-verify-swift -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -verify-additional-prefix access-level-
 
 /// @_implementationOnly rejects references from implicitly inlinable code.
 // RUN: %target-typecheck-verify-swift -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:    -D IOI -verify-additional-prefix ioi-
 

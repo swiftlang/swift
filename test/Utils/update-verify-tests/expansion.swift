@@ -4,7 +4,7 @@
 // RUN: split-file %s %t
 
 // Building this macro takes some time, so amortise the cost by using it for multiple sub tests
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(UnstringifyMacroDefinition) -module-name=UnstringifyMacroDefinition \
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(UnstringifyMacroDefinition) -module-name=UnstringifyMacroDefinition \
 // RUN:   %S/Inputs/unstringify-macro.swift -g -no-toolchain-stdlib-rpath
 
 

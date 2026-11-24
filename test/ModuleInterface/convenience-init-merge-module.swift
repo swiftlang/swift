@@ -8,7 +8,7 @@
 // RUN: %FileCheck %s < %t/TestMerge.swiftinterface
 
 // Check we can consume the interface without issue
-// RUN: %target-swift-frontend -swift-version 5 -compile-module-from-interface -o %t/Test.swiftmodule %t/TestMerge.swiftinterface
+// RUN: %target-swift-frontend -compile-module-from-interface -o %t/Test.swiftmodule %t/TestMerge.swiftinterface
 
 public class Base {
   let x: Int

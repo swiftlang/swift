@@ -4,7 +4,7 @@
 /// A package swiftinterface should be generated only if -package-name is passed.
 // RUN: %target-build-swift -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name foopkg \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/Bar.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Bar.package.swiftinterface
 
@@ -17,7 +17,7 @@
 /// `-emit-package-module-interface-path` is passed.
 // RUN: %target-build-swift -emit-module %t/Baz.swift -I %t \
 // RUN:   -module-name Baz \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/Baz.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Baz.package.swiftinterface
 

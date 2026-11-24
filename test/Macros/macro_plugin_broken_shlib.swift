@@ -9,7 +9,6 @@
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
-// RUN:   -swift-version 5 \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -module-name MyApp \
 // RUN:   -serialize-diagnostics-path %t/macro_expand.dia \
@@ -25,7 +24,6 @@
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
-// RUN:   -swift-version 5 \
 // RUN:   -plugin-path %t/plugins \
 // RUN:   -module-name MyApp \
 // RUN:   -serialize-diagnostics-path %t/macro_expand_inproc.dia \

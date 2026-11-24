@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-target %target-future-triple -parse-stdlib -parse-as-library) | %FileCheck %s
-// RUN: %target-run-simple-swift(-target %target-future-triple -parse-stdlib -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-future-triple -parse-stdlib -parse-as-library -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -40,7 +40,7 @@ func getCurrentThreadID() -> ThreadID { 0 }
 func equalThreadIDs(_ a: ThreadID, _ b: ThreadID) -> Bool { a == b }
 #endif
 
-var mainThread: ThreadID?
+nonisolated(unsafe) var mainThread: ThreadID?
 func isMainThread() -> Bool {
     return equalThreadIDs(getCurrentThreadID(), mainThread!)
 }

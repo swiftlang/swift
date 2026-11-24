@@ -1,7 +1,7 @@
 // REQUIRES: OS=macosx
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
-// RUN: %target-swift-frontend %s -typecheck -parse-as-library -enable-library-evolution -module-name MyModule -package-name MyModule -swift-version 5 -library-level api -emit-api-descriptor-path %t/api.json
+// RUN: %target-swift-frontend %s -typecheck -parse-as-library -enable-library-evolution -module-name MyModule -package-name MyModule -library-level api -emit-api-descriptor-path %t/api.json
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 public protocol PublicProto {}

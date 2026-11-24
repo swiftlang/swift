@@ -7,7 +7,7 @@
 /// Build the library.
 // RUN: %target-swift-frontend -emit-module %t/Lib_FileA.swift %t/Lib_FileB.swift \
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -enable-private-imports
 
 /// Typecheck a @_private client.

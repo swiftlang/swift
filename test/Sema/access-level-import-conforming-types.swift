@@ -2,16 +2,16 @@
 
 // RUN: %target-swift-frontend -emit-module -o %t/NormalLibrary.swiftmodule \
 // RUN:  %S/Inputs/implementation-only-import-in-decls-public-helper.swift \
-// RUN:  -enable-library-evolution -swift-version 5
+// RUN:  -enable-library-evolution
 
 // RUN: %target-swift-frontend -emit-module -o %t/BADLibrary.swiftmodule \
 // RUN:  %S/Inputs/implementation-only-import-in-decls-helper.swift -I %t \
-// RUN:  -enable-library-evolution -swift-version 5
+// RUN:  -enable-library-evolution
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
-// RUN:  -swift-version 5 -package-name pkg -enable-library-evolution
+// RUN:  -package-name pkg -enable-library-evolution
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t \
-// RUN:  -swift-version 5 -package-name pkg
+// RUN:  -package-name pkg
 
 internal import BADLibrary // expected-note 9 {{protocol 'BadProto' imported as 'internal' from 'BADLibrary' here}}
 // expected-note @-1 2 {{struct 'IntLike' imported as 'internal' from 'BADLibrary' here}}

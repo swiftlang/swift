@@ -7,7 +7,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) \
 // RUN:   %t/optimized.swift -module-name Lib \
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution -O
+// RUN:   -enable-library-evolution -O
 // RUN: %target-codesign %t/%target-library-name(Lib)
 // RUN: %target-build-swift %t/main.swift -o %t/main -I%t -lLib -L%t -O
 // RUN: %target-codesign %t/main
@@ -24,7 +24,7 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) \
 // RUN:   %t/non-optimized.swift -module-name Lib \
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -swift-version 5 -enable-library-evolution -O
+// RUN:   -enable-library-evolution -O
 // RUN: %target-codesign %t/%target-library-name(Lib)
 // RUN: %target-build-swift %t/main.swift -o %t/main -I%t -lLib -L%t -O
 // RUN: %target-codesign %t/main

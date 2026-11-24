@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test | %FileCheck %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)

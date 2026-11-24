@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/back_deployed.swift -o %t/ -swift-version 5 -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %S/Inputs/back_deployed.swift -o %t/ -enable-library-evolution
 // RUN: %target-swift-frontend -emit-ir %s -I %t -Onone | %FileCheck %s
 
 // _stdlib_isOSVersionAtLeast() is @_transparent on iOS

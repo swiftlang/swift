@@ -21,7 +21,7 @@
 
 /// 2. Lib
 /// Create an interface for Lib that imports XLogging with -module-alias XLogging=AppleLogging
-// RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-interface-path %t/Lib.swiftinterface -swift-version 5 -enable-library-evolution -I %t -Rmodule-loading 2> %t/result-Lib.output
+// RUN: %target-swift-frontend -module-name Lib %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-interface-path %t/Lib.swiftinterface -enable-library-evolution -I %t -Rmodule-loading 2> %t/result-Lib.output
 
 /// Check Lib.swiftinterface is created
 // RUN: test -f %t/Lib.swiftinterface

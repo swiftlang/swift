@@ -4,7 +4,7 @@
 // RUN: split-file --leading-lines %s %t
 
 // RUN: %target-swift-frontend -emit-module %t/HiddenLib.swift -o %t -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded
 
 /// Report errors on invalid references. Disable the early checks to trigger
@@ -12,7 +12,7 @@
 // RUN: not env SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY=1 \
 // RUN:   %target-swift-frontend -emit-module %t/MiddleLib.swift -o %t -I %t \
 // RUN:   -D BROKEN \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -enable-experimental-feature CheckImplementationOnlyStrict 2> %t/out
 // RUN: %FileCheck --input-file %t/out %t/MiddleLib.swift
@@ -20,13 +20,13 @@
 /// Build a valid version of the library, skipping @_implementationOnly decls.
 /// for a client to build against.
 // RUN: %target-swift-frontend -emit-module %t/MiddleLib.swift -o %t -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -enable-experimental-feature CheckImplementationOnlyStrict
 
 /// Build an actual client.
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
-// RUN:   -swift-version 5 -target arm64-apple-none-macho \
+// RUN:   -target arm64-apple-none-macho \
 // RUN:   -enable-experimental-feature Embedded \
 // RUN:   -enable-experimental-feature CheckImplementationOnlyStrict
 

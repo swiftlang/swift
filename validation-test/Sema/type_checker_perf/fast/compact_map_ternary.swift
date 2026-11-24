@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=3600 -swift-version 5
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=3600
 
 class MyEntity {
   func asEntity(for: String?) throws -> (any AppEntity)? {

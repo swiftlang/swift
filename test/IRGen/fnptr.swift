@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -import-objc-header %S/Inputs/fnptr.h -swift-version 5 -target arm64e-apple-ios13.0 %s -emit-ir -module-name test -use-clang-function-types -Xcc -Xclang -Xcc -fptrauth-function-pointer-type-discrimination | %FileCheck %s
+// RUN: %target-swift-frontend -import-objc-header %S/Inputs/fnptr.h -target arm64e-apple-ios13.0 %s -emit-ir -module-name test -use-clang-function-types -Xcc -Xclang -Xcc -fptrauth-function-pointer-type-discrimination | %FileCheck %s
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=ios

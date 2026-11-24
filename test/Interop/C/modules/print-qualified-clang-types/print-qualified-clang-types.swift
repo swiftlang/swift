@@ -28,9 +28,9 @@
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir %t/helper_module %t/main_module
-// RUN: %target-swift-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/helper_module/HelperModule.swiftmodule %S/Inputs/HelperModule.swift -I %S/Inputs
-// RUN: %target-swift-frontend -enable-library-evolution -swift-version 5 -emit-module -o %t/main_module/MainModule.swiftmodule -emit-module-interface-path %t/main_module/MainModule.swiftinterface -I %t/helper_module %S/Inputs/MainModule.swift -I %S/Inputs
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -o %t/helper_module/HelperModule.swiftmodule %S/Inputs/HelperModule.swift -I %S/Inputs
+// RUN: %target-swift-frontend -enable-library-evolution -emit-module -o %t/main_module/MainModule.swiftmodule -emit-module-interface-path %t/main_module/MainModule.swiftinterface -I %t/helper_module %S/Inputs/MainModule.swift -I %S/Inputs
 // RUN: %FileCheck --input-file=%t/main_module/MainModule.swiftinterface %s
-// RUN: %target-swift-frontend -typecheck -swift-version 5 %t/main_module/MainModule.swiftinterface -I %t/helper_module -I %S/Inputs
+// RUN: %target-swift-frontend -typecheck %t/main_module/MainModule.swiftinterface -I %t/helper_module -I %S/Inputs
 
 // CHECK: public func funcTakingForeignStruct(_ param: ForeignB::ForeignStruct)

@@ -4,7 +4,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %t/test.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -const-gather-protocols-file %t/protocols.json \
+// RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -const-gather-protocols-file %t/protocols.json \
 // RUN:   -scanner-prefix-map-paths %t /^tmp -I %t/include
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json A casFSRootID > %t/A.casid

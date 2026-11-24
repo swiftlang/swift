@@ -4,7 +4,7 @@
 // derives, because clients emit the type's members themselves and a printed
 // declaration has no body. A compiler that reads the interface derives them
 // again.
-// RUN: %target-swift-emit-module-interface(%t/Lib.swiftinterface) %s -module-name Lib -swift-version 5 -parse-as-library -enable-library-evolution -enable-experimental-feature BackDeployFrozenValueTypes
+// RUN: %target-swift-emit-module-interface(%t/Lib.swiftinterface) %s -module-name Lib -parse-as-library -enable-library-evolution -enable-experimental-feature BackDeployFrozenValueTypes
 // RUN: %FileCheck %s --check-prefix=INTERFACE < %t/Lib.swiftinterface
 
 // A client builds the module from its interface and emits its own copy of the

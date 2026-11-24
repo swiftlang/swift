@@ -14,7 +14,7 @@
 // CHECK: "version":2
 // CHECK: "name":"loaded_module_trace_multifile"
 // CHECK: "arch":"{{[^"]*}}"
-// CHECK: "languageMode":"4"
+// CHECK: "languageMode":"5"
 // CHECK: "enabledLanguageFeatures":[
 // CHECK: ]
 // CHECK: "swiftmodules":[

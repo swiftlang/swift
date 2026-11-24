@@ -9,7 +9,7 @@
 // RUN: split-file --leading-lines %s %t
 
 // Build the shared macro plugin.
-// RUN: %host-build-swift -swift-version 5 -emit-library \
+// RUN: %host-build-swift -emit-library \
 // RUN:   -o %t/%target-library-name(MacroDefinition) \
 // RUN:   -module-name=MacroDefinition \
 // RUN:   %S/Inputs/syntax_macro_definitions.swift \

@@ -4,7 +4,7 @@
 /// Generate a package swiftinterface. Note -package-name is repeated; the last value should be picked.
 // RUN: %target-swift-frontend -emit-module %t/Bar.swift -I %t \
 // RUN:   -module-name Bar -package-name foopkg -package-name barpkg \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-interface-path %t/Bar.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Bar.private.swiftinterface \
 // RUN:   -emit-package-module-interface-path %t/Bar.package.swiftinterface

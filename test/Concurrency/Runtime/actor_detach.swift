@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple) | %FileCheck %s
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
@@ -13,7 +13,7 @@ import Foundation
 
 @available(SwiftStdlib 5.1, *)
 actor Manager {
-    static var shared = Manager()
+    static let shared = Manager()
 
     func manage() async -> Int {
         print("manage")

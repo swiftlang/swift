@@ -15,7 +15,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
 // FIXME: This step shouldn't be needed once conformances broken by missing imports are diagnosed properly
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -verify \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
@@ -23,7 +23,7 @@
 // RUN:   -verify-additional-prefix conformance- \
 // RUN:   -enable-upcoming-feature MemberImportVisibility:migrate
 
-// RUN: %target-swift-frontend -emit-silgen -verify -swift-version 5 \
+// RUN: %target-swift-frontend -emit-silgen -verify \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \

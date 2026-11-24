@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -language-mode 4 -verify-additional-prefix swift4-
 
 // Intentionally has lower precedence than assignments and ?:
 infix operator %%%% : LowPrecedence
@@ -158,12 +159,20 @@ func callThrowingClosureWithoutTry(closure: (Int) throws -> Int) rethrows {
 }
 
 func producesOptional() throws -> Int? { return nil }
-let _: String = try? producesOptional() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+let _: String = try? producesOptional()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'String'}}
+let singleOptional = try? producesOptional()
+let _: String = singleOptional
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'String'}}
 
 let _ = (try? foo())!! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
 
 func producesDoubleOptional() throws -> Int?? { return 3 }
-let _: String = try? producesDoubleOptional() // expected-error {{cannot convert value of type 'Int???' to specified type 'String'}}
+let _: String = try? producesDoubleOptional()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int???' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int??' to specified type 'String'}}
 
 func maybeThrow() throws {}
 try maybeThrow() // okay
@@ -222,9 +231,13 @@ func produceAny() throws -> Any {
   return 3
 }
 
-let _: Int? = try? produceAny() as? Int // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? produceAny() as? Int
+// expected-swift4-error@-1 {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = (try? produceAny()) as? Int // good
 let _: Int?? = (try? produceAny()) as? Int // good
-let _: String = try? produceAny() as? Int // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+let _: String = try? produceAny() as? Int
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'String'}}
 let _: String = (try? produceAny()) as? Int // expected-error {{cannot convert value of type 'Int?' to specified type 'String'}}
 
 
@@ -237,33 +250,56 @@ struct ThingProducer {
 }
 
 let optProducer: ThingProducer? = ThingProducer()
-let _: Int? = try? optProducer?.produceInt() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
-// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
-let _: Int = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int'}}
-let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+let _: Int? = try? optProducer?.produceInt()
+// expected-swift4-error@-1 {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-swift4-note@-2 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
+let _: Int = try? optProducer?.produceInt()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'Int'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'Int'}}
+let _: String = try? optProducer?.produceInt()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'String'}}
 let _: Int?? = try? optProducer?.produceInt() // good
 
-let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
-// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
+let _: Int? = try? optProducer?.produceIntNoThrowing()
+// expected-swift4-error@-1 {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-swift4-note@-2 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
+// expected-swift5-warning@-3 {{no calls to throwing functions occur within 'try' expression}}
 let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good
-let _: Int? = try? optProducer?.produceAny() as? Int // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceAny() as? Int
+// expected-swift4-error@-1 {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int?? = try? optProducer?.produceAny() as? Int // good
-let _: String = try? optProducer?.produceAny() as? Int // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
+let _: String = try? optProducer?.produceAny() as? Int
+// expected-swift4-error@-1 {{cannot convert value of type 'Int??' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int?' to specified type 'String'}}
 
-let _: String = try? optProducer?.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int???' to specified type 'String'}}
+let _: String = try? optProducer?.produceDoubleOptionalInt()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int???' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int??' to specified type 'String'}}
 
 let producer = ThingProducer()
 
-let _: Int = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
-let _: Int? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
-let _: Int?? = try? producer.produceDoubleOptionalInt() // expected-error {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int = try? producer.produceDoubleOptionalInt()
+// expected-swift4-error@-1 {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int??' to specified type 'Int'}}
+
+// We don't offer 'try!' here because it would not change the type of the expression in Swift 5+
+let _: Int? = try? producer.produceDoubleOptionalInt()
+// expected-swift4-error@-1 {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int??' to specified type 'Int?'}}
+// expected-swift5-note@-3 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
+
+let _: Int?? = try? producer.produceDoubleOptionalInt()
+// expected-swift4-error@-1 {{value of optional type 'Int???' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
 let _: Int??? = try? producer.produceDoubleOptionalInt() // good
-let _: String = try? producer.produceDoubleOptionalInt() // expected-error {{cannot convert value of type 'Int???' to specified type 'String'}}
+let _: String = try? producer.produceDoubleOptionalInt()
+// expected-swift4-error@-1 {{cannot convert value of type 'Int???' to specified type 'String'}}
+// expected-swift5-error@-2 {{cannot convert value of type 'Int??' to specified type 'String'}}
 
 // rdar://problem/46742002
-protocol Dummy : class {}
+protocol Dummy : AnyObject {}
 
 class F<T> {
   func wait() throws -> T { fatalError() }

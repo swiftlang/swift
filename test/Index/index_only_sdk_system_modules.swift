@@ -7,7 +7,7 @@
 /// Create a Swift module to import.
 // RUN: cp %t/module.modulemap %t/sdk/
 // RUN: %target-swift-frontend -emit-module \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/sdk/LocalSystemModule.swiftmodule \
 // RUN:   -emit-module-interface-path %t/sdk/LocalSystemModule.swiftinterface \
 // RUN:   %t/LocalSystemModule.swift -I %t/sdk \

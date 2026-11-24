@@ -2,7 +2,7 @@
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/ModuleCache)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -swift-version 5 -emit-api-descriptor-path %t/api.json -target arm64-apple-macos12 -library-level api
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %s -typecheck -parse-as-library -emit-module-interface-path %t/MyModule.swiftinterface -enable-library-evolution -module-name MyModule -emit-api-descriptor-path %t/api.json -target arm64-apple-macos12 -library-level api
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 @available(iOS 13.0, *)

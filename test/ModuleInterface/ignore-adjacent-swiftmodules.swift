@@ -6,7 +6,7 @@
 
 /// Prepare the SDK.
 //// stdlib
-// RUN: %target-swift-frontend -emit-module -module-name Swift -enable-library-evolution -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name Swift -enable-library-evolution \
 // RUN:   -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Osize \
 // RUN:   %t/sdk/usr/lib/swift/Swift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/usr/lib/swift/Swift.swiftmodule/%target-swiftmodule-name \
@@ -15,7 +15,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/usr/lib/swift/Swift.swiftmodule/%target-swiftinterface-name) -module-name Swift -parse-stdlib
 
 //// Public framework
-// RUN: %target-swift-frontend -emit-module -module-name PublicSwift -enable-library-evolution -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name PublicSwift -enable-library-evolution \
 // RUN:   -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Osize -sdk %t/sdk \
 // RUN:   %t/sdk/System/Library/Frameworks/PublicSwift.framework/Modules/PublicSwift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/System/Library/Frameworks/PublicSwift.framework/Modules/PublicSwift.swiftmodule/%target-swiftmodule-name \
@@ -23,7 +23,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/System/Library/Frameworks/PublicSwift.framework/Modules/PublicSwift.swiftmodule/%target-swiftinterface-name) -module-name PublicSwift
 
 //// Private framework
-// RUN: %target-swift-frontend -emit-module -module-name PrivateSwift -enable-library-evolution -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name PrivateSwift -enable-library-evolution \
 // RUN:   -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Osize -sdk %t/sdk \
 // RUN:   %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftmodule-name \
@@ -31,7 +31,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftinterface-name) -module-name PrivateSwift
 
 //// Public library
-// RUN: %target-swift-frontend -emit-module -module-name PublicSwiftLibrary -enable-library-evolution -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name PublicSwiftLibrary -enable-library-evolution \
 // RUN:   -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Osize -sdk %t/sdk \
 // RUN:   %t/sdk/usr/lib/swift/PublicSwiftLibrary.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/usr/lib/swift/PublicSwiftLibrary.swiftmodule/%target-swiftmodule-name \
@@ -39,7 +39,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/sdk/usr/lib/swift/PublicSwiftLibrary.swiftmodule/%target-swiftinterface-name) -module-name PublicSwiftLibrary
 
 //// Public subframework
-// RUN: %target-swift-frontend -emit-module -module-name SubSwift -enable-library-evolution -swift-version 5 \
+// RUN: %target-swift-frontend -emit-module -module-name SubSwift -enable-library-evolution \
 // RUN:   -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Osize -sdk %t/sdk \
 // RUN:   %t/sdk/System/Library/SubFrameworks/SubSwift.framework/Modules/SubSwift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/System/Library/SubFrameworks/SubSwift.framework/Modules/SubSwift.swiftmodule/%target-swiftmodule-name \

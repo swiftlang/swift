@@ -7,7 +7,7 @@
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/PreservedConformanceProtocols.swift -parse-as-library -emit-module -emit-library -module-name PreservedConformanceProtocols -o %t/includes/PreservedConformanceProtocols.o
 
 // Build the macro library
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/Macros.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/Macros.swift -g -no-toolchain-stdlib-rpath
 
 // Build the test into a binary
 // RUN: %target-build-swift -target %target-swift-5.2-abi-triple  %s -parse-as-library -emit-module -emit-library -module-name PreservedConformances -O -whole-module-optimization -I %t/includes -o %t/PreservedConformances -Xlinker %t/includes/PreservedConformanceProtocols.o -load-plugin-library %t/%target-library-name(MacroDefinition)

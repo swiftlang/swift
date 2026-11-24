@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -swift-version 5 -wmo -o /dev/null
+// RUN: %target-swift-emit-ir -parse-as-library -module-name main -verify %s -enable-experimental-feature Embedded -wmo -o /dev/null
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded

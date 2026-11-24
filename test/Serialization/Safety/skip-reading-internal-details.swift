@@ -5,7 +5,7 @@
 
 /// Build libraries.
 // RUN: %target-swift-frontend -emit-module %t/HiddenLib.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/HiddenLib.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
 // RUN:   -enable-library-evolution \

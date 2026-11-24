@@ -3,13 +3,13 @@
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
 // RUN: %empty-directory(%t)
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Diagnostics testing
-// RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature PreambleMacros -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature PreambleMacros -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
 
 // Execution testing
-// RUN: %target-build-swift -swift-version 5 -g -enable-experimental-feature PreambleMacros -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
+// RUN: %target-build-swift -g -enable-experimental-feature PreambleMacros -enable-experimental-feature BorrowAndMutateAccessors -enable-experimental-feature CoroutineAccessors -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

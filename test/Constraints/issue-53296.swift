@@ -2,7 +2,7 @@
 
 // https://github.com/apple/swift/issues/53296
 
-protocol ViewDataSource: class {
+protocol ViewDataSource: AnyObject {
   func foo<T>() -> [T]
 }
 

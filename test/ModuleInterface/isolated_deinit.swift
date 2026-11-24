@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module %s \
-// RUN:   -module-name A -swift-version 5 \
+// RUN:   -module-name A \
 // RUN:   -target %target-swift-6.1-abi-triple \
 // RUN:   -enable-library-evolution \
 // RUN:     -emit-module-path %t/A.swiftmodule \
@@ -13,7 +13,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/A.swiftinterface)
 
 // RUN: %target-swift-frontend -emit-module %s \
-// RUN:   -module-name B -swift-version 5 \
+// RUN:   -module-name B \
 // RUN:   -target %target-swift-6.1-abi-triple \
 // RUN:   -enable-library-evolution \
 // RUN:   -default-isolation MainActor \

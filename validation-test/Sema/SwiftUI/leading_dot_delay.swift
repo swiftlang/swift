@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx11 -swift-version 5 -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx13 -swift-version 5 -solver-enable-diagnose-valid-salvage -verify-additional-prefix nosalvage-
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx11 -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage-
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx13 -solver-enable-diagnose-valid-salvage -verify-additional-prefix nosalvage-
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 

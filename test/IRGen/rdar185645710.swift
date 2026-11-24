@@ -4,7 +4,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t/src
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name MacroDefinition %t/src/macro.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name MacroDefinition %t/src/macro.swift -g -no-toolchain-stdlib-rpath
 
 // Similar test to `IRGen/macro_expand_extension.swift`, but triggers the exact
 // LLVM issue when emitting x86.

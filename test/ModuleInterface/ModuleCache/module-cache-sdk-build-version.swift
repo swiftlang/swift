@@ -10,7 +10,7 @@
 
 /// Build Lib against the old SDK.
 // RUN: %target-swift-frontend -emit-module -sdk %t/sdk %t/Lib.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 

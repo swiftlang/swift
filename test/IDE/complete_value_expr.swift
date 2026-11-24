@@ -1549,16 +1549,15 @@ func testDeDuped(_ x: dedupS) {
   x#^PROTOCOL_EXT_DEDUP_1^#
 // FIXME: Should produce 3 items (?)
 
-// PROTOCOL_EXT_DEDUP_1: Begin completions, 5 items
+// PROTOCOL_EXT_DEDUP_1: Begin completions, 4 items
 // PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]
-// PROTOCOL_EXT_DEDUP_1-DAG: Decl[InstanceVar]/Super:            .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_1-DAG: Keyword[self]/CurrNominal:          .self[#dedupS#]; name=self
 }
 func testDeDuped2(_ x: dedupP) {
   x#^PROTOCOL_EXT_DEDUP_2^#
-// PROTOCOL_EXT_DEDUP_2: Begin completions, 5 items
+// PROTOCOL_EXT_DEDUP_2: Begin completions, 4 items
 // PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#dedupP.T#]; name=foo()
 // PROTOCOL_EXT_DEDUP_2-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#dedupP.T#]; name=bar
 // FIXME(https://github.com/apple/swift/issues/65696): We should not be showing this because (1) it cannot be accessed on the existential (2) we don't have the syntax and features to represent the projected type sig anyway.
@@ -1567,7 +1566,7 @@ func testDeDuped2(_ x: dedupP) {
 }
 func testDeDuped3<T : dedupP where T.T == Int>(_ x: T) {
   x#^PROTOCOL_EXT_DEDUP_3^#
-// PROTOCOL_EXT_DEDUP_3: Begin completions, 5 items
+// PROTOCOL_EXT_DEDUP_3: Begin completions, 4 items
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceMethod]/CurrNominal:   .foo()[#Int#]; name=foo()
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[InstanceVar]/CurrNominal:      .bar[#Int#]; name=bar
 // PROTOCOL_EXT_DEDUP_3-DAG: Decl[Subscript]/CurrNominal:        [{#(x): Int#}][#Int#]; name=[:]

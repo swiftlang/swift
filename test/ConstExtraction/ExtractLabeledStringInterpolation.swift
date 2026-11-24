@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %target-swift-frontend -swift-version 5 -typecheck -emit-const-values-path %t/ExtractLabeledStringInterpolation.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
+// RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractLabeledStringInterpolation.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s
 // RUN: cat %t/ExtractLabeledStringInterpolation.swiftconstvalues 2>&1 | %FileCheck %s
 
 protocol MyProto {}

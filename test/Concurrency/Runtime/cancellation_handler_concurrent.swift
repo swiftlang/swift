@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch)
-// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 // REQUIRES: concurrency
 // REQUIRES: executable_test

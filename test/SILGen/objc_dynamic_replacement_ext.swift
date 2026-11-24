@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift -swift-version 5 -enable-implicit-dynamic
-// RUN: %target-swift-emit-silgen -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift -swift-version 5 -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPORT
-// RUN: %target-swift-emit-silgen -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift -swift-version 5 | %FileCheck %s --check-prefix=NO
-// RUN: %target-swift-frontend -module-name SomeModule -emit-module -emit-module-path=%t/SomeModule.swiftmodule %S/Inputs/objc_dynamic_replacement_ext.swift -swift-version 5 -validate-tbd-against-ir=all
-// RUN: %target-swift-frontend -module-name SomeModule -emit-module -emit-module-path=%t/SomeModule.swiftmodule %S/Inputs/objc_dynamic_replacement_ext.swift -swift-version 5 -enable-implicit-dynamic -validate-tbd-against-ir=all
-// RUN: %target-swift-emit-silgen -I %t %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-ir -I %t %s -swift-version 5 -validate-tbd-against-ir=all
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift -enable-implicit-dynamic
+// RUN: %target-swift-emit-silgen -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPORT
+// RUN: %target-swift-emit-silgen -module-name SomeModule %S/Inputs/objc_dynamic_replacement_ext.swift | %FileCheck %s --check-prefix=NO
+// RUN: %target-swift-frontend -module-name SomeModule -emit-module -emit-module-path=%t/SomeModule.swiftmodule %S/Inputs/objc_dynamic_replacement_ext.swift -validate-tbd-against-ir=all
+// RUN: %target-swift-frontend -module-name SomeModule -emit-module -emit-module-path=%t/SomeModule.swiftmodule %S/Inputs/objc_dynamic_replacement_ext.swift -enable-implicit-dynamic -validate-tbd-against-ir=all
+// RUN: %target-swift-emit-silgen -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-ir -I %t %s -validate-tbd-against-ir=all
 
 // REQUIRES: objc_interop
 

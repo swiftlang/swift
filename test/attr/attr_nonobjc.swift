@@ -108,7 +108,7 @@ struct SomeStruct { }
 
 // https://github.com/apple/swift/issues/46809
 
-protocol P_46809 : class {}
+protocol P_46809 : AnyObject {}
 extension P_46809 {
   @nonobjc func function() {} // expected-error {{only class members and extensions of classes can be declared '@nonobjc'}}
 }

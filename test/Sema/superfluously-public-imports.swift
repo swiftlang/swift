@@ -37,7 +37,7 @@
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -swift-version 5 -verify
+// RUN:   -verify
 
 // REQUIRES: swift_feature_InternalImportsByDefault
 
@@ -187,7 +187,7 @@ public func useConformance(_ a: any Proto = ConformingType()) {}
 // expected-remark @-3 {{struct 'ConformingType' is imported via 'ConformanceBaseTypes'}}
 // expected-remark @-4 {{initializer 'init()' is imported via 'ConformanceBaseTypes'}}
 
-@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {}
+@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
 
 @inlinable
 public func publicFuncUsesPrivate() {

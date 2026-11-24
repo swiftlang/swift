@@ -5,7 +5,7 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LiteralExpressions
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -module-name EnumRawValueObjCInterface -o %t/EnumRawValueObjCInterface.swiftmodule -emit-module-interface-path %t/EnumRawValueObjCInterface.swiftinterface -enable-library-evolution -swift-version 5 %s -enable-experimental-feature LiteralExpressions
+// RUN: %target-swift-frontend -emit-module -module-name EnumRawValueObjCInterface -o %t/EnumRawValueObjCInterface.swiftmodule -emit-module-interface-path %t/EnumRawValueObjCInterface.swiftinterface -enable-library-evolution %s -enable-experimental-feature LiteralExpressions
 // RUN: %FileCheck %s < %t/EnumRawValueObjCInterface.swiftinterface
 
 import Foundation

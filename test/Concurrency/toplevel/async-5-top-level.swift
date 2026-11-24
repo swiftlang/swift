@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 5 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple %s -verify
 
 // An await is used in the top-level, so the top-level code is a concurrent
 // context. Variables are declared with `@_predatesConcurrency @MainActor`, and

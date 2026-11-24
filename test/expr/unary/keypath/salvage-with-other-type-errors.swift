@@ -48,7 +48,7 @@ func f3() {
 
 // https://github.com/apple/swift/issues/47949
 
-protocol Bindable: class { }
+protocol Bindable: AnyObject { }
 
 extension Bindable {
   func test<Value>(to targetKeyPath: ReferenceWritableKeyPath<Self, Value>, change: Value?) {

@@ -7,7 +7,6 @@
 // RUN:     -emit-module \
 // RUN:     -module-name FakeSystem \
 // RUN:     -o %t/SDK/Frameworks/FakeSystem.framework/Modules/FakeSystem.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     %t/FakeSystem.swift
 //
 // RUN: %empty-directory(%t/idx)

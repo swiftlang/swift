@@ -5,7 +5,7 @@
 // RUN: env RC_DEBUG_OPTIONS=1 %target-swift-frontend -scan-dependencies -o %t/deps.json -I %t \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -g -file-compilation-dir %t -Xcc -ferror-limit=1 \
-// RUN:   %t/test.swift -module-name Test -swift-version 5 -experimental-clang-importer-direct-cc1-scan
+// RUN:   %t/test.swift -module-name Test -experimental-clang-importer-direct-cc1-scan
 // RUN: %FileCheck %s --check-prefix CHECK-DIRECT-CC1-SCAN --input-file=%t/deps.json
 
 // CHECK-DIRECT-CC1-SCAN-NOT: -dwarf-debug-flags

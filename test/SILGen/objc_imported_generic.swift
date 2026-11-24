@@ -71,7 +71,7 @@ public protocol ThingHolder {
   var propertyArrayOfThings: [Thing]? { get set }
 }
 
-public protocol Ansible: class {
+public protocol Ansible: AnyObject {
   associatedtype Anser: ThingHolder
 }
 

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_without_previous_calls1.swift
-// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_without_previous_calls2.swift -Xfrontend -disable-previous-implementation-calls-in-dynamic-replacements
-// RUN: %target-build-swift -I%t -L%t -lModule1 -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module1)) -module-name Module1 -emit-module -emit-module-path %t/Module1.swiftmodule %S/Inputs/dynamic_replacement_without_previous_calls1.swift
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Module2)) -I%t -L%t -lModule1 %target-rpath(%t) -module-name Module2 -emit-module -emit-module-path %t/Module2.swiftmodule %S/Inputs/dynamic_replacement_without_previous_calls2.swift -Xfrontend -disable-previous-implementation-calls-in-dynamic-replacements
+// RUN: %target-build-swift -I%t -L%t -lModule1 -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 // RUN: %target-run %t/main %t/%target-library-name(Module1) %t/%target-library-name(Module2)
 

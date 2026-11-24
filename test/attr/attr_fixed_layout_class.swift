@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 private struct PrivateType {}
 // expected-note@-1 {{struct 'PrivateType' is not '@usableFromInline' or public}}

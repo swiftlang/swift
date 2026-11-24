@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -I %t -swift-version 5 -package-name mypkg -verify
+// RUN: %target-swift-frontend -typecheck %s -I %t -package-name mypkg -verify
 
 package struct PkgStruct {
   package var one: Int

@@ -6,7 +6,6 @@
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     %t/SomeModule.swift
 
 // RUN: %target-swift-ide-test -code-completion -sdk %t/SDK -iframework %t/SDK/Frameworks -source-filename %t/main.swift -code-completion-token=GLOBAL | %FileCheck --check-prefix GLOBAL %s

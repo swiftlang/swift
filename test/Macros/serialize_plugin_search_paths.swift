@@ -4,7 +4,6 @@
 // RUN:   -emit-executable -emit-module \
 // RUN:   -Xfrontend -serialize-debugging-options \
 // RUN:   -module-name MyApp \
-// RUN:   -swift-version 5 \
 // RUN:   -plugin-path %t/plugins \
 // RUN:   -external-plugin-path %t/plugins#%swift-plugin-server \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \

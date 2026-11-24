@@ -3,12 +3,12 @@
 
 /// Build Utils module resiliently.
 // RUN: %target-swift-frontend -emit-module %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
 
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -package-name mypkg -verify
 
 /// Check serialization in SILGEN with resilience enabled.
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t
@@ -23,11 +23,11 @@
 
 /// Build Utils module non-resiliently
 // RUN: %target-swift-frontend -emit-module %t/Utils.swift \
-// RUN:   -module-name Utils -swift-version 5 -I %t \
+// RUN:   -module-name Utils -I %t \
 // RUN:   -package-name mypkg \
 // RUN:   -emit-module -emit-module-path %t/Utils.swiftmodule
 
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -package-name mypkg -verify
 
 /// Check serialization in SILGEN with resilience not enabled.
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil

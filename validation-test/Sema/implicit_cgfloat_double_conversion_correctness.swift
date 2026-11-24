@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -swift-version 5
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes
 // REQUIRES: objc_interop
 
 // Note this cannot use the mock SDK Foundation because it lacks required

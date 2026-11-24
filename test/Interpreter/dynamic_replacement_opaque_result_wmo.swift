@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -module-name A -swift-version 5 -O -wmo %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -module-name A -O -wmo %s -emit-ir | %FileCheck %s
 
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -wmo -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-build-swift -O -wmo -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s --check-prefix=CHECK-EXEC
 

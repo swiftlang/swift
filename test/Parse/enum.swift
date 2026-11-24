@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -language-mode 4 -verify-additional-prefix swift4-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-additional-prefix swift%language_mode-
 
 enum Empty {}
 
@@ -470,7 +471,7 @@ enum SE0036_Generic<T> {
 enum switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-12=`switch`}}
 
 enum SE0155 {
-  case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
+  case emptyArgs() // expected-swift4-warning {{enum element with associated values must have at least one associated value}} expected-swift5-error {{enum element with associated values must have at least one associated value}}
   // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
   // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }

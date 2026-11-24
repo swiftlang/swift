@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-module %s \
-// RUN:   -module-name _A -swift-version 5 \
+// RUN:   -module-name _A \
 // RUN:   -strict-concurrency=complete \
 // RUN:   -package-name A \
 // RUN:   -enable-library-evolution \

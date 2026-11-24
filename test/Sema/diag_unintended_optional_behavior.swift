@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -language-mode 4 -verify-additional-prefix swift4-
 
 func takeAny(_ left: Any, _ right: Any) -> Int? {
   return left as? Int
@@ -83,41 +84,88 @@ func warnNestedOptionalToOptionalAnyCoercion(_ a: Int?, _ b: Any??, _ c: Int???,
 }
 
 class C {
-  var a: Int!
-  var b: Any?!
-  func returningIUO() -> Int! { return a }
-  func returningAny() -> Any { return a }
+  var a: Int! // expected-swift5-note 2{{implicitly unwrapped property 'a' declared here}}
+  var b: Any?! // expected-swift5-note {{implicitly unwrapped property 'b' declared here}}
+  func returningIUO() -> Int! { return a } // expected-swift5-note {{instance method 'returningIUO()' with implicitly unwrapped result type is declared here}}
+  func returningAny() -> Any { return a } // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{40-40= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{40-40=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{40-40= as Any}}
 
-  subscript(i: Int) -> Int! { return 0 }
-  subscript(i: Float) -> Any! { return 0 }
+  subscript(i: Int) -> Int! { return 0 } // expected-swift5-note {{implicitly unwrapped subscript 'subscript(_:)' declared here}}
+  subscript(i: Float) -> Any! { return 0 } // expected-swift5-note {{implicitly unwrapped subscript 'subscript(_:)' declared here}}
 }
 
 class D {
-  init!() {}
+  init!() {} // expected-swift5-note 2{{implicitly unwrapped initializer 'init()' declared here}}
 }
 
-func returningIUO() -> Int! { return 1 }
+func returningIUO() -> Int! { return 1 } // expected-swift5-note {{global function 'returningIUO()' with implicitly unwrapped result type is declared here}}
 
-// No warnings in Swift 3/4 for IUO-to-Any coercion.
-func nowarnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
-  _ = takeAny(a, b)
-  _ = takeAny(returningIUO(), C().returningIUO())
-  _ = takeAny(C().a, C().b)
-  _ = takeAny(C()[0], C()[1.0])
-  _ = takeAny(D(), D())
+func warnIUOToAnyCoercion(_ a: Int!, _ b: Any?!) {
+  // expected-swift5-note@-1 {{implicitly unwrapped parameter 'a' declared here}}
+  // expected-swift5-note@-2 {{implicitly unwrapped parameter 'b' declared here}}
+  _ = takeAny(a, b) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{16-16= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{16-16=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{16-16= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'Any??' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{force-unwrap the value to avoid this warning}}{{19-19=!!}}
+  // expected-swift5-note@-6 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{19-19= as Any}}
+  _ = takeAny(returningIUO(), C().returningIUO()) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{29-29= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{29-29=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{29-29= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{provide a default value to avoid this warning}}{{49-49= ?? <#default value#>}}
+  // expected-swift5-note@-6 {{force-unwrap the value to avoid this warning}}{{49-49=!}}
+  // expected-swift5-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{49-49= as Any}}
+  _ = takeAny(C().a, C().b) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{20-20= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{20-20=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{20-20= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'Any??' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{force-unwrap the value to avoid this warning}}{{27-27=!!}}
+  // expected-swift5-note@-6 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{27-27= as Any}}
+  _ = takeAny(C()[0], C()[1.0]) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{21-21= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{21-21=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{21-21= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{provide a default value to avoid this warning}}{{31-31= ?? <#default value#>}}
+  // expected-swift5-note@-6 {{force-unwrap the value to avoid this warning}}{{31-31=!}}
+  // expected-swift5-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{31-31= as Any}}
+  _ = takeAny(D(), D()) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'D?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{18-18= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{18-18=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{18-18= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'D?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{provide a default value to avoid this warning}}{{23-23= ?? <#default value#>}}
+  // expected-swift5-note@-6 {{force-unwrap the value to avoid this warning}}{{23-23=!}}
+  // expected-swift5-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{23-23= as Any}}
 
   _ = takeAny(a as Any, b as Any)
 }
 
-// No warnings in Swift 3/4 for IUO-to-Any coercion.
-func nowarnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
-  takesOptionalAny(a, b)
+func warnIUOToOptionalAnyCoercion(_ a: Int!, _ b: Any?!, _ c: Int??!, _ d: Any???!) {
+  // expected-swift5-note@-1 {{implicitly unwrapped parameter 'b' declared here}}
+  // expected-swift5-note@-2 {{implicitly unwrapped parameter 'c' declared here}}
+  // expected-swift5-note@-3 {{implicitly unwrapped parameter 'd' declared here}}
+  takesOptionalAny(a, b) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Any??' to 'Any?' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{24-24= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{24-24=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
 
   takesOptionalAny(a, b ?? "")
   takesOptionalAny(a, b!)
   takesOptionalAny(a, b as Any?)
 
-  takesOptionalAny(c, d)
+  takesOptionalAny(c, d) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int???' to 'Any?' does not unwrap optional}}
+  // expected-swift5-note@-1 {{force-unwrap the value to avoid this warning}}{{21-21=!!}}
+  // expected-swift5-note@-2 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{21-21= as Any?}}
+  // expected-swift5-warning@-3 {{coercion of implicitly unwrappable value of type 'Any????' to 'Any?' does not unwrap optional}}
+  // expected-swift5-note@-4 {{force-unwrap the value to avoid this warning}}{{24-24=!!!}}
+  // expected-swift5-note@-5 {{explicitly cast to 'Any?' with 'as Any?' to silence this warning}}{{24-24= as Any?}}
 
   takesOptionalAny(c!!, d!!!)
   takesOptionalAny(c as Any?, d as Any?)
@@ -166,8 +214,15 @@ func warnCollectionOfOptionalToAnyCoercion(_ a: [Int?], _ d: [String : Int?]) {
   takesCollectionOfAny(a as [Any], d as [String : Any])
 }
 
-func nowarnCollectionOfIUOToAnyCoercion(_ a: Int!) {
-  takesCollectionOfAny([a], ["test" : a])
+func warnCollectionOfIUOToAnyCoercion(_ a: Int!) { // expected-swift5-note 2{{implicitly unwrapped parameter 'a' declared here}}
+  takesCollectionOfAny([a], ["test" : a]) // expected-swift5-warning {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-1 {{provide a default value to avoid this warning}}{{26-26= ?? <#default value#>}}
+  // expected-swift5-note@-2 {{force-unwrap the value to avoid this warning}}{{26-26=!}}
+  // expected-swift5-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{26-26= as Any}}
+  // expected-swift5-warning@-4 {{coercion of implicitly unwrappable value of type 'Int?' to 'Any' does not unwrap optional}}
+  // expected-swift5-note@-5 {{provide a default value to avoid this warning}}{{40-40= ?? <#default value#>}}
+  // expected-swift5-note@-6 {{force-unwrap the value to avoid this warning}}{{40-40=!}}
+  // expected-swift5-note@-7 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}{{40-40= as Any}}
 }
 
 func warnCollectionOfTripleOptionalToAnyCoercion(_ a: [Any???], _ d: [String: Any???]) {
@@ -263,4 +318,15 @@ _ = {
     // expected-note@-2 {{provide a default value to avoid this warning}}
     // expected-note@-3 {{force-unwrap the value to avoid this warning}}
   }
+}
+
+// https://github.com/apple/swift/issues/52599
+do {
+  func takesAny(_ x: Any) {}
+
+  let fn: (() -> Int?)! = { return nil }
+  takesAny(fn()) // expected-warning {{expression implicitly coerced from 'Int?' to 'Any'}}
+  // expected-note@-1 {{provide a default value to avoid this warning}}
+  // expected-note@-2 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }

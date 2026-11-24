@@ -3,10 +3,10 @@
 // This test checks that conformances to Copyable do not appear in swiftinterface files
 
 // Generate the parseable interface of the current file via the merge-modules step
-// RUN: %target-build-swift -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/TestMerge.swiftinterface -module-name Test %s -enable-library-evolution -swift-version 5
+// RUN: %target-build-swift -emit-module -o %t/Test.swiftmodule -emit-module-interface-path %t/TestMerge.swiftinterface -module-name Test %s -enable-library-evolution
 
 // Generate the parseable interface of the current file via a single frontend invocation
-// RUN: %target-swift-frontend -enable-library-evolution -typecheck -emit-module-interface-path %t/TestSingle.swiftinterface -module-name Test %s -enable-library-evolution -swift-version 5
+// RUN: %target-swift-frontend -enable-library-evolution -typecheck -emit-module-interface-path %t/TestSingle.swiftinterface -module-name Test %s -enable-library-evolution
 
 // Make sure Copyable doesn't appear anywhere in these files!
 // RUN: %FileCheck --implicit-check-not Copyable %s < %t/TestSingle.swiftinterface

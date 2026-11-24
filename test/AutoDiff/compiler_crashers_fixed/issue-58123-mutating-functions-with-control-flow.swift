@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -g -debug-info-format=dwarf -emit-module -module-name M -emit-module-path %t/M.swiftmodule -swift-version 5 -c %s
+// RUN: %target-build-swift -O -g -debug-info-format=dwarf -emit-module -module-name M -emit-module-path %t/M.swiftmodule -c %s
 
 // https://github.com/apple/swift/issues/58123
 // Mutating functions with control flow can cause assertion failure for

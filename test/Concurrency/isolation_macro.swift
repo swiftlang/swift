@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -dump-ast %s | %FileCheck %s
 
 // Diagnostics testing
-// RUN: not %target-swift-frontend -swift-version 5 -typecheck -DTEST_DIAGNOSTICS %s > %t/diagnostics.txt 2>&1
+// RUN: not %target-swift-frontend -typecheck -DTEST_DIAGNOSTICS %s > %t/diagnostics.txt 2>&1
 // RUN: %FileCheck %s --check-prefix CHECK-DIAGS < %t/diagnostics.txt
 
 // REQUIRES: concurrency

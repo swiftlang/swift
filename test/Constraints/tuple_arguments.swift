@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 // See test/Compatibility/tuple_arguments_4.swift for some
 // Swift 4-specific tests.

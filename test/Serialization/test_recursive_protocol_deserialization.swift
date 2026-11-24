@@ -3,7 +3,7 @@
 
 /// Build the library A
 // RUN: %target-swift-frontend -emit-module %t/src/API.swift \
-// RUN:   -module-name API -swift-version 5 \
+// RUN:   -module-name API \
 // RUN:   -emit-module-path %t/API.swiftmodule
 
 // Build client with module

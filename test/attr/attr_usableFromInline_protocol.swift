@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -disable-access-control %s
 
 public protocol PublicProtoWithReqs {

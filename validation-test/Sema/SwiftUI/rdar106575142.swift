@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -swift-version 5
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx

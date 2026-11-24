@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -swift-version 5 %s -verify -verify-ignore-unrelated
+// RUN: %target-swift-frontend -typecheck %s -verify -verify-ignore-unrelated
 
 func testPopFirst() {
   let str = "abc"

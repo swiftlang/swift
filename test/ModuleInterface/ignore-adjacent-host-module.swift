@@ -7,7 +7,7 @@
 /// their interface (which actually means anything within resource-dir/host).
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift \
-// RUN:   -swift-version 5 -enable-library-evolution \
+// RUN:   -enable-library-evolution \
 // RUN:   -parse-stdlib -module-cache-path %t/cache \
 // RUN:   -o %t/build/host -emit-module-interface-path %t/build/host/Lib.swiftinterface
 

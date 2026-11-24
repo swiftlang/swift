@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 //
 // `DiagnosticEngine::isDiagnosticGroupEnabled` skips the SwiftWarningControl
 // region tree, and the corresponding SwiftParser parse, unless the parser

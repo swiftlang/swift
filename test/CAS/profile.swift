@@ -5,7 +5,7 @@
 
 // RUN: %target-swift-frontend -scan-dependencies -module-name Test -module-cache-path %t/clang-module-cache -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
-// RUN:   %t/main.swift -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -profile-use=%t/default.profdata \
+// RUN:   %t/main.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -profile-use=%t/default.profdata \
 // RUN:   -scanner-prefix-map-paths %t /^tmp
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/Test.cmd

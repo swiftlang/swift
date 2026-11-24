@@ -13,7 +13,7 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -verify \
 // RUN:   -primary-file %t/function_bodies.swift \
 // RUN:   -primary-file %t/function_signatures_unqualified.swift \
 // RUN:   -primary-file %t/function_signatures_qualified.swift \
@@ -23,7 +23,7 @@
 // RUN:   -enable-upcoming-feature MemberImportVisibility \
 // RUN:   -verify-additional-prefix public-by-default-
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN: %target-swift-frontend -typecheck -verify \
 // RUN:   -primary-file %t/function_bodies.swift \
 // RUN:   -primary-file %t/function_signatures_unqualified.swift \
 // RUN:   -primary-file %t/function_signatures_qualified.swift \

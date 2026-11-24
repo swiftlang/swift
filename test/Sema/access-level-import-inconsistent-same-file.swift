@@ -16,8 +16,7 @@
 /// Test language mode specific variants.
 // RUN: %target-swift-frontend -typecheck -verify %t/Client_Swift6.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault
-// RUN: %target-swift-frontend -typecheck -verify %t/Client_Swift5.swift -I %t \
-// RUN:   -swift-version 5
+// RUN: %target-swift-frontend -typecheck -verify %t/Client_Swift5.swift -I %t
 
 // REQUIRES: swift_feature_InternalImportsByDefault
 

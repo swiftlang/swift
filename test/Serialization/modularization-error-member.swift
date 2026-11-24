@@ -4,23 +4,23 @@
 /// Compile the middle Swift library LibWithXRef.
 // RUN: %target-swift-frontend -emit-module %t/LibWithXRef.swift -I %t \
 // RUN:   -module-name LibWithXRef -o %t/LibWithXRef.swiftmodule \
-// RUN:   -swift-version 5
+// RUN:  
 
 /// Build client fine in the expected behavior.
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -validate-tbd-against-ir=none -swift-version 5
+// RUN:   -validate-tbd-against-ir=none
 
 // Replace headers, changing the type of `foo`.
 // RUN: cp %t/A_Changed.h %t/A.h
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -validate-tbd-against-ir=none -swift-version 5 \
+// RUN:   -validate-tbd-against-ir=none \
 // RUN:   -diagnostic-style llvm 2> %t/out
 // RUN: %FileCheck %t/A_Changed.h --input-file %t/out
 
 // Replace headers, disappearing `foo`.
 // RUN: cp %t/A_Disappeared.h %t/A.h
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -validate-tbd-against-ir=none -swift-version 5 \
+// RUN:   -validate-tbd-against-ir=none \
 // RUN:   -diagnostic-style llvm 2> %t/out
 // RUN: %FileCheck %t/A_Disappeared.h --input-file %t/out
 

@@ -7,7 +7,7 @@
 // RUN: %target-swift-emit-pcm -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/SwiftShims.pcm
 // RUN: %target-swift-emit-pcm -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/_SwiftConcurrencyShims.pcm
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/inputs/Foo.swiftmodule -emit-module-interface-path %t/Foo.swiftinterface -alias-module-names-in-module-interface \
-// RUN:   -swift-version 5 -enable-library-evolution -module-cache-path %t.module-cache %t/foo.swift -module-name Foo
+// RUN:   -enable-library-evolution -module-cache-path %t.module-cache %t/foo.swift -module-name Foo
 
 // RUN: echo "[{" > %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"Foo\"," >> %/t/inputs/map.json

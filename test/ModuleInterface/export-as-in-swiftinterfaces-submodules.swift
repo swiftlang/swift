@@ -3,7 +3,7 @@
 
 /// Build a client of the Library lib.
 // RUN: %target-swift-frontend -emit-module %t/LibraryClient.swift \
-// RUN:   -module-name LibraryClient -swift-version 5 -I %t \
+// RUN:   -module-name LibraryClient -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibraryClient.swiftmodule \
 // RUN:   -emit-module-interface-path %t/LibraryClient.swiftinterface \
@@ -18,7 +18,7 @@
 /// eventually folded into the `export_as` module itself. Library isn't loaded,
 /// so the private interface refers to LibraryCore.
 // RUN: %target-swift-frontend -emit-module %t/LibraryCoreClient.swift \
-// RUN:   -module-name LibraryCoreClient -swift-version 5 -I %t \
+// RUN:   -module-name LibraryCoreClient -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibraryCoreClient.swiftmodule \
 // RUN:   -emit-module-interface-path %t/LibraryCoreClient.swiftinterface \
@@ -30,11 +30,11 @@
 
 /// Build modules that import Library, with and without re-exporting it.
 // RUN: %target-swift-frontend -emit-module %t/Dep.swift \
-// RUN:   -module-name Dep -swift-version 5 -I %t \
+// RUN:   -module-name Dep -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Dep.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/ReexportingDep.swift \
-// RUN:   -module-name ReexportingDep -swift-version 5 -I %t \
+// RUN:   -module-name ReexportingDep -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/ReexportingDep.swiftmodule
 
@@ -42,7 +42,7 @@
 /// Library is loaded, but the private interface doesn't import it, so the
 /// interface must refer to LibraryCore.
 // RUN: %target-swift-frontend -emit-module %t/LibraryCoreInternalImportClient.swift \
-// RUN:   -module-name LibraryCoreInternalImportClient -swift-version 5 -I %t \
+// RUN:   -module-name LibraryCoreInternalImportClient -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibraryCoreInternalImportClient.swiftmodule \
 // RUN:   -emit-private-module-interface-path %t/LibraryCoreInternalImportClient.private.swiftinterface
@@ -54,7 +54,7 @@
 /// private interface can't refer to it, so the interface must refer to
 /// LibraryCore.
 // RUN: %target-swift-frontend -emit-module %t/LibraryCoreDepClient.swift \
-// RUN:   -module-name LibraryCoreDepClient -swift-version 5 -I %t \
+// RUN:   -module-name LibraryCoreDepClient -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibraryCoreDepClient.swiftmodule \
 // RUN:   -emit-private-module-interface-path %t/LibraryCoreDepClient.private.swiftinterface
@@ -65,7 +65,7 @@
 /// Library. Clients of the private interface can refer to Library through that
 /// module, so the interface refers to Library.
 // RUN: %target-swift-frontend -emit-module %t/LibraryCoreReexportingDepClient.swift \
-// RUN:   -module-name LibraryCoreReexportingDepClient -swift-version 5 -I %t \
+// RUN:   -module-name LibraryCoreReexportingDepClient -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibraryCoreReexportingDepClient.swiftmodule \
 // RUN:   -emit-private-module-interface-path %t/LibraryCoreReexportingDepClient.private.swiftinterface

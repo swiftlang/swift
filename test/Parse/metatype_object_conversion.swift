@@ -6,7 +6,7 @@ class C {}
 struct S {}
 
 protocol NonClassProto {}
-protocol ClassConstrainedProto : class {}
+protocol ClassConstrainedProto : AnyObject {}
 
 func takesAnyObject(_ x: AnyObject) {}
 

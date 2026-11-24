@@ -7,11 +7,11 @@
 
 // RUN: %empty-directory(%t)
 //
-// target-build-swift assumes we want -swift-version 4. Behavior in initializers
-// changed in swift 5, so we want to explicitly check it as well.
+// target-build-swift defaults to -swift-version 5. Behavior in initializers
+// changed in swift 5, so we want to explicitly check -language-mode 4 as well.
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out -swift-version 5
+// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out -language-mode 4
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 

@@ -4,7 +4,7 @@
 // RUN: %empty-directory(%t/ModuleCache)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %t/MyModuleCore.swift -parse-as-library  -emit-module -emit-module-path %t/MyModuleCore.swiftmodule -enable-library-evolution -module-name MyModuleCore -swift-version 5 -emit-api-descriptor-path %t/api.json -target arm64-apple-macos26 -library-level api -previous-module-installname-map-file %t/previous-module-installname-map.json
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) %t/MyModuleCore.swift -parse-as-library  -emit-module -emit-module-path %t/MyModuleCore.swiftmodule -enable-library-evolution -module-name MyModuleCore -emit-api-descriptor-path %t/api.json -target arm64-apple-macos26 -library-level api -previous-module-installname-map-file %t/previous-module-installname-map.json
 // RUN: %validate-json %t/api.json | %FileCheck %s
 
 //--- MyModuleCore.swift

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -o %t/main %s %S/Inputs/dynamic_replacement_multi_file_A.swift %S/Inputs/dynamic_replacement_multi_file_B.swift -swift-version 5
+// RUN: %target-build-swift -o %t/main %s %S/Inputs/dynamic_replacement_multi_file_A.swift %S/Inputs/dynamic_replacement_multi_file_B.swift
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 

@@ -1293,7 +1293,7 @@ class MethodTestChild : MethodTestParent {
 }
 
 // This test makes sure that if we cast self to a protocol (implicitly or not), we properly error.
-protocol ProtocolCastTestProtocol : class {
+protocol ProtocolCastTestProtocol : AnyObject {
 }
 
 class ProtocolCastTestParent {
@@ -1580,7 +1580,7 @@ class WeakCycle {
 // use in a delegating initializer, when there was none.
 class DelegatingInitTest {
   convenience init(x: Int) {
-    self // expected-warning {{expression of type 'DelegatingInitTest' is unused}}
+    self // expected-warning {{expression of type 'Self' is unused}}
       // expected-error@-1 {{'self' used before 'self.init' call or assignment to 'self'}}
   } // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }

@@ -4,7 +4,6 @@
 //// Ensure we cannot add the conformance in a different module.
 
 // RUN: %target-build-swift \
-// RUN:   -swift-version 5 \
 // RUN:   -emit-module \
 // RUN:   -emit-module-path %t/GardenKit.swiftmodule \
 // RUN:   -emit-module-interface-path %t/GardenKit.swiftinterface \

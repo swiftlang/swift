@@ -6,7 +6,6 @@
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     -D SOME_MODULE \
 // RUN:     %s
 

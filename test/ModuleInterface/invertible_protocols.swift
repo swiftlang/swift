@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend %s \
-// RUN:     -swift-version 5 \
 // RUN:     -enable-library-evolution \
 // RUN:     -emit-module -module-name Swift -parse-stdlib \
 // RUN:     -o %t/Swift.swiftmodule \

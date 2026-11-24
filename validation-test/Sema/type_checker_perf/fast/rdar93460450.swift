@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -swift-version 5 -solver-scope-threshold=10000 -solver-enable-short-conversions
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -solver-scope-threshold=10000 -solver-enable-short-conversions
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 

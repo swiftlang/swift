@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend %s -c -emit-ir -g -swift-version 5 -o - | %FileCheck %s
-// RUN: %target-swift-frontend %s -O -c -emit-ir -g -swift-version 5 -o - | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-frontend %s -c -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -c -emit-ir -g -o - | %FileCheck %s --check-prefix=OPT
 class MyClass {}
 
 // CHECK-LABEL: define {{.*}} @"$s13uninitialized1fyyF"

@@ -3,16 +3,16 @@
 // RUN: %empty-directory(%t)
 
 // Build the plugin
-// RUN: %host-build-swift %S/../../Macros/Inputs/syntax_macro_definitions.swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition -swift-version 5 -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift %S/../../Macros/Inputs/syntax_macro_definitions.swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-build-swift %s -module-name Macro -emit-module -emit-module-path %t -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-build-swift %s -module-name Macro -emit-module -emit-module-path %t -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: %target-swift-symbolgraph-extract -module-name Macro -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/Macro.symbols.json
 // RUN: %FileCheck %s --input-file %t/Macro.symbols.json --check-prefix MISSING
 
 // Also check for a macro expansion.
 // RUN: %empty-directory(%t/sg)
-// RUN: %target-swift-frontend %s -module-name Macro -emit-module -emit-module-path %t/sg/Macro.swiftmodule -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -emit-symbol-graph -emit-symbol-graph-dir %t/sg
+// RUN: %target-swift-frontend %s -module-name Macro -emit-module -emit-module-path %t/sg/Macro.swiftmodule -load-plugin-library %t/%target-library-name(MacroDefinition) -emit-symbol-graph -emit-symbol-graph-dir %t/sg
 // RUN: %FileCheck %s --check-prefix EXPANDED --input-file %t/sg/Macro.symbols.json
 
 @freestanding(expression)

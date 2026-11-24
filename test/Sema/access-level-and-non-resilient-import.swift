@@ -16,7 +16,7 @@
 /// Use AccessLevelOnImport or InternalImportsByDefault to get the error
 /// from Swift 7 in Swift 5.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
 // RUN:   -package-name pkg -library-level api
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift7.swift -I %t \
@@ -26,7 +26,6 @@
 
 /// A non-resilient client doesn't complain.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
-// RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
 // RUN:   -package-name pkg -library-level api
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift7.swift -I %t \

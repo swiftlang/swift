@@ -4,12 +4,12 @@
 //--- SPIDependency.swift
 
 // RUN: %target-swift-frontend -emit-module %t/SPIDependency.swift -o %t \
-// RUN:   -enable-library-evolution -swift-version 5
+// RUN:   -enable-library-evolution
 
 //--- Lib.swift
 
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -o %t -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Lib.private.swiftinterface \

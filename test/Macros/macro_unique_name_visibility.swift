@@ -7,12 +7,12 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(UniqueNameMacros) -module-name=UniqueNameMacros %t/UniqueNameMacros.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(UniqueNameMacros) -module-name=UniqueNameMacros %t/UniqueNameMacros.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -module-name M -load-plugin-library %t/%target-library-name(UniqueNameMacros) -primary-file %t/b.swift %t/a.swift %t/macros.swift
+// RUN: %target-swift-frontend -typecheck -verify -module-name M -load-plugin-library %t/%target-library-name(UniqueNameMacros) -primary-file %t/b.swift %t/a.swift %t/macros.swift
 
 // Check again with the declaring macro expanded before the references.
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 5 -module-name M -load-plugin-library %t/%target-library-name(UniqueNameMacros) %t/a.swift %t/b.swift %t/macros.swift
+// RUN: %target-swift-frontend -typecheck -verify -module-name M -load-plugin-library %t/%target-library-name(UniqueNameMacros) %t/a.swift %t/b.swift %t/macros.swift
 
 //--- UniqueNameMacros.swift
 

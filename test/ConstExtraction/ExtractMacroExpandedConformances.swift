@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: echo "[MyProto]" > %t/protocols.json
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/Macros.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/Macros.swift -g -no-toolchain-stdlib-rpath
 
 // RUN: %target-swift-frontend -typecheck -emit-const-values-path %t/ExtractFromMacroExpansion.swiftconstvalues -const-gather-protocols-file %t/protocols.json -primary-file %s -load-plugin-library %t/%target-library-name(MacroDefinition)
 // RUN: cat %t/ExtractFromMacroExpansion.swiftconstvalues 2>&1 | %FileCheck %s

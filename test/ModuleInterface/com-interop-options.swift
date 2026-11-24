@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -parse-stdlib -swift-version 5 \
+// RUN: %target-swift-frontend -parse-stdlib \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-com-interop -com-interop-model=microsoft \
 // RUN:   -disable-implicit-com-module-import -module-name MicrosoftCOMOptions \
@@ -12,7 +12,7 @@
 // RUN:   -o %t/MicrosoftCOMOptions.swiftmodule \
 // RUN:   %t/MicrosoftCOMOptions.swiftinterface
 
-// RUN: %target-swift-frontend -parse-stdlib -swift-version 5 \
+// RUN: %target-swift-frontend -parse-stdlib \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-experimental-com-interop -com-interop-model=corefoundation \
 // RUN:   -disable-implicit-com-module-import \

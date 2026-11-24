@@ -9,7 +9,6 @@
 // RUN:     -emit-module \
 // RUN:     -module-name SomeModule \
 // RUN:     -o %t/SDK/Frameworks/SomeModule.framework/Modules/SomeModule.swiftmodule/%module-target-triple.swiftmodule \
-// RUN:     -swift-version 5 \
 // RUN:     %t/SomeModule.swift
 
 // Doesn't matter whether the framework is system or not, SomeModule is part

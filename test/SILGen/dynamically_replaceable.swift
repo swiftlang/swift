@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
 
 // IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
 var x = 10
@@ -375,7 +375,7 @@ dynamic var globalX = 0
 // CHECK-LABEL: sil hidden [ossa] @$s23dynamically_replaceable7getsetXyS2iF
 // CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivs
 // CHECK: dynamic_function_ref @$s23dynamically_replaceable7globalXSivg
-func getsetX(_ x: Int) -> Int {
+@MainActor func getsetX(_ x: Int) -> Int {
   globalX = x
   return globalX
 }

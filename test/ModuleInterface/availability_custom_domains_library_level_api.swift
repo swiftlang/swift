@@ -4,7 +4,7 @@
 // RUN:   -I %S/../Inputs/custom-modules/availability-domains \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -experimental-spi-only-imports \
-// RUN:   -enable-library-evolution -swift-version 5 -library-level api \
+// RUN:   -enable-library-evolution -library-level api \
 // RUN:   -package-name TestPackage -module-name Test \
 // RUN:   -emit-module-interface-path %t/Test.swiftinterface \
 // RUN:   -emit-private-module-interface-path %t/Test.private.swiftinterface \

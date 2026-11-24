@@ -6,7 +6,7 @@
 
 /// Build lib with an export_as.
 // RUN: %target-swift-frontend -emit-module %t/Exported.swift \
-// RUN:   -module-name Exported -swift-version 5 -I %t \
+// RUN:   -module-name Exported -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exported.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exported.swiftinterface \
@@ -21,7 +21,7 @@
 
 /// Build lib with an @exported import of the exported one.
 // RUN: %target-swift-frontend -emit-module %t/Exporter.swift \
-// RUN:   -module-name Exporter -swift-version 5 -I %t \
+// RUN:   -module-name Exporter -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Exporter.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Exporter.swiftinterface \
@@ -33,7 +33,7 @@
 
 /// Build a client of the exporter lib.
 // RUN: %target-swift-frontend -emit-module %t/Client.swift \
-// RUN:   -module-name Client -swift-version 5 -I %t \
+// RUN:   -module-name Client -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \
@@ -46,7 +46,7 @@
 /// Build a client of the exporter lib against the public swiftinterface.
 // RUN: rm %t/Exporter.private.swiftinterface %t/Exporter.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Client.swift \
-// RUN:   -module-name Client -swift-version 5 -I %t \
+// RUN:   -module-name Client -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Client.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Client.swiftinterface \

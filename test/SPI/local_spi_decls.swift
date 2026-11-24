@@ -1,10 +1,10 @@
 // Checks for SPI declarations and limited exportability.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -swift-version 5 -package-name myPkg
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -enable-library-evolution -package-name myPkg
 
 // Without -enable-library-evolution the exportability check looks at struct internal properties.
-// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -swift-version 5 -package-name myPkg
+// RUN: %target-typecheck-verify-swift -I %t -verify-ignore-unknown -package-name myPkg
 
 // SPI declarations
 @_spi(MySPI) public func spiFunc() {}

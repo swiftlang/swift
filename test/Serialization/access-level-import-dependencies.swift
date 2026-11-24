@@ -5,7 +5,7 @@
 
 /// Prepare a module to hide or show depending on the import access-level.
 // RUN: %target-swift-frontend -emit-module %t/HiddenDep.swift -o %t \
-// RUN:   -swift-version 5 -enable-library-evolution
+// RUN:   -enable-library-evolution
 
 //--- HiddenDep.swift
 

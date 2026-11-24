@@ -5,11 +5,11 @@
 // RUN: split-file %s %t
 
 /// Build macros.
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroOne) -module-name=MacroOne %t/macro-1.swift
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroTwo) -module-name=MacroTwo %t/macro-2.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroOne) -module-name=MacroOne %t/macro-1.swift
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroTwo) -module-name=MacroTwo %t/macro-2.swift
 
 // RUN: %target-swift-frontend -emit-module %t/test.swift -module-name Test -o %t/Test.swiftmodule \
-// RUN:   -swift-version 5 -external-plugin-path %t#%swift-plugin-server -package-name Test \
+// RUN:   -external-plugin-path %t#%swift-plugin-server -package-name Test \
 // RUN:   -plugin-path %swift-plugin-dir -prefix-serialized-debugging-options \
 // RUN:   -load-plugin-library %t/%target-library-name(MacroOne) \
 // RUN:   -debug-prefix-map %t=/externalsearchpath \

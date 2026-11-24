@@ -3,9 +3,9 @@
 
 // Build the supporting modules.
 // RUN: %target-swift-frontend -emit-module %t/ProtoModule.swift -o %t \
-// RUN:   -module-name ProtoModule -swift-version 5 -enable-library-evolution
+// RUN:   -module-name ProtoModule -enable-library-evolution
 // RUN: %target-swift-frontend -emit-module %t/RefinementModule.swift -o %t \
-// RUN:   -I %t -module-name RefinementModule -swift-version 5 -enable-library-evolution
+// RUN:   -I %t -module-name RefinementModule -enable-library-evolution
 
 // Typecheck the handwritten swiftinterface. This should succeed without errors
 // even when MemberImportVisibility is enabled, because swiftinterfaces are

@@ -4,18 +4,18 @@
 // RUN: %target-swift-frontend -emit-module %t/Lib.swift -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -module-name Lib -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -swift-version 5
+// RUN:  
 
 /// Use of IOI types in SPI signatures is an error with -experimental-spi-only-imports
 // RUN: %target-swift-frontend -emit-module %t/ClientSPIOnlyMode.swift -I %t \
 // RUN:   -enable-library-evolution \
-// RUN:   -swift-version 5 -verify -verify-ignore-unrelated \
+// RUN:   -verify -verify-ignore-unrelated \
 // RUN:   -experimental-spi-only-imports
 
 /// Use of IOI types in SPI signatures is a warning without -experimental-spi-only-imports
 // RUN: %target-swift-frontend -emit-module %t/ClientDefaultMode.swift -I %t \
 // RUN:   -enable-library-evolution \
-// RUN:   -swift-version 5 -verify -verify-ignore-unrelated
+// RUN:   -verify -verify-ignore-unrelated
 
 //--- Lib.swift
 

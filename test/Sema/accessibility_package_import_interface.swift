@@ -3,7 +3,7 @@
 
 // TEST Build Dep with package symbols
 // RUN: %target-swift-frontend -emit-module %t/Dep.swift \
-// RUN:   -module-name Dep -swift-version 5 -I %t \
+// RUN:   -module-name Dep -I %t \
 // RUN:   -package-name myPkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Dep.swiftmodule \
@@ -49,14 +49,14 @@
 // TEST Remove and rebuild Dep from source
 // RUN: rm %t/Dep.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/Dep.swift \
-// RUN:   -module-name Dep -swift-version 5 -I %t \
+// RUN:   -module-name Dep -I %t \
 // RUN:   -package-name myPkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/Dep.swiftmodule
 
 // TEST Build LibPass with package name
 // RUN: %target-swift-frontend -emit-module %t/LibPass.swift \
-// RUN:   -module-name LibPass -swift-version 5 -I %t \
+// RUN:   -module-name LibPass -I %t \
 // RUN:   -package-name myPkg \
 // RUN:   -enable-library-evolution \
 // RUN:   -emit-module-path %t/LibPass.swiftmodule \

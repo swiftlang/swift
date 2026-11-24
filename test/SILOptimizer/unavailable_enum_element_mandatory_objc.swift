@@ -10,7 +10,7 @@
 // CHECK:       [[YBB]]:
 // CHECK:       } // end sil function '$s4Test30testFullyCoveredSwitchOpenEnumyySo9DimensionVF'
 public func testFullyCoveredSwitchOpenEnum(_ e: Dimension) {
-  switch e {
+  switch e { // expected-warning {{switch covers known cases, but 'Dimension' may have additional unknown values}} expected-note {{handle unknown values using "@unknown default"}}
   case .x: ()
   case .z: ()
   case .y: ()

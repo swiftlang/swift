@@ -5,28 +5,28 @@
 
 /// Build libraries
 // RUN: %target-swift-frontend -emit-module %t/ImportedPrivate.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -package-name pkg \
 // RUN:   -emit-module-path %t/ImportedPrivate.swiftmodule
 // RUN: %target-swift-frontend -emit-module %t/ImportedInternal.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -package-name pkg \
 // RUN:   -emit-module-path %t/ImportedInternal.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportedPackage.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -package-name pkg \
 // RUN:   -emit-module-path %t/ImportedPackage.swiftmodule -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportedPublic.swift \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -package-name pkg \
 // RUN:   -emit-module-path %t/ImportedPublic.swiftmodule -I %t
 
 /// Build clients
 // RUN: %target-swift-frontend -typecheck %t/InPackageClient.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -package-name pkg -verify
 // RUN: %target-swift-frontend -typecheck %t/OutOfPackageClient.swift -I %t \
-// RUN:   -enable-library-evolution -swift-version 5 \
+// RUN:   -enable-library-evolution \
 // RUN:   -verify
 
 //--- ImportedPrivate.swift

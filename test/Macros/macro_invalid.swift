@@ -4,9 +4,9 @@
 // RUN: split-file --leading-lines %s %t
 
 // Create the plugin
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroPlugin) -module-name=MacroPlugin %t/MacroPlugin.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: not %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroPlugin) -module-name TestModule %t/TestModule.swift 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -typecheck -load-plugin-library %t/%target-library-name(MacroPlugin) -module-name TestModule %t/TestModule.swift 2>&1 | %FileCheck %s
 // CHECK: unexpected token '}' in expanded member list
 
 //--- MacroPlugin.swift

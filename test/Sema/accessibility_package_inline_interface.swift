@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -module-name Utils1 %t/Utils.swift -emit-module -emit-module-path %t/Utils1.swiftmodule -package-name myLib -swift-version 5
+// RUN: %target-swift-frontend -module-name Utils1 %t/Utils.swift -emit-module -emit-module-path %t/Utils1.swiftmodule -package-name myLib
 // RUN: test -f %t/Utils1.swiftmodule
 
-// RUN: %target-swift-frontend -module-name Utils %t/Utils.swift -emit-module -emit-module-interface-path %t/Utils.swiftinterface -package-name myLib -enable-library-evolution -swift-version 5
+// RUN: %target-swift-frontend -module-name Utils %t/Utils.swift -emit-module -emit-module-interface-path %t/Utils.swiftinterface -package-name myLib -enable-library-evolution
 // RUN: test -f %t/Utils.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t/Utils.swiftinterface) -I%t
 

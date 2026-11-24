@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 protocol P1 {
   static func `init`(_: Int) // expected-note {{protocol requires function 'init' with type '(Int) -> ()'}}

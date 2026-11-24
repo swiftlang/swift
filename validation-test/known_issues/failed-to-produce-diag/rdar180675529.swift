@@ -1,5 +1,5 @@
 // rdar://180675529
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 enum Status {
   case unknown

@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-clang %t/Impl.m -c -o %t/Test.o
-// RUN: %target-build-swift %t/main.swift %t/doc.swift -import-objc-header %t/Test.h %t/Test.o -language-mode 5 -strict-concurrency=complete -o %t/main
+// RUN: %target-build-swift %t/main.swift %t/doc.swift -import-objc-header %t/Test.h %t/Test.o -strict-concurrency=complete -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

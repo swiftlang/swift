@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser
 
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift
 
 protocol P {
   associatedtype A

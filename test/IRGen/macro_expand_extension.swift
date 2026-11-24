@@ -6,7 +6,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t/src
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
 // Make sure we emit extension macros correctly for both single-threaded and multi-threaded WMO, as well
 // as regular single primary mode.

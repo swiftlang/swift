@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
+// RUN: %target-typecheck-verify-swift -package-name myPkg
 
 private struct PrivateStruct {} // expected-note 10{{type declared here}}
 internal struct InternalStruct {} // expected-note 4{{type declared here}}

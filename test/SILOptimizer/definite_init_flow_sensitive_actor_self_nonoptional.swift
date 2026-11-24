@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s -module-name test -swift-version 5 -sil-verify-all -o /dev/null
-// RUN: not %target-swift-frontend -emit-sil %s -module-name test -swift-version 5 -DUSE_BEFORE_INIT 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s -module-name test -sil-verify-all -o /dev/null
+// RUN: not %target-swift-frontend -emit-sil %s -module-name test -DUSE_BEFORE_INIT 2>&1 | %FileCheck %s
 // REQUIRES: concurrency
 
 // https://github.com/swiftlang/swift/issues/93800

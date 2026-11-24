@@ -3,36 +3,36 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(UnstringifyMacroDefinition) -module-name=UnstringifyMacroDefinition %S/Inputs/macro/unstringify-macro.swift -g -no-toolchain-stdlib-rpath
+// RUN: %host-build-swift -emit-library -o %t/%target-library-name(UnstringifyMacroDefinition) -module-name=UnstringifyMacroDefinition %S/Inputs/macro/unstringify-macro.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/main.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/empty-no-expansion.swift 2>&1 | %FileCheck --check-prefix=CHECK-MISSING %t/empty-no-expansion.swift
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/main.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -Rmacro-expansions -typecheck %t/empty-no-expansion.swift 2>&1 | %FileCheck --check-prefix=CHECK-MISSING %t/empty-no-expansion.swift
 
-// RUN: %target-swift-frontend-verify -swift-version 5 -verify-child-notes -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-positive.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -verify-child-notes -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-negative.swift 2>&1 | %FileCheck %t/cross-buffer-location-negative.swift --implicit-check-not error: --implicit-check-not warning:
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-badline.swift 2>&1 | %FileCheck --check-prefix=CHECK-BADLINE %t/cross-buffer-location-badline.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-wrongline.swift 2>&1 | %FileCheck --check-prefix=CHECK-WRONGLINE %t/cross-buffer-location-wrongline.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-dup.swift 2>&1 | %FileCheck --check-prefix=CHECK-DUP %t/cross-buffer-location-dup.swift
+// RUN: %target-swift-frontend-verify -verify-child-notes -typo-correction-limit 10 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-positive.swift
+// RUN: not %target-swift-frontend-verify -verify-child-notes -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-negative.swift 2>&1 | %FileCheck %t/cross-buffer-location-negative.swift --implicit-check-not error: --implicit-check-not warning:
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-badline.swift 2>&1 | %FileCheck --check-prefix=CHECK-BADLINE %t/cross-buffer-location-badline.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-wrongline.swift 2>&1 | %FileCheck --check-prefix=CHECK-WRONGLINE %t/cross-buffer-location-wrongline.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-buffer-location-dup.swift 2>&1 | %FileCheck --check-prefix=CHECK-DUP %t/cross-buffer-location-dup.swift
 
 // A '// #name@N' marker defined in one file's expected-expansion block, then
 // referenced from a diagnostic in another file that is verified first. Passes
 // only because every expansion block's markers are bound before any file is
 // verified.
-// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-file-order-a.swift %t/cross-file-order-b.swift
+// RUN: %target-swift-frontend-verify -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/cross-file-order-a.swift %t/cross-file-order-b.swift
 
-// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift
-// RUN: %target-swift-frontend-verify -swift-version 5 -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift -verify-child-notes
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift 2>&1 | %FileCheck --check-prefix=DISABLED %t/ignore-macro-note.swift
+// RUN: %target-swift-frontend-verify -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift
+// RUN: %target-swift-frontend-verify -verify-ignore-macro-note -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift -verify-child-notes
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/ignore-macro-note.swift 2>&1 | %FileCheck --check-prefix=DISABLED %t/ignore-macro-note.swift
 
 // Multiple expansions attached at the same source location (several peer macros
 // on one declaration). Each produces a distinct sibling expansion buffer, and
 // expansion directives are matched to them by position.
-// RUN: %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-both.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-misrouting.swift 2>&1 | %FileCheck --check-prefix=CHECK-MISROUTE %t/multi-misrouting.swift
-// RUN: %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-markers-outside.swift
-// RUN: %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-marker-sibling.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-more-directives.swift 2>&1 | %FileCheck --check-prefix=CHECK-MOREDIRS %t/multi-more-directives.swift
-// RUN: not %target-swift-frontend-verify -swift-version 5 -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-more-expansions.swift 2>&1 | %FileCheck --check-prefix=CHECK-MOREEXP %t/multi-more-expansions.swift
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-both.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-misrouting.swift 2>&1 | %FileCheck --check-prefix=CHECK-MISROUTE %t/multi-misrouting.swift
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-markers-outside.swift
+// RUN: %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-marker-sibling.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-more-directives.swift 2>&1 | %FileCheck --check-prefix=CHECK-MOREDIRS %t/multi-more-directives.swift
+// RUN: not %target-swift-frontend-verify -load-plugin-library %t/%target-library-name(UnstringifyMacroDefinition) -typecheck %t/multi-more-expansions.swift 2>&1 | %FileCheck --check-prefix=CHECK-MOREEXP %t/multi-more-expansions.swift
 
 //--- main.swift
 @attached(peer, names: overloaded)

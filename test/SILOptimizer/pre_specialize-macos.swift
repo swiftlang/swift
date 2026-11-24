@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
-// RUN: %target-swift-frontend -I %t -O -swift-version 5 -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module2.swiftinterface %S/Inputs/pre_specialized_module2.swift -module-name pre_specialized_module2
+// RUN: %target-swift-frontend -O -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module.swiftinterface %S/Inputs/pre_specialized_module.swift -module-name pre_specialized_module
+// RUN: %target-swift-frontend -I %t -O -enable-library-evolution -emit-module -o /dev/null -emit-module-interface-path %t/pre_specialized_module2.swiftinterface %S/Inputs/pre_specialized_module2.swift -module-name pre_specialized_module2
 // RUN: %target-swift-frontend -I %t -O -emit-sil -target %target-cpu-apple-macos51 %s | %FileCheck %s --check-prefix=OPT --check-prefix=CHECK
 // RUN: %target-swift-frontend -I %t -O -emit-sil -target %target-cpu-apple-macosx49 %s | %FileCheck %s --check-prefix=NOOPT --check-prefix=CHECK
 

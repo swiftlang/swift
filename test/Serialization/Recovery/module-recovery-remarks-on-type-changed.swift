@@ -4,17 +4,17 @@
 /// Compile the middle Swift library LibWithXRef.
 // RUN: %target-swift-frontend -emit-module %t/LibWithXRef.swift -I %t \
 // RUN:   -module-name LibWithXRef -o %t/LibWithXRef.swiftmodule \
-// RUN:   -swift-version 5
+// RUN:  
 
 /// Build client fine in the expected behavior.
 // RUN: %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -validate-tbd-against-ir=none -swift-version 5
+// RUN:   -validate-tbd-against-ir=none
 
 // Replace headers, changing the type of `foo`. The client must recover with a
 // normal diagnostic instead of aborting with a deserialization failure.
 // RUN: mv %t/A_DifferentAPI.h %t/A.h
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t \
-// RUN:   -validate-tbd-against-ir=none -swift-version 5 2>&1 \
+// RUN:   -validate-tbd-against-ir=none 2>&1 \
 // RUN:   -diagnostic-style llvm | %FileCheck %s
 // CHECK: error: reference to declaration 'foo' broken by a context change; the declaration kind of 'foo' from 'A' changed since building 'LibWithXRef'
 // CHECK: note: the declaration was expected to be found in module 'A' at '{{.*}}module.modulemap'

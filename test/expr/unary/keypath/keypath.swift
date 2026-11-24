@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify -solver-disable-enumerate-supertypes
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify -solver-disable-enumerate-supertypes -language-mode 4 -verify-additional-prefix swift4-
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify -solver-disable-enumerate-supertypes -verify-additional-prefix swift%language_mode-
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct Sub: Hashable {
@@ -77,7 +78,7 @@ extension Array where Element == A {
 protocol P { var member: String { get } }
 extension B : P { var member : String { return "Member Value" } }
 
-struct Exactly<T> {}
+struct Exactly<T> {} // expected-swift5-note 2 {{arguments to generic parameter 'T' ('WritableKeyPath<VisibilityTesting, Int>' and 'KeyPath<VisibilityTesting, Int>') are expected to be equal}}
 
 func expect<T>(_ x: inout T, toHaveType _: Exactly<T>.Type) {}
 
@@ -691,7 +692,7 @@ struct VisibilityTesting {
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     // Allow WritableKeyPath for Swift 3/4 only.
     expect(&zRef,
-      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self) // expected-swift5-error {{cannot convert value of type 'Exactly<WritableKeyPath<VisibilityTesting, Int>>.Type' to expected argument type 'Exactly<KeyPath<VisibilityTesting, Int>>.Type'}}
   }
 
   func inPrivateContext() {
@@ -714,7 +715,7 @@ struct VisibilityTesting2 {
     var zRef = \VisibilityTesting.z
     // Allow WritableKeyPath for Swift 3/4 only.
     expect(&xRef,
-      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
+      toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self) // expected-swift5-error {{cannot convert value of type 'Exactly<WritableKeyPath<VisibilityTesting, Int>>.Type' to expected argument type 'Exactly<KeyPath<VisibilityTesting, Int>>.Type'}}
     expect(&yRef,
       toHaveType: Exactly<WritableKeyPath<VisibilityTesting, Int>>.self)
     expect(&zRef,

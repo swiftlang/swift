@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift-dylib(%t/%target-library-name(TestDidWillSet)) -module-name TestDidWillSet -emit-module -emit-module-path %t/TestDidWillSet.swiftmodule -swift-version 5 %S/Inputs/dynamic_replacement_property_observer_orig.swift -Xfrontend -enable-private-imports -Xfrontend -enable-implicit-dynamic
-// RUN: %target-build-swift-dylib(%t/%target-library-name(TestDidWillSet2)) -I%t -L%t -lTestDidWillSet %target-rpath(%t) -module-name TestDidWillSet2 -swift-version 5 %S/Inputs/dynamic_replacement_property_observer_repl.swift
-// RUN: %target-build-swift -I%t -L%t -lTestDidWillSet -o %t/main %target-rpath(%t) %s -swift-version 5
+// RUN: %target-build-swift-dylib(%t/%target-library-name(TestDidWillSet)) -module-name TestDidWillSet -emit-module -emit-module-path %t/TestDidWillSet.swiftmodule %S/Inputs/dynamic_replacement_property_observer_orig.swift -Xfrontend -enable-private-imports -Xfrontend -enable-implicit-dynamic
+// RUN: %target-build-swift-dylib(%t/%target-library-name(TestDidWillSet2)) -I%t -L%t -lTestDidWillSet %target-rpath(%t) -module-name TestDidWillSet2 %S/Inputs/dynamic_replacement_property_observer_repl.swift
+// RUN: %target-build-swift -I%t -L%t -lTestDidWillSet -o %t/main %target-rpath(%t) %s
 // RUN: %target-codesign %t/main %t/%target-library-name(TestDidWillSet) %t/%target-library-name(TestDidWillSet2)
 // RUN: %target-run %t/main %t/%target-library-name(TestDidWillSet) %t/%target-library-name(TestDidWillSet)
 
