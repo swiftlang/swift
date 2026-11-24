@@ -19,6 +19,11 @@ func keep(_ function: (UnownedJob) -> Void) {}
 
 actor Counter {
   var value = 0
+  let deinitialized: CheckedContinuation<Void, Never>
+
+  init(deinitialized: CheckedContinuation<Void, Never>) {
+    self.deinitialized = deinitialized
+  }
 
   func bump() {
     value += 1
@@ -28,6 +33,7 @@ actor Counter {
   // running this deinit.
   isolated deinit {
     print("isolated deinit, value \(value)")
+    deinitialized.resume()
   }
 }
 
@@ -35,9 +41,12 @@ actor Counter {
 struct Main {
   static func main() async {
     keep(enqueueMainExecutor)
-    do {
-      let counter = Counter()
-      await counter.bump()
+    // Releasing the last reference can enqueue the deinit instead of running it.
+    await withCheckedContinuation { deinitialized in
+      Task { @MainActor in
+        let counter = Counter(deinitialized: deinitialized)
+        await counter.bump()
+      }
     }
     print("done")
   }
