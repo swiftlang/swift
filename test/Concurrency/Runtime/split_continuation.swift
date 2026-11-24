@@ -524,7 +524,7 @@ actor Elsewhere {
       // Cancellation walks past the scope's record to reach the handlers.
       let executor = ManualExecutor()
       let task = Task(executorPreference: executor) {
-        await __withTaskCancellationScope { _ in
+        await withTaskCancellationScope { _ in
           await withContinuation(of: Int.self, throwing: Never.self) {
             (continuation: consuming Continuation<Int, Never>,
              waiter: consuming ContinuationWaiter<Int, Never>) in
@@ -543,7 +543,7 @@ actor Elsewhere {
 
     tests.test("installing inside an already-cancelled scope runs the handler") {
       let task = Task {
-        await __withTaskCancellationScope { scope in
+        await withTaskCancellationScope { scope in
           scope.cancel()
           expectTrue(Task.isCancelled)
           return await withContinuation(of: Int.self, throwing: Never.self) {

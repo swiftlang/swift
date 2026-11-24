@@ -350,6 +350,9 @@ extension Task where Success == Never, Failure == Never {
   /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
   /// to return `false` even though the task has been cancelled externally.
   ///
+  /// Inside a ``TaskCancellationScope``, `isCancelled` reports the cancellation
+  /// of the nearest enclosing scope, even if the task isn't cancelled.
+  ///
   /// - SeeAlso: ``checkCancellation()``
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
   public static var isCancelled: Bool {

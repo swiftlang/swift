@@ -141,11 +141,11 @@ public nonisolated(nonsending) func withDeadline<Return, Failure, C>(
   let record = unsafe Builtin.taskPushDeadline(clock: clock, instant: expiration)
   defer { unsafe Builtin.taskPopDeadline(record: record) }
 
-  return try await __withTaskCancellationScope { scope throws(Failure) in
-    // `scope` is ~Escapable/~Copyable and cannot be captured by the
-    // escaping `Task.detached` closure below, so we capture its
-    // (Copyable, Escapable) raw record pointer instead and reconstruct
-    // a transient `TaskCancellationScope` from it at the point of use.
+  return try await withTaskCancellationScope { scope async throws(Failure) in
+    // `scope` is ~Escapable and cannot be captured by the escaping
+    // `Task.detached` closure below, so we capture its (Escapable) raw
+    // record pointer instead and reconstruct a transient
+    // `TaskCancellationScope` from it at the point of use.
     let scopeRecord = unsafe scope._record
 
     // If the deadline is already in the past, cancel the scope synchronously

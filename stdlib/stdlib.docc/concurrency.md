@@ -46,6 +46,9 @@ Perform asynchronous and parallel operations.
 - ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 - ``Swift/withTaskCancellationShield(operation:)-2lzl8``
 - ``Swift/Task/hasActiveCancellationShield``
+- ``Swift/withTaskCancellationScope(_:)-9rf6d``
+- ``Swift/withTaskCancellationScope(_:)-3mlgc``
+- ``Swift/TaskCancellationScope``
 
 ### Asynchronous Sequences
 

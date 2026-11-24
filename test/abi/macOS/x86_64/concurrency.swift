@@ -475,7 +475,7 @@ Added: __swift_concurrency_task_registry_enabled
 Added: __swift_concurrency_task_registry_shard_size
 
 // withDeadline / TaskCancellationScope: structured-concurrency deadlines,
-// scoped cancellation (SPI), and CancellationError.Reason plumbing.
+// scoped cancellation, and CancellationError.Reason plumbing.
 Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEtYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lF
 Added: _$ss12withDeadline_9tolerance5clock9operationx7Instants5ClockPQy0__8DurationAGQy0_Sgq0_xyYaq_YKYCXEtYaq_YKs5ErrorR_s12IdentifiableR0_sAFR0_Ri_zr1_lFTu
 Added: _$ss13SystemClockIDO10continuousyA2BmFWC
@@ -496,8 +496,8 @@ Added: _$ss15SuspendingClockV2ids06SystemB2IDOvg
 Added: _$ss15SuspendingClockV2ids06SystemB2IDOvpMV
 Added: _$ss15SuspendingClockVs12IdentifiablesMc
 Added: _$ss20_findNearestDeadline5clock7Instants5ClockPQzSgx_ts12IdentifiableRzsADRzlF
-Added: _$ss21TaskCancellationScopeV6recordABSV_tcfC
-Added: _$ss21TaskCancellationScopeV7_recordSVvg
+Added: _$ss21TaskCancellationScopeV6recordABSVSg_tcfC
+Added: _$ss21TaskCancellationScopeV7_recordSVSgvg
 Added: _$ss21TaskCancellationScopeVMa
 Added: _$ss21TaskCancellationScopeVMn
 Added: _$ss21TaskCancellationScopeVN
@@ -537,7 +537,7 @@ Added: _$sScTss5NeverORszABRs_rlE14activeDeadline3for7Instants5ClockPQyd__Sgqd__
 Added: _$sScTss5NeverORszABRs_rlE17hasActiveDeadlineSbvpZMV
 Added: _$sScTss5NeverORszABRs_rlE18cancellationReasonScE0C0OSgvpZMV
 Added: _swift_task_cancelCancellationScope
-Added: _swift_task_cancellationScopeIsCancelled
+Added: _swift_task_cancellationScopeGetIsCancelledWithReason
 Added: _swift_task_cancelWithFlags
 Added: _swift_task_findNearestDeadlineForClock
 Added: _swift_task_getIsCancelledWithReason

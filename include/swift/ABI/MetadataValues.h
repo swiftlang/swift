@@ -1838,6 +1838,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
 
+  /// The task that owns a cancellation scope record. It's address-diversified.
+  const uint16_t TaskCancellationScopeOwningTask = 0xce0d; // = 52749
+
   /// The task to resume in a NullaryContinuationJob.
   const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
 
