@@ -47,9 +47,10 @@ using namespace importer;
 using namespace llvm::support;
 
 /// Determine whether the new declarations matches an existing declaration.
-static bool matchesExistingDecl(clang::Decl *decl, clang::Decl *existingDecl) {
+static bool matchesExistingDecl(const clang::Decl *canonicalDecl,
+                                clang::Decl *existingDecl) {
   // If the canonical declarations are equivalent, we have a match.
-  return decl->getCanonicalDecl() == existingDecl->getCanonicalDecl();
+  return canonicalDecl == existingDecl->getCanonicalDecl();
 }
 
 template <typename value_type, typename CharT>
@@ -516,6 +517,7 @@ bool SwiftLookupTable::addLocalEntry(
   auto decl = newEntry.dyn_cast<clang::NamedDecl *>();
   auto macro = newEntry.dyn_cast<clang::MacroInfo *>();
   auto moduleMacro = newEntry.dyn_cast<clang::ModuleMacro *>();
+  const clang::Decl *canonicalDecl = decl ? decl->getCanonicalDecl() : nullptr;
 
   int64_t declComparisons = 0;
   SWIFT_DEFER {
@@ -527,7 +529,7 @@ bool SwiftLookupTable::addLocalEntry(
     // If it matches an existing declaration, there's nothing to do.
     if (decl && existingEntry.isDeclEntry()) {
       ++declComparisons;
-      if (matchesExistingDecl(decl, mapStoredDecl(existingEntry)))
+      if (matchesExistingDecl(canonicalDecl, mapStoredDecl(existingEntry)))
         return false;
     }
 
@@ -627,28 +629,38 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
      entries.push_back(entry);
   };
 
+  // Find the entries for this name, populating the cache from the reader if
+  // necessary.
+  auto getEntries = [&](TableType &table,
+                        llvm::function_ref<CacheCallback> create) -> auto & {
+    if (Reader) {
+      auto known = findOrCreate(table, name.getBaseName(), create);
+      if (known != table.end())
+        return known->second;
+    }
+    return table[name.getBaseName()];
+  };
+
   // If this is a global imported as a member, record is as such.
   auto context = *contextOpt;
   if (isGlobalAsMember(newEntry, context)) {
-    // Populate cache from reader if necessary.
-    findOrCreate(GlobalsAsMembers, name.getBaseName(),
-                 [](auto &results, auto &Reader, auto Name) {
-      return (void)Reader.lookupGlobalsAsMembers(Name, results);
-    });
-    updateTableWithEntry(newEntry, context,
-                         GlobalsAsMembers[name.getBaseName()]);
+    updateTableWithEntry(
+        newEntry, context,
+        getEntries(GlobalsAsMembers,
+                   [](auto &results, auto &Reader, auto Name) {
+                     return (void)Reader.lookupGlobalsAsMembers(Name, results);
+                   }));
 
     // Populate the index as well.
     auto &entries = GlobalsAsMembersIndex[context];
     (void)addLocalEntry(newEntry, entries);
   }
 
-  // Populate cache from reader if necessary.
-  findOrCreate(LookupTable, name.getBaseName(),
-               [](auto &results, auto &Reader, auto Name) {
-    return (void)Reader.lookup(Name, results);
-  });
-  updateTableWithEntry(newEntry, context, LookupTable[name.getBaseName()]);
+  updateTableWithEntry(
+      newEntry, context,
+      getEntries(LookupTable, [](auto &results, auto &Reader, auto Name) {
+        return (void)Reader.lookup(Name, results);
+      }));
 }
 
 SwiftLookupTable::TableType::iterator
@@ -1968,6 +1980,18 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
       return;
     }
   }
+
+  const clang::Decl *attrDecl = named;
+
+  // Attributes on a function template are attached to the templated decl.
+  if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(named))
+    attrDecl = ftd->getTemplatedDecl();
+
+  std::optional<DeclName> customSwiftName;
+  if (auto *swiftNameAttr = attrDecl->getAttr<clang::SwiftNameAttr>())
+    customSwiftName =
+        parseDeclName(swiftNameAttr->getName()).formDeclName(swiftCtx);
+
   // If we have a name to import as, add this entry to the table.
   auto currentVersion =
       ImportNameVersion::fromOptions(nameImporter.getLangOpts());
@@ -2005,21 +2029,11 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
           bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
         }
 
-        const clang::Decl *attrDecl = named;
-
-        // Attributes on a function template are attached to the templated decl.
-        if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(named))
-          attrDecl = ftd->getTemplatedDecl();
-
-        if (auto *swiftNameAttr = attrDecl->getAttr<clang::SwiftNameAttr>()) {
-          auto parsedDeclName = parseDeclName(swiftNameAttr->getName());
-          auto swiftDeclName = parsedDeclName.formDeclName(swiftCtx);
-          if (importedName.getDeclName() != swiftDeclName) {
-            table.addEntry(swiftDeclName, named,
-                           importedName.getEffectiveContext());
-            bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
-            bumpCounter(swiftCtx, &Counters::LookupTableDeclCustomNamesAdded);
-          }
+        if (customSwiftName && importedName.getDeclName() != *customSwiftName) {
+          table.addEntry(*customSwiftName, named,
+                         importedName.getEffectiveContext());
+          bumpCounter(swiftCtx, &Counters::LookupTableDeclNameVariantsAdded);
+          bumpCounter(swiftCtx, &Counters::LookupTableDeclCustomNamesAdded);
         }
 
         return true;
