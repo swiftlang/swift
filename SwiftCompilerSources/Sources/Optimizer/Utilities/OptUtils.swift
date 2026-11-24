@@ -1278,6 +1278,46 @@ extension CopyAddrInst {
   }
 }
 
+extension DestroyAddrInst {
+  /// Splits the `destroy_addr` of a struct or tuple into `destroy_addr`s of the non-trivial elements.
+  /// This enables to eliminate a `destroy_addr` for which the value is only available in the form of
+  /// stores to the elements, e.g.
+  ///
+  ///     %1 = struct_element_addr %0, #S.x
+  ///     store %2 to [init] %1
+  ///     ...
+  ///     destroy_addr %0
+  ///
+  func trySplit(_ context: FunctionPassContext) -> Bool {
+    let type = destroyedAddress.type
+    let elementTypes: [Type]
+    if type.isStruct {
+      guard let structDecl = type.nominal as? StructDecl,
+            !structDecl.hasUnreferenceableStorage,
+            // Destroying the fields individually would skip the deinit of the struct.
+            structDecl.valueTypeDestructor == nil,
+            let fields = type.getNominalFields(in: parentFunction)
+      else {
+        return false
+      }
+      elementTypes = Array(fields)
+    } else if type.isTuple {
+      elementTypes = Array(type.tupleElements)
+    } else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    for (index, elementType) in elementTypes.enumerated() where !elementType.isTrivial(in: parentFunction) {
+      let elementAddr = type.isStruct
+        ? builder.createStructElementAddr(structAddress: destroyedAddress, fieldIndex: index)
+        : builder.createTupleElementAddr(tupleAddress: destroyedAddress, elementIndex: index)
+      builder.createDestroyAddr(address: elementAddr)
+    }
+    context.erase(instruction: self)
+    return true
+  }
+}
+
 extension Type {
   /// True if a type can be expanded without a significant increase to code
   /// size.
@@ -1308,7 +1348,8 @@ extension Type {
       return self
     case .structField:
       guard let fields = getNominalFields(in: function),
-            index < fields.count
+            index < fields.count,
+            !(nominal as! StructDecl).hasUnreferenceableStorage
       else {
         return nil
       }
@@ -1323,6 +1364,10 @@ extension Type {
     default:
       return nil
     }
+  }
+
+  func canProject(path: SmallProjectionPath, in function: Function) -> Bool {
+    return project(path: path, in: function) != nil
   }
 }
 
