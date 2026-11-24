@@ -675,9 +675,10 @@ extension AsyncThrowingStream {
   /// - Returns: A tuple containing the stream and its continuation. The continuation should be passed to the
   /// producer while the stream should be passed to the consumer.
   @available(SwiftStdlib 6.5, *)
-  public static func makeStream(
+  @export(implementation)
+  public static func makeStream( // Typed throws variant without the `Failure == Error` requirement
     of elementType: Element.Type = Element.self,
-    throwing failureType: Failure.Type = Failure.self, // Typed throws variant without the `Failure == Error` requirement
+    throwing failureType: Failure.Type = Failure.self,
     bufferingPolicy limit: Continuation.BufferingPolicy = .unbounded
   ) -> (stream: AsyncThrowingStream<Element, Failure>, continuation: AsyncThrowingStream<Element, Failure>.Continuation) {
     var continuation: AsyncThrowingStream<Element, Failure>.Continuation!
