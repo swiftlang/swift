@@ -782,6 +782,94 @@ extension StoreInst {
     context.erase(instruction: self)
   }
 
+  /// Splits the store along `projectionPath` and returns the store of the projected element.
+  ///
+  /// If `useConstructureOperands` is true and the stored value is a `struct` or `tuple` instruction,
+  /// its operands are stored directly instead of destructuring the aggregate. In this case the `struct`
+  /// or `tuple` instruction may be deleted.
+  func split(alongPath projectionPath: SmallProjectionPath, useConstructureOperands: Bool = false,
+             _ context: FunctionPassContext
+  ) -> StoreInst {
+    precondition(storeOwnership != .assign)
+
+    let (fieldKind, index, subPath) = projectionPath.pop()
+    var projectedStore: StoreInst? = nil
+    let constructedElements = useConstructureOperands ? self.constructedElements : nil
+
+    switch fieldKind {
+    case .root:
+      return self
+    case .structField:
+      assert(!(source.type.nominal as! StructDecl).hasUnreferenceableStorage)
+      let builder = Builder(before: self, context)
+      let fieldValues: [Value]
+      if let elements = constructedElements {
+        fieldValues = elements
+      } else {
+        let v = if source.ownership != .none,
+                   (source.type.nominal as! StructDecl).valueTypeDestructor != nil
+        {
+          builder.createDropDeinit(of: source)
+        } else {
+          source
+        }
+        fieldValues = Array(builder.createDestructureStruct(struct: v).results)
+      }
+      for (fieldIdx, fieldValue) in fieldValues.enumerated() {
+        let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
+        let ownership = splitOwnership(for: fieldValue)
+        let s = builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: ownership)
+        if fieldIdx == index {
+          projectedStore = s
+        }
+      }
+    case .tupleField:
+      let builder = Builder(before: self, context)
+      let elementValues = constructedElements ?? Array(builder.createDestructureTuple(tuple: source).results)
+      for (elementIdx, elementValue) in elementValues.enumerated() {
+        let elementAddr = builder.createTupleElementAddr(tupleAddress: destination, elementIndex: elementIdx)
+        let ownership = splitOwnership(for: elementValue)
+        let s = builder.createStore(source: elementValue, destination: elementAddr, ownership: ownership)
+        if elementIdx == index {
+          projectedStore = s
+        }
+      }
+    default:
+      fatalError("unsupported projection")
+    }
+    let constructure = source as? SingleValueInstruction
+    context.erase(instruction: self)
+    if let constructure, constructedElements != nil, constructure.uses.ignoreDebugUses.isEmpty {
+      context.erase(instruction: constructure)
+    }
+    guard let projectedStore else {
+      fatalError("wrong projection path")
+    }
+    return projectedStore.split(alongPath: subPath, useConstructureOperands: useConstructureOperands, context)
+  }
+
+  /// If the stored value is a `struct` or `tuple` instruction, returns its operands, so that the elements
+  /// can be stored directly instead of destructuring the aggregate. Destructuring a just constructed
+  /// aggregate would hide the original element values from other optimizations, like the reference
+  /// root of a `ref_element_addr`.
+  private var constructedElements: [Value]? {
+    guard let constructure = source as? SingleValueInstruction,
+          constructure is StructInst || constructure is TupleInst
+    else {
+      return nil
+    }
+    if source.ownership == .owned {
+      // The aggregate is consumed by this store. Its operands can only be moved to the new stores if
+      // there are no other uses.
+      guard constructure.uses.ignoreDebugUses.singleUse?.instruction == self,
+            (source.type.nominal as? StructDecl)?.valueTypeDestructor == nil
+      else {
+        return nil
+      }
+    }
+    return Array(constructure.operands.values)
+  }
+
   private func splitOwnership(for fieldValue: Value) -> StoreOwnership {
     switch self.storeOwnership {
     case .trivial, .unqualified:
@@ -822,38 +910,26 @@ extension LoadInst {
     }
   }
   
-  func trySplit(
-    alongPath projectionPath: SmallProjectionPath,
-    _ context: FunctionPassContext
-  ) -> [LoadInst]? {
-    if projectionPath.isEmpty {
-      return nil
-    }
-    
+  func split(alongPath projectionPath: SmallProjectionPath, _ context: FunctionPassContext) -> LoadInst {
     let (fieldKind, index, pathRemainder) = projectionPath.pop()
     
     var elements: [LoadInst]
     
     switch fieldKind {
+    case .root:
+      return self
     case .structField where type.isStruct:
-      guard !(type.nominal as! StructDecl).hasUnreferenceableStorage,
-            let fields = type.getNominalFields(in: parentFunction) else {
-        return nil
-      }
-      
+      assert(!(type.nominal as! StructDecl).hasUnreferenceableStorage)
+      let fields = type.getNominalFields(in: parentFunction)!
+
       elements = splitStruct(fields: fields, context)
     case .tupleField where type.isTuple:
       elements = splitTuple(context)
     default:
-      return nil
+      fatalError("unsupported projection")
     }
     
-    if let recursiveSplitLoad = elements[index].trySplit(alongPath: pathRemainder, context) {
-      elements.remove(at: index)
-      elements += recursiveSplitLoad
-    }
-    
-    return elements
+    return elements[index].split(alongPath: pathRemainder, context)
   }
   
   private func splitStruct(fields: NominalFieldsArray, _ context: FunctionPassContext) -> [LoadInst] {
