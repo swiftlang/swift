@@ -451,10 +451,12 @@ public:
         // It will be imported as the following type:
         //   () -> NSString
         // But the first is correct, so make sure we don't mark this witness
-        // as foreign.
+        // as foreign. Static C++ methods have no self parameter, so they go
+        // through the native thunk.
         const auto *clangDecl = witness.getDecl()->getClangDecl();
+        auto *cxxMethod = dyn_cast_or_null<clang::CXXMethodDecl>(clangDecl);
         if (clangDecl &&
-            (dyn_cast<clang::CXXMethodDecl>(clangDecl) ||
+            ((cxxMethod && !cxxMethod->isStatic()) ||
              (isa<clang::FunctionDecl>(clangDecl) &&
               cast<clang::FunctionDecl>(clangDecl)->isOverloadedOperator())))
           newDecl = newDecl.asForeign();
