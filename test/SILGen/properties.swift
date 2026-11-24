@@ -336,7 +336,7 @@ func logical_local_captured_get(_ x: Int) -> Int {
   // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @$s10properties26logical_local_captured_getyS2iF0E5_propL_SiyF
   // CHECK: apply [[FUNC_REF]](%0)
 }
-// CHECK: sil private [ossa] @$s10properties26logical_local_captured_get{{.*}}vg
+// CHECK: sil private [closure] [ossa] @$s10properties26logical_local_captured_get{{.*}}vg
 // CHECK: bb0(%{{[0-9]+}} : @closureCapture $Int):
 
 func inout_arg(_ x: inout Int) {}

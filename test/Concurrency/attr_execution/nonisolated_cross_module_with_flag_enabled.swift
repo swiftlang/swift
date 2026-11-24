@@ -174,13 +174,13 @@ func testNonisolatedClass(t: NoinsolatedClassTest) async {
 func testTypeAliasParam(t: TestGenericTypeAlias) {
   // CHECK: closure #1 in testTypeAliasParam(t:)
   // CHECK: Isolation: nonisolated(nonsending)
-  // CHECK-LABEL: sil private @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // CHECK-LABEL: sil private [closure] @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   // CHECK: } // end sil function '$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFyyYaYCcfU_'
   testTypeAlias { }
 
   // CHECK: // closure #2 in testTypeAliasParam(t:)
   // CHECK: // Isolation: nonisolated(nonsending)
-  // CHECK-LABEL: sil private @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFSiyYaYCXEfU0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int
+  // CHECK-LABEL: sil private [closure] @$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFSiyYaYCXEfU0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> Int
   // CHECK: } // end sil function '$s6Client18testTypeAliasParam1ty1A011TestGenericcD0V_tFSiyYaYCXEfU0_'
   _ = t[{ 42 }]
 }

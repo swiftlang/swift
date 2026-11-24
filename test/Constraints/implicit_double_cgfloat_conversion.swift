@@ -57,7 +57,7 @@ func test_various_situations_converting_to_cgfloat() {
   test_to_cgfloat(test_returns_double(d)) // Two conversions
 
   // Overloads with CGFloat are preferred if that allows to avoid any implicit conversions.
-  // CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion038test_various_situations_converting_to_C0yyF0E23_loading_tuple_elementsL_6valuesy12CoreGraphics7CGFloatV_AGtz_tF : $@convention(thin) (@inout (CGFloat, CGFloat)) -> () {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s34implicit_double_cgfloat_conversion038test_various_situations_converting_to_C0yyF0E23_loading_tuple_elementsL_6valuesy12CoreGraphics7CGFloatV_AGtz_tF : $@convention(thin) (@inout (CGFloat, CGFloat)) -> () {
   func test_loading_tuple_elements(values: inout (CGFloat, CGFloat)) {
     struct S {
       init(x: Double, y: Double) {}
@@ -419,7 +419,7 @@ func do_not_want_infinite_recursion(_ str: String) -> CGFloat {
   return CGFloat(do_not_want_infinite_recursion(str) as Double)
 }
 
-// CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
+// CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
 func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
   // Make sure that @autoclosure thunk calls CGFloat./ and not Double./
   // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat

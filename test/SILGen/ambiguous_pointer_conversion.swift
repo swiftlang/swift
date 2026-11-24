@@ -27,7 +27,7 @@ func test(buffers: [MyV]) {
 // quite different in that case, involving calls to intrinsics. Make sure we pick the
 // value-to-optional conversion, because it generates much simpler SIL:
 
-// CHECK-LABEL: sil private [ossa] @$s28ambiguous_pointer_conversion4test7buffersySayAA3MyVCG_tFySPyAA5ImageCGXEfU_yAIXEfU_yAIXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (UnsafePointer<τ_0_0>, UnsafePointer<Image>, UnsafePointer<Image>) -> (@out τ_0_2, @error_indirect τ_0_1) for <Image, Never, ()> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s28ambiguous_pointer_conversion4test7buffersySayAA3MyVCG_tFySPyAA5ImageCGXEfU_yAIXEfU_yAIXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (UnsafePointer<τ_0_0>, UnsafePointer<Image>, UnsafePointer<Image>) -> (@out τ_0_2, @error_indirect τ_0_1) for <Image, Never, ()> {
 // CHECK: bb0(%0 : $*(), %1 : $*Never, %2 : $UnsafePointer<Image>, %3 : @closureCapture $UnsafePointer<Image>, %4 : @closureCapture $UnsafePointer<Image>):
 // CHECK: [[X:%.*]] = enum $Optional<UnsafePointer<Image>>, #Optional.some!enumelt, %3
 // CHECK: [[Y:%.*]] = enum $Optional<UnsafePointer<Image>>, #Optional.some!enumelt, %4

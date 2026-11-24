@@ -15,13 +15,13 @@ func always_inline_callee2() {}
 // CHECK-LABEL: sil hidden [heuristic_always_inline] [ossa] @$s13inline_always11testClosureyyF
 @inline(__always)
 func testClosure() {
-  // CHECK-LABEL: sil private [heuristic_always_inline] [ossa] @$s13inline_always11testClosureyyFyycfU_
+  // CHECK-LABEL: sil private [closure] [heuristic_always_inline] [ossa] @$s13inline_always11testClosureyyFyycfU_
   _ = { }
 }
 // CHECK-LABEL: sil hidden [always_inline] [ossa] @$s13inline_always12testClosure2yyF
 @inline(always)
 func testClosure2() {
-  // CHECK-LABEL: sil private [always_inline] [ossa] @$s13inline_always12testClosure2yyFyycfU_
+  // CHECK-LABEL: sil private [closure] [always_inline] [ossa] @$s13inline_always12testClosure2yyFyycfU_
   _ = { }
 }
 protocol AlwaysInline {

@@ -79,10 +79,10 @@ protocol StaticIntValue {
 
 func f<T : StaticIntValue>(_: T) {
   // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5innerL_1xySi_tAaCRzlFfA_ : $@convention(thin) <T where T : StaticIntValue> () -> Int
-  // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5innerL_1xySi_tAaCRzlF : $@convention(thin) <T where T : StaticIntValue> (Int) -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5innerL_1xySi_tAaCRzlF : $@convention(thin) <T where T : StaticIntValue> (Int) -> ()
   func inner(x: Int = T.intValue) {}
 
-  // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5otherL_yyAaCRzlF : $@convention(thin) <T where T : StaticIntValue> () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5otherL_yyAaCRzlF : $@convention(thin) <T where T : StaticIntValue> () -> ()
   func other() { inner() }
 }
 

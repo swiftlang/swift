@@ -116,11 +116,11 @@ extension Sub {
   @objc override func objCBaseMethod() {}
 }
 
-// CHECK-LABEL: sil private [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_ : $@convention(thin) (@guaranteed Sub) -> @owned @callee_guaranteed () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_ : $@convention(thin) (@guaranteed Sub) -> @owned @callee_guaranteed () -> ()
 // CHECK: function_ref @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Sub) -> ()
 // CHECK: } // end sil function '$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_'
 
-// CHECK-LABEL: sil private [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Sub) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Sub) -> ()
 // CHECK: objc_method %0 : $Sub, #Sub.foo!foreign : (Sub) -> () -> (), $@convention(objc_method) (Sub) -> ()
 // CHECK: } // end sil function '$s15objc_extensions9testCurryyyAA3SubCFyycADcfu_yycfu0_'
 func testCurry(_ x: Sub) {

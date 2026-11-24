@@ -18,7 +18,7 @@ func testCallAtMostOnce(_ f: @callable(once) () -> Void) {
 }
 
 func run() {
-  // CHECK-LABEL: sil private [ossa] @$s18callable_once_attr3runyyFyyXEfU_ : $@convention(thin) () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s18callable_once_attr3runyyFyyXEfU_ : $@convention(thin) () -> ()
   testCallAtMostOnce { }
 }
 
@@ -57,7 +57,7 @@ func testCallAtMostOnceEscaping(_ f: @escaping @callable(once) () -> Void) {
 // CHECK: } // end sil function '$s18callable_once_attr22testClosureWithCapture1fyyyXEn_tF'
 
 // Make sure that the closure uses `consumable_and_assignable` to access the capture.
-// CHECK-LABEL: sil private [ossa] @$s18callable_once_attr22testClosureWithCapture1fyyyXEn_tFyyXOofU_ : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s18callable_once_attr22testClosureWithCapture1fyyyXEn_tFyyXOofU_ : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> () {
 // CHECK: bb0([[F_CAPTURE:%.*]] : @closureCapture @owned $@noescape @callable(once) @callee_owned () -> ()):
 // CHECK:  [[F_BOX:%.*]] = alloc_stack $@noescape @callable(once) @callee_owned () -> (), var, name "f"
 // CHECK:  [[F_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_BOX]] : $*@noescape @callable(once) @callee_owned () -> ()
@@ -108,7 +108,7 @@ func testClosureWithCapture(f: @callable(once) () -> Void) {
 // The closure body's own capture is rebound into a local `var` via a fresh
 // `alloc_stack`, not a box - it never escapes further, so there's nothing to
 // promote from a box in the first place.
-// CHECK-LABEL: sil private [ossa] @$s18callable_once_attr25testClosureWithVarCaptureyyyyXEnFyyXOofU_ : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s18callable_once_attr25testClosureWithVarCaptureyyyyXEnFyyXOofU_ : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> ()) -> () {
 // CHECK: bb0([[F_CAPTURE:%.*]] : @closureCapture @owned $@noescape @callable(once) @callee_owned () -> ()):
 // CHECK:  [[F_STACK:%.*]] = alloc_stack $@noescape @callable(once) @callee_owned () -> (), var, name "f"
 // CHECK:  [[F_INIT_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[F_STACK]] : $*@noescape @callable(once) @callee_owned () -> ()
@@ -143,7 +143,7 @@ func testClosureWithVarCapture(_ f: @callable(once) () -> Void) {
 // CHECK:  partial_apply [called_at_most_once] {{.*}}([[COUNT_BOX_COPY]], [[F_VALUE]]) : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @callable(once) @callee_owned () -> ()) -> ()
 // CHECK: } // end sil function '$s18callable_once_attr21testMixedCaptureKindsyyyyXEnF'
 
-// CHECK-LABEL: sil private [ossa] @$s18callable_once_attr21testMixedCaptureKindsyyyyXEnFyyXOofU_ : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @callable(once) @callee_owned () -> ()) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s18callable_once_attr21testMixedCaptureKindsyyyyXEnFyyXOofU_ : $@convention(thin) (@guaranteed { var Int }, @owned @noescape @callable(once) @callee_owned () -> ()) -> () {
 // CHECK: bb0([[COUNT_CAPTURE:%.*]] : @closureCapture @guaranteed ${ var Int }, [[F_CAPTURE:%.*]] : @closureCapture @owned $@noescape @callable(once) @callee_owned () -> ()):
 // CHECK:  [[COUNT_PROJ:%.*]] = project_box [[COUNT_CAPTURE]] : ${ var Int }, 0
 // CHECK:  [[F_STACK:%.*]] = alloc_stack $@noescape @callable(once) @callee_owned () -> (), var, name "f"

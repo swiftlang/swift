@@ -50,7 +50,7 @@ public class Sub : Base {
   // CHECK: return [[RET]] : $Bool
   // CHECK: }
 
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s13auto_closures3SubC1xAA4BoolVvgAFyXEfu_ : $@convention(thin) (@guaranteed Sub) -> Bool {
+  // CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s13auto_closures3SubC1xAA4BoolVvgAFyXEfu_ : $@convention(thin) (@guaranteed Sub) -> Bool {
   // CHECK: [[SUPER:%[0-9]+]] = function_ref @$s13auto_closures4BaseC1xAA4BoolVvg : $@convention(method) (@guaranteed Base) -> Bool
   // CHECK: [[RET:%.*]] = apply [[SUPER]]({{%.*}})
   // CHECK: return [[RET]]
@@ -59,9 +59,9 @@ public class Sub : Base {
 
 // CHECK-LABEL: sil hidden [ossa] @$s13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtF : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private [transparent] [ossa] @$s13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXEfu_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXEfu_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
-// CHECK-LABEL: sil private [ossa] @$s13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXEfu_A2DXEfU_ : $@convention(thin) (Bool, Bool) -> Bool {
+// CHECK-LABEL: sil private [closure] [ossa] @$s13auto_closures20closureInAutoclosureyAA4BoolVAD_ADtFADyXEfu_A2DXEfU_ : $@convention(thin) (Bool, Bool) -> Bool {
 // CHECK: }
 func compareBool(_ lhs: Bool, _ rhs: Bool) -> Bool { return false_ }
 func testBool(_ x: Bool, _ pred: (Bool) -> Bool) -> Bool {

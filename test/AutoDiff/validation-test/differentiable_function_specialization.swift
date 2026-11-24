@@ -311,7 +311,7 @@ public func test7DistinctEntry(_ x: Double) -> Double {
 // CHECK8: } // end sil function '$s3src15test8WithSquareyS4dYjrXEXEF46$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEFSdTf1c_n'
 
 // CHECK8: // specialized test8Evaluate #1 (_:) in test8Entry(_:)
-// CHECK8: sil private [noinline] @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n : $@convention(thin) (Double) -> Double {
+// CHECK8: sil private [closure] [noinline] @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n : $@convention(thin) (Double) -> Double {
 // CHECK8-NOT: differentiable_function
 // CHECK8: } // end sil function '$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n'
 

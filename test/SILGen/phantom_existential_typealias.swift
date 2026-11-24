@@ -14,7 +14,7 @@ protocol P {
   var x: G<A> { get }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s29phantom_existential_typealias5test11pSaySiGAA1P_p_tFSiAA1SVXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <S, Int> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s29phantom_existential_typealias5test11pSaySiGAA1P_p_tFSiAA1SVXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <S, Int> {
 
 func test1(p: any P) -> [Int] {
   return p.x.f { $0.y }

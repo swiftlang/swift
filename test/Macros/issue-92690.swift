@@ -32,32 +32,32 @@ public struct IdentityMacro: ExpressionMacro {
 @freestanding(expression)
 macro id<T>(_ x: T) -> T = #externalMacro(module: "MacroDefinition", type: "IdentityMacro")
 
-_ = #id({1}) // CHECK-SIL: sil private @$s4mainSiycfU0_ : $@convention(thin) () -> Int {
-let y = {2} // CHECK-SIL: sil private @$s4mainSiycfU1_ : $@convention(thin) () -> Int {
+_ = #id({1}) // CHECK-SIL: sil private [closure] @$s4mainSiycfU0_ : $@convention(thin) () -> Int {
+let y = {2} // CHECK-SIL: sil private [closure] @$s4mainSiycfU1_ : $@convention(thin) () -> Int {
 print("top1:", y()) // CHECK: top1: 2
-_ = #id({3}) // CHECK-SIL: sil private @$s4mainSiycfU3_ : $@convention(thin) () -> Int {
-let z = {4} // CHECK-SIL: sil private @$s4mainSiycfU4_ : $@convention(thin) () -> Int {
+_ = #id({3}) // CHECK-SIL: sil private [closure] @$s4mainSiycfU3_ : $@convention(thin) () -> Int {
+let z = {4} // CHECK-SIL: sil private [closure] @$s4mainSiycfU4_ : $@convention(thin) () -> Int {
 print("top2:", z()) // CHECK: top2: 4
 
 func foo() {
   let x = 0
-  _ = #id({1}) // CHECK-SIL: sil private @$s4main3fooyyFSiycfU3_ : $@convention(thin) () -> Int {
-  let y = {2} // CHECK-SIL: sil private @$s4main3fooyyFSiycfU0_ : $@convention(thin) () -> Int {
+  _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3fooyyFSiycfU3_ : $@convention(thin) () -> Int {
+  let y = {2} // CHECK-SIL: sil private [closure] @$s4main3fooyyFSiycfU0_ : $@convention(thin) () -> Int {
   print("foo1:", y()) // CHECK: foo1: 2
-  _ = #id({3}) // CHECK-SIL: sil private @$s4main3fooyyFSiycfU4_ : $@convention(thin) () -> Int {
-  let z = {4} // CHECK-SIL: sil private @$s4main3fooyyFSiycfU2_ : $@convention(thin) () -> Int {
+  _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3fooyyFSiycfU4_ : $@convention(thin) () -> Int {
+  let z = {4} // CHECK-SIL: sil private [closure] @$s4main3fooyyFSiycfU2_ : $@convention(thin) () -> Int {
   print("foo2:", z()) // CHECK: foo2: 4
 }
 foo()
 
 func bar() {
-  let fn = { // CHECK-SIL: sil private @$s4main3baryyFyycfU_ : $@convention(thin) () -> () {
+  let fn = { // CHECK-SIL: sil private [closure] @$s4main3baryyFyycfU_ : $@convention(thin) () -> () {
     let x = 0
-    _ = #id({1}) // CHECK-SIL: sil private @$s4main3baryyFyycfU_SiycfU3_ : $@convention(thin) () -> Int {
-    let y = {2} // CHECK-SIL: sil private @$s4main3baryyFyycfU_SiycfU0_ : $@convention(thin) () -> Int {
+    _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3baryyFyycfU_SiycfU3_ : $@convention(thin) () -> Int {
+    let y = {2} // CHECK-SIL: sil private [closure] @$s4main3baryyFyycfU_SiycfU0_ : $@convention(thin) () -> Int {
     print("bar1:", y()) // CHECK: bar1: 2
-    _ = #id({3}) // CHECK-SIL: sil private @$s4main3baryyFyycfU_SiycfU4_ : $@convention(thin) () -> Int {
-    let z = {4} // CHECK-SIL: sil private @$s4main3baryyFyycfU_SiycfU2_ : $@convention(thin) () -> Int {
+    _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3baryyFyycfU_SiycfU4_ : $@convention(thin) () -> Int {
+    let z = {4} // CHECK-SIL: sil private [closure] @$s4main3baryyFyycfU_SiycfU2_ : $@convention(thin) () -> Int {
     print("bar2:", z()) // CHECK: bar2: 4
   }
   fn()
@@ -65,14 +65,14 @@ func bar() {
 bar()
 
 func baz() {
-  let fn1 = { // CHECK-SIL: sil private @$s4main3bazyyFyycfU_ : $@convention(thin) () -> () {
-    let fn2 = { // CHECK-SIL: sil private @$s4main3bazyyFyycfU_yycfU_ : $@convention(thin) () -> () {
+  let fn1 = { // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_ : $@convention(thin) () -> () {
+    let fn2 = { // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_yycfU_ : $@convention(thin) () -> () {
       let x = 0
-      _ = #id({1}) // CHECK-SIL: sil private @$s4main3bazyyFyycfU_yycfU_SiycfU3_ : $@convention(thin) () -> Int {
-      let y = {2} // CHECK-SIL: sil private @$s4main3bazyyFyycfU_yycfU_SiycfU0_ : $@convention(thin) () -> Int {
+      _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_yycfU_SiycfU3_ : $@convention(thin) () -> Int {
+      let y = {2} // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_yycfU_SiycfU0_ : $@convention(thin) () -> Int {
       print("baz1:", y()) // CHECK: baz1: 2
-      _ = #id({3}) // CHECK-SIL: sil private @$s4main3bazyyFyycfU_yycfU_SiycfU4_ : $@convention(thin) () -> Int {
-      let z = {4} // CHECK-SIL: sil private @$s4main3bazyyFyycfU_yycfU_SiycfU2_ : $@convention(thin) () -> Int {
+      _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_yycfU_SiycfU4_ : $@convention(thin) () -> Int {
+      let z = {4} // CHECK-SIL: sil private [closure] @$s4main3bazyyFyycfU_yycfU_SiycfU2_ : $@convention(thin) () -> Int {
       print("baz2:", z()) // CHECK: baz2: 4
     }
     fn2()
@@ -82,22 +82,22 @@ func baz() {
 baz()
 
 struct Qux {
-  let fn = { // CHECK-SIL: sil private @$s4main3QuxV2fnyycvpfiyycfU_ : $@convention(thin) () -> () {
+  let fn = { // CHECK-SIL: sil private [closure] @$s4main3QuxV2fnyycvpfiyycfU_ : $@convention(thin) () -> () {
     let x = 0
-    _ = #id({1}) // CHECK-SIL: sil private @$s4main3QuxV2fnyycvpfiyycfU_SiycfU3_ : $@convention(thin) () -> Int {
-    let y = {2} // CHECK-SIL: sil private @$s4main3QuxV2fnyycvpfiyycfU_SiycfU0_ : $@convention(thin) () -> Int {
+    _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3QuxV2fnyycvpfiyycfU_SiycfU3_ : $@convention(thin) () -> Int {
+    let y = {2} // CHECK-SIL: sil private [closure] @$s4main3QuxV2fnyycvpfiyycfU_SiycfU0_ : $@convention(thin) () -> Int {
     print("Qux.fn1:", y()) // CHECK: Qux.fn1: 2
-    _ = #id({3}) // CHECK-SIL: sil private @$s4main3QuxV2fnyycvpfiyycfU_SiycfU4_ : $@convention(thin) () -> Int {
-    let z = {4} // CHECK-SIL: sil private @$s4main3QuxV2fnyycvpfiyycfU_SiycfU2_ : $@convention(thin) () -> Int {
+    _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3QuxV2fnyycvpfiyycfU_SiycfU4_ : $@convention(thin) () -> Int {
+    let z = {4} // CHECK-SIL: sil private [closure] @$s4main3QuxV2fnyycvpfiyycfU_SiycfU2_ : $@convention(thin) () -> Int {
     print("Qux.fn2:", z()) // CHECK: Qux.fn2: 4
   }
   func qux2() {
     let x = 0
-    _ = #id({1}) // CHECK-SIL: sil private @$s4main3QuxV4qux2yyFSiycfU3_ : $@convention(thin) () -> Int {
-    let y = {2} // CHECK-SIL: sil private @$s4main3QuxV4qux2yyFSiycfU0_ : $@convention(thin) () -> Int {
+    _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3QuxV4qux2yyFSiycfU3_ : $@convention(thin) () -> Int {
+    let y = {2} // CHECK-SIL: sil private [closure] @$s4main3QuxV4qux2yyFSiycfU0_ : $@convention(thin) () -> Int {
     print("Qux.qux1:", y()) // CHECK: Qux.qux1: 2
-    _ = #id({3}) // CHECK-SIL: sil private @$s4main3QuxV4qux2yyFSiycfU4_ : $@convention(thin) () -> Int {
-    let z = {4} // CHECK-SIL: sil private @$s4main3QuxV4qux2yyFSiycfU2_ : $@convention(thin) () -> Int {
+    _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3QuxV4qux2yyFSiycfU4_ : $@convention(thin) () -> Int {
+    let z = {4} // CHECK-SIL: sil private [closure] @$s4main3QuxV4qux2yyFSiycfU2_ : $@convention(thin) () -> Int {
     print("Qux.qux2:", z()) // CHECK: Qux.qux2: 4
   }
 }
@@ -116,21 +116,21 @@ func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { x() }
 // Explicit closures inside an autoclosure are numbered in the enclosing
 // function's sequence, but parented to the autoclosure.
 func flam() {
-  // CHECK-SIL: sil private @$s4main4flamyyFSiyXEfu_SiyXEfU_ : $@convention(thin) () -> Int {
-  // CHECK-SIL: sil private @$s4main4flamyyFSiyXEfu_SiyXEfU1_ : $@convention(thin) () -> Int {
+  // CHECK-SIL: sil private [closure] @$s4main4flamyyFSiyXEfu_SiyXEfU_ : $@convention(thin) () -> Int {
+  // CHECK-SIL: sil private [closure] @$s4main4flamyyFSiyXEfu_SiyXEfU1_ : $@convention(thin) () -> Int {
   print("flam:", takesAutoclosure({1}() + #id({2}()))) // CHECK: flam: 3
 }
 flam()
 
 func vid() {
   struct S {
-    let fn = { // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_ : $@convention(thin) () -> () {
+    let fn = { // CHECK-SIL: sil private [closure] @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_ : $@convention(thin) () -> () {
       let x = 0
-      _ = #id({1}) // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU3_ : $@convention(thin) () -> Int {
-      let y = {2} // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU0_ : $@convention(thin) () -> Int {
+      _ = #id({1}) // CHECK-SIL: sil private [closure] @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU3_ : $@convention(thin) () -> Int {
+      let y = {2} // CHECK-SIL: sil private [closure] @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU0_ : $@convention(thin) () -> Int {
       print("vid1:", y()) // CHECK: vid1: 2
-      _ = #id({3}) // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU4_ : $@convention(thin) () -> Int {
-      let z = {4} // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU2_ : $@convention(thin) () -> Int {
+      _ = #id({3}) // CHECK-SIL: sil private [closure] @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU4_ : $@convention(thin) () -> Int {
+      let z = {4} // CHECK-SIL: sil private [closure] @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_SiycfU2_ : $@convention(thin) () -> Int {
       print("vid2:", z()) // CHECK: vid2: 4
     }
   }

@@ -81,7 +81,7 @@ func doit<T>(_ f: () -> T) -> T {
 // CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
 // CHECK:         apply {{%[^,]+}}<(Value, Value)>([[OUTPUT_TUPLE_ADDR]], [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate1'
-// CHECK-LABEL: sil private @$s19opaque_values_Onone10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] @$s19opaque_values_Onone10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[TUPLE_ADDR:%[^,]+]] : $*(Value, Value), [[VALUE_ADDR:%[^,]+]] :
 // CHECK:         [[ELT_1_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE_ADDR]]{{.*}}, 0
 // CHECK:         copy_addr [[VALUE_ADDR]] to [init] [[ELT_1_ADDR]]
@@ -103,7 +103,7 @@ func duplicate1<Value>(value: Value) -> (Value, Value) {
 // CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
 // CHECK:         apply {{%[^,]+}}<(one: Value, two: Value)>([[OUTPUT_TUPLE_ADDR]], [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate2'
-// CHECK-LABEL: sil private @$s19opaque_values_Onone10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] @$s19opaque_values_Onone10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[TUPLE_ADDR:%[^,]+]] : $*(one: Value, two: Value), [[VALUE_ADDR:%[^,]+]] :
 // CHECK:         [[ELT_1_ADDR:%[^,]+]] = tuple_element_addr [[TUPLE_ADDR]]{{.*}}, 0
 // CHECK:         copy_addr [[VALUE_ADDR]] to [init] [[ELT_1_ADDR]]
@@ -137,7 +137,7 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
 // CHECK:         [[CONVERTED:%[^,]+]] = convert_function [[DEPENDENCY]]
 // CHECK:         apply {{%[^,]+}}<(Int, (Value, (Value, (Value, Int), Value)), Int)>({{%[^,]+}}, [[CONVERTED]])
 // CHECK-LABEL: } // end sil function 'duplicate_with_int3'
-// CHECK-LABEL: sil private @$s19opaque_values_Onone19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ {{.*}} {
+// CHECK-LABEL: sil private [closure] @$s19opaque_values_Onone19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[OUT_ADDR:%[^,]+]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), [[IN_ADDR:%[^,]+]] : @closureCapture $*Value):
 // CHECK:         [[OUT_1_ADDR:%[^,]+]] = tuple_element_addr [[OUT_ADDR]] : $*(Int, (Value, (Value, (Value, Int), Value)), Int), 1
 // CHECK:         [[OUT_1_0_ADDR:%[^,]+]] = tuple_element_addr [[OUT_1_ADDR]] : $*(Value, (Value, (Value, Int), Value)), 0

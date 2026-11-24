@@ -39,4 +39,4 @@ func testCaptureWithClosureSpecialization() {
 
 // CHECK: // specialized closure #1 in compute() in Test #1 in testCaptureWithClosureSpecialization()
 // CHECK-NEXT: // Isolation: global_actor. type: MainActor
-// CHECK-NEXT: sil private @$s56transfernonsendable_closure_captures_with_specialization36testCaptureWithClosureSpecializationyyF4TestL_C7computeyyYaFyyYaYbScMYccfU_Tf2in_n : $@convention(thin) @Sendable @async (@guaranteed Optional<KlassNonsendable>, @thick @dynamic_self Test.Type) -> ()
+// CHECK-NEXT: sil private [closure] @$s56transfernonsendable_closure_captures_with_specialization36testCaptureWithClosureSpecializationyyF4TestL_C7computeyyYaFyyYaYbScMYccfU_Tf2in_n : $@convention(thin) @Sendable @async (@guaranteed Optional<KlassNonsendable>, @thick @dynamic_self Test.Type) -> ()
