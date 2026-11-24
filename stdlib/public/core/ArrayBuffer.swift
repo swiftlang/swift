@@ -658,6 +658,7 @@ extension _ArrayBuffer {
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
     let buffer = getOrAllocateAssociatedObjectBuffer()
+    defer { _fixLifetime(buffer) }
     let (pointer, count) = unsafe (buffer.firstElementAddress, buffer.count)
     return try unsafe body(UnsafeBufferPointer(start: pointer,  count: count))
   }
