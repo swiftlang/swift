@@ -8,18 +8,19 @@
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %t -cxx-interoperability-mode=default \
 // RUN:   %t%{fs-sep}test.swift -verify -verify-additional-file %t%{fs-sep}test.h -Rmacro-expansions -suppress-notes -eager-macro-checking
 
-// FIXME: None of these wrappers compile, because their counts use a C++
-// `char32_t` or `wchar_t` parameter as if it were an integer. This test emits a
-// module, so it type-checks the wrappers' bodies and expects the errors. Both
-// are builtin types in C++, which Swift imports as `CChar32` and `CWideChar`,
-// both `Unicode.Scalar`. For a count that is just `c`, the wrappers compute it
-// from the buffer with `CChar32(exactly: p.count)!` or
-// `CWideChar(exactly: p.count)!`, and `Unicode.Scalar` has no
-// `init(exactly:)`. A compound `wchar_t` count like `c + 1` also fails where
-// `wchar_t` is signed, e.g. on Apple platforms and x86_64 Linux, because it's
-// converted with `CInt(c)`. That isn't checked here due to `wchar_t` being
-// unsigned on some platforms (e.g. on ARM Linux and Android), it's converted with
-// `CUnsignedInt(c)`, which compiles
+// `char32_t` is imported as `CChar32`, which is `UInt32`, so its wrapper
+// compiles.
+//
+// FIXME: The `wchar_t` wrapper doesn't compile, because its count uses a C++
+// `wchar_t` parameter as if it were an integer. This test emits a module, so it
+// type-checks the wrapper's body and expects the error. `wchar_t` is imported as
+// `CWideChar`, which is `Unicode.Scalar`. For a count that is just `c`, the
+// wrapper computes it from the buffer with `CWideChar(exactly: p.count)!`, and
+// `Unicode.Scalar` has no `init(exactly:)`. A compound `wchar_t` count like
+// `c + 1` also fails where `wchar_t` is signed, e.g. on Apple platforms and
+// x86_64 Linux, because it's converted with `CInt(c)`. That isn't checked here
+// due to `wchar_t` being unsigned on some platforms (e.g. on ARM Linux and
+// Android), it's converted with `CUnsignedInt(c)`, which compiles
 // (https://github.com/swiftlang/swift/issues/94421).
 
 //--- test.h
@@ -31,7 +32,6 @@ void char32Bare(const int * __counted_by(c) p, char32_t c);
 // expected-expansion@-1:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func char32Bare(_ p: UnsafeBufferPointer<CInt>) {|}}
-//   expected-error@3{{extraneous argument label 'exactly:' in call}}
 //   expected-remark@3{{macro content: |    let c = CChar32(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe char32Bare(p.baseAddress, c)|}}
 //   expected-remark@5{{macro content: |}|}}
