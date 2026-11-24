@@ -6,6 +6,10 @@
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 //
+// rdar://188082318
+// XFAIL: OS=linux-android
+// XFAIL: OS=linux-androideabi
+//
 // REQUIRES: PTRSIZE=64
 
 // RUN: %empty-directory(%t)
