@@ -3551,10 +3551,12 @@ namespace {
           structResult->setIsCxxNonTrivial(isAddressOnly);
         }
 
-        auto gettersAndSetters = Impl.GetterSetterMap[result];
-        for (const auto &getterAndSetter : gettersAndSetters) {
-          auto getter = getterAndSetter.second.first;
-          auto setter = getterAndSetter.second.second;
+        SmallVector<std::pair<FuncDecl *, FuncDecl *>, 4> gettersAndSetters;
+        if (auto it = Impl.GetterSetterMap.find(result);
+            it != Impl.GetterSetterMap.end())
+          llvm::append_range(gettersAndSetters,
+                             llvm::make_second_range(it->second));
+        for (auto [getter, setter] : gettersAndSetters) {
           // We cannot make a computed property without a getter.
           if (!getter || getter->getDeclContext() != result)
             continue;
@@ -10730,7 +10732,7 @@ static void filterUsableVersionedAttrs(
   // We have a better attribute option if there exists another versioned attr
   // wrapper for this attribute kind with a valid version that is lower than the
   // one of the attribute we are considering
-  auto haveBetterAttr = [swiftVersionedAttributes, applicableVersion](
+  auto haveBetterAttr = [&swiftVersionedAttributes, applicableVersion](
                             clang::VersionTuple attrVersion,
                             clang::attr::Kind attrKind) -> bool {
     for (auto otherVersionedAttr : swiftVersionedAttributes) {

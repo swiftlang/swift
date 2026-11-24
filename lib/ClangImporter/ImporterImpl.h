@@ -261,9 +261,9 @@ struct ImportDiagnostic {
   Diagnostic diag;
   clang::SourceLocation loc;
 
-  ImportDiagnostic(ImportDiagnosticTarget target, const Diagnostic &diag,
+  ImportDiagnostic(ImportDiagnosticTarget target, Diagnostic diag,
                    clang::SourceLocation loc)
-      : target(target), diag(diag), loc(loc) {}
+      : target(target), diag(std::move(diag)), loc(loc) {}
 
   bool operator==(const ImportDiagnostic &other) const {
     return target == other.target && loc == other.loc &&

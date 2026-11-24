@@ -3380,13 +3380,13 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
 void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
     clang::SourceLocation loc) {
-  ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
   if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
     return;
-  auto [_, inserted] = CollectedDiagnostics.insert(importDiag);
+  auto [it, inserted] = CollectedDiagnostics.insert(
+      ImportDiagnostic(target, std::move(diag), loc));
   if (!inserted)
     return;
-  ImportDiagnostics[target].push_back(importDiag);
+  ImportDiagnostics[target].push_back(*it);
 }
 
 #pragma mark Source locations
@@ -6236,8 +6236,9 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
                    "MacroInfo or ModuleMacro pointer");
 }
 
-static void diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Impl,
-                                              HeaderLoc loc, Diagnostic diag) {
+static void
+diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Impl,
+                                  HeaderLoc loc, const Diagnostic &diag) {
   auto importedLoc =
     Impl.SwiftContext.getClangModuleLoader()->importSourceLocation(loc.clangLoc);
   Impl.diagnose(loc, diag).fixItInsert(

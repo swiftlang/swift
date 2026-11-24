@@ -1188,7 +1188,7 @@ private:
         std::string typeStr;
         llvm::raw_string_ostream typeOS(typeStr);
         owningPrinter.printTypeName(typeOS, type, emittedModule);
-        result.push_back(typeStr);
+        result.push_back(std::move(typeStr));
       }
     }
     return result;
@@ -1221,13 +1221,8 @@ private:
     if (!canPrintInheritedFunctionName(funcDecl, cxxName))
       return false;
     auto paramTypes = getCxxParamTypes(funcDecl);
-    auto [overloadIt, inserted] = overloads.try_emplace(
-        cxxName,
-        llvm::SmallVector<CxxDeclEmissionScope::EmittedFunctionOverload, 2>(
-            {{funcDecl, paramTypes}}));
-    if (inserted)
-      return true;
-    for (const auto &overload : overloadIt->second) {
+    auto &overloadList = overloads[cxxName];
+    for (const auto &overload : overloadList) {
       if (overload.cxxParamTypes == paramTypes) {
         owningPrinter.getCxxDeclEmissionScope()
             .additionalUnrepresentableDeclarations.insert(
@@ -1237,7 +1232,7 @@ private:
         return false;
       }
     }
-    overloadIt->second.push_back({funcDecl, paramTypes});
+    overloadList.push_back({funcDecl, std::move(paramTypes)});
     return true;
   }
 

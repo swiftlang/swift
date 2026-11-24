@@ -37,9 +37,7 @@ void SwiftToClangInteropContext::runIfStubForDeclNotEmitted(
 
 void SwiftToClangInteropContext::recordExtensions(
     const NominalTypeDecl *typeDecl, const ExtensionDecl *ext) {
-  auto it = extensions.insert(
-      std::make_pair(typeDecl, std::vector<const ExtensionDecl *>()));
-  it.first->second.push_back(ext);
+  extensions[typeDecl].push_back(ext);
 }
 
 llvm::ArrayRef<const ExtensionDecl *>
