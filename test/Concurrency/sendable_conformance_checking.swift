@@ -1,11 +1,15 @@
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -strict-concurrency=targeted -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete- -strict-concurrency=complete -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -swift-version 6 -verify-additional-prefix swift6plus- -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend -emit-sil %s -o /dev/null -verify -swift-version future -verify-additional-prefix swift6plus- -verify-additional-prefix future- %}
 
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 5.1, *)
-class NotSendable { // expected-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+class NotSendable { // expected-swift5-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+// expected-swift6-note@-1 9 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
+// expected-future-note@-2 8 {{class 'NotSendable' does not conform to the 'Sendable' protocol}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -36,7 +40,8 @@ actor A2: IsolatedWithNotSendableRequirements {
   nonisolated var prop: NotSendable { NotSendable() }
 
   nonisolated func fAsync() async -> NotSendable { NotSendable() }
-  // expected-warning@-1{{non-Sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
+  // expected-swift5-warning@-1{{non-Sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
+  // expected-swift6-error@-2 {{non-Sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -49,9 +54,11 @@ protocol AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A3: AsyncProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() async -> NotSendable { NotSendable() } // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -62,9 +69,11 @@ actor A3: AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A4: AsyncProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() -> NotSendable { NotSendable() } // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -107,9 +116,11 @@ protocol AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A7: AsyncThrowingProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() async -> NotSendable { NotSendable() } // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -120,9 +131,11 @@ actor A7: AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A8: AsyncThrowingProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  func f() -> NotSendable { NotSendable() } // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  var prop: NotSendable { // expected-swift5-warning{{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
+  // expected-swift6plus-error@-1 {{non-Sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -156,12 +169,15 @@ actor A10: AsyncThrowingProtocolWithNotSendable {
 }
 
 // rdar://86653457 - Crash due to missing Sendable conformances.
-// expected-warning @+1 {{non-final class 'Klass' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}} {{1-1=final }}
+// expected-swift5-warning @+1 {{non-final class 'Klass' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}} {{1-1=final }}
 class Klass<Output: Sendable>: Sendable {}
+// expected-swift6plus-error@-1 {{non-final class 'Klass' cannot conform to the 'Sendable' protocol}}
 // expected-complete-warning @+1 {{type 'S' does not conform to the 'Sendable' protocol}}
 final class SubKlass: Klass<[S]> {}
+// expected-swift6plus-error@-1 {{type 'S' does not conform to the 'Sendable' protocol}}
 // expected-complete-note @+1 {{consider making struct 'S' conform to the 'Sendable' protocol}}
 public struct S {}
+// expected-swift6plus-note@-1 {{consider making struct 'S' conform to the 'Sendable' protocol}}
 
 // rdar://88700507 - redundant conformance of @MainActor-isolated subclass to 'Sendable'
 @available(SwiftStdlib 5.1, *)
@@ -188,9 +204,10 @@ class NonSendableSuperclass {}
 // Non-isolated was always rejected, so its an error in the Swift 6 language mode.
 @available(SwiftStdlib 5.1, *)
 final class SendableSubclassOfNonSendable: NonSendableSuperclass, Sendable {}
-// expected-warning@-1:13 {{class 'SendableSubclassOfNonSendable' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
+// expected-swift5-warning@-1:13 {{class 'SendableSubclassOfNonSendable' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}}
 // expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
 // expected-note@-3:44 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+// expected-swift6plus-error@-4 {{class 'SendableSubclassOfNonSendable' cannot conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @globalActor
@@ -202,18 +219,22 @@ actor SomeActor {
 @available(SwiftStdlib 5.1, *)
 @MainActor
 class IsolatedSendableSubclass: NonSendableSuperclass, Sendable {
-  // expected-warning@-1:7 {{class 'IsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-  // expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
-  // expected-note@-3:33 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+  // expected-swift5-warning@-1:7 {{class 'IsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-2:7 {{class 'IsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+  // expected-note@-3:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+  // expected-note@-4:33 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+  // expected-future-error@-5 {{class 'IsolatedSendableSubclass' cannot conform to the 'Sendable' protocol}}
   var state = NonSendableSuperclass() // not flagged: global-actor isolation protects the storage
 }
 
 @available(SwiftStdlib 5.1, *)
 @SomeActor
 class OtherIsolatedSendableSubclass: NonSendableSuperclass, Sendable {}
-// expected-warning@-1:7 {{class 'OtherIsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-// expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
-// expected-note@-3:38 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+// expected-swift5-warning@-1:7 {{class 'OtherIsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-swift6-warning@-2:7 {{class 'OtherIsolatedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-3:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-4:38 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+// expected-future-error@-5 {{class 'OtherIsolatedSendableSubclass' cannot conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 protocol RefinesSendable: Sendable {}
@@ -224,9 +245,11 @@ protocol RefinesSendable: Sendable {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 class IsolatedImpliedSendableSubclass: NonSendableSuperclass, RefinesSendable {}
-// expected-warning@-1:7 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-// expected-note@-2:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
-// expected-note@-3:40 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+// expected-swift5-warning@-1:7 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-swift6-warning@-2:7 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-3:7 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-4:40 {{inherits from non-Sendable class 'NonSendableSuperclass'}}
+// expected-future-error@-5 {{class 'IsolatedImpliedSendableSubclass' cannot conform to the 'Sendable' protocol}}
 
 // Warning even in future language version due to preconcurrency implied conformance.
 @available(SwiftStdlib 5.1, *)
@@ -243,8 +266,10 @@ final class IsolatedExtensionSendableSubclass: NonSendableSuperclass {}
 
 @available(SwiftStdlib 5.1, *)
 extension IsolatedExtensionSendableSubclass: Sendable {}
-// expected-warning@-1:1 {{class 'IsolatedExtensionSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-// expected-note@-2:1 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-swift5-warning@-1:1 {{class 'IsolatedExtensionSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-swift6-warning@-2:1 {{class 'IsolatedExtensionSendableSubclass' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-3:1 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-future-error@-4 {{class 'IsolatedExtensionSendableSubclass' cannot conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 @MainActor
@@ -269,6 +294,7 @@ final class IsolatedSubclassOfIsolated: MainSuper, Sendable {}
 @MainActor
 class IsolatedNonSendableSubclass: NonSendableSuperclass {}
 // expected-complete-note@-1:7 {{class 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
+// expected-swift6plus-note@-2 {{class 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 func needsSendable<T: Sendable>(_: T) {}
@@ -277,6 +303,7 @@ func needsSendable<T: Sendable>(_: T) {}
 func passIsolatedNonSendableSubclass(_ instance: IsolatedNonSendableSubclass) {
   needsSendable(instance)
   // expected-complete-warning@-1:3 {{type 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
+  // expected-swift6plus-error@-2 {{type 'IsolatedNonSendableSubclass' does not conform to the 'Sendable' protocol}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -285,9 +312,11 @@ class TildeNonSendableSuperclass: ~Sendable {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 final class IsolatedSubclassOfTildeSuper: TildeNonSendableSuperclass, Sendable {}
-// expected-warning@-1:13 {{class 'IsolatedSubclassOfTildeSuper' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-// expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
-// expected-note@-3:43 {{inherits from non-Sendable class 'TildeNonSendableSuperclass'}}
+// expected-swift5-warning@-1:13 {{class 'IsolatedSubclassOfTildeSuper' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-swift6-warning@-2:13 {{class 'IsolatedSubclassOfTildeSuper' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-3:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-4:43 {{inherits from non-Sendable class 'TildeNonSendableSuperclass'}}
+// expected-future-error@-5 {{class 'IsolatedSubclassOfTildeSuper' cannot conform to the 'Sendable' protocol}}
 
 // `@MainActor` does not override an explicit `~Sendable` suppression, so an
 // isolated base is still non-Sendable and the subclass is diagnosed.
@@ -298,14 +327,17 @@ class IsolatedTildeSuper: ~Sendable {}
 @available(SwiftStdlib 5.1, *)
 @MainActor
 final class IsolatedSubclassOfIsolatedTilde: IsolatedTildeSuper, Sendable {}
-// expected-warning@-1:13 {{class 'IsolatedSubclassOfIsolatedTilde' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
-// expected-note@-2:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
-// expected-note@-3:46 {{inherits from non-Sendable class 'IsolatedTildeSuper'}}
+// expected-swift5-warning@-1:13 {{class 'IsolatedSubclassOfIsolatedTilde' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-swift6-warning@-2:13 {{class 'IsolatedSubclassOfIsolatedTilde' cannot conform to the 'Sendable' protocol; this will be an error in a future Swift language mode}}
+// expected-note@-3:13 {{a 'Sendable' class cannot inherit from a non-Sendable class}}
+// expected-note@-4:46 {{inherits from non-Sendable class 'IsolatedTildeSuper'}}
+// expected-future-error@-5 {{class 'IsolatedSubclassOfIsolatedTilde' cannot conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
-  // expected-warning@+1 {{non-final class 'Nested' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}} {{3-3=final }}
+  // expected-swift5-warning@+1 {{non-final class 'Nested' cannot conform to the 'Sendable' protocol; this is an error in the Swift 6 language mode}} {{3-3=final }}
   class Nested: Sendable {}
+  // expected-swift6plus-error@-1 {{non-final class 'Nested' cannot conform to the 'Sendable' protocol}}
 }
 
 @Sendable func globalFn() {}
@@ -329,12 +361,16 @@ public struct TestSendableWitnesses2 : NoSendableReqs {
 @preconcurrency @MainActor public protocol EscapingSendableProtocol {
   // expected-complete-note @+1 {{protocol requires function 'f(handler:)' with type '(@escaping @MainActor @Sendable (Int) -> Void) -> ()'}}
   @preconcurrency func f(handler: @escaping @MainActor @Sendable (Int) -> Void)
+  // expected-swift6plus-note@-1 {{protocol requires function 'f(handler:)' with type '(@escaping @MainActor @Sendable (Int) -> Void) -> ()'}}
 }
 
 // TODO: The following error should actually be a warning.
 // expected-complete-error @+2 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
 // expected-complete-note @+1 {{add stubs for conformance}}
 class TestEscapingOnly: EscapingSendableProtocol {
+// expected-swift6plus-error@-1 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
+// expected-swift6plus-note@-2 {{add stubs for conformance}}
     // expected-complete-note @+1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
     func f(handler: @escaping (Int) -> Void) {}
+    // expected-swift6plus-note@-1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
 }

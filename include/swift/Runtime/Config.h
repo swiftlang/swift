@@ -188,6 +188,14 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #endif
 #define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
+// Debuggers find these variables by name, and a linked wasm module names a data
+// symbol only if it is exported.
+#if defined(__wasm__)
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name) __attribute__((export_name(#name)))
+#else
+#define SWIFT_CONCURRENCY_DEBUG_VAR(name)
+#endif
+
 // Define mappings for calling conventions.
 
 // Annotation for specifying a calling convention of
@@ -288,6 +296,24 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_protocol_conformance_descriptor \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor)
+#define __ptrauth_swift_value_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ValueWitnessTable)
+#define __ptrauth_swift_protocol_witness_table_pointer \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ProtocolWitnessTable)
+// The individual pointer fields of a conformance cache entry's extended
+// storage. These live in process-local heap, so they use the process-dependent
+// data key, address-discriminated against their own slot.
+#define __ptrauth_swift_conformance_cache_storage_protocol \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageProtocol)
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageGlobalActorType)
+#define __ptrauth_swift_conformance_cache_storage_next \
+  __ptrauth(ptrauth_key_process_dependent_data, 1, \
+            SpecialPointerAuthDiscriminators::ConformanceCacheStorageNext)
 #define __ptrauth_swift_dynamic_replacement_key                                \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::DynamicReplacementKey)
@@ -300,6 +326,25 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_task_resume_context                                    \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TaskResumeContext)
+#define __ptrauth_swift_task_next_waiting_task                                 \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskNextWaitingTask)
+#define __ptrauth_swift_nullary_continuation_job_continuation                  \
+  __ptrauth(                                                                   \
+      ptrauth_key_process_dependent_data, 1,                                   \
+      SpecialPointerAuthDiscriminators::NullaryContinuationJobContinuation)
+#define __ptrauth_swift_task_executor_preference_identity                      \
+  __ptrauth(ptrauth_key_process_dependent_data, 1,                             \
+            SpecialPointerAuthDiscriminators::TaskExecutorPreferenceIdentity)
+#define __ptrauth_swift_task_executor_preference_implementation                \
+  __ptrauth(ptrauth_key_process_dependent_data, 1,                             \
+            SpecialPointerAuthDiscriminators::TaskExecutorPreferenceImplementation)
+#define __ptrauth_swift_actor_job_queue_link                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::ActorJobQueueLink)
+#define __ptrauth_swift_task_result_type_metadata                              \
+  __ptrauth(ptrauth_key_process_independent_data, 1,                           \
+            SpecialPointerAuthDiscriminators::TaskResultTypeMetadata)
 #define __ptrauth_swift_async_context_parent                                   \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::AsyncContextParent)
@@ -327,6 +372,10 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_objc_superclass                                        \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             swift::SpecialPointerAuthDiscriminators::ObjCSuperclass)
+// This must match __ptrauth_objc_isa_pointer, and EmbeddedHeapObject in
+// EmbeddedShims.h
+#define __ptrauth_swift_heap_object_metadata                                   \
+  __ptrauth(ptrauth_key_process_independent_data, 1, 0x6AE1)
 #define __ptrauth_swift_nonunique_extended_existential_type_shape              \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::NonUniqueExtendedExistentialTypeShape)
@@ -346,6 +395,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_deinit_work_function                                   \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::DeinitWorkFunction)
+#define __ptrauth_swift_isolated_deinit_job_object                             \
+  __ptrauth(ptrauth_key_process_dependent_data, 1,                             \
+            SpecialPointerAuthDiscriminators::IsolatedDeinitJobObject)
+#define __ptrauth_swift_synchronous_task_operation                             \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::SynchronousTaskOperation)
 #define __ptrauth_swift_is_global_actor_function                               \
   __ptrauth(ptrauth_key_function_pointer, 1,                                   \
             SpecialPointerAuthDiscriminators::IsCurrentGlobalActorFunction)
@@ -373,10 +428,21 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_class_method_pointer(__declkey)
 #define __ptrauth_swift_protocol_witness_function_pointer(__declkey)
 #define __ptrauth_swift_value_witness_function_pointer(__key)
+#define __ptrauth_swift_value_witness_table_pointer
+#define __ptrauth_swift_protocol_witness_table_pointer
+#define __ptrauth_swift_conformance_cache_storage_protocol
+#define __ptrauth_swift_conformance_cache_storage_global_actor_type
+#define __ptrauth_swift_conformance_cache_storage_next
 #define __ptrauth_swift_type_metadata_instantiation_function
 #define __ptrauth_swift_job_invoke_function
 #define __ptrauth_swift_task_resume_function
 #define __ptrauth_swift_task_resume_context
+#define __ptrauth_swift_task_next_waiting_task
+#define __ptrauth_swift_nullary_continuation_job_continuation
+#define __ptrauth_swift_task_executor_preference_identity
+#define __ptrauth_swift_task_executor_preference_implementation
+#define __ptrauth_swift_actor_job_queue_link
+#define __ptrauth_swift_task_result_type_metadata
 #define __ptrauth_swift_async_context_parent
 #define __ptrauth_swift_async_context_resume
 #define __ptrauth_swift_async_context_yield
@@ -386,6 +452,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_dispatch_invoke_function
 #define __ptrauth_swift_accessible_function_record
 #define __ptrauth_swift_objc_superclass
+#define __ptrauth_swift_heap_object_metadata
 #define __ptrauth_swift_runtime_function_entry
 #define __ptrauth_swift_runtime_function_entry_with_key(__key)
 #define __ptrauth_swift_runtime_function_entry_strip(__fn) (__fn)
@@ -398,6 +465,8 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
 #define __ptrauth_swift_type_layout_string
 #define __ptrauth_swift_deinit_work_function
+#define __ptrauth_swift_isolated_deinit_job_object
+#define __ptrauth_swift_synchronous_task_operation
 #define __ptrauth_swift_is_global_actor_function
 #define __ptrauth_swift_concurrency_hook
 #define __ptrauth_swift_thread_sanitizer_hook

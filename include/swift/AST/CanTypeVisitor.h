@@ -74,9 +74,9 @@ public:
 /// paired nominal type methods to a common implementation.
 ///
 /// The delegation flow is:
-///   {ClassType, BoundGenericClassType} -> AnyClassType -> AnyNominalType -> Type
-///   {EnumType, BoundGenericEnumType} -> AnyEnumType -> AnyNominalType -> Type
-///   {StructType, BoundGenericStructType} -> AnyStructType -> AnyNominalType -> Type
+///   ClassType -> AnyClassType -> AnyNominalType -> Type
+///   EnumType -> AnyEnumType -> AnyNominalType -> Type
+///   StructType -> AnyStructType -> AnyNominalType -> Type
 ///   ProtocolType -> AnyNominalType -> Type
 ///
 /// The new visitAny*Type methods take the appropriate Decl* as their second
@@ -85,10 +85,6 @@ template<typename ImplClass, typename RetTy = void, typename... Args>
 class CanTypeVisitor_AnyNominal : public CanTypeVisitor<ImplClass, RetTy, Args...> {
 public:
   RetTy visitClassType(CanClassType T, Args... args) {
-    return static_cast<ImplClass*>(this)
-      ->visitAnyClassType(T, T->getDecl(), ::std::forward<Args>(args)...);
-  }
-  RetTy visitBoundGenericClassType(CanBoundGenericClassType T, Args... args) {
     return static_cast<ImplClass*>(this)
       ->visitAnyClassType(T, T->getDecl(), ::std::forward<Args>(args)...);
   }
@@ -101,20 +97,12 @@ public:
     return static_cast<ImplClass*>(this)
       ->visitAnyStructType(T, T->getDecl(), ::std::forward<Args>(args)...);
   }
-  RetTy visitBoundGenericStructType(CanBoundGenericStructType T, Args... args) {
-    return static_cast<ImplClass*>(this)
-      ->visitAnyStructType(T, T->getDecl(), ::std::forward<Args>(args)...);
-  }
   RetTy visitAnyStructType(CanType T, StructDecl *D, Args... args) {
     return static_cast<ImplClass*>(this)
       ->visitAnyNominalType(T, D, ::std::forward<Args>(args)...);
   }
 
   RetTy visitEnumType(CanEnumType T, Args... args) {
-    return static_cast<ImplClass*>(this)
-      ->visitAnyEnumType(T, T->getDecl(), ::std::forward<Args>(args)...);
-  }
-  RetTy visitBoundGenericEnumType(CanBoundGenericEnumType T, Args... args) {
     return static_cast<ImplClass*>(this)
       ->visitAnyEnumType(T, T->getDecl(), ::std::forward<Args>(args)...);
   }

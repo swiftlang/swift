@@ -261,9 +261,29 @@ private extension InstructionRange {
         case let termInst as TermInst & ForwardingInstruction:
           worklist.pushIfNotVisited(contentsOf: termInst.forwardedResults.lazy.filter({ $0.ownership != .none }))
 
-        case is ForwardingInstruction, is MoveValueInst:
+        case let branch as BranchInst:
+          self.insert(user)
+          let phi = branch.getPhi(for: use)
+          if phi.incomingValues.allSatisfy({ worklist.hasBeenPushed($0)}) {
+            worklist.pushIfNotVisited(phi.value)
+          }
+
+        // `begin_cow_mutation` and `end_cow_mutation` are not ForwardingInstructions, but they do
+        // forward the ownership of their operand to their (instance) result.
+        case is ForwardingInstruction, is MoveValueInst,
+             is BeginCOWMutationInst, is EndCOWMutationInst:
           if let result = user.results.lazy.filter({ $0.ownership != .none }).singleElement {
             worklist.pushIfNotVisited(result)
+          }
+
+        // A function which is annotated to forward its owned argument to its result keeps the
+        // referenced object(s) alive in its result, e.g. `_ArrayBuffer._consumeAndCreateNew`.
+        case let apply as ApplyInst
+               where apply.referencedFunction?.hasSemanticsAttribute("realloc_array_buffer") ?? false:
+          if apply.ownership == .owned {
+            worklist.pushIfNotVisited(apply)
+          } else {
+            self.insert(user)
           }
 
         default:

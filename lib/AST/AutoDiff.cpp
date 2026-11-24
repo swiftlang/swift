@@ -394,8 +394,9 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
 // `Builtin.applyTranspose` operation name, attempts to parse the arity and
 // throwing-ness from the operation name. Modifies the operation name argument
 // in place as substrings get dropped.
-static void parseAutoDiffBuiltinCommonConfig(
-    StringRef &operationName, unsigned &arity, bool &throws) {
+static void parseAutoDiffBuiltinCommonConfig(StringRef &operationName,
+                                             unsigned &arity, bool &throws,
+                                             bool &async) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
   if (operationName.starts_with(arityPrefix)) {
@@ -416,11 +417,19 @@ static void parseAutoDiffBuiltinCommonConfig(
   } else {
     throws = false;
   }
+  // Parse '_async'.
+  constexpr char asyncPrefix[] = "_async";
+  if (operationName.starts_with(asyncPrefix)) {
+    operationName = operationName.drop_front(sizeof(asyncPrefix) - 1);
+    async = true;
+  } else {
+    async = false;
+  }
 }
 
 bool autodiff::getBuiltinApplyDerivativeConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
-    unsigned &arity, bool &throws) {
+    unsigned &arity, bool &throws, bool &async) {
   constexpr char prefix[] = "applyDerivative";
   if (!operationName.starts_with(prefix))
     return false;
@@ -433,22 +442,23 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
   else if (operationName.starts_with(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
-  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws, async);
   return operationName.empty();
 }
 
-bool autodiff::getBuiltinApplyTransposeConfig(
-    StringRef operationName, unsigned &arity, bool &throws) {
+bool autodiff::getBuiltinApplyTransposeConfig(StringRef operationName,
+                                              unsigned &arity, bool &throws,
+                                              bool &async) {
   constexpr char prefix[] = "applyTranspose";
   if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
-  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws, async);
   return operationName.empty();
 }
 
 bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
-    StringRef operationName, unsigned &arity, bool &throws) {
+    StringRef operationName, unsigned &arity, bool &throws, bool &async) {
   constexpr char differentiablePrefix[] = "differentiableFunction";
   constexpr char linearPrefix[] = "linearFunction";
   if (operationName.starts_with(differentiablePrefix))
@@ -457,7 +467,7 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
   else
     return false;
-  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
+  parseAutoDiffBuiltinCommonConfig(operationName, arity, throws, async);
   return operationName.empty();
 }
 
@@ -472,7 +482,7 @@ GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
   auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
   auto origCanGenSig = origGenSig.getCanonicalSignature();
   if (origCanGenSig == derivativeCanGenSig &&
-      derivativeCanGenSig->areAllParamsConcrete())
+      !derivativeCanGenSig->isEffectivelyGeneric())
     return GenericSignature();
   // Otherwise, return the derivative generic signature.
   return derivativeGenSig;
@@ -494,7 +504,7 @@ CanType TangentSpace::getCanonicalType() const {
 
 NominalTypeDecl *TangentSpace::getNominal() const {
   assert(isTangentVector());
-  return getTangentVector()->getNominalOrBoundGenericNominal();
+  return getTangentVector()->getNominalDecl();
 }
 
 const char DerivativeFunctionTypeError::ID = '\0';
@@ -618,7 +628,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   auto parentTanType =
       baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
-  auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
+  auto *parentTanStruct = parentTanType->getStructDecl();
   // Error if parent `TangentVector` is not a struct.
   if (!parentTanStruct) {
     return TangentPropertyInfo(
@@ -692,6 +702,7 @@ Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
     return Demangle::AutoDiffFunctionKind::JVP;
   case AutoDiffDerivativeFunctionKind::VJP: return Demangle::AutoDiffFunctionKind::VJP;
   }
+  llvm_unreachable("covered switch");
 }
 
 Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
@@ -702,6 +713,7 @@ Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
   case AutoDiffLinearMapKind::Pullback:
     return Demangle::AutoDiffFunctionKind::Pullback;
   }
+  llvm_unreachable("covered switch");
 }
 
 Demangle::MangledDifferentiabilityKind
@@ -717,4 +729,5 @@ Demangle::getMangledDifferentiabilityKind(DifferentiabilityKind kind) {
   SIMPLE_CASE(Linear)
   #undef SIMPLE_CASE
   }
+  llvm_unreachable("covered switch");
 }

@@ -126,6 +126,10 @@ public class NominalTypeDecl: GenericTypeDecl {
     return result
   }
 
+  final public var storedProperties: StoredPropertiesArray {
+    StoredPropertiesArray(nominal: self)
+  }
+
   public func add(member: Decl) {
     bridged.NominalTypeDecl_addMember(member.bridged)
   }
@@ -133,6 +137,12 @@ public class NominalTypeDecl: GenericTypeDecl {
 
 final public class EnumDecl: NominalTypeDecl {
   public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
+
+  /// True if this enum has cases which cannot be referenced in canonical SIL, but which can still
+  /// exist at runtime. Such an enum must not be treated as exhaustive.
+  public var hasCasesUnavailableDuringLowering: Bool {
+    bridged.Enum_hasCasesUnavailableDuringLowering()
+  }
 
   public static func create(
     declContext: DeclContext, enumKeywordLoc: SourceLoc?, name: String,
@@ -249,9 +259,27 @@ public class AbstractStorageDecl: ValueDecl {
   final public var isConst: Bool { bridged.AbstractStorage_isConst() }
 }
 
-public class VarDecl: AbstractStorageDecl {}
+public class VarDecl: AbstractStorageDecl {
+  final public var isLet: Bool { bridged.Var_isLet() }
+
+  /// True if the binding's declaration provides an initial value, e.g. `let x = 0`.
+  final public var hasInitialValue: Bool { bridged.Var_hasInitialValue() }
+
+  /// Emits a "change 'let' to 'var'" note with fix-it, if this is a simple `let` binding.
+  final public func emitLetToVarNoteIfSimple() { bridged.Var_emitLetToVarNoteIfSimple() }
+}
 
 final public class ParamDecl: VarDecl {
+  /// The location of an explicit `consuming` specifier on this parameter, if present.
+  public var consumingSpecifierLoc: SourceLoc? { specifierLoc(.consuming) }
+
+  /// The location of an explicit `borrowing` specifier on this parameter, if present.
+  public var borrowingSpecifierLoc: SourceLoc? { specifierLoc(.borrowing) }
+
+  private func specifierLoc(_ specifier: BridgedParamSpecifier) -> SourceLoc? {
+    SourceLoc(bridged: BridgedParamDecl(raw: bridged.obj).getSpecifierLoc(specifier))
+  }
+
   public func cloneWithoutType() -> ParamDecl {
     BridgedParamDecl(raw: bridged.obj).cloneWithoutType().asDecl.declObj.getAs(ParamDecl.self)
   }
@@ -266,6 +294,10 @@ final public class SubscriptDecl: AbstractStorageDecl, GenericContext {}
 public class AbstractFunctionDecl: ValueDecl, GenericContext {
   final public var isOverridden: Bool { bridged.AbstractFunction_isOverridden() }
 
+  final public var parameterList: ParameterList {
+    ParameterList(bridged: bridged.AbstractFunction_getParameterList())
+  }
+
   /// True if this function is a witness to a distributed protocol requirement
   /// with an ad-hoc `SerializationRequirement` conformance (e.g. `remoteCall` or
   /// `recordArgument`). Such witnesses have generic parameters that cannot be class-bound,
@@ -277,6 +309,7 @@ public class AbstractFunctionDecl: ValueDecl, GenericContext {
 
 final public class ConstructorDecl: AbstractFunctionDecl {
   public var isInheritable: Bool { bridged.Constructor_isInheritable() }
+  public var isFailable: Bool { bridged.Constructor_isFailable() }
 }
 
 final public class DestructorDecl: AbstractFunctionDecl {
@@ -285,7 +318,9 @@ final public class DestructorDecl: AbstractFunctionDecl {
 
 public class FuncDecl: AbstractFunctionDecl {}
 
-final public class AccessorDecl: FuncDecl {}
+final public class AccessorDecl: FuncDecl {
+  public var storage: AbstractStorageDecl { bridged.Accessor_getStorage().getAs(AbstractStorageDecl.self) }
+}
 
 final public class MacroDecl: ValueDecl {}
 
@@ -380,6 +415,17 @@ public class GenericParameterList {
 }
 
 public typealias TrailingWhereClause = BridgedTrailingWhereClause
+
+public struct StoredPropertiesArray : RandomAccessCollection {
+  fileprivate let nominal: NominalTypeDecl
+
+  public var startIndex: Int { 0 }
+  public var endIndex: Int { nominal.bridged.NominalType_getNumStoredProperties() }
+
+  public subscript(_ index: Int) -> VarDecl {
+    return nominal.bridged.NominalType_getStoredProperty(index).getAs(VarDecl.self)
+  }
+}
 
 public class ParameterList : RandomAccessCollection {
   public var startIndex: Int { 0 }

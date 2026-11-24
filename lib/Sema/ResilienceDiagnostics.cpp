@@ -47,6 +47,31 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   return true;
 }
 
+/// A layout exposed to clients of a non-resilient module can only reference
+/// modules that clients load, which excludes modules reached only through the
+/// internal bridging header. Suggest importing the module that declares \p D,
+/// unless \p D is declared by the bridging header itself, where no import can
+/// help.
+static void noteImportForInternalBridgingHeaderOrigin(
+    const Decl *D, const ExportContext &where,
+    DisallowedOriginKind originKind) {
+  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport ||
+      where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
+    return;
+
+  auto *SF = where.getDeclContext()->getOutermostParentSourceFile();
+  if (!SF)
+    return;
+
+  ModuleDecl *M = D->getModuleContext();
+  if (M->isClangBridgingHeaderImportModule())
+    return;
+
+  // Name the Swift overlay, if any, as that is what `import` resolves to.
+  noteAddImportOfModule(*SF, M->getTopLevelModule(/*overlay=*/true),
+                        AccessLevel::Internal);
+}
+
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  const ExportContext &where) {
@@ -150,6 +175,20 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
+  // An internal '@inline(always)' declaration can't be '@usableFromInline'
+  // (SE-0496); point at '@inlinable' instead, which is what's needed.
+  if (D->getFormalAccess() == AccessLevel::Internal &&
+      D->getModuleContext() == DC->getParentModule()) {
+    auto *inlineAttr = D->getAttrs().getAttribute<InlineAttr>();
+    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always) {
+      auto note =
+          Context.Diags.diagnose(D, diag::attr_inline_always_mark_inlinable, D);
+      SourceLoc insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
+      if (insertLoc.isValid())
+        note.fixItInsert(insertLoc, "@inlinable ");
+    }
+  }
+
   ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
@@ -246,6 +285,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                        limitImport->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(D, where, originKind);
 
   return true;
 }
@@ -302,6 +342,7 @@ static bool shouldDiagnoseDeclAccess(const ValueDecl *D,
     return isInternalBridgingHeader &&
            where.getExportedLevel() == ExportedLevel::ImplicitlyExported;
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
@@ -453,6 +494,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        import->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(D, where, originKind);
 
   return true;
 }
@@ -545,6 +587,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                        limitImport->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(ext, where, originKind);
 
   return true;
 }

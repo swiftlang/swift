@@ -19,8 +19,8 @@
 #include "IRGenModule.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/ABI/ObjectFile.h"
-#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/LinkLibrary.h"
@@ -48,15 +48,18 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Driver/CommonArgs.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
+#include "llvm/Analysis/ObjCARCUtil.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -76,6 +79,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
@@ -91,9 +95,7 @@
 #include "llvm/Transforms/ObjCARC.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Scalar/DCE.h"
-#if LLVM_VERSION_MAJOR >= 23
 #include "llvm/Transforms/Utils/AssignGUID.h"
-#endif
 #include "llvm/Transforms/Utils/Instrumentation.h"
 
 #include "llvm/IR/DiagnosticInfo.h"
@@ -172,10 +174,18 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
 
+  // Follow Clang's policy so that Swift and C objects linked together agree on
+  // whether cross-section DWARF references are relocated.
+  TargetOpts.MCOptions.MachORelocatableDwarf =
+      clang::driver::tools::useMachORelocatableDwarf(Ctx.LangOpts.Target,
+                                                     Opts.DWARFVersion);
+
+#if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())
     TargetOpts.ThreadModel = llvm::ThreadModel::Single;
+#endif
 
   if (Opts.EnableGlobalISel) {
     TargetOpts.EnableGlobalISel = true;
@@ -216,6 +226,13 @@ void setModuleFlags(IRGenModule &IGM) {
       IGM.getOptions().WitnessMethodElimination) {
     Module->addModuleFlag(llvm::Module::Error, "Virtual Function Elim", 1);
   }
+
+#if LLVM_VERSION_MAJOR >= 24
+  // WebAssembly doesn't support atomics yet, see
+  // https://github.com/apple/swift/issues/54533 for more details.
+  if (IGM.Triple.isOSBinFormatWasm())
+    Module->setThreadModel(llvm::ThreadModel::Single);
+#endif
 }
 
 static void align(llvm::Module *Module) {
@@ -423,11 +440,11 @@ void swift::performLLVMOptimizations(
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
-  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
+  PassBuilder PB(Module->getContext(), TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
-    Expected<PassPlugin> PassPlugin = PassPlugin::Load(PluginFile);
+    Expected<PassPlugin> PassPlugin = PassPlugin::load(PluginFile);
     if (PassPlugin) {
       PassPlugin->registerPassBuilderCallbacks(PB);
     } else {
@@ -569,8 +586,22 @@ void swift::performLLVMOptimizations(
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
-      !Opts.DisableLLVMOptzns)
+  //
+  // Even at -Onone, we still need to run ObjCARCContract for code Clang
+  // generated at -O1 or above (e.g. for imported inline functions with
+  // -Xcc -O2): to remove clang.arc.use / clang.arc.noop.use, and to insert
+  // the assembly markers Clang leaves to it (recorded in a module flag that
+  // Swift itself sets only when optimizing). Run it only if any of these
+  // actually appear and LTO isn't used (LTO runs ObjCARCContract).
+  if (!DisableObjCARCContract &&
+      (Opts.shouldOptimize()
+           ? !Opts.DisableLLVMOptzns
+           : !isThinLTO && !isFullLTO &&
+                 (Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_use) ||
+                  Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_noop_use) ||
+                  Module->getModuleFlag(objcarc::getRVMarkerModuleFlagStr()))))
     MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
 
   if (Opts.Verify) {
@@ -601,7 +632,8 @@ void swift::performLLVMOptimizations(
     break;
   case IRGenOutputKind::LLVMAssemblyAfterOptimization:
     MPM.addPass(PrintModulePass(*out, "", /*ShouldPreserveUseListOrder=*/false,
-                                /*EmitSummaryIndex=*/false));
+                                /*EmitSummaryIndex=*/false,
+                                /*ShouldRenumberMetadata=*/true));
     break;
   case IRGenOutputKind::LLVMBitcode: {
     // Emit a module summary by default for Regular LTO except ld64-based ones
@@ -610,12 +642,10 @@ void swift::performLLVMOptimizations(
         TargetMachine->getTargetTriple().getVendor() != llvm::Triple::Apple;
 
     if (Opts.LLVMLTOKind == IRGenLLVMLTOKind::Thin) {
-#if LLVM_VERSION_MAJOR >= 23
       // ThinLTOBitcodeWriterPass requests ModuleSummaryIndexAnalysis, which
       // requires a GUID to be assigned to every GlobalValue. The LTO prelink
       // pipelines do that via AssignGUIDPass, but the O0 pipeline does not.
       MPM.addPass(AssignGUIDPass());
-#endif
       MPM.addPass(ThinLTOBitcodeWriterPass(*out, nullptr));
     } else {
       if (EmitRegularLTOSummary) {
@@ -625,12 +655,11 @@ void swift::performLLVMOptimizations(
         // lto summary.)
         Module->addModuleFlag(llvm::Module::Error, "EnableSplitLTOUnit",
                               uint32_t(1));
-#if LLVM_VERSION_MAJOR >= 23
+
         // BitcodeWriterPass with EmitSummaryIndex requests
         // ModuleSummaryIndexAnalysis, which requires a GUID to be assigned to
         // every GlobalValue; the per-module/O0 pipelines do not do that.
         MPM.addPass(AssignGUIDPass());
-#endif
       }
       MPM.addPass(BitcodeWriterPass(
           *out, /*ShouldPreserveUseListOrder*/ false, EmitRegularLTOSummary));
@@ -647,6 +676,7 @@ void swift::performLLVMOptimizations(
     if (irFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irFile, nullptr);
   }
 
@@ -684,7 +714,12 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
   if (OutputFilename.empty())
     return true;
 
-  auto BinaryOwner = object::createBinary(OutputFilename);
+  // The existing output file is not an input of the compilation, so it is not
+  // in the virtual file system.
+  auto BinaryOwner = [&] {
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    return object::createBinary(OutputFilename);
+  }();
   if (!BinaryOwner) {
     consumeError(BinaryOwner.takeError());
     return true;
@@ -808,6 +843,20 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::vfs::OutputBackend &Backend,
                         UnifiedStatsReporter *Stats) {
 
+  // Whenever we leave this function, finalize the main remark streamer (if the
+  // context owns one). Finalization flushes the remark string table to the end
+  // of the remarks file and deregisters the streamer from the context. It must
+  // happen before the streamer (owned by the context) is destroyed, both to
+  // produce a valid remarks file and to satisfy the RemarkStreamer destructor's
+  // assertion that its serializer was released. Using a scope guard ensures
+  // this covers every early return (e.g. incremental codegen skipping the
+  // object file), not just the successful codegen path.
+  auto &Ctxt = Module->getContext();
+  SWIFT_DEFER {
+    if (Ctxt.getMainRemarkStreamer())
+      llvm::finalizeLLVMOptimizationRemarks(Ctxt);
+  };
+
   if (Opts.UseIncrementalLLVMCodeGen && HashGlobal) {
     // Check if we can skip the llvm part of the compilation if we have an
     // existing object file which was generated from the same llvm IR.
@@ -857,6 +906,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     }
 
     if (Opts.OutputKind == IRGenOutputKind::LLVMAssemblyBeforeOptimization) {
+      Module->renumberMetadataForAssembly();
       Module->print(*OutputFile, nullptr);
       return false;
     }
@@ -870,10 +920,10 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
     if (irgenFile.has_error() || error)
       ABORT("cannot open LLVM-IR output file");
 
+    Module->renumberMetadataForAssembly();
     Module->print(irgenFile, nullptr);
   }
 
-  auto &Ctxt = Module->getContext();
   std::unique_ptr<llvm::DiagnosticHandler> OldDiagnosticHandler =
           Ctxt.getDiagnosticHandler();
   Ctxt.setDiagnosticHandler(std::make_unique<SwiftDiagnosticHandler>(Opts));
@@ -1031,6 +1081,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
   opts.HeapDestructors =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.EmbeddedHeapObjectMetadata =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ObjCISA);
 
   // Partial-apply captures are not ABI and can use a more aggressive key.
   opts.PartialApplyCapture =
@@ -1431,8 +1484,8 @@ static void initLLVMModule(IRGenModule &IGM, SILModule &SIL, std::optional<unsig
 
       const auto format = SILOpts.OptRecordFormat;
       llvm::Expected<std::unique_ptr<llvm::remarks::RemarkSerializer>>
-        remarkSerializerOrErr = llvm::remarks::createRemarkSerializer(
-          format, llvm::remarks::SerializerMode::Separate, *file);
+          remarkSerializerOrErr =
+              llvm::remarks::createRemarkSerializer(format, *file);
       if (llvm::Error err = remarkSerializerOrErr.takeError()) {
         diagEngine.diagnose(SourceLoc(), diag::error_creating_remark_serializer,
                             toString(std::move(err)));

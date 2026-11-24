@@ -28,6 +28,7 @@ public struct NC : ~Copyable {
 }
 
 sil @readNC : $@convention(thin) (@guaranteed NC) -> ()
+sil @getNC : $@convention(thin) () -> @owned NC
 
 // CHECK-LABEL: sil [ossa] @stackedMarksConsumableAndAssignable
 sil [ossa] @stackedMarksConsumableAndAssignable : $@convention(thin) (@owned NC) -> () {
@@ -59,6 +60,48 @@ bb0(%0 : @owned $NC):
   end_borrow %6 : $NC
   destroy_addr %5 : $*NC
   dealloc_stack %1 : $*NC
+  %r = tuple ()
+  return %r : $()
+}
+
+// The debug_value attached to the inner [strict] mark (here, a borrow
+// binding `if case let borrowing y = x`) must not be hoisted above the init
+// store once the inner mark has been checked and replaced by the outer mark.
+// Otherwise %1 becomes live-in to bb2 and the checker inserts a destroy_addr
+// of it in bb1, which %1 does not dominate.
+//
+// CHECK-LABEL: sil [ossa] @stackedMarksDebugValueOnInnerMark
+// CHECK:       bb1:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb2:
+// CHECK:         [[STACK:%.*]] = alloc_stack [lexical] $NC, let, name "x"
+// CHECK-NOT:     debug_value [[STACK]]
+// CHECK:         store {{%.*}} to [init] [[STACK]]
+// CHECK-NEXT:    debug_value [[STACK]] : $*NC, let, name "y", expr op_deref
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:       } // end sil function 'stackedMarksDebugValueOnInnerMark'
+sil [ossa] @stackedMarksDebugValueOnInnerMark : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  %1 = alloc_stack [lexical] $NC, let, name "x"
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*NC
+  %3 = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %4 = apply %3() : $@convention(thin) () -> @owned NC
+  store %4 to [init] %2 : $*NC
+  %6 = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] %2 : $*NC
+  debug_value %6 : $*NC, let, name "y", expr op_deref
+  %8 = load_borrow %6 : $*NC
+  end_borrow %8 : $NC
+  destroy_addr %2 : $*NC
+  dealloc_stack %1 : $*NC
+  br bb3
+
+bb3:
   %r = tuple ()
   return %r : $()
 }

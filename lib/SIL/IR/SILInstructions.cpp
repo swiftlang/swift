@@ -17,6 +17,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -226,8 +227,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(0,
-                                 Var ? Var->Type.has_value() : false,
+      SILDebugVariableSupplement(0, false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
       // Initialize VarInfo with a temporary raw value of 0. The real
@@ -245,7 +245,7 @@ AllocStackInst::AllocStackInst(
   // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
   // addresses are wrong.
   VarInfo = TailAllocatedDebugVariable(
-      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      Var, getTrailingObjects<char>(), nullptr,
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
       nullptr);
@@ -270,8 +270,9 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Loc = {};
     if (Var->Scope == Loc.getScope())
       Var->Scope = nullptr;
-    if (Var->Type == elementType)
-      Var->Type = {};
+    ASSERT((!Var->Type || Var->Type == elementType.getObjectType()) &&
+           "alloc_stack cannot have a vartype != element type");
+    Var->Type = {};
     if (Var->DIExpr) {
       // alloc_stack cannot carry a DIExpression.
       // Strip a single implied op_deref. Anything else is an error.
@@ -379,6 +380,21 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
   return ::new (Buffer)
       AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, isNested,
                           ElementTypes, AllOperands);
+}
+
+DeallocRefInst *
+DeallocRefInst::create(SILDebugLocation DebugLoc, SILFunction &F,
+                       SILValue Operand, ArrayRef<SILType> ElementTypes,
+                       ArrayRef<SILValue> ElementCountOperands) {
+  assert(ElementTypes.size() == ElementCountOperands.size());
+  SmallVector<SILValue, 8> AllOperands;
+  AllOperands.push_back(Operand);
+  AllOperands.append(ElementCountOperands.begin(), ElementCountOperands.end());
+  collectTypeDependentOperands(AllOperands, F, ElementTypes);
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(DeallocRefInst));
+  return ::new (Buffer) DeallocRefInst(DebugLoc, AllOperands, ElementTypes);
 }
 
 bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
@@ -751,8 +767,8 @@ bool DebugValueInst::isExprTypeValid() const {
     // Cannot have an object category undef value of an address-only type,
     // except for the $error variable, which is handled differently.
     if (isa<SILUndef>(operand) && valueType.isObject() &&
-        !valueType.isLoadableOrOpaque(*getFunction())
-        && varInfo.Name != "$error") {
+        !valueType.isLoadableOrOpaque(*getFunction()) &&
+        !varInfo.isErrorVariable()) {
       return false;
     }
   } else {
@@ -784,7 +800,7 @@ bool DebugValueInst::isExprTypeValid() const {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
-          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+          RunningType.getNominalDecl() != FieldParent)
         return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
@@ -975,11 +991,13 @@ BeginApplyInst::BeginApplyInst(
     ArrayRef<SILValue> args, ArrayRef<SILValue> typeDependentOperands,
     std::optional<ArrayRef<SILLocation>> argLocs, ApplyOptions options,
     const GenericSpecializationInformation *specializationInfo,
-    std::optional<ApplyIsolationCrossing> isolationCrossing)
+    std::optional<ApplyIsolationCrossing> isolationCrossing,
+    bool isUnresolved)
     : InstructionBase(isolationCrossing, loc, callee, substCalleeTy, subs, args,
                       typeDependentOperands, argLocs, specializationInfo),
       MultipleValueInstructionTrailingObjects(this, allResultTypes,
-                                              allResultOwnerships) {
+                                              allResultOwnerships),
+      IsUnresolved(isUnresolved) {
   setApplyOptions(options);
   assert(substCalleeTy.castTo<SILFunctionType>()->isCoroutine());
 }
@@ -991,7 +1009,8 @@ BeginApplyInst *BeginApplyInst::create(
     SILFunction &parentFunction,
     const GenericSpecializationInformation *specializationInfo,
     std::optional<ApplyIsolationCrossing> isolationCrossing,
-    std::optional<ArrayRef<SILLocation>> argLocs) {
+    std::optional<ArrayRef<SILLocation>> argLocs,
+    bool isUnresolved) {
   SILType substCalleeSILType = callee->getType().substGenericArgs(
       parentFunction.getModule(), subs,
       parentFunction.getTypeExpansionContext());
@@ -1044,7 +1063,8 @@ BeginApplyInst *BeginApplyInst::create(
   return ::new (buffer)
       BeginApplyInst(loc, callee, substCalleeSILType, resultTypes,
                      resultOwnerships, subs, args, typeDependentOperands,
-                     argLocs, options, specializationInfo, isolationCrossing);
+                     argLocs, options, specializationInfo, isolationCrossing,
+                     isUnresolved);
 }
 
 void BeginApplyInst::getCoroutineEndPoints(
@@ -1112,19 +1132,30 @@ PartialApplyInst::PartialApplyInst(
   sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
 }
 
+bool PartialApplyInst::contextBorrowsArgument(const Operand &argOp) const {
+  if (!isOnStack() || argOp.get()->getType().isAddress())
+    return false;
+  if (!isNoncopyable())
+    return true;
+  return !ApplySite(const_cast<PartialApplyInst *>(this))
+              .getArgumentConvention(argOp)
+              .isOwnedConventionInCaller();
+}
+
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
     const GenericSpecializationInformation *specializationInfo,
-    OnStackKind onStack, StackAllocationIsNested_t isNested, bool isCalledOnce,
+    OnStackKind onStack, StackAllocationIsNested_t isNested,
+    std::optional<ExecutionSemantics> executionSemantics,
     std::optional<ArrayRef<SILLocation>> ArgLocs) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
   SILType ClosureType = SILBuilder::getPartialApplyResultType(
-      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(), {},
-      calleeConvention, resultIsolation, onStack, isCalledOnce);
+      F.getTypeExpansionContext(), SubstCalleeTy, Args.size(), F.getModule(),
+      {}, calleeConvention, resultIsolation, onStack, executionSemantics);
 
   SmallVector<SILValue, 32> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -1385,7 +1416,7 @@ DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
   assert(witness && "Differentiability witness must not be null");
 #ifndef NDEBUG
   if (functionType.has_value()) {
-    assert(module.getStage() == SILStage::Lowered &&
+    assert(module.hasCommittedLowered() &&
            "Explicit type is valid only in lowered SIL");
   }
 #endif
@@ -1903,7 +1934,7 @@ StructInst::StructInst(SILDebugLocation Loc, SILType Ty,
     : InstructionBaseWithTrailingOperands(
       Elems, Loc, Ty, forwardingOwnershipKind)
 {
-  assert(!Ty.getStructOrBoundGenericStruct()->hasUnreferenceableStorage());
+  assert(!Ty.getStructDecl()->hasUnreferenceableStorage());
 }
 
 BorrowedFromInst *BorrowedFromInst::create(SILDebugLocation DebugLoc, SILValue borrowedValue,
@@ -3040,8 +3071,10 @@ UnconditionalCheckedCastInst *UnconditionalCheckedCastInst::create(
       totalSizeToAlloc<swift::Operand>(1 + TypeDependentOperands.size());
   void *Buffer = Mod.allocateInst(size, alignof(UnconditionalCheckedCastInst));
   return ::new (Buffer) UnconditionalCheckedCastInst(
-      DebugLoc, options, Operand, TypeDependentOperands,
-      DestLoweredTy, DestFormalTy, forwardingOwnershipKind);
+      DebugLoc, options, Operand, TypeDependentOperands, DestLoweredTy,
+      DestFormalTy, forwardingOwnershipKind,
+      doesCastPreserveOwnershipForTypes(Mod, Operand->getType().getASTType(),
+                                        DestFormalTy));
 }
 
 CheckedCastBranchInst *CheckedCastBranchInst::create(
@@ -3115,10 +3148,11 @@ ThinToThickFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
       DebugLoc, Operand, TypeDependentOperands, Ty, forwardingOwnershipKind);
 }
 
-ConvertFunctionInst *ConvertFunctionInst::create(
-    SILDebugLocation DebugLoc, SILValue Operand, SILType Ty, SILModule &Mod,
-    SILFunction *F,
-    bool WithoutActuallyEscaping, ValueOwnershipKind forwardingOwnershipKind) {
+ConvertFunctionInst *
+ConvertFunctionInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                            SILType Ty, SILModule &Mod, SILFunction *F,
+                            Kind ConversionKind,
+                            ValueOwnershipKind forwardingOwnershipKind) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   if (F) {
     assert(&F->getModule() == &Mod);
@@ -3129,13 +3163,16 @@ ConvertFunctionInst *ConvertFunctionInst::create(
   void *Buffer = Mod.allocateInst(size, alignof(ConvertFunctionInst));
   auto *CFI = ::new (Buffer)
       ConvertFunctionInst(DebugLoc, Operand, TypeDependentOperands, Ty,
-                          WithoutActuallyEscaping, forwardingOwnershipKind);
+                          ConversionKind, forwardingOwnershipKind);
   // If we do not have lowered SIL, make sure that are not performing
   // ABI-incompatible conversions.
   //
+  // This reads the module, not a function's stage, because F is nullable here.
+  // ConvertEscapeToNoEscapeInst::create has a function and reads its stage.
+  //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (Mod.getStage() != SILStage::Lowered) {
+  if (!Mod.haveFunctionTypesBeenRewritten()) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3263,7 +3300,7 @@ ConvertEscapeToNoEscapeInst *ConvertEscapeToNoEscapeInst::create(
   //
   // *NOTE* We purposely do not use an early return here to ensure that in
   // builds without assertions this whole if statement is optimized out.
-  if (F.getModule().getStage() != SILStage::Lowered) {
+  if (F.getFunctionStage() != SILStage::Lowered) {
     // Make sure we are not performing ABI-incompatible conversions.
     CanSILFunctionType opTI =
         CFI->getOperand()->getType().castTo<SILFunctionType>();
@@ -3348,9 +3385,9 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     StringRef objcString) {
   llvm::FoldingSetNodeID id;
   Profile(id, signature, rootType, valueType, components, objcString);
-  
-  void *insertPos;
-  auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
+
+  llvm::FoldingSetInsertToken insertToken;
+  auto existing = M.KeyPathPatterns.lookup(id, insertToken);
   if (existing)
     return existing;
   
@@ -3377,7 +3414,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
-  M.KeyPathPatterns.InsertNode(newPattern, insertPos);
+  M.KeyPathPatterns.insert(newPattern, insertToken);
   return newPattern;
 }
 
@@ -3542,15 +3579,15 @@ KeyPathInst::~KeyPathInst() {
     operand.~Operand();
 }
 
-BoundGenericType *KeyPathInst::getKeyPathType() const {
+NominalType *KeyPathInst::getKeyPathType() const {
   auto kpTy = getType();
 
   if (auto existential = kpTy.getAs<ExistentialType>()) {
     return existential->getExistentialLayout()
-        .explicitSuperclass->castTo<BoundGenericType>();
+        .explicitSuperclass->castTo<NominalType>();
   }
 
-  return kpTy.getAs<BoundGenericType>();
+  return kpTy.getAs<NominalType>();
 }
 
 KeyPathPattern *KeyPathInst::getPattern() const {
@@ -3584,9 +3621,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   // starting `capability = .value` in
   // `_getKeyPathClassAndInstanceSizeFromPattern`.
   if (components.empty()) {
-    auto identityTy = BoundGenericType::get(ctx.getWritableKeyPathDecl(),
-                                            /*parent=*/swift::Type(),
-                                            {rootTy, valueTy})
+    auto identityTy = NominalType::get(ctx.getWritableKeyPathDecl(),
+                                       /*parent=*/swift::Type(),
+                                       {rootTy, valueTy}, ctx)
                           ->getCanonicalType();
     return SILType::getPrimitiveObjectType(identityTy);
   }
@@ -3601,7 +3638,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       auto *property = cast<VarDecl>(comp.getStoredPropertyDecl());
       if (property->isLet()) {
         keyPathClass = ctx.getKeyPathDecl();
-      } else if (rootTy->getClassOrBoundGenericClass()) {
+      } else if (rootTy->getClassDecl()) {
         keyPathClass = ctx.getReferenceWritableKeyPathDecl();
       } else {
         keyPathClass = ctx.getWritableKeyPathDecl();
@@ -3680,9 +3717,9 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
       break;
     }
     assert(keyPathClass && "unhandled component kind above?");
-    auto concreteTy = BoundGenericType::get(keyPathClass,
-                                            /*parent=*/swift::Type(),
-                                            {rootTy, valueTy})
+    auto concreteTy = NominalType::get(keyPathClass,
+                                       /*parent=*/swift::Type(),
+                                       {rootTy, valueTy}, ctx)
                           ->getCanonicalType();
     return SILType::getPrimitiveObjectType(concreteTy);
   }
@@ -3699,7 +3736,7 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   CanType currentRoot = rootTy;
 
   for (const auto &comp : components) {
-    bool rootIsClass = (bool)currentRoot->getClassOrBoundGenericClass();
+    bool rootIsClass = (bool)currentRoot->getClassDecl();
 
     switch (comp.getKind()) {
     case KeyPathPatternComponent::Kind::StoredProperty: {
@@ -3795,8 +3832,8 @@ SILType KeyPathInst::getStaticInstanceClassType() const {
   }
 
   auto concreteTy =
-      BoundGenericType::get(keyPathClass, /*parent=*/swift::Type(),
-                            {rootTy, valueTy})
+      NominalType::get(keyPathClass, /*parent=*/swift::Type(),
+                       {rootTy, valueTy}, ctx)
           ->getCanonicalType();
   return SILType::getPrimitiveObjectType(concreteTy);
 }
@@ -3848,6 +3885,86 @@ visitReferencedFunctionsAndMethods(
   }
 }
 
+
+namespace {
+
+/// A helper class used to check whether one type is structurally contained
+/// the other type either completely or partially.
+class TypeComparator : public TypeMatcher<TypeComparator> {
+  bool IsContained = false;
+
+public:
+  bool isEqual(CanType T1, CanType T2) { return T1 == T2; }
+  /// Check whether the type T1 is different from T2 and contained in the type
+  /// T2.
+  bool isStrictlyContainedIn(CanType T1, CanType T2) {
+    if (isEqual(T1, T2))
+      return false;
+    return T2.findIf([&T1, this](Type T) -> bool {
+      return isEqual(T->getCanonicalType(), T1);
+    });
+  }
+
+  /// Check whether the type T1 is strictly or partially contained in the type
+  /// T2.
+  /// Partially contained means that if you drop the common structural "prefix"
+  /// of T1 and T2 and get T1' and T2' then T1' is strictly contained in T2'.
+  bool isPartiallyContainedIn(CanType T1, CanType T2) {
+    if (isStrictlyContainedIn(T1, T2))
+      return true;
+    match(T1, T2);
+    return IsContained;
+  }
+
+  /// This method is invoked aftre skipping a common prefix of two types,
+  /// when a structural difference is found.
+  bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                Type sugaredFirstType) {
+    auto firstCanType = firstType->getCanonicalType();
+    auto secondCanType = secondType->getCanonicalType();
+    if (isEqual(firstCanType, secondCanType))
+      return false;
+    if (isStrictlyContainedIn(firstCanType, secondCanType)) {
+      IsContained = true;
+      return false;
+    }
+    return false;
+  }
+};
+
+} // end anonymous namespace
+
+/// Checks if a second substitution map is an expanded version of
+/// the first substitution map.
+/// This is the case if at least one of the substitution type in Subs2 is
+/// "bigger" than the corresponding substitution type in Subs1.
+/// Type T2 is "smaller" than type T1 if T2 is structurally contained in T1.
+bool swift::growingSubstitutions(SubstitutionMap Subs1,
+                                 SubstitutionMap Subs2) {
+  auto Replacements1 = Subs1.getReplacementTypes();
+  auto Replacements2 = Subs2.getReplacementTypes();
+  assert(Replacements1.size() == Replacements2.size());
+  TypeComparator TypeCmp;
+  // Perform component-wise comparisons for substitutions.
+  for (unsigned idx : indices(Replacements1)) {
+    auto Type1 = Replacements1[idx]->getCanonicalType();
+    auto Type2 = Replacements2[idx]->getCanonicalType();
+    // If types are the same, the substitution type does not grow.
+    if (TypeCmp.isEqual(Type2, Type1))
+      continue;
+    // If the new substitution type is getting smaller, the
+    // substitution type does not grow.
+    if (TypeCmp.isPartiallyContainedIn(Type2, Type1))
+      continue;
+    if (TypeCmp.isPartiallyContainedIn(Type1, Type2))
+      return true;
+    // None of the types is contained in the other type.
+    // They are not comparable in this sense.
+  }
+
+  // The substitution list is not growing.
+  return false;
+}
 
 GenericSpecializationInformation::GenericSpecializationInformation(
     SILFunction *Caller, SILFunction *Parent, SubstitutionMap Subs)
@@ -3919,7 +4036,7 @@ DestructureStructInst::create(const SILFunction &F, SILDebugLocation Loc,
                               ValueOwnershipKind forwardingOwnershipKind) {
   auto &M = F.getModule();
 
-  assert(Operand->getType().getStructOrBoundGenericStruct() &&
+  assert(Operand->getType().getStructDecl() &&
          "Expected a struct typed operand?!");
 
   llvm::SmallVector<SILType, 8> Types;
@@ -4020,7 +4137,8 @@ ReturnBorrowInst *ReturnBorrowInst::create(SILDebugLocation DebugLoc,
 ReturnBorrowInst::ReturnBorrowInst(SILDebugLocation DebugLoc,
                                    ArrayRef<SILValue> operands)
     : InstructionBaseWithTrailingOperands(operands, DebugLoc) {
-  assert(operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(operands[0]->getType().isAddress() ||
+         operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
 }
 
 // This may be called in an invalid SIL state. SILCombine creates new

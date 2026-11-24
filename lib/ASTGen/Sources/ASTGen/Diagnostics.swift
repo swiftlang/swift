@@ -172,6 +172,27 @@ extension ASTGenDiagnostic {
     )
   }
 
+  static func invalidArgumentInAttribute(_ attribute: AttributeSyntax, _ argument: some SyntaxProtocol) -> Self {
+    Self(
+      node: argument,
+      message: "invalid argument in '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+
+  static func expectedLParenInCallableAttribute(_ attribute: AttributeSyntax) -> Self {
+    Self(
+      node: attribute,
+      message: "expected '(' in 'callable' attribute"
+    )
+  }
+
+  static func expectedOnceInCallableAttribute(_ node: some SyntaxProtocol) -> Self {
+    Self(
+      node: node,
+      message: "expected 'once' in '@callable' attribute"
+    )
+  }
+
   static func expectedStringLiteralArgument(_ node: some SyntaxProtocol) -> Self {
     Self(
       node: node,

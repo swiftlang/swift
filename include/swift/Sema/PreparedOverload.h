@@ -13,6 +13,7 @@
 #define SWIFT_SEMA_PREPAREDOVERLOAD_H
 
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
@@ -67,90 +68,81 @@ using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
 /// A change to be introduced into the constraint system when this
 /// overload choice is chosen.
-struct PreparedOverloadChange {
-  enum ChangeKind : unsigned {
-    /// A generic parameter was opened to a type variable.
-    AddedTypeVariable,
-
-    /// A generic requirement was opened to a constraint.
-    AddedConstraint,
-
-    /// Special case of a Bind constraint.
-    AddedBindConstraint,
-
-    /// A mapping of generic parameter types to type variables
-    /// was recorded.
-    OpenedTypes,
-
-    /// An existential type was opened.
-    OpenedExistentialType,
-
-    /// A pack expansion type was opened.
-    OpenedPackExpansionType,
-
-    /// A property wrapper was applied to a parameter.
-    AppliedPropertyWrapper,
-
-    /// A fix was recorded because a property wrapper application failed.
-    AddedFix,
-
-    /// The type of an AST node was changed.
-    RecordedNodeType
+class PreparedOverloadChange {
+public:
+  enum class Kind : unsigned {
+#define CHANGE(ID, BODY, VISIT) ID,
+#include "PreparedOverloadChanges.def"
   };
 
-  /// The kind of change.
-  ChangeKind Kind;
+#define CHANGE(ID, BODY, VISIT) \
+  struct ID BODY;
+#include "PreparedOverloadChanges.def"
 
-  union {
-    /// For ChangeKind::AddedTypeVariable.
-    TypeVariableType *TypeVar;
+private:
+  using Members = ExternalUnionMembers<
+#define CHANGE(ID, BODY, VISIT) ID,
+#define LAST_CHANGE(ID, BODY, VISIT) ID
+#include "PreparedOverloadChanges.def"
+  >;
 
-    /// For ChangeKind::AddedConstraint.
-    Constraint *TheConstraint;
+  static constexpr Members::Index getIndexForKind(Kind kind) {
+    switch (kind) {
+#define CHANGE(ID, BODY, VISIT) \
+    case Kind::ID: return Members::indexOf<ID>();
+#include "PreparedOverloadChanges.def"
+    }
+    llvm_unreachable("bad kind");
+  }
 
-    /// For ChangeKind::AddedBindConstraint.
-    struct {
-      TypeBase *FirstType;
-      TypeBase *SecondType;
-    } Bind;
+  static constexpr Kind getDefaultKindForIndex(Members::Index index) {
+    switch (index) {
+#define CHANGE(ID, BODY, VISIT) \
+    case Members::indexOf<ID>(): return Kind::ID;
+#include "PreparedOverloadChanges.def"
+    }
+    llvm_unreachable("bad kind");
+  }
 
-    /// For ChangeKind::OpenedTypes.
-    struct {
-      const OpenedType *Data;
-      size_t Count;
-    } Replacements;
+  using StorageType = ExplicitTaggedUnion<Kind, Members, getIndexForKind,
+                                          getDefaultKindForIndex>;
+  StorageType storage;
 
-    /// For ChangeKind::OpenedExistentialType.
-    ExistentialArchetypeType *TheExistential;
+public:
+  template <class T,
+            typename = StorageType::enable_if_constructible_t<T> >
+  PreparedOverloadChange(T &&data) : storage(std::forward<T>(data)) {}
 
-    /// For ChangeKind::OpenedPackExpansionType.
-    struct {
-      PackExpansionType *TheExpansion;
-      TypeVariableType *TypeVar;
-    } PackExpansion;
+  Kind getKind() const {
+    return storage.getKind();
+  }
 
-    /// For ChangeKind::AppliedPropertyWrapper.
-    struct {
-      TypeBase *WrapperType;
-      PropertyWrapperInitKind InitKind;
-    } PropertyWrapper;
+  template <Kind K>
+  const StorageType::typeForKind<K> &get() const {
+    assert(getKind() == K);
+    return storage.get<StorageType::typeForKind<K>>();
+  }
 
-    /// For ChangeKind::Fix.
-    struct {
-      ConstraintFix *TheFix;
-      FixImpact Impact;
-    } Fix;
+  template <Kind K>
+  const StorageType::typeForKind<K> *dyn_cast() const {
+    return (getKind() == K
+              ? &storage.get<StorageType::typeForKind<K>>()
+              : nullptr);
+  }
 
-    /// For ChangeKind::RecordedNodeType.
-    struct {
-      ASTNode Node;
-      Type TheType;
-    } Node;
-  };
-
-  PreparedOverloadChange()
-      : Kind(ChangeKind::AddedTypeVariable),
-        TypeVar(nullptr) { }
+  template <class V>
+  auto visit(V &&visitor) const
+      -> decltype(std::forward<V>(visitor).visitAddedTypeVariable(nullptr)) {
+    switch (getKind()) {
+#define CHANGE(ID, BODY, VISIT_ARGS)                          \
+    case Kind::ID: {                                          \
+      auto &self = get<Kind::ID>();                           \
+      return std::forward<V>(visitor).visit##ID VISIT_ARGS;   \
+    }
+#include "PreparedOverloadChanges.def"
+    }
+    llvm_unreachable("bad kind");
+  }
 
   void dump(llvm::raw_ostream &out,
             ConstraintSystem &cs,
@@ -203,80 +195,51 @@ public:
 };
 
 struct PreparedOverloadBuilder {
-  SmallVector<PreparedOverload::Change, 8> Changes;
+  using Change = PreparedOverload::Change;
+  SmallVector<Change, 8> Changes;
   ConstraintLocator *Locator;
 
   PreparedOverloadBuilder(ConstraintLocator *locator)
     : Locator(locator) {}
 
   void addedTypeVariable(TypeVariableType *typeVar) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::AddedTypeVariable;
-    change.TypeVar = typeVar;
-    Changes.push_back(change);
+    Changes.emplace_back(Change::AddedTypeVariable{typeVar});
   }
 
   void addedConstraint(Constraint *constraint) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::AddedConstraint;
-    change.TheConstraint = constraint;
-    Changes.push_back(change);
+    Changes.emplace_back(Change::AddedConstraint{constraint});
   }
 
   void addedBindConstraint(Type firstType, Type secondType) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::AddedBindConstraint;
-    change.Bind.FirstType = firstType.getPointer();
-    change.Bind.SecondType = secondType.getPointer();
-    Changes.push_back(change);
+    Changes.emplace_back(
+      Change::AddedBindConstraint{firstType, secondType});
   }
 
   void openedTypes(ArrayRef<OpenedType> replacements) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::OpenedTypes;
-    change.Replacements.Data = replacements.data();
-    change.Replacements.Count = replacements.size();
-    Changes.push_back(change);
+    Changes.emplace_back(Change::OpenedTypes{replacements});
   }
 
   void openedExistentialType(ExistentialArchetypeType *openedExistential) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::OpenedExistentialType;
-    change.TheExistential = openedExistential;
-    Changes.push_back(change);
+    Changes.emplace_back(Change::OpenedExistentialType{openedExistential});
   }
 
   void openedPackExpansionType(PackExpansionType *packExpansion,
                                TypeVariableType *typeVar) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::OpenedPackExpansionType;
-    change.PackExpansion.TheExpansion = packExpansion;
-    change.PackExpansion.TypeVar = typeVar;
-    Changes.push_back(change);
+    Changes.emplace_back(
+      Change::OpenedPackExpansionType{packExpansion, typeVar});
   }
 
   void appliedPropertyWrapper(AppliedPropertyWrapper wrapper) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::AppliedPropertyWrapper;
-    change.PropertyWrapper.WrapperType = wrapper.wrapperType.getPointer();
-    change.PropertyWrapper.InitKind = wrapper.initKind;
-    Changes.push_back(change);
+    Changes.emplace_back(
+      Change::AppliedPropertyWrapper{wrapper.wrapperType, wrapper.initKind});
   }
 
   void addedFix(ConstraintFix *fix, FixImpact impact) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::AddedFix;
-    change.Fix.TheFix = fix;
-    change.Fix.Impact = impact;
-    Changes.push_back(change);
+    Changes.emplace_back(Change::AddedFix{fix, impact});
   }
 
   void recordedNodeType(ASTNode node, Type type) {
-    PreparedOverload::Change change;
-    change.Kind = PreparedOverload::Change::RecordedNodeType;
-    change.Node.Node = node;
-    change.Node.TheType = type;
-    Changes.push_back(change);
+    Changes.emplace_back(Change::RecordedNodeType{node, type});
   }
 
   void dump(llvm::raw_ostream &out,

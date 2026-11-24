@@ -34,29 +34,19 @@
 /// types. Explicitly conforming a `@com` class to `ISwiftObject` is a
 /// compile-time error.
 ///
-/// The interface has a single method (`object`, at vtable slot 3) that returns
-/// a borrowed reference to the Swift heap object. Like `IUnknown`'s methods,
-/// this is not exposed as a Swift protocol requirement because the
-/// implementation is compiler-managed and sealed.
+/// Following the three `IUnknown` entries, the interface provides two getters:
+/// `object` at vtable slot 3 returns the Swift heap object, and `metadata` at
+/// slot 4 returns that object's dynamic class metadata. Both pointers are
+/// borrowed and must describe the same object. The queried interface reference
+/// keeps the object alive while the runtime uses them.
 ///
-/// Before calling a property witness, its native COM entry recovers the Swift
-/// object pointer using the non-virtual adjustment stored at `vtable[−1]`.
-/// Each COM interface on an object has its own vtable, and each vtable carries
-/// its own adjustment value at this negative offset. The adjustment records the
-/// byte distance from the COM interface pointer to the Swift object pointer.
-/// This is analogous to the Itanium C++ ABI's `offset_to_top` field in
-/// structure (a per-vtable fixed displacement stored at a negative index)
-/// though the direction is reversed: rather than retreating to the lowest
-/// address of the complete object, the adjustment advances forward to where the
-/// Swift heap object begins within the allocation. The adjustment is per-vtable
-/// because each interface's vtable pointer sits at a different offset within
-/// the object's COM block.
+/// A successful `QueryInterface` returns an owned interface reference. The
+/// runtime releases it after using the borrowed identity; a Swift reference
+/// returned to the caller must acquire independent ownership.
 ///
-/// A user-provided implementation would bypass this per-vtable adjustment and
-/// produce incorrect results. The runtime calls `object` only after
-/// `QueryInterface` for `ISwiftObject` has confirmed the object is
-/// Swift-originated, so the adjustment is never read speculatively on foreign
-/// COM objects.
+/// Consumers query this interface using its reserved IID. They must not assume
+/// that the incoming interface, the identity interface, and the Swift object
+/// have the same address, or inspect a foreign object's allocation prefix.
 @com(interface: "8E369447-5188-5ADA-B9EC-8FCB732D226B")
 public protocol ISwiftObject {
   var object: UnsafeMutableRawPointer { get }

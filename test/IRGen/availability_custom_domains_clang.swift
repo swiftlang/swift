@@ -1,14 +1,66 @@
 // RUN: %target-swift-emit-irgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -import-bridging-header %S/Inputs/AvailabilityDomains.h \
-// RUN:   -Onone | %FileCheck %s --check-prefixes=CHECK,CHECK-O-NONE
+// RUN:   -Onone | %FileCheck %s --check-prefixes=CHECK,CHECK-O-NONE \
+// RUN:   --implicit-check-not=.str.14.disabledDomain
 
 // RUN: %target-swift-emit-irgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -import-bridging-header %S/Inputs/AvailabilityDomains.h \
-// RUN:   -O | %FileCheck %s --check-prefixes=CHECK,CHECK-O
+// RUN:   -O | %FileCheck %s --check-prefixes=CHECK,CHECK-O \
+// RUN:   --implicit-check-not=.str.14.disabledDomain
+
+// RUN: %target-swift-emit-irgen -module-name Test %s -verify \
+// RUN:   -enable-experimental-feature CustomAvailability \
+// RUN:   -import-bridging-header %S/Inputs/AvailabilityDomains.h \
+// RUN:   -unavailable-decl-optimization=complete \
+// RUN:   -Onone | %FileCheck %s --check-prefixes=CHECK,CHECK-O-NONE \
+// RUN:   --implicit-check-not=.str.14.disabledDomain
 
 // REQUIRES: swift_feature_CustomAvailability
+
+@_silgen_name("handle_enum_case")
+func handleEnumCase(_ name: StaticString)
+
+// The string for the disabled cases is verified to be absent using
+// '--implicit-check-not'. Universal and platform unavailability of Clang
+// declarations is not trusted, so the cases for elements that are only
+// unavailable in those domains are never removed.
+
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test16switchClosedEnumyySo0cD0aF"(i{{32|64}} %0)
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.15.alwaysAvailable to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.13.enabledDomain to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.13.dynamicDomain to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.24.unavailableEnabledDomain to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.32.platformUnavailableEnabledDomain to i{{32|64}})
+// CHECK: ret void
+public func switchClosedEnum(_ e: ClosedEnum) {
+  switch e {
+  case .alwaysAvailable: handleEnumCase("alwaysAvailable")
+  case .enabledDomain: handleEnumCase("enabledDomain")
+  case .disabledDomain: handleEnumCase("disabledDomain")
+  case .dynamicDomain: handleEnumCase("dynamicDomain")
+  case .unavailableEnabledDomain: handleEnumCase("unavailableEnabledDomain")
+  case .platformUnavailableEnabledDomain:
+    handleEnumCase("platformUnavailableEnabledDomain")
+  }
+}
+
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test14switchOpenEnumyySo0cD0aF"(i{{32|64}} %0)
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.15.alwaysAvailable to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.13.enabledDomain to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.13.dynamicDomain to i{{32|64}})
+// CHECK-DAG: call swiftcc void @handle_enum_case(i{{32|64}} ptrtoint (ptr @.str.7.unknown to i{{32|64}})
+// CHECK: ret void
+public func switchOpenEnum(_ e: OpenEnum) {
+  switch e {
+  case .alwaysAvailable: handleEnumCase("alwaysAvailable")
+  case .enabledDomain: handleEnumCase("enabledDomain")
+  case .disabledDomain: handleEnumCase("disabledDomain")
+  case .dynamicDomain: handleEnumCase("dynamicDomain")
+  @unknown default: handleEnumCase("unknown")
+  }
+}
 
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test24ifAvailableEnabledDomainyyF"()
 // CHECK: call void @available_in_enabled_domain()

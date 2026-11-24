@@ -93,6 +93,14 @@ Solution ConstraintSystem::finalize() {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
+  // If constraint system held onto any merged/conflicted types,
+  // finalize them into solution
+  for (const auto &mBinding : ambiguousBindings.conflictMap) {
+    for (ConflictedType *mConflict : mBinding.second) {
+      solution.ambiguousBindings.conflictMap[mBinding.first].insert(mConflict);
+    }
+  }
+
   // Copy over the resolved overloads.
   solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
@@ -282,6 +290,13 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       continue;
 
     assignFixedType(binding.first, binding.second, /*updateState=*/false);
+  }
+
+  // Register any merged/conflicted bindings from this solution
+  for (const auto &mBinding : solution.ambiguousBindings.conflictMap) {
+    for (auto *mConflict : mBinding.second) {
+      ambiguousBindings.conflictMap[mBinding.first].insert(mConflict);
+    }
   }
 
   // Register overload choices.
@@ -555,40 +570,6 @@ bool ConstraintSystem::simplify() {
 }
 
 namespace {
-
-template<typename T>
-void truncate(std::vector<T> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  vec.erase(vec.begin() + newSize, vec.end());
-}
-
-/// Truncate the given small vector to the given new size.
-template<typename T>
-void truncate(SmallVectorImpl<T> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  vec.erase(vec.begin() + newSize, vec.end());
-}
-
-template<typename T, unsigned N>
-void truncate(llvm::SmallSetVector<T, N> &vec, unsigned newSize) {
-  assert(newSize <= vec.size() && "Not a truncation!");
-  for (unsigned i = 0, n = vec.size() - newSize; i != n; ++i)
-    vec.pop_back();
-}
-
-template <typename K, typename V>
-void truncate(llvm::MapVector<K, V> &map, unsigned newSize) {
-  assert(newSize <= map.size() && "Not a truncation!");
-  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
-    map.pop_back();
-}
-
-template <typename K, typename V, unsigned N>
-void truncate(llvm::SmallMapVector<K, V, N> &map, unsigned newSize) {
-  assert(newSize <= map.size() && "Not a truncation!");
-  for (unsigned i = 0, n = map.size() - newSize; i != n; ++i)
-    map.pop_back();
-}
 
 template <typename V>
 void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
@@ -921,7 +902,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
 
     case SolutionResult::UndiagnosedError:
       if (stage == 1) {
-        diagnoseFailureFor(target);
+        produceFallbackDiagnostic(target.getLoc());
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return std::nullopt;
@@ -1494,7 +1475,7 @@ bool DisjunctionChoice::isUnaryOperator() const {
 bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   // First, let's bring all referenced variables into scope.
   {
-    llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
+    SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
 
     if (cs.isDebugMode()) {

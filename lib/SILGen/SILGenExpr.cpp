@@ -24,10 +24,12 @@
 #include "SILGenDynamicCast.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -402,24 +404,76 @@ ManagedValue SILGenFunction::emitManagedBufferWithCleanup(SILValue v,
   return ManagedValue::forOwnedAddressRValue(v, enterDestroyCleanup(v));
 }
 
+void SILGenFunction::emitBorrowInto(Expr *E, Initialization *I,
+                                    SILLocation loc) {
+  ASSERT(I->isBorrow());
+  // The initializer of an implicit binding in a desugared for-each loop is an
+  // opaque placeholder for an expression of the original loop; borrow the
+  // expression it stands for.
+  if (auto *opaque = dyn_cast<OpaqueValueExpr>(E)) {
+    if (auto *underlying = OpaqueExprs.lookup(opaque))
+      E = underlying;
+  }
+
+  FormalEvaluationScope writeback(*this);
+  ManagedValue MV;
+  if (StorageRefResult::findStorageReferenceExprForBorrow(SGM.M, E)) {
+    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
+    MV = emitBorrowedLValue(E, std::move(lv));
+  } else {
+    // The initializer doesn't refer to storage, so there is nothing to borrow
+    // in place; materialize the value and borrow that.
+    MV = emitRValueAsSingleValue(E);
+  }
+
+  // A borrowed value is only guaranteed for as long as the binding's own borrow
+  // scope, so mark that scope as the variable's. Storage in memory is bound by
+  // address instead, and the binding holds the access to it for its whole lifetime.
+  if (MV.getType().isObject() &&
+      MV.getOwnershipKind() != OwnershipKind::None) {
+    auto *borrow = B.createBeginBorrow(loc, MV.getValue(), IsNotLexical,
+                                       DoesNotHavePointerEscape, IsFromVarDecl);
+    MV = emitFormalEvaluationManagedBorrowedRValueWithCleanup(
+        loc, MV.getValue(), borrow);
+  } else if (MV.hasCleanup()) {
+    MV = MV.formalAccessBorrow(*this, loc);
+  }
+
+  // The dependents of a type that is addressable for dependencies depend on its
+  // address. Store the borrowed value to memory here, within the formal
+  // evaluation scope that keeps the binding alive, so that the in-memory borrow
+  // ends before the binding's borrow does. An addressable buffer produced for
+  // the binding on demand would only be cleaned up after the binding's borrow
+  // has ended. A move-only wrapper, as on a `borrowing` parameter, lowers with
+  // reference properties, so ask the type it wraps.
+  if (MV.getType().isObject() && silConv.useLoweredAddresses() &&
+      getTypeProperties(MV.getType().removingMoveOnlyWrapper())
+          .isAddressableForDependencies()) {
+    auto temporary = emitTemporaryAllocation(loc, MV.getType());
+    MV = emitFormalEvaluationManagedStoreBorrow(loc, MV.getValue(), temporary);
+  }
+
+  I->copyOrInitValueInto(*this, loc, MV, /*isInit*/ true);
+  std::move(writeback).deferPop();
+}
+
 void SILGenFunction::emitExprInto(Expr *E, Initialization *I,
                                   std::optional<SILLocation> L) {
   SILLocation loc = L ? *L : E;
+
+  // A borrow binding must not copy its initializer, so it is handled ahead of
+  // the lvalue copy below.
+  if (I->isBorrow()) {
+    emitBorrowInto(E, I, loc);
+    return;
+  }
+
   // Handle the special case of copying an lvalue.
   if (auto load = dyn_cast<LoadExpr>(E)) {
     FormalEvaluationScope writeback(*this);
     auto lv = emitLValue(load->getSubExpr(),
                          SGFAccessKind::BorrowedAddressRead);
     emitCopyLValueInto(loc, std::move(lv), I);
-    return;
-  }
-
-  if (I->isBorrow()) {
-    FormalEvaluationScope writeback(*this);
-    auto lv = emitLValue(E, SGFAccessKind::BorrowedObjectRead);
-    ManagedValue MV = emitBorrowedLValue(E, std::move(lv));
-    I->copyOrInitValueInto(*this, loc, std::move(MV), /*isInit*/ true);
-    std::move(writeback).deferPop();
     return;
   }
 
@@ -878,9 +932,14 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // to the delegating initializer is a metatype. Thus, we perform a
   // load_borrow. And move from WillSharedBorrowSelf -> DidSharedBorrowSelf.
   if (SelfInitDelegationState == SILGenFunction::WillSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
     SelfInitDelegationState = SILGenFunction::DidSharedBorrowSelf;
+    // If +1 is requested, it's a misuse of self that we expect
+    // definite initialization to diagnose.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
@@ -889,8 +948,12 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // If we are already in the did shared borrow self state, just return the
   // shared borrow value.
   if (SelfInitDelegationState == SILGenFunction::DidSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
+    // As above, +1 indicates a misuse of self for definite initialization to diagnose.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
@@ -1540,8 +1603,8 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
                                                 SGFContext C) {
   SmallVector<Type, 4> replacementTypes;
 
-  auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
-  auto toArgs = cast<BoundGenericType>(toCollection)->getGenericArgs();
+  auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
+  auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
   replacementTypes.insert(replacementTypes.end(),
                           fromArgs.begin(), fromArgs.end());
   replacementTypes.insert(replacementTypes.end(),
@@ -1849,6 +1912,7 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
           destFnType = origParamType.getClangType();
       }
     }
+    bool closureError = false;
     (void)emitAnyClosureExpr(
         SGF, semanticExpr, [&](AbstractClosureExpr *closure) {
           // Emit the closure body.
@@ -1858,10 +1922,13 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
                 AbstractionPattern(functionInfo.OrigType.getType(), destFnType);
             SGF.SGM.Types.withClosureTypeInfo(closure, functionInfo, [] {});
           }
-          SGF.SGM.emitClosure(closure, functionInfo);
+          closureError |= SGF.SGM.emitClosure(closure, functionInfo);
           loc = closure;
           return ManagedValue::forInContext();
         });
+    // If we had an error, bail with an undef.
+    if (closureError)
+      return SGF.emitUndef(SGF.getLoweredType(conversionExpr->getType()));
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -2135,6 +2202,17 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   CanAnyFunctionType destType =
       cast<FunctionType>(e->getType()->getCanonicalType());
 
+  // withoutActuallyDeiniting(_:do:) drops the exactly-once guarantee with a
+  // single marked conversion.
+  if (e->isWithoutActuallyDeiniting()) {
+    ManagedValue original = SGF.emitRValueAsSingleValue(e->getSubExpr());
+    SILType resultType = SGF.getLoweredType(destType);
+    SILValue result = SGF.B.createConvertFunction(
+        e, original.forward(SGF), resultType,
+        ConvertFunctionInst::Kind::WithoutActuallyDeiniting);
+    return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
+  }
+
   if (destType->getRepresentation() ==
       FunctionTypeRepresentation::CFunctionPointer) {
     ManagedValue result;
@@ -2300,6 +2378,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     return RValue(SGF, e, result);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 RValue RValueEmitter::visitCovariantFunctionConversionExpr(
@@ -2310,8 +2389,7 @@ RValue RValueEmitter::visitCovariantFunctionConversionExpr(
     = cast<AnyFunctionType>(e->getType()->getCanonicalType());
   SILType resultType = SGF.getLoweredType(destTy);
   SILValue result =
-      SGF.B.createConvertFunction(e, original.forward(SGF), resultType,
-                                  /*Withoutactuallyescaping=*/false);
+      SGF.B.createConvertFunction(e, original.forward(SGF), resultType);
   return RValue(SGF, e, SGF.emitManagedRValueWithCleanup(result));
 }
 
@@ -2527,7 +2605,8 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue::forObjectRValueWithoutOwnership(builtinBool),
                     builtinArgType);
 
-  PreparedArguments builtinArgs((AnyFunctionType::Param(builtinArgType)));
+  PreparedArguments builtinArgs(
+      (AnyFunctionType::Param::bodyAccess(builtinArgType)));
   builtinArgs.add(loc, std::move(builtinArg));
 
   auto result =
@@ -2698,12 +2777,12 @@ RValue RValueEmitter::visitUnreachableExpr(UnreachableExpr *E, SGFContext C) {
 static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation loc) {
   SILValue v = array;
   SILType storageType;
-  while (auto *sd = v->getType().getStructOrBoundGenericStruct()) {
+  while (auto *sd = v->getType().getStructDecl()) {
     ASSERT(sd->getStoredProperties().size() == 1 &&
            "Array or its internal structs should have exactly one stored property");
     auto *se = SGF.getBuilder().createStructExtract(loc, v, v->getType().getFieldDecl(0));
     if (se->getType() == SILType::getBridgeObjectType(SGF.getASTContext())) {
-      auto bridgeObjTy = cast<BoundGenericStructType>(v->getType().getASTType());
+      auto bridgeObjTy = cast<StructType>(v->getType().getASTType());
       CanType ct = CanType(bridgeObjTy->getGenericArgs()[0]);
       storageType = SILType::getPrimitiveObjectType(ct);
     }
@@ -2850,6 +2929,25 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
+  // A noncopyable member read whose base is an opened existential must
+  // be borrowed so the access stays open across the uses.  Concrete and
+  // generic bases already emit the whole member chain as a single l-value, so
+  // they don't need this (and taking this path for them regresses the
+  // address-only move-checker's diagnostics).
+  if (e->getType()->isNoncopyable() &&
+      e->getBase()->getType()->getRValueType()->is<ExistentialArchetypeType>()) {
+    LValue lv = SGF.emitLValue(e, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue mv = SGF.emitRawProjectedLValue(e, std::move(lv));
+
+    // If we got back a borrow (aka +0) because of a coroutine read
+    // accessor, defer the end_apply to the outer evaluation scope.
+    // Otherwise, we can end any other formal accesses now.
+    if (mv.isPlusZero())
+      std::move(scope).deferPop();
+
+    return RValue(SGF, e, mv);
+  }
+
   LValue lv = SGF.emitLValue(e, SGFAccessKind::OwnedObjectRead);
 
   // Otherwise, we can't load at +0 without further analysis, since the formal
@@ -2916,8 +3014,8 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
   Expr *IndexExpr = E->getArgs()->getUnaryExpr();
   assert(IndexExpr);
 
-  PreparedArguments IndexArgs(
-      FunctionType::Param(IndexExpr->getType()->getCanonicalType()));
+  PreparedArguments IndexArgs(FunctionType::Param::bodyAccess(
+      IndexExpr->getType()->getCanonicalType()));
   IndexArgs.add(E, SGF.emitRValue(IndexExpr));
 
   return SGF.emitDynamicSubscriptGetterApply(
@@ -3185,14 +3283,17 @@ static ManagedValue emitMetatypeOperand(SILGenFunction &SGF, Expr *baseExpr) {
                                      SGFContext::AllowImmediatePlusZero);
 }
 
-SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
+SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                                             CanType resultType) {
   Type formalBaseType = baseExpr->getType()->getWithoutSpecifierType();
   CanType baseTy = formalBaseType->getCanonicalType();
 
   // For class, archetype, and protocol types, look up the dynamic metatype.
   if (baseTy.isAnyExistentialType()) {
-    SILType metaTy = getLoweredLoadableType(
-                                      CanExistentialMetatypeType::get(baseTy));
+    CanType metatype = baseTy.isCOMExistentialType() && resultType
+                           ? resultType
+                           : CanExistentialMetatypeType::get(baseTy);
+    SILType metaTy = getLoweredLoadableType(metatype);
     FormalEvaluationScope scope(*this);
     auto base = emitMetatypeOperand(*this, baseExpr).getValue();
     return B.createExistentialMetatype(loc, metaTy, base);
@@ -3226,7 +3327,8 @@ SILValue SILGenFunction::emitMetatypeOfValue(SILLocation loc, Expr *baseExpr) {
 }
 
 RValue RValueEmitter::visitDynamicTypeExpr(DynamicTypeExpr *E, SGFContext C) {
-  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase());
+  auto metatype = SGF.emitMetatypeOfValue(E, E->getBase(),
+                                          E->getType()->getCanonicalType());
   return RValue(SGF, E,
                 ManagedValue::forObjectRValueWithoutOwnership(metatype));
 }
@@ -3371,20 +3473,27 @@ static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure
   if (!canEmitClosureFunctionUnderConversion(closureType, destType))
     return false;
 
+  auto destThrownError = destType.getThrownError();
+  bool thrownErrorDiffers = closureType.getThrownError() != destThrownError;
+
   // If the abstraction pattern has an abstract thrown error, we are
   // currently unable to emit the literal with a difference in the thrown
   // error type.
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
       (closureType->isThrowing() != destType->isThrowing() ||
-       closureType.getThrownError() != destType.getThrownError()))
+       thrownErrorDiffers))
     return false;
 
   // If the closure has a different thrown error type than the destination,
   // we cannot emit the closure directly because the SIL function type
   // (derived from the closure's own type) will have a different error
   // type than what the body expects (derived from the destination type).
-  if (closureType.getThrownError() != destType.getThrownError() &&
-      !isa<ClosureExpr>(closure))
+  if (thrownErrorDiffers && !isa<ClosureExpr>(closure))
+    return false;
+
+  // The destination's thrown error type is contextual, so it cannot become
+  // part of the closure's lowered type if it mentions archetypes.
+  if (thrownErrorDiffers && destThrownError && destThrownError->hasArchetype())
     return false;
 
   return true;
@@ -3476,9 +3585,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 ManagedValue
 RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
                                     const FunctionTypeInfo &contextInfo) {
-  // Emit the closure body.
-  SGF.SGM.emitClosure(e, contextInfo);
-
+  // Emit the closure body, bailing with an undef on failure.
+  if (SGF.SGM.emitClosure(e, contextInfo)) {
+    return SGF.emitUndef(
+        SILType::getPrimitiveObjectType(contextInfo.ExpectedLoweredType));
+  }
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   SILLocation loc = e;
@@ -3511,8 +3622,8 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
       RValue interpolationCount =
           visit(E->getInterpolationCountExpr(), SGFContext());
       builderInitArgs.emplace(
-          {AnyFunctionType::Param(literalCapacity.getType()),
-           AnyFunctionType::Param(interpolationCount.getType())});
+          {AnyFunctionType::Param::bodyAccess(literalCapacity.getType()),
+           AnyFunctionType::Param::bodyAccess(interpolationCount.getType())});
       builderInitArgs.add(E, std::move(literalCapacity));
       builderInitArgs.add(E, std::move(interpolationCount));
       RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
@@ -3537,7 +3648,8 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   }
 
   PreparedArguments resultInitArgs;
-  resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));
+  resultInitArgs.emplace(
+      AnyFunctionType::Param::bodyAccess(interpolation.getType()));
   resultInitArgs.add(E, std::move(interpolation));
 
   return SGF.emitApplyAllocatingInitializer(
@@ -3668,7 +3780,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
   if (auto propertyClass = storage->getDeclContext()->getSelfClassDecl()) {
     if (auto selfType = baseType->getAs<DynamicSelfType>())
       baseType = selfType->getSelfType()->getCanonicalType();
-    auto baseClass = baseType->getClassOrBoundGenericClass();
+    auto baseClass = baseType->getClassDecl();
 
     if (baseClass != propertyClass) {
       baseType = baseType->getSuperclassForDecl(propertyClass)
@@ -3699,7 +3811,8 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
     // FIXME: Varargs?
-    indexParams.emplace_back(SGF.F.mapTypeIntoEnvironment(elt.first));
+    indexParams.push_back(AnyFunctionType::Param::bodyAccess(
+        SGF.F.mapTypeIntoEnvironment(elt.first)));
   }
   
   PreparedArguments indexValues(indexParams);
@@ -3921,7 +4034,7 @@ static SILFunction *getOrCreateKeyPathGetter(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4020,7 +4133,7 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4159,7 +4272,7 @@ static SILFunction *getOrCreateKeyPathAppliedMethod(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4232,7 +4345,7 @@ static SILFunction *getOrCreateUnappliedKeypathMethod(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4330,7 +4443,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
 
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4576,8 +4689,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
-    SmallString<64> nameBuf;
-    
     auto name = Mangle::ASTMangler(SGM.getASTContext())
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
@@ -5001,10 +5112,21 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       // For storage we reference by a property descriptor, the descriptor will
       // supply the settability if needed. We only reference it here if the
       // setter is public.
-      if (shouldUseExternalKeyPathComponent())
-        return storage->isSettableInSwift(useDC) &&
-               storage->isSetterAccessibleFrom(useDC);
-      return storage->isSettableInSwift(storage->getDeclContext());
+      bool isExternal = shouldUseExternalKeyPathComponent();
+      auto settableDC = isExternal ? useDC : storage->getDeclContext();
+
+      if (!storage->isSettableInSwift(settableDC))
+        return false;
+
+      bool emulatingSwift4_2 =
+          !getASTContext().isLanguageModeAtLeast(LanguageMode::v5);
+
+      // Check if the setter will be accessible from the use site. Exceptions:
+      // * Property descriptors need to describe the whole property
+      // * Swift 4.2 and earlier didn't check access (Sema will have emitted a
+      //   warning instead of an error)
+      return forPropertyDescriptor || (emulatingSwift4_2 && !isExternal) ||
+                storage->isSetterAccessibleFrom(useDC);
     };
 
     if (auto var = dyn_cast<VarDecl>(storage)) {
@@ -5037,6 +5159,13 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (canStorageUseStoredKeyPathComponent(var, expansion)) {
         return KeyPathPatternComponent::forStoredProperty(var, componentTy);
       }
+
+      // Makes e.g. `offset(of:)` work on a modern C array projection as though
+      // it were a stored property.
+      if (auto *stored = findStoredCArrayCounterpart(var))
+        if (canStorageUseStoredKeyPathComponent(stored, expansion))
+          return KeyPathPatternComponent::forStoredProperty(stored,
+                                                            componentTy);
 
       // We need thunks to bring the getter and setter to the right signature
       // expected by the key path runtime.
@@ -5331,7 +5460,7 @@ static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
                                      SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto iaTy = E->getType()->castTo<BoundGenericStructType>();
+  auto iaTy = E->getType()->castTo<StructType>();
   auto loweredIAType = SGF.getLoweredType(iaTy);
 
   // If this is an empty InlineArray literal and it's loadable, then create an
@@ -5429,7 +5558,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     arrayType = ArraySliceType::get(elementType)->getCanonicalType();
   } else {
     arrayType = E->getType()->getCanonicalType();
-    auto genericType = cast<BoundGenericStructType>(arrayType);
+    auto genericType = cast<StructType>(arrayType);
     assert(genericType->isArray());
     elementType = genericType.getGenericArgs()[0];
   }
@@ -5479,7 +5608,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     return array;
 
   // Call the builtin initializer.
-  PreparedArguments args(AnyFunctionType::Param(E->getType()));
+  PreparedArguments args(AnyFunctionType::Param::bodyAccess(E->getType()));
   args.add(E, std::move(array));
 
   return SGF.emitApplyAllocatingInitializer(
@@ -5557,14 +5686,63 @@ computeNewSelfForRebindSelfInConstructorExpr(SILGenFunction &SGF,
                                              RebindSelfInConstructorExpr *E) {
   // Get newSelf, forward the cleanup for newSelf and clean everything else
   // up.
-  FormalEvaluationScope Scope(SGF);
-  ManagedValue newSelfWithCleanup =
-      SGF.emitRValueAsSingleValue(E->getSubExpr());
+  ManagedValue newSelfWithCleanup;
+  ManagedValue borrowedSelf;
+  {
+    FormalEvaluationScope Scope(SGF);
+    newSelfWithCleanup = SGF.emitRValueAsSingleValue(E->getSubExpr());
+
+    // The C++ constructor of a C++ foreign reference type only borrows 'self',
+    // so the original 'self' is still owned here.
+    if (SGF.isInitDelegationBorrowingSelf()) {
+      assert(SGF.SuperInitDelegationSelf && "super.init did not take self");
+      borrowedSelf = SGF.SuperInitDelegationSelf;
+    }
+  }
+
+  // The original 'self' was not backed by a ref count: the C++ constructor
+  // initialized it, and 'new self' carries the reference that it established.
+  // End the lifetime of the original 'self' without releasing it, since the box
+  // takes 'new self'. Do it once the arguments, which may borrow from it, are
+  // done.
+  if (borrowedSelf)
+    SGF.B.createEndLifetime(E, borrowedSelf);
 
   SGF.InitDelegationSelf = ManagedValue();
   SGF.SuperInitDelegationSelf = ManagedValue();
   SGF.InitDelegationLoc.reset();
   return newSelfWithCleanup;
+}
+
+bool SILGenFunction::isInitDelegationBorrowingSelf() const {
+  if (SelfInitDelegationState == NormalSelf || !InitDelegationLoc)
+    return false;
+  auto rebind = InitDelegationLoc->getAsASTNode<RebindSelfInConstructorExpr>();
+  if (!rebind)
+    return false;
+  // A `self.init` delegation calls the allocating entry point instead.
+  bool isChaining;
+  auto otherCtor = rebind->getCalledConstructor(isChaining)->getDecl();
+  return isChaining && SILDeclRef(otherCtor, SILDeclRef::Kind::Initializer)
+                           .asForeign(requiresForeignEntryPoint(otherCtor))
+                           .isCXXForeignReferenceInitializer();
+}
+
+/// Emit the builtin that points the C++ v-table pointers of \p self, a Swift
+/// subclass of a C++ foreign reference type, at the v-tables of its class.
+static void emitInitializeForeignReferenceSubclassVTables(SILGenFunction &SGF,
+                                                          SILLocation loc,
+                                                          ManagedValue self) {
+  auto &ctx = SGF.getASTContext();
+  auto builtinName = ctx.getIdentifier(getBuiltinName(
+      BuiltinValueKind::InitializeForeignReferenceSubclassVTables));
+  auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
+  auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
+                                   {self.getType().getASTType()},
+                                   ArrayRef<ProtocolConformanceRef>{});
+  SGF.B.createBuiltin(loc, builtinName,
+                      SGF.getLoweredType(ctx.TheEmptyTupleType), subs,
+                      {self.getValue()});
 }
 
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
@@ -5574,7 +5752,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   auto selfIfaceTy = ctorDecl->getDeclContext()->getSelfInterfaceType();
   auto selfTy = ctorDecl->mapTypeIntoEnvironment(selfIfaceTy);
 
-  bool isChaining; // Ignored
+  bool isChaining;
   auto *otherCtor = E->getCalledConstructor(isChaining)->getDecl();
   assert(otherCtor);
 
@@ -5651,6 +5829,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     // type (or a derived class thereof). Only Objective-C classes can
     // violate this assumption.
     newSelf = SGF.B.createUncheckedRefCast(E, newSelf, destTy);
+  }
+
+  // The C++ base constructor of a Swift subclass of a C++ foreign reference
+  // type leaves the v-table pointers of 'self' pointing at the v-tables of the
+  // base class. Point them at the v-tables of this class.
+  if (isChaining) {
+    auto classDecl = ctorDecl->getDeclContext()->getSelfClassDecl();
+    if (classDecl && !classDecl->isForeignReferenceType() &&
+        classDecl->getForeignReferenceSuperclassOrSelf())
+      emitInitializeForeignReferenceSubclassVTables(SGF, E, newSelf);
   }
 
   // Forward or assign into the box depending on whether we actually consumed
@@ -6749,6 +6937,16 @@ void SILGenFunction::emitOpenExistentialExprImpl(
                              SGFAccessKind::BorrowedAddressRead);
       existentialValue = emitBorrowedLValue(load, std::move(lv));
     }
+    // Do the same for a reference to a locally-mutable parameter that is implicitly
+    // loaded from.
+    if (auto dr = dyn_cast<DeclRefExpr>(existentialExpr)) {
+      auto pd = dyn_cast<ParamDecl>(dr->getDecl());
+      if (pd && pd->getIntroducer() == VarDecl::Introducer::Var) {
+        LValue lv = emitLValue(dr,
+                               SGFAccessKind::BorrowedAddressRead);
+        existentialValue = emitBorrowedLValue(dr, std::move(lv));
+      }
+    }
   }
 
   if (!existentialValue) {
@@ -6841,9 +7039,9 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   // verification yet.
   auto closureRepresentation = silFnTy->getExtInfo().getRepresentation();
   if (closureRepresentation != SILFunctionTypeRepresentation::Thick) {
-    auto escapingClosure =
-        SGF.B.createConvertFunction(E, functionValue, escapingFnTy,
-                                    /*WithoutActuallyEscaping=*/true);
+    auto escapingClosure = SGF.B.createConvertFunction(
+        E, functionValue, escapingFnTy,
+        ConvertFunctionInst::Kind::WithoutActuallyEscaping);
     bool isBlockConvention =
         closureRepresentation == SILFunctionTypeRepresentation::Block;
     return visitSubExpr(escapingClosure,
@@ -7251,7 +7449,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   SmallVector<Type, 2> replacementTypes;
   replacementTypes.push_back(
-      accessInfo.ArrayType->castTo<BoundGenericStructType>()->getGenericArgs()[0]);
+      accessInfo.ArrayType->castTo<StructType>()->getGenericArgs()[0]);
   replacementTypes.push_back(accessInfo.PointerType);
 
   auto genericSig = converter->getGenericSignature();
@@ -7432,6 +7630,64 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
 }
 
 RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
+  if (SGF.getASTContext().SILOpts.EnableLifetimeResolution) {
+    auto *subExpr = E->getSubExpr();
+    auto subASTType = subExpr->getType()->getCanonicalType();
+    auto subType = SGF.getLoweredType(subASTType);
+
+    ManagedValue mv;
+    std::optional<FormalEvaluationScope> writeback;
+
+    // Ignore the load and pretend we applied the consume to the LValue.
+    if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
+      writeback.emplace(SGF);
+      auto consumingAccess = subType.isAddress()
+                                 ? SGFAccessKind::OwnedAddressConsume
+                                 : SGFAccessKind::OwnedObjectConsume;
+      LValue lv = SGF.emitLValue(li->getSubExpr(), consumingAccess);
+      mv = SGF.emitConsumedLValue(E, std::move(lv));
+    } else {
+      mv = SGF.emitRValue(subExpr, SGFContext())
+          .getAsSingleValue(SGF, subExpr);
+    }
+
+    // Now, consume `mv` whether it is an object or address.
+
+    if (mv.getType().isAddress()) {
+      if (mv.getType().getObjectType().isLoadableOrOpaque(SGF.F)) {
+        // load [take] the value out of the address and return it.
+        ManagedValue value =
+          SGF.B.createLoadTake(E, mv);
+        return RValue(SGF, {value}, subType.getASTType());
+      }
+
+      // Emit a copy_addr [take] into a temporary location.
+      // This deinitializes the address, which is the goal here.
+      // TODO: is it fine to ignore the SGFContext?
+      TemporaryInitializationPtr optTemp;
+      optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
+      SILValue dest = optTemp->getAddressForInPlaceInitialization(SGF, E);
+      SGF.B.createCopyAddr(E, mv.getValue(), dest, IsTake, IsInitialization);
+      optTemp->finishInitialization(SGF);
+      return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+    }
+
+    if (mv.getType().isTrivial(SGF.F))
+      return RValue(SGF, {mv}, subType.getASTType());
+
+    // Otherwise, it's an object.
+
+    // NOTE: we only ensurePlusOne to satisfy SILBuilder.
+    // We expect RemoveSILGenLifetimes to delete the copy if emitted.
+    mv = SGF.B.createMoveValue(E, mv.ensurePlusOne(SGF, E));
+
+    // Set the [allows_diagnostics] flag to indicate this move originated from
+    // an explicit 'consume' at the language level.
+    cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
+    return RValue(SGF, {mv}, subType.getASTType());
+  }
+
+
   auto *subExpr = E->getSubExpr();
   auto subASTType = subExpr->getType()->getCanonicalType();
   auto subType = SGF.getLoweredType(subASTType);
@@ -7521,9 +7777,10 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
   if (auto *li = dyn_cast<LoadExpr>(subExpr)) {
     FormalEvaluationScope writeback(SGF);
 
-    // If we're relying on ManualOwnership for explicit-copies enforcement,
-    // avoid doing address-based emission for loadable types.
-    if (subType.isLoadableOrOpaque(SGF.F) && SGF.B.hasManualOwnershipAttr()) {
+    // If we're not relying on the @moveOnly wrapper for explicit-copies
+    //  enforcement, avoid doing address-based emission for loadable types.
+    if (subType.isLoadableOrOpaque(SGF.F) &&
+        !SGF.usingWrapperTypeImplicitCopyEnforcement()) {
       // Do a read on the lvalue. If we get back an address, do a load before
       // emitting the explicit copy.
       LValue lv =
@@ -7681,10 +7938,12 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
   if (isolation == ActorIsolation::ActorInstance) {
     auto ctor = dyn_cast<ConstructorDecl>(SGF.FunctionDC);
     if (ctor && ctor->isDesignatedInit() &&
-        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+        isolation.getActorInstance() == ctor->getImplicitSelfDecl() &&
+        E->getType()->getCanonicalType() ==
+            SILType::getOpaqueIsolationType(SGF.getASTContext()).getASTType()) {
       // If we are in an actor initializer that is isolated to self, the
       // current isolation is flow-sensitive; use that instead of the
-      // synthesized expression.
+      // synthesized expression if #isolation has type `(any Actor)?`.
       auto isolationValue =
         SGF.emitFlowSensitiveSelfIsolation(E, isolation);
       return RValue(SGF, E, isolationValue);

@@ -249,7 +249,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     auto inheritedTypes = classDecl->getInherited();
     for (unsigned i : inheritedTypes.getIndices()) {
       if (auto inheritedType = inheritedTypes.getEntry(i).getType()) {
-        if (inheritedType->getClassOrBoundGenericClass()) {
+        if (inheritedType->getClassDecl()) {
           superclassLoc = inheritedTypes.getEntry(i).getSourceRange().Start;
           return superclassLoc;
         }
@@ -945,10 +945,18 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   Type type = entry->getDeclContext()->getDeclaredInterfaceType();
   ASTContext &ctx = nominal->getASTContext();
 
+  auto isInheritedFromConditional = [&] {
+    auto *conformingExt = dyn_cast<ExtensionDecl>(conformingDC);
+    return conformingExt && conformingExt->isConstrainedExtension();
+  };
+
   if (protocol->getInvertibleProtocolKind() &&
       entry->getDeclContext() == nominal &&
       (entry->getKind() == ConformanceEntryKind::Synthesized ||
-       entry->getKind() == ConformanceEntryKind::Inherited)) {
+       (entry->getKind() == ConformanceEntryKind::Inherited &&
+        // An inherited conditional conformance shouldn't result in
+        // an unconditional one on the conforming type.
+        !isInheritedFromConditional()))) {
     // Unconditional conformances to Copyable and Escapable are represented as
     // builtin conformances, which do not need to store a substitution map.
     //

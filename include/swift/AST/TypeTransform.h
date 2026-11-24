@@ -113,6 +113,7 @@ case TypeKind::Id:
     case TypeKind::Error:
     case TypeKind::TypeVariable:
     case TypeKind::Placeholder:
+    case TypeKind::Hole:
     case TypeKind::SILToken:
     case TypeKind::Module:
     case TypeKind::BuiltinTuple:
@@ -215,16 +216,52 @@ case TypeKind::Id:
     case TypeKind::Class:
     case TypeKind::Protocol: {
       auto nominalTy = cast<NominalType>(base);
+      SmallVector<Type, 4> substArgs;
+      bool anyChanged = false;
+      Type substParentTy;
+
       if (auto parentTy = nominalTy->getParent()) {
-        parentTy = doIt(parentTy, pos);
-        if (!parentTy)
+        substParentTy = doIt(parentTy, pos);
+        if (!substParentTy)
           return Type();
 
-        if (parentTy.getPointer() == nominalTy->getParent().getPointer())
-          return t;
-
-        return NominalType::get(nominalTy->getDecl(), parentTy, ctx);
+        if (substParentTy.getPointer() != parentTy.getPointer())
+          anyChanged = true;
       }
+
+      const auto transformGenArg = [&](Type arg, TypePosition p) -> bool {
+        Type substArg = doIt(arg, p);
+        if (!substArg)
+          return true;
+        substArgs.push_back(substArg);
+        if (substArg.getPointer() != arg.getPointer())
+          anyChanged = true;
+
+        return false;
+      };
+
+      if (nominalTy->isArray() || nominalTy->isOptional()) {
+        // Swift.Array preserves variance in its 'Element' type.
+        // Swift.Optional preserves variance in its 'Wrapped' type.
+        if (transformGenArg(nominalTy->getGenericArgs().front(), pos))
+          return Type();
+      } else if (nominalTy->isDictionary()) {
+        // Swift.Dictionary preserves variance in its 'Value' type,
+        // but not its 'Key' type.
+        if (transformGenArg(nominalTy->getGenericArgs().front(),
+                            TypePosition::Invariant) ||
+            transformGenArg(nominalTy->getGenericArgs().back(), pos))
+          return Type();
+      } else {
+        for (auto arg : nominalTy->getGenericArgs()) {
+          if (transformGenArg(arg, TypePosition::Invariant))
+            return Type();
+        }
+      }
+
+      if (anyChanged)
+        return NominalType::get(nominalTy->getDecl(), substParentTy,
+                                substArgs, ctx, nominalTy->getScopeArgs());
 
       return t;
     }
@@ -421,57 +458,6 @@ case TypeKind::Id:
       return t;
     }
 
-    case TypeKind::BoundGenericClass:
-    case TypeKind::BoundGenericEnum:
-    case TypeKind::BoundGenericStruct: {
-      auto bound = cast<BoundGenericType>(base);
-      SmallVector<Type, 4> substArgs;
-      bool anyChanged = false;
-      Type substParentTy;
-      if (auto parentTy = bound->getParent()) {
-        substParentTy = doIt(parentTy, pos);
-        if (!substParentTy)
-          return Type();
-
-        if (substParentTy.getPointer() != parentTy.getPointer())
-          anyChanged = true;
-      }
-
-      const auto transformGenArg = [&](Type arg, TypePosition p) -> bool {
-        Type substArg = doIt(arg, p);
-        if (!substArg)
-          return true;
-        substArgs.push_back(substArg);
-        if (substArg.getPointer() != arg.getPointer())
-          anyChanged = true;
-
-        return false;
-      };
-
-      if (bound->isArray() || bound->isOptional()) {
-        // Swift.Array preserves variance in its 'Value' type.
-        // Swift.Optional preserves variance in its 'Wrapped' type.
-        if (transformGenArg(bound->getGenericArgs().front(), pos))
-          return Type();
-      } else if (bound->isDictionary()) {
-        // Swift.Dictionary preserves variance in its 'Element' type.
-        if (transformGenArg(bound->getGenericArgs().front(),
-                            TypePosition::Invariant) ||
-            transformGenArg(bound->getGenericArgs().back(), pos))
-          return Type();
-      } else {
-        for (auto arg : bound->getGenericArgs()) {
-          if (transformGenArg(arg, TypePosition::Invariant))
-            return Type();
-        }
-      }
-
-      if (!anyChanged)
-        return t;
-
-      return BoundGenericType::get(bound->getDecl(), substParentTy, substArgs);
-    }
-
     case TypeKind::ExistentialMetatype: {
       auto meta = cast<ExistentialMetatypeType>(base);
       auto instanceTy = doIt(meta->getInstanceType(), pos);
@@ -526,7 +512,7 @@ case TypeKind::Id:
         if (!newParentType) return newUnderlyingTy;
       }
 
-      if (newParentType && newParentType->isExistentialType())
+      if (newParentType && !TypeAliasType::isValidParent(newParentType))
         return newUnderlyingTy;
 
       RecursiveTypeProperties substProps;
@@ -806,6 +792,7 @@ case TypeKind::Id:
         auto label = param.getLabel();
         auto flags = param.getParameterFlags();
         auto internalLabel = param.getInternalLabel();
+        auto accessScope = param.getAccessScope();
 
         TypePosition paramPos = pos.flipped();
         if (param.isInOut())
@@ -833,15 +820,16 @@ case TypeKind::Id:
           for (auto substEltType : substPack->getElementTypes()) {
             if (first) {
               substParams.emplace_back(substEltType, label, flags,
-                                       internalLabel);
+                                       internalLabel, accessScope);
               first = false;
             } else {
               substParams.emplace_back(substEltType, Identifier(), flags,
-                                       Identifier());
+                                       Identifier(), accessScope);
             }
           }
         } else {
-          substParams.emplace_back(substType, label, flags, internalLabel);
+          substParams.emplace_back(substType, label, flags, internalLabel,
+                                   accessScope);
         }
       }
 
@@ -924,34 +912,17 @@ case TypeKind::Id:
           extInfo = extInfo->withGlobalActor(globalActorType);
         }
 
-        // Transform the sendable dependent type if present.
-        if (auto sendableDep = origExtInfo.getSendableDependentType()) {
-          auto [newSendableDep, isSendable] =
-              asDerived().transformSendableDependentType(sendableDep);
-          if (!newSendableDep) {
-            // If we're no longer sendable dependent, update the @Sendable bit.
-            extInfo = extInfo->withSendableDependentType(Type());
-            extInfo = extInfo->withSendable(isSendable);
-            isUnchanged = false;
-          } else if (newSendableDep.getPointer() != sendableDep.getPointer()) {
-            extInfo = extInfo->withSendableDependentType(newSendableDep);
-            isUnchanged = false;
-          }
-        }
+        // Transform the types that properties of the function depend on.
+        for (auto dependentType : origExtInfo.getTypeDependencies()) {
+          auto kind = dependentType.getInt();
+          auto builder = extInfo->intoBuilder();
+          Type newDependentType = asDerived().transformTypeDependency(
+              kind, dependentType.getPointer(), builder);
+          if (newDependentType.getPointer() == dependentType.getPointer())
+            continue;
 
-        // Transform the @called(once) dependent type if present.
-        if (auto calledOnceDep = origExtInfo.getCalledOnceDependentType()) {
-          auto [newCalledOnceDep, isCalledOnce] =
-              asDerived().transformCalledOnceDependentType(calledOnceDep);
-          if (!newCalledOnceDep) {
-            // If we're no longer @called(once) dependent, update the @called(once) bit.
-            extInfo = extInfo->withCalledOnceDependentType(Type());
-            extInfo = extInfo->withCalledOnce(isCalledOnce);
-            isUnchanged = false;
-          } else if (newCalledOnceDep.getPointer() != calledOnceDep.getPointer()) {
-            extInfo = extInfo->withCalledOnceDependentType(newCalledOnceDep);
-            isUnchanged = false;
-          }
+          extInfo = builder.withTypeDependency(kind, newDependentType).build();
+          isUnchanged = false;
         }
       }
 
@@ -1209,12 +1180,12 @@ case TypeKind::Id:
 
   bool shouldDesugarTypeAliases() const { return false; }
 
-  std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
-    return std::make_pair(ty, false);
-  }
-
-  std::pair<Type, /*calledOnce*/ bool> transformCalledOnceDependentType(Type ty) {
-    return std::make_pair(ty, false);
+  /// Transforms the type that \p kind of a function type depends on. Returns
+  /// the new dependent type, or a null type if the dependence is resolved, in
+  /// which case the property it determines must be set in \p extInfo.
+  Type transformTypeDependency(TypeDependenceKind kind, Type ty,
+                               ASTExtInfoBuilder &extInfo) {
+    return ty;
   }
 
   CanType transformSILField(CanType fieldTy, TypePosition pos) {

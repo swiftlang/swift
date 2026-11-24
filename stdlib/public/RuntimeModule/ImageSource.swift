@@ -25,6 +25,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 enum ImageSourceError: Error {
@@ -192,7 +194,8 @@ struct ImageSource: CustomStringConvertible {
       if size < 0 {
         throw ImageSourceError.posixError(_swift_get_errno())
       }
-      let base = mmap(nil, Int(size), PROT_READ, MAP_FILE|MAP_PRIVATE, fd, 0)
+      let base: UnsafeMutableRawPointer? = mmap(nil, Int(size), PROT_READ,
+                                                MAP_FILE|MAP_PRIVATE, fd, 0)
       if base == nil || base! == UnsafeRawPointer(bitPattern: -1)! {
         throw ImageSourceError.posixError(_swift_get_errno())
       }
@@ -209,7 +212,7 @@ struct ImageSource: CustomStringConvertible {
           #if os(Windows)
           UnmapViewOfFile(UnsafeMutableRawPointer(mutating: bytes.baseAddress))
           #else
-          munmap(UnsafeMutableRawPointer(mutating: bytes.baseAddress),
+          munmap(UnsafeMutableRawPointer(mutating: bytes.baseAddress!),
                  bytes.count)
           #endif
         case .substorage, .unowned, .empty:
@@ -237,7 +240,9 @@ struct ImageSource: CustomStringConvertible {
           let oldPart = UnsafeMutableRawBufferPointer(
             rebasing: newBuffer[0..<count]
           )
-          oldPart.copyMemory(from: bytes)
+          oldPart.copyMemory(from:
+            UnsafeRawBufferPointer(rebasing: bytes[0..<count])
+          )
           mutableBytes.deallocate()
           kind = .allocated(count)
         default:
@@ -263,7 +268,7 @@ struct ImageSource: CustomStringConvertible {
       }
 
       if capacity >= byteCount {
-        return mutableBytes
+        return UnsafeMutableRawBufferPointer(mutating: bytes)
       }
 
       let extra = byteCount - capacity
@@ -291,7 +296,7 @@ struct ImageSource: CustomStringConvertible {
       guard case let .allocated(count) = kind else {
         fatalError("Cannot append to immutable image source storage")
       }
-      guard mutableBytes.count - count <= bytes else {
+      guard self.bytes.count - count >= bytes else {
         fatalError("Buffer overrun detected")
       }
       kind = .allocated(count + bytes)
@@ -404,6 +409,16 @@ struct ImageSource: CustomStringConvertible {
                          path: path)
     }
   }
+
+  #if os(Android)
+  /// Get a sub-range of this ImageSource with a path of its own, for a
+  /// library stored in an APK.
+  func subrange(_ range: Range<Address>, path: String) throws -> ImageSource {
+    var result = try self[range]
+    result.path = path
+    return result
+  }
+  #endif
 
   /// Mark unused bytes in the storage as used
   func used(bytes: Int) {

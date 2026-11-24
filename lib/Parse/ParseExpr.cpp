@@ -2816,7 +2816,7 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
             diagnose(Tok, diag::attr_unowned_expected_rparen);
         }
         // `sending <<identifier>>` or `self`
-      } else if (Context.LangOpts.hasFeature(Feature::CalledAttribute) &&
+      } else if (Context.LangOpts.hasFeature(Feature::OnceFunctions) &&
                  Tok.isContextualKeyword("sending") &&
                  (peekToken().is(tok::identifier) ||
                   peekToken().is(tok::kw_self))) {

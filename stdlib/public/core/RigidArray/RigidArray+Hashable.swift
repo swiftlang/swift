@@ -10,9 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray: Hashable where Element: Hashable & ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal func hash(into hasher: inout Hasher) {
     hasher.combine(self.count)

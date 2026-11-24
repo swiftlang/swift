@@ -7,6 +7,15 @@ import Builtin
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
 
+// The runtime authenticates handlers with fixed discriminators, see
+// SpecialPointerAuthDiscriminators. The compiler must sign with the same values.
+// CHECK-arm64e-DAG: @"$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU_.ptrauth" = {{.*}}, i64 3848 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU0_TA.ptrauth" = {{.*}}, i64 3848 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins36testTaskAddPriorityEscalationHandleryyYaFys5UInt8V_ADtXEfU_.ptrauth" = {{.*}}, i64 30817 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins36testTaskAddPriorityEscalationHandleryyYaFys5UInt8V_ADtXEfU0_TA.ptrauth" = {{.*}}, i64 30817 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU_.ptrauth" = {{.*}}, i64 62877 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU0_TA.ptrauth" = {{.*}}, i64 62877 }, section "llvm.ptrauth"
+
 // CHECK: call swiftcc void @swift_errorInMain(
 
 infix operator *
@@ -160,6 +169,27 @@ func vector_bitcast_test_ii(_ src: Builtin.Int16) -> Builtin.Vec16xInt8 {
   // CHECK: vector_bitcast_test_ii
   let v16x1 = Builtin.bitcast_Int16_Vec16xInt1(src) // CHECK: bitcast
   return Builtin.sext_Vec16xInt1_Vec16xInt8(v16x1)   // CHECK: sext
+}
+
+func fmaddRelaxed_test(
+  _ a: Builtin.FPIEEE32,
+  _ b: Builtin.FPIEEE32,
+  _ c: Builtin.FPIEEE32
+) -> Builtin.FPIEEE32 {
+  // CHECK: fmul reassoc nsz contract float
+  // CHECK: fadd reassoc nsz contract float
+  Builtin.fadd_relaxed_FPIEEE32(a, Builtin.fmul_relaxed_FPIEEE32(b, c))
+}
+
+func fmaddRelaxedVector_test(
+  _ a: Builtin.Vec4xFPIEEE32,
+  _ b: Builtin.Vec4xFPIEEE32,
+  _ c: Builtin.Vec4xFPIEEE32
+) -> Builtin.Vec4xFPIEEE32 {
+  // CHECK: fmul reassoc nsz contract <4 x float>
+  // CHECK: fadd reassoc nsz contract <4 x float>
+  let p = Builtin.fmul_relaxed_Vec4xFPIEEE32(b, c)
+  return Builtin.fadd_relaxed_Vec4xFPIEEE32(a, p)
 }
 
 func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
@@ -623,6 +653,23 @@ func copyGenArray<T>(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count:
   Builtin.assignTakeArray(T.self, dest, src, count)
 }
 
+// Zero-sized trivial elements have no bytes to move, and their addresses may be
+// undef, so nothing is emitted for them.
+// CHECK-LABEL: define hidden {{.*}}void @"$s8builtins14copyEmptyArray{{[_0-9a-zA-Z]*}}F"(ptr %0, ptr %1, i64 %2) {{.*}} {
+// CHECK-NOT:     call {{.*}}@llvm.memcpy
+// CHECK-NOT:     call {{.*}}@llvm.memmove
+// CHECK-NOT:     call {{.*}}@swift_array
+// CHECK:         ret void
+func copyEmptyArray(_ dest: Builtin.RawPointer, src: Builtin.RawPointer, count: Builtin.Word) {
+  Builtin.copyArray(Empty.self, dest, src, count)
+  Builtin.takeArrayFrontToBack(Empty.self, dest, src, count)
+  Builtin.takeArrayBackToFront(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayNoAlias(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayFrontToBack(Empty.self, dest, src, count)
+  Builtin.assignCopyArrayBackToFront(Empty.self, dest, src, count)
+  Builtin.assignTakeArray(Empty.self, dest, src, count)
+}
+
 // CHECK-LABEL: define hidden {{.*}}void @"$s8builtins24conditionallyUnreachableyyF"
 // CHECK-NEXT:  entry
 // CHECK-NEXT:    unreachable
@@ -701,11 +748,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr %[[LD_RC]])
@@ -715,7 +762,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD_RC]])
@@ -724,11 +771,11 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -741,7 +788,7 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 
 // ObjC nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
-// CHECK-SAME:    (ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-SAME:    (ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
@@ -753,7 +800,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(ptr %[[LD]])
@@ -769,7 +816,7 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD]])
@@ -779,7 +826,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr noalias captures(none) dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr noalias align 8 captures(none) dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(ptr
 // CHECK: ret i1
@@ -970,6 +1017,26 @@ nonisolated(nonsending) func testTaskAddPriorityEscalationHandler() async {
   }
   Builtin.taskRemovePriorityEscalationHandler(record: result2)
   Builtin.taskRemovePriorityEscalationHandler(record: result)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addCancellationHandlerWithReason(ptr @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.6, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addCancellationHandlerWithReason(ptr @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: call{{.*}} void @swift_task_removeCancellationHandler(ptr [[RESULT_2]])
+// CHECK: call{{.*}} void @swift_task_removeCancellationHandler(ptr [[RESULT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{%.*}})
+nonisolated(nonsending) func testTaskAddCancellationHandlerWithReason() async {
+  let result = Builtin.taskAddCancellationHandlerWithReason { (reason: UInt8) in
+    _ = reason
+  }
+  let x = "123"
+  let result2 = Builtin.taskAddCancellationHandlerWithReason { (reason: UInt8) in
+    print(x)
+    _ = reason
+  }
+  Builtin.taskRemoveCancellationHandler(record: result2)
+  Builtin.taskRemoveCancellationHandler(record: result)
 }
 
 // CHECK-LABEL: define {{.*}}void @"$s8builtins22testTaskLocalValuePushyyBp_xntYalF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3, ptr noalias %4, ptr %Value)

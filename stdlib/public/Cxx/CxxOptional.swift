@@ -10,19 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral {
-  associatedtype Wrapped
+public protocol CxxOptional<Wrapped>: ExpressibleByNilLiteral, ~Escapable {
+  associatedtype Wrapped: ~Escapable
 
+  @_lifetime(immortal)
   init()
 
+  @_lifetime(copy value)
   init(_ value: Wrapped)
 
   func __convertToBool() -> Bool
 
-  var pointee: Wrapped { get }
+  var pointee: Wrapped {
+    @_lifetime(borrow self)
+    get
+  }
 }
 
-extension CxxOptional {
+extension CxxOptional where Self: ~Escapable, Wrapped: ~Escapable {
+  @_lifetime(immortal)
   public init(nilLiteral: ()) {
     self.init()
   }
@@ -36,10 +42,14 @@ extension CxxOptional {
 
   @inlinable
   public var value: Wrapped? {
+    @_lifetime(copy self)
     get {
       guard hasValue else { return nil }
-      return pointee
+      // 'pointee' projects the wrapped value out of 'self', but the value
+      // itself was copied into 'self', so it shares the lifetime of 'self'.
+      return unsafe _cxxOverrideLifetime(pointee, copying: self)
     }
+    @_lifetime(self: copy newValue)
     set(newValue) {
       if let newValueNonNull = newValue {
         self = Self.init(newValueNonNull)
@@ -50,13 +60,11 @@ extension CxxOptional {
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Escapable {
   @inlinable
-  public init(fromCxx value: some CxxOptional<Wrapped>) {
-    guard value.__convertToBool() else {
-      self = nil
-      return
-    }
-    self = value.pointee
+  @_lifetime(copy value)
+  public init<O: CxxOptional<Wrapped> & ~Escapable>(fromCxx value: borrowing O)
+  where O.Wrapped: ~Escapable {
+    self = value.value
   }
 }

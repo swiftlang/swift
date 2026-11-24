@@ -306,6 +306,8 @@ struct SILDeclRef {
   ClosureExpr *getClosureExpr() const;
   AutoClosureExpr *getAutoClosureExpr() const;
   FuncDecl *getFuncDecl() const;
+  /// If this is a 'defer' body, get the function decl representing its body
+  FuncDecl *getDeferBodyFuncDecl() const;
   AbstractFunctionDecl *getAbstractFunctionDecl() const;
   AccessorDecl *getAccessorDecl() const;
   FileUnit *getFileUnit() const { return cast<FileUnit *>(loc); }
@@ -423,6 +425,14 @@ struct SILDeclRef {
   /// foreign language or environment,
   static bool declExposedToForeignLanguage(const ValueDecl *decl);
 
+  /// True if the generated C++ header for \p M may print the declaration, so
+  /// that the header can reference it.
+  static bool declMayBePrintedInCxxHeader(const ValueDecl *decl,
+                                          const SILModule &M);
+
+  /// True if the generated C++ header for \p M may call this entry point.
+  bool mayBeCalledFromCxxHeader(const SILModule &M) const;
+
   /// True if the declaration should have a non-unique definition based on the
   /// embedded linkage model.
   static bool declHasNonUniqueDefinition(const ValueDecl *decl);
@@ -526,6 +536,10 @@ struct SILDeclRef {
 
   /// True if the decl ref references a thunk handling potentially distributed actor functions
   bool isDistributedThunk() const;
+
+  /// True if the decl ref references a C++ constructor of an already allocated
+  /// instance of C++ foreign reference type.
+  bool isCXXForeignReferenceInitializer() const;
 
   /// If this is a distributed-thunk decl ref, return its distributed thunk.
   FuncDecl *getDistributedThunk() const;
@@ -674,14 +688,6 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
-  static SILDeclRef getEmptyKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, false, nullptr);
-  }
-  static SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, false, false,
-                      false, BackDeploymentKind::None, 0, false, nullptr);
-  }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     return hash_value(Val);
   }

@@ -18,7 +18,8 @@ target_link_libraries(swiftSerialization PRIVATE
   swiftClangImporter
   swiftOption
   swiftAST
+  swiftIRGen
   swiftSIL
-  clangIndex)
+  clangUnifiedSymbolResolution)
 
 set_swift_llvm_is_available(swiftSerialization)

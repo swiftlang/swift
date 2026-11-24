@@ -2310,14 +2310,19 @@ bb0:
 // CHECK-LABEL: begin running test {{.*}} on test_end_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: // function_ref coro_callee
+// CHECK-NEXT:       %1 = function_ref @coro_callee : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %4 = end_apply %3 as $()
+// CHECK-NEXT: require %%0: %4 = end_apply %3 as $()
 // CHECK-NEXT: end running test {{.*}} on test_end_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_end_apply : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass):
   %f = function_ref @coro_callee : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
   (%1, %token) = begin_apply %f(%0) : $@yield_once @convention(thin) (@guaranteed NonSendableKlass) -> @yields @inout NonSendableKlass
-  end_apply %token as $()
+  %r = end_apply %token as $()
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
-  %r = tuple ()
   return %r : $()
 }
 
@@ -2427,6 +2432,54 @@ bb0(%0 : $*SendableEnum):
   %payload_addr = unchecked_take_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   destroy_addr %payload_addr
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_borrow_enum_data_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*NonSendableEnum
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_borrow_enum_data_addr: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_borrow_enum_data_addr : $@convention(thin) (@in_guaranteed NonSendableEnum) -> () {
+bb0(%0 : $*NonSendableEnum):
+  %scratch = alloc_stack $NonSendableEnum
+  %payload_addr = unchecked_borrow_enum_data_addr %0 : $*NonSendableEnum, #NonSendableEnum.some!enumelt in %scratch
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %scratch
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_borrow_enum_data_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*MixedEnum
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = unchecked_borrow_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt in %1 : $*MixedEnum
+// CHECK-NEXT: require %%0:   %2 = unchecked_borrow_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt in %1 : $*MixedEnum
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_borrow_enum_data_addr_nonsendable_to_sendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_borrow_enum_data_addr_nonsendable_to_sendable : $@convention(thin) (@in_guaranteed MixedEnum) -> () {
+bb0(%0 : $*MixedEnum):
+  %scratch = alloc_stack $MixedEnum
+  %payload_addr = unchecked_borrow_enum_data_addr %0 : $*MixedEnum, #MixedEnum.sendable!enumelt in %scratch
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %scratch
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_unchecked_borrow_enum_data_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*SendableEnum
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = unchecked_borrow_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt in %1 : $*SendableEnum
+// CHECK-NEXT: assign_fresh %%1:   %2 = unchecked_borrow_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt in %1 : $*SendableEnum
+// CHECK-NEXT: end running test {{.*}} on test_unchecked_borrow_enum_data_addr_sendable_to_nonsendable: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_unchecked_borrow_enum_data_addr_sendable_to_nonsendable : $@convention(thin) (@in_guaranteed SendableEnum) -> () {
+bb0(%0 : $*SendableEnum):
+  %scratch = alloc_stack $SendableEnum
+  %payload_addr = unchecked_borrow_enum_data_addr %0 : $*SendableEnum, #SendableEnum.value!enumelt in %scratch
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  dealloc_stack %scratch
   %r = tuple ()
   return %r : $()
 }

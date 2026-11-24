@@ -37,6 +37,8 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
@@ -101,6 +103,7 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
   case clang::BuiltinType::BoundMember:
   case clang::BuiltinType::BuiltinFn:
   case clang::BuiltinType::IncompleteMatrixIdx:
+  case clang::BuiltinType::MetaInfo:
   case clang::BuiltinType::Overload:
   case clang::BuiltinType::PseudoObject:
   case clang::BuiltinType::UnknownAny:
@@ -192,6 +195,16 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
     // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
+    return std::nullopt;
+
+    // HLSL packed builtin types that don't have Swift equivalents.
+#define HLSL_PACKED_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/HLSLPackedTypes.def"
+    return std::nullopt;
+
+    // SPIRV opaque builtin types that don't have Swift equivalents.
+#define SPIRV_TYPE(Name, Id, SingletonId) case clang::BuiltinType::Id:
+#include "clang/Basic/SPIRVTypes.def"
     return std::nullopt;
   }
 
@@ -458,6 +471,16 @@ namespace {
     }
 
     ImportResult
+    VisitOverflowBehaviorType(const clang::OverflowBehaviorType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: handle OverflowBehaviorType.
+      return Type();
+    }
+
+    ImportResult
     VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Visit(type->desugar());
     }
@@ -520,12 +543,11 @@ namespace {
 
       // FIXME: remove workaround once Unsafe*Pointer supports
       //        nonescapable pointees.
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({pointeeQualType.getTypePtr(), nullptr}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+      if (isNonEscapable(Impl.SwiftContext.evaluator,
+                         pointeeQualType.getTypePtr(), nullptr)) {
         addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable,
-                                       pointeeQualType.getTypePtr()));
+                                       pointeeQualType.getTypePtr(),
+                                       /*isReference=*/false));
         return Type();
       }
 
@@ -638,6 +660,22 @@ namespace {
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
       auto pointeeQualType = type->getPointeeType();
       auto quals = pointeeQualType.getQualifiers();
+
+      // A reference is imported as an 'Unsafe(Mutable)Pointer', which cannot
+      // have a non-Escapable pointee. Most reference parameters are imported as
+      // their pointee type and do not get here; mutable reference parameters
+      // of function pointers do, and the function pointer then falls back to
+      // 'OpaquePointer'.
+      // FIXME: remove workaround once Unsafe*Pointer supports
+      //        nonescapable pointees.
+      if (isNonEscapable(Impl.SwiftContext.evaluator,
+                         pointeeQualType.getTypePtr(), nullptr)) {
+        addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable,
+                                       pointeeQualType.getTypePtr(),
+                                       /*isReference=*/true));
+        return Type();
+      }
+
       Type pointeeType =
           Impl.importTypeIgnoreIUO(pointeeQualType, ImportTypeKind::Value,
                                    addImportDiagnostic,
@@ -691,29 +729,21 @@ namespace {
     }
 
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
-      // FIXME: Map to a real fixed-size Swift array type when we have those.
-      // Importing as a tuple at least fills the right amount of space, and
-      // we can cheese static-offset "indexing" using .$n operations.
-
       Type elementType = Impl.importTypeIgnoreIUO(
           type->getElementType(), ImportTypeKind::Value, addImportDiagnostic,
           AllowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
       if (!elementType)
         return Type();
 
-      auto size = type->getSize().getZExtValue();
+      if (type->getSize().isZero())
+        // Tail-allocated array: we don't know the actual size, but we import
+        // as `Void` so the offset can be computed.
+        // FIXME: Can we do something better than this?
+        return Impl.SwiftContext.TheEmptyTupleType;
 
-      // An array of size N is imported as an N-element tuple which
-      // takes very long to compile. We chose 4096 as the upper limit because
-      // we don't want to break arrays of size PATH_MAX.
-      if (size > 4096)
-        return Type();
-
-      if (size == 1)
-        return elementType;
-
-      SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
-      return TupleType::get(elts, elementType->getASTContext());
+      auto countType = IntegerType::get(
+          APSInt(type->getSize(), /*isUnsigned=*/true), Impl.SwiftContext);
+      return InlineArrayType::get(countType, elementType);
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
@@ -740,8 +770,9 @@ namespace {
             // All checks passed: the imported element type is SIMDScalar,
             // and a generic SIMDn type exists with n == count. Construct the
             // bound generic type and return that.
-            return BoundGenericType::get(
-              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element }
+            return NominalType::get(
+              cast<NominalTypeDecl>(unbound->getDecl()), Type(), { element },
+              Impl.SwiftContext
             );
           }
         }
@@ -805,7 +836,8 @@ namespace {
         // FIXME(https://github.com/apple/swift/issues/45134): If we were walking TypeLocs, we could actually get parameter names.
         // The probably doesn't matter outside of a FuncDecl, which we'll have
         // to special-case, but it's an interesting bit of data loss.
-        params.emplace_back(swiftParamTy, Identifier(), flags);
+        params.push_back(AnyFunctionType::Param::bodyAccess(
+            swiftParamTy, Identifier(), flags));
       }
 
       // Mark any `sending` result types if need be.
@@ -1003,6 +1035,17 @@ namespace {
         return underlyingResult;
       }
 
+      // If the typedef is for a C array and the compiler is in legacy mode, use
+      // the underlying type so that when we import declarations which use the
+      // typedef, their projections get distinguishable types. (We could have
+      // special-cased Modern instead, but if only one mode can get diagnostics
+      // with the typealias name, it should be the one we want people to use.)
+      if (Impl.VisibleCArrayProjection == CArrayProjection::Legacy &&
+              importer::getNeededCArrayCounterpartForType(type->desugar()) !=
+                  CArrayProjection::Modern) {
+        return underlyingResult;
+      }
+
 #ifndef NDEBUG
       switch (underlyingResult.Hint) {
       case ImportHint::Block:
@@ -1057,9 +1100,10 @@ namespace {
     SUGAR_TYPE(Attributed)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(SubstTemplateTypeParm)
-    SUGAR_TYPE(Elaborated)
     SUGAR_TYPE(Using)
     SUGAR_TYPE(BTFTagAttributed)
+    SUGAR_TYPE(PredefinedSugar)
+    SUGAR_TYPE(LateParsedAttr)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -1223,8 +1267,8 @@ namespace {
             }
           }
           assert(importedTypeArgs.size() == typeParamCount);
-          importedType = BoundGenericClassType::get(
-            imported, parentTy, importedTypeArgs);
+          importedType = ClassType::get(
+            imported, parentTy, importedTypeArgs, Impl.SwiftContext);
         } else {
           importedType = imported->getDeclaredInterfaceType();
         }
@@ -1343,8 +1387,9 @@ namespace {
             } else {
               // Everything else.
               bridgedType =
-                  BoundGenericType::get(cast<NominalTypeDecl>(unboundDecl),
-                                        Type(), importedTypeArgs);
+                  NominalType::get(cast<NominalTypeDecl>(unboundDecl),
+                                   Type(), importedTypeArgs,
+                                   Impl.SwiftContext);
             }
           }
 
@@ -1460,9 +1505,10 @@ static Type getUnmanagedType(ClangImporter::Implementation &impl,
   if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
     return payloadType;
 
-  Type unmanagedClassType = BoundGenericType::get(unmanagedDecl,
-                                                  /*parent*/ Type(),
-                                                  payloadType);
+  Type unmanagedClassType = NominalType::get(unmanagedDecl,
+                                             /*parent*/ Type(),
+                                             payloadType,
+                                             impl.SwiftContext);
   return unmanagedClassType;
 }
 
@@ -1491,7 +1537,7 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
   if (!elementObj)
     return Type();
 
-  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  auto elementClass = elementObj->getClassDecl();
   if (!elementClass)
     return Type();
 
@@ -1532,7 +1578,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   if (!insideOptionalType)
     insideOptionalType = elementType;
 
-  auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+  auto boundGenericTy = insideOptionalType->getAs<NominalType>();
   if (!boundGenericTy)
     return Type();
 
@@ -1733,12 +1779,12 @@ static ImportedType adjustTypeForConcreteImport(
   case ImportHint::IntrusivelyRefCountedSmartPtr:
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind)) {
       auto decl = importedType->castTo<StructType>()->getDecl();
-      auto lookupResult = decl->lookupDirect(
-          DeclName(impl.SwiftContext.getIdentifier("asReference")));
-      ASSERT(lookupResult.size() == 1);
-      auto asReference = cast<VarDecl>(lookupResult.front());
-      importedType = asReference->getInterfaceType();
-      optKind = OTK_None;
+      // If the annotation is invalid, VisitRecordDecl() diagnoses it and does
+      // not import the smart pointer, so leave it unbridged here.
+      if (auto *asReference = impl.lookupAndImportAsReference(decl)) {
+        importedType = asReference->getInterfaceType();
+        optKind = OTK_None;
+      }
     }
     break;
   }
@@ -1802,9 +1848,6 @@ void swift::findSwiftAttributes(
     if (auto *MQT = dyn_cast<clang::MacroQualifiedType>(type))
       return MQT->isSugared() ? skipUnrelatedSugar(MQT->desugar()) : type;
 
-    if (auto *ET = dyn_cast<clang::ElaboratedType>(type))
-      return ET->isSugared() ? skipUnrelatedSugar(ET->desugar()) : type;
-
     return type;
   };
 
@@ -1864,6 +1907,9 @@ ImportedType ClangImporter::Implementation::importType(
     std::optional<unsigned> completionHandlerErrorParamIndex) {
   if (type.isNull())
     return {Type(), false};
+
+  if (auto *Stats = SwiftContext.Stats)
+    ++Stats->getFrontendCounters().ClangImportType;
 
   // The "built-in" Objective-C types id, Class, and SEL can actually be (and
   // are) defined within the library. Clang tracks the redefinition types
@@ -2125,6 +2171,7 @@ private:
   }
 
   NEVER_VISIT(PlaceholderType)
+  NEVER_VISIT(HoleType)
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)
@@ -2134,14 +2181,7 @@ private:
 
   NEVER_VISIT(ReferenceStorageType)
 
-  VISIT(EnumType, pass)
-  VISIT(StructType, pass)
-  VISIT(ClassType, compose)
-  VISIT(ProtocolType, compose)
-
-  Result visitBoundGenericType(BoundGenericType *ty) {
-    assert(!isa<BoundGenericClassType>(ty) && "classes handled elsewhere");
-
+  Result visitNominalType(NominalType *ty) {
     // These types are produced during bridging and have conditional
     // conformances to Sendable depending on their generic parameters, so we
     // want to make their generic parameters `Sendable`.
@@ -2152,11 +2192,13 @@ private:
         ty->isDictionary())
       return recurse(ty);
 
-    // Other non-class generic types (e.g. pointers) cannot be made Sendable.
-    return pass(ty);
+    if (isa<EnumType>(ty) || isa<StructType>(ty))
+      return pass(ty);
+    if (isa<ClassType>(ty) || isa<ProtocolType>(ty))
+      return compose(ty);
+    llvm_unreachable("unknown nominal type kind");
   }
 
-  VISIT(BoundGenericClassType, compose)
   NEVER_VISIT(UnboundGenericType)
 
   VISIT(AnyMetatypeType, recurse)
@@ -2341,14 +2383,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
 
-  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
-  // idiomatic in Swift, let's drop these return values.
-  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
-  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
-       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
-       op == clang::OverloadedOperatorKind::OO_StarEqual ||
-       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
-      clangDecl->getReturnType()->isReferenceType()) {
+  auto voidResult = [&]() -> ImportedType {
     auto voidTy = SwiftContext.getVoidType();
     if (!voidTy)
       addImportDiagnostic(clangDecl,
@@ -2356,6 +2391,59 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                                      "Void", "Swift"),
                           clangDecl->getLocation());
     return {voidTy, false};
+  };
+
+  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
+  // idiomatic in Swift, let's drop these return values.
+  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
+  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+       op == clang::OverloadedOperatorKind::OO_StarEqual ||
+       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
+      clangDecl->getReturnType()->isReferenceType())
+    return voidResult();
+
+  // A reference to a non-Escapable type cannot be imported (see
+  // VisitReferenceType). Some operators that return one are still useful.
+  const auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
+  if (method && clangDecl->getReturnType()->isReferenceType() &&
+      isNonEscapable(SwiftContext.evaluator,
+                     clangDecl->getReturnType()->getPointeeType().getTypePtr(),
+                     nullptr)) {
+    bool takesNoArguments = method->getNumExplicitParams() == 0;
+
+    // A method synthesized to forward to an inherited operator is not an
+    // operator itself, but backs the same synthesized members.
+    auto effectiveOp = op;
+    for (const auto *forwarded = getForwardedCXXMethod(method); forwarded;
+         forwarded = getForwardedCXXMethod(forwarded))
+      effectiveOp = forwarded->getOverloadedOperator();
+
+    // A prefix ++ or -- returns a reference to self, and is only called for its
+    // side effect, e.g. by the synthesized 'successor()'. Drop its result.
+    if ((effectiveOp == clang::OO_PlusPlus ||
+         effectiveOp == clang::OO_MinusMinus) &&
+        takesNoArguments)
+      return voidResult();
+
+    // A dereference or subscript operator only backs the synthesized 'pointee'
+    // property or subscript. For a non-Escapable element those use address
+    // accessors, which never dereference the 'Unsafe(Mutable)Pointer'. Import
+    // the reference as one.
+    if ((effectiveOp == clang::OO_Star && takesNoArguments) ||
+        effectiveOp == clang::OO_Subscript) {
+      auto pointeeQualType = clangDecl->getReturnType()->getPointeeType();
+      Type pointeeType = importTypeIgnoreIUO(
+          pointeeQualType, ImportTypeKind::Value,
+          ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
+          allowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
+      if (!pointeeType)
+        return {Type(), false};
+      return {pointeeType->wrapInPointer(pointeeQualType.isConstQualified()
+                                             ? PTK_UnsafePointer
+                                             : PTK_UnsafeMutablePointer),
+              false};
+    }
   }
 
   // Fix up optionality.
@@ -2366,7 +2454,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
 
-  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType returnType = clangDecl->getReturnType();
   returnType = desugarIfBoundsAttributed(returnType);
   // In C interop mode, the return type of library builtin functions
   // like 'memcpy' from headers like 'string.h' drops
@@ -2487,7 +2575,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
-  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType returnType = clangDecl->getReturnType();
   returnType = desugarIfBoundsAttributed(returnType);
 
   // An explicit nullability specifier on a dependent return type, such as
@@ -2614,7 +2702,7 @@ ClangImporter::Implementation::importParameterType(
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
-  auto paramTy = desugarIfElaborated(param->getType());
+  auto paramTy = param->getType();
   paramTy = desugarIfBoundsAttributed(paramTy);
 
   // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
@@ -2834,28 +2922,36 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
     // HACK: Clang will crash while trying to instantiate this default arg.
     return false;
 
-  if (param->hasUninstantiatedDefaultArg() &&
-      isa<clang::CXXConstructorDecl>(functionDecl))
-    // HACK: Constructors of std::set have default arguments that rely on the
-    // comparator type being copyable.
-    return false;
-
-  clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;
   // Try to instantiate the default expression.
-  auto defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
-      clang::SourceLocation(), const_cast<clang::FunctionDecl *>(functionDecl),
-      const_cast<clang::ParmVarDecl *>(param));
+  clang::ExprResult defaultArgExprResult;
+  bool instantiationFailed;
+  {
+    auto &clangDiags = getClangSema().getDiagnostics();
+    bool prevSuppressAllDiagnostics = clangDiags.getSuppressAllDiagnostics();
+    clangDiags.setSuppressAllDiagnostics(true);
+    SWIFT_DEFER {
+      clangDiags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics);
+    };
+    clang::DiagnosticErrorTrap errorTrap(clangDiags);
+    defaultArgExprResult = getClangSema().BuildCXXDefaultArgExpr(
+        clang::SourceLocation(),
+        const_cast<clang::FunctionDecl *>(functionDecl),
+        const_cast<clang::ParmVarDecl *>(param));
+    instantiationFailed =
+        !defaultArgExprResult.isUsable() || errorTrap.hasErrorOccurred();
+  }
   // If the default expression can't be instantiated, bail.
-  if (!defaultArgExprResult.isUsable())
+  if (instantiationFailed)
     return false;
 
-  defaultArgExpr = cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
+  auto defaultArgExpr =
+      cast<clang::CXXDefaultArgExpr>(defaultArgExprResult.get());
 
   // If the type of this parameter is a view type, do not import the
   // default expression, since we cannot guarantee the lifetime of the
   // pointee value.
   if (auto paramRecordDecl = param->getType()->getAsCXXRecordDecl()) {
-    if (isViewType(paramRecordDecl) &&
+    if (isViewType(getClangSema(), paramRecordDecl) &&
         !paramRecordDecl->hasUserDeclaredCopyConstructor())
       return false;
   }
@@ -2906,9 +3002,8 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift compiler to pass in a temporary copy to prevent dangling.
   auto paramContext = param->getDeclContext();
   if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
+      classifyCxxReferenceParameter(param->getType()) &&
       !swiftParamTy->isForeignReferenceType() &&
-      !(isa<clang::FunctionDecl>(paramContext) &&
-        cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
       !isa<clang::ObjCMethodDecl, clang::ObjCContainerDecl>(paramContext)) {
     paramInfo->setAddressable();
   }
@@ -2931,8 +3026,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
 
   // Import the default expression for this parameter if possible.
   // Swift doesn't support default values of inout parameters.
-  // TODO: support default arguments of constructors
-  // (https://github.com/apple/swift/issues/70124)
   // TODO: support params with template parameters
   if (param->hasDefaultArg() && !isInOut &&
       impl->isDefaultArgSafeToImport(param) &&
@@ -3095,9 +3188,6 @@ ArgumentAttrs ClangImporter::Implementation::inferDefaultArgument(
   // Don't introduce a default argument for the first parameter of setters.
   if (isFirstParameter && camel_case::getFirstWord(baseNameStr) == "set")
     return DefaultArgumentKind::None;
-
-  if (auto elaboratedTy = type->getAs<clang::ElaboratedType>())
-    type = elaboratedTy->desugar();
 
   // Some nullable parameters default to 'nil'.
   if (clangOptionality == OTK_Optional) {
@@ -3417,7 +3507,7 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   ImportDiagnosticAdder addImportDiag(*this, clangDecl,
                                       clangDecl->getLocation());
-  clang::QualType resultType = desugarIfElaborated(clangDecl->getReturnType());
+  clang::QualType resultType = clangDecl->getReturnType();
   ImportedType importedType = importer::findOptionSetEnum(resultType, *this);
   if (!importedType)
     importedType = importType(resultType, resultKind, addImportDiag,
@@ -3700,9 +3790,8 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   if (!origDC)
     return {Type(), false};
 
-  auto fieldType =
-      desugarIfElaborated(isGetter ? clangDecl->getReturnType()
-                                   : clangDecl->getParamDecl(0)->getType());
+  auto fieldType = isGetter ? clangDecl->getReturnType()
+                            : clangDecl->getParamDecl(0)->getType();
   // Import the property type, independent of what kind of accessor this is.
   ImportedType importedType = importer::findOptionSetEnum(fieldType, *this);
   if (!importedType)
@@ -3870,8 +3959,8 @@ bool ClangImporter::Implementation::matchesHashableBound(Type type) {
 
   // Struct or enum type must have been bridged.
   // TODO: Check that the bridged type is Hashable?
-  if (type->getStructOrBoundGenericStruct() ||
-      type->getEnumOrBoundGenericEnum()) {
+  if (type->getStructDecl() ||
+      type->getEnumDecl()) {
     auto nominal = type->getAnyNominal();
     auto hashable = SwiftContext.getProtocol(KnownProtocolKind::Hashable);
     SmallVector<ProtocolConformance *, 2> conformances;
@@ -3910,4 +3999,265 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
 
 Type ClangImporter::Implementation::getNSObjectProtocolType() {
   return getNamedProtocolType(*this, "NSObject");
+}
+
+// An array of size N is imported as an N-element tuple which
+// takes very long to compile. We chose 4096 as the upper limit because
+// we don't want to break arrays of size PATH_MAX.
+constexpr unsigned MAX_TUPLE_SIZE = 4096;
+
+namespace {
+/// \see importer::getNeededCArrayCounterpartForType()
+class ClassifyLegacyCArrayTypeVisitor
+    : public clang::TypeVisitor<ClassifyLegacyCArrayTypeVisitor,
+                                CArrayProjection> {
+public:
+  CArrayProjection Visit(clang::QualType qualType) {
+    if (qualType.isNull())
+      return CArrayProjection::Modern;
+
+    // Typedefs need special handling, so don't desugar until after we've
+    // dispatched.
+    return TypeVisitor::Visit(qualType.getTypePtr());
+  }
+
+  CArrayProjection VisitType(clang::Type *) = delete;
+
+  // Contains a C array iff Getter contains a C array.
+#define RECURSE(Class, Getter) \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *ty) { \
+    return Visit(ty->Getter); \
+  }
+
+  // Can never contain a C array.
+#define STOP(Class) \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *) { \
+    return CArrayProjection::Modern; \
+  }
+
+  // If this type is sugared (this is sometimes conditional per instance),
+  // desugar and re-dispatch; otherwise STOP.
+#define DESUGAR(Class) \
+  CArrayProjection Visit##Class##Type(const clang::Class##Type *ty) { \
+    if (!ty->isSugared()) \
+      return CArrayProjection::Modern; \
+    return Visit(ty->desugar()); \
+  }
+
+  // Swift doesn't import dependent types (see ClangTypeConverter above).
+#define DEPENDENT_TYPE(Class, Base) STOP(Class)
+#define TYPE(Class, Base)
+#include "clang/AST/TypeNodes.inc"
+
+  STOP(Builtin)
+  RECURSE(Complex, getElementType())
+
+  CArrayProjection VisitPointerType(const clang::PointerType *pointerType) {
+    auto result = Visit(pointerType->getPointeeType());
+
+    // We can import pointers to otherwise unimportable arrays as
+    // OpaquePointer.
+    result = std::min(result, CArrayProjection::Legacy);
+
+    return result;
+  }
+
+  RECURSE(BlockPointer, getPointeeType())
+  RECURSE(Reference, getPointeeType())
+  RECURSE(MemberPointer, getPointeeType())
+
+  // Only ConstantArrayType is imported as InlineArray.
+  RECURSE(Array, getElementType())
+
+  CArrayProjection
+  VisitConstantArrayType(const clang::ConstantArrayType *arrayType) {
+    // Tail-allocated array is imported as an empty tuple in both legacy and
+    // modern modes.
+    // FIXME: Import as a span (possibly passing the count as a parameter).
+    //        (You'd want to get IncompleteArrayType, too.)
+    if (arrayType->getSize().isZero())
+      return CArrayProjection::Modern;
+
+    // If the array is too large, we can't import it as a tuple.
+    if (arrayType->getLimitedSize() > MAX_TUPLE_SIZE)
+      return CArrayProjection::HiddenStorage;
+
+    // If the element type contains an unimportable array, we can't import
+    // this as a tuple, either.
+    if (Visit(arrayType->getElementType())
+            == CArrayProjection::HiddenStorage)
+      return CArrayProjection::HiddenStorage;
+
+    return CArrayProjection::Legacy;
+  }
+
+  RECURSE(Vector, getElementType())
+  RECURSE(Matrix, getElementType())
+
+  CArrayProjection VisitFunctionType(const clang::FunctionType *funcType) {
+    auto result = CArrayProjection::Modern;
+    auto ratchetResult = [&](CArrayProjection newResult) {
+      result = std::max(result, newResult);
+    };
+
+    if (auto protoFuncType = dyn_cast<clang::FunctionProtoType>(funcType)) {
+      for (auto paramType : protoFuncType->getParamTypes()) {
+        ratchetResult(Visit(paramType));
+      }
+    }
+    ratchetResult(Visit(funcType->getReturnType()));
+
+    return result;
+  }
+
+  DESUGAR(Using)
+  RECURSE(Paren, getInnerType())
+
+  CArrayProjection VisitTypedefType(const clang::TypedefType *type) {
+    auto underlyingResult = Visit(type->desugar());
+
+    // If the typedef is imported as a newtype *and* the newtype is accessible
+    // in legacy mode (only true if the underlying type is importable), there's
+    // no need to dual-project APIs that use it.
+    // FIXME: Weird that we're not version-gating like getSwiftNewtypeAttr().
+    if (underlyingResult == CArrayProjection::Legacy
+          && type->getDecl()->hasAttr<clang::SwiftNewTypeAttr>())
+      return CArrayProjection::Modern;
+
+    return underlyingResult;
+  }
+
+  DESUGAR(MacroQualified)
+  DESUGAR(LateParsedAttr)
+  DESUGAR(Adjusted)
+  DESUGAR(TypeOfExpr)
+  DESUGAR(TypeOf)
+  DESUGAR(PredefinedSugar)
+  RECURSE(Decltype, getUnderlyingType())
+  RECURSE(UnaryTransform, getUnderlyingType())
+  STOP(Tag)
+  DESUGAR(Attributed)
+  RECURSE(OverflowBehavior, getUnderlyingType())
+  DESUGAR(BTFTagAttributed)
+  STOP(HLSLAttributedResource)
+  STOP(HLSLInlineSpirv)
+  DESUGAR(SubstTemplateTypeParm)
+  DESUGAR(TemplateSpecialization)
+  RECURSE(Deduced, getDeducedType())
+
+  CArrayProjection
+  VisitPackIndexingType(const clang::PackIndexingType *indexTy) {
+    if (indexTy->hasSelectedType())
+      return Visit(indexTy->getSelectedType());
+    return CArrayProjection::Modern;
+  }
+
+  DESUGAR(ObjCTypeParam)
+  STOP(ObjCObject)
+  STOP(ObjCObjectPointer)
+  DESUGAR(BoundsAttributed)
+  DESUGAR(ValueTerminated)
+  RECURSE(Pipe, getElementType())
+  RECURSE(Atomic, getValueType())
+  STOP(BitInt)
+
+#undef DESUGAR
+#undef RECURSE
+#undef STOP
+};
+} // end anonymous namespace
+
+CArrayProjection
+importer::getNeededCArrayCounterpartForType(clang::QualType clangType) {
+  return ClassifyLegacyCArrayTypeVisitor().Visit(clangType);
+}
+
+/// \param projection Either \c Legacy or \c HiddenStorage. For
+///        \c HiddenStorage, every C array is replaced with the
+///        \c Builtin.FixedArray it wraps, rather than a tuple, so arrays that
+///        aren't representable as tuples can still be imported.
+/// \returns \c Type() if there is a C array but it is not representable as a
+/// tuple (and \p projection is \c Legacy); converted type otherwise.
+static Type computeLegacyCArrayTypeImpl(Type modernType,
+                                        CArrayProjection projection) {
+  ASSERT(projection != CArrayProjection::Modern);
+  if (modernType.isNull())
+    return modernType;
+
+  bool substituteBuiltinStorage = projection == CArrayProjection::HiddenStorage;
+
+  return modernType.transformRec([&](TypeBase *ty) -> std::optional<Type> {
+    auto desugaredType = ty->getDesugaredType();
+
+    // In legacy mode, a newtype with an un-importable C array type will be
+    // marked as a modern projection with no legacy counterpart to indicate that
+    // it cannot be used in legacy projections. Bail out to stop ClangImporter
+    // from generating whatever legacy projection was trying to use it.
+    if (auto *nominal = desugaredType->getAnyNominal()) {
+      auto *attr = nominal->getAttrs().getAttribute<CArrayProjectionAttr>();
+      if (attr && attr->getProjection() == CArrayProjection::Modern
+            && !attr->getCounterpart() && !substituteBuiltinStorage)
+        return Type();
+    }
+
+    // Special case for pointers: If the pointee is a C array that *can't* be
+    // imported as a legacy type, we need to map to OpaquePointer.
+    if (auto pointee = desugaredType->getAnyPointerElementType()) {
+      auto legacyPointee =
+          computeLegacyCArrayTypeImpl(pointee, CArrayProjection::Legacy);
+      if (legacyPointee.isNull())
+        return desugaredType->getASTContext().getOpaquePointerDecl()
+                  ->getDeclaredInterfaceType();
+    }
+
+    // The rest of this is concerned with the main event: InlineArray.
+    auto elementType = desugaredType->getInlineArrayElementType();
+    if (!elementType)
+      // Ordinary type, walk into its children.
+      return std::nullopt;
+
+    // The element type could itself be a (modern) C array.
+    elementType =
+        computeLegacyCArrayTypeImpl(elementType, projection);
+    if (elementType.isNull())
+      // Whoops, it was un-importable.
+      return Type();
+
+    auto count = desugaredType->getInlineArrayCount();
+    if (!count)
+      return Type();
+
+    if (substituteBuiltinStorage) {
+      auto sizeType = desugaredType->castTo<StructType>()
+                          ->getGenericArgs()[0]->getCanonicalType();
+      return BuiltinFixedArrayType::get(sizeType,
+                                        elementType->getCanonicalType());
+    }
+
+    auto size = count->getZExtValue();
+    if (size > MAX_TUPLE_SIZE)
+      return Type();
+
+    // There's no such thing as a 1-tuple.
+    if (size == 1)
+      return elementType;
+
+    SmallVector<TupleTypeElt, 8> elts{static_cast<size_t>(size), elementType};
+    auto tupleType = TupleType::get(elts, elementType->getASTContext());
+
+    return tupleType;
+  });
+}
+
+ImportedType importer::computeLegacyCArrayType(ImportedType modernType,
+                                               CArrayProjection projection) {
+  if (projection == CArrayProjection::Modern)
+    return modernType;
+
+  auto legacyType =
+      computeLegacyCArrayTypeImpl(modernType.getType(), projection);
+  if (!legacyType)
+    return ImportedType();
+
+  return { legacyType, modernType.isImplicitlyUnwrapped() };
 }

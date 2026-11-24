@@ -324,6 +324,14 @@ ResilientClassTestSuite.test("ResilientThenEmpty") {
   expectEqual(c.resilient.i, 17)
 }
 
+// https://github.com/swiftlang/swift/issues/92338
+ResilientClassTestSuite.test("OptionalResultThroughDispatchThunk") {
+  let c = ResilientOptionalResult()
+  expectNil(c.get(false))
+  expectEqual(c.get(true)?.a, 1)
+  expectEqual(c.get(true)?.b, 2)
+}
+
 // This test triggers https://github.com/apple/swift/issues/43427
 // (rdar://problem/25318716) on macOS 10.9 and iOS 7. Disable it for now when
 // testing on those versions.

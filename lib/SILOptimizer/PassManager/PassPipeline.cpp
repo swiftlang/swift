@@ -88,6 +88,52 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
   P.addMandatoryInlining();
 }
 
+static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
+  P.addClosureLifetimeFixup();
+
+  // Eliminate SILGen's copies of borrowed values that are only used as borrows.
+  P.addMergeBorrowScopes();
+  P.addCopyToBorrowOptimization();
+  P.addCopySinking();
+
+  // Main sequence for LifetimeResolution
+  P.addRemoveSILGenLifetimes();
+  P.addLifetimeResolution();
+  P.addDiagnoseResolvedLifetimes();
+
+  // Run the verifier in non-asserts builds to double-check LifetimeResolution.
+  P.addVerifier();
+
+  // Remaining pieces of DefiniteInitialization we still rely-on.
+  P.addLetPropertyLowering();
+  P.addRawSILInstLowering();
+
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly.
+  P.addImplicitDestroyChecker();
+}
+
+static void addLegacyMoveCheckingPasses(SILPassPipelinePlan &P) {
+  P.addClosureLifetimeFixup();
+
+  // These happen after ClosureLifetimeFixup because they depend on the
+  // resolution of nonescaping closure lifetimes to correctly check the use
+  // of move-only values as captures in nonescaping closures as borrows.
+
+  // Check noImplicitCopy and move only types for objects and addresses.
+  P.addMoveOnlyChecker();
+
+  // Check that values that must be consumed, like those of `~Deinitable`
+  // types, are never destroyed implicitly. This relies on the move-only
+  // checker having made every destroy explicit.
+  P.addImplicitDestroyChecker();
+
+  // Check no uses after consume operator of a value in an address.
+  P.addConsumeOperatorCopyableAddressesChecker();
+  // No uses after consume operator of copyable value.
+  P.addConsumeOperatorCopyableValuesChecker();
+}
+
 // This pipeline defines a set of mandatory diagnostic passes and a set of
 // supporting optimization passes that enable those diagnostics. These are run
 // before any performance optimizations and in contrast to those optimizations
@@ -99,7 +145,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("Mandatory Diagnostic Passes + Enabling Optimization Passes");
 
   P.addMarkNeverWrittenMutableClosureBoxesAsImmutable();
+
   P.addDiagnoseInvalidEscapingCaptures();
+
   P.addReferenceBindingTransform();
   P.addNestedSemanticFunctionCheck();
   P.addCapturePromotion();
@@ -117,11 +165,17 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
 
-  /// Passes for performing definite initialization.
-  /// Must be run together in this order.
-  P.addDefiniteInitialization();
-  P.addLetPropertyLowering();
-  P.addRawSILInstLowering();
+  const auto &Options = P.getOptions();
+
+  if (Options.EnableLifetimeResolution) {
+    addLifetimeResolutionPasses(P);
+  } else {
+    // Passes for performing definite initialization.
+    // Must be run together in this order.
+    P.addDefiniteInitialization();
+    P.addLetPropertyLowering();
+    P.addRawSILInstLowering();
+  }
 
   P.addAddressLowering();
 
@@ -151,23 +205,9 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // and `differentiable_function` instructions.
   P.addDifferentiation();
 
-  const auto &Options = P.getOptions();
-  P.addClosureLifetimeFixup();
-
-  //===---
-  // Begin Ownership Optimizations
-  //
-  // These happen after ClosureLifetimeFixup because they depend on the
-  // resolution of nonescaping closure lifetimes to correctly check the use
-  // of move-only values as captures in nonescaping closures as borrows.
-
-  // Check noImplicitCopy and move only types for objects and addresses.
-  P.addMoveOnlyChecker();
-
-  // Check no uses after consume operator of a value in an address.
-  P.addConsumeOperatorCopyableAddressesChecker();
-  // No uses after consume operator of copyable value.
-  P.addConsumeOperatorCopyableValuesChecker();
+  // Under LifetimeResolution, we don't need to run the move checker.
+  if (!Options.EnableLifetimeResolution)
+    addLegacyMoveCheckingPasses(P);
 
   // Check ~Escapable.
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
@@ -178,10 +218,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // until we can audit the later part of the pipeline. Eventually, this should
   // occur before IRGen.
   P.addMoveOnlyTypeEliminator();
-
-  //
-  // End Ownership Optimizations
-  //===---
 
 #ifndef NDEBUG
   // Add a verification pass to check our work when skipping
@@ -245,6 +281,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // OSLogOptimization and MandatoryDeadObjectElimination.
   P.addOnoneSimplification();
 
+  // Create the specialized bodies exported by `@specialized(exported: true)`
+  // before MandatoryPerformanceOptimizations so that
+  // MandatoryPerformanceOptimizations applies to those specialized bodies.
+  if (P.getOptions().EmbeddedSwift) {
+    P.addEmbeddedExportedPrespecializations();
+  }
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
@@ -293,15 +336,6 @@ SILPassPipelinePlan::getSILGenPassPipeline(const SILOptions &Options) {
   P.startPipeline("SILGen Passes");
 
   P.addSILGenCleanup();
-
-  if (P.getOptions().EnableLifetimeResolution) {
-    if (P.getOptions().EnableLifetimeDependenceDiagnostics)
-      P.addLifetimeDependenceInsertion();
-
-    P.addRemoveSILGenLifetimes();
-    P.addLifetimeResolution();
-    return P;
-  }
 
   if (P.getOptions().EnableLifetimeDependenceDiagnostics) {
     P.addLifetimeDependenceInsertion();
@@ -391,7 +425,6 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
 /// Perform semantic annotation/loop base optimizations.
 void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Perform classic SSA optimizations for cleanup.
-  P.addLowerAggregateInstrs();
   P.addSILCombine();
   P.addEarlySROA();
   P.addDeadObjectElimination();
@@ -417,6 +450,15 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addAccessEnforcementOpts();
   P.addLoopInvariantCodeMotion();
   // Simplify CFG after LICM that creates new exit blocks
+  P.addSimplifyCFG();
+  // LoopRotate cannot rotate when the header contains a begin_access. LICM can
+  // only hoist code that runs in every iteration, which LoopRotate can achieve
+  // for the loop body. The earlier LICM may have hoisted a begin_access that
+  // had prevented that LoopRotate. Try LoopRotate again so that LICM can hoist
+  // other begin_access and more. This is cheap: a pass is skipped if the
+  // function didn't change since the pass last ran on it.
+  P.addLoopRotate();
+  P.addLoopInvariantCodeMotion();
   P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
@@ -466,6 +508,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
+
+  P.addLowerAddressInstructions();
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
   if (OpLevel == OptimizationLevelKind::HighLevel) {
@@ -559,6 +603,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+  P.addPackTypeElimination();
 
   // Promote stack allocations to values and eliminate redundant
   // loads.
@@ -599,6 +644,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addCommonSubexpressionElimination();
   P.addDCE();
   P.addDeadDebugVariableElimination();
+  P.addDebugReconstructionBlockSimplification();
   P.addDeadAccessScopeElimination();
 
   // Perform retain/release code motion and run the first ARC optimizer.
@@ -630,6 +676,11 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+
+  // Add verification checkpoints within the pipeline. This is especially
+  // important to verify OSSA ownership within the pipeline and not only
+  // at the end of the OSSA pipeline (in OwnershipModelEliminator).
+  P.addVerifier();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {
@@ -752,6 +803,10 @@ static void addMidLevelFunctionPipeline(SILPassPipelinePlan &P) {
 
 static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.startPipeline("ClosureSpecialize");
+  // Runs after serialization, because specialized witness tables are not
+  // serialized. The created specialized witness methods are optimized by the
+  // following low-level function passes.
+  P.addWitnessTableSpecialization();
   P.addDeadFunctionAndGlobalElimination();
   P.addReadOnlyGlobalVariablesPass();
   P.addDeadStoreElimination();
@@ -782,6 +837,9 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   // take advantage of static dispatch.
   P.addConstantCapturePropagation();
 
+  // New specializations miss the earlier SILCombine before LetPropertiesOpt.
+  // Simplify their closure calls before running closure specialization.
+  P.addSILCombine();
   P.addClosureSpecialization();
   P.addDeadDebugVariableElimination();
 
@@ -1014,6 +1072,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+
+  // Remove dynamic access enforcement before serialization: after
+  // serialization, functions which can be inlined into client modules may be
+  // removed. Then AccessEnforcementWMO would not see all accesses of non-public
+  // declarations anymore (which matters with aggressive CMO and in Embedded
+  // Swift). This also lets client modules benefit from the optimization.
+  P.addAccessEnforcementWMO();
 
   P.addCrossModuleOptimization();
   P.addConformanceCheckOptimization();

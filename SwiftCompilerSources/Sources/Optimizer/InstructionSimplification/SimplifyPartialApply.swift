@@ -12,14 +12,30 @@
 
 import SIL
 
-extension PartialApplyInst : OnoneSimplifiable {
+extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    let optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
+    if tryReplaceWithThinToThickFunction(context) {
+      return
+    }
+
+    let keepForDebugInfo =
+      context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst })
+
+    let optimizedApplyOfPartialApply: Bool
+    if keepForDebugInfo && !type.isImplicitlyDestroyable(in: parentFunction) {
+      // Combining the calls of a closure that can't be destroyed implicitly is correct only if the
+      // closure is then deleted. The combiner checks that the closure can be deleted, but it
+      // expects debug uses to be salvaged. Here the closure is kept for its debug info instead, so
+      // keep its calls.
+      optimizedApplyOfPartialApply = false
+    } else {
+      optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
+    }
     if optimizedApplyOfPartialApply {
       context.notifyInvalidatedStackNesting()
     }
 
-    if context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst }) {
+    if keepForDebugInfo {
       return
     }
 
@@ -30,5 +46,26 @@ extension PartialApplyInst : OnoneSimplifiable {
     if context.tryDeleteDeadClosure(closure: self, needKeepArgsAlive: !optimizedApplyOfPartialApply) {
       context.notifyInvalidatedStackNesting()
     }
+  }
+}
+
+private extension PartialApplyInst {
+  /// A partial_apply without any substitutions or arguments is just a thin_to_thick_function.
+  func tryReplaceWithThinToThickFunction(_ context: SimplifyContext) -> Bool {
+    guard numArguments == 0,
+          !hasSubstitutions,
+          callee.type.functionTypeRepresentation == .thin,
+          // Make sure the only difference is that the result is thick.
+          type == callee.type.getFunctionType(withRepresentation: .thick)
+                             .getFunctionType(withCalleeConvention: calleeConvention)
+                             .getFunctionType(withNoEscape: type.isNoEscapeFunction)
+    else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let thinToThick = builder.createThinToThickFunction(thinFunction: callee, resultType: type)
+    context.erase(instructions: uses.users(ofType: DeallocStackInst.self))
+    replace(with: thinToThick, context)
+    return true
   }
 }

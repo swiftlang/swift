@@ -170,8 +170,9 @@ extension std.string: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.string, rhs: std.string) {
+  public static func +=(lhs: inout std.string, rhs: @_addressable std.string) {
     lhs.append(rhs)
   }
 
@@ -257,8 +258,11 @@ extension std.wstring: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.wstring, rhs: std.wstring) {
+  public static func +=(
+    lhs: inout std.wstring, rhs: @_addressable std.wstring
+  ) {
     lhs.append(rhs)
   }
 
@@ -384,7 +388,7 @@ extension String {
   @export(implementation)
   public init(_ cxxString: std.string) {
     let buffer = unsafe UnsafeBufferPointer<CChar>(
-      start: cxxString.__c_strUnsafe(),
+      start: cxxString.c_str(),
       count: cxxString.size())
     self = unsafe buffer.withMemoryRebound(to: UInt8.self) {
       unsafe String(decoding: $0, as: UTF8.self)
@@ -403,7 +407,7 @@ extension String {
   @export(implementation)
   public init(_ cxxU16String: std.u16string) {
     let buffer = unsafe UnsafeBufferPointer<UInt16>(
-      start: cxxU16String.__dataUnsafe(),
+      start: cxxU16String.data(),
       count: cxxU16String.size())
     self = unsafe String(decoding: buffer, as: UTF16.self)
     withExtendedLifetime(cxxU16String) {}
@@ -420,7 +424,7 @@ extension String {
   @export(implementation)
   public init(_ cxxU32String: std.u32string) {
     let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
-      start: cxxU32String.__dataUnsafe(),
+      start: cxxU32String.data(),
       count: cxxU32String.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
       unsafe String(decoding: $0, as: UTF32.self)
@@ -444,12 +448,12 @@ extension String {
   public init(_ cxxWString: std.wstring) {
 #if os(Windows)
     let buffer = unsafe UnsafeBufferPointer<UInt16>(
-      start: cxxWString.__dataUnsafe(),
+      start: cxxWString.data(),
       count: cxxWString.size())
     self = unsafe String(decoding: buffer, as: UTF16.self)
 #else
     let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
-      start: cxxWString.__dataUnsafe(),
+      start: cxxWString.data(),
       count: cxxWString.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
       unsafe String(decoding: $0, as: UTF32.self)
@@ -473,7 +477,7 @@ extension String {
   @export(implementation)
   public init(_ cxxStringView: std.string_view) {
     let buffer = unsafe UnsafeBufferPointer<CChar>(
-      start: cxxStringView.__dataUnsafe(),
+      start: cxxStringView.data(),
       count: cxxStringView.size())
     self = unsafe buffer.withMemoryRebound(to: UInt8.self) {
       unsafe String(decoding: $0, as: UTF8.self)
@@ -493,7 +497,7 @@ extension String {
   @export(implementation)
   public init(_ cxxU16StringView: std.u16string_view) {
     let buffer = unsafe UnsafeBufferPointer<UInt16>(
-      start: cxxU16StringView.__dataUnsafe(),
+      start: cxxU16StringView.data(),
       count: cxxU16StringView.size())
     self = unsafe String(decoding: buffer, as: UTF16.self)
     unsafe withExtendedLifetime(cxxU16StringView) {}
@@ -511,7 +515,7 @@ extension String {
   @export(implementation)
   public init(_ cxxU32StringView: std.u32string_view) {
     let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
-      start: cxxU32StringView.__dataUnsafe(),
+      start: cxxU32StringView.data(),
       count: cxxU32StringView.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
       unsafe String(decoding: $0, as: UTF32.self)
@@ -523,12 +527,12 @@ extension String {
   public init(_ cxxWStringView: std.wstring_view) {
 #if os(Windows)
     let buffer = unsafe UnsafeBufferPointer<UInt16>(
-      start: cxxWStringView.__dataUnsafe(),
+      start: cxxWStringView.data(),
       count: cxxWStringView.size())
     self = unsafe String(decoding: buffer, as: UTF16.self)
 #else
     let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
-      start: cxxWStringView.__dataUnsafe(),
+      start: cxxWStringView.data(),
       count: cxxWStringView.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
       unsafe String(decoding: $0, as: UTF32.self)
@@ -544,7 +548,7 @@ extension std.string {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let span = unsafe Span(_unsafeElements: buffer)
       return unsafe _cxxOverrideLifetime(span, borrowing: self)
     }
@@ -557,7 +561,7 @@ extension std.string {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let rawBuffer = UnsafeRawBufferPointer(buffer)
       let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt8.self)
       let span = unsafe Span(_unsafeElements: bufferWithFixedType)
@@ -573,7 +577,7 @@ extension std.u16string {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let rawBuffer = UnsafeRawBufferPointer(buffer)
       let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt16.self)
       let span = unsafe Span(_unsafeElements: bufferWithFixedType)
@@ -588,7 +592,7 @@ extension std.u32string {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let rawBuffer = UnsafeRawBufferPointer(buffer)
       let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: UInt32.self)
       let span = unsafe Span(_unsafeElements: bufferWithFixedType)
@@ -603,7 +607,7 @@ extension std.wstring {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let rawBuffer = UnsafeRawBufferPointer(buffer)
       let bufferWithFixedType = unsafe rawBuffer.assumingMemoryBound(to: CWideChar.self)
       let span = unsafe Span(_unsafeElements: bufferWithFixedType)

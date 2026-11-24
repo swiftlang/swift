@@ -27,3 +27,8 @@ module UsingNonPublic {
   header "using-non-public.h"
   requires cplusplus
 }
+
+module PrivateFileIDUsing {
+  header "private-fileid-using.h"
+  requires cplusplus
+}

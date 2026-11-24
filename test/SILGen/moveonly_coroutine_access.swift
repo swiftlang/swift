@@ -123,3 +123,56 @@ func test_subscript_write(snc: inout SNC_OPT) {
   let x = snc[0].take()
   snc[0] = x
 }
+
+
+// A noncopyable member read through an *existential* base.  The opened
+// existential breaks up the member chain, so the yielded value cannot be copied
+// out of the coroutine access; the access has to stay open across the uses.
+// rdar://159079818 fixed the subscript form of this; this is the property form.
+protocol PNC: ~Copyable {
+  var ncProp: NC { get }
+}
+
+// TRIVIAL-LABEL: sil hidden [ossa] @${{.*}}test_existential_read1pyAA3PNC_pRi_s_XP_tF : $@convention(thin) (@in_guaranteed any PNC & ~Copyable) -> () {
+// TRIVIAL:         ([[YIELDED:%.*]], [[HANDLE:%.*]]) = begin_apply
+// TRIVIAL:          [[COPY:%.*]] = copy_value [[YIELDED]]
+// TRIVIAL:          [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// TRIVIAL:          [[BORROW_MARK:%.*]] = begin_borrow [[MARK]]
+// TRIVIAL:          [[X:%.*]] = struct_extract [[BORROW_MARK]], #NC.x
+// TRIVIAL:          end_borrow [[BORROW_MARK]]
+// TRIVIAL:          destroy_value [[MARK]]
+// TRIVIAL:          = end_apply [[HANDLE]] as $()
+// TRIVIAL:          = apply {{%.*}}([[X]])
+
+
+// LOADABLE-LABEL: sil hidden [ossa] @${{.*}}test_existential_read1pyAA3PNC_pRi_s_XP_tF : $@convention(thin) (@in_guaranteed any PNC & ~Copyable) -> () {
+// LOADABLE:         ([[YIELDED:%.*]], [[HANDLE:%.*]]) = begin_apply
+// LOADABLE:          [[COPY:%.*]] = copy_value [[YIELDED]]
+// LOADABLE:          [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// LOADABLE:          [[BORROW_MARK:%.*]] = begin_borrow [[MARK]]
+// LOADABLE:          [[X:%.*]] = struct_extract [[BORROW_MARK]], #NC.x
+
+// LOADABLE:          [[X_COPY:%.*]] = copy_value [[X]]
+
+// LOADABLE:          end_borrow [[BORROW_MARK]]
+// LOADABLE:          destroy_value [[MARK]]
+// LOADABLE:          = end_apply [[HANDLE]] as $()
+
+// LOADABLE:          = apply {{%.*}}([[X_COPY]])
+
+
+// ADDRESS_ONLY-LABEL: sil hidden [ossa] @${{.*}}test_existential_read1pyAA3PNC_pRi_s_XP_tF : $@convention(thin) (@in_guaranteed any PNC & ~Copyable) -> () {
+// ADDRESS_ONLY:         ([[YIELDED:%.*]], [[HANDLE:%.*]]) = begin_apply
+
+// ADDRESS_ONLY:          [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[YIELDED]]
+// ADDRESS_ONLY:          [[X_FIELD_ADDR:%.*]] = struct_element_addr [[MARK]], #NC.x
+// ADDRESS_ONLY:          [[X_LOCAL_ADDR:%.*]] = alloc_stack $Any
+// ADDRESS_ONLY:          copy_addr [[X_FIELD_ADDR]] to [init] [[X_LOCAL_ADDR]]
+// ADDRESS_ONLY:          = end_apply [[HANDLE]] as $()
+// ADDRESS_ONLY:          = apply {{%.*}}([[X_LOCAL_ADDR]])
+// ADDRESS_ONLY:          destroy_addr [[X_LOCAL_ADDR]]
+// ADDRESS_ONLY:          dealloc_stack [[X_LOCAL_ADDR]]
+
+func test_existential_read(p: borrowing any PNC & ~Copyable) {
+  use(p.ncProp.x)
+}

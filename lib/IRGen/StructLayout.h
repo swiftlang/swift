@@ -330,6 +330,9 @@ public:
   /// Return the spare bit mask of the structure built so far.
   SpareBitVector getSpareBits() const;
 
+  /// Return the size in bits of the mask that getSpareBits would build.
+  uint64_t getSpareBitsSize() const;
+
   /// Build the current elements as a new anonymous struct type.
   llvm::StructType *getAsAnonStruct() const;
 

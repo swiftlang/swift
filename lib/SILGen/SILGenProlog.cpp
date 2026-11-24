@@ -881,9 +881,9 @@ private:
         }
       }
     }
-    // If we're relying on ManualOwnership for explicit-copies enforcement,
-    // we don't need @noImplicitCopy / MoveOnlyWrapper.
-    if (SGF.B.hasManualOwnershipAttr())
+
+    // Do we actually need the wrapper type?
+    if (!SGF.usingWrapperTypeImplicitCopyEnforcement())
       isNoImplicitCopy = false;
 
     // If we have a no implicit copy argument and the argument is trivial,
@@ -1002,7 +1002,8 @@ private:
       // We don't need to mark_uninitialized since we immediately initialize.
       auto mutableBox =
           SGF.emitLocalVariableWithCleanup(pd,
-                                           /*uninitialized kind*/ std::nullopt);
+                                           /*uninitialized kind*/ std::nullopt,
+                                           ArgNo);
       argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
       return;
     }
@@ -1012,6 +1013,14 @@ private:
     // argument if we're responsible for it.
     SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
+      // Under opaque values, an argument that the caller passes by address is a
+      // guaranteed object. The binding below can be a copy of it, so remember
+      // the argument itself: its address is the one the caller passed.
+      if (auto *arg = dyn_cast<SILFunctionArgument>(argrv.getValue());
+          arg && arg->getArgumentConvention() ==
+                     SILArgumentConvention::Indirect_In_Guaranteed) {
+        SGF.GuaranteedIndirectArguments[pd] = arg;
+      }
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
       SGF.enterFormalScopeCleanup(loc, argrv.getValue());
@@ -1313,8 +1322,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   bool isNoImplicitCopy;
 
-  if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
-      SGF.B.hasManualOwnershipAttr()) {
+  if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;
@@ -1335,7 +1343,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   } else {
     isNoImplicitCopy = false;
   }
-    
+  bool useWrapper =
+      isNoImplicitCopy && SGF.usingWrapperTypeImplicitCopyEnforcement();
+
   SILValue arg;
   SILFunctionArgument *box = nullptr;
 
@@ -1349,6 +1359,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // Constant decls are captured by value.
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
+    fArg->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
 
     ManagedValue val = ManagedValue::forBorrowedRValue(fArg);
 
@@ -1372,7 +1383,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       val = addr->getManagedAddress();
     }
     
-    if (isNoImplicitCopy && !val.getType().isMoveOnly()) {
+    if (useWrapper && !val.getType().isMoveOnly()) {
       val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(Loc, val);
     }
 
@@ -1451,8 +1462,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
+    box->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
     arg = SGF.B.createProjectBox(Loc, box, 0);
-    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+    if (useWrapper && !arg->getType().isMoveOnly()) {
       arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
     }
     enforcement = isMutable
@@ -1475,9 +1487,22 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
+    fArg->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
     arg = SILValue(fArg);
     
-    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+    // With opaque values the capture is an object. A noncopyable one must not
+    // be consumed, since the closure can be invoked more than once.
+    if (!arg->getType().isAddress() && arg->getType().isMoveOnly()) {
+      auto val = ManagedValue::forBorrowedRValue(arg).ensurePlusOne(SGF, Loc);
+      arg = SGF.B
+                .createMarkUnresolvedNonCopyableValueInst(
+                    Loc, val,
+                    MarkUnresolvedNonCopyableValueInst::CheckKind::
+                        NoConsumeOrAssign)
+                .getValue();
+    }
+
+    if (useWrapper && !arg->getType().isMoveOnly()) {
       if (fnConv.isSILIndirect(paramInfo)) {
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
 
@@ -1753,10 +1778,10 @@ static void emitIndirectErrorParameter(SILGenFunction &SGF,
   }
 
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
-                                 ctx.getIdentifier("$error"), SourceLoc(),
-                                 ctx.getIdentifier("$error"),
-                                 DC);
+  auto var = new (ctx) ParamDecl(
+      SourceLoc(), SourceLoc(),
+      ctx.getIdentifier(SILDebugVariable::ErrorVariableName), SourceLoc(),
+      ctx.getIdentifier(SILDebugVariable::ErrorVariableName), DC);
   var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(errorType);
 
@@ -1844,13 +1869,15 @@ uint16_t SILGenFunction::emitBasicProlog(
   // conventions; do the same for the `$error` debug placeholder, which
   // must only appear in a function whose SIL type has an error result
   // (SIL verifier enforces this invariant).
-  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr &&
-      F.getLoweredFunctionType()->hasErrorResult()) {
+  if (errorType && !(*errorType)->isNever() &&
+      F.getLoweredFunctionType()->hasErrorResult() &&
+      !F.getLoweredFunctionType()->hasIndirectErrorResult()) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
     ManagedValue undef = emitUndef(loweredErrorTy);
-    SILDebugVariable dbgVar("$error", /*Constant*/ false, ++ArgNo);
+    SILDebugVariable dbgVar(SILDebugVariable::ErrorVariableName,
+                            /*Constant*/ false, ++ArgNo);
     RegularLocation loc = RegularLocation::getAutoGeneratedLocation();
     if (throwsLoc.isValid())
       loc = throwsLoc;

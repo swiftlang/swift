@@ -145,7 +145,7 @@
 // CHECK-NEXT: public func getCopyCounter() -> UnsafeMutablePointer<CInt>
 // CHECK-NEXT: public struct CopyTrackedBaseClass {
 // CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
-// CHECK-NEXT:   @_transparent public init()
+// CHECK-NEXT:   @_transparent @unsafe public init()
 // CHECK-NEXT:   public init(_ x: CInt)
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> CInt
@@ -156,7 +156,7 @@
 
 // CHECK-NEXT: public struct CopyTrackedDerivedClass {
 // CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
-// CHECK-NEXT:   @_transparent public init()
+// CHECK-NEXT:   @_transparent @unsafe public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> CInt
 // CHECK-NEXT:   @discardableResult
@@ -176,7 +176,7 @@
 
 // CHECK-NEXT: public struct CopyTrackedDerivedDerivedClass {
 // CHECK-NEXT:   @available(*, deprecated, message: "This zero-initializes the backing memory of the struct, which is unsafe for some C++ structs. Consider adding an explicit default initializer for this C++ struct.")
-// CHECK-NEXT:   @_transparent public init()
+// CHECK-NEXT:   @_transparent @unsafe public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> CInt
 // CHECK-NEXT:   @discardableResult
@@ -187,4 +187,14 @@
 // CHECK-NEXT:   public func getY() -> CInt
 // CHECK-NEXT:   public init(_ x: CInt)
 // CHECK-NOT:    public
+// CHECK:      }
+
+// Inherited methods name their unnamed parameters, which keep their argument
+// labels and default arguments.
+// CHECK:      public struct DerivedFromUnnamedParams {
+// CHECK:        public func takesUnnamed(_ __param0: CInt, _ __param1: CBool, _ __param2: UnsafeMutablePointer<CInt>!, _ __param3: NonTrivial, _ __param4: inout CInt) -> CInt
+// CHECK:        public func unnamedWithDefault(_ __param0: CInt = cxxDefaultArg) -> CInt
+// CHECK:        public func __operatorSubscriptConst(_ __param0: CInt) -> CInt
+// CHECK:        public func callAsFunction(_ __param0: CInt) -> CInt
+// CHECK:        public subscript(__param0: CInt) -> CInt { get }
 // CHECK:      }

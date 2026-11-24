@@ -1,0 +1,20 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining -verify
+// RUN: not --crash %target-sil-opt -enable-sil-verify-all %s -mandatory-inlining -assert-on-diagnostic-error 2>&1 | %FileCheck %s
+
+// Make sure that -assert-on-diagnostic-error traps when an error diagnostic is
+// emitted. The trap is an ASSERT, so this works without asserts enabled.
+
+// CHECK: We emitted an error?!
+
+import Builtin
+import Swift
+
+// Note that this is a self-recursive 'transparent' function, so the mandatory
+// inliner does not emit a "while inlining here" note (notes are only emitted
+// for nested/mutual recursion; see mandatory_inlining_circular.sil).
+sil [transparent] @test_circular_foo : $@convention(thin) (Float32) -> Float32 {
+bb0(%0 : $Float32):
+  %3 = function_ref @test_circular_foo : $@convention(thin) (Float32) -> Float32
+  %5 = apply %3(%0) : $@convention(thin) (Float32) -> Float32 // expected-error {{inlining 'transparent' functions forms circular loop}}
+  return %5 : $Float32
+}

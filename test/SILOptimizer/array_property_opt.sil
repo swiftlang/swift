@@ -441,3 +441,372 @@ bb3:
   return %5
 }
  
+
+// Check that the pass doesn't run out of basic block bits for deep loop nests.
+// CHECK-LABEL: sil @deep_loop_nest :
+// CHECK-LABEL: } // end sil function 'deep_loop_nest'
+sil @deep_loop_nest : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  br bb_h1
+
+bb_h1:
+  cond_br %0, bb_b1, bb_e1
+
+bb_b1:
+  br bb_h2
+
+bb_h2:
+  cond_br %0, bb_b2, bb_e2
+
+bb_b2:
+  br bb_h3
+
+bb_h3:
+  cond_br %0, bb_b3, bb_e3
+
+bb_b3:
+  br bb_h4
+
+bb_h4:
+  cond_br %0, bb_b4, bb_e4
+
+bb_b4:
+  br bb_h5
+
+bb_h5:
+  cond_br %0, bb_b5, bb_e5
+
+bb_b5:
+  br bb_h6
+
+bb_h6:
+  cond_br %0, bb_b6, bb_e6
+
+bb_b6:
+  br bb_h7
+
+bb_h7:
+  cond_br %0, bb_b7, bb_e7
+
+bb_b7:
+  br bb_h8
+
+bb_h8:
+  cond_br %0, bb_b8, bb_e8
+
+bb_b8:
+  br bb_h9
+
+bb_h9:
+  cond_br %0, bb_b9, bb_e9
+
+bb_b9:
+  br bb_h10
+
+bb_h10:
+  cond_br %0, bb_b10, bb_e10
+
+bb_b10:
+  br bb_h11
+
+bb_h11:
+  cond_br %0, bb_b11, bb_e11
+
+bb_b11:
+  br bb_h12
+
+bb_h12:
+  cond_br %0, bb_b12, bb_e12
+
+bb_b12:
+  br bb_h13
+
+bb_h13:
+  cond_br %0, bb_b13, bb_e13
+
+bb_b13:
+  br bb_h14
+
+bb_h14:
+  cond_br %0, bb_b14, bb_e14
+
+bb_b14:
+  br bb_h15
+
+bb_h15:
+  cond_br %0, bb_b15, bb_e15
+
+bb_b15:
+  br bb_h16
+
+bb_h16:
+  cond_br %0, bb_b16, bb_e16
+
+bb_b16:
+  br bb_h17
+
+bb_h17:
+  cond_br %0, bb_b17, bb_e17
+
+bb_b17:
+  br bb_h18
+
+bb_h18:
+  cond_br %0, bb_b18, bb_e18
+
+bb_b18:
+  br bb_h19
+
+bb_h19:
+  cond_br %0, bb_b19, bb_e19
+
+bb_b19:
+  br bb_h20
+
+bb_h20:
+  cond_br %0, bb_b20, bb_e20
+
+bb_b20:
+  br bb_h21
+
+bb_h21:
+  cond_br %0, bb_b21, bb_e21
+
+bb_b21:
+  br bb_h22
+
+bb_h22:
+  cond_br %0, bb_b22, bb_e22
+
+bb_b22:
+  br bb_h23
+
+bb_h23:
+  cond_br %0, bb_b23, bb_e23
+
+bb_b23:
+  br bb_h24
+
+bb_h24:
+  cond_br %0, bb_b24, bb_e24
+
+bb_b24:
+  br bb_h25
+
+bb_h25:
+  cond_br %0, bb_b25, bb_e25
+
+bb_b25:
+  br bb_h26
+
+bb_h26:
+  cond_br %0, bb_b26, bb_e26
+
+bb_b26:
+  br bb_h27
+
+bb_h27:
+  cond_br %0, bb_b27, bb_e27
+
+bb_b27:
+  br bb_h28
+
+bb_h28:
+  cond_br %0, bb_b28, bb_e28
+
+bb_b28:
+  br bb_h29
+
+bb_h29:
+  cond_br %0, bb_b29, bb_e29
+
+bb_b29:
+  br bb_h30
+
+bb_h30:
+  cond_br %0, bb_b30, bb_e30
+
+bb_b30:
+  br bb_h31
+
+bb_h31:
+  cond_br %0, bb_b31, bb_e31
+
+bb_b31:
+  br bb_h32
+
+bb_h32:
+  cond_br %0, bb_b32, bb_e32
+
+bb_b32:
+  br bb_h33
+
+bb_h33:
+  cond_br %0, bb_b33, bb_e33
+
+bb_b33:
+  br bb_h34
+
+bb_h34:
+  cond_br %0, bb_b34, bb_e34
+
+bb_b34:
+  br bb_h35
+
+bb_h35:
+  cond_br %0, bb_b35, bb_e35
+
+bb_b35:
+  br bb_h36
+
+bb_h36:
+  cond_br %0, bb_b36, bb_e36
+
+bb_b36:
+  br bb_h37
+
+bb_h37:
+  cond_br %0, bb_b37, bb_e37
+
+bb_b37:
+  br bb_h38
+
+bb_h38:
+  cond_br %0, bb_b38, bb_e38
+
+bb_b38:
+  br bb_h39
+
+bb_h39:
+  cond_br %0, bb_b39, bb_e39
+
+bb_b39:
+  br bb_h40
+
+bb_h40:
+  cond_br %0, bb_b40, bb_e40
+
+bb_b40:
+  br bb_h40
+
+bb_e40:
+  br bb_h39
+
+bb_e39:
+  br bb_h38
+
+bb_e38:
+  br bb_h37
+
+bb_e37:
+  br bb_h36
+
+bb_e36:
+  br bb_h35
+
+bb_e35:
+  br bb_h34
+
+bb_e34:
+  br bb_h33
+
+bb_e33:
+  br bb_h32
+
+bb_e32:
+  br bb_h31
+
+bb_e31:
+  br bb_h30
+
+bb_e30:
+  br bb_h29
+
+bb_e29:
+  br bb_h28
+
+bb_e28:
+  br bb_h27
+
+bb_e27:
+  br bb_h26
+
+bb_e26:
+  br bb_h25
+
+bb_e25:
+  br bb_h24
+
+bb_e24:
+  br bb_h23
+
+bb_e23:
+  br bb_h22
+
+bb_e22:
+  br bb_h21
+
+bb_e21:
+  br bb_h20
+
+bb_e20:
+  br bb_h19
+
+bb_e19:
+  br bb_h18
+
+bb_e18:
+  br bb_h17
+
+bb_e17:
+  br bb_h16
+
+bb_e16:
+  br bb_h15
+
+bb_e15:
+  br bb_h14
+
+bb_e14:
+  br bb_h13
+
+bb_e13:
+  br bb_h12
+
+bb_e12:
+  br bb_h11
+
+bb_e11:
+  br bb_h10
+
+bb_e10:
+  br bb_h9
+
+bb_e9:
+  br bb_h8
+
+bb_e8:
+  br bb_h7
+
+bb_e7:
+  br bb_h6
+
+bb_e6:
+  br bb_h5
+
+bb_e5:
+  br bb_h4
+
+bb_e4:
+  br bb_h3
+
+bb_e3:
+  br bb_h2
+
+bb_e2:
+  br bb_h1
+
+bb_e1:
+  %r = tuple ()
+  return %r
+}

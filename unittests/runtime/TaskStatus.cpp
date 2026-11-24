@@ -81,15 +81,10 @@ static void withSimpleTask(T &&value,
   withSimpleTask(TaskCreateFlags(), std::forward<T>(value), invokeFn, bodyFn);
 }
 
-static SerialExecutorRef createFakeExecutor(uintptr_t value) {
-  return SerialExecutorRef::forDefaultActor(reinterpret_cast<DefaultActor*>(value));
-}
-
 } // end anonymous namespace
 
 TEST(TaskStatusTest, basicTasks) {
   AsyncTask *createdTask = nullptr;
-  auto createdExecutor = createFakeExecutor(1024);
   bool hasRun = false;
 
   struct Storage { int value; };
@@ -97,9 +92,6 @@ TEST(TaskStatusTest, basicTasks) {
     [&](ValueContext<Storage> *context) {
     // The task passed in should be the task we created.
     EXPECT_EQ(createdTask, swift_task_getCurrent());
-
-    // The executor passed in should be the executor we created.
-    //EXPECT_EQ(createdExecutor, executor);
 
     // We shouldn't have run yet.
     EXPECT_FALSE(hasRun);
@@ -113,7 +105,7 @@ TEST(TaskStatusTest, basicTasks) {
     createdTask = task;
 
     EXPECT_FALSE(hasRun);
-    swift_job_run(task, createdExecutor);
+    swift_job_run(task, SerialExecutorRef::generic());
     EXPECT_TRUE(hasRun);
 
     createdTask = nullptr;
@@ -134,6 +126,6 @@ TEST(TaskStatusTest, cancellation_simple) {
     swift_task_cancel(task);
     EXPECT_TRUE(swift_task_isCancelled(task));
   }, [&](AsyncTask *task) {
-    swift_job_run(task, createFakeExecutor(1024));
+    swift_job_run(task, SerialExecutorRef::generic());
   });
 }

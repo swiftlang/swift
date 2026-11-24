@@ -129,6 +129,7 @@ struct TestOptions {
   bool PrintResponseAsJSON = false;
   bool PrintRawResponse = false;
   bool PrintResponse = true;
+  bool AllowErrorResponse = false;
   bool SimplifiedDemangling = false;
   bool SynthesizedExtensions = false;
   bool CollectActionables = false;

@@ -688,3 +688,113 @@ func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows 
 func testArbitraryAndRethrows() {
   takesArbitraryAndRethrows(throwingFunc) { }
 }
+
+// Rethrows checking with a consuming parameter.
+func rethrowsConsuming(_ body: consuming @escaping () throws -> Void) rethrows {
+  try body()
+}
+
+func rethrowsConsumingConsumed(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  try (consume body)()
+}
+
+func rethrowsForwardConsuming(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  try rethrowsConsuming(body)
+}
+
+func rethrowsConsumingReassigned(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  body = { throw MyError.fail }
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func rethrowsConsumingCopied(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  try (copy body)()
+}
+
+// Any use of a consuming parameter other than reading it might modify it.
+
+func rethrowsConsumingTupleAssigned(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  var other = 0
+  (body, other) = ({ throw MyError.fail }, 1)
+  _ = other
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func rethrowsConsumingKeyPathAssigned(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  body[keyPath: \.self] = { throw MyError.fail }
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func assignThrowing(_ body: inout () throws -> Void) {
+  body = { throw MyError.fail }
+}
+
+func rethrowsConsumingPassedInOut(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  assignThrowing(&body)
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func rethrowsConsumingKeyPathPassedInOut(
+  _ body: consuming @escaping () throws -> Void
+) rethrows {
+  assignThrowing(&body[keyPath: \.self])
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+extension Optional {
+  var settableSelf: Wrapped? {
+    get { self }
+    set { self = newValue }
+  }
+}
+
+func rethrowsConsumingMemberAssigned(
+  _ body: consuming (() throws -> Void)?
+) rethrows {
+  body.settableSelf = { throw MyError.fail }
+  try body?() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+// Calling a consuming or inout parameter from a nested function is classified
+// as it is anywhere else.
+func callConsumingInNestedGeneric<E: Error>(
+  _ body: consuming @escaping () throws(E) -> Void
+) throws(E) {
+  func inner<T>(_: T) throws(E) { try body() }
+  try inner(1)
+}
+
+func callInOutInNestedGeneric<E: Error>(
+  _ body: inout () throws(E) -> Void
+) throws(E) {
+  func inner<T>(_: T) throws(E) {
+    do { try body() } catch { let e: E = error; throw e }
+  }
+  try inner(1)
+}
+
+func rethrowsInOut(_ body: inout () throws -> Void) rethrows {
+  try body() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+}
+
+func testConsumingAndRethrows() throws {
+  rethrowsConsuming { }
+  rethrowsConsumingConsumed { }
+  rethrowsForwardConsuming { }
+  try rethrowsForwardConsuming { throw MyError.fail }
+  rethrowsConsumingCopied { }
+}

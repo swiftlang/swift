@@ -153,6 +153,7 @@ CONSTANT_OWNERSHIP_INST(None, OpenExistentialAddr)
 CONSTANT_OWNERSHIP_INST(None, OpenExistentialBox)
 CONSTANT_OWNERSHIP_INST(None, OpenExistentialMetatype)
 CONSTANT_OWNERSHIP_INST(None, PointerToAddress)
+CONSTANT_OWNERSHIP_INST(None, ValueToAddress)
 CONSTANT_OWNERSHIP_INST(None, ProjectBlockStorage)
 CONSTANT_OWNERSHIP_INST(None, ProjectBox)
 CONSTANT_OWNERSHIP_INST(None, ProjectExistentialBox)
@@ -299,15 +300,7 @@ ValueOwnershipKindClassifier::visitForwardingInst(SILInstruction *i,
         return op.get()->getOwnershipKind();
       }));
 
-  if (!mergedValue) {
-    // If we have mismatched SILOwnership and sil ownership is not enabled,
-    // just return None for staging purposes. If SILOwnership is enabled, then
-    // we must assert!
-    if (!i->getModule().getOptions().VerifySILOwnership) {
-      return OwnershipKind::None;
-    }
-    llvm_unreachable("Forwarding inst with mismatching ownership kinds?!");
-  }
+  ASSERT(mergedValue && "Forwarding inst with mismatching ownership kinds?!");
 
   return mergedValue;
 }
@@ -509,6 +502,7 @@ struct ValueOwnershipKindBuiltinVisitor
 // This returns a value at +1 that is destroyed strictly /after/ the
 // UnsafeGuaranteedEnd. This provides the guarantee that we want.
 CONSTANT_OWNERSHIP_BUILTIN(Owned, COWBufferForReading)
+CONSTANT_OWNERSHIP_BUILTIN(None, InitializeForeignReferenceSubclassVTables)
 CONSTANT_OWNERSHIP_BUILTIN(None, AddressOfBorrowOpaque)
 CONSTANT_OWNERSHIP_BUILTIN(None, UnprotectedAddressOfBorrowOpaque)
 CONSTANT_OWNERSHIP_BUILTIN(None, AShr)
@@ -528,6 +522,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GenericExactSDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, ExactUDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericExactUDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, FAdd)
+CONSTANT_OWNERSHIP_BUILTIN(None, FAddRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFAdd)
 CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_OEQ)
 CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_OGE)
@@ -544,6 +539,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FCMP_UNE)
 CONSTANT_OWNERSHIP_BUILTIN(None, FDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFDiv)
 CONSTANT_OWNERSHIP_BUILTIN(None, FMul)
+CONSTANT_OWNERSHIP_BUILTIN(None, FMulRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFMul)
 CONSTANT_OWNERSHIP_BUILTIN(None, FNeg)
 CONSTANT_OWNERSHIP_BUILTIN(None, FPExt)
@@ -553,6 +549,7 @@ CONSTANT_OWNERSHIP_BUILTIN(None, FPTrunc)
 CONSTANT_OWNERSHIP_BUILTIN(None, FRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFRem)
 CONSTANT_OWNERSHIP_BUILTIN(None, FSub)
+CONSTANT_OWNERSHIP_BUILTIN(None, FSubRelaxed)
 CONSTANT_OWNERSHIP_BUILTIN(None, GenericFSub)
 CONSTANT_OWNERSHIP_BUILTIN(None, Freeze)
 CONSTANT_OWNERSHIP_BUILTIN(None, ICMP_EQ)
@@ -687,6 +684,9 @@ CONSTANT_OWNERSHIP_BUILTIN(None, GetCurrentExecutor)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeNonThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationReturning)
 CONSTANT_OWNERSHIP_BUILTIN(None, ResumeThrowingContinuationThrowing)
+CONSTANT_OWNERSHIP_BUILTIN(None, CreateSplitContinuation)
+CONSTANT_OWNERSHIP_BUILTIN(None, GetSplitContinuationAddr)
+CONSTANT_OWNERSHIP_BUILTIN(None, DestroySplitContinuation)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinaryTaskExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildOrdinarySerialExecutorRef)
 CONSTANT_OWNERSHIP_BUILTIN(None, BuildComplexEqualitySerialExecutorRef)
@@ -698,7 +698,6 @@ CONSTANT_OWNERSHIP_BUILTIN(None, EndAsyncLetLifetime)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroup)
 CONSTANT_OWNERSHIP_BUILTIN(None, CreateTaskGroupWithFlags)
 CONSTANT_OWNERSHIP_BUILTIN(None, DestroyTaskGroup)
-CONSTANT_OWNERSHIP_BUILTIN(None, TaskRunInline)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, FlowSensitiveSelfIsolation)
 CONSTANT_OWNERSHIP_BUILTIN(Owned, FlowSensitiveDistributedSelfIsolation)
 CONSTANT_OWNERSHIP_BUILTIN(None, GetEnumTag)
@@ -757,6 +756,7 @@ UNOWNED_OR_NONE_DEPENDING_ON_RESULT(Deinterleave)
 // must be owned.
 OWNED_OR_NONE_DEPENDING_ON_RESULT(ZeroInitializer)
 OWNED_OR_NONE_DEPENDING_ON_RESULT(PrepareInitialization)
+OWNED_OR_NONE_DEPENDING_ON_RESULT(TaskRunInline)
 #undef OWNED_OR_NONE_DEPENDING_ON_RESULT
 
 #define BUILTIN(X,Y,Z)

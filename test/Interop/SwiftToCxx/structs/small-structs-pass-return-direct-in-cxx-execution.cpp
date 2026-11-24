@@ -11,16 +11,33 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <type_traits>
 #include "structs.h"
 
 int main() {
   using namespace Structs;
+
+  static_assert(std::is_trivial<StructOneI64>::value, "");
+  static_assert(std::is_trivial<StructOneI16AndOneStruct>::value, "");
+  static_assert(std::is_trivial<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copyable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_destructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_copy_assignable<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_constructible<StructDoubleAndFloat>::value, "");
+  static_assert(std::is_trivially_move_assignable<StructDoubleAndFloat>::value, "");
+  // Storage must still be initialized through a Swift factory.
+  static_assert(!std::is_default_constructible<StructDoubleAndFloat>::value, "");
 
   static_assert(sizeof(StructOneI64) == 8, "");
   static_assert(sizeof(StructTwoI32) == 8, "");
   static_assert(sizeof(StructOneI16AndOneStruct) == 12, "");
   static_assert(sizeof(StructU16AndPointer) == (sizeof(void *) * 2), "");
   static_assert(sizeof(StructDoubleAndFloat) == 16, "");
+  static_assert(sizeof(StructSixBytes) == 6, "");
+  static_assert(sizeof(StructThreeBytes) == 3, "");
+  static_assert(sizeof(StructSixAndThreeBytes) == 10, "");
+  static_assert(sizeof(StructI64AndFiveBytes) == 16, "");
 
   StructOneI64 structOneI64 = returnNewStructOneI64();
   printStructOneI64(structOneI64);
@@ -48,6 +65,18 @@ int main() {
   assert(getStructDoubleAndFloat_x(structDoubleAndFloat) == doubleValue);
   assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue);
 
+  // Exercise copying a value whose Swift size excludes its tail padding.
+  auto copy = structDoubleAndFloat;
+  auto assigned = returnNewStructDoubleAndFloat(0.0f, 0.0);
+  assigned = copy;
+  auto &alias = assigned;
+  assigned = alias;
+  inoutStructDoubleAndFloat(copy);
+  assert(getStructDoubleAndFloat_x(assigned) == 1.25);
+  assert(getStructDoubleAndFloat_y(assigned) == -5.0f);
+  assert(getStructDoubleAndFloat_x(copy) == -6.25);
+  assert(getStructDoubleAndFloat_y(copy) == -0.5f);
+
   // s = StructOneI16AndOneStruct(x: 0xFF, y: StructTwoI32(x: 5, y: 72))
   auto s = returnNewStructOneI16AndOneStruct();
   // s2 = StructTwoI32(x: 10, y: 20)
@@ -60,5 +89,32 @@ int main() {
   inoutStructDoubleAndFloat(structDoubleAndFloat);
   assert(getStructDoubleAndFloat_x(structDoubleAndFloat) == doubleValue * floatValue);
   assert(getStructDoubleAndFloat_y(structDoubleAndFloat) == floatValue / 10);
+
+  auto six = returnNewStructSixBytes();
+  printStructSixBytes(six);
+  // CHECK-NEXT: StructSixBytes(-100, -200, -300)
+  printStructSixBytes(passThroughStructSixBytes(six));
+  // CHECK-NEXT: StructSixBytes(-100, -200, -300)
+
+  auto three = returnNewStructThreeBytes();
+  printStructThreeBytes(three);
+  // CHECK-NEXT: StructThreeBytes(-1, -2, -3)
+  printStructThreeBytes(passThroughStructThreeBytes(three));
+  // CHECK-NEXT: StructThreeBytes(-1, -2, -3)
+
+  auto sixAndThree = returnNewStructSixAndThreeBytes();
+  printStructSixAndThreeBytes(sixAndThree);
+  // CHECK-NEXT: StructSixAndThreeBytes(StructSixBytes(-100, -200, -300), StructThreeBytes(-1, -2, -3))
+  printStructSixAndThreeBytes(passThroughStructSixAndThreeBytes(sixAndThree));
+  // CHECK-NEXT: StructSixAndThreeBytes(StructSixBytes(-100, -200, -300), StructThreeBytes(-1, -2, -3))
+  printStructSixBytes(sixAndThree.getS());
+  // CHECK-NEXT: StructSixBytes(-100, -200, -300)
+  printStructThreeBytes(sixAndThree.getT());
+  // CHECK-NEXT: StructThreeBytes(-1, -2, -3)
+
+  auto i64AndFive = returnNewStructI64AndFiveBytes();
+  printStructI64AndFiveBytes(i64AndFive);
+  // CHECK-NEXT: StructI64AndFiveBytes(-1000, -1, -2, -3, -4, -5)
+
   return 0;
 }

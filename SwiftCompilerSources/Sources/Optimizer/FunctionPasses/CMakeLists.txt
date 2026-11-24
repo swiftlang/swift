@@ -26,10 +26,13 @@ swift_compiler_sources(Optimizer
   DeadDebugVariableElimination.swift
   DeadObjectElimination.swift
   DeadStoreElimination.swift
+  DebugReconstructionBlockSimplification.swift
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
+  DiagnoseResolvedLifetimes.swift
   EmbeddedWitnessCallSpecialization.swift
+  ImplicitDestroyChecker.swift
   InitializeStaticGlobals.swift
   KillInvalidDebugValues.swift
   LetPropertyLowering.swift
@@ -37,7 +40,9 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
   LifetimeResolution.swift
+  LifetimeResolutionSingleDef.swift
   LoopInvariantCodeMotion.swift
+  LowerAddressInstructions.swift
   ObjectOutliner.swift
   ObjCBridgingOptimization.swift
   MandatoryDestroyHoisting.swift
@@ -53,5 +58,8 @@ swift_compiler_sources(Optimizer
   StripObjectHeaders.swift
   TempLValueElimination.swift
   TempRValueElimination.swift
+  TrivialOwnershipElimination.swift
+  Verifier.swift
+  PackTypeElimination.swift
   PackSpecialization.swift
 )

@@ -1918,22 +1918,18 @@ bool DiagnosticVerifier::verifyDeferredMarkerDiagnostics() {
   return HadError;
 }
 
-/// After the file has been processed, check to see if we got all of
-/// the expected diagnostics and check to see if there were any unexpected
-/// ones.
-DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
-  Errors.clear();
-  ExpansionMarkerLocs.clear();
-  using llvm::SMLoc;
-
+/// Scan the buffer for 'expected-*' directives, appending them to
+/// \p ExpectedDiagnostics. Binding of any '// #name@N' markers defined inside
+/// an expected-expansion block happens here as a side effect of parsing.
+void DiagnosticVerifier::parseExpectedDiagnostics(
+    unsigned BufferID,
+    std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics) {
   StringRef InputFile = BufferID ? SM.getEntireTextForBuffer(BufferID) : "";
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
 
   unsigned PrevExpectedContinuationLine = 0;
-
-  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
 
   // Validate that earlier prefixes are not prefixes of alter
   // prefixes... otherwise, we will never pattern match the later prefix.
@@ -1958,6 +1954,20 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExpectedDiagnostics.push_back(Expected);
     PrevMatchEnd = Expected.ExpectedEnd;
   }
+}
+
+/// After the file has been processed, check to see if we got all of
+/// the expected diagnostics and check to see if there were any unexpected
+/// ones.
+DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
+  Errors.clear();
+  ExpansionMarkerLocs.clear();
+  using llvm::SMLoc;
+
+  StringRef InputFile = BufferID ? SM.getEntireTextForBuffer(BufferID) : "";
+
+  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
+  parseExpectedDiagnostics(BufferID, ExpectedDiagnostics);
 
   resolveDeferredMarkers(ExpectedDiagnostics);
   forEachMarkerDefinition(
@@ -2276,6 +2286,30 @@ bool DiagnosticVerifier::finishProcessing() {
   if (!Errors.empty())
     Result.HadError = true;
   Errors.clear();
+
+  // Bind every expected-expansion block's '// #name@N' markers before verifying
+  // any file, so a marker defined in one buffer can be referenced from another
+  // regardless of the order buffers are verified in. verifyFile() resolves and
+  // verifies a buffer's directives in a single pass, so without this pre-pass a
+  // '@#marker' reference verified before its defining block was parsed would be
+  // dropped as unbound. Parsing is a pure function of buffer text apart from
+  // populating LocationMarkers, so the throwaway diagnostics and any parse
+  // errors are discarded; verifyFile() re-parses each buffer and re-emits those
+  // errors in the normal per-file order.
+  {
+    std::vector<ExpectedDiagnosticInfo> Throwaway;
+    for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
+      for (auto &BufferID : BufferIDList) {
+        Throwaway.clear();
+        ExpansionMarkerLocs.clear();
+        parseExpectedDiagnostics(BufferID, Throwaway);
+      }
+    Errors.clear();
+    // Rewind the per-location parse cursors consumed above so verifyFile()'s
+    // own parse numbers each location's directives identically.
+    for (auto &Entry : Expansions)
+      Entry.second.resetParseCursor();
+  }
 
   for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
     for (auto &BufferID : BufferIDList) {

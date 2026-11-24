@@ -15,8 +15,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
-#include "swift/AST/Module.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/Module.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/IRGen/TBDGen.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -71,7 +73,7 @@ class CrossModuleOptimization {
 
 public:
   CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
-    : M(M), conservative(conservative), everything(everything) { }
+      : M(M), conservative(conservative), everything(everything) {}
 
   void serializeFunctionsInModule(SILPassManager *manager);
   void serializeWitnessTablesInModule();
@@ -89,6 +91,10 @@ private:
 
   void trySerializeFunctions(ArrayRef<SILFunction *> functions);
 
+  bool isEmbedded() const { return M.getOptions().EmbeddedSwift; }
+  bool isEmittedIntoClients(SILFunction *function);
+  bool hasInterfaceModel(const Decl *decl);
+
   bool canSerializeFunction(SILFunction *function,
                             FunctionFlags &canSerializeFlags,
                             int maxDepth);
@@ -102,6 +108,8 @@ private:
   bool canSerializeType(SILType type);
   bool canSerializeType(CanType type);
   bool canSerializeDecl(NominalTypeDecl *decl);
+  bool canClientsSubstituteOpaqueType(OpaqueTypeArchetypeType *archetype,
+                                      int maxDepth = 16);
 
   /// Check whether decls imported with certain access levels or attributes
   /// can be serialized.
@@ -113,10 +121,10 @@ private:
   bool canUseFromInline(SILFunction *func);
 
   void serializeFunction(SILFunction *function,
-                   const FunctionFlags &canSerializeFlags);
+                         FunctionFlags &canSerializeFlags);
 
   void serializeInstruction(SILInstruction *inst,
-                                    const FunctionFlags &canSerializeFlags);
+                            FunctionFlags &canSerializeFlags);
 
   void serializeGlobal(SILGlobalVariable *global);
 
@@ -444,11 +452,59 @@ bool CrossModuleOptimization::isReferenceSerializeCandidate(SILGlobalVariable *G
   return hasPublicVisibility(G->getLinkage());
 }
 
+/// Determine whether the given declaration has the "interface" code
+/// generation model, meaning that it has a unique definition in this module.
+bool CrossModuleOptimization::hasInterfaceModel(const Decl *decl) {
+  return decl->getEffectiveCodeGenerationModel() ==
+         CodeGenerationModel::Interface;
+}
+
+/// In Embedded Swift, determine whether the code for the given function is
+/// emitted into clients, so they need its body. Code with the "interface"
+/// model has a unique definition in this module, which clients refer to by
+/// symbol.
+bool CrossModuleOptimization::isEmittedIntoClients(SILFunction *function) {
+  assert(isEmbedded());
+
+  if (function->isNeverEmitIntoClient())
+    return false;
+
+  // Any module that uses a generic function can create the same
+  // specialization of it.
+  if (function->isSpecialization())
+    return true;
+
+  // A closure is emitted wherever the declaration containing it is.
+  if (auto declRef = function->getDeclRef()) {
+    if (auto *closure = declRef.getAbstractClosureExpr()) {
+      const DeclContext *dc = closure;
+      while (dc->getParent() && dc->getParent()->isLocalContext())
+        dc = dc->getParent();
+      if (auto *decl = dc->getAsDecl())
+        return !hasInterfaceModel(decl);
+      return true;
+    }
+  }
+
+  // A global's one-time initializer is only called from its addressor, which
+  // is serialized if clients need it.
+  if (function->isGlobalInitOnceFunction())
+    return false;
+
+  // Other functions, such as witness thunks, can be reached from serialized
+  // witness tables, and clients need their bodies to specialize them.
+  return true;
+}
+
 /// Select functions in the module which should be serialized.
 void CrossModuleOptimization::trySerializeFunctions(
     ArrayRef<SILFunction *> functions) {
   for (SILFunction *F : functions) {
-    if (isSerializeCandidate(F, M.getOptions()) || everything) {
+    bool isCandidate =
+        (everything && isEmbedded())
+            ? isEmittedIntoClients(F)
+            : (isSerializeCandidate(F, M.getOptions()) || everything);
+    if (isCandidate) {
       if (canSerializeFunction(F, canSerializeFlags, /*maxDepth*/ 64)) {
         serializeFunction(F, canSerializeFlags);
       }
@@ -520,6 +576,11 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 void CrossModuleOptimization::serializeVTablesInModule() {
   if (everything) {
     for (SILVTable *vt : M.getVTables()) {
+      // In Embedded Swift, a class with the "interface" model has unique
+      // metadata in this module, which clients refer to by symbol.
+      if (isEmbedded() && hasInterfaceModel(vt->getClass()))
+        continue;
+
       vt->setSerializedKind(IsSerialized);
       for (auto &entry : vt->getEntries()) {
         makeFunctionUsableFromInline(entry.getImplementation());
@@ -616,6 +677,16 @@ bool CrossModuleOptimization::canSerializeFunction(
       // We don't support functions with opaque result types, yet.
       return false;
     }
+  }
+
+  // Opaque types can also be hidden in substitutions, e.g.
+  // `@substituted <τ_0_0> () -> @out τ_0_0 for <@_opaqueReturnTypeOf(...)>`.
+  if (fnTy->hasOpaqueArchetype() &&
+      fnTy.findIf([this](Type t) {
+        auto *opaque = t->getAs<OpaqueTypeArchetypeType>();
+        return opaque && !canClientsSubstituteOpaqueType(opaque);
+      })) {
+    return false;
   }
 
   // Avoid a stack overflow in case of a very deeply nested call graph.
@@ -821,8 +892,11 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
   bool success = !type.findIf(
      [this](Type rawSubType) {
        CanType subType = rawSubType->getCanonicalType();
-       if (auto nominal = subType->getNominalOrBoundGenericNominal()) {
+       if (auto nominal = subType->getNominalDecl()) {
          return !canSerializeDecl(nominal);
+       }
+       if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(subType)) {
+         return !canClientsSubstituteOpaqueType(opaque);
        }
        // Types that might not have nominal include Builtin types (e.g. Builtin.Int64),
        // generic parameter types (e.g. T as in Foo<T>), SIL function result types
@@ -832,6 +906,49 @@ bool CrossModuleOptimization::canSerializeType(CanType type) {
 
   canTypesChecked[type] = success;
   return success;
+}
+
+/// Returns true if a client module substitutes the opaque archetype
+/// \p archetype with the same underlying type as this module does.
+///
+/// Within this module, opaque types are looked through to their underlying
+/// types, e.g. the argument types of a function with an opaque result type.
+/// A client can only look through opaque types if the underlying types are
+/// visible to it. If a client stops earlier, e.g. because the underlying type
+/// is a private type or the opaque result type of a private function, the
+/// types in a deserialized function don't match.
+bool CrossModuleOptimization::canClientsSubstituteOpaqueType(
+    OpaqueTypeArchetypeType *archetype, int maxDepth) {
+  OpaqueTypeDecl *decl = archetype->getDecl();
+
+  // Opaque types from other modules are substituted the same way in this
+  // module and in clients.
+  if (decl->getModuleContext() != M.getSwiftModule())
+    return true;
+
+  auto subs = decl->getUniqueUnderlyingTypeSubstitutions();
+  if (!subs)
+    return true;
+
+  if (maxDepth <= 0)
+    return false;
+
+  for (Type replType : subs->getReplacementTypes()) {
+    bool notVisible = replType.findIf([&](Type subType) {
+      TypeDecl *typeDecl = subType->getAnyNominal();
+      auto *opaque = subType->getAs<OpaqueTypeArchetypeType>();
+      if (opaque)
+        typeDecl = opaque->getDecl();
+      if (!typeDecl)
+        return false;
+      if (typeDecl->getEffectiveAccess() < AccessLevel::Package)
+        return true;
+      return opaque && !canClientsSubstituteOpaqueType(opaque, maxDepth - 1);
+    });
+    if (notVisible)
+      return false;
+  }
+  return true;
 }
 
 bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
@@ -1004,8 +1121,8 @@ bool CrossModuleOptimization::canUseFromInline(SILFunction *function) {
 
 /// Serialize \p function and recursively all referenced functions which are
 /// marked in \p canSerializeFlags.
-void CrossModuleOptimization::serializeFunction(SILFunction *function,
-                                                const FunctionFlags &canSerializeFlags) {
+void CrossModuleOptimization::serializeFunction(
+    SILFunction *function, FunctionFlags &canSerializeFlags) {
   if (isSerializedWithRightKind(M, function))
     return;
 
@@ -1039,14 +1156,21 @@ void CrossModuleOptimization::serializeFunction(SILFunction *function,
 /// Prepare \p inst for serialization.
 ///
 /// If \p inst is a function_ref, recursively visits the referenced function.
-void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
-                                       const FunctionFlags &canSerializeFlags) {
+void CrossModuleOptimization::serializeInstruction(
+    SILInstruction *inst, FunctionFlags &canSerializeFlags) {
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
     SILFunction *callee = FRI->getInitiallyReferencedFunction();
     assert(callee);
     if (!callee->isDefinition() || callee->isAvailableExternally())
       return;
+    // In Embedded Swift, only code that is emitted into clients is a
+    // candidate for serialization. Anything else that serialized code refers
+    // to, such as a global's one-time initializer called from a serialized
+    // addressor, has to be serialized along with it, unless it has a unique
+    // definition here.
+    if (everything && isEmbedded())
+      (void)canSerializeFunction(callee, canSerializeFlags, /*maxDepth=*/64);
     if (canUseFromInline(callee)) {
       if (conservative) {
         // In conservative mode, avoid making non-public functions public,
@@ -1170,7 +1294,10 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
       //
       // With non-package CMO, serialize vtables, their superclass
       // vtables, and make all vfunctions usable from inline.
-      if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+      auto *classDecl = dyn_cast<ClassDecl>(decl);
+      if (classDecl && isEmbedded() && hasInterfaceModel(classDecl))
+        classDecl = nullptr;
+      if (classDecl) {
         auto *vTable = M.lookUpVTable(classDecl);
         vTable->setSerializedKind(IsSerialized);
         for (auto &entry : vTable->getEntries()) {
@@ -1207,7 +1334,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
   if (!typesHandled.insert(type.getPointer()).second)
     return;
 
-  if (NominalTypeDecl *NT = type->getNominalOrBoundGenericNominal()) {
+  if (NominalTypeDecl *NT = type->getNominalDecl()) {
     makeDeclUsableFromInline(NT);
   }
 
@@ -1215,7 +1342,7 @@ void CrossModuleOptimization::makeTypeUsableFromInline(CanType type) {
   type.visit([this](Type rawSubType) {
     CanType subType = rawSubType->getCanonicalType();
     if (typesHandled.insert(subType.getPointer()).second) {
-      if (NominalTypeDecl *subNT = subType->getNominalOrBoundGenericNominal()) {
+      if (NominalTypeDecl *subNT = subType->getNominalDecl()) {
         makeDeclUsableFromInline(subNT);
       }
     }

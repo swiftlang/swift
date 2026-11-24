@@ -23,4 +23,6 @@ int main() {
   RecordConfig::AudioFormat z = x.getFile().getFormat();
   assert(z == RecordConfig::AudioFormat::ALAC);
   RecordConfig::File::Gate g = RecordConfig::File::Gate::init();
+  RecordConfig c = x.getDirectory().makeConfig();
+  assert(c.getGate().getProp() == 80);
 }

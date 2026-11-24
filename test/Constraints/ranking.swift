@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 -g | %FileCheck %s
 
 protocol P {
   var p: P { get set }
@@ -29,6 +29,20 @@ func genericOverload<T>(_: T) {}
 func genericOverload<T>(_: T?) {}
 func genericOptional<T>(_: T?) {}
 func genericNoOptional<T>(_: T) {}
+
+// CHECK-LABEL: sil [ossa] @main
+
+// We prefer the function when the overloaded var is a use-after-decl.
+func overloadedWithScriptVar1(_ x: Int) {}
+overloadedWithScriptVar1(0)
+// CHECK: function_ref @$s7ranking24overloadedWithScriptVar1yySiF
+let overloadedWithScriptVar1 = { (x: Int) in }
+
+func overloadedWithScriptVar2(_ x: Int) {}
+let overloadedWithScriptVar2 = { (x: Int) in }
+overloadedWithScriptVar2(0)
+// CHECK: [[CLOSURE_ADDR:%[0-9]+]] = global_addr @$s7ranking24overloadedWithScriptVar2yySicvp
+// CHECK: load [copy] [[CLOSURE_ADDR]] {{.*}} loc {{.*}}:[[@LINE-2]]:1
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
@@ -489,4 +503,66 @@ extension Collection {
       // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
     }
   }
+}
+
+//--------------------------------------------------------------------
+// Broken favoring behavior
+//--------------------------------------------------------------------
+
+// rdar://189932437 - while this should really be ambiguous, we would
+// actually pick the NotEq overload of shouldBeAmbiguous().
+struct Eq: Equatable {}
+struct NotEq {}
+
+func shouldBeAmbiguous() -> Eq? {
+  return nil
+}
+func shouldBeAmbiguous() -> NotEq? {
+  return nil
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking23shouldBeAmbiguousCalleryyF : $@convention(thin) () -> () {
+func shouldBeAmbiguousCaller() {
+  // CHECK: function_ref @$s7ranking17shouldBeAmbiguousAA5NotEqVSgyF : $@convention(thin) () -> Optional<NotEq>
+  // CHECK: function_ref @$ss26_OptionalNilComparisonTypeV10nilLiteralAByt_tcfC : $@convention(method) (@thin _OptionalNilComparisonType.Type) -> _OptionalNilComparisonType
+  // CHECK: return
+
+  _ = (shouldBeAmbiguous() != nil)
+}
+
+// https://github.com/swiftlang/swift/issues/93291
+func swiftTestingAmbiguity(_: some CustomStringConvertible) {}
+func swiftTestingAmbiguity(_: some CustomDebugStringConvertible) {}
+func swiftTestingAmbiguity(_: some CustomStringConvertible & CustomDebugStringConvertible) {}
+
+@_disfavoredOverload
+@available(*, deprecated, message: "don't call me!")
+func swiftTestingAmbiguity(_: borrowing some ~Copyable & ~Escapable) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking27swiftTestingAmbiguityCalleryyxSgSyRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : StringProtocol> (@in_guaranteed Optional<τ_0_0>) -> () {
+func swiftTestingAmbiguityCaller(_ value: (some StringProtocol)?) {
+  // CHECK: function_ref @$s7ranking21swiftTestingAmbiguityyyxs28CustomDebugStringConvertibleRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : CustomDebugStringConvertible> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: return
+
+  swiftTestingAmbiguity(value)  // no-warning
+}
+
+protocol MaybeProtocol {}
+protocol OtherProtocol {}
+
+extension Optional: MaybeProtocol {}
+extension String: OtherProtocol {}
+
+@_disfavoredOverload
+@available(*, deprecated, message: "don't call me!")
+func brokenOptionalFavoring(_: borrowing some ~Copyable & ~Escapable) {}
+
+func brokenOptionalFavoring(_: some MaybeProtocol) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking28brokenOptionalFavoringCalleryyxSglF : $@convention(thin) <T> (@in_guaranteed Optional<T>) -> () {
+func brokenOptionalFavoringCaller<T>(_ x: T?) {
+  // CHECK: function_ref @$s7ranking22brokenOptionalFavoringyyxRi_zRi0_zlF : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@in_guaranteed τ_0_0) -> ()
+  // CHECK: return
+
+  brokenOptionalFavoring(x) // expected-warning {{'brokenOptionalFavoring' is deprecated: don't call me!}}
 }

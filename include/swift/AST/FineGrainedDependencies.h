@@ -822,11 +822,11 @@ public:
         ->addDefIDependUpon(def->getSequenceNumber());
   }
 
-  /// Read a swiftdeps file at \p path and return a SourceFileDepGraph if
-  /// successful. If \p allowSwiftModule is true, try to load the information
-  /// from a swiftmodule file if appropriate.
+  /// Read a swiftdeps file at \p path from \p fs and return a
+  /// SourceFileDepGraph if successful. If \p allowSwiftModule is true, try to
+  /// load the information from a swiftmodule file if appropriate.
   std::optional<SourceFileDepGraph> static loadFromPath(
-      StringRef, bool allowSwiftModule = false);
+      StringRef path, llvm::vfs::FileSystem &fs, bool allowSwiftModule = false);
 
   /// Read a swiftdeps file from \p buffer and return a SourceFileDepGraph if
   /// successful.
@@ -839,8 +839,10 @@ public:
   // Fail with a message instead of returning false.
   bool verify() const;
 
-  /// Ensure that when read, the graph is the same as what was written.
-  bool verifyReadsWhatIsWritten(StringRef path) const;
+  /// Ensure that when read from \p fs, the graph is the same as what was
+  /// written.
+  bool verifyReadsWhatIsWritten(StringRef path,
+                                llvm::vfs::FileSystem &fs) const;
 
   bool verifySequenceNumber() const;
 

@@ -28,7 +28,16 @@
 
 #include <os/lock.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdint.h>
+
+void _swift_lockStandardOutput(void) {
+  flockfile(stdout);
+}
+
+void _swift_unlockStandardOutput(void) {
+  funlockfile(stdout);
+}
 
 #if __has_include(<pthread/tsd_private.h>)
 #include <pthread/tsd_private.h>

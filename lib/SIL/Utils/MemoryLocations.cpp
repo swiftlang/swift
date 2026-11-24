@@ -342,7 +342,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
-        if (apply->hasAddressResult()) {
+        if (use == apply->getSelfAddressOfAddressBorrowMutateAccessorResult()) {
           if (!analyzeAddrProjection(apply, locIdx, 0, collectedVals,
                                      subLocationMap))
             return false;
@@ -390,6 +390,21 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
   return true;
 }
 
+unsigned MemoryLocations::addSubLocation(SingleValueInstruction *projection,
+                                         unsigned parentLocIdx) {
+  unsigned subLocIdx = locations.size();
+  bool trivial = isTrivial(projection->getType(), projection->getFunction())
+                 // Make sure if the parent is trivial (e.g. an enum with a
+                 // trivial case), all sub-locations are also trivial.
+                 || locations[parentLocIdx].isTrivial;
+  locations.push_back(Location(projection, trivial, subLocIdx, parentLocIdx));
+  locations.back().selfAndParents |= locations[parentLocIdx].selfAndParents;
+  for (int idx = parentLocIdx; idx >= 0; idx = locations[idx].parentIdx) {
+    setBitAndResize(locations[idx].subLocations, subLocIdx);
+  }
+  return subLocIdx;
+}
+
 bool MemoryLocations::analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
@@ -401,28 +416,30 @@ bool MemoryLocations::analyzeAddrProjection(
   if (projection->getType().aggregateHasUnreferenceableStorage())
     return false;
 
+  // The address result of an accessor is not a field of its self. It gets a
+  // sub-location of its own, which doesn't cover any field of self.
+  if (auto *applyAddressResult = dyn_cast<ApplyInst>(projection)) {
+    assert(applyAddressResult
+               ->getSelfAddressOfAddressBorrowMutateAccessorResult() &&
+           "an apply sub-location must be a borrow/mutate accessor with an "
+           "address self and an address result");
+    unsigned subLocIdx = addSubLocation(projection, parentLocIdx);
+    if (!analyzeLocationUsesRecursively(projection, subLocIdx, collectedVals,
+                                        subLocationMap)) {
+      return false;
+    }
+    registerProjection(projection, subLocIdx);
+    collectedVals.push_back(projection);
+    return true;
+  }
+
   auto key = std::make_pair(parentLocIdx, fieldNr);
   unsigned subLocIdx = subLocationMap[key];
   if (subLocIdx == 0) {
-    subLocIdx = locations.size();
+    subLocIdx = addSubLocation(projection, parentLocIdx);
     assert(subLocIdx > 0);
     subLocationMap[key] = subLocIdx;
-    bool trivial = isTrivial(projection->getType(), f)
-                   // Make sure if the parent is trivial (e.g. an enum with a trivial case),
-                   // all sub-locations are also trivial.
-                   || locations[parentLocIdx].isTrivial;
-    locations.push_back(Location(projection, trivial, subLocIdx, parentLocIdx));
-
     Location &parentLoc = locations[parentLocIdx];
-    locations.back().selfAndParents |= parentLoc.selfAndParents;
-
-    int idx = (int)parentLocIdx;
-    do {
-      Location &loc = locations[idx];
-      setBitAndResize(loc.subLocations, subLocIdx);
-      idx = loc.parentIdx;
-    } while (idx >= 0);
-
     initFieldsCounter(parentLoc);
     assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
     parentLoc.updateFieldCounters(projection->getType(), -1, this);
@@ -474,7 +491,7 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
   loc.numNonTrivialFieldsNotCovered = 0;
   SILFunction *function = loc.representativeValue->getFunction();
   SILType ty = loc.representativeValue->getType();
-  if (StructDecl *decl = ty.getStructOrBoundGenericStruct()) {
+  if (StructDecl *decl = ty.getStructDecl()) {
     if (decl->isResilient(function->getModule().getSwiftModule(),
                           function->getResilienceExpansion())) {
       loc.numFieldsNotCoveredBySubfields = INT_MAX;
@@ -528,7 +545,7 @@ bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
     return true;
   }
 
-  if (StructDecl *structDecl = type.getStructOrBoundGenericStruct()) {
+  if (StructDecl *structDecl = type.getStructDecl()) {
     if (structDecl->isResilient(inFunction->getModule().getSwiftModule(),
                                 inFunction->getResilienceExpansion())) {
       return false;
@@ -547,7 +564,7 @@ bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
     return true;
   }
 
-  if (EnumDecl *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (EnumDecl *enumDecl = type.getEnumDecl()) {
     // An enum is trivial if _any_ case is trivial.
     for (EnumElementDecl *caseDecl : enumDecl->getAllElements()) {
       if (!caseDecl->hasAssociatedValues())

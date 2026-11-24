@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-sil %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-IR
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo > %t.ll
+// RUN: %FileCheck %s --check-prefix CHECK-IR < %t.ll
+// RUN: %FileCheck %s --check-prefix CHECK-IR-NO-ALIAS < %t.ll
 
 // UNSUPPORTED: CPU=wasm32
 // REQUIRES: swift_feature_Embedded
@@ -71,5 +73,7 @@ public func bar(t: T2) -> MyClass<T2> {
 // CHECK-IR-DAG: @"$e4main7MyClassCyAA2T1VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T1V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T1V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T1V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T1V_Tg5" }>
 // CHECK-IR-DAG: @"$e4main7MyClassCyAA2T2VGMf" = {{.*}} <{ ptr, ptr, ptr, ptr, ptr, ptr, ptr, ptr }> <{ ptr @"$eBoWV", ptr null, ptr @"$e4main7MyClassCfDAA2T2V_Tg5", ptr null, ptr @"$e4main7MyClassC1txvgAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvsAA2T2V_Tg5", ptr @"$e4main7MyClassC1txvMAA2T2V_Tg5", ptr @"$e4main7MyClassC1tACyxGx_tcfCAA2T2V_Tg5" }>
 
-// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T1VGN" = {{.*}} alias {{.*}} ptr @"$e4main7MyClassCyAA2T1VGMf", i32 0, i32 1)
-// CHECK-IR-DAG: @"$e4main7MyClassCyAA2T2VGN" = {{.*}} alias {{.*}} ptr @"$e4main7MyClassCyAA2T2VGMf", i32 0, i32 1)
+// The full metadata of a generic specialization is emitted on demand into each
+// module that uses it, and so is the alias to its address point, which is
+// unused here.
+// CHECK-IR-NO-ALIAS-NOT: @"$e4main7MyClassCyAA2T{{[12]}}VGN" =

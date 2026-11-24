@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -28,7 +29,11 @@ class CliArguments(argparse.Namespace):
     use_submodules: bool
     verbose: bool
     command: Optional[Any]
-    max_retries: int
+    # Class-level default so partially-populated namespaces (e.g. built by
+    # add-worktree) still resolve max_retries; parse_args overrides it.
+    max_retries: int = 3
+    restart: str = "all"
+    retry_base_delay: float = 10.0
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -113,7 +118,9 @@ repositories.
         parser.add_argument(
             "--github-comment",
             help="""Check out related pull requests referenced in the given
-            free-form GitHub-style comment.""",
+            free-form GitHub-style comment. Defaults to the value of the
+            ghprbCommentBody environment variable if set.""",
+            default=os.environ.get("ghprbCommentBody"),
             metavar="GITHUB-COMMENT",
         )
         parser.add_argument(
@@ -144,7 +151,24 @@ repositories.
             " cloning of any repository failed. 0 for no retries, -1 for"
             " unlimited retries.",
             type=int,
-            default=3,
+            default=CliArguments.max_retries,
+        )
+        parser.add_argument(
+            "--restart",
+            help="What to do if updating changes update-checkout's"
+            " configuration or the script itself: 'never' prints a message"
+            " but never restarts; 'config' restarts the update when the"
+            " configuration changes, but keeps running the current script;"
+            " 'all' also restarts the whole script when it changes.",
+            choices=["never", "config", "all"],
+            default=CliArguments.restart,
+        )
+        parser.add_argument(
+            "--retry-base-delay",
+            help="Initial delay in seconds before retrying a git operation"
+            " The delay grows exponentially between retries.",
+            type=float,
+            default=CliArguments.retry_base_delay,
         )
         parser.add_argument(
             "-j",

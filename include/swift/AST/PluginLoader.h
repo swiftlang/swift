@@ -15,6 +15,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/PluginRegistry.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/PrefixMapper.h"
 #include <optional>
 #include "llvm/ADT/ArrayRef.h"
 
@@ -57,17 +58,16 @@ private:
   llvm::DenseMap<swift::Identifier, PluginEntry> &getPluginMap();
 
   /// Resolved plugin path remappings.
-  std::vector<std::pair<std::string, std::string>> PathRemap;
+  std::optional<llvm::PrefixMapper> PathRemapper;
+
+  /// Map a prefix mapped plugin path back to the local path.
+  std::string remapPath(StringRef path);
 
 public:
   PluginLoader(ASTContext &Ctx, DependencyTracker *DepTracker,
                std::optional<std::vector<std::pair<std::string, std::string>>>
                    Remap = std::nullopt,
-               bool disableSandbox = false)
-      : Ctx(Ctx), DepTracker(DepTracker), disableSandbox(disableSandbox) {
-    if (Remap)
-      PathRemap = std::move(*Remap);
-  }
+               bool disableSandbox = false);
 
   void setRegistry(PluginRegistry *newValue);
   PluginRegistry *getRegistry();
@@ -98,6 +98,9 @@ public:
   /// NOTE: This method is idempotent. If the plugin is already loaded, the same
   /// instance is simply returned.
   llvm::Expected<CompilerPlugin *> loadExecutablePlugin(llvm::StringRef path);
+
+  /// Returns the file system that plugins are loaded from.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getPluginLoadingFS();
 
   /// Add the specified plugin associated with the module name to the dependency
   /// tracker if needed.

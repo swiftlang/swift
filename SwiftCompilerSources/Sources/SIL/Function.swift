@@ -26,6 +26,19 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     return Location(bridged: bridged.getLocation())
   }
 
+  /// True if `sourceLoc` is within the function's declaration or closure expression.
+  public func contains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInSourceRange(sourceLoc.bridged)
+  }
+
+  /// True if `sourceLoc` is within the function's body.
+  public func bodyContains(_ sourceLoc: SourceLoc) -> Bool {
+    bridged.isInBodySourceRange(sourceLoc.bridged)
+  }
+
+  /// The location of the end of the function's body.
+  public var bodyEndLoc: SourceLoc? { SourceLoc(bridged: bridged.getBodyEndLoc()) }
+
   public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
 
   public var sourceFile: SourceFile? { declRef.sourceFile }
@@ -48,7 +61,24 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// and the function has no `@_optimize(none)` attribute.
   public var shouldOptimize: Bool { bridged.shouldOptimize() }
 
+  /// True if this function is optimized for code size, e.g. with `-Osize`.
+  public var isOptimizedForSize: Bool { bridged.isOptimizedForSize() }
+
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+  
+  public var hasOwnershipForTrivialValues: Bool {
+    bridged.hasOwnershipForTrivialValues()
+  }
+  public func set(hasOwnershipForTrivialValues: Bool, _ context: some MutatingContext) {
+    bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
+  }
+
+  /// True between RemoveSILGenLifetimes and LifetimeResolution, while a value may be consumed
+  /// more than once or not at all.
+  public var hasUnresolvedLifetimes: Bool { bridged.hasUnresolvedLifetimes() }
+  public func set(hasUnresolvedLifetimes: Bool, _ context: some MutatingContext) {
+    bridged.setHasUnresolvedLifetimes(hasUnresolvedLifetimes)
+  }
 
   /// The module which defines this function, or nil if it's not known.
   ///
@@ -64,6 +94,15 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     parentModule == context.currentModuleContext
   }
 
+  /// This function's SIL stage. Prefer this over `Context.stageFloor` for a
+  /// per-function query.
+  public var silStage: SILStage {
+    guard let stage = SILStage(rawValue: bridged.getFunctionStage()) else {
+      fatalError("unhandled SILStage")
+    }
+    return stage
+  }
+
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
@@ -72,9 +111,18 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAddressor: Bool { bridged.isAddressor() }
 
+  /// The nesting level of constant-capture-propagation specializations (see ConstantCapturePropagation).
   public var specializationLevel: Int { bridged.specializationLevel() }
 
+  /// The number of closure specializations (see ClosureSpecialization) which are applied on top of
+  /// each other to create this function, e.g. 2 for a closure specialization of a closure specialization.
+  public var closureSpecializationLevel: Int { bridged.closureSpecializationLevel() }
+
   public var isSpecialization: Bool { bridged.isSpecialization() }
+
+  /// True for a specialization that a `@specialized(exported: true)` attribute
+  /// declares. Its declaring module owns the only definition.
+  public var isExportedSpecialization: Bool { bridged.isExportedSpecialization() }
 
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
@@ -211,6 +259,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
+    }
+  }
+
+  public func addSemanticsAttribute(_ attr: StaticString, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
+      bridged.addSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
 
@@ -351,7 +406,10 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   }
 
   public var isDeinitBarrier: Bool {
-    effects.sideEffects?.global.isDeinitBarrier ?? true
+    if hasSemanticsAttribute("realloc_array_buffer") {
+      return false
+    }
+    return effects.sideEffects?.global.isDeinitBarrier ?? true
   }
 
   public enum PerformanceConstraints {

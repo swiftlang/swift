@@ -98,3 +98,46 @@ nonisolated func testConformancesFromNonisolated() {
   let _: any RawRepresentable.Type = RawRepresentableEnum.self
   let _: any Encodable.Type = CodableClass.self // expected-error{{main actor-isolated conformance of 'CodableClass' to 'Encodable' cannot be used in nonisolated context}}
 }
+
+// A conformance implied by a conformance to a protocol that inherits
+// 'SendableMetatype' is not inferred to be isolated.
+nonisolated protocol SendableP: P, Sendable {}
+
+nonisolated protocol RefinesP: P {}
+
+// Conformance in an extension of a main actor-isolated type.
+struct SExtension {}
+
+extension SExtension: SendableP {
+  // expected-error@-1 {{conformance of 'SExtension' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
+  @MainActor func f() {}
+  // expected-note@-1 {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+}
+
+// Conformance in an extension of a 'nonisolated' type.
+nonisolated struct SNonisolated {}
+
+extension SNonisolated: SendableP {
+  // expected-error@-1 {{conformance of 'SNonisolated' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+  // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
+  @MainActor func f() {}
+  // expected-note@-1 {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+}
+
+// No 'Sendable' refinement: still inferred isolated.
+struct SNoSendableRefinement {}
+
+extension SNoSendableRefinement: RefinesP {
+  @MainActor func f() {}
+}
+
+nonisolated func useP<T: P>(_: T.Type) {}
+
+nonisolated func testImpliedConformancesFromNonisolated() {
+  useP(SExtension.self)
+  useP(SNonisolated.self)
+
+  useP(SNoSendableRefinement.self)
+  // expected-error@-1 {{main actor-isolated conformance of 'SNoSendableRefinement' to 'P' cannot be used in nonisolated context}}
+}

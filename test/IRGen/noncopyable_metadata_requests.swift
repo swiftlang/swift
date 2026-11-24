@@ -32,7 +32,7 @@ test()
 // CHECK: Foo.bar(1)
 
 // NEW: define hidden swiftcc void @"$s4main4testyyF"()
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main3FooVySiGMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main3FooVySiGMd", ptr @"$s4main3FooVySiGMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main4testyyF"()
@@ -42,7 +42,7 @@ test()
 struct NC: ~Copyable {}
 
 // NEW: define hidden swiftcc void @"$s4main10testWithNCyyF"()
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main3FooVyAA2NCVGMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main3FooVyAA2NCVGMd", ptr @"$s4main3FooVyAA2NCVGMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main10testWithNCyyF"()
@@ -85,26 +85,26 @@ testNonGeneric()
 // CHECK: JustNoncopyable.bar
 
 // NEW: define hidden swiftcc void @"$s4main14testNonGenericyyF"()
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main15JustNoncopyableVySiGMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main15JustNoncopyableVySiGMd", ptr @"$s4main15JustNoncopyableVySiGMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main14testNonGenericyyF"()
-// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main15JustNoncopyableVySiGMD")
+// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main15JustNoncopyableVySiGMd", ptr @"$s4main15JustNoncopyableVySiGMR")
 // OLD: }
 
 
-/// Check that Optional still uses `__swift_instantiateConcreteTypeFromMangledName`
+/// Check that Optional still uses `__swift_instantiateConcreteTypeFromMangledNameV2`
 /// even when calling a method available to a noncopyable Optional.
 extension Optional where Wrapped: ~Copyable {
   mutating func bar(_ i: Int) { print("Optional.bar(\(i))") }
 }
 
 // NEW: define hidden swiftcc void @"$s4main20testCopyableOptionalyyF"()
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSiSgMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSiSgMd", ptr @"$sSiSgMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main20testCopyableOptionalyyF"()
-// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSiSgMD")
+// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSiSgMd", ptr @"$sSiSgMR")
 // OLD: }
 func testCopyableOptional() {
     var opt = Optional<Int>(94103)
@@ -115,11 +115,11 @@ testCopyableOptional()
 
 
 // NEW: define hidden swiftcc void @"$s4main23testNOTCopyableOptionalyyF"()
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main2NCVSgMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main2NCVSgMd", ptr @"$s4main2NCVSgMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main23testNOTCopyableOptionalyyF"()
-// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main2NCVSgMD")
+// OLD: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main2NCVSgMd", ptr @"$s4main2NCVSgMR")
 // OLD: }
 func testNOTCopyableOptional() {
     var opt = Optional<NC>(NC())
@@ -130,7 +130,7 @@ testNOTCopyableOptional()
 
 
 // NEW: define hidden swiftcc void @"$s4main26check_existential_metatype4withyypRi_s_XPXpSg_tF"
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sypRi_s_XPXpSgMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sypRi_s_XPXpSgMd", ptr @"$sypRi_s_XPXpSgMR")
 // NEW: }
 
 // OLD: define hidden swiftcc void @"$s4main26check_existential_metatype4withyypRi_s_XPXpSg_tF"

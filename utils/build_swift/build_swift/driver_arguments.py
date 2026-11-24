@@ -514,7 +514,8 @@ def create_argument_parser():
                 'multiple times.')
     option('--caching-prefix-map', toggle_true,
            help='enable prefix mapping for cached builds. Maps source, '
-                'SDK, and toolchain paths to canonical prefixes.')
+                'SDK, and toolchain paths to canonical prefixes, plus the '
+                'Xcode developer directory for Swift on macOS.')
     option('--caching-remote-service-path', store_path,
            default=None,
            help='the path to the remote caching service socket. Implies '

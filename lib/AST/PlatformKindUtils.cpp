@@ -262,6 +262,7 @@ static bool inheritsAvailabilityFromAnyAppleOS(PlatformKind platform) {
   case PlatformKind::Android:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,

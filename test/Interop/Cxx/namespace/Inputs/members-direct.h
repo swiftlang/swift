@@ -11,6 +11,14 @@ struct DirectStruct {
   int memberVar;
 };
 
+namespace NestedCommonNamespace {
+
+struct NestedDirectStruct {
+  int memberVar;
+};
+
+} // namespace NestedCommonNamespace
+
 } // namespace CommonNamespace
 
 CommonNamespace::TransitiveStruct returnsTransitiveStruct() {

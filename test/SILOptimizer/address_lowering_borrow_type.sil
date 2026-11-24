@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -module-name Swift -sil-verify-all %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+sil @takeGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+sil @takeBorrow : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> ()
+
+// CHECK-LABEL: sil [ossa] @make_borrow_dereference_borrow : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    [[B:%.*]] = alloc_stack $Builtin.Borrow<T>
+// CHECK-NEXT:    init_borrow_addr [[B]] : $*Builtin.Borrow<T> with %0 : $*T
+// CHECK:         apply %{{.*}}<T>([[B]])
+// CHECK-NEXT:    [[D:%.*]] = dereference_borrow_addr [[B]] : $*Builtin.Borrow<T>
+// CHECK:         apply %{{.*}}<T>([[D]])
+// CHECK:         dealloc_stack [[B]] : $*Builtin.Borrow<T>
+// CHECK-LABEL: } // end sil function 'make_borrow_dereference_borrow'
+sil [ossa] @make_borrow_dereference_borrow : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = make_borrow %0 : $T
+  %2 = function_ref @takeBorrow : $@convention(thin) <τ_0_0> (@in_guaranteed Builtin.Borrow<τ_0_0>) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed Builtin.Borrow<τ_0_0>) -> ()
+  %4 = dereference_borrow %1 : $Builtin.Borrow<T>
+  %6 = function_ref @takeGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %6<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %4 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @make_addr_borrow_result : $@convention(thin) <T> (@inout T) -> @out Builtin.Borrow<T> {
+// CHECK:       bb0(%0 : $*Builtin.Borrow<T>, %1 : $*T):
+// CHECK-NEXT:    init_borrow_addr %0 : $*Builtin.Borrow<T> with %1 : $*T
+// CHECK-NEXT:    tuple ()
+// CHECK-LABEL: } // end sil function 'make_addr_borrow_result'
+sil [ossa] @make_addr_borrow_result : $@convention(thin) <T> (@inout T) -> @out Builtin.Borrow<T> {
+bb0(%0 : $*T):
+  %1 = make_addr_borrow %0 : $*T
+  return %1 : $Builtin.Borrow<T>
+}
+
+// CHECK-LABEL: sil [ossa] @dereference_borrow_opaque_operand : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> () {
+// CHECK:       bb0(%0 : $*Builtin.Borrow<T>):
+// CHECK-NEXT:    [[D:%.*]] = dereference_borrow_addr %0 : $*Builtin.Borrow<T>
+// CHECK:         apply %{{.*}}<T>([[D]])
+// CHECK-NOT:     end_borrow
+// CHECK-LABEL: } // end sil function 'dereference_borrow_opaque_operand'
+sil [ossa] @dereference_borrow_opaque_operand : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> () {
+bb0(%0 : $Builtin.Borrow<T>):
+  %1 = dereference_borrow %0 : $Builtin.Borrow<T>
+  %2 = function_ref @takeGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %1 : $T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dereference_addr_borrow_opaque_operand : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> () {
+// CHECK:       bb0(%0 : $*Builtin.Borrow<T>):
+// CHECK-NEXT:    [[D:%.*]] = dereference_borrow_addr %0 : $*Builtin.Borrow<T>
+// CHECK:         apply %{{.*}}<T>([[D]])
+// CHECK-LABEL: } // end sil function 'dereference_addr_borrow_opaque_operand'
+sil [ossa] @dereference_addr_borrow_opaque_operand : $@convention(thin) <T> (@in_guaranteed Builtin.Borrow<T>) -> () {
+bb0(%0 : $Builtin.Borrow<T>):
+  %1 = dereference_addr_borrow %0 : $Builtin.Borrow<T>
+  %4 = load_borrow %1 : $*T
+  %2 = function_ref @takeGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %4 : $T
+  %r = tuple ()
+  return %r : $()
+}

@@ -123,7 +123,7 @@ public func single_concrete() {
 // TYPEBYNAME-NEXT:    br i1 [[IS_NULL]], label %cacheIsNull, label %cont
 
 // TYPEBYNAME:       cacheIsNull:
-// TYPEBYNAME-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMD")
+// TYPEBYNAME-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s42conditional_conformance_basic_conformances6SingleVyAA4IsP2VGMd")
 // TYPEBYNAME-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // TYPEBYNAME-NEXT:    [[A_P2_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // TYPEBYNAME-NEXT:    store ptr @"$s42conditional_conformance_basic_conformances4IsP2VAA0F0AAWP", ptr [[A_P2_PTR]], align 8

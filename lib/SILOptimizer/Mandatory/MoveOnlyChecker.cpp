@@ -216,7 +216,7 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     // If an earlier pass told use to not emit diagnostics for this function,
@@ -248,6 +248,11 @@ class MoveOnlyCheckerPass : public SILFunctionTransform {
       emitCheckerMissedCopyOfNonCopyableTypeErrors(fn,
                                                    checker.diagnosticEmitter);
     }
+
+    // Later move-only diagnostics, like the ones from the implicit destroy
+    // checker, would only add noise.
+    if (checker.diagnosticEmitter.emittedDiagnostic())
+      fn->addSemanticsAttr(semantics::NO_MOVEONLY_DIAGNOSTICS);
 
     // Remaining borrows
     // should be correctly immutable. We can canonicalize any remaining

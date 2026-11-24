@@ -20,6 +20,11 @@ set(swift_stdlib_unittest_compile_flags
 
 list(APPEND swift_stdlib_unittest_compile_flags "-enable-experimental-feature" "Lifetimes")
 
+# Let `Builtin.assert_configuration` return the active value from the client
+# module in `@export(implementation) functions, like for the stdlib.
+list(APPEND swift_stdlib_unittest_compile_flags
+  "-Xfrontend" "-assert-config" "-Xfrontend" "DisableReplacement")
+
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
 endif()

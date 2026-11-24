@@ -65,6 +65,17 @@ int main() {
       assert(g.getB().getCount() == 2);
     }
 
+    {
+      auto h = H::c(swift::Optional<C>::some(c));
+      assert(h.isC());
+      auto extracted = h.getC();
+      assert(extracted.isSome());
+      assert(extracted.get().getX() == 5678);
+
+      auto none = H::c(swift::Optional<C>::none());
+      assert(none.getC().isNone());
+    }
+
     assert(getRetainCount(c) == 1);
     return 0;
 }

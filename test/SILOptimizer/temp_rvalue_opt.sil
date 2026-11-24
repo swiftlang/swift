@@ -365,11 +365,12 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // Test temp RValue elimination on switches.
+// TODO: the copy is not removed in non-OSSA, because the loaded value is not copied.
+//       Restore the original CHECK lines once OSSA is enabled throughout the pipeline.
 // CHECK-LABEL: sil @rvalueSwitch
 // CHECK:      bb1:
-// CHECK-NEXT:   struct_element_addr %1
-// CHECK-NEXT:   load
-// CHECK-NOT: alloc_stack $UnfoldSequence
+// CHECK-NEXT:   alloc_stack $UnfoldSequence
+// CHECK-NEXT:   copy_addr %1
 // CHECK:        return
 sil @rvalueSwitch : $@convention(method) <Element, State> (@inout UnfoldSequence<Element, State>) -> @out Optional<Element> {
 bb0(%0 : $*Optional<Element>, %1 : $*UnfoldSequence<Element, State>):
@@ -734,6 +735,89 @@ bb0(%0 : $*Builtin.NativeObject):
   return %v : $()
 }
 
+// CHECK-LABEL: sil @copy_in_loop_with_alloc_stack_outside_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     copy_addr
+// CHECK:         apply %{{[0-9]+}}(%0)
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'copy_in_loop_with_alloc_stack_outside_loop'
+sil @copy_in_loop_with_alloc_stack_outside_loop : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  %2 = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1 : $*Klass
+  %5 = apply %2(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1 : $*Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// The value is not destroyed on the loop exit.
+//
+// CHECK-LABEL: sil @copy_in_loop_not_destroyed_on_exit :
+// CHECK:         [[STK:%.*]] = alloc_stack $Klass
+// CHECK:       bb1:
+// CHECK-NEXT:    copy_addr %0 to [init] [[STK]]
+// CHECK-LABEL: } // end sil function 'copy_in_loop_not_destroyed_on_exit'
+sil @copy_in_loop_not_destroyed_on_exit : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = alloc_stack $Klass
+  %2 = function_ref @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> ()
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1 : $*Klass
+  %5 = apply %2(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_addr %1 : $*Klass
+  br bb1
+
+bb3:
+  dealloc_stack %1 : $*Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @projection_hoisted_out_of_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb1:
+// CHECK-NEXT:    [[A:%.*]] = struct_element_addr %0 : $*GS<B>, #GS._value
+// CHECK-NEXT:    load [[A]]
+// CHECK-LABEL: } // end sil function 'projection_hoisted_out_of_loop'
+sil @projection_hoisted_out_of_loop : $@convention(thin) <B> (@in_guaranteed GS<B>) -> () {
+bb0(%0 : $*GS<B>):
+  %1 = alloc_stack $GS<B>
+  %2 = struct_element_addr %1 : $*GS<B>, #GS._value
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1 : $*GS<B>
+  %4 = load %2 : $*Builtin.Int64
+  %5 = builtin "cmp_slt_Int64"(%4 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %1 : $*GS<B>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1 : $*GS<B>
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
 // CHECK-NOT: alloc_stack
 // CHECK: fix_lifetime %0
@@ -750,11 +834,12 @@ bb0(%0 : $*Klass):
   return %9999 : $()
 }
 
+// TODO: the copy is not removed in non-OSSA, because the loaded value is not copied.
+//       Restore the original CHECK lines once OSSA is enabled throughout the pipeline.
 // CHECK-LABEL: sil @test_aliasing_modify_access
 // CHECK:         [[A:%.*]] = ref_element_addr [immutable] %0 : $Klass, #Klass.a
-// CHECK-NOT:     copy_addr
-// CHECK:         [[L:%.*]] = load [[A]]
-// CHECK:         return [[L]]
+// CHECK:         copy_addr [[A]]
+// CHECK:         return
 // CHECK:       } // end sil function 'test_aliasing_modify_access'
 sil @test_aliasing_modify_access : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned String {
 bb0(%0 : $Klass, %1 : $Klass):
@@ -827,9 +912,12 @@ bb0:
   return %12
 }
 
+// TODO: the copy is not removed in non-OSSA, because the loaded value is not copied.
+//       Restore the original CHECK lines once OSSA is enabled throughout the pipeline.
 // CHECK-LABEL: sil @store_to_temp :
 // CHECK:         %1 = load %0
-// CHECK-NEXT:    return %1
+// CHECK-NEXT:    alloc_stack
+// CHECK-NEXT:    store %1
 // CHECK-LABEL: } // end sil function 'store_to_temp'
 sil @store_to_temp : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
 bb0(%0 : $*Klass):
@@ -883,3 +971,35 @@ bb3:
 }
 
 
+
+// The loaded value is used after the source is destroyed. Replacing %2 with %0 would be a use-after-free.
+// CHECK-LABEL: sil @load_of_nontrivial_value_used_after_destroy_of_source :
+// CHECK:         copy_addr %0 to [init] %1
+// CHECK-LABEL: } // end sil function 'load_of_nontrivial_value_used_after_destroy_of_source'
+sil @load_of_nontrivial_value_used_after_destroy_of_source : $@convention(thin) (@in Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %2 = alloc_stack $Klass
+  copy_addr %0 to [init] %2
+  %4 = load %2
+  destroy_addr %0
+  strong_retain %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+
+// CHECK-LABEL: sil @load_of_nontrivial_projection_used_after_destroy_of_source :
+// CHECK:         copy_addr %0 to [init] %1
+// CHECK-LABEL: } // end sil function 'load_of_nontrivial_projection_used_after_destroy_of_source'
+sil @load_of_nontrivial_projection_used_after_destroy_of_source : $@convention(thin) (@in Str) -> @owned Klass {
+bb0(%0 : $*Str):
+  %2 = alloc_stack $Str
+  copy_addr %0 to [init] %2
+  %4 = struct_element_addr %2, #Str.kl
+  %5 = load %4
+  destroy_addr %0
+  strong_retain %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
+}

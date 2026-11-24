@@ -898,6 +898,16 @@ EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
                               llvm::cl::init(false));
 
+static llvm::cl::opt<bool>
+EnableLibraryEvolution("enable-library-evolution",
+                       llvm::cl::desc("Build the module to allow binary-compatible library evolution"),
+                       llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+LazyTypecheck("experimental-lazy-typecheck",
+              llvm::cl::desc("Type-check lazily as needed instead of eagerly; requires -enable-library-evolution"),
+              llvm::cl::cat(Category), llvm::cl::init(false));
+
 static llvm::cl::opt<bool> EnableBareSlashRegexLiterals(
     "enable-bare-slash-regex",
     llvm::cl::desc("Enable the ability to write '/.../' regex literals"),
@@ -1436,7 +1446,6 @@ static void printCodeCompletionResultsImpl(
         case CodeCompletionDiagnosticSeverity::None:
           llvm_unreachable("none");
         }
-        SmallString<256> Scratch;
         OS << ":" << DiagSeverityAndMessage.second;
       }
     }
@@ -4691,6 +4700,13 @@ int main(int argc, char *argv[]) {
     InitInvok.getLangOptions().DisableImplicitStringProcessingModuleImport = true;
   }
 
+  if (options::EnableLibraryEvolution) {
+    InitInvok.getLangOptions().enableFeature(Feature::LibraryEvolution);
+    // Mirror the frontend, which ignores this without library evolution.
+    InitInvok.getTypeCheckerOptions().EnableLazyTypecheck =
+        options::LazyTypecheck;
+  }
+
   if (options::EnableExperimentalNamedOpaqueTypes) {
     InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
   }
@@ -4705,8 +4721,8 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
       options::SwiftVersion[options::SwiftVersion.size()-1];
-    if (auto swiftVersion = VersionParser::parseVersionString(
-            LastSwiftVersion, SourceLoc(), nullptr)) {
+    if (auto swiftVersion =
+            VersionParser::parseLanguageMode(LastSwiftVersion, nullptr)) {
       if (auto actual = swiftVersion.value().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.value();
     }

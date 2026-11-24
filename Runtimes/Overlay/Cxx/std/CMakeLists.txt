@@ -10,6 +10,7 @@ target_compile_options(swiftCxxStdlib PRIVATE
   "-cxx-interoperability-mode=default"
   "SHELL:-enable-experimental-feature AllowUnsafeAttribute"
   "SHELL:-enable-experimental-feature Lifetimes"
+  "SHELL:-enable-experimental-feature AddressableParameters"
   # This flag is unnecessary when building with newer compilers that allow using
   # C++ symbols in resilient overlays (see f4204568).
   "SHELL:-enable-experimental-feature AssumeResilientCxxTypes"
@@ -18,7 +19,8 @@ target_compile_options(swiftCxxStdlib PRIVATE
   # module or qualify types with module names
   "SHELL:-disable-upcoming-feature MemberImportVisibility"
   "SHELL:-Xfrontend -module-interface-preserve-types-as-written"
-  "SHELL:-Xfrontend -disable-module-selectors-in-module-interface")
+  "SHELL:-Xfrontend -disable-module-selectors-in-module-interface"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 
 target_link_libraries(swiftCxxStdlib PUBLIC
   $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>

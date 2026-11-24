@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 
 // Build the reusable fake actor system module.
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo %S/Inputs/EmbeddedFakeActorSystem.swift -module-name EmbeddedFakeActorSystem -emit-module -emit-module-path %t/EmbeddedFakeActorSystem.swiftmodule -c -o %t/EmbeddedFakeActorSystem.o
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -wmo %S/Inputs/EmbeddedFakeActorSystem.swift -module-name EmbeddedFakeActorSystem -emit-module -emit-module-path %t/EmbeddedFakeActorSystem.swiftmodule -c -o %t/EmbeddedFakeActorSystem.o
 
 // Build the `@Resolvable` API module
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -plugin-path %swift-plugin-dir -I %t %S/Inputs/GreeterAPI.swift -module-name GreeterAPI -emit-module -emit-module-path %t/GreeterAPI.swiftmodule -c -o %t/GreeterAPI.o
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -wmo -plugin-path %swift-plugin-dir -I %t %S/Inputs/GreeterAPI.swift -module-name GreeterAPI -emit-module -emit-module-path %t/GreeterAPI.swiftmodule -c -o %t/GreeterAPI.o
 
 // Build the server module (only module with concrete `GreeterImpl`):
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -I %t %S/Inputs/GreeterServer.swift -module-name GreeterServer -emit-module -emit-module-path %t/GreeterServer.swiftmodule -c -o %t/GreeterServer.o
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -wmo -I %t %S/Inputs/GreeterServer.swift -module-name GreeterServer -emit-module -emit-module-path %t/GreeterServer.swiftmodule -c -o %t/GreeterServer.o
 
 // Build the client / main module:
-// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -I %t %s -module-name main -c -o %t/main.o
+// RUN: %target-swift-frontend -target %target-cpu-apple-macos14 -enable-experimental-feature Embedded -parse-as-library -wmo -I %t %s -module-name main -c -o %t/main.o
 
 // Run client:
 // RUN: %target-embedded-link %t/EmbeddedFakeActorSystem.o %t/GreeterAPI.o %t/GreeterServer.o %t/main.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency -lswiftDistributed %target-swift-default-executor-opt %target-embedded-concurrency-threading-shim -dead_strip
@@ -20,7 +20,6 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 
 // A realistic client/server split over a `@Resolvable` distributed actor protocol,
 // spread across four modules:

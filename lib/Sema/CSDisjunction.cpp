@@ -370,7 +370,7 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         arguments.size() > 0 &&
         llvm::all_of(arguments, [&](const AnyFunctionType::Param &arg) -> bool {
           auto argType = arg.getPlainType();
-          if (argType->isPlaceholder())
+          if (argType->is<HoleType>())
             return true;
 
           if (auto *typeVar = argType->getAs<TypeVariableType>())
@@ -717,6 +717,35 @@ static void forEachDisjunctionChoice(
 
 static const bool verifyIncrementalDisjunctionPruning = false;
 
+static uint64_t computeGenerationNumber(ConstraintSystem &cs,
+                                        FunctionType *newFuncType) {
+  uint64_t newGenerationNumber = 0;
+
+  // The disjunction generation number is the maximum of the generation
+  // number of the result's type variable, and any argument type variables
+  // that are the types of closure literals.
+  auto newResultTypeVar =
+      newFuncType->getResult()->getAs<TypeVariableType>();
+  if (newResultTypeVar) {
+    const auto &node = cs.getConstraintGraph()[newResultTypeVar];
+    const auto &bindings = node.getPotentialBindings();
+    newGenerationNumber = bindings.GenerationNumber;
+  }
+
+  for (auto param : newFuncType->getParams()) {
+    if (auto *paramTypeVar = param.getParameterType()->getAs<TypeVariableType>()) {
+      if (paramTypeVar->getImpl().isClosureType()) {
+        const auto &node = cs.getConstraintGraph()[paramTypeVar];
+        const auto &bindings = node.getPotentialBindings();
+        newGenerationNumber = std::max(newGenerationNumber,
+                                       bindings.GenerationNumber);
+      }
+    }
+  }
+
+  return newGenerationNumber;
+}
+
 /// Lazily prune a disjunction if the argument and result types at the call site
 /// changed since last time.
 void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
@@ -732,11 +761,20 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
 
   auto PO = PrintOptions::forDebugging();
 
-  // The below only depends on the overload choices and argument types, so
-  // we can skip it if the argument type is already known.
+  // We skip pruning the disjunction if neither of these changed:
+  // 1) The simplified argument and result types at the call site.
+  // 2) In the case where the result type is a type variable, the generation
+  // number of that type variable's potential bindings.
+  //
+  // (Thus, disjunction pruning is only allowed to depend on those two things; the
+  // simplified type of the disjunction, and the potential bindings of the
+  // result.)
   auto newFuncType =
       cs.simplifyType(applicableFn->getFirstType())->castTo<FunctionType>();
-  if (newFuncType == argFuncType) {
+  uint64_t newGenerationNumber = computeGenerationNumber(cs, newFuncType);
+
+  if (newFuncType == argFuncType &&
+      newGenerationNumber == generationNumber) {
     ++NumDisjunctionsSkipped;
     LLVM_DEBUG(llvm::dbgs() << "No change: " << newFuncType->getString(PO) << "\n");
     if (verifyIncrementalDisjunctionPruning)
@@ -755,9 +793,12 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
   // saved type for the disjunction.
   if (cs.solverState) {
     cs.recordChange(
-      SolverTrail::Change::PrunedDisjunction(disjunction, argFuncType));
+      SolverTrail::Change::PrunedDisjunction(disjunction,
+                                             argFuncType,
+                                             generationNumber));
   }
   argFuncType = newFuncType;
+  generationNumber = newGenerationNumber;
 
   pruneDisjunction(cs, applicableFn, /*verify=*/false);
 }
@@ -866,6 +907,26 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         auto argType = argParam.getOldType();
         auto paramType = param.getOldType();
 
+        // We delay binding the type of a closure until we're ready to
+        // type check its body, because of how result builders work.
+        //
+        // If the argument is a type variable representing a closure type,
+        // fish out the actual type of the closure from its potential
+        // bindings.
+        if (auto *typeVar = argType->getAs<TypeVariableType>()) {
+          if (typeVar->getImpl().isClosureType()) {
+            const auto &node = cs.getConstraintGraph()[typeVar];
+            const auto &bindings = node.getPotentialBindings();
+
+            if (bindings.Defaults.size() == 1) {
+              auto defaultType = bindings.Defaults[0]->getSecondType();
+              if (defaultType->is<FunctionType>()) {
+                argType = defaultType;
+              }
+            }
+          }
+        }
+
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<FunctionType>()->getResult();
 
@@ -873,9 +934,30 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
       }
 
       auto overloadResultType = overloadType->getResult();
-      auto applyResultType = argFuncType->getResult();
-      reason |= checkConversion(cs.CC, overloadResultType,
-                                applyResultType, genericSig);
+      auto argResultType = argFuncType->getResult();
+      auto *resultTypeVar = argResultType->getAs<TypeVariableType>();
+
+      // If the result of the applicable fn is a type variable, consider each
+      // potential subtype binding on this type variable. If any of them
+      // contradict the result type of this overload, we can prune the overload.
+      if (resultTypeVar != nullptr) {
+        const auto &node = cs.getConstraintGraph()[resultTypeVar];
+        const auto &bindings = node.getPotentialBindings();
+        ASSERT(bindings.GenerationNumber <= generationNumber);
+
+        for (const auto &binding : bindings.Bindings) {
+          if (binding.Kind == inference::AllowedBindingKind::Subtypes) {
+            reason |= checkConversion(cs.CC, overloadResultType,
+                                      binding.BindingType,
+                                      genericSig);
+          }
+        }
+
+      // Otherwise, the result type is concrete. Check conversion directly.
+      } else {
+        reason |= checkConversion(cs.CC, overloadResultType, argResultType,
+                                  genericSig);
+      }
 
       if (reason) {
         if (cs.isDebugMode()) {

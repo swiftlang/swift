@@ -1,0 +1,52 @@
+sil_stage canonical
+import Swift
+
+import M
+
+sil [ossa] @com_native_conditional : $@convention(thin) (@owned any ISource) -> @owned Optional<NativeBase> {
+bb0(%source : @owned $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to NativeBase, bb1, bb2
+bb1(%target : @owned $NativeBase):
+  %some = enum $Optional<NativeBase>, #Optional.some!enumelt, %target : $NativeBase
+  br bb3(%some : $Optional<NativeBase>)
+bb2(%failed : @owned $any ISource):
+  destroy_value %failed : $any ISource
+  %none = enum $Optional<NativeBase>, #Optional.none!enumelt
+  br bb3(%none : $Optional<NativeBase>)
+bb3(%result : @owned $Optional<NativeBase>):
+  return %result : $Optional<NativeBase>
+}
+
+sil [ossa] @com_native_forced : $@convention(thin) (@owned any ISource) -> @owned NativeBase {
+bb0(%source : @owned $any ISource):
+  %target = unconditional_checked_cast %source : $any ISource to NativeBase
+  return %target : $NativeBase
+}
+
+sil [ossa] @com_native_optional : $@convention(thin) (@owned Optional<any ISource>) -> @owned Optional<NativeBase> {
+bb0(%source : @owned $Optional<any ISource>):
+  checked_cast_br Optional<any ISource> in %source : $Optional<any ISource> to NativeBase, bb1, bb2
+bb1(%target : @owned $NativeBase):
+  %some = enum $Optional<NativeBase>, #Optional.some!enumelt, %target : $NativeBase
+  br bb3(%some : $Optional<NativeBase>)
+bb2(%failed : @owned $Optional<any ISource>):
+  destroy_value %failed : $Optional<any ISource>
+  %none = enum $Optional<NativeBase>, #Optional.none!enumelt
+  br bb3(%none : $Optional<NativeBase>)
+bb3(%result : @owned $Optional<NativeBase>):
+  return %result : $Optional<NativeBase>
+}
+
+sil [ossa] @com_native_protocol : $@convention(thin) (@owned any ISource) -> @owned Optional<any NativeMarker> {
+bb0(%source : @owned $any ISource):
+  checked_cast_br any ISource in %source : $any ISource to any NativeMarker, bb1, bb2
+bb1(%target : @owned $any NativeMarker):
+  %some = enum $Optional<any NativeMarker>, #Optional.some!enumelt, %target : $any NativeMarker
+  br bb3(%some : $Optional<any NativeMarker>)
+bb2(%failed : @owned $any ISource):
+  destroy_value %failed : $any ISource
+  %none = enum $Optional<any NativeMarker>, #Optional.none!enumelt
+  br bb3(%none : $Optional<any NativeMarker>)
+bb3(%result : @owned $Optional<any NativeMarker>):
+  return %result : $Optional<any NativeMarker>
+}

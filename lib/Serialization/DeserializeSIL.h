@@ -37,6 +37,12 @@ namespace swift {
     llvm::BitstreamCursor SILCursor;
     llvm::BitstreamCursor SILIndexCursor;
 
+    /// The stage floor the producing compilation committed to. Read eagerly
+    /// from the head of the SIL block, and reported only for a SIB, whose
+    /// module file is a whole module rather than a dependency. See
+    /// getRecordedStageFloor().
+    SILStage SerializedStageFloor = SILStage::Raw;
+
     class FuncTableInfo;
     using SerializedFuncTable =
       llvm::OnDiskIterableChainedHashTable<FuncTableInfo>;
@@ -141,11 +147,18 @@ namespace swift {
     bool readBlockArgs(SILBasicBlock *BB, SILFunction *Fn,
                        ArrayRef<uint64_t> Args);
     /// Read a SIL instruction.
-    bool readSILInstruction(SILFunction *Fn,
-                            SILBuilder &Builder,
-                            unsigned RecordKind,
-                            SmallVectorImpl<uint64_t> &scratch,
-                            SmallVectorImpl<DebugValueInst *> &DebugBBWorklist);
+    llvm::Error
+    readSILInstruction(SILFunction *Fn, SILBuilder &Builder,
+                       unsigned RecordKind, SmallVectorImpl<uint64_t> &scratch,
+                       SmallVectorImpl<DebugValueInst *> &DebugBBWorklist);
+
+    /// Diagnose a SIL function body that references a module that isn't
+    /// loaded.
+    void diagnoseModuleNotLoaded(SILFunction *fn, llvm::Error error);
+
+    /// Discard the partially deserialized body of \p fn after a failure,
+    /// leaving it as a declaration.
+    void dropPartialBody(SILFunction *fn);
 
     /// Read the SIL function table.
     std::unique_ptr<SerializedFuncTable>
@@ -178,6 +191,18 @@ namespace swift {
     llvm::Expected<unsigned> readNextRecord(SmallVectorImpl<uint64_t> &scratch);
     llvm::Expected<std::optional<SILLocation>>
     readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
+    /// Decode a location written by SILSerializer::encodeLoc.
+    SILLocation::FilenameAndLocation *
+    decodeLoc(unsigned Line, unsigned Column,
+              serialization::IdentifierID FNameID);
+    /// Read the debug variable in \p ListOfValues, the values of a
+    /// SIL_DEBUG_VALUE record after its operands.
+    llvm::Expected<std::optional<SILDebugVariable>>
+    readDebugVariable(SILFunction *Fn, SILBuilder &Builder, unsigned Attr,
+                      unsigned TyCategory, ArrayRef<uint64_t> ListOfValues);
+    /// Read the SIL_DEBUG_VALUE record following an alloc_stack or alloc_box.
+    llvm::Expected<std::optional<SILDebugVariable>>
+    readAllocationDebugVariable(SILFunction *Fn, SILBuilder &Builder);
 
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
     llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;
@@ -226,6 +251,16 @@ namespace swift {
     }
     FileUnit *getFile() const {
       return MF->getFile();
+    }
+
+    /// For a SIB, the stage floor its producing compilation committed to.
+    /// std::nullopt for a .swiftmodule, whose functions each carry their own
+    /// stage. A SIB may be only part of the module being compiled, so the
+    /// caller decides whether this floor becomes the module's.
+    std::optional<SILStage> getRecordedStageFloor() const {
+      if (!MF->isSIB())
+        return std::nullopt;
+      return SerializedStageFloor;
     }
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,

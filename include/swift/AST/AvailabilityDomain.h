@@ -359,6 +359,12 @@ public:
                             AvailabilityVersionKind versionKind,
                             const ASTContext &ctx) const;
 
+  /// Returns true if \p version in this domain must be remapped to be
+  /// compared with versions in \p toDomain, which must be contained by this
+  /// domain.
+  bool requiresVersionRemapping(AvailabilityDomain toDomain,
+                                const llvm::VersionTuple &version) const;
+
   /// Returns true for a domain that is permanently always available, and
   /// therefore availability restrictions in the domain are effectively the same
   /// as restrictions in the `*` domain. This is used to diagnose unnecessary
@@ -588,12 +594,6 @@ public:
 
 template <>
 struct DenseMapInfo<AvailabilityDomain> {
-  static inline AvailabilityDomain getEmptyKey() {
-    return DenseMapInfo<AvailabilityDomain::Storage>::getEmptyKey();
-  }
-  static inline AvailabilityDomain getTombstoneKey() {
-    return DenseMapInfo<AvailabilityDomain::Storage>::getTombstoneKey();
-  }
   static inline unsigned getHashValue(AvailabilityDomain domain) {
     return DenseMapInfo<AvailabilityDomain::Storage>::getHashValue(
         domain.storage);

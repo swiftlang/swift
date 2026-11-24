@@ -90,27 +90,12 @@ public:
                                          Association.getPointer(),
                                          Requirement));
   }
-
-  static AssociatedConformance getEmptyKey() {
-    return AssociatedConformance(SourceInfo::getEmptyKey());
-  }
-  static AssociatedConformance getTombstoneKey() {
-    return AssociatedConformance(SourceInfo::getTombstoneKey());
-  }
 };
 
 } // end namespace swift
 
 namespace llvm {
   template <> struct DenseMapInfo<swift::AssociatedConformance> {
-    static inline swift::AssociatedConformance getEmptyKey() {
-      return swift::AssociatedConformance::getEmptyKey();
-    }
-
-    static inline swift::AssociatedConformance getTombstoneKey() {
-      return swift::AssociatedConformance::getTombstoneKey();
-    }
-
     static unsigned getHashValue(swift::AssociatedConformance val) {
       return val.getHashValue();
     }

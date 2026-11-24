@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 -o /dev/null %s 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -o /dev/null %s 2>&1 | %FileCheck %s
 
 // This file tests that when we emit an error, it is a true negative. This is
 // done by parsing the emitted output from the ownership verifier.

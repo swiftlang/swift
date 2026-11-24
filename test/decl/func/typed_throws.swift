@@ -221,3 +221,22 @@ struct GenericError<T>: Error {}
 
 func placeholderThrowing1() throws(_) {} // expected-error {{type placeholder not allowed here}}
 func placeholderThrowing2() throws(GenericError<_>) {} // expected-error {{type placeholder not allowed here}}
+
+@available(SwiftStdlib 6.0, *)
+func badThrownTypeInEnumElementPattern(_ x: Any) {
+  enum E<T> { case a }
+  switch x {
+  case E<() throws(Int) -> Void>.a: ()
+    // expected-error@-1 {{thrown type 'Int' does not conform to the 'Error' protocol}}
+  default: ()
+  }
+  if case E<() throws(Int) -> Void>.a = x {}
+  // expected-error@-1 {{thrown type 'Int' does not conform to the 'Error' protocol}}
+  _ = {
+    switch x {
+    case E<() throws(Int) -> Void>.a: ()
+      // expected-error@-1 {{thrown type 'Int' does not conform to the 'Error' protocol}}
+    default: ()
+    }
+  }
+}

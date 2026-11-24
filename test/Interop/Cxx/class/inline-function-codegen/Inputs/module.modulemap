@@ -23,6 +23,11 @@ module FieldInitCallsFunction {
   requires cplusplus
 }
 
+module LambdaCopyConstructorCallsFunction {
+  header "lambda-copy-constructor-calls-function.h"
+  requires cplusplus
+}
+
 module MethodCallsFunction {
   header "method-calls-function.h"
   requires cplusplus

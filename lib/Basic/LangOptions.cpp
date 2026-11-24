@@ -412,34 +412,18 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
   switch (triple.getArch()) {
   // ARM is only a 32 bit arch and all archs besides the microcontroller profile
   // ones have double word atomics.
+  //
+  // ARMv6-M has no lock-free atomics at all (Clang reports 0), but the
+  // Synchronization module assumes word-sized atomics on every target.
   case llvm::Triple::ArchType::arm:
   case llvm::Triple::ArchType::thumb:
-    switch (triple.getSubArch()) {
-    case llvm::Triple::SubArchType::ARMSubArch_v6m:
-    case llvm::Triple::SubArchType::ARMSubArch_v7m:
-      setMaxAtomicBitWidth(32);
-      break;
-
-    default:
-      setMaxAtomicBitWidth(64);
-      break;
-    }
+    setMaxAtomicBitWidth(triple.isArmMClass() ? 32 : 64);
     break;
 
-  // AArch64 (arm64) supports double word atomics on all archs besides the
-  // microcontroller profiles.
+  // AArch64 (arm64) supports double word atomics. There is no AArch64
+  // microcontroller profile.
   case llvm::Triple::ArchType::aarch64:
-    switch (triple.getSubArch()) {
-    case llvm::Triple::SubArchType::ARMSubArch_v8m_baseline:
-    case llvm::Triple::SubArchType::ARMSubArch_v8m_mainline:
-    case llvm::Triple::SubArchType::ARMSubArch_v8_1m_mainline:
-      setMaxAtomicBitWidth(64);
-      break;
-
-    default:
-      setMaxAtomicBitWidth(128);
-      break;
-    }
+    setMaxAtomicBitWidth(128);
     break;
 
   // arm64_32 has 32 bit pointer words, but it has the same architecture as

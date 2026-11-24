@@ -118,8 +118,8 @@ void ClangClassTypePrinter::printClassTypeReturnScaffold(
     llvm::function_ref<void(void)> bodyPrinter) {
   ClangSyntaxPrinter printer(type->getASTContext(), os);
   os << "  return ";
-  printer.printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
-                                                 moduleContext);
+  printer.printBaseName(type->getModuleContext());
+  os << "::";
   if (!printer.printNestedTypeNamespaceQualifiers(type))
     os << "::";
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";

@@ -77,7 +77,8 @@ public struct TaskCancellationScope: ~Copyable, ~Escapable {
   ///
   /// Checks only the cancellation status of this scope, and not the enclosing task.
   ///
-  /// If checking from within a task and the scope is cancelled, the task will also report being cancelled.
+  /// If the scope is cancelled, `Task.isCancelled` also returns `true` for code running inside the
+  /// scope, unless a cancellation shield inside of the scope prevents it.
   ///
   /// - Returns: `true` if this scope has been cancelled (via
   ///   ``cancel(reason:)`` or by an outer scope cascading cancellation

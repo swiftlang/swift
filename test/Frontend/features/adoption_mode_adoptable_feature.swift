@@ -10,14 +10,14 @@
 // RUN:   -disable-experimental-feature ExistentialAny:migrate                \
 // RUN:   %s 2>&1 | %FileCheck %s --check-prefix=CHECK-SWIFT-5
 
-// RUN: %target-swift-frontend -parse -swift-version 7                         \
+// RUN: %target-swift-frontend -parse -swift-version future                    \
 // RUN:   -enable-upcoming-feature      ExistentialAny:invalid1                \
 // RUN:   -enable-upcoming-feature      ExistentialAny:migrate                \
 // RUN:   -enable-experimental-feature  ExistentialAny:invalid2                \
 // RUN:   -enable-experimental-feature  ExistentialAny:migrate                \
 // RUN:   -disable-upcoming-feature     ExistentialAny:migrate                \
 // RUN:   -disable-experimental-feature ExistentialAny:migrate                \
-// RUN:   %s 2>&1 | %FileCheck %s --check-prefix=CHECK-SWIFT-7
+// RUN:   %s 2>&1 | %FileCheck %s --check-prefix=CHECK-FUTURE
 
 // REQUIRES: swift_feature_ExistentialAny
 // REQUIRES: asserts
@@ -31,8 +31,8 @@
 // CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'ExistentialAny'; did you mean 'migrate'? [#StrictLanguageFeatures]{{$}}
 // CHECK-SWIFT-5-NOT: warning:
 
-// CHECK-SWIFT-7-NOT: warning:
-// CHECK-SWIFT-7-COUNT-6: warning: upcoming feature 'ExistentialAny' already enabled as of the Swift 7 language mode{{$}}
-// CHECK-SWIFT-7-NOT: warning:
+// CHECK-FUTURE-NOT: warning:
+// CHECK-FUTURE-COUNT-6: warning: upcoming feature 'ExistentialAny' already enabled as of the Swift 7 language mode{{$}}
+// CHECK-FUTURE-NOT: warning:
 
 // CHECK-NOT: error:

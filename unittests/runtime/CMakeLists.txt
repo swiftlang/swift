@@ -103,13 +103,18 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Actor.cpp
     TaskStatus.cpp)
 
-  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST
+  # The reusable LLVMSupport PCH is the host's, built without
+  # SWIFT_INLINE_NAMESPACE, so its `::llvm` clashes with the runtime's own
+  # namespaced copy this target uses (see SWIFT_INLINE_NAMESPACE=__runtime
+  # below). Disable reuse rather than build against the wrong namespace.
+  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST DISABLE_PCH_REUSE
     Array.cpp
     CompatibilityOverrideRuntime.cpp
     CompatibilityOverrideConcurrency.cpp
     Concurrent.cpp
     COMDynamicCast.cpp
     COMMetadata.cpp
+    COMSwiftObject.cpp
     CrashReporter.cpp
     Metadata.cpp
     Enum.cpp
@@ -149,6 +154,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     ${SWIFT_SOURCE_DIR}/stdlib/include)
   target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/public)
+  target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include)
 
   # `stdlib/include/llvm/Support` headers, a subset of
   # `llvm-project/llvm/include/llvm/Support`, are not compatible with the

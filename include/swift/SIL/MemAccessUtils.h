@@ -319,6 +319,8 @@ public:
     Tail,
     Argument, // Address or RawPointer argument
     Yield,
+    // Address result of a borrow or mutate accessor.
+    BorrowMutateAccessor,
     Nested,
     Unidentified,
     NumKindBits = countBitsUsed(static_cast<unsigned>(Unidentified))
@@ -489,6 +491,7 @@ public:
     case Tail:
     case Argument:
     case Yield:
+    case BorrowMutateAccessor:
     case Nested:
     case Unidentified:
       return value == other.value;
@@ -512,6 +515,7 @@ public:
     case Tail:
     case Argument:
     case Yield:
+    case BorrowMutateAccessor:
     case Nested:
     case Unidentified:
       return false;
@@ -534,6 +538,7 @@ public:
     case Class:
     case Tail:
     case Yield:
+    case BorrowMutateAccessor:
     case Nested:
     case Unidentified:
       return false;
@@ -760,6 +765,7 @@ public:
     case AccessStorage::Nested:
     case AccessStorage::Argument:
     case AccessStorage::Yield:
+    case AccessStorage::BorrowMutateAccessor:
     case AccessStorage::Unidentified:
       return getValue();
     case AccessStorage::Global:
@@ -833,18 +839,6 @@ namespace llvm {
 /// AccessStorage values are distinct. Inequality does, however, guarantee that
 /// two *uniquely* identified AccessStorage values are distinct.
 template <> struct DenseMapInfo<swift::AccessStorage> {
-  static swift::AccessStorage getEmptyKey() {
-    return swift::AccessStorage(swift::SILValue::getFromOpaqueValue(
-                               llvm::DenseMapInfo<void *>::getEmptyKey()),
-                           swift::AccessStorage::Unidentified);
-  }
-
-  static swift::AccessStorage getTombstoneKey() {
-    return swift::AccessStorage(swift::SILValue::getFromOpaqueValue(
-                               llvm::DenseMapInfo<void *>::getTombstoneKey()),
-                           swift::AccessStorage::Unidentified);
-  }
-
   static unsigned getHashValue(swift::AccessStorage storage) {
     switch (storage.getKind()) {
     case swift::AccessStorage::Unidentified:
@@ -855,6 +849,7 @@ template <> struct DenseMapInfo<swift::AccessStorage> {
     case swift::AccessStorage::Stack:
     case swift::AccessStorage::Nested:
     case swift::AccessStorage::Yield:
+    case swift::AccessStorage::BorrowMutateAccessor:
       return DenseMapInfo<swift::SILValue>::getHashValue(storage.getValue());
     case swift::AccessStorage::Argument:
       return storage.getParamIndex();
@@ -1285,18 +1280,6 @@ namespace llvm {
 
 /// Allow AccessPath to be used in DenseMap.
 template <> struct DenseMapInfo<swift::AccessPath> {
-  static inline swift::AccessPath getEmptyKey() {
-    return swift::AccessPath(
-        DenseMapInfo<swift::AccessStorage>::getEmptyKey(),
-        swift::AccessPath::PathNode(
-          DenseMapInfo<swift::IndexTrieNode *>::getEmptyKey()), 0);
-  }
-  static inline swift::AccessPath getTombstoneKey() {
-    return swift::AccessPath(
-        DenseMapInfo<swift::AccessStorage>::getTombstoneKey(),
-        swift::AccessPath::PathNode(
-          DenseMapInfo<swift::IndexTrieNode *>::getTombstoneKey()), 0);
-  }
   static inline unsigned getHashValue(const swift::AccessPath &val) {
     return llvm::hash_combine(
         DenseMapInfo<swift::AccessStorage>::getHashValue(val.getStorage()),
@@ -1308,16 +1291,6 @@ template <> struct DenseMapInfo<swift::AccessPath> {
   }
 };
 template <> struct DenseMapInfo<swift::AccessPathWithBase> {
-  static inline swift::AccessPathWithBase getEmptyKey() {
-    return swift::AccessPathWithBase(
-        DenseMapInfo<swift::AccessPath>::getEmptyKey(),
-        DenseMapInfo<swift::SILValue>::getEmptyKey());
-  }
-  static inline swift::AccessPathWithBase getTombstoneKey() {
-    return swift::AccessPathWithBase(
-        DenseMapInfo<swift::AccessPath>::getTombstoneKey(),
-        DenseMapInfo<swift::SILValue>::getTombstoneKey());
-  }
   static inline unsigned getHashValue(const swift::AccessPathWithBase &val) {
     return llvm::hash_combine(
         DenseMapInfo<swift::AccessPath>::getHashValue(val.accessPath),
@@ -1724,6 +1697,9 @@ public:
   Result visitYieldAccess(MultipleValueInstructionResult *yield) {
     return asImpl().visitBase(yield, AccessStorage::Yield);
   }
+  Result visitBorrowMutateAccessorAccess(ApplyInst *apply) {
+    return asImpl().visitBase(apply, AccessStorage::BorrowMutateAccessor);
+  }
   Result visitStackAccess(AllocStackInst *stack) {
     return asImpl().visitBase(stack, AccessStorage::Stack);
   }
@@ -1792,11 +1768,11 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
       return asImpl().visitUnidentified(sourceAddr);
 
     if (isAddressReturn(sourceAddr)) {
-      auto *selfOp = &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand();
-      if (selfOp->get()->getType().isObject()) {
-        return asImpl().visitUnidentified(sourceAddr);
+      auto *apply = cast<ApplyInst>(sourceAddr);
+      if (!apply->hasSelfArgument()) {
+        return asImpl().visitUnidentified(apply);
       }
-      return asImpl().visitAccessProjection(cast<ApplyInst>(sourceAddr), selfOp);
+      return asImpl().visitBorrowMutateAccessorAccess(apply);
     }
 
     // Don't currently allow any other calls to return an accessed address.

@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -module-name main -target %target-future-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -module-name main -target %target-future-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a-opaque-values.out
+// RUN: %target-codesign %t/a-opaque-values.out
+// RUN: %target-run %t/a-opaque-values.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -17,6 +20,8 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 struct S<T: Codable>: Codable { var data: T }
+
+struct NonCodable {}
 
 distributed actor Greeter {
   // Four key generic parameters, eight protocol requirements.
@@ -39,11 +44,14 @@ struct Main {
     let handler = FakeRoundtripResultHandler({ _ in }, onError: { _ in })
 
     // ==== -------------------------------------------------------------------
-    // Check that wrong count of substitutions is rejected properly:
+    // Check that substitutions not fulfilling the generic requirements are
+    // rejected properly. Use a correct substitution count: only SwiftStdlib
+    // 6.5+ runtimes diagnose a wrong count precisely, older ones would read
+    // past the substitutions buffer.
 
     var decoder = FakeInvocationDecoder(
       args: [],
-      substitutions: [Int.self, String.self])
+      substitutions: [Int.self, String.self, NonCodable.self, Int.self])
     do {
       try await system.executeDistributedTarget(
         on: greeter,

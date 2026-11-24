@@ -33,6 +33,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -929,8 +930,7 @@ public:
     if (Ctx.sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(F);
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF),
-                std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       Ctx.initBlockIDs(RPOT);
       interleave(RPOT,
@@ -1333,6 +1333,14 @@ public:
     }
   }
 
+  /// Print the scopes referenced by \p I, including its debug variable's scope.
+  void printDebugScopes(const SILInstruction &I, const SourceManager &SM) {
+    printDebugScope(I.getDebugScope(), SM);
+    if (auto DVI = DebugVarCarryingInst(const_cast<SILInstruction *>(&I)))
+      if (auto Var = DVI.getVarInfo(/* complete = */ false))
+        printDebugScope(Var->Scope, SM);
+  }
+
   void printDebugScopeRef(const SILDebugScope *DS, const SourceManager &SM,
                           bool PrintComma = true) {
     if (DS) {
@@ -1714,8 +1722,10 @@ public:
       *this << "[stack] ";
     if (!ARI->isStackAllocationNested())
       *this << "[non_nested] ";
-    auto Types = ARI->getTailAllocatedTypes();
-    auto Counts = ARI->getTailAllocatedCounts();
+    printTailElems(ARI->getTailAllocatedTypes(), ARI->getTailAllocatedCounts());
+  }
+
+  void printTailElems(ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
@@ -1763,7 +1773,7 @@ public:
 
   void printSubstitutions(SubstitutionMap Subs,
                           GenericSignature Sig = GenericSignature()) {
-    if (!Subs.hasAnySubstitutableParams()) return;
+    if (!Subs.isEffectivelyGeneric()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses
     // a generic signature that's close-to-but-not-the-same-as expected.
@@ -1822,6 +1832,8 @@ public:
   void visitBeginApplyInst(BeginApplyInst *AI) {
     if (AI->isNonThrowing())
       *this << "[nothrow] ";
+    if (AI->isUnresolved())
+      *this << "[unresolved] ";
     visitApplyInstBase(AI);
   }
 
@@ -1874,8 +1886,15 @@ public:
       if (!CI->isStackAllocationNested())
         *this << "[non_nested] ";
     }
-    if (CI->isCalledOnce()) {
-      *this << "[called_once] ";
+    if (auto semantics = CI->getExecutionSemantics()) {
+      switch (*semantics) {
+      case ExecutionSemantics::AtMostOnce:
+        *this << "[called_at_most_once] ";
+        break;
+      case ExecutionSemantics::Once:
+        *this << "[called_once] ";
+        break;
+      }
     }
     visitApplyInstBase(CI);
   }
@@ -2039,7 +2058,10 @@ public:
     if (LBI->isUnchecked()) {
       *this << "[unchecked] ";
     }
-    *this << getIDAndType(LBI->getOperand());
+    *this << getIDAndType(LBI->getAddress());
+    if (LBI->hasValueHint()) {
+      *this << ", value_hint " << getIDAndType(LBI->getValueHint());
+    }
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *BBI) {
@@ -2377,6 +2399,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
+    if (CI->withoutActuallyDeiniting())
+      *this << "[without_actually_deiniting] ";
     *this << CI->getType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
@@ -2578,6 +2602,11 @@ public:
   }
 
   void visitUncheckedOwnershipInst(UncheckedOwnershipInst *I) {
+    *this << getIDAndType(I->getOperand());
+    printForwardingOwnershipKind(I);
+  }
+
+  void visitValueToAddressInst(ValueToAddressInst *I) {
     *this << getIDAndType(I->getOperand());
   }
 
@@ -2957,6 +2986,24 @@ public:
     *this << getIDAndType(RI->getOperand());
   }
 
+  void visitDiagnoseInst(DiagnoseInst *I) {
+    using DiagnoseKind = DiagnoseInst::DiagnoseKind;
+    switch (I->getKind()) {
+    case DiagnoseKind::Invalid:
+      llvm::report_fatal_error("Invalid?!");
+    case DiagnoseKind::UnpermittedCopy:
+      *this << "[unpermitted_copy] ";
+      break;
+    case DiagnoseKind::LetReinit:
+      *this << "[let_reinit] ";
+      break;
+    case DiagnoseKind::MissingSuperInit:
+      *this << "[missing_super_init] ";
+      break;
+    }
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitTypeValueInst(TypeValueInst *tvi) {
     *this << tvi->getType() << " for " << tvi->getParamType();
   }
@@ -3052,6 +3099,7 @@ public:
     *this << getIDAndType(ESRL->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
+    printTailElems(DI->getTailAllocatedTypes(), DI->getTailAllocatedCounts());
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
@@ -3079,6 +3127,7 @@ public:
           << getSILAccessEnforcementName(BAI->getEnforcement()) << "] "
           << (BAI->hasNoNestedConflict() ? "[no_nested_conflict] " : "")
           << (BAI->isFromBuiltin() ? "[builtin] " : "")
+          << (BAI->isUnresolved() ? "[unresolved] " : "")
           << getIDAndType(BAI->getOperand());
   }
   void visitMoveOnlyWrapperToCopyableAddrInst(
@@ -3684,7 +3733,7 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
   auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
     SILPrinter P(Ctx);
-    P.printDebugScope(I.getDebugScope(), SM);
+    P.printDebugScopes(I, SM);
   }
 
   SILPrinter(Ctx).print(this);
@@ -3797,7 +3846,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     for (auto &BB : *this)
       for (auto &I : BB) {
         SILPrinter P(PrintCtx);
-        P.printDebugScope(I.getDebugScope(), SM);
+        P.printDebugScopes(I, SM);
       }
     OS << "\n";
   }
@@ -3975,7 +4024,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     OS << "[_semantics \"" << Attr << "\"] ";
 
   for (auto *Attr : getSpecializeAttrs()) {
-    OS << "[_specialize "; Attr->print(OS); OS << "] ";
+    OS << (Attr->isSpecializedSpelling() ? "[specialized " : "[_specialize ");
+    Attr->print(OS);
+    OS << "] ";
   }
 
   if (markedAsUsed())
@@ -4000,8 +4051,14 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // SIB) after importing canonical SIL from another module. If the imported
   // functions are reserialized (e.g. shared linkage), then we must preserve
   // this attribute.
-  if (WasDeserializedCanonical && getModule().getStage() == SILStage::Raw)
+  if (WasDeserializedCanonical && getModule().getStageFloor() == SILStage::Raw)
     OS << "[canonical] ";
+
+  // A function that is ahead of the module's stage floor carries its own stage.
+  // A function at the floor prints nothing: the module `sil_stage` line already
+  // captures this.
+  if (getFunctionStage() > getModule().getStageFloor())
+    OS << "[stage=" << getSILStageName(getFunctionStage()) << "] ";
 
   // If this function is not an external declaration /and/ is in ownership ssa
   // form, print [ossa].
@@ -4012,6 +4069,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // indicate this with [opaque].
   if (!hasLoweredAddresses())
     OS << "[opaque] ";
+
+  if (hasUnresolvedLifetimes())
+    OS << "[unresolved] ";
 
   if (needsStackProtection())
     OS << "[stack_protection] ";
@@ -4466,18 +4526,7 @@ static void printExternallyVisibleDecls(SILPrintContext &Ctx,
 void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
                       bool PrintASTDecls) const {
   llvm::raw_ostream &OS = PrintCtx.OS();
-  OS << "sil_stage ";
-  switch (Stage) {
-  case SILStage::Raw:
-    OS << "raw";
-    break;
-  case SILStage::Canonical:
-    OS << "canonical";
-    break;
-  case SILStage::Lowered:
-    OS << "lowered";
-    break;
-  }
+  OS << "sil_stage " << getSILStageName(StageFloor);
 
   OS << "\n\nimport " << BUILTIN_NAME
      << "\nimport " << STDLIB_NAME
@@ -5145,7 +5194,7 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
       auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
-      std::copy(po_begin(UnsafeF), po_end(UnsafeF), std::back_inserter(RPOT));
+      llvm::copy(post_order(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
       for (unsigned Index : indices(RPOT))

@@ -283,6 +283,7 @@ NODE(TypeMetadataInstantiationCache)
 NODE(TypeMetadataInstantiationFunction)
 NODE(TypeMetadataSingletonInitializationCache)
 NODE(TypeMetadataDemanglingCache)
+NODE(TypeMetadataMangledNameRef)
 NODE(TypeMetadataLazyCache)
 NODE(UncurriedFunctionType)
 NODE(UnknownIndex)
@@ -430,6 +431,9 @@ CONTEXT_NODE(MutateAccessor)
 NODE(AsyncMainEntryPoint)
 NODE(CalledOnceFunctionType)
 NODE(YieldTypes)
+NODE(CalledAtMostOnceFunctionType)
+NODE(ImplCalledAtMostOnceFunction)
+NODE(BackDeploymentCopy)
 
 #undef CONTEXT_NODE
 #undef NODE

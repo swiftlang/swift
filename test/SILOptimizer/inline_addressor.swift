@@ -15,7 +15,7 @@ var totalsum = nonTrivialInit(true)
 // CHECK-DAG:     builtin "once"
 // CHECK-DAG:     function_ref @$s16inline_addressor8inputval_WZ :
 // CHECK-DAG:     builtin "once"
-// CHECK:       {{^bb1:}}
+// CHECK:       {{^bb1(.*):}}
 // CHECK-NOT:     "once"
 // CHECK-NOT:     apply
 // CHECK:       } // end sil function '$s16inline_addressor6testityySiF'

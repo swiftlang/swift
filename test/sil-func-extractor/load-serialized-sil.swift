@@ -12,7 +12,7 @@
 // CHECK-NEXT:  init
 // CHECK-NEXT: }
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -20,7 +20,7 @@
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 
-// CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
+// CHECK: sil [canonical] [stage=canonical] @unknown : $@convention(thin) () -> ()
 
 // CHECK-NOT: sil {{.*}} @$ss1XVABycfC : $@convention(thin) (@thin X.Type) -> X
 
@@ -36,7 +36,7 @@
 // SIB-CHECK-NEXT:  init
 // SIB-CHECK-NEXT: }
 
-// SIB-CHECK-LABEL: sil [serialized] [canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
+// SIB-CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @$ss1XV4testyyF : $@convention(method) (X) -> ()
 // SIB-CHECK: bb0
 // SIB-CHECK-NEXT: function_ref
 // SIB-CHECK-NEXT: function_ref @unknown : $@convention(thin) () -> ()
@@ -44,7 +44,7 @@
 // SIB-CHECK-NEXT: tuple
 // SIB-CHECK-NEXT: return
 
-// SIB-CHECK: sil [canonical] @unknown : $@convention(thin) () -> ()
+// SIB-CHECK: sil [canonical] [stage=canonical] @unknown : $@convention(thin) () -> ()
 
 // SIB-CHECK-NOT: sil {{.*}} @$ss1XVABycfC : $@convention(thin) (@thin X.Type) -> X
 

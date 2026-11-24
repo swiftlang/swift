@@ -1,0 +1,22 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-com-interop -module-name COM -emit-module-path %t/COM.swiftmodule %S/../../Inputs/COM.swift
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %s 2>&1 | %FileCheck %s
+// RUN: sed 's/any ISource/Optional<any ISource>/g' %s > %t/optional.sil
+// RUN: not --crash %target-sil-opt -enable-experimental-com-interop -I %t -enable-sil-verify-all %t/optional.sil 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+import Swift
+
+@com(interface: "10000000-0000-0000-0000-000000000001")
+public protocol ISource: AnyObject {}
+public class NativeTarget {}
+
+// An unconditional cast still has to acquire the recovered object's ownership.
+// CHECK: Non directly forwarding instructions can not forward guaranteed
+sil [ossa] @invalid_borrow : $@convention(thin) (@guaranteed any ISource) -> @owned NativeTarget {
+bb0(%source : @guaranteed $any ISource):
+  %target = unconditional_checked_cast %source : $any ISource to NativeTarget, forwarding: @guaranteed
+  %copy = copy_value %target : $NativeTarget
+  return %copy : $NativeTarget
+}

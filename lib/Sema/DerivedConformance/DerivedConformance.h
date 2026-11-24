@@ -487,6 +487,9 @@ bool checkAvailabilityForElement(
     const EnumElementDecl *elt, AvailabilityContext availabilityContext,
     SmallVectorImpl<AvailabilityQuery> &availabilityQueries);
 
+/// Get a string describing the enum type we are deriving a conformance
+/// for by producing valid swift syntax.
+std::string getEnumTypeInfoString(EnumDecl *decl);
 } // namespace swift
 
 #endif

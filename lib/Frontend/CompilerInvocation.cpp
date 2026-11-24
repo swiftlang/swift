@@ -35,6 +35,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -89,7 +90,8 @@ void CompilerInvocation::setMainExecutablePath(StringRef Path) {
 
 static std::string
 getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
-                               StringRef defaultPrebuiltPath) {
+                               StringRef defaultPrebuiltPath,
+                               llvm::vfs::FileSystem &FS) {
   if (!sdkVer.has_value())
     return defaultPrebuiltPath.str();
   std::string versionStr = sdkVer->getAsString();
@@ -97,7 +99,7 @@ getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
   do {
     SmallString<64> pathWithSDKVer = defaultPrebuiltPath;
     llvm::sys::path::append(pathWithSDKVer, vs);
-    if (llvm::sys::fs::exists(pathWithSDKVer)) {
+    if (FS.exists(pathWithSDKVer)) {
       return pathWithSDKVer.str().str();
     } else if (vs.ends_with(".0")) {
       vs = vs.substr(0, vs.size() - 2);
@@ -109,7 +111,11 @@ getVersionedPrebuiltModulePath(std::optional<llvm::VersionTuple> sdkVer,
 
 std::string CompilerInvocation::computePrebuiltCachePath(
     StringRef RuntimeResourcePath, llvm::Triple target,
-    std::optional<llvm::VersionTuple> sdkVer) {
+    std::optional<llvm::VersionTuple> sdkVer,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  if (!FS)
+    FS = llvm::vfs::createPhysicalFileSystem();
+
   SmallString<64> defaultPrebuiltPath{RuntimeResourcePath};
   StringRef platform;
   if (tripleIsMacCatalystEnvironment(target)) {
@@ -123,10 +129,11 @@ std::string CompilerInvocation::computePrebuiltCachePath(
 
   // If the SDK version is given, we should check if SDK-versioned prebuilt
   // module cache is available and use it if so.
-  return getVersionedPrebuiltModulePath(sdkVer, defaultPrebuiltPath);
+  return getVersionedPrebuiltModulePath(sdkVer, defaultPrebuiltPath, *FS);
 }
 
-void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
+void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
 
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
     return;
@@ -134,7 +141,8 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
     return;
 
   FrontendOpts.PrebuiltModuleCachePath = computePrebuiltCachePath(
-      SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion);
+      SearchPathOpts.RuntimeResourcePath, LangOpts.Target, LangOpts.SDKVersion,
+      std::move(FS));
   if (!FrontendOpts.PrebuiltModuleCachePath.empty())
     return;
   StringRef anchor = "prebuilt-modules";
@@ -394,7 +402,8 @@ void CompilerInvocation::computeAArch64TBIOptions() {
   IRGenOpts.HasAArch64TBI = aarch64_use_tbi != LLVMArgs.end();
 }
 
-void CompilerInvocation::computeCXXStdlibOptions() {
+void CompilerInvocation::computeCXXStdlibOptions(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
   if (!LangOpts.EnableCXXInterop)
     return;
 
@@ -410,13 +419,18 @@ void CompilerInvocation::computeCXXStdlibOptions() {
   } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin() ||
              LangOpts.Target.isOSFreeBSD()) {
     auto [clangDriver, clangDiagEngine, clangDiagOpts] =
-        ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
+        ClangImporter::createClangDriver(LangOpts, ClangImporterOpts, FS);
     auto clangDriverArgs = ClangImporter::createClangArgs(
         ClangImporterOpts, SearchPathOpts, clangDriver);
-    auto &clangToolchain = clangDriver.getToolChain(
-        clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
-    auto cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
-    auto cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
+    clang::driver::ToolChain::CXXStdlibType cxxStdlibKind, cxxDefaultStdlibKind;
+    {
+      // The Clang driver is not sandboxed, as in clang.
+      auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+      auto &clangToolchain = clangDriver.getToolChain(
+          clangDriverArgs, llvm::Triple(LangOpts.Target.normalize()));
+      cxxStdlibKind = clangToolchain.GetCXXStdlibType(clangDriverArgs);
+      cxxDefaultStdlibKind = clangToolchain.GetDefaultCXXStdlibType();
+    }
 
     auto toCXXStdlibKind =
         [](clang::driver::ToolChain::CXXStdlibType clangCXXStdlibType)
@@ -427,6 +441,7 @@ void CompilerInvocation::computeCXXStdlibOptions() {
       case clang::driver::ToolChain::CST_Libstdcxx:
         return CXXStdlibKind::Libstdcxx;
       }
+      llvm_unreachable("covered switch");
     };
 
     LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
@@ -516,10 +531,11 @@ static void ParseAssertionArgs(ArgList &args) {
   }
 }
 
-static bool ParseFrontendArgs(
-    FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
-    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers) {
-  ArgsToFrontendOptionsConverter converter(diags, args, opts);
+static bool
+ParseFrontendArgs(FrontendOptions &opts, ArgList &args, DiagnosticEngine &diags,
+                  SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers,
+                  llvm::vfs::FileSystem &fs) {
+  ArgsToFrontendOptionsConverter converter(diags, args, opts, fs);
   return converter.convert(buffers);
 }
 
@@ -559,16 +575,17 @@ generateOptimizationRemarkRegex(DiagnosticEngine &Diags, ArgList &Args,
 }
 
 // Lifted from the clang driver.
-static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
+static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir,
+                     StringRef WorkingDir) {
   const bool Escape = std::strpbrk(Arg, "\"\\$ ");
 
   if (!TempDir.empty()) {
     llvm::SmallString<256> ArgPath{Arg};
-    llvm::sys::fs::make_absolute(ArgPath);
+    llvm::sys::path::make_absolute(WorkingDir, ArgPath);
     llvm::sys::path::native(ArgPath);
 
     llvm::SmallString<256> TempPath{TempDir};
-    llvm::sys::fs::make_absolute(TempPath);
+    llvm::sys::path::make_absolute(WorkingDir, TempPath);
     llvm::sys::path::native(TempPath);
 
     if (StringRef(ArgPath).starts_with(TempPath)) {
@@ -717,7 +734,9 @@ static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       llvm::raw_string_ostream OS(str);
       interleave(
           argList,
-          [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
+          [&](const char *Argument) {
+            PrintArg(OS, Argument, StringRef(), StringRef());
+          },
           [&] { OS << " "; });
     };
     printFlags(Flags.Flags, RenderedArgs.Standard);
@@ -880,6 +899,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   }
 
   Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
+
+  if (auto *A = Args.getLastArg(OPT_scanner_cas_fs))
+    Opts.DepscanCASFileSystemRootID = A->getValue();
+  Opts.CASFSEscapePaths = Args.getAllArgValues(OPT_cas_fs_escape);
 
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
@@ -1137,11 +1160,6 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
   if (Args.hasArg(OPT_enable_builtin_module))
     Opts.enableFeature(Feature::BuiltinModule);
 
-  if (Args.hasArg(OPT_strict_memory_safety))
-    Opts.enableFeature(Feature::StrictMemorySafety);
-  else if (Args.hasArg(OPT_strict_memory_safety_migrate))
-    Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
-
   if (Args.hasArg(OPT_enable_library_evolution, OPT_enable_resilience))
     Opts.enableFeature(Feature::LibraryEvolution);
 
@@ -1150,6 +1168,7 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
+                          const DiagnosticOptions &DiagnosticOpts,
                           ModuleInterfaceOptions &ModuleInterfaceOpts,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
@@ -1159,8 +1178,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_language_mode)) {
-    auto vers =
-        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
+    auto vers = VersionParser::parseLanguageMode(A->getValue(), &Diags);
     bool isValid = false;
     if (vers.has_value()) {
       if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {
@@ -1255,6 +1273,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.EnableWorkaroundBrokenModules
     &= !Args.hasArg(OPT_disable_workaround_broken_modules);
+
+  Opts.DebugDuplicateClosureDiscriminators |=
+      Args.hasArg(OPT_debug_duplicate_closure_discriminators);
 
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
@@ -1426,6 +1447,27 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
+
+  // The C++ overlay uses '@unsafe(always)', including in .swiftinterface files
+  // built without the flag, so the feature is always on for it. This also makes
+  // '$AlwaysUnsafeAttribute' true when its interface is rebuilt.
+  if (FrontendOpts.ModuleName == CXX_MODULE_NAME)
+    Opts.enableFeature(Feature::AlwaysUnsafeAttribute);
+
+  // '-strict-memory-safety' only enables the diagnostic group, but
+  // `#if hasFeature` and the module's strict memory safety flag key on the
+  // feature. Turn the feature on whenever the group is enabled.
+  DiagnosticState commandLineDiagState;
+  commandLineDiagState.setWarningGroupControlRules(
+      DiagnosticOpts.WarningGroupControlRules);
+  if (!commandLineDiagState.isIgnoredDiagnosticGroupTree(
+          DiagGroupID::StrictMemorySafety))
+    Opts.enableFeature(Feature::StrictMemorySafety);
+
+  // Clients detect strict memory safety from the interface's flags.
+  if (Opts.hasFeature(Feature::StrictMemorySafety) &&
+      !Args.hasArg(OPT_strict_memory_safety))
+    ModuleInterfaceOpts.PublicFlags.IgnorableFlags += " -strict-memory-safety";
 
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
   // If the old prototype version of the feature has been requested, honor it.
@@ -1760,6 +1802,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
         Diags.diagnose(SourceLoc(), diag::error_unsupported_option_argument,
                        A->getOption().getPrefixedName(), A->getValue());
     }
+
+    // Preserve the stdcall convention of imported Win32 COM function types.
+    if (Opts.COMModel == LangOptions::COMInteropModel::Microsoft &&
+        Target.isOSWindows() && Target.getArch() == llvm::Triple::x86)
+      Opts.UseClangFunctionTypes = true;
   }
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
@@ -2250,6 +2297,16 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                    OPT_solver_disable_promote_supertypes,
                    Opts.SolverEnablePromoteSupertypes);
 
+  Opts.SolverEnableShortConversions =
+      Args.hasFlag(OPT_solver_enable_short_conversions,
+                   OPT_solver_disable_short_conversions,
+                   Opts.SolverEnableShortConversions);
+
+  Opts.SolverEnableExtremeEdgeContraction =
+      Args.hasFlag(OPT_solver_enable_extreme_edge_contraction,
+                   OPT_solver_disable_extreme_edge_contraction,
+                   Opts.SolverEnableExtremeEdgeContraction);
+
   if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::Immediate)
     Opts.DeferToRuntime = true;
 
@@ -2304,7 +2361,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
                                    StringRef workingDirectory,
                                    const LangOptions &LangOpts,
                                    const FrontendOptions &FrontendOpts,
-                                   const CASOptions &CASOpts) {
+                                   const CASOptions &CASOpts,
+                                   llvm::vfs::FileSystem &FS) {
   using namespace options;
 
   if (const Arg *a = Args.getLastArg(OPT_tools_directory)) {
@@ -2314,7 +2372,7 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     // the Swift project itself.
     llvm::SmallString<128> clangPath(a->getValue());
     llvm::sys::path::append(clangPath, "clang");
-    if (llvm::sys::fs::exists(clangPath)) {
+    if (FS.exists(clangPath)) {
       Opts.clangPath = std::string(clangPath);
     }
   }
@@ -2608,6 +2666,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_in_process_plugin_server_path))
     Opts.InProcessPluginServerPath = A->getValue();
+  if (const Arg *A =
+          Args.getLastArg(OPT_resolved_in_process_plugin_server_path))
+    Opts.ResolvedInProcessPluginServerPath = A->getValue();
 
   // All plugin search options, i.e. '-load-plugin-library',
   // '-load-plugin-executable', '-plugin-path', and  '-external-plugin-path'
@@ -2716,7 +2777,7 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_explicit_swift_module_map))
     Opts.ExplicitSwiftModuleMapPath = A->getValue();
-  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file)) {
+  for (auto A : Args.getAllArgValues(options::OPT_swift_module_file_EQ)) {
     if (validateSwiftModuleFileArgumentAndAdd(A, Diags,
                                               Opts.ExplicitSwiftModuleInputs))
       return true;
@@ -2972,6 +3033,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                                DiagGroupID::HeapAllocation);
   }
 
+  // Enabled before processing warning flags so `-warnings-as-errors` applies.
+  if (Args.hasArg(OPT_strict_memory_safety, OPT_strict_memory_safety_migrate))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::StrictMemorySafety);
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
@@ -3041,31 +3107,39 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.LocalizationCode = localeCode;
     }
   }
-  if (Arg *A = Args.getLastArg(OPT_localization_path)) {
-    if (!llvm::sys::fs::exists(A->getValue())) {
-      Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
-                     A->getValue());
-    } else if (!Opts.LocalizationCode.empty()) {
-      // Check if the localization path exists but it doesn't have a file
-      // for the specified locale code.
-      llvm::SmallString<128> localizationPath(A->getValue());
-      llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
-      llvm::sys::path::replace_extension(localizationPath, ".strings");
-      if (!llvm::sys::fs::exists(localizationPath)) {
-        Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
-                       Opts.LocalizationCode, localizationPath);
-      }
-
-      Opts.LocalizationPath = A->getValue();
-    }
-  }
+  // The localization path is validated once the file system is set up.
+  if (Arg *A = Args.getLastArg(OPT_localization_path))
+    Opts.LocalizationPath = A->getValue();
   return false;
+}
+
+static std::string computeLocalizationPath(const DiagnosticOptions &Options,
+                                           StringRef mainExecutablePath,
+                                           llvm::vfs::FileSystem &FS) {
+  if (Options.LocalizationCode.empty())
+    return {};
+  if (!Options.LocalizationPath.empty() && FS.exists(Options.LocalizationPath))
+    return Options.LocalizationPath;
+
+  // Fall back to the localized messages in the toolchain.
+  llvm::SmallString<128> locPathBuffer(mainExecutablePath);
+  llvm::sys::path::remove_filename(locPathBuffer); // Remove /swift
+  llvm::sys::path::remove_filename(locPathBuffer); // Remove /bin
+  llvm::sys::path::append(locPathBuffer, "share", "swift", "diagnostics");
+  return std::string(locPathBuffer);
+}
+
+std::string
+CompilerInvocation::getLocalizationPath(llvm::vfs::FileSystem &FS) const {
+  return computeLocalizationPath(DiagnosticOpts,
+                                 FrontendOpts.MainExecutablePath, FS);
 }
 
 static void configureDiagnosticEngine(
     const DiagnosticOptions &Options,
     std::optional<version::Version> effectiveLanguageVersion,
-    StringRef mainExecutablePath, DiagnosticEngine &Diagnostics) {
+    StringRef mainExecutablePath, DiagnosticEngine &Diagnostics,
+    llvm::vfs::FileSystem &FS) {
   if (Options.ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
@@ -3103,31 +3177,45 @@ static void configureDiagnosticEngine(
   llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
   Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
 
-  if (!Options.LocalizationCode.empty()) {
-    std::string locPath = Options.LocalizationPath;
-    if (locPath.empty()) {
-      llvm::SmallString<128> locPathBuffer(mainExecutablePath);
-      llvm::sys::path::remove_filename(locPathBuffer); // Remove /swift
-      llvm::sys::path::remove_filename(locPathBuffer); // Remove /bin
-      llvm::sys::path::append(locPathBuffer, "share", "swift", "diagnostics");
-      locPath = locPathBuffer.str();
-    }
-    Diagnostics.setLocalization(Options.LocalizationCode, locPath);
-  }
+  std::string localizationPath =
+      computeLocalizationPath(Options, mainExecutablePath, FS);
+  if (!localizationPath.empty())
+    Diagnostics.setLocalization(Options.LocalizationCode, localizationPath, FS);
 
   if (effectiveLanguageVersion)
     Diagnostics.setLanguageVersion(*effectiveLanguageVersion);
 }
 
 /// Configures the diagnostic engine for the invocation's options.
-void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags) {
+void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags,
+                                               llvm::vfs::FileSystem &FS) {
   configureDiagnosticEngine(DiagnosticOpts, LangOpts.EffectiveLanguageVersion,
-                            FrontendOpts.MainExecutablePath, diags);
+                            FrontendOpts.MainExecutablePath, diags, FS);
 
   // Once configured, immediately diagnose any unknown warning groups that were
   // encountered while parsing the diagnostic options.
   for (const auto &unknownGroup : DiagnosticOpts.UnknownWarningGroups) {
     diags.diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
+  }
+
+  if (!DiagnosticOpts.LocalizationPath.empty()) {
+    if (!FS.exists(DiagnosticOpts.LocalizationPath)) {
+      diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
+                     DiagnosticOpts.LocalizationPath);
+    } else if (!DiagnosticOpts.LocalizationCode.empty()) {
+      // Check if the localization path exists but it doesn't have a file
+      // for the specified locale code.
+      llvm::SmallString<128> localizationPath(DiagnosticOpts.LocalizationPath);
+      llvm::sys::path::append(localizationPath,
+                              DiagnosticOpts.LocalizationCode);
+      llvm::sys::path::replace_extension(localizationPath, ".db");
+      bool hasSerializedFile = FS.exists(localizationPath);
+      llvm::sys::path::replace_extension(localizationPath, ".strings");
+      if (!hasSerializedFile && !FS.exists(localizationPath)) {
+        diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
+                       DiagnosticOpts.LocalizationCode, localizationPath);
+      }
+    }
   }
 }
 
@@ -3223,6 +3311,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   // Propagate -experimental-skip-non-exportable-decls to SIL.
   Opts.SkipNonExportableDecls = LangOpts.SkipNonExportableDecls;
+
+  // The generated C++ header references the declarations it prints, which
+  // must then survive optimization. Only internal declarations can be removed
+  // otherwise; public and package ones are already visible outside the module.
+  // This does not require -emit-clang-header-path: when the driver emits the
+  // module in a separate job, only that job gets the header path, while every
+  // job gets -emit-clang-header-min-access.
+  if (FEOpts.clangHeaderHasCxxContent(LangOpts.EnableCXXInterop) &&
+      FEOpts.ClangHeaderMinAccess == AccessLevel::Internal) {
+    Opts.CxxHeaderMinAccess = FEOpts.ClangHeaderMinAccess;
+    Opts.CxxHeaderRequiresExposeAttr = FEOpts.clangHeaderRequiresExposeAttr();
+  }
 
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
@@ -3414,8 +3514,19 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EnableRecompilationToOSSAModule |=
       Args.hasArg(OPT_enable_recompilation_to_ossa_module);
   Opts.EnableOSSAOptimizations &= !Args.hasArg(OPT_disable_ossa_opts);
+
+  Opts.EnableLifetimeResolution =
+      Args.hasFlag(OPT_enable_lifetime_resolution,
+                   OPT_disable_lifetime_resolution,
+                   Opts.EnableLifetimeResolution);
+
+  // By default, enable SIL Opaque Values when using LifetimeResolution.
+  const bool OpaqueValuesDefaultEnablement = Opts.EnableLifetimeResolution;
+
   Opts.EnableSILOpaqueValues = Args.hasFlag(
-      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values, false);
+      OPT_enable_sil_opaque_values, OPT_disable_sil_opaque_values,
+      OpaqueValuesDefaultEnablement);
+
   Opts.EnableAsyncDemotion |= Args.hasArg(OPT_enable_async_demotion);
   Opts.EnableThrowsPrediction = Args.hasFlag(
       OPT_enable_throws_prediction, OPT_disable_throws_prediction,
@@ -3463,14 +3574,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasFlag(OPT_enable_lifetime_dependence_diagnostics,
                    OPT_disable_lifetime_dependence_diagnostics,
                    Opts.EnableLifetimeDependenceDiagnostics);
-  Opts.EnableLifetimeResolution =
-      Args.hasFlag(OPT_enable_lifetime_resolution,
-                   OPT_disable_lifetime_resolution,
-                   Opts.EnableLifetimeResolution);
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
-  Opts.VerifyOwnershipAll |= Args.hasArg(OPT_sil_ownership_verify_all);
   Opts.AbortOnUnknownRegionIsolationPatternError |=
       Args.hasArg(OPT_sil_region_isolation_assert_on_unknown_pattern);
   Opts.EmitIsolationHistory |=
@@ -3493,7 +3599,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
   Opts.DisableSILPartialApply |=
     Args.hasArg(OPT_disable_sil_partial_apply);
-  Opts.VerifySILOwnership &= !Args.hasArg(OPT_disable_sil_ownership_verifier);
   Opts.EnableDynamicReplacementCanCallPreviousImplementation = !Args.hasArg(
       OPT_disable_previous_implementation_calls_in_dynamic_replacements);
   Opts.ParseStdlib = FEOpts.ParseStdlib;
@@ -3610,10 +3715,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     Opts.ShouldFunctionsBePreservedToDebugger &=
         LTOKind.value() == IRGenLLVMLTOKind::None;
 
-  Opts.EnableAddressDependencies = Args.hasFlag(
-      OPT_enable_address_dependencies, OPT_disable_address_dependencies,
-      Opts.EnableAddressDependencies);
-
   if (LangOpts.Target.isOSDarwin() || LangOpts.Target.isOSLinux()) {
     // On Darwin and Linux, use yield_once_2 by default.
     Opts.CoroutineAccessorsUseYieldOnce2 = true;
@@ -3629,9 +3730,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 }
 
 void CompilerInvocation::buildDebugFlags(std::string &Output,
-                                         const ArgList &Args,
-                                         StringRef SDKPath,
-                                         StringRef ResourceDir) {
+                                         const ArgList &Args, StringRef SDKPath,
+                                         StringRef ResourceDir,
+                                         llvm::vfs::FileSystem &FS) {
   ArgStringList ReducedArgs;
   for (auto *A : Args) {
     // Do not encode cache invariant options, even for non-caching build.
@@ -3655,12 +3756,24 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   // This isn't guaranteed to be the same temp directory as what the driver
   // uses, but it's highly likely.
   llvm::SmallString<128> TDir;
-  llvm::sys::path::system_temp_directory(true, TDir);
+  {
+    // On Windows, the temporary directory is made absolute against the current
+    // directory of the process.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    llvm::sys::path::system_temp_directory(true, TDir);
+  }
+
+  llvm::SmallString<128> WorkingDir;
+  if (auto CWD = FS.getCurrentWorkingDirectory())
+    WorkingDir = *CWD;
 
   llvm::raw_string_ostream OS(Output);
-  interleave(ReducedArgs,
-             [&](const char *Argument) { PrintArg(OS, Argument, TDir.str()); },
-             [&] { OS << " "; });
+  interleave(
+      ReducedArgs,
+      [&](const char *Argument) {
+        PrintArg(OS, Argument, TDir.str(), WorkingDir);
+      },
+      [&] { OS << " "; });
 
   // Inject the SDK path and resource dir if they are nonempty and missing.
   bool haveSDKPath = SDKPath.empty();
@@ -3675,11 +3788,11 @@ void CompilerInvocation::buildDebugFlags(std::string &Output,
   }
   if (!haveSDKPath) {
     OS << " -sdk ";
-    PrintArg(OS, SDKPath.data(), TDir.str());
+    PrintArg(OS, SDKPath.data(), TDir.str(), WorkingDir);
   }
   if (!haveResourceDir) {
     OS << " -resource-dir ";
-    PrintArg(OS, ResourceDir.data(), TDir.str());
+    PrintArg(OS, ResourceDir.data(), TDir.str(), WorkingDir);
   }
 }
 
@@ -3689,6 +3802,26 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   using namespace options;
 
   Opts.HasMultipleIGMs = Invocation.getIRGenOptions().hasMultipleIGMs();
+
+  if (Invocation.getFrontendOptions().InputsAndOutputs.hasTBDPath()) {
+    // A TBD file would describe symbols that the object file doesn't have.
+    if (Args.hasArg(OPT_emit_empty_object_file)) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_empty_object_file);
+      return true;
+    }
+
+    // Under the "inlinable" code generation model of Embedded Swift, which
+    // symbols get strong definitions depends on how they are used.
+    const auto &langOpts = Invocation.getLangOptions();
+    if (langOpts.hasFeature(Feature::Embedded) &&
+        langOpts.CodeGenerationModelOverride.value_or(
+            CodeGenerationModel::Inlinable) == CodeGenerationModel::Inlinable) {
+      Diags.diagnose(SourceLoc(),
+                     diag::tbd_not_supported_with_inlinable_code_generation);
+      return true;
+    }
+  }
 
   if (const Arg *A = Args.getLastArg(OPT_module_link_name)) {
     Opts.ModuleLinkName = A->getValue();
@@ -3704,6 +3837,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
   Opts.FragileResilientProtocols =
     Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
+  Opts.RelativeProtocolWitnessTables =
+      Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
+                   OPT_disable_relative_protocol_witness_tables, false);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();
@@ -3721,15 +3857,12 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   return false;
 }
 
-static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
-                           DiagnosticEngine &Diags,
-                           const FrontendOptions &FrontendOpts,
-                           const SILOptions &SILOpts,
-                           const LangOptions &LangOpts,
-                           const CASOptions &CASOpts,
-                           StringRef SDKPath,
-                           StringRef ResourceDir,
-                           const llvm::Triple &Triple) {
+static bool
+ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args, DiagnosticEngine &Diags,
+               const FrontendOptions &FrontendOpts, const SILOptions &SILOpts,
+               const LangOptions &LangOpts, const CASOptions &CASOpts,
+               StringRef SDKPath, StringRef ResourceDir,
+               const llvm::Triple &Triple, llvm::vfs::FileSystem &FS) {
   using namespace options;
 
   if (!SILOpts.SILOutputFileNameForDebugging.empty()) {
@@ -3747,17 +3880,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
   if (Opts.DebugInfoLevel >= IRGenDebugInfoLevel::LineTables) {
     if (Args.hasArg(options::OPT_debug_info_store_invocation))
-      CompilerInvocation::buildDebugFlags(Opts.DebugFlags,
-                                          Args, SDKPath,
-                                          ResourceDir);
+      CompilerInvocation::buildDebugFlags(Opts.DebugFlags, Args, SDKPath,
+                                          ResourceDir, FS);
 
     if (const Arg *A = Args.getLastArg(OPT_file_compilation_dir))
       Opts.DebugCompilationDir = A->getValue();
-    else {
-      llvm::SmallString<256> cwd;
-      llvm::sys::fs::current_path(cwd);
-      Opts.DebugCompilationDir = std::string(cwd.str());
-    }
+    else if (auto cwd = FS.getCurrentWorkingDirectory())
+      Opts.DebugCompilationDir = *cwd;
   }
   if (const Arg *A = Args.getLastArg(options::OPT_debug_info_format)) {
     if (A->containsValue("dwarf"))
@@ -3833,6 +3962,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     auto SplitMap = StringRef(A).split('=');
     Opts.CoveragePrefixMap.addMapping(SplitMap.first, SplitMap.second);
   }
+  if (auto cwd = FS.getCurrentWorkingDirectory())
+    Opts.CoverageCompilationDir = *cwd;
 
   for (const Arg *A : Args.filtered(OPT_Xcc)) {
     StringRef Opt = A->getValue();
@@ -4165,6 +4296,25 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
                      A->getAsString(Args), A->getValue());
     }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_dump_abstract_type_layout_info_EQ)) {
+    StringRef kind(A->getValue());
+    if (kind == "sil-type")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::SILType;
+    else if (kind == "type-lowering")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeLowering;
+    else if (kind == "type-info")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::TypeInfo;
+    else if (kind == "all")
+      Opts.DumpAbstractTypeLayoutInfo =
+          IRGenOptions::AbstractTypeLayoutInfoDumpKind::All;
+    else
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
   }
 
   auto getRuntimeCompatVersion = [&]() -> std::optional<llvm::VersionTuple> {
@@ -4519,11 +4669,15 @@ bool CompilerInvocation::parseArgs(
     ArrayRef<const char *> Args, DiagnosticEngine &Diags,
     SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
         *ConfigurationFileBuffers,
-    StringRef workingDirectory, StringRef mainExecutablePath) {
+    StringRef workingDirectory, StringRef mainExecutablePath,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
   using namespace options;
 
   if (Args.empty())
     return false;
+
+  if (!FS)
+    FS = llvm::vfs::createPhysicalFileSystem();
 
   // Parse frontend command line options using Swift's option table.
   unsigned MissingIndex;
@@ -4553,12 +4707,12 @@ bool CompilerInvocation::parseArgs(
   }
   configureDiagnosticEngine(DiagnosticOpts,
                             /*effectiveLanguageVersion=*/std::nullopt,
-                            mainExecutablePath, Diags);
+                            mainExecutablePath, Diags, *FS);
 
   ParseAssertionArgs(ParsedArgs);
 
   if (ParseFrontendArgs(FrontendOpts, ParsedArgs, Diags,
-                        ConfigurationFileBuffers)) {
+                        ConfigurationFileBuffers, *FS)) {
     return true;
   }
 
@@ -4573,8 +4727,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
-                    FrontendOpts)) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, DiagnosticOpts,
+                    ModuleInterfaceOpts, FrontendOpts)) {
     return true;
   }
 
@@ -4583,8 +4737,8 @@ bool CompilerInvocation::parseArgs(
   }
 
   if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory, LangOpts, FrontendOpts,
-                             CASOpts)) {
+                             workingDirectory, LangOpts, FrontendOpts, CASOpts,
+                             *FS)) {
     return true;
   }
 
@@ -4602,7 +4756,8 @@ bool CompilerInvocation::parseArgs(
 
   if (ParseIRGenArgs(IRGenOpts, ParsedArgs, Diags, FrontendOpts, SILOpts,
                      LangOpts, CASOpts, getSDKPath(),
-                     SearchPathOpts.RuntimeResourcePath, LangOpts.Target)) {
+                     SearchPathOpts.RuntimeResourcePath, LangOpts.Target,
+                     *FS)) {
     return true;
   }
 
@@ -4615,18 +4770,17 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
-                             SearchPathOpts, Diags);
+  SDKInfo = parseSDKSettings(*FS, LangOpts, SearchPathOpts, Diags);
 
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
   updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
-  setDefaultPrebuiltCacheIfNecessary();
+  setDefaultPrebuiltCacheIfNecessary(FS);
   setDefaultInProcessPluginServerPathIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
   setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
-  computeCXXStdlibOptions();
+  computeCXXStdlibOptions(FS);
   computeAArch64TBIOptions();
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
@@ -4640,20 +4794,16 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::StrictMemorySafety)) {
-    if (SILOpts.RemoveRuntimeAsserts ||
-        SILOpts.AssertConfig == SILOptions::Unchecked) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-Ounchecked");
-    }
+  if (SILOpts.RemoveRuntimeAsserts ||
+      SILOpts.AssertConfig == SILOptions::Unchecked) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-Ounchecked");
+  }
 
-    if (!LangOpts.EnableAccessControl &&
-        FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-disable-access-control");
-    }
+  if (!LangOpts.EnableAccessControl &&
+      FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-disable-access-control");
   }
 
   SILOpts.UseAggressiveReg2MemForCodeSize =

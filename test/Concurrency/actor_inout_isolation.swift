@@ -39,7 +39,7 @@ actor TestActor {
   var value2: Int = 1 // expected-note 5{{property declared here}}
   var points: [Point] = [] // expected-note {{property declared here}}
 
-  subscript(x : inout Int) -> Int { // expected-error {{'inout' may only be used on function or initializer parameters}}
+  subscript(x : inout Int) -> Int {
     x += 1
     return x
   }
@@ -179,6 +179,10 @@ extension TestActor {
   func modifiedByOtherTestActor(_ other: TestActor) async {
     //expected-error@+1{{actor-isolated property 'value2' cannot be passed 'inout' to implicitly 'async' function call}}
     await other.modify(&value2)
+
+    var i = 0
+    _ = await other[&i]
+    _ = i
   }
 
   // Actor state passed inout to an implicitly async function on an actor of a

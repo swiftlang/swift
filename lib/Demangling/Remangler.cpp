@@ -214,7 +214,7 @@ namespace {
 
 class Remangler : public RemanglerBase {
   template <typename Mangler>
-  friend void Mangle::mangleIdentifier(Mangler &M, StringRef ident);
+  friend bool Mangle::mangleIdentifier(Mangler &M, StringRef ident);
   friend class Mangle::SubstitutionMerging;
 
   const ManglingFlavor Flavor = ManglingFlavor::Default;
@@ -239,9 +239,6 @@ class Remangler : public RemanglerBase {
   void addWord(const SubstitutionWord &word) {
     Words.push_back(word, Factory);
   }
-
-  template <typename Mangler>
-  friend void mangleIdentifier(Mangler &M, StringRef ident);
 
   class EntityContext {
     bool AsContext = false;
@@ -350,7 +347,7 @@ class Remangler : public RemanglerBase {
   bool trySubstitution(Node *node, SubstitutionEntry &entry,
                        bool treatAsIdentifier = false);
 
-  void mangleIdentifierImpl(Node *node, bool isOperator);
+  ManglingError mangleIdentifierImpl(Node *node, bool isOperator);
 
   bool mangleStandardSubstitution(Node *node);
 
@@ -442,16 +439,18 @@ bool Remangler::trySubstitution(Node *node, SubstitutionEntry &entry,
   return true;
 }
 
-void Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
+ManglingError Remangler::mangleIdentifierImpl(Node *node, bool isOperator) {
   SubstitutionEntry entry;
-  if (trySubstitution(node, entry, /*treatAsIdentifier*/ true)) return;
-  if (isOperator) {
-    Mangle::mangleIdentifier(*this,
-                              Mangle::translateOperator(node->getText()));
-  } else {
-    Mangle::mangleIdentifier(*this, node->getText());
-  }
+  if (trySubstitution(node, entry, /*treatAsIdentifier*/ true))
+    return ManglingError::Success;
+  bool mangled =
+      isOperator ? Mangle::mangleIdentifier(
+                       *this, Mangle::translateOperator(node->getText()))
+                 : Mangle::mangleIdentifier(*this, node->getText());
+  if (!mangled)
+    return MANGLING_ERROR(ManglingError::InvalidIdentifier, node);
   addSubstitution(entry);
+  return ManglingError::Success;
 }
 
 bool Remangler::mangleStandardSubstitution(Node *node) {
@@ -855,6 +854,14 @@ ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
   RETURN_IF_ERROR(
       mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
   Buffer << "XO";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
+                                                            unsigned depth) {
+  RETURN_IF_ERROR(
+      mangleChildNodesReversed(node, depth + 1)); // argument tuple, result type
+  Buffer << "XOo";
   return ManglingError::Success;
 }
 
@@ -1657,6 +1664,9 @@ Remangler::mangleFunctionSignatureSpecializationParam(Node *node,
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Buffer << 'C' << node->getChild(idx++)->getIndex();
       break;
+    case FunctionSigSpecializationParamKind::DifferentiableFunctionProp:
+      Buffer << 'a';
+      break;
     case FunctionSigSpecializationParamKind::BoxToValue:
       Buffer << 'i';
       break;
@@ -1914,6 +1924,7 @@ ManglingError Remangler::mangleGlobal(Node *node, unsigned depth) {
       case Node::Kind::AccessibleFunctionRecord:
       case Node::Kind::BackDeploymentThunk:
       case Node::Kind::BackDeploymentFallback:
+      case Node::Kind::BackDeploymentCopy:
       case Node::Kind::HasSymbolQuery:
       case Node::Kind::CoroFunctionPointer:
       case Node::Kind::DefaultOverride:
@@ -1940,8 +1951,7 @@ ManglingError Remangler::mangleGlobalGetter(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleIdentifier(Node *node, unsigned depth) {
-  mangleIdentifierImpl(node, /*isOperator*/ false);
-  return ManglingError::Success;
+  return mangleIdentifierImpl(node, /*isOperator*/ false);
 }
 
 ManglingError Remangler::mangleIndex(Node *node, unsigned depth) {
@@ -1992,6 +2002,12 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
 ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
                                                       unsigned depth) {
   Buffer << 'O';
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplCalledAtMostOnceFunction(Node *node,
+                                                            unsigned depth) {
+  Buffer << "Oo";
   return ManglingError::Success;
 }
 
@@ -2205,6 +2221,9 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
         break;
       case Node::Kind::ImplCalledOnceFunction:
         Buffer << 'O';
+        break;
+      case Node::Kind::ImplCalledAtMostOnceFunction:
+        Buffer << "Oo";
         break;
       case Node::Kind::ImplSendingResult:
         Buffer << 'T';
@@ -2425,7 +2444,7 @@ ManglingError Remangler::mangleNoDerivative(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::mangleInfixOperator(Node *node, unsigned depth) {
-  mangleIdentifierImpl(node, /*isOperator*/ true);
+  RETURN_IF_ERROR(mangleIdentifierImpl(node, /*isOperator*/ true));
   Buffer << "oi";
   return ManglingError::Success;
 }
@@ -2791,13 +2810,13 @@ ManglingError Remangler::mangleAsyncMainEntryPoint(Node *node, unsigned depth) {
 }
 
 ManglingError Remangler::manglePostfixOperator(Node *node, unsigned depth) {
-  mangleIdentifierImpl(node, /*isOperator*/ true);
+  RETURN_IF_ERROR(mangleIdentifierImpl(node, /*isOperator*/ true));
   Buffer << "oP";
   return ManglingError::Success;
 }
 
 ManglingError Remangler::manglePrefixOperator(Node *node, unsigned depth) {
-  mangleIdentifierImpl(node, /*isOperator*/ true);
+  RETURN_IF_ERROR(mangleIdentifierImpl(node, /*isOperator*/ true));
   Buffer << "op";
   return ManglingError::Success;
 }
@@ -3477,7 +3496,14 @@ ManglingError Remangler::mangleTypeMetadataCompletionFunction(Node *node,
 ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
                                                            unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
-  Buffer << "MD";
+  Buffer << "Md";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleTypeMetadataMangledNameRef(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "MR";
   return ManglingError::Success;
 }
 
@@ -4158,6 +4184,12 @@ ManglingError Remangler::mangleBackDeploymentThunk(Node *node,
 ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
                                                       unsigned depth) {
   Buffer << "TwB";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleBackDeploymentCopy(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twa";
   return ManglingError::Success;
 }
 

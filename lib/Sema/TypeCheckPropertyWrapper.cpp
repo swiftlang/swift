@@ -350,7 +350,7 @@ static bool validateEnclosingSelfSubscript(SubscriptDecl *subscript) {
                                     ->getAs<ProtocolCompositionType>()) {
         auto newType = compositionTy->withoutMarkerProtocols();
         if (!newType->isEqual(compositionTy)) {
-          paramTy = newType->getClassOrBoundGenericClass()
+          paramTy = newType->getClassDecl()
                         ? newType
                         : ExistentialType::get(newType);
         }

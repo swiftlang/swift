@@ -1,6 +1,9 @@
 
 /* Generic Signature Changes */
 cake: Constructor S1.init(_:) has mangled name changing from 'cake.S1.init(Swift.Int) -> cake.S1' to 'cake.S1.init(Swift.Double) -> cake.S1'
+cake: Constructor TypedThrowsOpenClassInits.init() has mangled name changing from 'cake.TypedThrowsOpenClassInits.init() throws -> cake.TypedThrowsOpenClassInits' to 'cake.TypedThrowsOpenClassInits.init() throws(cake.TypedThrowsError) -> cake.TypedThrowsOpenClassInits'
+cake: Constructor TypedThrowsOpenClassInits.init(x:) has mangled name changing from 'cake.TypedThrowsOpenClassInits.init(x: Swift.Int) throws -> cake.TypedThrowsOpenClassInits' to 'cake.TypedThrowsOpenClassInits.init(x: Swift.Int) throws(cake.TypedThrowsError) -> cake.TypedThrowsOpenClassInits'
+cake: Constructor TypedThrowsOpenClassInits.init(y:) has mangled name changing from 'cake.TypedThrowsOpenClassInits.init(y: Swift.Int) throws -> cake.TypedThrowsOpenClassInits' to 'cake.TypedThrowsOpenClassInits.init(y: Swift.Int) throws(cake.TypedThrowsError) -> cake.TypedThrowsOpenClassInits'
 cake: Func C1.foo1() has mangled name changing from 'static cake.C1.foo1() -> ()' to 'cake.C1.foo1() -> ()'
 cake: Func C1.foo2(_:) has mangled name changing from 'cake.C1.foo2(Swift.Int) -> ()' to 'cake.C1.foo2(() -> ()) -> ()'
 cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
@@ -8,11 +11,18 @@ cake: Func P1.P1Constraint() has mangled name changing from '(extension in cake)
 cake: Func S1.foo3() has mangled name changing from 'cake.S1.foo3() -> ()' to 'static cake.S1.foo3() -> ()'
 cake: Func S1.foo5(x:y:) has mangled name changing from 'cake.S1.foo5(x: Swift.Int, y: Swift.Int) -> ()' to 'cake.S1.foo5(x: Swift.Int, y: Swift.Int, z: Swift.Int) -> ()'
 cake: Func Somestruct2.foo1(_:) has mangled name changing from 'static cake.Somestruct2.foo1(cake.C3) -> ()' to 'static cake.NSSomestruct2.foo1(cake.C1) -> ()'
+cake: Func TypedThrowsOpenClass.untypedToTypedThrowsOpen() has mangled name changing from 'cake.TypedThrowsOpenClass.untypedToTypedThrowsOpen() throws -> ()' to 'cake.TypedThrowsOpenClass.untypedToTypedThrowsOpen() throws(cake.TypedThrowsError) -> ()'
+cake: Func TypedThrowsProto.untypedToTypedThrowsReq() has mangled name changing from 'cake.TypedThrowsProto.untypedToTypedThrowsReq() throws -> ()' to 'cake.TypedThrowsProto.untypedToTypedThrowsReq() throws(cake.TypedThrowsError) -> ()'
 cake: Func addingAnInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
 cake: Func addingAnInverse(_:) has mangled name changing from 'cake.addingAnInverse<A>(A) -> ()' to 'cake.addingAnInverse<A where A: ~Swift.Copyable>(A) -> ()'
 cake: Func addingAnInversePreInverse(_:) has generic signature change from <T> to <T where T : ~Copyable>
+cake: Func genericTypedToUntypedThrows(_:) has mangled name changing from 'cake.genericTypedToUntypedThrows<A where A: Swift.Error>(A) throws(A) -> ()' to 'cake.genericTypedToUntypedThrows<A where A: Swift.Error>(A) throws -> ()'
 cake: Func ownershipChange(_:_:) has mangled name changing from 'cake.ownershipChange(inout Swift.Int, __shared Swift.Int) -> ()' to 'cake.ownershipChange(Swift.Int, __owned Swift.Int) -> ()'
 cake: Func returnFunctionTypeOwnershipChange() has mangled name changing from 'cake.returnFunctionTypeOwnershipChange() -> (cake.C1) -> ()' to 'cake.returnFunctionTypeOwnershipChange() -> (__owned cake.C1) -> ()'
+cake: Func typedThrowsErrorChanged() has mangled name changing from 'cake.typedThrowsErrorChanged() throws(cake.TypedThrowsError) -> ()' to 'cake.typedThrowsErrorChanged() throws(cake.OtherTypedThrowsError) -> ()'
+cake: Func typedToUntypedThrows() has mangled name changing from 'cake.typedToUntypedThrows() throws(cake.TypedThrowsError) -> ()' to 'cake.typedToUntypedThrows() throws -> ()'
+cake: Func untypedToNeverThrows() has mangled name changing from 'cake.untypedToNeverThrows() throws -> ()' to 'cake.untypedToNeverThrows() -> ()'
+cake: Func untypedToTypedThrows() has mangled name changing from 'cake.untypedToTypedThrows() throws -> ()' to 'cake.untypedToTypedThrows() throws(cake.TypedThrowsError) -> ()'
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 cake: Struct Somestruct2 has mangled name changing from 'cake.Somestruct2' to 'cake.NSSomestruct2'
 
@@ -44,19 +54,30 @@ cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
 cake: Accessor Zoo.current.Get() has return type change from cake.Cat to cake.Dog
+cake: Accessor typedThrowsGetter.Get() has thrown error type change from cake.TypedThrowsError to cake.OtherTypedThrowsError
 cake: AssociatedType AssociatedTypePro.T3 has default type change from cake.C1 to cake.C6
 cake: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Swift.Int to Swift.String
 cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swift.Double
+cake: Constructor TypedThrowsOpenClassInits.init() has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Constructor TypedThrowsOpenClassInits.init(x:) has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Constructor TypedThrowsOpenClassInits.init(y:) has thrown error type change from any Swift.Error to cake.TypedThrowsError
 cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()
 cake: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func EscapingFunctionType.addedEscaping(_:) has added '@escaping' in parameter 0
 cake: Func EscapingFunctionType.removedEscaping(_:) has removed '@escaping' in parameter 0
 cake: Func Somestruct2.foo1(_:) has parameter 0 type change from cake.C3 to cake.C1
+cake: Func TypedThrowsOpenClass.untypedToTypedThrowsOpen() has thrown error type change from any Swift.Error to cake.TypedThrowsError
+cake: Func TypedThrowsProto.untypedToTypedThrowsReq() has thrown error type change from any Swift.Error to cake.TypedThrowsError
 cake: Func Zoo.getCurrentAnimalInlinable() has return type change from [cake.Cat] to [cake.Dog]
+cake: Func genericTypedToUntypedThrows(_:) has thrown error type change from τ_0_0 to any Swift.Error
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 cake: Func returnFunctionTypeOwnershipChange() has return type change from (cake.C1) -> () to (__owned cake.C1) -> ()
+cake: Func typedThrowsErrorChanged() has thrown error type change from cake.TypedThrowsError to cake.OtherTypedThrowsError
+cake: Func typedToUntypedThrows() has thrown error type change from cake.TypedThrowsError to any Swift.Error
+cake: Func untypedToNeverThrows() has thrown error type change from any Swift.Error to Swift.Never
+cake: Func untypedToTypedThrows() has thrown error type change from any Swift.Error to cake.TypedThrowsError
 cake: Var Zoo.current has declared type change from cake.Cat to cake.Dog
 
 /* Decl Attribute changes */
@@ -64,6 +85,7 @@ cake: Accessor GlobalLetChangedToVar.Modify() is a new API without '@available'
 cake: Accessor GlobalLetChangedToVar.Set() is a new API without '@available'
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without '@available'
 cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without '@available'
+cake: Accessor nonThrowingToThrowingGetter.Get() is now throwing
 cake: AssociatedType RequirementChanges.addedTypeWithDefault is a new API without '@available'
 cake: AssociatedType RequirementChanges.addedTypeWithoutDefault is a new API without '@available'
 cake: Class C0 is a new API without '@available'

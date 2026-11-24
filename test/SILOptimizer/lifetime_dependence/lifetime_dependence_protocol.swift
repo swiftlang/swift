@@ -4,6 +4,12 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil \
+// RUN:   -enable-builtin-module \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name test \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -o /dev/null
 
 // REQUIRES: swift_feature_Lifetimes
 

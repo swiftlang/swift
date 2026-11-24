@@ -142,10 +142,12 @@ public func registerTests() {
   registerTests(
     parseTestSpecificationTest,
     basicBlockTest,
+    postOrderBlocksTest,
     instructionIndexTest,
     instructionIterationTest,
     instructionWorklistTest,
     smallProjectionPathTest,
+    fieldIndexTrieTest,
     getAccessBaseTest,
     accessPathTest,
     updateBorrowedFromTest,

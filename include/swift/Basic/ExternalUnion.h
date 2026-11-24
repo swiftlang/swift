@@ -52,6 +52,19 @@ public:
      indexInTail != -1 ? indexInTail + 1 : -1);
 };
 
+template <unsigned index, class... Members>
+struct typeAtIndex;
+
+template <class Head, class... Tail>
+struct typeAtIndex<0, Head, Tail...> {
+  using type = Head;
+};
+
+template <unsigned index, class Head, class... Tail>
+struct typeAtIndex<index, Head, Tail...> {
+  using type = typename typeAtIndex<index - 1, Tail...>::type;
+};
+
 /// A helper class for deriving information and rule-of-five operations
 /// for the storage of a union.
 template <class... Members>
@@ -104,6 +117,10 @@ struct ExternalUnionMembers {
   static constexpr bool contains() {
     return ExternalUnionImpl::indexOf<T, Members...>::value != -1;
   }
+
+  template <Index index>
+  using typeForIndex =
+    typename ExternalUnionImpl::typeAtIndex<unsigned(index), Members...>::type;
 };
 
 /// An external union that uses the member-list index as the user-facing
@@ -308,6 +325,10 @@ public:
   enum : bool {
     union_is_trivially_copyable = decltype(Union)::union_is_trivially_copyable
   };
+
+  template <Kind K>
+  using typeForKind =
+    typename Members::template typeForIndex<GetIndexForKind(K)>;
 
   /// Construct a union member in-place.
   template <class T, class... Args>

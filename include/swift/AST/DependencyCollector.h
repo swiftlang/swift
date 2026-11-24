@@ -58,18 +58,6 @@ struct DependencyCollector {
         : kind(kind), subject(subject), name(name) {}
 
   public:
-    static Reference empty() {
-      return {Kind::Empty, llvm::DenseMapInfo<DeclContext *>::getEmptyKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getEmptyKey()};
-    }
-
-    static Reference tombstone() {
-      return {Kind::Tombstone,
-              llvm::DenseMapInfo<DeclContext *>::getTombstoneKey(),
-              llvm::DenseMapInfo<DeclBaseName>::getTombstoneKey()};
-    }
-
-  public:
     static Reference usedMember(DeclContext *subject, DeclBaseName name) {
       return {Kind::UsedMember, subject, name};
     }
@@ -88,10 +76,6 @@ struct DependencyCollector {
 
   public:
     struct Info {
-      static inline Reference getEmptyKey() { return Reference::empty(); }
-      static inline Reference getTombstoneKey() {
-        return Reference::tombstone();
-      }
       static inline unsigned getHashValue(const Reference &Val) {
         return llvm::hash_combine(Val.kind, Val.subject,
                                   Val.name.getAsOpaquePointer());

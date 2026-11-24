@@ -22,6 +22,10 @@
 #include <mutex>
 #include "llvm/ADT/ArrayRef.h"
 
+namespace llvm::vfs {
+class FileSystem;
+}
+
 namespace swift {
 
 /// Base class for compiler plugins, or plugin servers.
@@ -226,10 +230,11 @@ public:
   llvm::Expected<CompilerPlugin *>
   getInProcessPlugins(llvm::StringRef serverPath);
 
-  /// Load an executable plugin specified by \p path .
+  /// Load an executable plugin specified by \p path in \p fs.
   /// If \p path plugin is already loaded, this returns the cached object.
-  llvm::Expected<CompilerPlugin *> loadExecutablePlugin(llvm::StringRef path,
-                                                        bool disableSandbox);
+  llvm::Expected<CompilerPlugin *>
+  loadExecutablePlugin(llvm::StringRef path, bool disableSandbox,
+                       llvm::vfs::FileSystem &fs);
 };
 
 } // namespace swift

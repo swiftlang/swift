@@ -4,6 +4,12 @@
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out %t/%target-library-name(FakeDistributedActorSystems) | %FileCheck %s
 
+// RUN: %empty-directory(%t/opaque-values)
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -target %target-cpu-apple-macosx13.0 -parse-as-library -emit-library -Xlinker -install_name -Xlinker @executable_path/%target-library-name(FakeDistributedActorSystems) -emit-module-path %t/opaque-values/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems %S/../Inputs/FakeDistributedActorSystems.swift -o %t/opaque-values/%target-library-name(FakeDistributedActorSystems)
+// RUN: %target-build-swift -Xfrontend -enable-sil-opaque-values -target %target-cpu-apple-macosx13.0 -parse-as-library -lFakeDistributedActorSystems -module-name main -I %t/opaque-values -L %t/opaque-values %s -o %t/opaque-values/a.out
+// RUN: %target-codesign %t/opaque-values/a.out
+// RUN: %target-run %t/opaque-values/a.out %t/opaque-values/%target-library-name(FakeDistributedActorSystems) | %FileCheck %s
+
 // REQUIRES: OS=macosx && (CPU=x86_64 || CPU=arm64)
 // REQUIRES: executable_test
 // REQUIRES: concurrency

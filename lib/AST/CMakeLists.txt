@@ -126,6 +126,7 @@ add_swift_host_library(swiftAST STATIC
   RequirementMachine/Symbol.cpp
   RequirementMachine/Term.cpp
   RequirementMachine/TypeDifference.cpp
+  ScopeRestrictions.cpp
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
@@ -158,7 +159,7 @@ if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
 endif()
 target_link_libraries(swiftAST INTERFACE
   clangCodeGen
-  clangIndex
+  clangUnifiedSymbolResolution
   clangFormat
   clangToolingCore
   clangFrontendTool

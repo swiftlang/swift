@@ -1,0 +1,5 @@
+module ListProxy {
+  header "header.h"
+  requires cplusplus
+  export *
+}

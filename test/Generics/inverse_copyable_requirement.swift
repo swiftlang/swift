@@ -160,71 +160,71 @@ func checkCasting(_ b: any Box, _ mo: borrowing MO, _ a: Any) {
 
   let _: Sendable = MO() // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
   let _: Copyable = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
-  let _: AnyObject = MO() // expected-error {{value of noncopyable type 'MO' cannot be converted to 'AnyObject'}}
+  let _: AnyObject = MO() // expected-error {{value of non-'Copyable' type 'MO' cannot be converted to 'AnyObject'}}
   let _: Any = mo // expected-error {{value of type 'MO' does not conform to specified type 'Copyable'}}
 
   _ = MO() as P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
   _ = MO() as any P // expected-error {{cannot convert value of type 'MO' to type 'any P' in coercion}}
   _ = MO() as Any // expected-error {{cannot convert value of type 'MO' to type 'Any' in coercion}}
   _ = MO() as MO
-  _ = MO() as AnyObject // expected-error {{value of noncopyable type 'MO' cannot be converted to 'AnyObject'}}
+  _ = MO() as AnyObject // expected-error {{value of non-'Copyable' type 'MO' cannot be converted to 'AnyObject'}}
   _ = 5 as MO // expected-error {{cannot convert value of type 'Int' to type 'MO' in coercion}}
   _ = a as MO // expected-error {{cannot convert value of type 'Any' to type 'MO' in coercion}}
   _ = b as MO // expected-error {{cannot convert value of type 'any Box' to type 'MO' in coercion}}
 
   _ = MO() is AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() is AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() is Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() is P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() is MO // expected-warning {{'is' test is always true}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   _ = 5 is MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = a is MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = b is MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   _ = MO() as! AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as! AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as! Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as! P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as! MO // expected-warning {{forced cast of 'MO' to same type has no effect}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   _ = 5 as! MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = a as! MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = b as! MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   _ = MO() as? AnyHashable // expected-warning {{cast from 'MO' to unrelated type 'AnyHashable' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as? AnyObject // expected-warning {{cast from 'MO' to unrelated type 'AnyObject' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as? Any // expected-warning {{cast from 'MO' to unrelated type 'Any' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as? P // expected-warning {{cast from 'MO' to unrelated type 'any P' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = MO() as? MO // expected-warning {{conditional cast from 'MO' to 'MO' always succeeds}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
   _ = 5 as? MO // expected-warning {{cast from 'Int' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = a as? MO // expected-warning {{cast from 'Any' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
   _ = b as? MO // expected-warning {{cast from 'any Box' to unrelated type 'MO' always fails}}
-  // expected-error@-1 {{noncopyable types cannot be conditionally cast}}
+  // expected-error@-1 {{non-'Copyable' types cannot be conditionally cast}}
 
 }
 

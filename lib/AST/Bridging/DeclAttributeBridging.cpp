@@ -142,6 +142,10 @@ BridgedAvailableAttr BridgedAvailableAttr_createUnavailableInEmbedded(
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupMember();
 }
+void BridgedAvailableAttr_setMacroLoc(BridgedAvailableAttr cAttr,
+                                      SourceLoc loc) {
+  cAttr.unbridged()->setMacroLoc(loc);
+}
 void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupedWithWildcard();
 }
@@ -495,6 +499,7 @@ MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
   case BridgedMacroSyntaxFreestanding:
     return MacroSyntax::Freestanding;
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
@@ -761,12 +766,32 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                     /*Implicit=*/false);
 }
 
+BridgedTailAllocatedAttr BridgedTailAllocatedAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
+    Identifier countsName, SourceLoc countsNameLoc, BridgedArrayRef cTypes) {
+  return TailAllocatedAttr::createParsed(cContext.unbridged(), atLoc, range,
+                                         countsName, countsNameLoc,
+                                         cTypes.unbridged<TypeRepr *>());
+}
+
 BridgedTargetAttr
 BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                                SourceRange range, BridgedStringRef cValue) {
   return new (cContext.unbridged())
       TargetAttr(cValue.unbridged(), atLoc, range,
                 /*Implicit=*/false);
+}
+
+BridgedScopeParamsAttr
+BridgedScopeParamsAttr_createParsed(BridgedASTContext cContext,
+                                    SourceLoc atLoc, SourceRange range,
+                                    BridgedArrayRef cParams) {
+  SmallVector<Located<ScopeName>, 2> params;
+  for (auto cParam : cParams.unbridged<BridgedLocatedIdentifier>())
+    params.push_back({ScopeName(cParam.Name), cParam.NameLoc});
+  auto &ctx = cContext.unbridged();
+  return new (ctx)
+      ScopeParamsAttr(atLoc, range, ScopeParamListRepr::create(ctx, params));
 }
 
 BridgedSetterAccessAttr
@@ -877,9 +902,8 @@ BridgedUnsafeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged()) UnsafeAttr(atLoc, range, isAlways);
 }
 
-BridgedCalledAttr
-BridgedCalledAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                               SourceRange range,
-                               swift::ExecutionSemantics semantics) {
-  return new (cContext.unbridged()) CalledAttr(atLoc, range, semantics);
+BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
+                                                     SourceLoc atLoc,
+                                                     SourceRange range) {
+  return new (cContext.unbridged()) CallableAttr(atLoc, range);
 }

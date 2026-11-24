@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters -enable-experimental-feature RawLayout
 
 // RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
@@ -16,6 +16,7 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_RawLayout
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 //--- header.h
@@ -26,6 +27,19 @@ struct Trivial {
     int x, y;
 
     inline Trivial(int x, int y) : x(x), y(y) {}
+};
+
+extern int customCopies;
+
+struct CustomCopy {
+    int value;
+    CustomCopy(int value) : value(value) {}
+    CustomCopy(const CustomCopy &other) : value(other.value) { ++customCopies; }
+    CustomCopy &operator=(const CustomCopy &other) {
+        value = other.value;
+        ++customCopies;
+        return *this;
+    }
 };
 
 template<class T>
@@ -56,6 +70,14 @@ module CxxTest {
 
 //--- use-cxx-types.swift
 import CxxTest
+
+public struct WithCustomCopy {
+    private var value: CustomCopy
+
+    public init(_ value: CInt) {
+        self.value = CustomCopy(value)
+    }
+}
 
 public func retNonTrivial(y: CInt) -> NonTrivialTemplateTrivial {
     return NonTrivialTemplateTrivial(Trivial(42, y))
@@ -107,8 +129,24 @@ public func retArrayNonTrivial(_ x: CInt) -> [NonTrivialTemplateTrivial] {
 #include "Swift.h"
 #include "UseCxx.h"
 #include <assert.h>
+#include <type_traits>
+
+int customCopies = 0;
 
 int main() {
+  // A trivial destructor does not make a custom copy operation trivial.
+  static_assert(std::is_trivially_destructible<CustomCopy>::value, "");
+  static_assert(!std::is_trivially_copyable<UseCxx::WithCustomCopy>::value, "");
+  {
+    auto value = UseCxx::WithCustomCopy::init(42);
+    customCopies = 0;
+    auto copy = value;
+    assert(customCopies > 0);
+    customCopies = 0;
+    copy = value;
+    assert(customCopies > 0);
+  }
+
   {
     auto x = UseCxx::retTrivial(423421);
     assert(x.x == 423421);

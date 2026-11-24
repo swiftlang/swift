@@ -99,6 +99,7 @@
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
@@ -112,6 +113,14 @@ static bool hasUncheckedAddrCast(SILValue v) {
   if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
     return hasUncheckedAddrCast(bai->getOperand());
   }
+  // An `index_addr` with a zero index doesn't change the AccessPath. Therefore
+  // it can appear between the cast and the destroyed address, e.g.
+  //   %1 = unchecked_addr_cast %vector to $*Element
+  //   %2 = index_addr %1, 0
+  //   destroy_addr %2
+  if (auto *iai = dyn_cast<IndexAddrInst>(v)) {
+    return hasUncheckedAddrCast(iai->getBase());
+  }
   if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
     if (isAccessStorageCast(svi)) {
       return hasUncheckedAddrCast(svi->getAllOperands()[0].get());
@@ -123,18 +132,15 @@ static bool hasUncheckedAddrCast(SILValue v) {
 /// Step #1: Find all known uses of the unique storage object.
 struct KnownStorageUses : UniqueStorageUseVisitor {
   bool preserveDebugInfo;
-  bool ignoreDeinitBarriers;
 
   SmallPtrSet<SILInstruction *, 16> storageUsers;
   llvm::SmallSetVector<SILInstruction *, 4> originalDestroys;
   SmallPtrSet<SILInstruction *, 4> debugInsts;
   SmallVector<Operand *, 4> debugUses;
 
-  KnownStorageUses(AccessStorage storage, SILFunction *function,
-                   bool ignoreDeinitBarriers)
+  KnownStorageUses(AccessStorage storage, SILFunction *function)
       : UniqueStorageUseVisitor(storage, function),
-        preserveDebugInfo(function->preserveDebugInfo()),
-        ignoreDeinitBarriers(ignoreDeinitBarriers) {}
+        preserveDebugInfo(function->preserveDebugInfo()) {}
 
   bool empty() const {
     return storageUsers.empty() && originalDestroys.empty() &&
@@ -214,23 +220,14 @@ protected:
   }
 
   bool visitUnknownUse(Operand *use) override {
-    auto *user = use->getUser();
-    if (isa<BuiltinRawPointerType>(use->get()->getType().getASTType()) &&
-        !ignoreDeinitBarriers) {
-      // When respecting deinit barriers, destroy hoisting considers
-      // address_to_pointer to be a leaf use because any potential pointer
-      // access is already considered to be a barrier to hoisting (because as a
-      // pointer access it's a deinitialization barrier). Consequently, any
-      // instruction that uses a value produced by address_to_pointer isn't
-      // regarded as a storage use.
-      //
-      // On the other hand, when _not_ respecting deinit barriers, potential
-      // pointer accesses are _not_ already considered to be barriers to
-      // hoisting (deinit barriers being ignored); so uses of the pointer must
-      // obstruct all hoisting.
-      return true;
-    }
-    LLVM_DEBUG(llvm::dbgs() << "Unknown user " << *user);
+    // This includes uses of a value produced by address_to_pointer. It's not
+    // sufficient to rely on pointer accesses being deinit barriers, because
+    // not every instruction which accesses memory through a pointer is a
+    // deinit barrier. For example, the "copyArray" builtin reads the storage
+    // through a pointer, but it is not a deinit barrier. And the pointer may
+    // be forwarded through arbitrary values before it is accessed. Therefore
+    // pointer uses must obstruct all hoisting.
+    LLVM_DEBUG(llvm::dbgs() << "Unknown user " << *use->getUser());
     return false;
   }
 };
@@ -518,7 +515,7 @@ bool HoistDestroys::perform() {
       storage.getKind() != AccessStorage::Kind::Nested)
     return false;
 
-  KnownStorageUses knownUses(storage, getFunction(), ignoreDeinitBarriers);
+  KnownStorageUses knownUses(storage, getFunction());
   if (!knownUses.findUses())
     return false;
 
@@ -558,9 +555,15 @@ bool HoistDestroys::rewriteDestroys(const AccessStorage &storage,
   // Kill debug operands that use destroyed memory.
   for (auto *debugUse : knownUses.debugUses) {
     auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
+    // Another operand of this instruction may have erased it already.
+    if (debugInst->isDeleted())
+      continue;
     if (!deinitBarriers.deadUsers.contains(debugInst))
       continue;
-    debugInst->killOperand(debugUse->getOperandNumber());
+    if (debugInst->getVarType().hasLocalArchetype())
+      replaceWithVoidVariable(debugInst);
+    else
+      debugInst->killOperand(debugUse->getOperandNumber());
   }
   for (auto *destroyInst : knownUses.originalDestroys) {
     if (reusedDestroys.contains(destroyInst))
@@ -1077,7 +1080,8 @@ void DestroyAddrHoisting::run() {
           sis.push_back(si);
         }
       } else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
-        if (cai->isInitializationOfDest() == IsNotInitialization) {
+        if (cai->isInitializationOfDest() == IsNotInitialization &&
+            !cai->getDest()->getType().mayHaveCustomAssign(*getFunction())) {
           cais.push_back(cai);
         }
       }

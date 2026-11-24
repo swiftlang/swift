@@ -783,10 +783,10 @@ private:
       update(reinterpret_cast<uintptr_t>(Data[i]));
     }
 
-    H *= 0x27d4eb2d;
-
-    // Rotate right by 10 and then truncate to 32 bits.
-    return uint32_t((H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10)));
+    // Each update rotates the earlier arguments right, which can leave their
+    // low bits at the top of H. Mix every bit of H into the low 32 bits, which
+    // the hash table indexes by.
+    return uint32_t(llvm::hash_value(uint64_t(H)));
   }
 };
 

@@ -1,0 +1,185 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -early-inline -module-name vjp_inlining %s -o - | %FileCheck %s
+
+// This SIL is derived from the following swift:
+//
+// @differentiable(reverse)
+// func minimum<T: Differentiable & Comparable>(_ x: T, _ y: T) -> T {
+//     x < y ? x : y
+// }
+//
+// @differentiable(reverse)
+// func clamp(_ x: Float) -> Float {
+//     minimum(x > 0 ? x : 0, 1)
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+@differentiable(reverse, wrt: (x, y))
+func minimum<T>(_ x: T, _ y: T) -> T where T : Comparable, T : Differentiable
+
+@differentiable(reverse, wrt: x)
+func clamp(_ x: Float) -> Float
+
+enum _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb0__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0> where τ_0_0 : Comparable, τ_0_0 : Differentiable {
+}
+
+enum _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb1__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0> where τ_0_0 : Comparable, τ_0_0 : Differentiable {
+  case bb0(())
+}
+
+enum _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb2__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0> where τ_0_0 : Comparable, τ_0_0 : Differentiable {
+  case bb0(())
+}
+
+enum _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0> where τ_0_0 : Comparable, τ_0_0 : Differentiable {
+  case bb2(predecessor: _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb2__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0>)
+  case bb1(predecessor: _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb1__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<τ_0_0>)
+}
+
+enum _AD__$s12vjp_inlining5clampyS2fF_bb0__Pred__src_0_wrt_0 {
+}
+
+enum _AD__$s12vjp_inlining5clampyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+enum _AD__$s12vjp_inlining5clampyS2fF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+enum _AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0 {
+  case bb2(predecessor: _AD__$s12vjp_inlining5clampyS2fF_bb2__Pred__src_0_wrt_0)
+  case bb1(predecessor: _AD__$s12vjp_inlining5clampyS2fF_bb1__Pred__src_0_wrt_0)
+}
+
+
+sil shared [ossa] @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSLRzAcDRzlTJrSSpSrSf_Tg5 : $@convention(thin) (Float, Float) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) {
+[%0: write v**]
+[global: ]
+// %0                                             // users: %16, %11
+// %1                                             // users: %11, %3
+// %2                                             // users: %16, %5
+bb0(%0 : $*Float, %1 : $Float, %2 : $Float):
+  %3 = struct_extract %1, #Float._value           // users: %4, %7
+  %5 = struct_extract %2, #Float._value           // users: %6, %7
+  %7 = builtin "fcmp_olt_FPIEEE32"(%3, %5) : $Builtin.Int1 // user: %9
+  %8 = tuple ()                                   // users: %15, %10
+  cond_br %7, bb1, bb2                            // id: %9
+
+bb1:                                              // Preds: bb0
+  %10 = enum $_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb1__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>, #_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb1__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl.bb0!enumelt, %8 // user: %12
+  store %1 to [trivial] %0                        // id: %11
+  %12 = tuple $(predecessor: _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb1__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>) (%10) // user: %13
+  %13 = enum $_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>, #_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl.bb1!enumelt, %12 // user: %14
+  br bb3(%13)                                     // id: %14
+
+bb2:                                              // Preds: bb0
+  %15 = enum $_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb2__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>, #_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb2__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl.bb0!enumelt, %8 // user: %17
+  store %2 to [trivial] %0                        // id: %16
+  %17 = tuple $(predecessor: _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb2__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>) (%15) // user: %18
+  %18 = enum $_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>, #_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl.bb2!enumelt, %17 // user: %19
+  br bb3(%18)                                     // id: %19
+
+// %20                                            // user: %22
+bb3(%20 : $_AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>): // Preds: bb2 bb1
+  // function_ref specialized pullback of minimum<A>(_:_:)
+  %21 = function_ref @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSLRzAcDRzlTJpSSpSrSf_TG5 : $@convention(thin) (@in_guaranteed Float, @owned _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>) -> (@out Float, @out Float) // user: %22
+  %22 = partial_apply [callee_guaranteed] %21(%20) : $@convention(thin) (@in_guaranteed Float, @owned _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>) -> (@out Float, @out Float) // user: %23
+  %23 = convert_function %22 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float> // user: %24
+  return %23                                      // id: %24
+} // end sil function '$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSLRzAcDRzlTJrSSpSrSf_Tg5'
+
+
+// CHECK-LABEL: sil {{.*}}@$s12vjp_inlining5clampyS2fFTJrSpSr :
+// CHECK-NOT:     = apply
+// CHECK:         builtin "fcmp_olt_FPIEEE32"
+// CHECK-NOT:     = apply
+// CHECK:       } // end sil function
+
+sil hidden [ossa] @$s12vjp_inlining5clampyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+// %0                                             // users: %3, %11, %1
+bb0(%0 : $Float):
+  %2 = alloc_stack $Float                         // users: %37, %46, %45
+  %3 = struct_extract %0, #Float._value           // user: %5
+  %4 = float_literal $Builtin.FPIEEE32, 0x0 // 0  // user: %5
+  %5 = builtin "fcmp_olt_FPIEEE32"(%4, %3) : $Builtin.Int1 // user: %7
+  %6 = tuple ()                                   // users: %12, %8
+  cond_br %5, bb1, bb2                            // id: %7
+
+bb1:                                              // Preds: bb0
+  %8 = enum $_AD__$s12vjp_inlining5clampyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s12vjp_inlining5clampyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %6 // user: %9
+  %9 = tuple $(predecessor: _AD__$s12vjp_inlining5clampyS2fF_bb1__Pred__src_0_wrt_0) (%8) // user: %10
+  %10 = enum $_AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %9 // user: %11
+  br bb3(%0, %10)                                 // id: %11
+
+bb2:                                              // Preds: bb0
+  %12 = enum $_AD__$s12vjp_inlining5clampyS2fF_bb2__Pred__src_0_wrt_0, #_AD__$s12vjp_inlining5clampyS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %6 // user: %15
+  %13 = float_literal $Builtin.FPIEEE32, 0x0 // 0 // user: %14
+  %14 = struct $Float (%13)                       // user: %17
+  %15 = tuple $(predecessor: _AD__$s12vjp_inlining5clampyS2fF_bb2__Pred__src_0_wrt_0) (%12) // user: %16
+  %16 = enum $_AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %15 // user: %17
+  br bb3(%14, %16)                                // id: %17
+
+// %18                                            // user: %21
+// %19                                            // user: %48
+bb3(%18 : $Float, %19 : $_AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0): // Preds: bb2 bb1
+  %20 = alloc_stack [lexical] $Float              // users: %35, %44, %21
+  store %18 to [trivial] %20                      // id: %21
+  %22 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1 // user: %23
+  %23 = struct $Float (%22)                       // user: %25
+  %24 = alloc_stack [lexical] $Float              // users: %36, %43, %25
+  store %23 to [trivial] %24                      // id: %25
+  // function_ref specialized minimum<A>(_:_:)
+  %26 = function_ref @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> @out Float // user: %27
+  %27 = thin_to_thick_function %26 to $@callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float // user: %32; ownership: none
+  // function_ref autodiff subset parameters thunk for forward-mode derivative from minimum<A>(_:_:)
+  %28 = function_ref @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFS5fIegnr_Iegnnro_TJSfSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) // user: %29
+  %29 = thin_to_thick_function %28 to $@callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) // user: %32; ownership: none
+  // function_ref autodiff subset parameters thunk for reverse-mode derivative from minimum<A>(_:_:)
+  %30 = function_ref @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFS5fIegnr_Iegnnro_TJSrSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) // user: %31
+  %31 = thin_to_thick_function %30 to $@callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) // user: %32; ownership: none
+  %32 = differentiable_function [parameters 0] [results 0] %27 with_derivative {%29, %31} // user: %33
+  destroy_value %32                               // id: %33
+  // function_ref specialized reverse-mode derivative of minimum<A>(_:_:)
+  %34 = function_ref @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSLRzAcDRzlTJrSSpSrSf_Tg5 : $@convention(thin) (Float, Float) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) // user: %37
+  %35 = load [trivial] %20                        // user: %37
+  %36 = load [trivial] %24                        // user: %37
+  %37 = apply %34(%2, %35, %36) : $@convention(thin) (Float, Float) -> (@out Float, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @out τ_0_2) for <Float, Float, Float>) // user: %39
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)
+  %38 = function_ref @$sS3fIegnrr_TJSpSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> @out Float // user: %40
+  %39 = convert_function %37 to $@callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float) // user: %40
+  %40 = partial_apply [callee_guaranteed] %38(%39) : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> @out Float // user: %42
+  // function_ref thunk for @escaping @callee_guaranteed (@in_guaranteed Float) -> (@out Float)
+  %41 = function_ref @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float // user: %42
+  %42 = partial_apply [callee_guaranteed] %41(%40) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float // user: %48
+  dealloc_stack %24                               // id: %43
+  dealloc_stack %20                               // id: %44
+  %45 = load [trivial] %2                         // user: %49
+  dealloc_stack %2                                // id: %46
+  // function_ref pullback of clamp(_:)
+  %47 = function_ref @$s12vjp_inlining5clampyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float) -> Float // user: %48
+  %48 = partial_apply [callee_guaranteed] %47(%19, %42) : $@convention(thin) (Float, @owned _AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float) -> Float // user: %49
+  %49 = tuple (%45, %48)                          // user: %50
+  return %49                                      // id: %50
+} // end sil function '$s12vjp_inlining5clampyS2fFTJrSpSr'
+
+sil hidden_external [ossa] @$s12vjp_inlining5clampyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s12vjp_inlining5clampyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float) -> Float
+
+sil hidden_external [transparent] [reabstraction_thunk] [ossa] @$sS2fIegnr_S2fIegyd_TR : $@convention(thin) (Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> @out Float) -> Float
+
+sil hidden_external [transparent] [thunk] [ossa] @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFS5fIegnr_Iegnnro_TJSfSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float)
+
+sil hidden_external [transparent] [thunk] [ossa] @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFS5fIegnr_Iegnnro_TJSrSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float)
+
+sil hidden_external [transparent] [thunk] [ossa] @$sS3fIegnrr_TJSpSSpSrSUP : $@convention(thin) (@in_guaranteed Float, @guaranteed @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float)) -> @out Float
+
+sil hidden_external [transparent] [thunk] [ossa] @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSf_TG5 : $@convention(thin) (@in_guaranteed Float, @in_guaranteed Float) -> @out Float
+
+sil hidden_external [transparent] [thunk] [ossa] @$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlFSLRzAcDRzlTJpSSpSrSf_TG5 : $@convention(thin) (@in_guaranteed Float, @owned _AD__$s12vjp_inlining7minimumyxx_xtSLRz16_Differentiation14DifferentiableRzlF_bb3__Pred__src_0_wrt_0_1_SLRz16_Differentiation14DifferentiableRzl<Float>) -> (@out Float, @out Float)

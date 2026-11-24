@@ -548,7 +548,8 @@ static ArrayRef<const char *> getDeviceOnlyModuleList() {
 
 void ide::collectModuleNames(StringRef SDKPath,
                                std::vector<std::string> &Modules) {
-  std::string SDKName = getSDKName(SDKPath);
+  std::string SDKName =
+      getSDKName(SDKPath, *llvm::vfs::createPhysicalFileSystem());
   std::string lowerSDKName = StringRef(SDKName).lower();
   bool isOSXSDK = StringRef(lowerSDKName).contains("macosx");
   bool isDeviceOnly = StringRef(lowerSDKName).contains("iphoneos");
@@ -672,6 +673,7 @@ static StringRef adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
     }
     return expandedCode;
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
@@ -1089,8 +1091,8 @@ bool swift::ide::isDynamicRef(Expr *Base, ValueDecl *D, llvm::function_ref<Type(
   // here, but not if the instance type is a struct/enum.
   if (auto IT = getType(Base)->getAs<MetatypeType>()) {
     auto InstanceType = IT->getInstanceType();
-    if (InstanceType->getStructOrBoundGenericStruct() ||
-        InstanceType->getEnumOrBoundGenericEnum())
+    if (InstanceType->getStructDecl() ||
+        InstanceType->getEnumDecl())
       return false;
   }
 

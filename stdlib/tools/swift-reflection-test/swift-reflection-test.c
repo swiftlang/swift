@@ -806,6 +806,16 @@ static int reflectAsyncTaskInstance(SwiftReflectionContextRef RC,
                     TaskInfo.EnqueuePriority);
     if (TaskInfo.Name)
       indented_printf(indentLevel, "name \"%s\"\n", TaskInfo.Name);
+    if (TaskInfo.HasSynchronousOperation)
+      indented_printf(indentLevel, "synchronousOperation\n");
+    if (TaskInfo.HasIsRunning)
+      indented_printf(indentLevel, "running %s\n",
+                      TaskInfo.IsRunning ? "true" : "false");
+    indented_printf(indentLevel, "runJob %#" PRIx64 "\n",
+                    (uint64_t)TaskInfo.RunJob);
+    for (unsigned i = 0; i < TaskInfo.AsyncBacktraceFramesCount; i++)
+      indented_printf(indentLevel, "asyncBacktrace %#" PRIx64 "\n",
+                      (uint64_t)TaskInfo.AsyncBacktraceFrames[i]);
     if (TaskInfo.ChildTaskCount > 0) {
       indented_printf(indentLevel, "children = {\n");
 

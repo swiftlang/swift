@@ -1,0 +1,108 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+typealias Int = Builtin.Int64
+
+protocol Error {}
+
+// A callee that has more than one direct result and a generic typed error, which is returned indirectly.
+sil [ossa] @multiResultThrowing : $@convention(thin) <E where E : Error> () -> (Int, Int, @error_indirect E)
+
+// The results of a `try_apply` with more than one direct result are the normal
+// block's tuple argument, which has no storage of its own. The error block's
+// argument is the error itself, not one of those results, so it must be lowered
+// like any other opaque value.
+// CHECK-LABEL: sil [ossa] @caller : $@convention(thin) <E where E : Error> () -> (Builtin.Int64, @error_indirect E) {
+// CHECK:       bb0([[ERROR_OUT:%[^,]+]] : $*E):
+// CHECK:         [[ERROR_BUF:%[^,]+]] = alloc_stack $E
+// CHECK:         try_apply {{%[^,]+}}<E>([[ERROR_BUF]]) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> () -> (Builtin.Int64, Builtin.Int64, @error_indirect τ_0_0), normal bb2, error bb1
+//
+// CHECK:       bb1:
+// CHECK:         [[COPY:%[^,]+]] = alloc_stack $E
+// CHECK:         copy_addr [[ERROR_BUF]] to [init] [[COPY]] : $*E
+// CHECK:         destroy_addr [[ERROR_BUF]] : $*E
+// CHECK:         copy_addr [take] [[COPY]] to [init] [[ERROR_OUT]] : $*E
+// CHECK:         throw_addr
+//
+// CHECK:       bb2({{%[^,]+}} : $(Builtin.Int64, Builtin.Int64)):
+// CHECK:         destructure_tuple
+// CHECK-LABEL: } // end sil function 'caller'
+sil [ossa] @caller : $@convention(thin) <E where E : Error> () -> (Int, @error_indirect E) {
+bb0:
+  %callee = function_ref @multiResultThrowing : $@convention(thin) <τ_0_0 where τ_0_0 : Error> () -> (Int, Int, @error_indirect τ_0_0)
+  try_apply %callee<E>() : $@convention(thin) <τ_0_0 where τ_0_0 : Error> () -> (Int, Int, @error_indirect τ_0_0), normal bb1, error bb2
+
+bb1(%results : $(Int, Int)):
+  (%first, %second) = destructure_tuple %results : $(Int, Int)
+  return %first : $Int
+
+bb2(%error : @owned $E):
+  %copy = copy_value %error : $E
+  destroy_value %error : $E
+  throw %copy : $E
+}
+
+// A generic result is a direct result until AddressLowering rewrites it, so a
+// call returning `(R, Int)` has two direct results even though only the `Int`
+// stays direct afterwards. This is the shape of an ordinary typed-throws
+// wrapper, with no pass ordering involved:
+//   func f<R, E: Error>(_ g: () throws(E) -> (R, Int)) throws(E) -> (R, Int)
+sil [ossa] @opaqueMultiResultThrowing : $@convention(thin) <R, E where E : Error> () -> (@out R, Int, @error_indirect E)
+
+// CHECK-LABEL: sil [ossa] @callerOpaque : $@convention(thin) <R, E where E : Error> () -> (@out R, Builtin.Int64, @error_indirect E) {
+// CHECK:       bb0([[RESULT_OUT:%[^,]+]] : $*R, [[ERROR_OUT:%[^,]+]] : $*E):
+// CHECK:         [[ERROR_BUF:%[^,]+]] = alloc_stack $E
+// CHECK:         try_apply {{%[^,]+}}<R, E>([[RESULT_OUT]], [[ERROR_BUF]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+//
+// CHECK:       [[ERROR]]:
+// CHECK:         copy_addr [take] {{.*}} to [init] [[ERROR_OUT]] : $*E
+// CHECK:         throw_addr
+//
+// CHECK:       [[NORMAL]]({{%[^,]+}} : $Builtin.Int64):
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'callerOpaque'
+sil [ossa] @callerOpaque : $@convention(thin) <R, E where E : Error> () -> (@out R, Int, @error_indirect E) {
+bb0:
+  %callee = function_ref @opaqueMultiResultThrowing : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> () -> (@out τ_0_0, Int, @error_indirect τ_0_1)
+  try_apply %callee<R, E>() : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> () -> (@out τ_0_0, Int, @error_indirect τ_0_1), normal bb1, error bb2
+
+bb1(%results : @owned $(R, Int)):
+  return %results : $(R, Int)
+
+bb2(%error : @owned $E):
+  throw %error : $E
+}
+
+// A function-typed second result next to a generic one, like the `value` and
+// `pullback` returned by valueWithPullback (and `differential` by
+// valueWithDifferential) in _Differentiation:
+//   func valueWithPullback<T, R, E: Error>(...) throws(E)
+//     -> (value: R, pullback: (R.TangentVector) -> T.TangentVector)
+sil [ossa] @closureResultThrowing : $@convention(thin) <R, E where E : Error> () -> (@out R, @owned @callee_guaranteed () -> (), @error_indirect E)
+
+// CHECK-LABEL: sil [ossa] @callerWithClosure : $@convention(thin) <R, E where E : Error> () -> (@out R, @owned @callee_guaranteed () -> (), @error_indirect E) {
+// CHECK:       bb0([[RESULT_OUT:%[^,]+]] : $*R, [[ERROR_OUT:%[^,]+]] : $*E):
+// CHECK:         [[ERROR_BUF:%[^,]+]] = alloc_stack $E
+// CHECK:         try_apply {{%[^,]+}}<R, E>([[RESULT_OUT]], [[ERROR_BUF]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+//
+// CHECK:       [[ERROR]]:
+// CHECK:         copy_addr [take] {{.*}} to [init] [[ERROR_OUT]] : $*E
+// CHECK:         throw_addr
+//
+// CHECK:       [[NORMAL]]({{%[^,]+}} : @owned $@callee_guaranteed () -> ()):
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'callerWithClosure'
+sil [ossa] @callerWithClosure : $@convention(thin) <R, E where E : Error> () -> (@out R, @owned @callee_guaranteed () -> (), @error_indirect E) {
+bb0:
+  %callee = function_ref @closureResultThrowing : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> () -> (@out τ_0_0, @owned @callee_guaranteed () -> (), @error_indirect τ_0_1)
+  try_apply %callee<R, E>() : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_1 : Error> () -> (@out τ_0_0, @owned @callee_guaranteed () -> (), @error_indirect τ_0_1), normal bb1, error bb2
+
+bb1(%results : @owned $(R, @callee_guaranteed () -> ())):
+  return %results : $(R, @callee_guaranteed () -> ())
+
+bb2(%error : @owned $E):
+  throw %error : $E
+}

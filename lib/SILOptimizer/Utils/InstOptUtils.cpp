@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
@@ -726,13 +727,11 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
                        "not ABI "
                        "compatible");
       // Insert convert_function.
-      return {builder->createConvertFunction(loc, value, destTy,
-                                             /*WithoutActuallyEscaping=*/false),
-              false};
+      return {builder->createConvertFunction(loc, value, destTy), false};
     }
   }
-  NominalTypeDecl *srcNominal = srcTy.getNominalOrBoundGenericNominal();
-  NominalTypeDecl *destNominal = destTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *srcNominal = srcTy.getNominalDecl();
+  NominalTypeDecl *destNominal = destTy.getNominalDecl();
   if (srcNominal && srcNominal == destNominal &&
       !layoutIsTypeDependent(srcNominal) &&
       srcTy.isObject() && destTy.isObject()) {
@@ -922,7 +921,8 @@ static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
 }
 
 void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
-                                 SILValue operand, InstModCallbacks callbacks) {
+                                 SILValue operand, InstModCallbacks callbacks,
+                                 IsDeadEnd_t isDeadEnd) {
   // If we have an address, we insert a destroy_addr and return. Any live range
   // issues must have been dealt with by our caller.
   if (operand->getType().isAddress()) {
@@ -939,7 +939,8 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 
   // If we have qualified ownership, we should just emit a destroy value.
   if (builder.getFunction().hasOwnership()) {
-    callbacks.createdNewInst(builder.createDestroyValue(loc, operand));
+    callbacks.createdNewInst(
+        builder.createDestroyValue(loc, operand, isDeadEnd));
     return;
   }
 
@@ -987,19 +988,46 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILValue arg,
                                            SILParameterInfo paramInfo,
-                                           InstModCallbacks callbacks) {
+                                           InstModCallbacks callbacks,
+                                           IsDeadEnd_t isDeadEnd) {
   if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
                                             builder.getFunction()))
     return;
 
-  emitDestroyOperation(builder, loc, arg, callbacks);
+  emitDestroyOperation(builder, loc, arg, callbacks, isDeadEnd);
 }
 
 /// Returns true if \p user is a user of an on-stack closure which can be
 /// deleted together with the closure.
 static bool isDeadOnStackClosureUser(SILInstruction *user) {
   return isa<DeallocStackInst>(user) || isa<DebugValueInst>(user) ||
-         isa<DestroyValueInst>(user);
+         isa<DestroyValueInst>(user) ||
+         // `strong_release` is `destroy_value`'s non-OSSA equivalent: a
+         // dead on-stack closure can be found (and deleted) after ownership
+         // has been lowered from its function, e.g. when closure
+         // specialization folds `apply(partial_apply())` into a direct call.
+         isa<StrongReleaseInst>(user);
+}
+
+bool swift::isCaptureOwnedByOnStackClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
+    return false;
+  ApplySite site(pai);
+  if (!site.isArgumentOperand(argOp))
+    return false;
+  if (site.hasContextOwnedAddressArgument(argOp))
+    return true;
+  SILValue arg = argOp.get();
+  SILFunction *function = pai->getFunction();
+  if (function->hasOwnership())
+    return argOp.isConsuming();
+
+  // Without ownership, follow IRGen: the context owns each nontrivial value
+  // that it captures, unless it borrows the value.
+  if (arg->getType().isAddress() || arg->getType().isTrivial(*function))
+    return false;
+  return !pai->contextBorrowsArgument(argOp);
 }
 
 static bool
@@ -1014,7 +1042,9 @@ deadMarkDependenceUser(Operand *use,
   for (auto *mdiUse : mdi->getUses()) {
     // In OSSA the closure is destroyed via the forwarding mark_dependence.
     if (isDeadOnStackClosureUser(mdiUse->getUser())) {
-      deleteInsts.push_back(mdiUse->getUser());
+      // Debug uses are salvaged rather than deleted.
+      if (!isa<DebugValueInst>(mdiUse->getUser()))
+        deleteInsts.push_back(mdiUse->getUser());
       continue;
     }
     if (!deadMarkDependenceUser(mdiUse, deleteInsts))
@@ -1126,6 +1156,53 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
   return true;
 }
 
+/// Returns true if each use of the on-stack closure \p value, which is the
+/// closure itself or a mark_dependence of it, is removed or dead.
+static bool areOnStackClosureUsesDeadOrRemoved(
+    SingleValueInstruction *value,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || isDeadOnStackClosureUser(user))
+      continue;
+    // See deadMarkDependenceUser().
+    auto *mdi = dyn_cast<MarkDependenceInst>(user);
+    if (!mdi || use->getOperandNumber() != MarkDependenceInst::Dependent ||
+        !areOnStackClosureUsesDeadOrRemoved(mdi, isRemoved))
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if each use of \p value, which is the closure or a value with
+/// transitive ownership of it, is removed or doesn't keep it alive.
+static bool
+areClosureUsesDeadOrRemoved(SingleValueInstruction *value,
+                            function_ref<bool(SILInstruction *)> isRemoved) {
+  // See collectDestroysRecursively().
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || useDoesNotKeepValueAlive(user))
+      continue;
+    if (!useHasTransitiveOwnership(user) ||
+        !areClosureUsesDeadOrRemoved(cast<SingleValueInstruction>(user),
+                                     isRemoved))
+      return false;
+  }
+  return true;
+}
+
+bool swift::canDeleteDeadClosure(
+    SingleValueInstruction *closure,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  auto *pa = dyn_cast<PartialApplyInst>(closure);
+  if (!pa && !isa<ThinToThickFunctionInst>(closure))
+    return false;
+  if (pa && pa->isOnStack())
+    return areOnStackClosureUsesDeadOrRemoved(pa, isRemoved);
+  return areClosureUsesDeadOrRemoved(closure, isRemoved);
+}
+
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                  InstModCallbacks callbacks,
                                  bool needKeepArgsAlive) {
@@ -1143,18 +1220,41 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     SmallVector<SILInstruction *, 8> deleteInsts;
     for (auto *use : pa->getUses()) {
       if (isDeadOnStackClosureUser(use->getUser())) {
-        deleteInsts.push_back(use->getUser());
+        // Debug uses are salvaged rather than deleted.
+        if (!isa<DebugValueInst>(use->getUser()))
+          deleteInsts.push_back(use->getUser());
       } else if (!deadMarkDependenceUser(use, deleteInsts)) {
         return false;
       }
     }
-    for (auto *inst : reverse(deleteInsts))
+
+    // Regular on-stack closures only borrow their captures, so their
+    // lifetime is managed outside of the closure and there's nothing to do
+    // here.
+
+    // A noncopyable on-stack closure can also own (consume) its
+    // captures, and is responsible for releasing them via its destructor.
+    // Release such captures here to make up for that.
+    if (pa->isNoncopyable()) {
+      SILBuilderContext builderCtxt(pa->getModule());
+      for (Operand &argOp : pa->getArgumentOperands()) {
+        // A capture that was transferred to a combined apply is undef.
+        if (!isCaptureOwnedByOnStackClosure(argOp) ||
+            isa<SILUndef>(argOp.get()))
+          continue;
+
+        SILBuilderWithScope builder(pa, builderCtxt);
+        emitDestroyOperation(builder, pa->getLoc(), argOp.get(), callbacks);
+      }
+    }
+
+    for (auto *inst : reverse(deleteInsts)) {
+      salvageDebugInfo(inst);
       callbacks.deleteInst(inst);
+    }
+    salvageDebugInfo(pa);
     callbacks.deleteInst(pa);
 
-    // Note: the lifetime of the captured arguments is managed outside of the
-    // trivial closure value i.e: there will already be releases for the
-    // captured arguments. Releasing captured arguments is not necessary.
     return true;
   }
 
@@ -1196,13 +1296,18 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
   // deleted first.
   for (auto *use : closureDestroys) {
     auto *user = use->getUser();
+    // Debug uses are salvaged rather than deleted.
+    if (isa<DebugValueInst>(user))
+      continue;
     assert(
         (useDoesNotKeepValueAlive(user) || useHasTransitiveOwnership(user)) &&
         "We expect only ARC operations without "
         "results or a cast from escape to noescape without users");
+    salvageDebugInfo(user);
     callbacks.deleteInst(user);
   }
 
+  salvageDebugInfo(closure);
   callbacks.deleteInst(closure);
   return true;
 }
@@ -1502,7 +1607,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
 void swift::insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<SILValue(SILValue)> getValueToDestroy,
-    SILLocation origLoc) {
+    SILLocation origLoc, IsDeadEnd_t isDeadEnd) {
   assert(pai->isOnStack());
 
   ApplySite site(pai);
@@ -1517,7 +1622,8 @@ void swift::insertDestroyOfCapturedArguments(
                  OwnershipKind::Owned)));
 
     auto paramInfo = site.getParamInfoForOperand(arg);
-    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo);
+    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo,
+                                   InstModCallbacks(), isDeadEnd);
   }
 }
 
@@ -1531,7 +1637,8 @@ void swift::insertDeallocOfCapturedArguments(
   ApplySite site(pai);
   for (auto &arg : pai->getArgumentOperands()) {
     auto paramInfo = site.getParamInfoForOperand(arg);
-    if (!paramInfo.isIndirectInGuaranteed())
+    if (!paramInfo.isIndirectInGuaranteed() ||
+        !site.getSubstCalleeConv().isSILIndirect(paramInfo))
       continue;
 
     SILValue argValue = getAddressToDealloc(arg.get());
@@ -1899,6 +2006,32 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+void swift::replaceWithVoidVariable(DebugValueInst *debugValue) {
+  SILBuilder builder(debugValue, debugValue->getDebugScope());
+  builder.createVoidVariableDebugValue(
+      debugValue->getLoc(), *debugValue->getVarInfo(),
+      debugValue->usesMoveableValueDebugInfo(), debugValue->hasTrace());
+  debugValue->eraseFromParent();
+}
+
+/// Kills every debug use of \p value. A variable whose type cannot be written
+/// becomes an empty tuple placeholder instead.
+static void killDebugUses(SILValue value) {
+  while (Operand *use = getAnyDebugUse(value)) {
+    auto *debugValue = cast<DebugValueInst>(use->getUser());
+    if (debugValue->getVarType().hasLocalArchetype())
+      replaceWithVoidVariable(debugValue);
+    else
+      debugValue->killOperand(use->getOperandNumber());
+  }
+}
+
+/// Kills every debug use of any result of \p inst.
+static void killDebugUses(SILInstruction *inst) {
+  for (SILValue result : inst->getResults())
+    killDebugUses(result);
+}
+
 /// Canonicalizes the operand list of \p debugValue, minimizing the amount of
 /// live operands. Merges duplicates, and kills dead or undef operands.
 static void canonicalizeDebugValue(DebugValueInst *debugValue) {
@@ -2037,7 +2170,7 @@ static void salvageCheckedTruncFromLiteral(BuiltinInst *builtin) {
   std::optional<bool> ResultsInError;
   SILValue folded = constantFoldBuiltin(builtin, ResultsInError);
   if (!folded)
-    return;
+    return killDebugUses(builtin);
 
   auto *tupleFolded = cast<SingleValueInstruction>(folded);
 
@@ -2141,7 +2274,10 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (srcDVI)
     newDVI->cloneReconstructionBlockFrom(srcDVI);
 
-  newDVI->stripDeref(0);
+  // For a store or store_borrow, the load must be removed.
+  // A copy_addr has an address on both sides, so no rewrite is necessary.
+  if (!isa<CopyAddrInst>(SI))
+    newDVI->stripDeref(0);
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
@@ -2191,7 +2327,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
     }
     tupleType = swift::TupleType::get(tupleElements, packType->getASTContext());
 
-    silType = PESI->getFunction()->getLoweredType(tupleType);
+    silType = PESI->getFunction()->getLoweredType(tupleType).getObjectType();
   }
 
   for (Operand *U : getDebugUses(API)) {
@@ -2213,20 +2349,86 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
   }
 }
 
+/// Build the value of the empty type \p type. This can be an empty struct,
+/// tuple, or inline array, or any combination of those.
+static SILValue createEmptyValue(SILBuilder &builder, SILLocation loc,
+                                 SILType type) {
+  SILFunction &f = builder.getFunction();
+  SmallVector<SILValue, 4> elements;
+  if (auto tupleTy = type.getAs<TupleType>()) {
+    for (unsigned idx : indices(tupleTy->getElements()))
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getTupleElementType(idx)));
+    return builder.createTuple(loc, type, elements);
+  }
+  if (StructDecl *structDecl = type.getStructDecl()) {
+    for (VarDecl *field : structDecl->getStoredProperties())
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getFieldType(field, &f)));
+    return builder.createStruct(loc, type, elements);
+  }
+  // Fallback for zero-length InlineArrays.
+  return builder.createZeroInitValue(loc, type);
+}
+
+/// Replaces the loads of the address-category operand \p operandIdx of
+/// \p debugValue by a constant empty value, and kills its other uses.
+static void replaceOperandWithEmptyValue(DebugValueInst *debugValue,
+                                  unsigned operandIdx) {
+  SILBasicBlock *debugBB = debugValue->getOrCreateDebugReconstructionBlock();
+  SILArgument *argument = debugBB->getArgument(operandIdx);
+  for (Operand *use : llvm::make_early_inc_range(argument->getUses())) {
+    auto *load = dyn_cast<LoadInst>(use->getUser());
+    if (!load)
+      continue;
+    SILBuilder builder(load);
+    load->replaceAllUsesWith(
+        createEmptyValue(builder, load->getLoc(), load->getType()));
+    load->eraseFromParent();
+  }
+  debugValue->killOperand(operandIdx);
+  // Remove the dead operand.
+  addOperandsToDebugValue(debugValue, {});
+}
+
+/// Salvage an `alloc_stack` if its content is empty and can be reconstructed.
+static void salvageEmptyAllocStack(AllocStackInst *asi) {
+  SILFunction &f = *asi->getFunction();
+  SILType type = asi->getElementType();
+  if (type.hasLocalArchetype() || type.isMoveOnly() || !type.isEmpty(f))
+    return;
+
+  // Give the variable of the allocation a debug use, rewritten below.
+  if (auto varInfo = asi->getVarInfo())
+    SILBuilder(asi, asi->getDebugScope())
+      .createDebugValue(asi->getLoc(), asi, *varInfo);
+
+  while (Operand *use = getAnyDebugUse(asi))
+    replaceOperandWithEmptyValue(cast<DebugValueInst>(use->getUser()),
+                                 use->getOperandNumber());
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
 // other debug_value instructions exist between the old and new location for
 // the same variable.
-//
-// TODO: Kill all debug uses when the salvage fails.
 void swift::salvageDebugInfo(SILInstruction *I) {
   if (!I)
     return;
 
+  // Stores to an allocation are salvaged: debug values are cloned at each
+  // store. The debug values on the allocation itself are deleted rather than
+  // killed, as the clones describe the variable now.
+  // Empty alloc_stacks have no stores and need to be salvaged.
+  if (auto *asi = dyn_cast<AllocStackInst>(I))
+    salvageEmptyAllocStack(asi);
+  if (isa<AllocStackInst>(I) || isa<AllocPackInst>(I))
+    return deleteAllDebugUses(I, /*salvage=*/false);
+
   // Instructions with type dependent operands cannot be salvaged.
   if (I->getNumTypeDependentOperands() != 0)
-    return;
+    return killDebugUses(I);
 
   switch (I->getKind()) {
   case SILInstructionKind::StoreInst: {
@@ -2260,6 +2462,8 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::ConvertEscapeToNoEscapeInst:
   case SILInstructionKind::ConvertFunctionInst:
+  case SILInstructionKind::ThinToThickFunctionInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
   case SILInstructionKind::RefElementAddrInst:
@@ -2267,8 +2471,15 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::RefTailAddrInst:
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::IndexRawPointerInst:
+  case SILInstructionKind::FunctionRefInst:
     // Instructions with no side effect can be salvaged into the debug
     // reconstruction block.
+    return salvageMultiOperandInst(cast<SingleValueInstruction>(I));
+
+  case SILInstructionKind::GlobalAddrInst:
+    // A dependency token cannot be passed into a debug_value.
+    if (cast<GlobalAddrInst>(I)->hasOperand())
+      return killDebugUses(I);
     return salvageMultiOperandInst(cast<SingleValueInstruction>(I));
 
   case SILInstructionKind::DestructureStructInst:
@@ -2278,6 +2489,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   case SILInstructionKind::CopyValueInst:
   case SILInstructionKind::MoveValueInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::BeginAccessInst:
   case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
     return salvageIdentityInst(cast<SingleValueInstruction>(I));
 
@@ -2286,7 +2498,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // Only salvage side-effects free SIL builtins.
     BuiltinInfo info = builtin->getBuiltinInfo();
     if (info.ID == BuiltinValueKind::None || !info.isReadNone())
-      return;
+      return killDebugUses(I);
 
     if ((info.ID == BuiltinValueKind::SToSCheckedTrunc ||
          info.ID == BuiltinValueKind::UToUCheckedTrunc ||
@@ -2303,9 +2515,10 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     // or, and, xor, cmp_*, ...
     return salvageMultiOperandInst(builtin);
   }
+
   default:
-    // TODO: Kill all debug uses when the salvage fails.
-    return;
+    // Any instruction that cannot be salvaged has its debug uses killed.
+    return killDebugUses(I);
   }
 }
 
@@ -2408,7 +2621,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
     SILBuilderWithScope builder(insertionPoint, ctx);
     return builder.createTuple(insertionPoint->getLoc(), ty, elements);
   }
-  if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *decl = ty.getStructDecl()) {
     TypeExpansionContext tec = *function;
     auto &module = function->getModule();
     if (decl->isResilient(tec.getContext()->getParentModule(),
@@ -2431,7 +2644,7 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
 }
 
 static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
-  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = ty.getStructDecl()) {
     return swift::findUnreferenceableStorage(structDecl, ty, func);
   }
   if (auto tupleTy = ty.getAs<TupleType>()) {
@@ -2908,4 +3121,45 @@ bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) 
 
   // Check whether the cond_fail's message was listed in the config file.
   return CondFailsToRemove.find(withMessage.str()) != CondFailsToRemove.end();
+}
+
+//===----------------------------------------------------------------------===//
+//                              Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedOptimizerUtilities::UpdateFunctionFn
+    simplifyDebugReconstructionBlocksFunction;
+static BridgedOptimizerUtilities::UpdateInstructionFn
+    simplifyDebugReconstructionBlockFunction;
+
+void BridgedOptimizerUtilities::registerDebugReconstructionSimplification(
+    UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
+    UpdateInstructionFn simplifyDebugReconstructionBlockFn) {
+  simplifyDebugReconstructionBlocksFunction =
+      simplifyDebugReconstructionBlocksFn;
+  simplifyDebugReconstructionBlockFunction = simplifyDebugReconstructionBlockFn;
+}
+
+// Both run on an invocation of their own, so that the change notifications are
+// dropped with it: debug reconstruction blocks are not part of the function,
+// so nothing an analysis knows about changes. This also keeps the erased
+// instructions out of the worklist of a pass which may be running.
+
+void swift::simplifyDebugReconstructionBlocks(SILPassManager *pm,
+                                              SILFunction *f) {
+  if (!simplifyDebugReconstructionBlocksFunction)
+    return;
+  SwiftPassInvocation invocation(pm, /*transform=*/nullptr, f);
+  simplifyDebugReconstructionBlocksFunction({&invocation}, {f});
+}
+
+DebugValueInst *
+swift::simplifyDebugReconstructionBlock(SILPassManager *pm,
+                                        DebugValueInst *dvi) {
+  if (!simplifyDebugReconstructionBlockFunction)
+    return dvi;
+  SwiftPassInvocation invocation(pm, /*transform=*/nullptr, dvi->getFunction());
+  return simplifyDebugReconstructionBlockFunction({&invocation},
+                                                  {dvi->asSILNode()})
+      .getAs<DebugValueInst>();
 }

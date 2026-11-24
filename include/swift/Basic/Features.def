@@ -256,6 +256,7 @@ LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 BASELINE_LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 BASELINE_LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
+BASELINE_LANGUAGE_FEATURE(BuiltinApplyIsolatedUnchecked, 0, "Builtin.applyActorIsolatedUnchecked and Builtin.applyGlobalActorIsolatedUnchecked")
 BASELINE_LANGUAGE_FEATURE(MemorySafetyAttributes, 458, "@unsafe attribute")
 BASELINE_LANGUAGE_FEATURE(ValueGenerics, 452, "Value generics feature (integer generics)")
 LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
@@ -264,7 +265,7 @@ LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolat
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
 BASELINE_LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
-SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
+BASELINE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
@@ -291,12 +292,18 @@ LANGUAGE_FEATURE(BuiltinGepProjection, 0, "gepProjection Builtin")
 LANGUAGE_FEATURE(BuiltinDereferenceable, 0, "Builtin.dereferenceable")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 LANGUAGE_FEATURE(BuiltinContinuationNonCopyableSuccess, 0, "Builtin.{resume,withUnsafe}*Continuation* relaxed to allow Success: ~Copyable")
+LANGUAGE_FEATURE(BuiltinSplitContinuations, 564, "Split continuation builtins")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
+/// Allow the kind of an OS version query function in the
+/// `availability.osversion` semantics attribute.
+SUPPRESSIBLE_LANGUAGE_FEATURE(AvailabilityOSVersionQueryKind, 0, "Kind of OS version query function in @_semantics attribute")
+
 LANGUAGE_FEATURE(SuppressedAssociatedTypesWithDefaults, 503, "Associated types that are ~Copyable and ~Escapable")
 LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @diagnose")
 LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
 LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
+LANGUAGE_FEATURE(SubscriptParametersWithOwnership, 562, "Ownership of subscript parameters")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -545,6 +552,9 @@ LANGUAGE_FEATURE(ForeignReferenceTypeInheritance, 0, "foreign reference type inh
 /// Enable @cxx @implementation for implementing C++ functions in Swift.
 EXPERIMENTAL_FEATURE(CxxImplementation, true)
 
+/// Expose noncopyable Swift structs and enums to C++ as move-only C++ classes.
+EXPERIMENTAL_FEATURE(GenerateBindingsForNoncopyableTypesInCXX, true)
+
 /// Allow a Swift class to subclass a C++ foreign reference type.
 EXPERIMENTAL_FEATURE(ForeignReferenceTypeSubclassing, true)
 
@@ -589,10 +599,6 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 /// Allow declarations of Swift runtime symbols using @_silgen_name.
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
-/// Allow use of `default` declarations that control file-level defaults such
-/// as actor isolation.
-EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
-
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
@@ -616,7 +622,10 @@ LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
 /// Allow use of the @unsafe(always) attribute
-SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AlwaysUnsafeAttribute, false)
+
+/// The Deinitable invertible protocol, which Copyable inherits
+SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
 
 /// Allow use of 'Swift' (Swift runtime version) in @available attributes
 EXPERIMENTAL_FEATURE(SwiftRuntimeAvailability, true)
@@ -627,10 +636,6 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
-
-/// Enable subscript parameters that have ownership (inout, borrowing,
-/// consuming).
-EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
 
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
@@ -662,39 +667,66 @@ LANGUAGE_FEATURE(BorrowingSequence, 516, "Iterable protocol")
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 
-/// Allow stored properties of types from an internal bridging header in
-/// non-resilient modules. Layout will be encoded in the .swiftmodule.
-EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
-
 /// Allow use of macros to derive various conformances
 EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, true)
 
-/// Allow use of `@called(...)` on function types.
-EXPERIMENTAL_FEATURE(CalledAttribute, false)
+/// Allow `@once` and `@callable(once)` function types.
+EXPERIMENTAL_FEATURE(OnceFunctions, false)
+
+/// Allow structs, enums, and generic parameters to suppress `Deinitable`, for
+/// testing the compiler's support for `~Deinitable` types.
+EXPERIMENTAL_FEATURE(NondeinitableTypes, false)
 
 /// Allow `self` to be mutated or consumed inside of non-`Copyable` type `deinit`s.
 EXPERIMENTAL_FEATURE(MutateAndConsumeInDeinit, true)
 
 /// Import C++ methods that are hard to use correctly under their original name
 /// as '@unsafe(always)', instead of renaming them to '__<name>Unsafe'.
-EXPERIMENTAL_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, true)
+LANGUAGE_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, 0,
+                 "import unsafe C++ methods as '@unsafe(always)'")
 
 /// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
 LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
 
-/// Infer the return ownership of C++ methods that return libkern's OSObject or
-/// one of its subclasses from the method's name, following libkern's
-/// conventions.
-EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
-
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
-EXPERIMENTAL_FEATURE(DistributedActorResignRemoteID, false)
+LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
 
-/// Enable distributed actors in Embedded Swift.
-EXPERIMENTAL_FEATURE(EmbeddedDistributed, false)
+/// Enable @_tailAllocated, which describes the tail-allocated elements of a
+/// class so that typed deallocation in Embedded Swift can pass the size and
+/// type ID of the allocation.
+EXPERIMENTAL_FEATURE(TailAllocatedAttribute, true)
+
+/// Enable type-based scope restrictions on ~Escapable types.
+EXPERIMENTAL_FEATURE(ScopeRestrictions, false)
+
+/// Builtins for relaxed floating-point operations.
+LANGUAGE_FEATURE(BuiltinRelaxedFP, 0, "Support for Builtin.F[Add,Sub,Mul]Relaxed")
+
+/// Enable usage of `Cell`, `ConstCell`, and `Volatile` from the standard library.
+EXPERIMENTAL_FEATURE(Cells, true)
+
+/// Extend `@specialized` for `@specialized(exported: true, ...)`.
+EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
+
+
+/// Builtin.createSynchronousDiscardingTask
+LANGUAGE_FEATURE(BuiltinCreateSynchronousDiscardingTask, 0, "Builtin.createSynchronousDiscardingTask")
+
+/// Allow `@backDeployed(before:)` on `@frozen` structs and enums.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(BackDeployFrozenValueTypes, true)
+
+/// Import C arrays using newer types like InlineArray. This flag has no effect
+/// if the minimum deployment target is not high enough to guarantee InlineArray
+/// will be available.
+EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
+
+/// Import C arrays using newer types like InlineArray. This flag limits the
+/// availability of affected declarations and is not expected to be incorporated
+/// into a future language version.
+EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

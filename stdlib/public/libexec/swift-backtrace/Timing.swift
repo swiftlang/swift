@@ -187,8 +187,8 @@ func -(lhs: Timestamp, rhs: Timestamp) -> Duration {
 
   let flatDuration = flatLhs - flatRhs
   let rawDuration = FILETIME(
-    dwLowDateTime: UInt32(truncatingIfNeeded: flatDuration),
-    dwHighDateTime: UInt32(truncatingIfNeeded: flatDuration >> 32)
+    dwLowDateTime: DWORD(truncatingIfNeeded: flatDuration),
+    dwHighDateTime: DWORD(truncatingIfNeeded: flatDuration >> 32)
   )
   return Duration(rawValue: rawDuration)
   #else

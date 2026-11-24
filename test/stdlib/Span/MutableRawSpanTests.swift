@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature Lifetimes)
 
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: executable_test
 
-// Blocked by rdar://181604244 (opaque values borrow accessors)
+// Blocked by https://github.com/swiftlang/swift/issues/91660 (rdar://181604244)
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
@@ -369,6 +370,472 @@ suite.test("storeBytes(repeating:count:as:) unsafe")
   }
 }
 
+suite.test("updateAll(repeating:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateAll(repeating: 0xa5)
+  expectEqual(a.allSatisfy({ $0 == 0xa5 }), true)
+
+  var empty = MutableRawSpan()
+  empty.updateAll(repeating: .max)
+  expectTrue(empty.isEmpty)
+}
+
+suite.test("updateSubrange(_:repeating:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let byteCount = 8
+  var a = ContiguousArray<UInt8>(repeating: 0, count: byteCount)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(2..<6, repeating: 0xff)
+  for i in 0...span.byteCount {
+    span.updateSubrange(i..<i, repeating: 0x11)
+  }
+  expectEqual(a, [0, 0, 0xff, 0xff, 0xff, 0xff, 0, 0])
+}
+
+suite.test("updateSubrange(_:repeating:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  let range = Bool.random() ? -1..<span.byteCount : 0..<(span.byteCount + 1)
+  expectCrashLater(withDebugMessage: "Byte offset range out of bounds")
+  span.updateSubrange(range, repeating: 0)
+}
+
+suite.test("updateAll(copying:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let source = ContiguousArray<UInt8>([1, 2, 3, 4, 5, 6, 7, 8])
+  var a = ContiguousArray<UInt8>(repeating: 0, count: source.count)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateAll(copying: source.span.bytes)
+  expectEqual(a, source)
+
+  var empty = MutableRawSpan()
+  empty.updateAll(copying: RawSpan())
+  expectTrue(empty.isEmpty)
+}
+
+suite.test("updateAll(copying:) count mismatch")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  let count = 4
+  let badCount = Bool.random() ? count - 1 : count + 1
+  let source = ContiguousArray<UInt8>(0..<UInt8(badCount))
+  var a = ContiguousArray<UInt8>(repeating: 0, count: count)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  expectCrashLater(
+    withDebugMessage: "Source must have as many bytes as the destination"
+  )
+  span.updateAll(copying: source.span.bytes)
+}
+
+suite.test("updateSubrange(_:copying:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let source = ContiguousArray<UInt8>([0xd, 0xe, 0xf])
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(4..<7, copying: source.span.bytes)
+  span.updateSubrange(0..<0, copying: RawSpan())
+  expectEqual(a, [0, 0, 0, 0, 0xd, 0xe, 0xf, 0])
+}
+
+suite.test("updateSubrange(_:) with other range expressions")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let head = ContiguousArray<UInt8>([0xd, 0xe])
+  let tail = ContiguousArray<UInt8>([7, 8, 9])
+  let all = ContiguousArray<UInt8>(0..<8)
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var span: MutableRawSpan
+
+  span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(1...2, repeating: 1)
+  span.updateSubrange(6..., repeating: 2)
+  span.updateSubrange(..<1, repeating: 3)
+  expectEqual(a, [3, 1, 1, 0, 0, 0, 2, 2])
+
+  span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(3...4, copying: head.span.bytes)
+  span.updateSubrange(5..., copying: tail.span.bytes)
+  expectEqual(a, [3, 1, 1, 0xd, 0xe, 7, 8, 9])
+
+  span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(..., repeating: 5)
+  expectEqual(a, [5, 5, 5, 5, 5, 5, 5, 5])
+
+  span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(..., copying: all.span.bytes)
+  expectEqual(a, [0, 1, 2, 3, 4, 5, 6, 7])
+}
+
+suite.test("updateSubrange(_:copying:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  let range = Bool.random() ? -1..<span.byteCount : 0..<(span.byteCount + 1)
+  let source = ContiguousArray<UInt8>(0..<UInt8(span.byteCount + 1))
+  expectCrashLater(withDebugMessage: "Byte offset range out of bounds")
+  span.updateSubrange(range, copying: source.span.bytes)
+}
+
+suite.test("updateAll(moving:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let byteCount = 8
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: byteCount, alignment: 8
+  )
+  defer { storage.deallocate() }
+  _ = storage.initializeMemory(
+    as: UInt8.self, fromContentsOf: 0..<UInt8(byteCount)
+  )
+  var source = OutputRawSpan(buffer: storage, initializedCount: byteCount)
+  expectEqual(source.isFull, true)
+
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: byteCount)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateAll(moving: &source)
+  expectEqual(a.elementsEqual(0..<UInt8(byteCount)), true)
+
+  expectEqual(source.isEmpty, true)
+  expectEqual(source.finalize(for: storage), 0)
+
+  var emptySource = OutputRawSpan(buffer: storage, initializedCount: 0)
+  var empty = MutableRawSpan()
+  empty.updateAll(moving: &emptySource)
+  expectEqual(emptySource.finalize(for: storage), 0)
+}
+
+suite.test("updateSubrange(_:moving:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 8, alignment: 8
+  )
+  defer { storage.deallocate() }
+  var source = OutputRawSpan(buffer: storage, initializedCount: 0)
+  source.append(0xab)
+  source.append(0xcd)
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 6)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  span.updateSubrange(2..<4, moving: &source)
+  expectEqual(source.isEmpty, true)
+  expectEqual(span.load(fromByteOffset: 1, as: UInt8.self), 0)
+  expectEqual(span.load(fromByteOffset: 2, as: UInt8.self), 0xab)
+  expectEqual(span.load(fromByteOffset: 3, as: UInt8.self), 0xcd)
+  expectEqual(span.load(fromByteOffset: 4, as: UInt8.self), 0)
+
+  source.append(0xef)
+  source.append(0x01)
+  span.updateSubrange(4..., moving: &source)
+  expectEqual(source.isEmpty, true)
+  expectEqual(span.load(fromByteOffset: 3, as: UInt8.self), 0xcd)
+  expectEqual(span.load(fromByteOffset: 4, as: UInt8.self), 0xef)
+  expectEqual(span.load(fromByteOffset: 5, as: UInt8.self), 0x01)
+
+  for i in 0..<6 {
+    source.append(UInt8(10 + i))
+  }
+  span.updateSubrange(..., moving: &source)
+  expectEqual(source.isEmpty, true)
+
+  span.updateSubrange(3..<3, moving: &source)
+  span.updateSubrange(6..., moving: &source)
+  expectEqual(source.finalize(for: storage), 0)
+
+  expectEqual(a, [10, 11, 12, 13, 14, 15])
+}
+
+suite.test("updateSubrange(_:moving:), out of bounds range")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  let range = Bool.random() ? -1..<span.byteCount : 0..<(span.byteCount + 1)
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: span.byteCount + 1, alignment: 8
+  )
+  defer { storage.deallocate() }
+  _ = storage.initializeMemory(
+    as: UInt8.self, fromContentsOf: 0..<UInt8(span.byteCount + 1)
+  )
+  var source = OutputRawSpan(
+    buffer: storage, initializedCount: span.byteCount + 1
+  )
+  expectCrashLater(withDebugMessage: "Byte offset range out of bounds")
+  span.updateSubrange(range, moving: &source)
+}
+
+suite.test("updateAll(moving:) count mismatch")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  let count = 4
+  let badCount = Bool.random() ? count - 1 : count + 1
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: count + 1, alignment: 8
+  )
+  defer { storage.deallocate() }
+  _ = storage.initializeMemory(
+    as: UInt8.self, fromContentsOf: 0..<UInt8(badCount)
+  )
+  var source = OutputRawSpan(buffer: storage, initializedCount: badCount)
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: count)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  expectCrashLater(
+    withDebugMessage: "Source must have as many bytes as the destination"
+  )
+  span.updateAll(moving: &source)
+}
+
+suite.test("updateElements(startingAt:copyingAll:)")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let byteCount = 8
+  let source = ContiguousArray<UInt8>([1, 2, 3, 4])
+  let elements = source.span
+  let more: [2 of UInt8] = [8, 9]
+  let empty = Span<UInt8>()
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: byteCount)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+
+  var offset = 2
+  span.updateElements(startingAt: &offset, copyingAll: elements)
+  expectEqual(offset, 6)
+  span.updateElements(startingAt: &offset, copyingAll: more)
+  expectEqual(offset, byteCount)
+
+  span.updateElements(startingAt: &offset, copyingAll: empty)
+  expectEqual(offset, byteCount)
+
+  expectEqual(a, [0, 0, 1, 2, 3, 4, 8, 9])
+}
+
+suite.test("updateElements(startingAt:copyingAll:), returning the end offset")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source = ContiguousArray<UInt8>([1, 2, 3, 4])
+  let more: [2 of UInt8] = [8, 9]
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 8)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+
+  var end = span.updateElements(startingAt: 2, copyingAll: source.span)
+  expectEqual(end, 6)
+  end = span.updateElements(startingAt: end, copyingAll: more)
+  expectEqual(end, 8)
+
+  expectEqual(a, [0, 0, 1, 2, 3, 4, 8, 9])
+}
+
+suite.test("updateElements(startingAt:copyingFrom:), bad offset")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 5
+  let empty = Span<UInt8>()
+  var iterator = empty.makeBorrowingIterator()
+  expectCrashLater(withDebugMessage: "Byte offset out of bounds")
+  span.updateElements(startingAt: &offset, copyingFrom: &iterator)
+}
+
+suite.test("updateElements(startingAt:copyingFrom:), negative offset")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = -1
+  let source = ContiguousArray<UInt8>(0..<4)
+  let elements = source.span
+  var iterator = elements.makeBorrowingIterator()
+  expectCrashLater(withDebugMessage: "Byte offset out of bounds")
+  span.updateElements(startingAt: &offset, copyingFrom: &iterator)
+}
+
+suite.test("updateElements(startingAt:copyingFrom:), continuing with the iterator")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source = ContiguousArray<UInt8>(0..<6)
+  let elements = source.span
+  var iterator = elements.makeBorrowingIterator()
+
+  var first = ContiguousArray<UInt8>(repeating: 0xff, count: 6)
+  var span1 = MutableRawSpan(elements: first.mutableSpan)
+  var offset = 2
+  span1.updateElements(startingAt: &offset, copyingFrom: &iterator)
+  expectEqual(offset, 6)
+  expectEqual(first, [0xff, 0xff, 0, 1, 2, 3])
+
+  var second = ContiguousArray<UInt8>(repeating: 0xff, count: 4)
+  var span2 = MutableRawSpan(elements: second.mutableSpan)
+  offset = 0
+  span2.updateElements(startingAt: &offset, copyingFrom: &iterator)
+  expectEqual(offset, 2)
+  expectEqual(second, [4, 5, 0xff, 0xff])
+}
+
+private struct SourceError: Error, Equatable {}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterator
+: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
+  typealias Element = UInt8
+  typealias Failure = SourceError
+
+  var _inner: Span<UInt8>.BorrowingIterator
+  var _remaining: Int
+  let _chunkSize: Int
+
+  @_lifetime(copy inner)
+  init(
+    _ inner: consuming Span<UInt8>.BorrowingIterator,
+    limit: Int,
+    chunkSize: Int
+  ) {
+    self._inner = inner
+    self._remaining = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(&self)
+  @_lifetime(self: copy self)
+  mutating func nextSpan(maxCount: Int) throws(SourceError) -> Span<UInt8> {
+    if _remaining <= 0 { throw SourceError() }
+    let count = Swift.min(maxCount, _remaining, _chunkSize)
+    let span = _inner.nextSpan(maxCount: count)
+    _remaining -= span.count
+    return span
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterable: Iterable, ~Copyable, ~Escapable {
+  typealias Element = UInt8
+  typealias Failure = SourceError
+  typealias BorrowingIterator = ThrowingIterator
+
+  var _span: Span<UInt8>
+  var _limit: Int
+  var _chunkSize: Int
+
+  @_lifetime(copy span)
+  init(_ span: Span<UInt8>, limit: Int, chunkSize: Int) {
+    self._span = span
+    self._limit = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(borrow self)
+  func makeBorrowingIterator() -> ThrowingIterator {
+    ThrowingIterator(.init(_span), limit: _limit, chunkSize: _chunkSize)
+  }
+}
+
+suite.test("updateElements(startingAt:copyingFrom:), source throws")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let values = ContiguousArray<UInt8>(0..<10)
+  let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
+
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 8)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 2
+  do throws(SourceError) {
+    var iterator = source.makeBorrowingIterator()
+    try span.updateElements(startingAt: &offset, copyingFrom: &iterator)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(offset, 7)
+  expectEqual(a, [0xff, 0xff, 0, 1, 2, 3, 4, 0xff])
+
+  var b = ContiguousArray<UInt8>(repeating: 0xff, count: 5)
+  var full = MutableRawSpan(elements: b.mutableSpan)
+  offset = 0
+  do throws(SourceError) {
+    var iterator = source.makeBorrowingIterator()
+    try full.updateElements(startingAt: &offset, copyingFrom: &iterator)
+    expectEqual(offset, 5)
+    expectEqual(b, [0, 1, 2, 3, 4])
+
+    do throws(SourceError) {
+      _ = try iterator.nextSpan()
+      expectUnreachable()
+    } catch {
+      expectEqual(error, SourceError())
+    }
+  } catch {
+    expectUnreachable()
+  }
+}
+
+suite.test("updateElements(startingAt:copyingAll:), source longer than destination")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source: [5 of UInt8] = [0, 1, 2, 3, 4]
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 6)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 2
+  expectCrashLater(
+    withDebugMessage: "Source has more bytes than the destination can contain"
+  )
+  span.updateElements(startingAt: &offset, copyingAll: source)
+}
+
+suite.test("updateElements(startingAt:copyingAll:), source throws when checking for more bytes")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let values = ContiguousArray<UInt8>(0..<10)
+  let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
+
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 7)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 2
+  do throws(SourceError) {
+    try span.updateElements(startingAt: &offset, copyingAll: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(offset, 7)
+  expectEqual(a, [0xff, 0xff, 0, 1, 2, 3, 4])
+}
+
 suite.test("_mutatingExtracting()")
 .require(.minimumStdlib(.stdlib_6_2))
 .code {
@@ -449,7 +916,7 @@ suite.test("_consumingExtracting() bounds checking")
 .crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(2 ..< .max)
 }
@@ -599,7 +1066,7 @@ suite.test("_consumingExtracting(first:) bound checking")
 .crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(first: -1)
 }
@@ -610,7 +1077,7 @@ suite.test("_consumingExtracting(droppingLast:) bound checking")
 .crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(droppingLast: -1)
 }
@@ -726,7 +1193,7 @@ suite.test("_consumingExtracting(last:) bound checking")
 .crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(last: -1)
 }
@@ -737,7 +1204,7 @@ suite.test("_consumingExtracting(droppingFirst:) bound checking")
 .crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
-  var span = MutableRawSpan(elements: b.mutableSpan)
+  let span = MutableRawSpan(elements: b.mutableSpan)
   expectCrashLater()
   _ = span._consumingExtracting(droppingFirst: -1)
 }
@@ -892,6 +1359,72 @@ suite.test("MutableRawSpan storeBytes repeating with ByteOrder")
     let offset = i * MemoryLayout<UInt16>.stride
     expectEqual(bytes[offset], 0x01)
     expectEqual(bytes[offset + 1], 0x02)
+  }
+}
+
+suite.test("init(bytesOf:) from value")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var inline: [5 of UInt8] = [0, 1, 2, 3, 4]
+  let count = inline.count
+
+  var bytes = MutableRawSpan(bytesOf: &inline)
+  expectEqual(bytes.byteCount, count)
+  for o in bytes.byteOffsets {
+    bytes[o] += 1
+  }
+  _ = consume bytes
+
+  for i in inline.indices {
+    expectEqual(inline[i], UInt8(i + 1))
+  }
+}
+
+suite.test("init(bytesOf:) from integer")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var value = 42
+
+  var span = MutableRawSpan(bytesOf: &value)
+  expectEqual(span.byteCount, MemoryLayout<Int>.size)
+  span.storeBytes(of: 43, toByteOffset: 0, as: Int.self)
+
+  expectEqual(value, 43)
+}
+
+suite.test("init(bytesOf:) from value: round-trip")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  var value = UInt64.zero
+
+  var bytes = MutableRawSpan(bytesOf: &value)
+  expectEqual(bytes.byteCount, MemoryLayout<UInt64>.size)
+  bytes.storeBytes(of: UInt64.max, toByteOffset: 0, as: UInt64.self)
+  _ = consume bytes
+
+  expectEqual(value, .max)
+}
+
+suite.test("init(bytesOf:) from value: compare with indirect approach")
+.require(.minimumStdlib(.stdlib_6_5)).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  var a: [5 of UInt8] = [0, 1, 2, 3, 4]
+  var b = a
+
+  var directBytes = MutableRawSpan(bytesOf: &a)
+  let directByteCount = directBytes.byteCount
+  directBytes.storeBytes(of: UInt16.max, toByteOffset: 2, as: UInt16.self)
+  _ = consume directBytes
+
+  var span = MutableSpan<InlineArray>(ofOne: &b)
+  var spanBytes = span.mutableBytes
+  expectEqual(directByteCount, spanBytes.byteCount)
+  spanBytes.storeBytes(of: UInt16.max, toByteOffset: 2, as: UInt16.self)
+  _ = consume spanBytes
+  _ = consume span
+
+  for i in a.indices {
+    expectEqual(a[i], b[i])
   }
 }
 

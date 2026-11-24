@@ -8,16 +8,19 @@
 
 swift_compiler_sources(Optimizer
   AddressUtils.swift
+  BorrowAccessorFixup.swift
+  BoxAccessSummary.swift
   ControlFlowUtils.swift
   Devirtualization.swift
   EscapeUtils.swift
-  FunctionSignatureTransforms.swift
   GenericSpecialization.swift
   LifetimeCompletion.swift
   LifetimeDependenceUtils.swift
+  LifetimeResolutionUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
   OwnershipUtilities.swift
+  SignatureOptimizationUtilities.swift
   Test.swift
 )

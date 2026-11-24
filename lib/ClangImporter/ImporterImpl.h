@@ -58,6 +58,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -496,7 +497,8 @@ public:
       DiagnosedTemplateDiagnostics;
 
   // Tracks already-emitted diagnostics associated with template arguments
-  // (e.g., from a malformed SWIFT_ESCAPABLE_IF) to avoid duplicate diagnostics.
+  // (e.g., from a malformed SWIFT_SELF_CONTAINED_IF) to avoid duplicate
+  // diagnostics.
   llvm::DenseSet<
       std::pair<const clang::ClassTemplateSpecializationDecl *, unsigned>>
       DiagnosedConditionalAttrParams;
@@ -507,6 +509,8 @@ public:
   const bool BridgingHeaderIsInternal;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
+
+  const CArrayProjection VisibleCArrayProjection;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -587,8 +591,64 @@ public:
   /// The Swift lookup table for the bridging header.
   std::unique_ptr<SwiftLookupTable> BridgingHeaderLookupTable;
 
-  /// Mapping of already-imported declarations.
-  llvm::DenseMap<std::pair<const clang::Decl *, Version>, Decl *> ImportedDecls;
+  using ImportedDeclsKey = std::pair<const clang::Decl *, Version>;
+
+private:
+  /// Mapping of already-imported declarations, and whether each import is
+  /// complete. An importer may cache a declaration before it is completely
+  /// imported, so that recursive imports find it instead of looping.
+  llvm::DenseMap<ImportedDeclsKey, llvm::PointerIntPair<Decl *, 1, bool>>
+      ImportedDecls;
+
+public:
+  /// Returns the cached import of \p key, which is null if the declaration
+  /// could not be imported, or std::nullopt if nothing is cached (or if
+  /// \p requireCompletelyImported and the cached import is not complete).
+  std::optional<Decl *>
+  findImportedDecl(ImportedDeclsKey key,
+                   bool requireCompletelyImported = false) const {
+    auto it = ImportedDecls.find(key);
+    if (it == ImportedDecls.end())
+      return std::nullopt;
+    if (requireCompletelyImported && !it->second.getInt())
+      return std::nullopt;
+    return it->second.getPointer();
+  }
+
+  /// Caches \p decl as the import of \p key, replacing any cached import.
+  ///
+  /// Pass \p isComplete false to cache \p decl before it is completely
+  /// imported, then call \c markImportedDeclComplete once it is.
+  void cacheImportedDecl(ImportedDeclsKey key, Decl *decl,
+                         bool isComplete = true) {
+    ImportedDecls[key] = {decl, isComplete};
+  }
+
+  /// Marks the import cached for \p key complete, if any.
+  void markImportedDeclComplete(ImportedDeclsKey key) {
+    auto it = ImportedDecls.find(key);
+    if (it != ImportedDecls.end())
+      it->second.setInt(true);
+  }
+
+  /// Caches \p decl as the complete import of \p key, unless another import
+  /// is already cached. Returns the cached import.
+  Decl *cacheImportedDeclIfAbsent(ImportedDeclsKey key, Decl *decl) {
+    auto it = ImportedDecls.try_emplace(key, decl, true).first;
+    return it->second.getPointer();
+  }
+
+  void eraseImportedDecl(ImportedDeclsKey key) { ImportedDecls.erase(key); }
+
+  size_t getNumImportedDecls() const { return ImportedDecls.size(); }
+
+  /// Calls \p fn on each non-null imported declaration and its key.
+  void forEachImportedDecl(
+      llvm::function_ref<void(ImportedDeclsKey, Decl *)> fn) const {
+    for (auto &entry : ImportedDecls)
+      if (auto *decl = entry.second.getPointer())
+        fn(entry.first, decl);
+  }
 
   /// Maps a canonical declaration and a type that only appears \em elsewhere
   /// in its redeclaration chain to the declaration that should be used as part
@@ -740,9 +800,34 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// For constructors of foreign reference types, whenever a static factory
+  /// is synthesized, keep track of the C++ constructor it calls.
+  llvm::DenseMap<const clang::CXXMethodDecl *, const clang::CXXConstructorDecl *>
+      foreignReferenceFactoryToOriginalConstructor;
+
   /// Accessors and operator functions synthesized around an imported function,
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
+
+  /// The C++ methods built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , keyed by its
+  /// arguments (with flags packed into one integer).
+  llvm::DenseMap<
+      std::tuple<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *,
+                 const clang::CXXMethodDecl *, uint8_t>,
+      clang::CXXMethodDecl *>
+      synthesizedForwardingMethods;
+
+  /// The C++ method that \p method , if it was built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , forwards to.
+  /// This scans \c synthesizedForwardingMethods , so keep it off hot paths.
+  const clang::CXXMethodDecl *
+  getForwardedCXXMethod(const clang::CXXMethodDecl *method) const {
+    for (const auto &[key, forwarding] : synthesizedForwardingMethods)
+      if (forwarding == method)
+        return std::get<2>(key);
+    return nullptr;
+  }
 
 private:
   // Keep track of the decls that were already cloned for this specific class.
@@ -810,6 +895,89 @@ public:
   /// __convertToBool() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
 
+  /// Info about a Clang record decl possibly annotated with REFCOUNTED_PTR.
+  ///
+  /// Records three pieces of information: the name of the toRawPtr operation,
+  /// the toRawPtr method decl, and the toSmartPtr constructor decl; as well as
+  /// any errors associated with those decls.
+  class RefCountedPtrInfo {
+  public:
+    /// The kinds of errors associated with toRawPtr and toSmartPtr
+    enum class Error : uint8_t {
+      NoError = 0,
+      Missing,
+      LookupFailure,
+      LookupAmbiguity,
+      NotAFunction,
+      WrongSignature,
+    };
+
+  private:
+    StringRef toRawPtrName;
+    llvm::PointerIntPair<ValueDecl *, 3, Error> toRawPtrAndError;
+    llvm::PointerIntPair<ConstructorDecl *, 3, Error> toSmartPtrAndError;
+
+  public:
+    /// A record that is not annotated with SWIFT_REFCOUNTED_PTR
+    static RefCountedPtrInfo notAnnotated() {
+      return {"", nullptr, Error::NoError, nullptr, Error::Missing};
+    }
+
+    /// An annotation that does not name a ToRawPointer function
+    static RefCountedPtrInfo missingRawPtr() {
+      return {"", nullptr, Error::Missing, nullptr, Error::NoError};
+    }
+
+    /// \p toRawPtr is what looking up the ToRawPointer function \p
+    /// toRawPtrName found, if anything. If it is not a function, the
+    /// ToRawPointer error is NotAFunction rather than \p toRawPtrError.
+    RefCountedPtrInfo(StringRef toRawPtrName, ValueDecl *toRawPtr,
+                      Error toRawPtrError, ConstructorDecl *toSmartPtr,
+                      Error toSmartPtrError)
+        : toRawPtrName(toRawPtrName), toRawPtrAndError(toRawPtr, toRawPtrError),
+          toSmartPtrAndError(toSmartPtr, toSmartPtrError) {
+      if (toRawPtr && !isa<FuncDecl>(toRawPtr))
+        toRawPtrAndError.setInt(Error::NotAFunction);
+    }
+
+    bool isAnnotated() const {
+      return toSmartPtrAndError.getInt() != Error::Missing;
+    }
+
+    /// Whether the record is not a valid SWIFT_REFCOUNTED_PTR, including when
+    /// it is not annotated at all.
+    bool hasError() const {
+      return toRawPtrAndError.getInt() != Error::NoError ||
+             toSmartPtrAndError.getInt() != Error::NoError;
+    }
+
+    StringRef getToRawPtrName() const { return toRawPtrName; }
+
+    /// The ToRawPointer function, or null if hasError().
+    FuncDecl *getToRawPtr() const {
+      return hasError() ? nullptr
+                        : cast<FuncDecl>(toRawPtrAndError.getPointer());
+    }
+
+    /// The constructor that converts a foreign reference to the smart pointer,
+    /// used by SILGen for implicit bridging, or null if hasError().
+    ConstructorDecl *getToSmartPtr() const {
+      return hasError() ? nullptr : toSmartPtrAndError.getPointer();
+    }
+
+    /// Emits a note on \p decl for each error in its annotation. Returns true
+    /// if it emitted any.
+    bool diagnose(Implementation &Impl, const clang::TagDecl *decl) const;
+  };
+
+  /// Validate the SWIFT_REFCOUNTED_PTR annotation of \a Record, if any.
+  RefCountedPtrInfo validateRefCountedPtr(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .asReference property of a
+  /// valid SWIFT_REFCOUNTED_PTR smart pointer, or of a C++ struct that
+  /// publicly inherits from one without being annotated itself.
+  VarDecl *lookupAndImportAsReference(NominalTypeDecl *Record);
+
 private:
   /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
   llvm::DenseMap<NominalTypeDecl *,
@@ -819,6 +987,8 @@ private:
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
       importedSubscriptsCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
+  llvm::DenseMap<NominalTypeDecl *, RefCountedPtrInfo> refCountedPtrInfoCache;
+  llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedAsReferenceCache;
 
 public:
   /// Cache of synthesized derived-to-base pointer upcast functions,
@@ -839,6 +1009,21 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inherit);
 
+  /// Like three-arg \c importBaseMemberDecl() , but clones only the indicated
+  /// \p projection .
+  /// If \p memberAccess is given, it is used in place of the access \p decl
+  /// was declared with.
+  ValueDecl *
+  importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                       ClangInheritanceInfo inherit,
+                       CArrayProjection projection,
+                       std::optional<AccessLevel> memberAccess = std::nullopt);
+
+  /// Returns the operator that was synthesized from \p decl , a function
+  /// imported from a C++ operator (so its name starts with `__operator`), or
+  /// \c nullptr if there is none.
+  FuncDecl *getCXXSynthesizedOperatorFunc(const ValueDecl *decl);
+
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
 
@@ -858,13 +1043,18 @@ public:
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
   // Cache for already-specialized function templates and any thunks they may
-  // have.
-  llvm::DenseMap<clang::FunctionDecl *, ValueDecl *>
+  // have, per Swift declaration of the template: e.g. a member template and its
+  // '__<name>Unsafe' migration stub share a C++ specialization, but resolve to
+  // different Swift declarations.
+  llvm::DenseMap<std::pair<clang::FunctionDecl *, const ValueDecl *>,
+                 ValueDecl *>
       specializedFunctionTemplates;
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
-  llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+  llvm::DenseMap<std::pair<const clang::FunctionDecl *, CArrayProjection>,
+                 VarDecl *>
+      FunctionsAsProperties;
 
   /// Maps a foreign reference type's Clang record to the (retain, release)
   /// Clang functions that implement its custom reference counting.
@@ -900,13 +1090,19 @@ public:
     return it->second;
   }
 
-  /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
-  /// libkern's OSObject hierarchy.
-  llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
-      libkernSubclasses;
+  /// Maps each type that exposes an unusable foreign type to that unusable
+  /// type and why.
+  ///
+  /// An unusable type maps to itself; other entries are added lazily.
+  /// FIXME: If a type exposes several unusable types, this only records one.
+  ///
+  /// Types known not to expose an unusable type are not in this map; they are
+  /// marked with \c NominalTypeDecl::setNoExposedUnusableForeignTypes instead.
+  llvm::DenseMap<const NominalTypeDecl *, UnusableForeignType>
+      UnusableForeignTypes;
 
-  /// Classify \p decl against libkern's OSObject hierarchy.
-  LibkernSubclass getLibkernSubclass(const clang::CXXRecordDecl *decl);
+  /// Returns the unusable foreign type exposed by values of \p type, if any.
+  UnusableForeignType exposesUnusableForeignType(Type type);
 
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because
@@ -974,6 +1170,15 @@ public:
       if (alt == altDecl)
         return;
     vec.push_back(altDecl);
+  }
+
+  /// The maximum access level a declaration can have while still being
+  /// usable from the given C array projection, given whether it needs a
+  /// counterpart in the other projection to be fully available.
+  AccessLevel getMaxAccessLevel(CArrayProjection projection, bool needsBoth) {
+    if (needsBoth && VisibleCArrayProjection != projection)
+      return AccessLevel::Internal;
+    return AccessLevel::Open;
   }
 
 private:
@@ -1287,6 +1492,16 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
+  /// The availability that \p decl needs at a minimum, without considering any
+  /// availability attributes on its clang node. In many cases it returns
+  ///  \c isAlwaysAvailable() .
+  AvailabilityRange getAvailabilityFloor(Decl *decl);
+
+  /// Add an \c @available attribute with the version returned by
+  /// \c getAvailabilityFloor(). Use this only for declarations that \em don't
+  /// pass through \c importAttributes() .
+  void applyAvailabilityFloor(Decl *decl);
+
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
@@ -1299,9 +1514,9 @@ public:
   /// Determines the key that should be used to store or look up \p ClangDecl
   /// in \c ImportedDecls . This will usually canonicalize the decl, although
   /// there are rare exceptions.
-  std::pair<const clang::Decl *, Version>
-  getImportedDeclsKey(const clang::NamedDecl *ClangDecl, Version version,
-                      bool UseCanonicalDecl = true);
+  ImportedDeclsKey getImportedDeclsKey(const clang::NamedDecl *ClangDecl,
+                                       Version version,
+                                       bool UseCanonicalDecl = true);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
@@ -1309,6 +1524,94 @@ public:
                                          Version version,
                                          bool UseCanonicalDecl = true);
 
+  /// If \p decl needs multiple C array projections, imports it for all of them,
+  /// registers them as counterparts, and returns the projection indicated by
+  /// \p version . Otherwise, imports \p decl only for the modern projection and
+  /// doesn't register it.
+  ///
+  /// \param importVersion Imports \p decl for the version it's given. It's
+  ///        passed a variant of \p version for each projection that should
+  ///        be imported, and should return \c nullptr if the requested
+  ///        projection of \p decl is unimportable, or if a \c HiddenStorage
+  ///        projection was requested for a declaration that doesn't have
+  ///        storage.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \p version, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(const clang::NamedDecl *decl, Version version,
+                               BodyFn &&importVersion,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, Version>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        decl, version, [&](Version v) -> Decl * { return importVersion(v); },
+        addAlternate));
+  }
+
+  /// If \p needsBoth is true, imports a declaration for both the modern and
+  /// legacy C array projections, registering them as counterparts of one
+  /// another. Otherwise, imports only a modern projection and does not
+  /// register it as a C array projection.
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(bool needsBoth, BodyFn &&importProjection,
+                               bool addAlternate = true) {
+    return forEachCArrayProjection(
+        needsBoth ? CArrayProjection::Legacy : CArrayProjection::Modern,
+        std::move(importProjection), addAlternate);
+  }
+
+  /// Imports a declaration for both the modern C array projection and
+  /// \p neededCounterpartProjection , registering them as counterparts of one
+  /// another. (If \p neededCounterpartProjection is \c Modern, only one
+  /// projection is imported and it is not registered.)
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
+  ///
+  /// \param addAlternate Whether to record the counterpart projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(CArrayProjection neededCounterpartProjection,
+                               BodyFn &&importProjection,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, CArrayProjection>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        neededCounterpartProjection,
+        [&](CArrayProjection p) -> Decl * { return importProjection(p); },
+        addAlternate));
+  }
+
+private:
+  Decl *forEachCArrayProjectionImpl(
+    const clang::NamedDecl *decl, Version version,
+    llvm::function_ref<Decl *(Version)> importVersion, bool addAlternate);
+
+  Decl *forEachCArrayProjectionImpl(
+      CArrayProjection neededProjection,
+      llvm::function_ref<Decl *(CArrayProjection)> importProjection,
+      bool addAlternate);
+
+public:
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
@@ -1404,6 +1707,9 @@ private:
                                  Version version,
                                  bool UseCanonicalDecl = true);
 
+  /// Recursion depth of importDecl[Real] calls.
+  int64_t importDeclRecursionDepth = 0;
+
 public:
   /// Import the declaration context of a given Clang declaration into
   /// Swift.
@@ -1425,6 +1731,11 @@ public:
 
   /// Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
+
+  /// Add an implicit \c @unsafe attribute to \p decl.
+  /// An existing \c @unsafe attribute is upgraded to \c @unsafe(always) when
+  /// needed.
+  void markUnsafe(ValueDecl *decl, bool always);
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
@@ -1656,6 +1967,16 @@ public:
   ImportedType importFunctionReturnType(DeclContext *dc,
                                         const clang::FunctionDecl *clangDecl,
                                         bool allowNSUIntegerAsInt);
+
+  /// Computes the imported Swift type of the Clang `VarDecl` \p clangDecl,
+  /// without a corresponding Swift `VarDecl`.
+  ///
+  /// \param clangDecl The Clang `VarDecl` to import the type of.
+  /// \param inSystemModule Whether \p clangDecl is from a system module.
+  ///
+  /// \returns The imported Swift type, or a null `ImportedType` on failure.
+  ImportedType importClangVarType(const clang::VarDecl *clangDecl,
+                                  bool inSystemModule);
 
   /// Import the parameter list for a function
   ///
@@ -1909,6 +2230,11 @@ public:
 
   Type loadTypeEraserType(const TypeEraserAttr *TRA,
                           uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
+  VarDecl *loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                       uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -2192,6 +2518,74 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
 
+/// Determines which C array projection, besides the modern one, a declaration
+/// involving \p type needs. \c Modern indicates that no C arrays are involved.
+CArrayProjection getNeededCArrayCounterpartForType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// for \p projection.
+///
+/// \param projection The projection to compute the type for. Legacy by default.
+ImportedType
+computeLegacyCArrayType(ImportedType modernType,
+                        CArrayProjection projection = CArrayProjection::Legacy);
+
+/// Determines which C array projection, besides the modern one, \p decl needs.
+/// \c Modern indicates that no C array projections are involved.
+CArrayProjection getNeededCArrayCounterpart(const clang::NamedDecl *decl);
+
+/// The other C array projection of \p decl, or null if \p decl has none (or
+/// has no projections at all). To tell a declaration with no projections apart
+/// from one with a modern projection only, check for a
+/// \c CArrayProjectionAttr ; to get only a legacy or only a hidden storage
+/// projection, use \c getDeclForCArrayProjection() .
+template <typename DeclTy>
+DeclTy *getDeclForCounterpartCArrayProjection(const DeclTy *decl) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || !attr->getCounterpart())
+    return nullptr;
+
+  return dyn_cast_or_null<DeclTy>(attr->getCounterpart());
+}
+
+/// Switch to the C array projection of \p decl that is \p projection.
+///
+/// \returns \p decl if it has no C array projections or is already the
+///          requested one; otherwise its counterpart if that is the requested
+///          projection, or null if the requested projection doesn't exist.
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjection(DeclTy *decl, CArrayProjection projection) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || attr->getProjection() == projection)
+    return decl;
+
+  auto *counterpart = getDeclForCounterpartCArrayProjection(decl);
+  if (!counterpart)
+    return nullptr;
+  auto *counterpartAttr =
+      counterpart->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  return counterpartAttr && counterpartAttr->getProjection() == projection
+             ? counterpart : nullptr;
+}
+
+/// Switch to the C array projection of \p decl that is the same as the
+/// projection of \p reference.
+///
+/// \returns \p decl if \p reference has no C array projections; otherwise the
+///          same thing as \c getDeclForCArrayProjection() .
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjectionMatching(DeclTy *decl,
+                                           const ValueDecl *reference) {
+  auto *attr = reference->getAttrs().getAttribute<CArrayProjectionAttr>();
+  return attr ? getDeclForCArrayProjection(decl, attr->getProjection())
+              : decl;
+}
+
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);
 
@@ -2238,7 +2632,7 @@ void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
+T *dynCastIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2251,7 +2645,7 @@ static T *dynCastIgnoringCompatibilityAlias(Decl *D) {
 
 /// Finds a particular kind of nominal by looking through typealiases.
 template <typename T>
-static T *castIgnoringCompatibilityAlias(Decl *D) {
+T *castIgnoringCompatibilityAlias(Decl *D) {
   static_assert(std::is_base_of<NominalTypeDecl, T>::value,
                 "only meant for use with NominalTypeDecl and subclasses");
   if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(D)) {
@@ -2375,6 +2769,11 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+/// Alternative to \c NominalTypeDecl::lookupDirect for an imported C++ record,
+/// which does not load (and hence deserialize) extensions of \p decl.
+TinyPtrVector<ValueDecl *> lookupDirectWithoutExtensions(NominalTypeDecl *decl,
+                                                         DeclName name);
+
 bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
@@ -2384,11 +2783,16 @@ bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
 
+/// Whether the C++ escapability of \p type is known to be non-Escapable. An
+/// unknown escapability does not count.
+bool isNonEscapable(Evaluator &evaluator, const clang::Type *type,
+                    ClangImporter::Implementation *impl);
+
 /// The \c @_refCountedPtr attribute marking \p decl as a reference counting
 /// smart pointer, or null if it does not have one.
 CustomAttr *getRefCountedPtrAttr(Decl *decl);
 
-/// The macro that spells \p attr in a header, e.g. \c SWIFT_ESCAPABLE for
+/// The macro that spells \p attr in a header, e.g. \c SWIFT_SELF_CONTAINED for
 /// \c swift_attr("Escapable"), for use in diagnostics. Falls back to the
 /// attribute string itself when it has no documented macro.
 StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
@@ -2410,14 +2814,14 @@ bool anySubobjectTypeSatisfies(
     const clang::RecordDecl *decl,
     llvm::function_ref<bool(clang::QualType)> pred);
 
-bool isViewType(const clang::CXXRecordDecl *decl);
+bool isViewType(clang::Sema &sema, const clang::CXXRecordDecl *decl);
 
 /// Determine whether \p type is a "direct view": a pointer or reference to a
 /// self-contained pointee, or a record (including a class template
 /// specialization) in which every field and base is either self-contained or
 /// itself a direct view. Here "self-contained" means escapable
-/// (SWIFT_ESCAPABLE), a foreign reference type, or a type annotated
-/// SWIFT_SELF_CONTAINED (import_owned); a type explicitly marked unsafe is
+/// (SWIFT_SELF_CONTAINED or inferred), a foreign reference type, or a type
+/// with the import_owned attribute; a type explicitly marked unsafe is
 /// never self-contained. Incomplete/forward-declared types, `void` pointees,
 /// and function pointees are never direct views.
 ///
@@ -2462,28 +2866,6 @@ std::optional<CxxUnsafetyReason>
 shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
                               ASTContext &ctx);
 
-/// Whether \p method keeps its original Swift name, and is imported
-/// \c @unsafe(always) rather than renamed to \c __<name>Unsafe .
-///
-/// False unless \c ImportUnsafeCxxMethodsAsAlwaysUnsafe is enabled. Also false
-/// for the handful of C++ standard library methods that the overlay in
-/// stdlib/public/Cxx wraps in a safe Swift API of the same name, since the
-/// original-named import would shadow or ambiguate the wrapper.
-bool keepsNameWhenImportedAsUnsafe(const clang::CXXMethodDecl *method,
-                                   ASTContext &ctx);
-
-inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar().getTypePtr();
-  return type;
-}
-
-inline clang::QualType desugarIfElaborated(clang::QualType type) {
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
-    return elaborated->desugar();
-  return type;
-}
-
 inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
   if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
     return BAT->desugar();
@@ -2518,20 +2900,31 @@ TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
                                                 StringRef name);
 
 template <typename T>
-const T *
-getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+SmallVector<const T *, 1>
+getImplicitObjectParamAnnotations(const clang::FunctionDecl *FD) {
+  SmallVector<const T *, 1> result;
   const clang::TypeSourceInfo *TSI = FD->getTypeSourceInfo();
   if (!TSI)
-    return nullptr;
+    return result;
   clang::AttributedTypeLoc ATL;
   for (clang::TypeLoc TL = TSI->getTypeLoc();
        (ATL = TL.getAsAdjusted<clang::AttributedTypeLoc>());
        TL = ATL.getModifiedLoc()) {
     if (auto attr = ATL.getAttrAs<T>())
-      return attr;
+      result.push_back(attr);
   }
-  return nullptr;
+  return result;
 }
+
+template <typename T>
+const T *getFirstImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
+  auto attrs = getImplicitObjectParamAnnotations<T>(FD);
+  return attrs.empty() ? nullptr : attrs.front();
+}
+
+/// Whether \p method is the dereference operator of \c std::unique_ptr or
+/// \c std::shared_ptr, whose result is imported as depending on \c self.
+bool isSmartPointerDereference(const clang::CXXMethodDecl *method);
 
 /// Compute the foreign reference type info for \p decl without consulting or
 /// populating the \c ForeignReferenceTypeInfoRequest cache.
@@ -2559,6 +2952,15 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// they can be looked up during IRGen.
 void checkRetainReleaseFunctions(ClassDecl *classDecl,
                                  ClangImporter::Implementation &Impl);
+
+/// Returns true if \p method overrides a virtual member retain or release operation.
+bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
+                                     StringRef swiftBaseName,
+                                     Evaluator &evaluator);
+
+/// Whether Swift copies and destroys values of \p nominal by copying and
+/// destroying its storage.
+bool hasExposedStorage(const NominalTypeDecl *nominal);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.

@@ -20,10 +20,10 @@ markUsed(advanced.foo(1, 2))
 
 // DWARF: .debug_info
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name ("Swift")
+// DWARF:   DW_AT_name ("Foo")
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
-// DWARF:   DW_AT_name ("Foo")
+// DWARF:   DW_AT_name ("Swift")
 // DWARF:   DW_AT_LLVM_include_path
 // DWARF: DW_TAG_module
 // DWARF:   DW_AT_name ("advanced")
@@ -31,4 +31,4 @@ markUsed(advanced.foo(1, 2))
 // DWARF-NOT: "Swift.Optional"
 
 // DWARF-DAG: file_names{{.*}}
-// DWARF-NEXT: "Imports.swift"
+// DWARF-NEXT: {{"|/|\\\\}}Imports.swift"

@@ -618,6 +618,9 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
+
+  /// When set, ignore execution semantics mismatches between function types.
+  IgnoreExecutionSemanticsMismatch = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -1021,6 +1024,12 @@ private:
   /// The constraint graph.
   ConstraintGraph CG;
 
+  /// The current bindings generation number. This is incremented every
+  /// time a binding set changes, so that we take the maximum generation
+  /// number of a collection of binding sets and compare it against a
+  /// saved value to check if any of those binding sets changed.
+  uint64_t BindingGenerationNumber = 0;
+
   /// Information about the remaining disjunctions we have yet to attempt
   /// in this path.
   llvm::DenseMap<Constraint *, SolverDisjunction> RemainingDisjunctions;
@@ -1112,6 +1121,10 @@ public:
   /// This is not trail-protected state; it's just a cache for some
   /// information about Decls.
   ConformanceCache CC;
+
+  uint64_t getNextBindingGenerationNumber() {
+    return ++BindingGenerationNumber;
+  }
 
 private:
   /// Describes the current solver state.
@@ -1316,6 +1329,9 @@ private:
 
   void incrementScopeCounter();
   void incrementLeafScopes();
+
+  /// All type variables seen with conflicting types while solving
+  AmbiguousBindings ambiguousBindings;
 
 public:
   /// Introduces a new solver scope, which any changes to the
@@ -2071,12 +2087,14 @@ public:
   bool recordFix(ConstraintFix *fix, FixImpact impact = FixImpact::Mismatch,
                  PreparedOverloadBuilder *preparedOverload = nullptr);
 
+  void recordConflictedType(TypeVariableType *root, Type conflict,
+                            ConstraintLocator *loc, ConflictReason reason);
+
   void recordPotentialHole(TypeVariableType *typeVar);
   void recordAnyTypeVarAsPotentialHole(Type type);
 
-  /// Record all unbound type variables that occur in the given type
-  /// as being bound to "hole" type represented by \c PlaceholderType
-  /// in this constraint system.
+  /// Record all unbound type variables that occur in the given type as being
+  /// bound to "hole" type represented by \c HoleType in this constraint system.
   ///
   /// \param type The type on which to holeify.
   void recordTypeVariablesAsHoles(Type type);
@@ -2129,17 +2147,6 @@ public:
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
-  
-  /// Mine the active and inactive constraints in the constraint
-  /// system to generate a plausible diagnosis of why the system could not be
-  /// solved.
-  ///
-  /// \param target The solution target whose constraints we're investigating
-  /// for a better diagnostic.
-  ///
-  /// Assuming that this constraint system is actually erroneous, this *always*
-  /// emits an error message.
-  void diagnoseFailureFor(SyntacticElementTarget target);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
@@ -3154,8 +3161,8 @@ public:
                                         TypeMatchOptions flags,
                                         ConstraintLocatorBuilder locator);
 
-  /// Match the execution semantics between two functions currently
-  /// represented by `@called(once)` bit.
+  /// Match the execution semantics (exactly-once, at-most-once, or
+  /// unconstrained) between two functions.
   SolutionKind
   matchFunctionExecutionSemantics(FunctionType *func1, FunctionType *func2,
                                   ConstraintKind kind, TypeMatchOptions flags,
@@ -3551,6 +3558,12 @@ private:
   /// Attempt to simplify the given EscapableFunctionOf constraint.
   SolutionKind simplifyEscapableFunctionOfConstraint(
                                          Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify the given DeinitableFunctionOf constraint.
+  SolutionKind
+  simplifyDeinitableFunctionOfConstraint(Type type1, Type type2,
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
@@ -4397,6 +4410,15 @@ ValueDecl *getOverloadChoiceDecl(Constraint *choice);
 /// This function requires the type to be fully resolved.
 bool isSendableCapture(Type type);
 
+/// Determine the execution semantics of an unapplied reference to a consuming
+/// method on the given base type. Such a reference owns its base, so it can't
+/// be copied if the base is non-Copyable, and has to be called if the base is
+/// also non-Deinitable.
+///
+/// This function requires the type to be fully resolved.
+std::optional<ExecutionSemantics>
+getUnappliedConsumingMethodExecutionSemantics(Type baseType);
+
 /// Find any references to external type variables used in the body of a
 /// conjunction element (e.g closures, taps, if/switch expressions).
 ///
@@ -4414,7 +4436,7 @@ class TypeVarRefCollector : public ASTWalker {
   DeclContext *DC;
   ConstraintLocator *Locator;
 
-  llvm::SmallSetVector<TypeVariableType *, 4> TypeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> TypeVars;
   unsigned DCDepth = 0;
 
 public:

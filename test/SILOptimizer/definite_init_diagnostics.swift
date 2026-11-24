@@ -1725,3 +1725,36 @@ class BaseForFailableOverrideInit {
 class DerivedFailableOverrideInit: BaseForFailableOverrideInit {
   override init?(fail: String) {} // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 }
+
+// https://github.com/swiftlang/swift/issues/88991
+// passing an uninitialized stored property as an argument to self.init is illegal
+class Retained {}
+struct NC: ~Copyable {
+  let retained = Retained()
+}
+
+class SelfInitArgument {
+  let value: Retained
+  let ncValue: NC?
+  init(_ value: Retained) {
+    self.value = value
+    self.ncValue = nil
+  }
+
+  init(withNC nc: consuming NC?) {
+    self.value = Retained()
+    self.ncValue = nc
+  }
+
+  convenience init() {
+    self.init(value) // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  }
+
+  convenience init(nonOverride: ()) {
+    self.init(withNC: ncValue) // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  }
+
+  convenience init?(failable1: ()) {
+    self.init(withNC: ncValue) // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  }
+}

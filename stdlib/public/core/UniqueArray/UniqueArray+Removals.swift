@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Removes all elements from the array, preserving its allocated capacity.
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func removeAll() {
     _storage.removeAll()
@@ -28,7 +26,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The last element of the original array.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @discardableResult
   @export(implementation)
   public mutating func removeLast() -> Element {
@@ -46,7 +43,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    the count of the array.
   ///
   /// - Complexity: O(`k`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func removeLast(_ k: Int) {
     _storage.removeLast(k)
@@ -62,7 +58,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: The removed element.
   ///
   /// - Complexity: O(`self.count`)
-  @available(SwiftStdlib 6.4, *)
   @discardableResult
   @export(implementation)
   public mutating func remove(at index: Int) -> Element {
@@ -78,7 +73,6 @@ extension UniqueArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`self.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func removeSubrange(_  bounds: Range<Int>) {
     _storage.removeSubrange(bounds)
@@ -90,7 +84,6 @@ extension UniqueArray where Element: ~Copyable {
   ///   of the range must be valid indices of the array.
   ///
   /// - Complexity: O(`self.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
@@ -98,7 +91,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Removes and returns the last element of the array, if there is one.
   ///
@@ -106,7 +98,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    otherwise, `nil`.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func popLast() -> Element? {
     if isEmpty { return nil }

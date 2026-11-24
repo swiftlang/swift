@@ -9,6 +9,7 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+import glob
 import multiprocessing
 import os
 import shutil
@@ -38,7 +39,7 @@ TEST_SUBSETS = [
     'only_stress',
 ]
 
-SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
+SWIFT_SOURCE_DIR = os.path.realpath(os.path.join(SWIFT_SOURCE_ROOT, 'swift'))
 TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'test')
 VALIDATION_TEST_SOURCE_DIR = os.path.join(SWIFT_SOURCE_DIR, 'validation-test')
 
@@ -57,6 +58,14 @@ LIT_BIN_DEFAULT = os.path.join(os.environ.get("LLVM_SOURCE_DIR",
 
 host_target = StdlibDeploymentTarget.host_target().name
 
+IS_WINDOWS = sys.platform == 'win32'
+
+# Triples used by utils/build.ps1 to name per-platform build directories.
+WINDOWS_TRIPLES = {
+    'AMD64': 'x86_64-unknown-windows-msvc',
+    'ARM64': 'aarch64-unknown-windows-msvc',
+}
+
 
 def error_exit(msg):
     print("%s: %s" % (os.path.basename(sys.argv[0]), msg), file=sys.stderr)
@@ -74,6 +83,54 @@ def is_swift_build_dir(path, unified_build_dir):
             os.path.isdir(os.path.join(*tests_path)))
 
 
+# Return the build directories that utils/build.ps1 tests Swift in, most
+# preferred first.  Honors SWIFT_BINARY_CACHE, which matches build.ps1's
+# -BinaryCache parameter.
+def windows_default_build_dirs():
+    binary_cache = os.environ.get('SWIFT_BINARY_CACHE', 'S:\\BinaryCache')
+    triple = WINDOWS_TRIPLES.get(
+        os.environ.get('PROCESSOR_ARCHITECTURE', 'AMD64').upper())
+    if triple is None:
+        return []
+    return [os.path.join(binary_cache, triple, project)
+            for project in ['Stage2Compilers', 'Compilers']]
+
+
+# Set up the environment that utils/build.ps1 uses when it runs the tests
+# (see Test-Compilers), so that the tools built in `build_dir` can find the
+# Swift runtime and friends.  The Visual Studio environment is set up by
+# run-test.cmd.
+def setup_windows_test_environment(build_dir):
+    triple_dir = os.path.dirname(build_dir)
+    binary_cache = os.path.dirname(triple_dir)
+    build_root = os.environ.get('SWIFT_BUILD_ROOT',
+                                os.path.dirname(binary_cache))
+
+    prefix = glob.glob(os.path.join(build_root, 'Program Files', 'Swift',
+                                    'Runtimes', '*', 'usr', 'bin'))
+    prefix += [
+        os.path.join(build_dir, 'bin'),
+        os.path.join(triple_dir, 'DynamicCDispatch'),
+        os.path.join(triple_dir, 'DynamicCDispatch', 'bin'),
+    ]
+    prefix += glob.glob(os.path.join(triple_dir, 'cmark-gfm-*', 'src'))
+
+    suffix = []
+    vs_install = os.environ.get('VSINSTALLDIR')
+    if vs_install:
+        suffix.append(os.path.join(
+            vs_install, 'DIA SDK', 'bin',
+            os.environ.get('VSCMD_ARG_HOST_ARCH', 'amd64')))
+    suffix.append(os.path.join(os.environ.get('SystemDrive', 'C:') + os.sep,
+                               'Program Files', 'Git', 'usr', 'bin'))
+
+    os.environ['PATH'] = os.pathsep.join(
+        [d for d in prefix if os.path.isdir(d)] +
+        [os.environ.get('PATH', '')] +
+        [d for d in suffix if os.path.isdir(d)])
+    os.environ['PYTHONUTF8'] = '1'
+
+
 # Return true if the swift build directory is configured with `Xcode`
 # generator.
 def is_build_dir_xcode(path):
@@ -82,7 +139,8 @@ def is_build_dir_xcode(path):
 
 # Return true if 'path' is sub path of 'd'
 def is_subpath(path, d):
-    path, d = os.path.abspath(path), os.path.abspath(d)
+    path = os.path.normcase(os.path.realpath(path))
+    d = os.path.normcase(os.path.realpath(d))
     if os.path.isdir(path):
         path = os.path.join(path, '')
     d = os.path.join(d, '')
@@ -172,6 +230,20 @@ def main():
 
     args = parser.parse_args()
 
+    # On Windows, build.ps1 produces unified LLVM builds in a well-known
+    # location, so default to those and work out the layout ourselves.
+    auto_unified = IS_WINDOWS and not args.unified
+    if IS_WINDOWS and args.build_dir is None:
+        if not args.paths or any(is_subpath(p, SWIFT_SOURCE_DIR)
+                                 for p in args.paths):
+            for d in windows_default_build_dirs():
+                if os.path.isdir(d):
+                    args.build_dir = d
+                    break
+            else:
+                error_exit("can't find a build directory; pass --build-dir "
+                           "or set SWIFT_BINARY_CACHE")
+
     targets = args.targets
     if not targets:
         targets = [host_target]
@@ -187,6 +259,8 @@ def main():
         for d in [
                 build_dir,
                 os.path.join(build_dir, 'swift-%s' % host_target)]:
+            if auto_unified and not is_swift_build_dir(d, False):
+                args.unified = True
             if is_swift_build_dir(d, args.unified):
                 build_dir = d
                 break
@@ -215,13 +289,30 @@ def main():
             # Building dependencies requires `build_dir` set.
             # Traverse the first test path to find the `build_dir`
             d = os.path.dirname(paths[0])
-            while d not in ['', os.sep]:
+            while True:
+                if auto_unified and not is_swift_build_dir(d, False):
+                    args.unified = True
                 if is_swift_build_dir(d, args.unified):
                     build_dir = d
                     break
-                d = os.path.dirname(d)
-            else:
-                error_exit("Can't infer swift build directory")
+                parent = os.path.dirname(d)
+                # At the filesystem root (e.g. `/` or `C:\`), dirname is a
+                # fixed point.
+                if parent == d or not parent:
+                    error_exit("Can't infer swift build directory")
+                d = parent
+
+    # utils/build.ps1 only configures the in-tree stdlib when asked to test.
+    if IS_WINDOWS:
+        stdlib_module = os.path.join(build_dir, 'lib', 'swift', 'windows',
+                                     'Swift.swiftmodule')
+        if not os.path.isdir(stdlib_module) or not os.listdir(stdlib_module):
+            error_exit("'%s' has no standard library; run "
+                       "`utils\\build.cmd -Test swift-prepare` first" %
+                       build_dir)
+
+    if IS_WINDOWS:
+        setup_windows_test_environment(build_dir)
 
     # Ensure we have up to date test dependency
     if args.build != 'skip' and is_build_dir_xcode(build_dir):
@@ -231,11 +322,18 @@ def main():
         sys.stdout.flush()
 
     elif args.build != 'skip':
-        dependency_targets = ["all"]
+        if IS_WINDOWS:
+            # build.ps1 builds the runtime separately, so `all` and
+            # upload-stdlib-* don't apply.  Build SwiftCompilerPlugin, which
+            # the macro tests need, plus the per-target test dependencies.
+            dependency_targets = ["SwiftCompilerPlugin"]
+        else:
+            dependency_targets = ["all"]
         upload_stdlib_targets = []
-        need_validation = any('/validation-test-' in path for path in paths)
+        need_validation = any(
+            '/validation-test-' in path.replace(os.sep, '/') for path in paths)
         for target in targets:
-            if args.mode != 'only_non_executable':
+            if args.mode != 'only_non_executable' and not IS_WINDOWS:
                 upload_stdlib_targets += ["upload-stdlib-%s" % target]
             if need_validation:
                 dependency_targets += ["swift-validation-%s-test-depends" % target]
@@ -255,7 +353,8 @@ def main():
               ', '.join(dependency_targets))
         sys.stdout.flush()
         shell.call(cmake_build + dependency_targets)
-        shell.call(cmake_build + upload_stdlib_targets)
+        if upload_stdlib_targets:
+            shell.call(cmake_build + upload_stdlib_targets)
         print("--- Build finished ---")
         sys.stdout.flush()
 

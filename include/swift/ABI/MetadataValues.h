@@ -247,7 +247,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseTakable) |
                                    (isBT ? 0 : IsNonBitwiseTakable));
   }
-  
+
   /// True if values of this type can be passed by value when borrowed.
   /// If this bit is true, then borrows of the value are independent of the
   /// value's address, so a value can be passed in registers or memcpy'd
@@ -268,7 +268,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonBitwiseBorrowable) |
                                    (isBB ? 0 : IsNonBitwiseBorrowable));
   }
-  
+
   /// True if values of this type can be copied.
   /// NOTE: This is NOT accurate for types that are conditionally Copyable.
   /// You may need to use `checkInvertibleRequirements`.
@@ -277,7 +277,7 @@ public:
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |
                                    (isCopyable ? 0 : IsNonCopyable));
   }
-  
+
   /// True if values of this type are addressable-for-dependencies, meaning
   /// that values of this type should be passed indirectly to functions that
   /// produce lifetime-dependent values that could possibly contain pointers
@@ -835,7 +835,7 @@ public:
                                  ? IsConformanceOfProtocolMask
                                  : 0));
   }
-  
+
   ConformanceFlags withHasGlobalActorIsolation(
                                            bool hasGlobalActorIsolation) const {
     return ConformanceFlags((Value & ~HasGlobalActorIsolation)
@@ -1159,6 +1159,14 @@ struct TargetFunctionMetadataDifferentiabilityKind {
 using FunctionMetadataDifferentiabilityKind =
     TargetFunctionMetadataDifferentiabilityKind<size_t>;
 
+/// Execution semantics for function type metadata.
+/// Duplicates `ExecutionSemantics` in AST/AttrKind.h, plus `None`.
+enum class FunctionMetadataExecutionSemantics : uint8_t {
+  None = 0,
+  AtMostOnce = 1,
+  Once = 2,
+};
+
 /// Flags in a function type metadata record.
 template <typename int_type>
 class TargetFunctionTypeFlags {
@@ -1308,9 +1316,10 @@ class TargetExtendedFunctionTypeFlags {
     // Values if we have a sending result.
     HasSendingResult = 0x00000010U,
 
-    IsCalledOnce = 0x00000020U,
+    // Values for the enumerated execution semantics.
+    ExecutionSemanticsMask = 0x000000E0U, // three bits
+    ExecutionSemanticsShift = 5,
 
-    /// A InvertibleProtocolSet in the high bits.
     InvertedProtocolshift = 16,
     InvertedProtocolMask = 0xFFFFU << InvertedProtocolshift,
   };
@@ -1351,9 +1360,10 @@ public:
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
-  withCalledOnce(bool newValue = true) const {
+  withExecutionSemantics(FunctionMetadataExecutionSemantics semantics) const {
     return TargetExtendedFunctionTypeFlags<int_type>(
-        (Data & ~IsCalledOnce) | (newValue ? IsCalledOnce : 0));
+        (Data & ~ExecutionSemanticsMask) |
+        (int_type(semantics) << ExecutionSemanticsShift));
   }
 
   const TargetExtendedFunctionTypeFlags<int_type>
@@ -1362,7 +1372,7 @@ public:
         (Data & ~InvertedProtocolMask) |
         (inverted.rawBits() << InvertedProtocolshift));
   }
-  
+
   bool isTypedThrows() const { return bool(Data & TypedThrowsMask); }
 
   bool isIsolatedAny() const {
@@ -1377,12 +1387,13 @@ public:
     return bool(Data & HasSendingResult);
   }
 
-  bool isCalledOnce() const {
-    return bool(Data & IsCalledOnce);
-  }
-
   int_type getIntValue() const {
     return Data;
+  }
+
+  FunctionMetadataExecutionSemantics getExecutionSemantics() const {
+    return FunctionMetadataExecutionSemantics((Data & ExecutionSemanticsMask) >>
+                                              ExecutionSemanticsShift);
   }
 
   InvertibleProtocolSet getInvertedProtocols() const {
@@ -1662,7 +1673,7 @@ enum class RawLayoutFlags : uintptr_t {
 
   /// Whether or not this raw layout type was declared 'movesAsLike'.
   MovesAsLike = 0x2,
-  
+
   /// Whether this raw layout type is bitwise borrowable.
   ///
   /// No raw layout types are yet, but should we change our mind about that in the future,
@@ -1712,6 +1723,34 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t ProtocolConformanceDescriptor = 0xc6eb;
 
   const uint16_t ProtocolDescriptor = 0xe909; // = 59657
+
+  /// Protocol witness table pointers in the runtime's conformance cache.
+  ///
+  /// Computed with ptrauth_string_discriminator("protocol_witness_table").
+  const uint16_t ProtocolWitnessTable = 0x22d0; // = 8912
+
+  /// The combined pointer/tag words stored in the two swift::SignedPointerUnion
+  /// fields of the runtime conformance cache's entries. Each field has its own
+  /// discriminator so a signed word from one cannot be substituted into the
+  /// other.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_type_or_descriptor") and
+  /// ptrauth_string_discriminator("conformance_cache_proto_or_storage").
+  const uint16_t ConformanceCacheTypeOrDescriptor = 0xbe9b; // = 48795
+  const uint16_t ConformanceCacheProtoOrStorage = 0x06a2; // = 1698
+
+  /// The individual pointer fields of a conformance cache entry's extended
+  /// storage (used for global-actor-isolated conformances). Each field is
+  /// signed with its own discriminator.
+  ///
+  /// Computed with
+  /// ptrauth_string_discriminator("conformance_cache_storage_protocol"),
+  /// ptrauth_string_discriminator("conformance_cache_storage_global_actor_type")
+  /// and ptrauth_string_discriminator("conformance_cache_storage_next").
+  const uint16_t ConformanceCacheStorageProtocol = 0x2465; // = 9317
+  const uint16_t ConformanceCacheStorageGlobalActorType = 0x31dc; // = 12764
+  const uint16_t ConformanceCacheStorageNext = 0x5664; // = 22116
 
   // Type descriptors as arguments.
   const uint16_t OpaqueTypeDescriptor = 0xbdd1; // = 48593
@@ -1789,10 +1828,35 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t AsyncContextResume = 0xd707; // = 55047
   const uint16_t AsyncContextYield = 0xe207; // = 57863
   const uint16_t CancellationNotificationFunction = 0x0f08; // = 3848
-  const uint16_t CancellationNotificationWithReasonFunction = 0x89d1; // = 35281
+  const uint16_t CancellationNotificationWithReasonFunction = 0xf59d; // = 62877
   const uint16_t EscalationNotificationFunction = 0x7861; // = 30817
   const uint16_t AsyncThinNullaryFunction = 0x0f08; // = 3848
   const uint16_t AsyncFutureFunction = 0x720f; // = 29199
+
+  /// Task pointers in a future's wait queue: the queue head in the future
+  /// fragment, and the link to the next waiter in a task dependency record.
+  const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
+  const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
+
+  /// The task to resume in a NullaryContinuationJob.
+  const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
+
+  /// The executor identity and witness table stored in a task executor
+  /// preference status record.
+  const uint16_t TaskExecutorPreferenceIdentity = 0xc69e; // = 50846
+  const uint16_t TaskExecutorPreferenceImplementation = 0x3dac; // = 15788
+
+  /// The task waiting on a task group. It's address-diversified.
+  const uint16_t TaskGroupWaitQueue = 0x69ea; // = 27114
+
+  /// Job pointers in a default actor's job queues: the first job in the
+  /// actor's status word, and the links between jobs and the priority queue's
+  /// head and tails. Address-diversified.
+  const uint16_t ActorStatusFirstJob = 0x0d12; // = 3346
+  const uint16_t ActorJobQueueLink = 0xcc5c;   // = 52316
+
+  /// Result type metadata stored in a future task or task group.
+  const uint16_t TaskResultTypeMetadata = 0xe89e; // = 59550
 
   /// Swift async context parameter stored in the extended frame info.
   const uint16_t SwiftAsyncContextExtendedFrameEntry = 0xc31a; // = 49946
@@ -1822,6 +1886,12 @@ namespace SpecialPointerAuthDiscriminators {
 
   /// Isolated deinit body function pointer
   const uint16_t DeinitWorkFunction = 0x8438; // = 33848
+
+  /// The object passed to an isolated deinit body.
+  const uint16_t IsolatedDeinitJobObject = 0xe281; // = 57985
+
+  /// The synchronous & discarding task's operation `() -> ()`
+  const uint16_t SynchronousTaskOperation = 0x0f08; // = 3848
 
   /// IsCurrentGlobalActor function used between the Swift runtime and
   /// concurrency runtime.
@@ -2825,6 +2895,14 @@ public:
     /// Supported starting in Swift 6.1.
     Task_IsTaskFunctionConsumed                   = 15,
     Task_IsImmediateTask                          = 16,
+    /// The task's operation is synchronous and does not throw.
+    /// The task function is a plain Swift function pointer
+    /// instead of an async function pointer.
+    ///
+    /// A synchronous operation which throws would need its own flag.
+    ///
+    /// Supported starting in Swift 6.5.
+    Task_HasSynchronousOperation                  = 17,
   };
 
   explicit constexpr TaskCreateFlags(size_t bits) : FlagSet(bits) {}
@@ -2860,6 +2938,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_IsImmediateTask,
                                 isImmediateTask,
                                 setIsImmediateTask)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasSynchronousOperation,
+                                hasSynchronousOperation,
+                                setHasSynchronousOperation)
 };
 
 /// Flags for schedulable jobs.
@@ -2880,10 +2961,12 @@ public:
     Task_IsChildTask                      = 24,
     Task_IsFuture                         = 25,
     Task_IsGroupChildTask                 = 26,
-    // 27 is currently unused
+    Task_HasSynchronousOperation          = 27,
     Task_IsAsyncLetTask                   = 28,
     Task_HasInitialTaskExecutorPreference = 29,
     Task_HasInitialTaskName               = 30,
+    // 31 is currently unused. It is the last free task flag,
+    // if we need add any more flags, overflow to a flags fragment.
   };
   // clang-format on
 
@@ -2923,6 +3006,9 @@ public:
   FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasInitialTaskName,
                                 task_hasInitialTaskName,
                                 task_setHasInitialTaskName)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Task_HasSynchronousOperation,
+                                task_hasSynchronousOperation,
+                                task_setHasSynchronousOperation)
 };
 
 /// Kinds of task status record.
@@ -3133,13 +3219,21 @@ public:
   enum {
     /// Whether this is a "distributed" actor function.
     Distributed = 0,
+    /// Whether the accessor this record points at has a leading `isolated (any Actor)?`.
+    HasLeadingImplicitActorIsolationParameter = 1,
   };
 
   explicit AccessibleFunctionFlags(uint32_t bits) : FlagSet(bits) {}
   constexpr AccessibleFunctionFlags() {}
 
   /// Whether the this is a "distributed" actor function.
-  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed, isDistributed, setDistributed)
+  FLAGSET_DEFINE_FLAG_ACCESSORS(Distributed,
+    isDistributed, setDistributed)
+
+  /// Whether the target function has a leading implicit actor isolation parameter.
+  FLAGSET_DEFINE_FLAG_ACCESSORS(HasLeadingImplicitActorIsolationParameter,
+    hasLeadingImplicitActorIsolationParameter,
+    setHasLeadingImplicitActorIsolationParameter)
 };
 
 } // end namespace swift

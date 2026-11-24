@@ -163,14 +163,6 @@ using swift::ProfileCounterRef;
 using swift::ASTNode;
 
 template <> struct DenseMapInfo<ProfileCounterRef> {
-  static inline ProfileCounterRef getEmptyKey() {
-    return ProfileCounterRef(DenseMapInfo<ASTNode>::getEmptyKey(),
-                             ProfileCounterRef::Kind::Node);
-  }
-  static inline ProfileCounterRef getTombstoneKey() {
-    return ProfileCounterRef(DenseMapInfo<ASTNode>::getTombstoneKey(),
-                             ProfileCounterRef::Kind::Node);
-  }
   static unsigned getHashValue(const ProfileCounterRef &ref) {
     return hash_value(ref);
   }

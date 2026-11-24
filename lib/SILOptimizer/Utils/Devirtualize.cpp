@@ -22,6 +22,7 @@
 #include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -58,7 +59,7 @@ void swift::getAllSubclasses(ClassHierarchyAnalysis *cha, ClassDecl *cd,
 
   // FIXME: This is wrong -- we could have a non-generic class nested
   // inside a generic class
-  if (isa<BoundGenericClassType>(classType)) {
+  if (isa<ClassType>(classType)) {
     // Filter out any subclasses that do not inherit from this
     // specific bound class.
     auto removedIt =
@@ -225,7 +226,7 @@ SILValue swift::getInstanceWithExactDynamicType(SILValue instance,
     if (!singlePred) {
       if (!isa<SILFunctionArgument>(arg))
         break;
-      auto *cd = arg->getType().getClassOrBoundGenericClass();
+      auto *cd = arg->getType().getClassDecl();
       // Check if this class is effectively final.
       if (!cd || !isKnownFinalClass(cd, module, cha))
         break;
@@ -321,7 +322,7 @@ SILType swift::getExactDynamicType(SILValue instance,
       if (fArg->getType().is<AnyMetatypeType>()) {
         return SILType();
       }
-      auto *cd = fArg->getType().getClassOrBoundGenericClass();
+      auto *cd = fArg->getType().getClassDecl();
       // If it is not class and it is a trivial type, then it
       // should be the exact type.
       if (!cd && fArg->getType().isTrivial(*f)) {
@@ -444,7 +445,7 @@ combineSubstitutionMaps(SubstitutionMap firstSubMap,
     //
     // The conformance Bar : Q is difficult to recover in the general case.
     //
-    // Some combination of storing substitution maps in BoundGenericTypes
+    // Some combination of storing substitution maps in NominalTypes
     // as well as for method overrides would solve this, but for now, just
     // punt to global lookup.
     LookUpConformanceInModule());
@@ -469,7 +470,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
   if (auto metatypeType = baseSelfType->getAs<MetatypeType>())
     baseSelfType = metatypeType->getInstanceType();
 
-  auto *baseClassDecl = baseSelfType->getClassOrBoundGenericClass();
+  auto *baseClassDecl = baseSelfType->getClassDecl();
   assert(baseClassDecl && "not a class method");
 
   unsigned baseDepth = 0;
@@ -495,7 +496,7 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
           applySite.getFunction()->getTypeExpansionContext());
   if (auto metatypeType = calleeSelfType->getAs<MetatypeType>())
     calleeSelfType = metatypeType->getInstanceType();
-  auto *calleeClassDecl = calleeSelfType->getClassOrBoundGenericClass();
+  auto *calleeClassDecl = calleeSelfType->getClassDecl();
   assert(calleeClassDecl && "self is not a class type");
 
   // Add generic parameters from the method itself, ignoring any generic
@@ -511,27 +512,86 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
                                  baseCalleeSig);
 }
 
+/// Returns true if \p applySite calls a borrow accessor whose result is
+/// reborrowed by a phi. Devirtualization cannot replace such a result with a
+/// cast of the new result.
+///
+/// FIXME: Support devirtualization of borrow accessors with reborrows.
+static bool hasReborrowedBorrowAccessorResult(FullApplySite applySite) {
+  auto *ai = dyn_cast<ApplyInst>(applySite.getInstruction());
+  if (!ai) {
+    return false;
+  }
+  auto borrow = BorrowedValue(ai);
+  return borrow && borrow.hasReborrow();
+}
+
+/// Make the scope-ending uses of the borrow accessor result \p oldResult end
+/// the borrow scope of \p newAI instead. The result is a borrow scope nested in
+/// the borrow scope of self, so also end \p selfBorrow after them.
+static void replaceResultScope(SILLocation loc, BorrowedValue oldResult,
+                               ApplyInst *newAI, SILValue selfBorrow) {
+  assert(!oldResult.hasReborrow() &&
+         "canDevirtualize rejects a reborrowed borrow accessor result");
+  SmallVector<Operand *, 4> scopeEnds;
+  oldResult.visitLocalScopeEndingUses([&](Operand *use) {
+    scopeEnds.push_back(use);
+    return true;
+  });
+  for (Operand *scopeEnd : scopeEnds) {
+    scopeEnd->set(newAI);
+    if (!selfBorrow) {
+      continue;
+    }
+    auto *user = scopeEnd->getUser();
+    if (auto *returnBorrow = dyn_cast<ReturnBorrowInst>(user)) {
+      // The borrow of self encloses the result's borrow scope.
+      SmallVector<SILValue, 4> enclosingValues(
+          returnBorrow->getEnclosingValues().begin(),
+          returnBorrow->getEnclosingValues().end());
+      enclosingValues.push_back(selfBorrow);
+      SILBuilderWithScope(returnBorrow)
+          .createReturnBorrow(returnBorrow->getLoc(),
+                              returnBorrow->getReturnValue(), enclosingValues);
+      returnBorrow->eraseFromParent();
+      continue;
+    }
+    assert(isa<EndBorrowInst>(user));
+    SILBuilderWithScope::insertAfter(user, [&](SILBuilder &builder) {
+      builder.createEndBorrow(loc, selfBorrow);
+    });
+  }
+}
+
 // Return the new apply and true if a cast required CFG modification.
 static std::pair<ApplyInst *, bool /* changedCFG */>
 replaceApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc, ApplyInst *oldAI,
                  SILValue newFn, SubstitutionMap newSubs,
-                 ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows) {
+                 ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows,
+                 SILValue selfBorrow) {
   auto *newAI =
       builder.createApply(loc, newFn, newSubs, newArgs,
                           oldAI->getApplyOptions());
-
-  if (!newArgBorrows.empty()) {
-    for (SILValue arg : newArgBorrows) {
+  // Only the borrow of self encloses the scope of a borrow accessor result.
+  // Other argument borrows end after the call.
+  auto resultBorrow = BorrowedValue(oldAI);
+  if (!resultBorrow) {
+    selfBorrow = SILValue();
+  }
+  for (SILValue arg : newArgBorrows) {
+    if (arg != selfBorrow) {
       builder.createEndBorrow(loc, arg);
     }
   }
 
-  // Check if any casting is required for the return value.  newAI cannot be a
-  // guaranteed value, so this cast cannot generate borrow scopes and it can be
-  // used anywhere the original oldAI was used.
+  // Check if any casting is required for the return value. A cast of a borrow
+  // accessor result is a forwarded value within the borrow scope of newAI.
   auto castRes = castValueToABICompatibleType(
       &builder, pm, loc, newAI, newAI->getType(), oldAI->getType());
 
+  if (resultBorrow) {
+    replaceResultScope(loc, resultBorrow, newAI, selfBorrow);
+  }
   oldAI->replaceAllUsesWith(castRes.first);
   return {newAI, castRes.second};
 }
@@ -672,12 +732,12 @@ static std::pair<ApplySite, bool /* changedCFG */>
 replaceApplySite(SILBuilder &builder, SILPassManager *pm, SILLocation loc, ApplySite oldAS,
                  SILValue newFn, SubstitutionMap newSubs,
                  ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
-                 ArrayRef<SILValue> newArgBorrows) {
+                 ArrayRef<SILValue> newArgBorrows, SILValue selfBorrow) {
   switch (oldAS.getKind()) {
   case ApplySiteKind::ApplyInst: {
     auto *oldAI = cast<ApplyInst>(oldAS);
     return replaceApplyInst(builder, pm, loc, oldAI, newFn, newSubs, newArgs,
-                            newArgBorrows);
+                            newArgBorrows, selfBorrow);
   }
   case ApplySiteKind::TryApplyInst: {
     auto *oldTAI = cast<TryApplyInst>(oldAS);
@@ -716,7 +776,7 @@ SILFunction *swift::getTargetClassMethod(SILModule &module, FullApplySite as, Cl
   if (auto *vtable = module.lookUpSpecializedVTable(silType)) {
     // We cannot de-virtualize a generic method call to a specialized method.
     // This would result in wrong argument/return calling conventions.
-    if (as.getSubstitutionMap().hasAnySubstitutableParams())
+    if (as.getSubstitutionMap().isEffectivelyGeneric())
       return nullptr;
 
     return vtable->getEntry(module, member)->getImplementation();
@@ -750,6 +810,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
                           << *applySite.getInstruction());
 
+  if (hasReborrowedBorrowAccessorResult(applySite)) {
+    return false;
+  }
+
   SILModule &module = applySite.getModule();
 
   auto *mi = cast<MethodInst>(applySite.getCallee());
@@ -776,7 +840,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   // Mandatory inlining does class method devirtualization. I'm not sure if this
   // is really needed, but some test rely on this.
   // So even for Onone functions we have to do it if the SILStage is raw.
-  if (f->getModule().getStage() != SILStage::Raw && !f->shouldOptimize()) {
+  // This asks whether the raw mandatory pipeline is still running, not what
+  // stage the callee is at. Mandatory inlining must devirtualize even Onone
+  // callees while the module is Raw, so read the floor.
+  if (f->getModule().getStageFloor() != SILStage::Raw && !f->shouldOptimize()) {
     // Do not consider functions that should not be optimized.
     LLVM_DEBUG(llvm::dbgs()
                << "        FAIL: Could not optimize function "
@@ -875,6 +942,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   // will introduce new consuming uses. In contrast, if we have an owned value,
   // we are ok due to the forwarding nature of upcasts.
   SmallVector<SILValue, 8> newArgBorrows;
+  SILValue selfBorrow;
 
   auto indirectResultArgIter = applySite.getIndirectSILResults().begin();
   for (auto resultTy : substConv.getIndirectSILResultTypes(
@@ -909,6 +977,11 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
+      // Self is the last parameter.
+      if (std::next(paramArgIter) ==
+          applySite.getArgumentsWithoutIndirectResults().end()) {
+        selfBorrow = arg;
+      }
     }
     auto argCastRes = castValueToABICompatibleType(
         &builder, pm, loc, arg, paramArgIter->getType(), paramType);
@@ -919,8 +992,9 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   }
   ApplySite newAS;
   bool neededCFGChange;
-  std::tie(newAS, neededCFGChange) = replaceApplySite(
-      builder, pm, loc, applySite, fri, subs, newArgs, substConv, newArgBorrows);
+  std::tie(newAS, neededCFGChange) =
+      replaceApplySite(builder, pm, loc, applySite, fri, subs, newArgs,
+                       substConv, newArgBorrows, selfBorrow);
   changedCFG |= neededCFGChange;
   FullApplySite newAI = FullApplySite::isa(newAS.getInstruction());
   assert(newAI);
@@ -1160,6 +1234,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   // Collect arguments from the apply instruction.
   SmallVector<SILValue, 4> arguments;
   SmallVector<SILValue, 4> borrowedArgs;
+  SILValue selfBorrow;
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
@@ -1182,6 +1257,11 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);
         borrowedArgs.push_back(arg);
+        // Self is the last argument.
+        if (applySite.hasSelfArgument() &&
+            substArgIdx == substConv.getNumSILArguments()) {
+          selfBorrow = arg;
+        }
       }
       auto argCastRes = castValueToABICompatibleType(
           &argBuilder, pm, applySite.getLoc(), arg, arg->getType(), paramType);
@@ -1202,7 +1282,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   bool neededCFGChange = false;
   std::tie(newApplySite, neededCFGChange) =
       replaceApplySite(applyBuilder, pm, loc, applySite, fri, subMap, arguments,
-                       substConv, borrowedArgs);
+                       substConv, borrowedArgs, selfBorrow);
   changedCFG |= neededCFGChange;
 
   if (ore)
@@ -1239,6 +1319,12 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   SILWitnessTable *wt;
 
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
+
+  if (auto fullApply = FullApplySite::isa(applySite.getInstruction())) {
+    if (hasReborrowedBorrowAccessorResult(fullApply)) {
+      return false;
+    }
+  }
 
   // Handle vanishing tuples: don't devirtualize a call to a tuple conformance
   // if the lookup type can possibly be unwrapped after substitution.
@@ -1411,7 +1497,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
   if (auto *cmi = dyn_cast<ClassMethodInst>(fas.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     if (isEffectivelyFinalMethod(fas, classType, cd, cha))
       return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore,
@@ -1424,7 +1510,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
       // in getInstanceWithExactDynamicType than in stripUpCasts.
       CanType classType = getSelfInstanceType(instance->getType().getASTType());
       // This should never be null - make the check just to be on the safe side.
-      if (ClassDecl *cd = classType.getClassOrBoundGenericClass())
+      if (ClassDecl *cd = classType.getClassDecl())
         return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore);
       return {ApplySite(), false};
     }
@@ -1439,7 +1525,7 @@ swift::tryDevirtualizeApply(SILPassManager *pm, ApplySite applySite, ClassHierar
   if (isa<SuperMethodInst>(fas.getCallee())) {
     auto instance = fas.getArguments().back();
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     return tryDevirtualizeClassMethod(pm, fas, instance, cd, classType, ore);
   }
@@ -1479,7 +1565,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   if (auto *cmi = dyn_cast<ClassMethodInst>(applySite.getCallee())) {
     auto instance = stripUpCasts(cmi->getOperand());
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     if (isEffectivelyFinalMethod(applySite, classType, cd, cha))
       return canDevirtualizeClassMethod(applySite, cd, classType,
@@ -1490,7 +1576,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
     // known.
     if (auto instance = getInstanceWithExactDynamicType(cmi->getOperand(), cha)) {
       CanType classType = getSelfInstanceType(instance->getType().getASTType());
-      ClassDecl *cd = classType.getClassOrBoundGenericClass();
+      ClassDecl *cd = classType.getClassDecl();
       return cd && canDevirtualizeClassMethod(applySite, cd, classType);
     }
 
@@ -1503,7 +1589,7 @@ bool swift::canDevirtualizeApply(FullApplySite applySite,
   if (isa<SuperMethodInst>(applySite.getCallee())) {
     auto instance = applySite.getArguments().back();
     auto classType = getSelfInstanceType(instance->getType().getASTType());
-    auto *cd = classType.getClassOrBoundGenericClass();
+    auto *cd = classType.getClassDecl();
 
     return canDevirtualizeClassMethod(applySite, cd, classType);
   }

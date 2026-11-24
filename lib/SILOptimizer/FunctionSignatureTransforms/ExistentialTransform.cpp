@@ -475,16 +475,20 @@ void ExistentialTransform::populateThunkBody() {
       case ExistentialRepresentation::Class: {
         // If the operand is not object type, we need an explicit load.
         SILValue OrigValue = OrigOperand;
+        // A guaranteed object argument can be opened and passed to the callee
+        // directly. A copy is not needed and would even be wrong if the callee
+        // returns a guaranteed value which depends on the argument.
+        bool NeedsCopy =
+            Builder.hasOwnership() && !OriginallyConsumed &&
+            OrigOperand->getOwnershipKind() != OwnershipKind::Guaranteed;
         if (!OrigOperand->getType().isObject()) {
           auto qual = LoadOwnershipQualifier::Take;
           if (Builder.hasOwnership() && !OriginallyConsumed) {
             qual = LoadOwnershipQualifier::Copy;
           }
           OrigValue = Builder.emitLoadValueOperation(Loc, OrigValue, qual);
-        } else {
-          if (Builder.hasOwnership() && !OriginallyConsumed) {
-            OrigValue = Builder.emitCopyValueOperation(Loc, OrigValue);
-          }
+        } else if (NeedsCopy) {
+          OrigValue = Builder.emitCopyValueOperation(Loc, OrigValue);
         }
 
         // OpenExistentialRef forwards ownership, so it does the right thing
@@ -514,7 +518,7 @@ void ExistentialTransform::populateThunkBody() {
           // do not need to do it then.
           //
           // TODO: This would be simpler if we had managed value/cleanup scopes.
-          if (Builder.hasOwnership() && !OriginallyConsumed) {
+          if (NeedsCopy) {
             Temps.push_back({SILValue(), archetypeValue});
           }
         }
@@ -624,7 +628,7 @@ void ExistentialTransform::populateThunkBody() {
   if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
-    Builder.createReturn(Loc, ReturnValue);
+    createThunkReturn(Builder, Loc, ReturnValue);
   }
 }
 
@@ -650,12 +654,20 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     auto NewFGenericEnv = NewFGenericSig.getGenericEnvironment();
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
+    // The specialized function is an internal detail, so we need to
+    // disconnect it from a parent class, if one exists, thus the override
+    // of the classSubclassScope. Inheriting the original's scope would give
+    // the clone external visibility (a private method of an open class gets
+    // effective public linkage for vtable layout), but a specialization has
+    // no vtable slot and no TBD entry, so an exported symbol for it trips
+    // TBD-vs-IR validation.
     NewF = FunctionBuilder.createFunction(
         linkage, Name, NewFTy, F->getActorIsolation(), NewFGenericEnv,
         F->getLocation(), F->isBare(), F->isTransparent(),
         F->getSerializedKind(), IsNotDynamic, IsNotDistributed,
         IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
-        F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
+        /*classSubclassScope=*/SubclassScope::NotApplicable,
+        F->getInlineStrategy(), F->getEffectsKind(),
         nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.

@@ -32,7 +32,7 @@ extension P where Self: ~Copyable { // expected-error {{'Self' required to be 'C
 struct S<T> {
 
   // expected-note@+2 3{{add}}
-  // expected-error@+1 {{parameter of noncopyable type 'U' must specify ownership}}
+  // expected-error@+1 {{parameter of non-'Copyable' type 'U' must specify ownership}}
   func fn<U>(_ u: U)
     where T: ~Copyable, // expected-error {{cannot suppress '~Copyable' on generic parameter 'T' defined in outer scope}}
                         // expected-error@-1 {{'T' required to be 'Copyable' but is marked with '~Copyable'}}

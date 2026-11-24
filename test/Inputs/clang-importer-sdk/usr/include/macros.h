@@ -120,6 +120,7 @@ typedef unsigned int TEST_DWORD;
 #define CAST_UNSIGNED_MINUS_ONE ((unsigned)-1)
 #define CAST_UNSIGNED_MINUS_TEN ((unsigned)-10)
 #define CAST_TYPEDEF_UNSIGNED_MINUS_ONE ((TEST_DWORD)-1)
+#define CAST_SIGNED_UNSIGNED_HIGH_BIT ((int)0x80000000)
 
 #define CAST_SIZE_T_MINUS_ONE ((size_t)-1)
 

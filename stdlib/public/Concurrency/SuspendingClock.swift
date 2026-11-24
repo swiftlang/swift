@@ -21,7 +21,6 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 public struct SuspendingClock: Sendable {
   public struct Instant: Sendable {
     internal var _value: Swift.Duration
@@ -53,8 +52,7 @@ extension Clock where Self == SuspendingClock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
-extension SuspendingClock: Clock {
+extension SuspendingClock {
   /// The current instant accounting for machine suspension.
   @available(StdlibDeploymentTarget 5.7, *)
   public var now: SuspendingClock.Instant {
@@ -66,12 +64,16 @@ extension SuspendingClock: Clock {
   public static var now: SuspendingClock.Instant {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
+#if $Embedded
+    unsafe _platformSuspendingTime(&seconds, &nanoseconds)
+#else
     unsafe _getTime(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
+#endif
     return Instant(
-      _value: Duration(_seconds: seconds, nanoseconds: nanoseconds)
+      _value: Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
     )
   }
 
@@ -80,13 +82,21 @@ extension SuspendingClock: Clock {
   public var minimumResolution: Swift.Duration {
     var seconds = Int64(0)
     var nanoseconds = Int64(0)
+#if $Embedded
+    unsafe _platformSuspendingResolution(&seconds, &nanoseconds)
+#else
     unsafe _getClockRes(
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.suspending.rawValue)
-    return Duration(_seconds: seconds, nanoseconds: nanoseconds)
+#endif
+    return Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
+}
 
+@available(StdlibDeploymentTarget 5.7, *)
+@_unavailableInEmbedded
+extension SuspendingClock: Clock {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
@@ -122,17 +132,15 @@ extension SuspendingClock: Clock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock {
   @available(SwiftStdlib 5.7, *)
   @export(implementation)
   public var systemEpoch: Instant {
-    unsafe unsafeBitCast(Duration.seconds(0), to: Instant.self)
+    unsafe unsafeBitCast(Swift.Duration.seconds(0), to: Instant.self)
   }
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
 

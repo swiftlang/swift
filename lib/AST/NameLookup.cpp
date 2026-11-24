@@ -404,8 +404,7 @@ bool swift::removeOutOfModuleDecls(SmallVectorImpl<ValueDecl*> &decls,
   decls.erase(
     std::remove_if(decls.begin(), decls.end(), [&](ValueDecl *decl) -> bool {
       bool inScope = llvm::any_of(visibleFrom, [&](ModuleDecl *visibleFromMod) {
-        return ctx.getImportCache().isImportedBy(
-                       decl->getModuleContextForNameLookup(), visibleFromMod);
+        return visibleFromMod->isDeclImported(decl);
       });
 
       LLVM_DEBUG(decl->dumpRef(llvm::dbgs()));
@@ -869,6 +868,26 @@ static CanType removeThrownError(Type type) {
   })->getCanonicalType();
 }
 
+/// Remove the execution semantics of every function type.
+///
+/// A parameter with execution semantics is implicitly `consuming`, and that
+/// flag is kept. So, like redeclarations, declarations that only differ in the
+/// execution semantics of a closure parameter don't shadow each other, but
+/// ones that only differ in the execution semantics of a result do.
+static CanType removeExecutionSemantics(CanType type) {
+  return type
+      .transformRec([](TypeBase *type) -> std::optional<Type> {
+        if (auto *fnType = dyn_cast<AnyFunctionType>(type)) {
+          if (fnType->hasCalledAtMostOnceSemantics())
+            return removeExecutionSemantics(
+                fnType->withExecutionSemantics(std::nullopt)
+                    ->getCanonicalType());
+        }
+        return std::nullopt;
+      })
+      ->getCanonicalType();
+}
+
 /// Given a set of declarations whose names and generic signatures have matched,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
@@ -893,7 +912,8 @@ static void recordShadowedDeclsAfterSignatureMatch(
     if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
       type = asd->getOverloadSignatureType();
     else
-      type = removeThrownError(decl->getInterfaceType()->getCanonicalType());
+      type = removeExecutionSemantics(
+          removeThrownError(decl->getInterfaceType()->getCanonicalType()));
 
     // Strip `@Sendable` annotations for declarations that come from
     // or are exposed to Objective-C to make it possible to introduce
@@ -1599,6 +1619,12 @@ void MemberLookupTable::addMember(Decl *member) {
 
   // Unnamed entities w/o @_implements synonyms cannot be found by name lookup.
   if (!A && !vd->hasName())
+    return;
+
+  // Skip a '@specialized' declaration without a body so that member accesses
+  // still find the imported member: it names that member instead of declaring
+  // one.
+  if (SpecializedAttr::isSpecializationDeclaration(vd))
     return;
 
   // If this declaration is already in the lookup table, don't add it
@@ -2638,7 +2664,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
 
     // Look into the superclasses of this archetype.
     if (auto superclass = archetypeTy->getSuperclass()) {
-      if (auto superclassDecl = superclass->getClassOrBoundGenericClass())
+      if (auto superclassDecl = superclass->getClassDecl())
         decls.push_back(superclassDecl);
     }
 
@@ -2653,7 +2679,7 @@ void namelookup::extractDirectlyReferencedNominalTypes(
     }
 
     if (auto superclass = layout.explicitSuperclass) {
-      auto *superclassDecl = superclass->getClassOrBoundGenericClass();
+      auto *superclassDecl = superclass->getClassDecl();
       if (superclassDecl)
         decls.push_back(superclassDecl);
     }
@@ -2711,8 +2737,12 @@ bool DeclContext::lookupQualified(Type type,
 }
 
 bool DeclContext::isDeclImported(const Decl *decl) const {
-  auto declModule = decl->getModuleContextForNameLookup();
-  return getASTContext().getImportCache().isImportedBy(declModule, this);
+  auto &importCache = getASTContext().getImportCache();
+  SmallVector<ModuleDecl *, 1> declModules;
+  decl->getModuleContextsForNameLookup(declModules);
+  return llvm::any_of(declModules, [&](ModuleDecl *declModule) {
+    return importCache.isImportedBy(declModule, this);
+  });
 }
 
 static void installPropertyWrapperMembersIfNeeded(NominalTypeDecl *target,
@@ -3659,6 +3689,7 @@ InheritedProtocolsRequest::evaluate(Evaluator &evaluator,
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
+    case KnownProtocolKind::Deinitable:
       skipInverses = true;
       break;
 
@@ -3888,7 +3919,7 @@ static bool declsAreProtocols(ArrayRef<TypeDecl *> decls) {
   return llvm::any_of(decls, [&](const TypeDecl *decl) {
     if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
       auto ty = alias->getUnderlyingType();
-      decl = ty->getNominalOrBoundGenericNominal();
+      decl = ty->getNominalDecl();
       if (decl == nullptr || ty->is<ExistentialType>())
         return false;
     }

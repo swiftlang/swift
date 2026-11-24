@@ -96,6 +96,11 @@ foreach(library ${CoreLibs})
   copy_library_sources(${library} "public" "Core")
 endforeach()
 
+# ExecutorImpl.h includes SwiftPlatform/ExecutorTypes.h relative to its
+# own directory.
+copy_files("public/EmbeddedPlatform/include" "Core/Concurrency"
+  FILES "SwiftPlatform/ExecutorTypes.h")
+
 # copying Core/core separately, so we can specify the case of the target folder
 # correctly on case sensitive file systems
 copy_library_sources("" "public/core" "Core/Core")
@@ -212,9 +217,13 @@ message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Windows/clang
   FILES
     ucrt.modulemap
+    SwiftUCRT.h
+    SwiftWinRT.h
     WinSDK.apinotes
-    winsdk_um.modulemap
-    winsdk_shared.modulemap
+    winrt.modulemap
+    winsdk.modulemap
+    um.modulemap
+    shared.modulemap
     vcruntime.modulemap
     vcruntime.apinotes)
 

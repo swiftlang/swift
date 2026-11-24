@@ -17,6 +17,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Demangling/Demangler.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -46,18 +47,23 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
 }
 
 SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
-  while (true) {
-    switch (value->getKind()) {
-    default:
-      return value;
-    case ValueKind::MoveValueInst:
-    case ValueKind::CopyValueInst:
-    case ValueKind::BeginBorrowInst:
-    case ValueKind::MarkUnresolvedNonCopyableValueInst:
-    case ValueKind::CopyableToMoveOnlyWrapperValueInst:
-      value = cast<SingleValueInstruction>(value)->getOperand(0);
-    }
+  auto *bbi = dyn_cast<BeginBorrowInst>(value);
+  if (!bbi) {
+    return value;
   }
+  auto *muncvi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
+  if (!muncvi) {
+    return value;
+  }
+  auto *cvi = dyn_cast<CopyValueInst>(muncvi->getOperand());
+  if (!cvi) {
+    return value;
+  }
+  auto result = cvi->getOperand();
+  if (auto *cmwi = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(result)) {
+    return cmwi->getOperand();
+  }
+  return result;
 }
 
 bool swift::visitNonOwnershipUses(SILValue value,
@@ -463,7 +469,7 @@ bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
 }
 
 static RuntimeEffect metadataEffect(SILType ty) {
-  ClassDecl *cl = ty.getClassOrBoundGenericClass();
+  ClassDecl *cl = ty.getClassDecl();
   if (cl && !cl->hasKnownSwiftImplementation())
     return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
   return RuntimeEffect::MetaData;
@@ -543,6 +549,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::ValueToAddressInst:
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
@@ -608,6 +615,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::MarkFunctionEscapeInst:
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExtendLifetimeInst:
+  case SILInstructionKind::DiagnoseInst:
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::CondFailInst:
@@ -758,11 +766,14 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = SILType();
     return RuntimeEffect::MetaData;
 
-  case SILInstructionKind::OpenExistentialAddrInst:
-    if (cast<OpenExistentialAddrInst>(inst)->getAccessKind() ==
-        OpenedExistentialAccess::Mutable)
+  case SILInstructionKind::OpenExistentialAddrInst: {
+    auto *open = cast<OpenExistentialAddrInst>(inst);
+    if (open->getAccessKind() == OpenedExistentialAccess::Mutable &&
+        !open->getOperand()->getType().canUseExistentialRepresentation(
+            ExistentialRepresentation::COM))
       return RuntimeEffect::Allocating | RuntimeEffect::Existential;
     return RuntimeEffect::Existential;
+  }
 
   case SILInstructionKind::OpenExistentialRefInst: {
     impactType = inst->getOperand(0)->getType();
@@ -898,7 +909,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
         impactType = SILType::getPrimitiveObjectType(CanType(instTy));
       if (auto selfType = instTy->getAs<DynamicSelfType>())
         instTy = selfType->getSelfType();
-      auto *cl = instTy->getClassOrBoundGenericClass();
+      auto *cl = instTy->getClassDecl();
       bool isForeign = cl && (cl->getObjectModel() == ReferenceCounting::ObjC ||
                               cl->isForeign());
       if (isForeign || instTy->isAnyObject())
@@ -913,7 +924,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     impactType = opType;
     switch (opType.getPreferredExistentialRepresentation()) {
     case ExistentialRepresentation::COM:
-      return RuntimeEffect::MetaData | RuntimeEffect::Existential;
+      return RuntimeEffect::Casting | RuntimeEffect::Releasing;
     case ExistentialRepresentation::Metatype:
     case ExistentialRepresentation::Boxed:
     case ExistentialRepresentation::Opaque:
@@ -927,7 +938,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
           return RuntimeEffect::MetaData | RuntimeEffect::Existential;
         }
       }
-      auto *cl = opType.getClassOrBoundGenericClass();
+      auto *cl = opType.getClassDecl();
       bool usesObjCModel =
           cl && cl->getObjectModel() == ReferenceCounting::ObjC;
       if (usesObjCModel)
@@ -1141,6 +1152,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::NoEffect;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a block used as a noescape function argument, attempt to find all
@@ -1283,6 +1295,80 @@ void swift::findClosuresForFunctionValue(
       continue;
     }
     // Ignore other unrecognized values that feed this applied argument.
+  }
+}
+
+bool swift::isNonEscapingClosure(CanSILFunctionType funcTy) {
+  auto isInoutAliasable = [](SILParameterInfo paramInfo) {
+    return paramInfo.getConvention()
+    == ParameterConvention::Indirect_InoutAliasable;
+  };
+  return llvm::any_of(funcTy->getParameters(), isInoutAliasable);
+}
+
+/// Return true if \p fn is a specialization created by AllocBoxToStack, which
+/// promotes a box argument to an @inout_aliasable address argument. The
+/// specialization's mangled name has a function signature specialization with
+/// a BoxToStack parameter. For example: $s4main1fyyFyycfU_Tf0s_n.
+static bool isBoxToStackSpecialization(SILFunction *fn) {
+  Demangle::StackAllocatedDemangler<1024> demangler;
+  Demangle::Node *root = demangler.demangleSymbol(fn->getName());
+  if (!root || root->getKind() != Demangle::Node::Kind::Global)
+    return false;
+
+  for (Demangle::Node *specialization : *root) {
+    if (specialization->getKind() !=
+        Demangle::Node::Kind::FunctionSignatureSpecialization)
+      continue;
+    for (Demangle::Node *param : *specialization) {
+      if (param->getKind() !=
+          Demangle::Node::Kind::FunctionSignatureSpecializationParam)
+        continue;
+      for (Demangle::Node *paramKind : *param) {
+        if (paramKind->getKind() ==
+                Demangle::Node::Kind::
+                    FunctionSignatureSpecializationParamKind &&
+            paramKind->hasIndex() &&
+            paramKind->getIndex() ==
+                (Demangle::Node::IndexType)
+                    Demangle::FunctionSigSpecializationParamKind::BoxToStack)
+          return true;
+      }
+    }
+  }
+  return false;
+}
+
+void swift::findNonEscapingClosuresForFunctionValue(
+    SILValue funcVal, TinyPtrVector<PartialApplyInst *> &results) {
+  SILType funcTy = funcVal->getType();
+  // Handle `Optional<@convention(block) @noescape (_)->(_)>`
+  if (auto optionalObjTy = funcTy.getOptionalObjectType())
+    funcTy = optionalObjTy;
+  auto fnType = funcTy.getAs<SILFunctionType>();
+  if (!fnType)
+    return;
+
+  if (fnType->isNoEscape()) {
+    findClosuresForFunctionValue(funcVal, results);
+    return;
+  }
+  if (fnType->getRepresentation() == SILFunctionTypeRepresentation::Block)
+    return;
+
+  TinyPtrVector<PartialApplyInst *> closures;
+  findClosuresForFunctionValue(funcVal, closures);
+  for (auto *closure : closures) {
+    if (!isNonEscapingClosure(closure->getOrigCalleeType()))
+      continue;
+    // An escaping closure with an @inout_aliasable capture is either one that
+    // MandatoryAllocBoxToStack proved non-escaping when it promoted a box, or
+    // an invalid escaping capture of an inout parameter, which
+    // DiagnoseInvalidEscapingCaptures has already reported as an error. Only
+    // the first is the specialization of a closure that took the box.
+    SILFunction *callee = closure->getReferencedFunctionOrNull();
+    if (callee && isBoxToStackSpecialization(callee))
+      results.push_back(closure);
   }
 }
 
@@ -1492,7 +1578,7 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
   // A move-only-with-deinit type cannot be SROA.
   //
   // TODO: we could loosen this requirement if all paths lead to a drop_deinit.
-  if (auto *nominalTy = ty.getNominalOrBoundGenericNominal()) {
+  if (auto *nominalTy = ty.getNominalDecl()) {
     if (nominalTy->hasValueTypeDestructor())
       return false;
   }

@@ -1065,6 +1065,46 @@ bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (), %1 : @guaranteed $A
   return %r
 }
 
+sil @use_dynamic_self : $@convention(thin) (@thick @dynamic_self Act.Type) -> ()
+
+sil [ossa] @dynamic_self_closure : $@convention(thin) (@thick @dynamic_self Act.Type) -> () {
+bb0(%0 : $@thick @dynamic_self Act.Type):
+  %1 = function_ref @use_dynamic_self : $@convention(thin) (@thick @dynamic_self Act.Type) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@thick @dynamic_self Act.Type) -> ()
+  return %2
+}
+
+sil [ossa] @bool_closure : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = tuple ()
+  return %1
+}
+
+sil [ossa] @use_two_closures : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (), %1 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %2 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %3 = apply %1() : $@noescape @callee_guaranteed () -> ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @test_dynamic_self_closure
+// CHECK:         [[DYNAMIC_FN:%.*]] = function_ref @dynamic_self_closure
+// CHECK:         [[DYNAMIC_CLOSURE:%.*]] = partial_apply {{.*}} [[DYNAMIC_FN]]
+// CHECK:         apply {{.*}}([[DYNAMIC_CLOSURE]],
+sil [ossa] @test_dynamic_self_closure : $@convention(method) (Bool, @guaranteed Act) -> () {
+bb0(%0 : $Bool, %1 : @guaranteed $Act):
+  %2 = metatype $@thick @dynamic_self Act.Type
+  %3 = function_ref @dynamic_self_closure : $@convention(thin) (@thick @dynamic_self Act.Type) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@thick @dynamic_self Act.Type) -> ()
+  %5 = function_ref @bool_closure : $@convention(thin) (Bool) -> ()
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%0) : $@convention(thin) (Bool) -> ()
+  %7 = function_ref @use_two_closures : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%4, %6) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %6
+  destroy_value %4
+  return %8
+}
+
 // Check that specializing the same function for the same closure, one time non-escaping and the other time escaping,
 // does not violate ownership rules for parameter passing.
 sil [ossa] @guaranteed_capture_inner_fn : $@convention(thin) (@guaranteed AnyObject) -> ()
@@ -1131,3 +1171,119 @@ bb0(%0 : @owned $AnyObject):
   return %r
 }
 
+// A reabstraction thunk is looked through to find the root closure, but the thunk's
+// partial_apply itself is still cloned into the specialized callee. If the thunk is
+// generic and specialized on an archetype of the caller (here: an opened existential),
+// the clone would reference an archetype whose definition stays in the caller.
+
+sil [ossa] @closure_body : $@convention(thin) () -> ()
+
+sil [reabstraction_thunk] [ossa] @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [ossa] @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @opened_archetype_thunk :
+// CHECK:         [[T:%.*]] = function_ref @generic_thunk
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[T]]<@opened
+// CHECK:         [[F:%.*]] = function_ref @take_closure :
+// CHECK:         apply [[F]]([[PA]])
+// CHECK:       } // end sil function 'opened_archetype_thunk'
+sil [ossa] @opened_archetype_thunk : $@convention(thin) (@in_guaranteed any P) -> () {
+bb0(%0 : $*any P):
+  %1 = open_existential_addr immutable_access %0 : $*any P to $*@opened(1, any P) Self
+  %2 = function_ref @closure_body : $@convention(thin) () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = function_ref @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<@opened(1, any P) Self>(%3) : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = function_ref @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// A concrete substitution does not depend on the caller, so specializing is fine.
+// CHECK-LABEL: sil [ossa] @concrete_thunk :
+// CHECK:         [[F:%.*]] = function_ref @$s12take_closure0B5_bodyTf1c_n :
+// CHECK:         apply [[F]]()
+// CHECK:       } // end sil function 'concrete_thunk'
+sil [ossa] @concrete_thunk : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @closure_body : $@convention(thin) () -> ()
+  %3 = thin_to_thick_function %2 : $@convention(thin) () -> () to $@noescape @callee_guaranteed () -> ()
+  %4 = function_ref @generic_thunk : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<S>(%3) : $@convention(thin) <T where T : P> (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = function_ref @take_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// Check that a closure is specialized even if it is wrapped in a `begin_borrow` before it is
+// passed as a `@guaranteed` argument to an apply.
+// This is also the shape which the closure specializer itself creates when it re-materializes an
+// owned closure in a specialized function. Therefore not looking through the `begin_borrow` also
+// prevented the recursive specialization of nested closure users, like
+// `borrowed_closure_forward` -> `borrowed_closure_apply` below.
+
+sil @borrowed_closure_fn : $@convention(thin) (Int, Int) -> Int
+
+// The closure is re-created in the specialized function and the `apply` of it is folded into a
+// direct call of the closure function.
+// CHECK-LABEL: sil shared [ossa] @$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n : $@convention(thin) (Int, Int) -> Int {
+// CHECK:         [[FN:%.*]] = function_ref @borrowed_closure_fn
+// CHECK:         apply [[FN]](%0, %1)
+// CHECK:       } // end sil function '$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n'
+
+// Applies its `@guaranteed` closure argument.
+sil [ossa] @borrowed_closure_apply : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> Int):
+  %2 = apply %1(%0) : $@callee_guaranteed (Int) -> Int
+  return %2 : $Int
+}
+
+// The recursive specialization round must specialize `borrowed_closure_apply` as well, although
+// the closure is passed to it via a `begin_borrow`.
+// CHECK-LABEL: sil shared [ossa] @$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n : $@convention(thin) (Int, Int) -> Int {
+// CHECK:         [[SPEC:%.*]] = function_ref @$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n
+// CHECK-NEXT:    apply [[SPEC]](%0, %1)
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function '$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n'
+
+// Passes its `@guaranteed` closure argument down to `borrowed_closure_apply`.
+sil [ossa] @borrowed_closure_forward : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> Int):
+  %2 = function_ref @borrowed_closure_apply : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_closure_caller : $@convention(thin) (Int, Int) -> Int {
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     begin_borrow
+// CHECK:         [[SPEC:%.*]] = function_ref @$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n
+// CHECK-NEXT:    apply [[SPEC]](%0, %1)
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'borrowed_closure_caller'
+sil [ossa] @borrowed_closure_caller : $@convention(thin) (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = function_ref @borrowed_closure_fn : $@convention(thin) (Int, Int) -> Int
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (Int, Int) -> Int
+  %4 = begin_borrow %3 : $@callee_guaranteed (Int) -> Int
+  %5 = function_ref @borrowed_closure_forward : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  %6 = apply %5(%0, %4) : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  end_borrow %4 : $@callee_guaranteed (Int) -> Int
+  destroy_value %3 : $@callee_guaranteed (Int) -> Int
+  return %6 : $Int
+}

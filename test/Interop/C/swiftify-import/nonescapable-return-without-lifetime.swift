@@ -17,8 +17,8 @@ module Test {
 
 struct __attribute__((swift_attr("~Escapable"))) NonescapableStruct {};
 // expected-note@+3{{'nonescapableReturnNoLifetime' declared here}}
-// expected-error@+2{{a function with a ~Escapable result requires '@_lifetime(...)'}}
-// expected-warning@+1{{the returned type 'struct NonescapableStruct' is annotated as non-escapable; its lifetime dependencies must be annotated}}
+// expected-error@+2{{a function with a non-'Escapable' result requires '@_lifetime(...)'}}
+// expected-warning@+1{{the returned type 'struct NonescapableStruct' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 struct NonescapableStruct nonescapableReturnNoLifetime(int len, int * __counted_by(len) p);
 
 //--- test.swift

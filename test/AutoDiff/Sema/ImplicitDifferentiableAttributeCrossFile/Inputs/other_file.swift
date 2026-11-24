@@ -33,20 +33,20 @@ public protocol Protocol2: Differentiable {
 
 struct ConformingStruct: Differentiable {
   // Error for missing `@differentiable` attribute.
-  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement 'internalMethod1' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse) }}
+  // expected-note @+1 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement 'internalMethod1' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse) }}
   func internalMethod1(_ x: Float) -> Float {
     x
   }
 
   // Error for missing `@differentiable` superset attribute.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement 'internalMethod2' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' to satisfy requirement 'internalMethod2' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse) }}
   @differentiable(reverse, wrt: x)
   func internalMethod2(_ x: Float) -> Float {
     x
   }
 
   // Error for missing `@differentiable` subset attribute.
-  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse, wrt: x)' attribute to satisfy requirement 'internalMethod3' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse, wrt: x) }}
+  // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse, wrt: x)' to satisfy requirement 'internalMethod3' (in protocol 'Protocol1'); explicit attribute is necessary because candidate is declared in a different type context or file than the conformance of 'ConformingStruct' to 'Protocol1'}} {{3-3=@differentiable(reverse, wrt: x) }}
   @differentiable(reverse, wrt: (self, x))
   func internalMethod3(_ x: Float) -> Float {
     x

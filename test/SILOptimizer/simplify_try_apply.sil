@@ -158,3 +158,107 @@ bb3:
   %9 = tuple ()
   return %9
 }
+
+sil @throws_never : $@convention(thin) () -> (Int, @error Never)
+sil @throws_never_indirect : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error_indirect Never)
+sil @throws_never_substituted : $@convention(thin) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect τ_0_1) for <Int, Never>
+sil @throws_substituted_error : $@convention(thin) @substituted <τ_0_0> () -> (Int, @error τ_0_0) for <any Error>
+
+// A `throws(E)` function specialized for `E == Never` cannot take its error branch. Without
+// removing it the rethrow survives to IRGen, which emits it as an unconditional trap.
+
+// CHECK-LABEL: sil @remove_uninhabited_error_edge :
+// CHECK:         [[F:%.*]] = function_ref @throws_never
+// CHECK-NEXT:    [[R:%.*]] = apply [nothrow] [[F]]()
+// CHECK-NEXT:    br bb1([[R]])
+// CHECK-NOT:     throw
+// CHECK:       } // end sil function 'remove_uninhabited_error_edge'
+sil @remove_uninhabited_error_edge : $@convention(thin) () -> (Int, @error Never) {
+bb0:
+  %0 = function_ref @throws_never : $@convention(thin) () -> (Int, @error Never)
+  try_apply %0() : $@convention(thin) () -> (Int, @error Never), normal bb1, error bb2
+
+bb1(%2 : $Int):
+  return %2
+
+bb2(%4 : $Never):
+  throw %4
+}
+
+// CHECK-LABEL: sil @remove_uninhabited_indirect_error_edge :
+// CHECK:         [[F:%.*]] = function_ref @throws_never_indirect
+// CHECK-NEXT:    [[R:%.*]] = apply [nothrow] [[F]](%0, %1, %2)
+// CHECK-NEXT:    br bb1([[R]])
+// CHECK-NOT:     throw_addr
+// CHECK:       } // end sil function 'remove_uninhabited_indirect_error_edge'
+sil @remove_uninhabited_indirect_error_edge : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error_indirect Never) {
+bb0(%0 : $*Int, %1 : $*Never, %2 : $*Int):
+  %3 = function_ref @throws_never_indirect : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error_indirect Never)
+  try_apply %3(%0, %1, %2) : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error_indirect Never), normal bb1, error bb2
+
+bb1(%5 : $()):
+  return %5
+
+bb2:
+  throw_addr
+}
+
+// This is the shape generic specialization actually produces: the error type is `Never` only
+// once the pattern substitutions of the `@substituted` callee type are applied.
+
+// CHECK-LABEL: sil @remove_uninhabited_substituted_error_edge :
+// CHECK:         [[F:%.*]] = function_ref @throws_never_substituted
+// CHECK-NEXT:    [[R:%.*]] = apply [nothrow] [[F]](%0, %1, %2)
+// CHECK-NEXT:    br bb1([[R]])
+// CHECK-NOT:     throw_addr
+// CHECK:       } // end sil function 'remove_uninhabited_substituted_error_edge'
+sil @remove_uninhabited_substituted_error_edge : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error_indirect Never) {
+bb0(%0 : $*Int, %1 : $*Never, %2 : $*Int):
+  %3 = function_ref @throws_never_substituted : $@convention(thin) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect τ_0_1) for <Int, Never>
+  try_apply %3(%0, %1, %2) : $@convention(thin) @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error_indirect τ_0_1) for <Int, Never>, normal bb1, error bb2
+
+bb1(%5 : $()):
+  return %5
+
+bb2:
+  throw_addr
+}
+
+// The error block is removed, so a value which was destroyed on both paths keeps a single
+// destroy on the remaining one.
+
+// CHECK-LABEL: sil [ossa] @remove_uninhabited_error_edge_ossa :
+// CHECK:         apply [nothrow]
+// CHECK:       bb1([[R:%.*]] : $Int):
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'remove_uninhabited_error_edge_ossa'
+sil [ossa] @remove_uninhabited_error_edge_ossa : $@convention(thin) (@owned Bar) -> (Int, @error Never) {
+bb0(%0 : @owned $Bar):
+  %1 = function_ref @throws_never : $@convention(thin) () -> (Int, @error Never)
+  try_apply %1() : $@convention(thin) () -> (Int, @error Never), normal bb1, error bb2
+
+bb1(%3 : $Int):
+  destroy_value %0
+  return %3
+
+bb2(%5 : $Never):
+  destroy_value %0
+  throw %5
+}
+
+// CHECK-LABEL: sil @keep_inhabited_substituted_error_edge :
+// CHECK:         try_apply
+// CHECK:         throw
+// CHECK:       } // end sil function 'keep_inhabited_substituted_error_edge'
+sil @keep_inhabited_substituted_error_edge : $@convention(thin) () -> (Int, @error any Error) {
+bb0:
+  %0 = function_ref @throws_substituted_error : $@convention(thin) @substituted <τ_0_0> () -> (Int, @error τ_0_0) for <any Error>
+  try_apply %0() : $@convention(thin) @substituted <τ_0_0> () -> (Int, @error τ_0_0) for <any Error>, normal bb1, error bb2
+
+bb1(%2 : $Int):
+  return %2
+
+bb2(%4 : $any Error):
+  throw %4
+}

@@ -431,4 +431,20 @@ extension Set._Variant {
     return asNative.intersection(other._variant.asNative)
 #endif
   }
+
+  @export(implementation)
+  @unsafe
+  internal mutating func formUnion(_ buffer: UnsafeBufferPointer<Element>) {
+#if _runtime(_ObjC)
+    guard isNative else {
+      // `insert` only migrates to native storage when needed.
+      for index in 0..<buffer.count {
+        _ = insert(unsafe buffer[index])
+      }
+      return
+    }
+#endif
+    let isUnique = isUniquelyReferenced()
+    unsafe asNative.formUnion(buffer, isUnique: isUnique)
+  }
 }

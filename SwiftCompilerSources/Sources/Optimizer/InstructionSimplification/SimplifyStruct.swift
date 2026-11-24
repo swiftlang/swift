@@ -55,8 +55,17 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
   ///   %6 = copy_value %2
   /// ```
   func simplify(_ context: SimplifyContext) {
+    splitOwnedAggregate(context)
+  }
+}
+
+/// The common implementation for `struct` and `tuple` instructions.
+extension SingleValueInstruction {
+  /// Eliminates `struct_extract`s/`tuple_extract`s of an owned `struct`/`tuple` where the extracts are
+  /// inside a borrow scope. See the comment of `StructInst.simplify`.
+  func splitOwnedAggregate(_ context: SimplifyContext) {
     guard ownership == .owned,
-          hasOnlyStructExtractUsesInBorrowScopes()
+          hasOnlyExtractUsesInBorrowScopes()
     else {
       return
     }
@@ -64,7 +73,7 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
     for use in uses {
       switch use.instruction {
       case let beginBorrow as BeginBorrowInst:
-        splitAndRemoveStructExtracts(beginBorrow: beginBorrow, context)
+        splitAndRemoveExtracts(beginBorrow: beginBorrow, context)
       case let copy as CopyValueInst:
         splitAndRemoveDestructuresOfCopy(copy: copy, context)
       case is DebugValueInst:
@@ -77,8 +86,8 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
     context.erase(instructionIncludingAllUsers: self)
   }
 
-  private func hasOnlyStructExtractUsesInBorrowScopes() -> Bool {
-    var hasStructExtract = false
+  private func hasOnlyExtractUsesInBorrowScopes() -> Bool {
+    var hasExtract = false
 
     for use in uses.ignoreDebugUses {
       switch use.instruction {
@@ -87,8 +96,8 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
           switch borrowUse.instruction {
           case is EndBorrowInst:
             break
-          case is StructExtractInst:
-            hasStructExtract = true
+          case is StructExtractInst, is TupleExtractInst:
+            hasExtract = true
           default:
             return false
           }
@@ -96,8 +105,8 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
       case let copy as CopyValueInst:
         for copyUse in copy.uses.ignoreDebugUses {
           switch copyUse.instruction {
-          case is DestructureStructInst:
-            hasStructExtract = true
+          case is DestructureStructInst, is DestructureTupleInst:
+            hasExtract = true
           default:
             return false
           }
@@ -108,27 +117,33 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
         }
       }
     }
-    return hasStructExtract
+    return hasExtract
   }
 
-  private func splitAndRemoveStructExtracts(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
-    for structExtract in beginBorrow.uses.users(ofType: StructExtractInst.self) {
-      let field = self.operands[structExtract.fieldIndex].value
-      switch structExtract.ownership {
+  private func splitAndRemoveExtracts(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
+    for extract in beginBorrow.uses.users(ofType: SingleValueInstruction.self) {
+      let fieldIndex: Int
+      switch extract {
+      case let structExtract as StructExtractInst: fieldIndex = structExtract.fieldIndex
+      case let tupleExtract as TupleExtractInst:   fieldIndex = tupleExtract.fieldIndex
+      default:                                     continue
+      }
+      let field = self.operands[fieldIndex].value
+      switch extract.ownership {
       case .none:
-        structExtract.replace(with: field, context)
+        extract.replace(with: field, context)
       case .guaranteed:
         let beginBuilder = Builder(before: beginBorrow, context)
         let borrowedField = beginBuilder.createBeginBorrow(of: field,
                                                            isLexical: beginBorrow.isLexical,
                                                            hasPointerEscape: beginBorrow.hasPointerEscape)
-        structExtract.replace(with: borrowedField, context)
+        extract.replace(with: borrowedField, context)
         for endBorrow in beginBorrow.endInstructions {
           let endBuilder = Builder(before: endBorrow, context)
           endBuilder.createEndBorrow(of: borrowedField)
         }
       case .owned, .unowned:
-        fatalError("wrong ownership of struct_extract")
+        fatalError("wrong ownership of struct_extract/tuple_extract")
       }
     }
   }
@@ -143,13 +158,13 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
   ///   %6 = copy_value %2
   /// ```
   private func splitAndRemoveDestructuresOfCopy(copy: CopyValueInst, _ context: SimplifyContext) {
-    for (fieldIndex, structField) in self.operands.values.enumerated() {
-      let copiedField = if structField.ownership == .none {
-        structField
+    for (fieldIndex, field) in self.operands.values.enumerated() {
+      let copiedField = if field.ownership == .none {
+        field
       } else {
-        Builder(before: copy, context).createCopyValue(operand: structField)
+        Builder(before: copy, context).createCopyValue(operand: field)
       }
-      for destructure in copy.uses.users(ofType: DestructureStructInst.self) {
+      for destructure in copy.uses.users(ofType: MultipleValueInstruction.self) {
         destructure.results[fieldIndex].uses.replaceAll(with: copiedField, context)
       }
     }
@@ -158,7 +173,45 @@ extension StructInst : Simplifiable, SILCombineSimplifiable {
 
   private func sinkToEndOfLifetime(use: Operand, _ context: SimplifyContext) {
     let builder = Builder(before: use.instruction, context)
-    let delayedStruct = builder.createStruct(type: type, elements: Array(operands.values))
-    use.set(to: delayedStruct, context)
+
+    if let destroy = use.instruction as? DestroyValueInst, !hasValueTypeDestructor {
+      // Instead of re-creating the aggregate, just destroy its fields.
+      // This is what SimplifyDestroyValue would do anyway, but doing it here avoids creating (and later removing)
+      // an aggregate instruction for each destroy, which would cause quadratic complexity in SILCombine
+      // if there are many destroys.
+      for op in operands where op.value.ownership == .owned {
+        builder.createDestroyValue(operand: op.value, isDeadEnd: destroy.isDeadEnd)
+      }
+      // The original destroy is erased together with this aggregate in `splitOwnedAggregate`.
+      return
+    }
+
+    let delayedAggregate: Value
+    switch self {
+    case is StructInst:
+      delayedAggregate = builder.createStruct(type: type, elements: Array(operands.values))
+    case is TupleInst:
+      delayedAggregate = builder.createTuple(type: type, elements: Array(operands.values))
+    default:
+      fatalError("unexpected aggregate instruction")
+    }
+    use.set(to: delayedAggregate, context)
+  }
+
+  private var hasValueTypeDestructor: Bool {
+    if self is StructInst {
+      // Moving the destroy to a non-copyable struct's fields would drop the deinit call!
+      return type.nominal!.valueTypeDestructor != nil
+    }
+    return false
+  }
+}
+
+extension StructInst : DebugReconstructionBlockSimplifiable {
+  /// Just folds an all-undef struct to undef.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
+      replaceWithUndef(context)
+    }
   }
 }

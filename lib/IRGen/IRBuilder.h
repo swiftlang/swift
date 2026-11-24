@@ -101,9 +101,9 @@ public:
     IRBuilderBase::SetInsertPoint(BB);
   }
   
-  void SetInsertPoint(llvm::BasicBlock *BB, llvm::BasicBlock::iterator before) {
+  void SetInsertPoint(llvm::BasicBlock::iterator before) {
     ClearedIP = nullptr;
-    IRBuilderBase::SetInsertPoint(BB, before);
+    IRBuilderBase::SetInsertPoint(before);
   }
 
   void SetInsertPoint(llvm::Instruction *I) {
@@ -292,23 +292,60 @@ public:
     return CreateMemSet(dest.getAddress(), value, size,
                         llvm::MaybeAlign(dest.getAlignment().getValue()));
   }
-  
-  using IRBuilderBase::CreateLifetimeStart;
+
+  // The size of a lifetime marker is now implied by the underlying alloca, so
+  // the explicit size argument is ignored (see llvm.org/pr150248).
+  //
+  // The verifier also requires the pointer operand of a lifetime marker to be
+  // a direct alloca (see llvm.org/pr149310). Swift's IRGen, however, hands
+  // lifetime markers a variety of pointers that are not (static) allocas:
+  // malloc'd buffers, task/coroutine allocations, dynamic allocas, and
+  // bitcasts thereof. Skip emitting the marker unless the pointer looks
+  // through to a static alloca. The lifetime of everything else is either
+  // managed explicitly by its own allocation/deallocation, or — in the case
+  // of dynamic allocas — governed by the alloca/stackrestore pair itself;
+  // moreover, a dynamic alloca's address may be loop-carried through a phi,
+  // which LLVM optimizations can propagate into the marker's operand and
+  // trip the verifier. This mirrors clang, which only emits lifetime markers
+  // for static allocas.
+  static llvm::Value *getLifetimeMarkerAlloca(llvm::Value *buf) {
+    buf = buf->stripPointerCasts();
+    auto *alloca = dyn_cast<llvm::AllocaInst>(buf);
+    if (alloca && alloca->isStaticAlloca())
+      return alloca;
+    return nullptr;
+  }
+  llvm::CallInst *CreateLifetimeStart(llvm::Value *buf) {
+    if (auto *alloca = getLifetimeMarkerAlloca(buf))
+      return IRBuilderBase::CreateLifetimeStart(alloca);
+    return nullptr;
+  }
+  llvm::CallInst *CreateLifetimeStart(Address buf) {
+    return CreateLifetimeStart(buf.getAddress());
+  }
   llvm::CallInst *CreateLifetimeStart(Address buf, Size size) {
-    return CreateLifetimeStart(buf,
-                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+    return CreateLifetimeStart(buf.getAddress());
   }
   llvm::CallInst *CreateLifetimeStart(Address buf, llvm::ConstantInt *size) {
-    return CreateLifetimeStart(buf.getAddress(), size);
+    return CreateLifetimeStart(buf.getAddress());
   }
   
   using IRBuilderBase::CreateLifetimeEnd;
+
+  llvm::CallInst *CreateLifetimeEnd(llvm::Value *buf) {
+    if (auto *alloca = getLifetimeMarkerAlloca(buf))
+      return IRBuilderBase::CreateLifetimeEnd(alloca);
+    return nullptr;
+  }
+  llvm::CallInst *CreateLifetimeEnd(Address buf) {
+    return CreateLifetimeEnd(buf.getAddress());
+  }
+
   llvm::CallInst *CreateLifetimeEnd(Address buf, Size size) {
-    return CreateLifetimeEnd(buf,
-                   llvm::ConstantInt::get(Context, APInt(64, size.getValue())));
+    return CreateLifetimeEnd(buf.getAddress());
   }
   llvm::CallInst *CreateLifetimeEnd(Address buf, llvm::ConstantInt *size) {
-    return CreateLifetimeEnd(buf.getAddress(), size);
+    return CreateLifetimeEnd(buf.getAddress());
   }
 
   // We're intentionally not allowing direct use of
@@ -451,7 +488,7 @@ public:
 
   bool insertingAtEndOfBlock() const {
     assert(hasValidIP() && "Must have insertion point to ask about it");
-    return InsertPt == BB->end();
+    return InsertPt == GetInsertBlock()->end();
   }
 };
 
@@ -489,10 +526,9 @@ public:
     builder.SetInsertPoint(newInsertionPoint);
   }
 
-  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *block,
-                          llvm::BasicBlock::iterator iter)
+  SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock::iterator iter)
       : SavedInsertionPointRAII(b) {
-    builder.SetInsertPoint(block, iter);
+    builder.SetInsertPoint(iter);
   }
 
   SavedInsertionPointRAII(IRBuilder &b, llvm::BasicBlock *insertionBlock)

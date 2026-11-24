@@ -247,7 +247,7 @@ For the list of function attributes see [FunctionAttributes](FunctionAttributes.
 Optionally a function can define a list of effects, which describe effects,
 like memory effects or escaping effects for arguments. For details
 see the documentation in
-[Effects.swift](`SwiftCompilerSources/Sources/SIL/Effects.swift`).
+[Effects.swift](../../SwiftCompilerSources/Sources/SIL/Effects.swift).
 
 ```
 effects ::= '[' argument-name ':' argument-effect (',' argument-effect)*]'
@@ -683,6 +683,30 @@ result - the non-escaping closure.
   %3 = partial_apply [on_stack] %f(%1, %2)    -+ borrow scope for %1 and %2
   %4 = convert_function %3 to $SomeFuncType    |
   destroy_value %4                            -+ %1 and %2 must be alive until here
+```
+
+The closure's lifetime also extends through a `move_value` and through a
+closure that captures it. A closure with at-most-once or exactly-once semantics
+is `@callee_owned`, so the `apply` that calls it ends its lifetime.
+
+The closure can also be stored into a stack slot that holds nothing but the
+closure, such as the slot of an inlined `consuming` parameter. The slot must be
+initialized only by that store. Its lifetime then extends through the values
+that `load [take]` takes out of the slot and through the slots that
+`copy_addr [take]` moves the closure into, and a `destroy_addr` of the slot
+ends it.
+
+```
+  %3 = partial_apply [on_stack] [called_at_most_once] %f(%1)  -+ borrow scope for %1
+  %4 = alloc_stack $@noescape @callable(once) () -> ()         |
+  store %3 to [init] %4                                        |
+  cond_br %c, bb1, bb2                                         |
+bb1:                                                           |
+  %5 = load [take] %4                                          |
+  %6 = apply %5()                                             -+ %1 must be alive until here
+  ...                                                          |
+bb2:                                                           |
+  destroy_addr %4                                             -+ or until here
 ```
  
 #### `mark_dependence`
@@ -1801,9 +1825,13 @@ by the type system as follows:
     including a Swift class instance, a box allocated by `alloc_box`, or
     a thick function's closure context. It may not alias natively
     Objective-C class instances.
--   An `AnyObject` or `Builtin.BridgeObject` may alias any class
-    instance, whether Swift or Objective-C, but may not alias
-    non-class-instance heap objects.
+-   An `AnyObject` may alias any class instance, whether Swift or Objective-C,
+    but may not alias non-class-instance heap objects.
+-   A `Builtin.BridgeObject` may alias any class instance, whether Swift or
+    Objective-C, but may not alias non-class-instance heap objects. Here,
+    "aliasing" refers to accessing the memory pointed-to by the bridge object
+    value. As explained in [Typed Access TBAA](#typed-access-tbaa), a pointer
+    to a `Builtin.BridgeObject` cannot alias another type.
 -   Two values of the same class type `$C` may alias. Two values of
     related class type `$B` and `$D`, where there is a subclass
     relationship between `$B` and `$D`, may alias. Two values of
@@ -1916,6 +1944,10 @@ Similarly, the LLVM builtins `Builtin.bitcast` and
 pointer values must be converted to an address via `pointer_to_address`
 before typed access can occur. Whether the `pointer_to_address` is
 strict determines whether aliasing may occur.
+
+A pointer to a `Builtin.BridgeObject` cannot alias another type. Although a
+`Builtin.BridgeObject` may be cast to and from a class reference or a
+`Builtin.Word`, such casts are always value casts, not in-place address casts.
 
 Memory may be rebound to an unrelated type. Addresses to unrelated types
 may alias as long as typed access only occurs while memory is bound to

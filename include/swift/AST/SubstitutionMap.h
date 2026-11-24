@@ -136,10 +136,9 @@ public:
   /// Whether the substitution map is empty.
   bool empty() const;
 
-  /// Whether the substitution has any substitutable parameters, i.e.,
-  /// it is non-empty and at least one of the type parameters can be
-  /// substituted (i.e., is not mapped to a concrete type).
-  bool hasAnySubstitutableParams() const;
+  /// Whether the substitution has generic parameters that are not mapped to
+  /// a concrete type.
+  bool isEffectivelyGeneric() const;
   
   /// True if this substitution map is an identity mapping.
   bool isIdentity() const;
@@ -231,16 +230,6 @@ public:
 
   static SubstitutionMap getFromOpaqueValue(const void *ptr) {
     return SubstitutionMap(const_cast<Storage *>((const Storage *)ptr));
-  }
-
-  static SubstitutionMap getEmptyKey() {
-    return SubstitutionMap(
-             (Storage *)llvm::DenseMapInfo<void*>::getEmptyKey());
-  }
-
-  static SubstitutionMap getTombstoneKey() {
-    return SubstitutionMap(
-               (Storage *)llvm::DenseMapInfo<void*>::getTombstoneKey());
   }
 
   friend bool operator ==(SubstitutionMap lhs, SubstitutionMap rhs) {
@@ -361,12 +350,6 @@ namespace llvm {
 
   // Substitution maps hash just like pointers.
   template<> struct DenseMapInfo<swift::SubstitutionMap> {
-    static swift::SubstitutionMap getEmptyKey() {
-      return swift::SubstitutionMap::getEmptyKey();
-    }
-    static swift::SubstitutionMap getTombstoneKey() {
-      return swift::SubstitutionMap::getTombstoneKey();
-    }
     static unsigned getHashValue(swift::SubstitutionMap map) {
       return DenseMapInfo<void*>::getHashValue(map.getOpaqueValue());
     }

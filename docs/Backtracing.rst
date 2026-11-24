@@ -104,6 +104,13 @@ follows:
 |                 |         | directory, the backtracer will generate unique   |
 |                 |         | filenames within that directory.  Otherwise it   |
 |                 |         | is assumed to be a filename.                     |
+|                 |         |                                                  |
+|                 |         | On Windows, ``eventlog`` writes the backtrace to |
+|                 |         | the Application event log; this is the default   |
+|                 |         | for programs without a console.  ``console``     |
+|                 |         | behaves like ``stderr``, except that if the      |
+|                 |         | program has no console, the backtracer is given  |
+|                 |         | a new console window.                            |
 +-----------------+---------+--------------------------------------------------+
 | symbolicate     | full    | Options are ``full``, ``fast``, or ``off``.      |
 |                 |         | Full means to look up source locations and       |
@@ -121,6 +128,17 @@ follows:
 | close-fds       | false   | Close all file descriptors in the crashing       |
 |                 |         | process before starting to gather a crash log.   |
 |                 |         | (This does nothing on Windows.)                  |
++-----------------+---------+--------------------------------------------------+
+| hook-fail-fast  | false   | Windows only.  Intercept calls to                |
+|                 |         | ``RaiseFailFastException()`` so that a backtrace |
+|                 |         | is generated before the process terminates.      |
+|                 |         | Some frameworks (e.g. WinUI) use this to         |
+|                 |         | terminate the process when an exception occurs   |
+|                 |         | in an event handler, which bypasses the normal   |
+|                 |         | crash handler.  This works by patching import    |
+|                 |         | address tables, and means running code in a      |
+|                 |         | process that has asked to terminate immediately, |
+|                 |         | so it is not enabled by default.                 |
 +-----------------+---------+--------------------------------------------------+
 
 (*) On macOS 26 and later, this defaults to ``tty`` rather than ``yes``. On

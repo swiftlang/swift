@@ -42,6 +42,7 @@
 #include "swift/Threading/ConditionVariable.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include <optional>
 
 // Does the runtime integrate with libdispatch?
 #if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
@@ -235,7 +236,8 @@ class NullaryContinuationJob : public Job {
 
 private:
   SWIFT_ATTRIBUTE_UNUSED AsyncTask *Task;
-  AsyncTask *Continuation;
+  AsyncTask *__ptrauth_swift_nullary_continuation_job_continuation
+      Continuation;
 
 public:
   NullaryContinuationJob(AsyncTask *task, JobPriority priority, AsyncTask *continuation)
@@ -261,7 +263,7 @@ public:
 /// TaskOptionRecord is used to provide the witnesses.
 struct ResultTypeInfo {
 #if !SWIFT_CONCURRENCY_EMBEDDED
-  const Metadata *metadata = nullptr;
+  const Metadata *__ptrauth_swift_task_result_type_metadata metadata = nullptr;
   bool isNull() {
     return metadata == nullptr;
   }
@@ -566,6 +568,10 @@ private:
   void flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord);
   void destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord);
   uint32_t taskFlagAsRunningWithoutDependency(InvokeFlags invokeFlags);
+
+  /// Remove the enqueued bit in the ActiveTaskStatus atomically. This must be
+  /// done when a Task's intrusive link is dequeued but after reading the local
+  /// stealer exclusion value. This should not be called from any other context.
   void taskRemoveEnqueued();
 
 public:
@@ -573,16 +579,35 @@ public:
   /// enqueue it.
   void flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor);
 
+  /// Flag that the task is to be enqueued on the provided executor, but return
+  /// the job to enqueue instead of enqueuing it. This is either the task itself
+  /// or a stealer for it, and the caller must either enqueue it on
+  /// `newExecutor` or run it on the current thread as `newExecutor` would.
+  Job *flagAsEnqueuedOnExecutor(SerialExecutorRef newExecutor);
+
   /// Flag that this task is now completed. This normally does not do anything
   /// but can be used to locally insert logging.
   void flagAsDestroyed();
 
-  /// Check whether this task has been cancelled.
+  /// Check whether the task itself has been cancelled.
   /// Checking this is, of course, inherently race-prone on its own.
   ///
-  /// \param ignoreShield if cancellation shield should be ignored. 
-  ///        Cancellation shields prevent the observation of the isCancelled flag while active.
-  bool isCancelled(bool ignoreShield) const;
+  /// Cancellation shields and cancellation scopes only affect the code that
+  /// runs inside of them, so they are not taken into account.
+  bool isTaskCancelled() const;
+
+  /// Check whether the code that the task currently runs observes a
+  /// cancellation, taking cancellation shields and cancellation scopes into
+  /// account.
+  ///
+  /// Only the task itself observes its cancellation shields and cancellation
+  /// scopes. For any other caller this is the same as `isTaskCancelled`.
+  bool isCancelledInCurrentContext() const;
+
+  /// The reason of the cancellation that `isCancelledInCurrentContext`
+  /// observes, or `std::nullopt` if it doesn't observe one. The nearest
+  /// cancellation scope decides the reason.
+  std::optional<size_t> getCancellationReasonInCurrentContext() const;
 
   // ==== Task Naming ----------------------------------------------------------
 
@@ -883,7 +908,8 @@ public:
     };
 
     /// An item within the wait queue, which includes the status and the
-    /// head of the list of tasks.
+    /// head of the list of tasks. The task pointer is signed with the address
+    /// of the waitQueue field that holds the item.
     struct WaitQueueItem {
       /// Mask used for the low status bits in a wait queue item.
       static const uintptr_t statusMask = 0x03;
@@ -894,13 +920,29 @@ public:
         return static_cast<Status>(storage & statusMask);
       }
 
-      AsyncTask *getTask() const {
-        return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+      AsyncTask *getTask(const void *slot) const {
+        auto task = reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+#if SWIFT_PTRAUTH
+        if (task)
+          task = ptrauth_auth_data(
+              task, ptrauth_key_process_independent_data,
+              ptrauth_blend_discriminator(
+                  slot, SpecialPointerAuthDiscriminators::TaskFutureWaitQueue));
+#endif
+        return task;
       }
 
-      static WaitQueueItem get(Status status, AsyncTask *task) {
-        return WaitQueueItem{
-          reinterpret_cast<uintptr_t>(task) | static_cast<uintptr_t>(status)};
+      static WaitQueueItem get(Status status, AsyncTask *task,
+                               const void *slot) {
+#if SWIFT_PTRAUTH
+        if (task)
+          task = ptrauth_sign_unauthenticated(
+              task, ptrauth_key_process_independent_data,
+              ptrauth_blend_discriminator(
+                  slot, SpecialPointerAuthDiscriminators::TaskFutureWaitQueue));
+#endif
+        return WaitQueueItem{reinterpret_cast<uintptr_t>(task) |
+                             static_cast<uintptr_t>(status)};
       }
     };
 
@@ -923,8 +965,8 @@ public:
 
   public:
     explicit FutureFragment(ResultTypeInfo resultType)
-      : waitQueue(WaitQueueItem::get(Status::Executing, nullptr)),
-        resultType(resultType) { }
+        : waitQueue(WaitQueueItem::get(Status::Executing, nullptr, &waitQueue)),
+          resultType(resultType) {}
 
     /// Destroy the storage associated with the future.
     void destroy();
@@ -974,6 +1016,11 @@ public:
 
   bool isFuture() const { return Flags.task_isFuture(); }
 
+  /// Is the operation of this task a synchronous function?
+  bool hasSynchronousOperation() const {
+    return Flags.task_hasSynchronousOperation();
+  }
+
   FutureFragment *futureFragment() {
     assert(isFuture());
     return reinterpret_cast<FutureFragment *>(
@@ -1010,7 +1057,8 @@ private:
   /// Access the next waiting task, which establishes a singly linked
   /// list of tasks that are waiting on a future. This function
   /// assumes that this Task is suspended waiting on a another Task.
-  AsyncTask *&getNextWaitingTask();
+  AsyncTask *getNextWaitingTask();
+  void setNextWaitingTask(AsyncTask *task);
 };
 
 // The compiler will eventually assume these.
@@ -1201,6 +1249,20 @@ public:
       asyncEntryPoint;
   void *closureContext;
   SwiftError *errorResult;
+};
+
+/// Storage that is allocated before the initial AsyncContext of a synchronous
+/// discarding task.
+///
+/// It has no 'errorResult', no 'indirectResult' and the operation is
+/// synchronous.
+class SynchronousDiscardingContextPrefix {
+public:
+  using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
+
+  /// The synchronous task function, which is called with `closureContext`
+  FunctionType *__ptrauth_swift_synchronous_task_operation function;
+  void *closureContext;
 };
 
 } // end namespace swift

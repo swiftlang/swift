@@ -27,7 +27,7 @@ public struct G<T> {
 // the @sil_sending attribute on the outer function parameter.
 //
 // CHECK-LABEL:  sil @test_sending_optional_closure : $@convention(thin) <T> (@sil_sending @owned Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>) -> () {
-// CHECK: alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>, var, name "body", type $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>
+// CHECK: alloc_stack $Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@in_guaranteed G<τ_0_0>) -> () for <T>>, var, name "body"
 // CHECK:       } // end sil function 'test_sending_optional_closure'
 sil @test_sending_optional_closure : $@convention(thin) <T> (@sil_sending @owned Optional<@callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> (@guaranteed G<τ_0_0>) -> () for <T>>) -> () {
 // %0 "body"                                      // user: %2

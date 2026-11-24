@@ -236,7 +236,7 @@ extension ArraySlice {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return unsafe _buffer.getSubscriptBaseAddress() + index
+    return unsafe _buffer.getSubscriptBaseAddress().project(index)
   }
 }
 
@@ -555,7 +555,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique() // makes the array native, too
       _checkSubscript_native(index)
-      let address = unsafe _buffer.getSubscriptBaseAddress() + index
+      let address = unsafe _buffer.getSubscriptBaseAddress().project(index)
       defer { _endMutation() }
       yield unsafe &address.pointee
     }
@@ -602,6 +602,33 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
         self.replaceSubrange(bounds, with: rhs)
       }
     }
+  }
+
+  /// Exchanges the values at the specified indices of the array.
+  ///
+  /// Both parameters must be valid indices of the array and not
+  /// equal to `endIndex`. Passing the same index as both `i` and `j` has no
+  /// effect.
+  ///
+  /// - Parameters:
+  ///   - i: The index of the first value to swap.
+  ///   - j: The index of the second value to swap.
+  ///
+  /// - Complexity: O(1)
+  @export(implementation)
+  public mutating func swapAt(_ i: Index, _ j: Index) {
+    guard i != j else {
+      return
+    }
+    _makeMutableAndUnique()
+    _checkSubscript_native(i)
+    _checkSubscript_native(j)
+    let pi = unsafe _buffer.getSubscriptBaseAddress().project(i)
+    let pj = unsafe _buffer.getSubscriptBaseAddress().project(j)
+    let tmp = unsafe pi.move()
+    unsafe pi.initialize(to: pj.move())
+    unsafe pj.initialize(to: tmp)
+    _endMutation()
   }
 
   /// The number of elements in the array.

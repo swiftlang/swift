@@ -154,6 +154,7 @@ bool swift::Demangle::isFunctionAttr(Node::Kind kind) {
     case Node::Kind::AccessibleFunctionRecord:
     case Node::Kind::BackDeploymentThunk:
     case Node::Kind::BackDeploymentFallback:
+    case Node::Kind::BackDeploymentCopy:
     case Node::Kind::HasSymbolQuery:
     case Node::Kind::CoroFunctionPointer:
     case Node::Kind::DefaultOverride:
@@ -1825,7 +1826,8 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
 
   if (FuncType->getKind() != Node::Kind::FunctionType &&
       FuncType->getKind() != Node::Kind::NoEscapeFunctionType &&
-      FuncType->getKind() != Node::Kind::CalledOnceFunctionType)
+      FuncType->getKind() != Node::Kind::CalledOnceFunctionType &&
+      FuncType->getKind() != Node::Kind::CalledAtMostOnceFunctionType)
     return nullptr;
 
   unsigned FirstChildIdx = 0;
@@ -2508,8 +2510,13 @@ NodePointer Demangler::demangleImplFunctionType() {
     type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
                    *this);
 
-  if (nextIf('O'))
-    type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  if (nextIf('O')) {
+    if (nextIf('o'))
+      type->addChild(createNode(Node::Kind::ImplCalledAtMostOnceFunction),
+                     *this);
+    else
+      type->addChild(createNode(Node::Kind::ImplCalledOnceFunction), *this);
+  }
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'
@@ -2667,7 +2674,10 @@ NodePointer Demangler::demangleMetatype() {
                              Ty->getChild(0));
     }
     case 'D':
+    case 'd':
       return createWithPoppedType(Node::Kind::TypeMetadataDemanglingCache);
+    case 'R':
+      return createWithPoppedType(Node::Kind::TypeMetadataMangledNameRef);
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
     case 'F':
@@ -3313,6 +3323,7 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       }
     case 'w':
       switch (nextChar()) {
+      case 'a': return createNode(Node::Kind::BackDeploymentCopy);
       case 'b': return createNode(Node::Kind::BackDeploymentThunk);
       case 'B': return createNode(Node::Kind::BackDeploymentFallback);
       case 'c':
@@ -3532,6 +3543,13 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           }
           break;
         }
+        case FunctionSigSpecializationParamKind::DifferentiableFunctionProp: {
+          for (int I = 0; I != 3; ++I) {
+            paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+            paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Identifier));
+          }
+          continue;
+        }
         case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
@@ -3574,6 +3592,14 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::EscapingClosureProp)));
+    case 'a':
+      // Consumes three (function identifier, component type) pairs, ordered
+      // original, JVP, VJP. The parameters will be added later.
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     uint64_t(FunctionSigSpecializationParamKind::
+                                  DifferentiableFunctionProp)));
     case 'C': {
       // Consumes an identifier and multiple type parameters.
       // The parameters will be added later.
@@ -4033,6 +4059,8 @@ NodePointer Demangler::demangleSpecialType() {
     case 'C':
       return popFunctionType(Node::Kind::CFunctionPointer);
     case 'O':
+      if (nextIf('o'))
+        return popFunctionType(Node::Kind::CalledAtMostOnceFunctionType);
       return popFunctionType(Node::Kind::CalledOnceFunctionType);
     case 'g':
     case 'G':
@@ -4763,6 +4791,8 @@ NodePointer Demangler::demangleMacroExpansion() {
   } else {
     result = createWithChildren(kind, context, macroName, discriminator);
   }
+  if (!result)
+    return nullptr;
   if (privateDiscriminator)
     result->addChild(privateDiscriminator, *this);
   return result;

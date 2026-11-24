@@ -62,10 +62,6 @@ struct FunctionPassContext : MutatingContext {
     bridgedPassContext.updateAnalysis()
   }
 
-  func notifyNewFunction(function: Function, derivedFrom: Function) {
-    bridgedPassContext.addFunctionToPassManagerWorklist(function.bridged, derivedFrom.bridged)
-  }
-
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
     return name.withUTF8Buffer { (nameBuffer: UnsafeBufferPointer<UInt8>) in
       let nameStr = BridgedStringRef(data: nameBuffer.baseAddress, count: nameBuffer.count)
@@ -107,6 +103,16 @@ struct FunctionPassContext : MutatingContext {
   func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
     if bridgedPassContext.specializeAppliesInFunction(function.bridged, isMandatory) {
       notifyInstructionsChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
+  func unrollPackLoops(in function: Function) -> Bool {
+    if bridgedPassContext.unrollPackLoopsInFunction(function.bridged) {
+      notifyInstructionsChanged()
+      notifyBranchesChanged()
       notifyCallsChanged()
       return true
     }
@@ -158,6 +164,28 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  typealias DifferentiableFunctionArgumentMangling = (
+    argumentIndex: Int,
+    function: DifferentiableFunctionInst,
+    originalRoot: ThinToThickFunctionInst,
+    jvpRoot: ThinToThickFunctionInst,
+    vjpRoot: ThinToThickFunctionInst
+  )
+
+  func mangle(withDifferentiableFunctionArguments args: [DifferentiableFunctionArgumentMangling],
+              from applySiteCallee: Function) -> String {
+    let bridgedArgManglings = args.map {
+      BridgedPassContext.DifferentiableFunctionArgMangling(
+        argIdx: $0.argumentIndex, inst: $0.function.bridged,
+        originalRoot: $0.originalRoot.bridged, jvpRoot: $0.jvpRoot.bridged,
+        vjpRoot: $0.vjpRoot.bridged)
+    }
+    return bridgedArgManglings.withBridgedArrayRef { bridgedDifferentiableFunctionArgs in
+      String(taking: bridgedPassContext.mangleWithDifferentiableFunctionArgs(
+        bridgedDifferentiableFunctionArgs, applySiteCallee.bridged))
+    }
+  }
+
   func mangle(withConstantCaptureArguments constArgs: [(argumentIndex: Int, argument: Value)],
               from applySiteCallee: Function
   ) -> String {
@@ -181,50 +209,6 @@ struct FunctionPassContext : MutatingContext {
 
   func mangle(withChangedRepresentation original: Function) -> String {
     String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
-  }
-
-  func createSpecializedFunctionDeclaration(
-    from original: Function, withName specializedFunctionName: String,
-    withParams specializedParameters: [ParameterInfo],
-    withResults specializedResults: [ResultInfo]? = nil,
-    withRepresentation: FunctionTypeRepresentation? = nil,
-    makeBare: Bool = false,
-    preserveGenericSignature: Bool = true
-  ) -> Function {
-    return specializedFunctionName._withBridgedStringRef { nameRef in
-      let bridgedParamInfos = specializedParameters.map { $0._bridged }
-      let repr = withRepresentation ?? original.loweredFunctionType.functionTypeRepresentation
-
-      return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-
-        if let bridgedResultInfos = specializedResults?.map({ $0._bridged }) {
-
-          return bridgedResultInfos.withUnsafeBufferPointer { resultBuf in
-            return bridgedPassContext.createSpecializedFunctionDeclaration(
-              nameRef, paramBuf.baseAddress, paramBuf.count,
-              resultBuf.baseAddress, resultBuf.count,
-              original.bridged, repr.bridged, makeBare,
-              preserveGenericSignature
-            ).function
-          }
-        } else {
-          return bridgedPassContext.createSpecializedFunctionDeclaration(
-            nameRef, paramBuf.baseAddress, paramBuf.count,
-            nil, 0,
-            original.bridged, repr.bridged, makeBare,
-            preserveGenericSignature
-          ).function
-        }
-      }
-    }
-  }
-
-  func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
-    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(specializedFunction.bridged)
-    let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
-    defer { bridgedPassContext.deinitializedNestedPassContext() }
-
-    return buildFn(specializedFunction, nestedContext)
   }
 
   /// Makes sure that the lifetime of `value` ends at all control flow paths, even in dead-end blocks.
@@ -262,5 +246,11 @@ struct FunctionPassContext : MutatingContext {
 
   func fixStackNesting(in function: Function) {
     bridgedPassContext.fixStackNesting(function.bridged)
+  }
+}
+
+extension VerificationContext {
+  init(_ context: FunctionPassContext) {
+    self.init(_bridged: context._bridged)
   }
 }

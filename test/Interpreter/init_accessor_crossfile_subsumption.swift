@@ -9,6 +9,7 @@
 // RUN:   -emit-module -emit-module-path %t/Lib.swiftmodule \
 // RUN:   -emit-library -static -o %t/%target-static-library-name(Lib)
 // RUN: %target-build-swift %t/main.swift -I %t -L %t -l Lib -o %t/a.out
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test

@@ -1849,6 +1849,35 @@ public struct ConformanceViaExtensionMacro: ExtensionMacro {
   }
 }
 
+/// Adds an extension that both conforms the type to `MyProtocol` and declares a
+/// nested `Cases` enum conforming to `Hashable`. Mirrors the shape of AppIntents'
+/// `@UnionValue`, which synthesizes a nested `<Enum>Cases` type. Used to test
+/// that the nested type's context descriptor is emitted into the same output
+/// module as its conformance records under multi-threaded WMO (rdar://185645710).
+public struct NestedCasesViaExtensionMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    let decl: DeclSyntax =
+      """
+      extension \(raw: type.trimmedDescription): MyProtocol {
+        public enum Cases: Swift.Hashable {
+          case a
+          case b
+        }
+      }
+      """
+
+    return [
+      decl.cast(ExtensionDeclSyntax.self)
+    ]
+  }
+}
+
 public struct HashableMacro: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,

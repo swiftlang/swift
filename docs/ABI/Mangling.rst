@@ -145,6 +145,9 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
+  global ::= type 'MD'                   // type metadata demangling cache variable (old)
+  global ::= type 'Md'                   // type metadata demangling cache variable
+  global ::= type 'MR'                   // type metadata mangled name ref
   global ::= nominal-type 'Mr'           // generic type completion function
   global ::= nominal-type 'Mi'           // generic type instantiation function
   global ::= nominal-type 'MI'           // generic type instantiation cache
@@ -253,6 +256,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
+  global ::= global 'Twa'                // back deployment copy
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
   global ::= global 'Twc'                // coro function pointer of a function
@@ -300,6 +304,19 @@ types where the metadata itself has unknown layout.)
 
 All reabstraction thunks have the "from" and "to" types in that order, and
 are always non-polymorphic ``<impl-function-type>`` types.
+
+A back deployment copy is a module's own copy of an entity of a back-deployed
+struct or enum from another module. A module whose deployment target predates
+the type emits its own copy of the type, and gives its copies of the type
+metadata access function and the nominal type descriptor a distinct name, so
+that it can reference the defining module's entities by their usual names.
+The access function's copy references the defining module's access function
+weakly, and uses it when it is available at runtime. The module's conformance
+records for the type also refer weakly to the defining module's descriptor, so
+that the runtime applies them to the defining module's metadata. For example,
+``$s5MyKit5PointVMaTwa`` is a back deployment copy of ``$s5MyKit5PointVMa``,
+and ``$s5MyKit5PointVMnTwa`` is a back deployment copy of
+``$s5MyKit5PointVMn``.
 
 ::
 
@@ -764,7 +781,8 @@ Types
   FUNCTION-KIND ::= 'zC' C-TYPE              // C function pointer / C++ method type with non-canonical C type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
-  FUNCTION-KIND ::= 'O'                      // `@called(once)` function type
+  FUNCTION-KIND ::= 'O'                      // `@once` function type
+  FUNCTION-KIND ::= 'Oo'                     // `@callable(once)` function type
 
   C-TYPE ::= NATURAL IDENTIFIER-STRING       // raw Itanium mangling
 
@@ -886,7 +904,8 @@ mangled in to disambiguate.
 #endif
 
 #if SWIFT_RUNTIME_VERSION >= 6.5
-  CALLED-ONCE ::= 'O'                        // @called(once)
+  CALLED-ONCE ::= 'O'                        // @once
+  CALLED-ONCE ::= 'Oo'                       // @callable(once)
 #endif
 
   DIFFERENTIABILITY-KIND ::= 'd'             // @differentiable

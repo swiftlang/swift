@@ -200,15 +200,17 @@ final class AddressableLetField {
 
 final class MutableField {
   // A `var` can be reassigned, releasing the buffer while a Span still points
-  // into it, so the dependence is on the access scope rather than on `self`.
+  // into it, so the dependence cannot be on `self`. Instead, it is on the copy
+  // loaded within the access scope, which keeps the buffer alive.
   var array = [1, 2, 3]
 
   // CHECK-LABEL: sil hidden [ossa] @$s4test12MutableFieldC7getDatas4SpanVySiGyF : $@convention(method) (@guaranteed MutableField) -> @lifetime(borrow 0) @owned Span<Int> {
   // CHECK: bb0(%0 : @guaranteed $MutableField):
   // CHECK: [[ADDR:%.*]] = ref_element_addr %0, #MutableField.array
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[ADDR]]
+  // CHECK: [[COPY:%.*]] = load [copy] [[ACCESS]]
   // CHECK: [[SPAN:%.*]] = apply %{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[ACCESS]]
+  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[COPY]]
   // CHECK-LABEL: } // end sil function '$s4test12MutableFieldC7getDatas4SpanVySiGyF'
   @_lifetime(borrow self)
   func getData() -> Span<Int> {

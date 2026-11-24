@@ -16,6 +16,7 @@ import Swift
 
 /// `MutableSpan<Element>` represents a contiguous region of memory which
 /// contains initialized instances of `Element`.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -92,10 +93,6 @@ extension MutableSpan where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
 
     let ms = unsafe MutableSpan<Element>(_unchecked: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: buffer)
@@ -113,6 +110,21 @@ extension MutableSpan where Element: ~Copyable {
     let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: count)
     let ms = unsafe MutableSpan(_unsafeElements: buffer)
     self = unsafe _overrideLifetime(ms, borrowing: start)
+  }
+
+  /// Create a mutable span over a single value.
+  ///
+  /// The span has a `count` of 1. Writes through the span modify `value`,
+  /// which is exclusively accessed while the span exists.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be mutated through the span
+  @export(implementation)
+  @_lifetime(&value)
+  public init(ofOne value: inout Element) {
+    let address = Builtin.unprotectedAddressOf(&value)
+    let span = unsafe MutableSpan(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, mutating: &value)
   }
 }
 
@@ -199,19 +211,17 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(&mutableBytes)
   public init(mutating mutableBytes: inout MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      mutating: &mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
+      )
+    }
+    self = unsafe _overrideLifetime(span, mutating: &mutableBytes)
   }
 
   /// Convert a raw span to a typed span.
@@ -225,19 +235,17 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
   @export(implementation)
   @_lifetime(copy mutableBytes)
   public init(mutableBytes: consuming MutableRawSpan) {
-    _precondition(
-      unsafe ((Int(bitPattern: mutableBytes._pointer) &
-        (MemoryLayout<Element>.alignment &- 1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let byteCount = mutableBytes.byteCount
-    let stride = MemoryLayout<Element>.stride
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    _precondition(remainder == 0, "Span must contain a whole number of elements")
-    self = unsafe _overrideLifetime(
-      MutableSpan(_unchecked: mutableBytes._pointer, count: count),
-      copying: mutableBytes
-    )
+    let pointer = unsafe mutableBytes._pointer
+    let span = if MemoryLayout<Element>.stride == 1 {
+      unsafe MutableSpan(_unchecked: pointer, count: mutableBytes._count)
+    } else {
+      unsafe MutableSpan(
+        _unsafeBytes: UnsafeMutableRawBufferPointer(
+          start: pointer, count: mutableBytes.byteCount
+        )
+      )
+    }
+    self = unsafe _overrideLifetime(span, copying: mutableBytes)
   }
 }
 
@@ -643,17 +651,343 @@ extension MutableSpan where Element: BitwiseCopyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableSpan {
 
-  /// Update every element of this span to the given value.
+  /// Overwrites every element of this span with the given value.
+  ///
+  /// - Note: This function is a synonym for `updateAll(repeating:)`.
   ///
   /// - Parameter repeatedValue: The value to set for every element.
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func update(repeating repeatedValue: consuming Element) {
-    guard !isEmpty else { return }
+    updateAll(repeating: repeatedValue)
+  }
+
+  /// Overwrites every element of this span with the given value.
+  ///
+  /// - Parameter repeatedValue: The value to set for every element.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(repeating repeatedValue: consuming Element) {
+    if self.isEmpty { return }
     unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
       unsafe $0.update(repeating: repeatedValue, count: count)
     }
   }
+
+  /// Overwrites every element within a range of indices with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - repeatedValue: The value to set for every element in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Index>,
+    repeating repeatedValue: consuming Element
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(repeating: repeatedValue)
+  }
+
+  /// Overwrites every element within a range of indices with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - repeatedValue: The value to set for every element in `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>,
+    repeating repeatedValue: consuming Element
+  ) {
+    updateSubrange(subrange.relative(to: indices), repeating: repeatedValue)
+  }
+
+  /// Overwrites every element of this span with the given value.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - repeatedValue: The value to set for every element.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange,
+    repeating repeatedValue: consuming Element
+  ) {
+    updateAll(repeating: repeatedValue)
+  }
+
+  /// Overwrites every element of this span by copying the elements
+  /// of the source.
+  ///
+  /// `source` must have exactly as many elements as this span.
+  ///
+  /// - Note: When `Element: BitwiseCopyable`, this function lowers
+  ///     to LLVM's `memcpy` primitive.
+  ///
+  /// - Parameter source: The elements to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(copying source: Span<Element>) {
+    _precondition(
+      source.count == self.count,
+      "Source must have as many elements as the destination"
+    )
+    if self.isEmpty { return }
+    withUnsafeMutableBufferPointer { destination in
+      source.withUnsafeBufferPointer {
+        let c = unsafe destination.update(fromContentsOf: $0)
+        _internalInvariant(c == destination.count)
+      }
+    }
+  }
+
+  /// Overwrites every element within a range of indices by copying
+  /// the elements of the source.
+  ///
+  /// `source` must have exactly as many elements as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Index>, copying source: Span<Element>
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(copying: source)
+  }
+
+  /// Overwrites every element within a range of indices by copying
+  /// the elements of the source.
+  ///
+  /// `source` must have exactly as many elements as `subrange`.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to copy into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>, copying source: Span<Element>
+  ) {
+    updateSubrange(subrange.relative(to: indices), copying: source)
+  }
+
+  /// Overwrites every element of this span by copying the elements
+  /// of the source.
+  ///
+  /// `source` must have exactly as many elements as this span.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - source: The elements to copy into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, copying source: Span<Element>
+  ) {
+    updateAll(copying: source)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan where Element: ~Copyable {
+
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameter source: The elements to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateAll(moving source: inout OutputSpan<Element>) {
+    _precondition(
+      source.count == self.count,
+      "Source must have as many elements as the destination"
+    )
+    if self.isEmpty { return }
+    withUnsafeMutableBufferPointer { destination in
+      unsafe source.withUnsafeMutableBufferPointer {
+        let c = unsafe destination.moveUpdate(
+          fromContentsOf: $0.extracting(first: $1)
+        )
+        _internalInvariant(c == destination.count)
+        $1 = 0
+      }
+    }
+  }
+
+  /// Overwrites every element within a range of indices by moving
+  /// the elements from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: Range<Index>, moving source: inout OutputSpan<Element>
+  ) {
+    var span = self._mutatingExtracting(subrange)
+    span.updateAll(moving: &source)
+  }
+
+  /// Overwrites every element within a range of indices by moving
+  /// the elements from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as `subrange`.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: A valid range of indices. Every index in this range
+  ///      must be within the bounds of this `MutableSpan`.
+  ///   - source: The elements to move into `subrange`.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: some RangeExpression<Index>,
+    moving source: inout OutputSpan<Element>
+  ) {
+    updateSubrange(subrange.relative(to: indices), moving: &source)
+  }
+
+  /// Overwrites every element of this span by moving the elements
+  /// from the source.
+  ///
+  /// `source` must have exactly as many initialized elements as this span.
+  /// When this function returns, `source` is empty, and its memory has been
+  /// returned to the uninitialized state.
+  ///
+  /// - Parameters:
+  ///   - subrange: An unbounded range, selecting every index of this span.
+  ///   - source: The elements to move into this span.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func updateSubrange(
+    _ subrange: UnboundedRange, moving source: inout OutputSpan<Element>
+  ) {
+    updateAll(moving: &source)
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableSpan {
+
+#if !SPAN_COMPATIBILITY_STUB
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// every element of the source.
+  ///
+  /// This span must have enough space from `index` to its end
+  /// (`index..<count`) for every element provided by `source`. If `source`
+  /// has fewer elements, the remaining elements of this span are unchanged.
+  ///
+  /// If reading from `source` throws an error, the elements copied before
+  /// the error occurred remain in this span, and `index` is updated to
+  /// the index after the last element updated before the error.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to start copying. It must be a valid
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
+  ///   - source: The elements to copy into this span.
+  /// - Throws: Any error thrown while reading from `source`.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: Iterable & ~Escapable & ~Copyable
+  >(
+    startingAt index: inout Index, copyingAll source: borrowing I
+  ) throws(I.Failure) where I.Element == Element {
+    var iterator = source.makeBorrowingIterator()
+    try updateElements(startingAt: &index, copyingFrom: &iterator)
+    let next = try iterator.nextSpan(maxCount: 1)
+    _precondition(
+      next.isEmpty, "Source has more elements than the destination can contain"
+    )
+  }
+
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// every element of the source.
+  ///
+  /// This span must have enough space from `index` to its end
+  /// (`index..<count`) for every element provided by `source`. If `source`
+  /// has fewer elements, the remaining elements of this span are unchanged.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to start copying. It must be a valid
+  ///      index of this span, or equal to its `count`.
+  ///   - source: The elements to copy into this span.
+  /// - Returns: The index after the last element updated.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: Iterable & ~Escapable & ~Copyable
+  >(
+    startingAt index: Index, copyingAll source: borrowing I
+  ) -> Index where I.Element == Element, I.Failure == Never {
+    var index = index
+    updateElements(startingAt: &index, copyingAll: source)
+    return index
+  }
+
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// elements from an iterator.
+  ///
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
+  ///
+  /// If reading from `source` throws an error, the elements copied before
+  /// the error occurred remain in this span, and `index` is updated to
+  /// the index after the last element updated before the error.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to start copying. It must be a valid
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
+  ///   - source: An iterator over the elements to copy into this span.
+  ///      On normal return, it is positioned after the last element copied.
+  /// - Throws: Any error thrown while reading from `source`.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
+  >(
+    startingAt index: inout Index, copyingFrom source: inout I
+  ) throws(I.Failure) where I.Element == Element {
+    _precondition(
+      UInt(bitPattern: index) <= UInt(bitPattern: _count),
+      "Index out of bounds"
+    )
+    while index < count {
+      let elements = try source.nextSpan(maxCount: count &- index)
+      if elements.isEmpty { break }
+      updateSubrange(
+        index ..< (index &+ elements.count), copying: elements
+      )
+      index &+= elements.count
+    }
+  }
+#endif // !SPAN_COMPATIBILITY_STUB
 }
 
 // MARK: sub-spans
@@ -740,7 +1074,11 @@ extension MutableSpan where Element: ~Copyable {
   mutating public func _mutatingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in _mutatingExtracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
@@ -786,7 +1124,11 @@ extension MutableSpan where Element: ~Copyable {
   consuming public func _consumingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Self(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in _consumingExtracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
@@ -1006,14 +1348,10 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the initial elements of this span,
@@ -1050,14 +1388,10 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of trailing elements.
@@ -1075,15 +1409,11 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of trailing elements.
@@ -1118,15 +1448,11 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the trailing elements of this span,
@@ -1148,16 +1474,12 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span containing the trailing elements of this span,
@@ -1200,16 +1522,12 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of initial elements.
@@ -1230,7 +1548,6 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
@@ -1238,9 +1555,6 @@ extension MutableSpan where Element: ~Copyable {
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 
   /// Returns a span over all but the specified number of initial elements.
@@ -1281,7 +1595,6 @@ extension MutableSpan where Element: ~Copyable {
   @export(implementation)
   @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
-#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
@@ -1289,9 +1602,6 @@ extension MutableSpan where Element: ~Copyable {
     let newCount = count &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, count: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
-#else
-    fatalError("Unsupported compiler")
-#endif
   }
 }
 
@@ -1313,4 +1623,4 @@ extension MutableSpan: Iterable where Element: ~Copyable {
     .init(self.span)
   }
 }
-#endif
+#endif // !SPAN_COMPATIBILITY_STUB

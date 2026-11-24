@@ -1,0 +1,5 @@
+module SubpartVec {
+  header "header.h"
+  requires cplusplus
+  export *
+}

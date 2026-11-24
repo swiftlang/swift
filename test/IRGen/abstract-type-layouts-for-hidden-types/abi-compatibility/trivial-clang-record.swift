@@ -89,7 +89,9 @@ import Library
 
 public func use(_ value: TrivialHiddenCStructWrapper)
     -> TrivialHiddenCStructWrapper {
-  passThrough(value)
+  var copy = value
+  copy = value
+  return passThrough(copy)
 }
 
 public func clientWrapperSize() -> Int {
@@ -118,6 +120,9 @@ let output = use(input)
 assert(output.hiddenCount == 42)
 assert(output.hiddenValue == 2.5)
 assert(output.visibleField == 100)
+assert(clientWrapperSize() == 24)
+assert(clientWrapperAlignment() == 8)
+assert(clientWrapperStride() == 24)
 assert(clientWrapperSize() == libraryWrapperSize())
 assert(clientWrapperAlignment() == libraryWrapperAlignment())
 assert(clientWrapperStride() == libraryWrapperStride())

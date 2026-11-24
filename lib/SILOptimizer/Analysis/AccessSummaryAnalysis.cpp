@@ -551,6 +551,18 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
       // uses. It only uses the address, it does not produce a new address.
       continue;
     }
+    case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+    case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst: {
+      // Look through the move-only wrapper cast. A copyable 'consuming'
+      // value is stored as $@moveOnly, so field projections follow the cast.
+      auto projection =
+          getSingleAddressProjectionUser(cast<SingleValueInstruction>(User));
+      if (!projection.first)
+        return std::make_pair(nullptr, 0);
+      SingleUser = projection.first;
+      ProjectionIndex = projection.second;
+      break;
+    }
     default:
       return std::make_pair(nullptr, 0);
     }
@@ -594,7 +606,7 @@ SILType AccessSummaryAnalysis::getSubPathType(SILType baseType,
 
   SILType iterType = baseType;
   for (unsigned index : llvm::reverse(reversedIndices)) {
-    if (StructDecl *decl = iterType.getStructOrBoundGenericStruct()) {
+    if (StructDecl *decl = iterType.getStructDecl()) {
       VarDecl *var = decl->getStoredProperties()[index];
       iterType = iterType.getFieldType(var, mod, context);
       continue;
@@ -633,7 +645,7 @@ std::string AccessSummaryAnalysis::getSubPathDescription(
   for (unsigned index : llvm::reverse(reversedIndices)) {
     os << ".";
 
-    if (StructDecl *D = containingType.getStructOrBoundGenericStruct()) {
+    if (StructDecl *D = containingType.getStructDecl()) {
       VarDecl *var = D->getStoredProperties()[index];
       os << var->getBaseName();
       containingType = containingType.getFieldType(var, M, context);

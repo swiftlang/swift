@@ -55,3 +55,13 @@ module ObjCAsyncNonTrivialCxx {
   requires objc
   requires cplusplus
 }
+
+module CFReturnsRetained {
+  header "cf-returns-retained.h"
+  requires cplusplus
+}
+
+module CFInheritedMembers {
+  header "cf-inherited-members.h"
+  requires cplusplus
+}

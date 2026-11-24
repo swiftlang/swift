@@ -395,10 +395,15 @@ bool Implementation::gatherUses(SILValue value) {
       // since the control flow is significant, and we can't destructure through
       // the switch dispatch. If the final pattern match ends up destructuring
       // the value, then SILGen emits that as a separate access.
-      if (auto switchEnum = dyn_cast<SwitchEnumInst>(nextUse->getUser())) {
+      //
+      // Likewise treat opening a borrowed existential as a full liveness use of
+      // the existential: its payload is not part of the existential's type
+      // tree, so we can't destructure through it.
+      if (isa<SwitchEnumInst>(nextUse->getUser()) ||
+          (isa<OpenExistentialValueInst>(nextUse->getUser()) &&
+           isa<BeginBorrowInst>(nextUse->get()))) {
         SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
-        TypeTreeLeafTypeRange::get(&switchEnum->getOperandRef(), getRootValue(),
-                                   leafRanges);
+        TypeTreeLeafTypeRange::get(nextUse, getRootValue(), leafRanges);
         if (!leafRanges.size()) {
           LLVM_DEBUG(llvm::dbgs() << "        Failed to compute leaf range?!\n");
           return false;
@@ -416,7 +421,7 @@ bool Implementation::gatherUses(SILValue value) {
         instToInterestingOperandIndexMap.insert(nextUse->getUser(), nextUse);
         continue;
       }
-    
+
       // Look through guaranteed forwarding if we have at least one non-trivial
       // value. If we have all non-trivial values, treat this as a liveness use.
       SmallVector<SILValue, 8> forwardedValues;
@@ -1116,24 +1121,23 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
                                  borrow);
       return true;
     });
-  } else if (auto swi = dyn_cast<SwitchEnumInst>(op->getUser())) {
-    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch:\n"
+  } else if (isa<SwitchEnumInst>(op->getUser()) ||
+             isa<OpenExistentialValueInst>(op->getUser())) {
+    LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow for switch or opened "
+                               "existential:\n"
                                "    ";
-               swi->print(llvm::dbgs()));
+               op->getUser()->print(llvm::dbgs()));
     // End the borrow where the original borrow of the subject was ended.
-    // TODO: handle if the switch isn't directly on a borrow?
-    auto beginBorrow = cast<BeginBorrowInst>(swi->getOperand());
-    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
-    BorrowingOperand(&beginBorrow->getOperandRef())
-      .visitScopeEndingUses([&](Operand *endScope) -> bool {
-        auto *endScopeInst = endScope->getUser();
-        LLVM_DEBUG(llvm::dbgs() << "       ";
-                   endScopeInst->print(llvm::dbgs()));
-        SILBuilderWithScope endBuilder(endScopeInst);
-        endBuilder.createEndBorrow(getSafeLoc(endScopeInst),
-                                   borrow);
-        return true;
-      });
+    auto borrowedValue = getSingleBorrowIntroducingValue(op->get());
+    // FIXME: ignoring the visitLocalScopeEndingUses result ignores unknown
+    // uses.
+    borrowedValue.visitLocalScopeEndingUses([&](Operand *endScope) -> bool {
+      auto *endScopeInst = endScope->getUser();
+      LLVM_DEBUG(llvm::dbgs() << "       "; endScopeInst->print(llvm::dbgs()));
+      SILBuilderWithScope endBuilder(endScopeInst);
+      endBuilder.createEndBorrow(getSafeLoc(endScopeInst), borrow);
+      return true;
+    });
   } else {
     auto *nextInst = op->getUser()->getNextInstruction();
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after momentary use at: ";
@@ -1141,7 +1145,6 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
     SILBuilderWithScope endBuilder(nextInst);
     endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
   }
-  
 }
 
 void Implementation::rewriteUses(InstructionDeleter *deleter) {
@@ -1362,7 +1365,12 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 operand.getOperandOwnership() == OperandOwnership::TrivialUse) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
-              goto update_operand;
+            } else if (operand.getOperandOwnership() ==
+                       OperandOwnership::GuaranteedForwarding) {
+              // For guaranteed forwarding terminators, the borrow must be
+              // extended to outlive transitive uses of the forwarded values, so
+              // call insertEndBorrowsForNonConsumingUse as normal.
+              insertEndBorrowsForNonConsumingUse(&operand, borrow);
             } else {
               // Otherwise, put the end_borrow.
               for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -1370,12 +1378,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 SILBuilderWithScope endBuilder(nextInst);
                 endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
               }
-              goto update_operand;
             }
+          } else {
+            insertEndBorrowsForNonConsumingUse(&operand, borrow);
           }
 
-          insertEndBorrowsForNonConsumingUse(&operand, borrow);
-update_operand:
           // We update the operand after placing end_borrows, since we might
           // need the original operand's lifetime to correctly delineate the
           // new lifetime, such as if there is an InteriorPointerOperand.
@@ -1525,6 +1532,43 @@ void Implementation::cleanup() {
 //                   MARK: Borrow and SwitchEnum Gathering
 //===----------------------------------------------------------------------===//
 
+/// Whether \p bbi is borrowed only so that its value can be copied into a
+/// `mark_unresolved_non_copyable_value [no_consume_or_assign]`.
+///
+/// SILGen emits this for the pattern variables that a `where` clause borrows
+/// from the subject of a `switch consume` while it evaluates the condition. The
+/// mark is checked on its own, and eraseMarkWithCopiedOperand replaces the copy
+/// with the borrow once it has been checked. There is nothing to destructure.
+/// Converting such a borrow would turn the copy into a copy of the owned value
+/// and the mark into a consume of that copy, which the checker rejects when the
+/// owned value is consumed afterwards by the case body.
+static bool isBorrowOfNoConsumeCopiesOnly(BeginBorrowInst *bbi) {
+  if (!bbi->isFixed())
+    return false;
+
+  bool foundCopy = false;
+  for (auto *use : bbi->getUses()) {
+    auto *user = use->getUser();
+    if (isa<EndBorrowInst>(user))
+      continue;
+
+    auto *cvi = dyn_cast<CopyValueInst>(user);
+    if (!cvi)
+      return false;
+    auto *copyUse = cvi->getSingleUse();
+    if (!copyUse)
+      return false;
+    auto *mark =
+        dyn_cast<MarkUnresolvedNonCopyableValueInst>(copyUse->getUser());
+    if (!mark ||
+        mark->getCheckKind() !=
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
+      return false;
+    foundCopy = true;
+  }
+  return foundCopy;
+}
+
 /// Visit all of the uses of \p mmci and find all begin_borrows.
 ///
 /// Returns false if we found an escape and thus cannot process. It is assumed
@@ -1601,6 +1645,11 @@ static bool gatherBorrows(SILValue rootValue,
       continue;
     case OperandOwnership::Borrow:
       if (auto *bbi = dyn_cast<BeginBorrowInst>(use->getUser())) {
+        if (isBorrowOfNoConsumeCopiesOnly(bbi)) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "    Skipping borrow of no-consume copies: " << *bbi);
+          continue;
+        }
         LLVM_DEBUG(llvm::dbgs() << "    Found borrow: " << *bbi);
         borrowWorklist.push_back(bbi);
       }

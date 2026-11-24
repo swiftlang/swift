@@ -512,14 +512,14 @@ private func getHash(
     }
     hasher.combine(ObjectIdentifier(BuiltinInst.self))
     hasher.combine(bi.name._bridged.data)
-    hasher.combine(bi.substitutionMap.hasAnySubstitutableParams)
+    hasher.combine(bi.substitutionMap.isEffectivelyGeneric)
     for op in bi.operands {
       hasher.combine(op.value.hashable)
     }
 
   case let emi as ExistentialMetatypeInst:
-    // Only CSE the value-operand form; the address form is not safe.
-    if emi.operand.value.type.isAddress {
+    // COM metadata queries execute foreign code, and the address form reads mutable storage.
+    if emi.mayHaveSideEffects || emi.operand.value.type.isAddress {
       return nil
     }
     hasher.combine(ObjectIdentifier(ExistentialMetatypeInst.self))

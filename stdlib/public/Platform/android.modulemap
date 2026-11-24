@@ -543,6 +543,10 @@ module android_apis [system] {
     header "android/log.h"
     export *
   }
+  explicit module system_properties {
+    header "sys/system_properties.h"
+    export *
+  }
   explicit module trace {
     header "android/trace.h"
     export *

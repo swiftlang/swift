@@ -620,6 +620,11 @@ public:
 
   bool isBorrowAccessorResult() const;
 
+  /// Returns true if this is a value yielded with a guaranteed convention by a
+  /// begin_apply, i.e. a value that the coroutine has lent to us and which we
+  /// therefore only borrow.
+  bool isGuaranteedCoroutineYield() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -728,9 +733,7 @@ public:
   }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  ///
-  /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership() const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1060,6 +1063,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// A formal SIL reference to a value, suitable for use as a stored
@@ -1109,7 +1113,8 @@ public:
   Operand(SILInstruction *owner, SILValue theValue)
       : TheValue(theValue), Owner(owner),
         customBits(0), lastInitializedBitfieldID(0) {
-    insertIntoCurrent();
+    if (theValue)
+      insertIntoCurrent();
   }
 
   /// Operands are not copyable.
@@ -1673,14 +1678,6 @@ namespace llvm {
 
   // Values hash just like pointers.
   template<> struct DenseMapInfo<swift::SILValue> {
-    static swift::SILValue getEmptyKey() {
-      return swift::SILValue::getFromOpaqueValue(
-                                      llvm::DenseMapInfo<void*>::getEmptyKey());
-    }
-    static swift::SILValue getTombstoneKey() {
-      return swift::SILValue::getFromOpaqueValue(
-                                  llvm::DenseMapInfo<void*>::getTombstoneKey());
-    }
     static unsigned getHashValue(swift::SILValue V) {
       return DenseMapInfo<swift::ValueBase *>::getHashValue(V);
     }

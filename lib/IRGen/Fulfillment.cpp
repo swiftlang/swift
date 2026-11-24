@@ -90,12 +90,6 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Struct:
     return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
-  // Bound generic types have type arguments.
-  case TypeKind::BoundGenericClass:
-  case TypeKind::BoundGenericEnum:
-  case TypeKind::BoundGenericStruct:
-    return false;
-
   // Functions have component types.
   case TypeKind::Function:
   case TypeKind::GenericFunction:  // included for future-proofing
@@ -165,6 +159,11 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
 
+  // Dynamic Self has no metadata of its own, so it can't fulfill anything.
+  // It can appear as a generic argument, e.g. in the metadata for S<Self>.
+  if (isa<DynamicSelfType>(type))
+    return false;
+
   // If this is an exact source, and it's an interesting type, add this
   // as a fulfillment.
   if (isExact && keys.isInterestingType(type)) {
@@ -210,7 +209,7 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
 
   // Inexact metadata will be a problem if we ever try to use this
   // to remember that we already have the metadata for something.
-  if (isa<NominalType>(type) || isa<BoundGenericType>(type)) {
+  if (isa<NominalType>(type)) {
     return searchNominalTypeMetadata(IGM, type, metadataState,
                                      source, std::move(path), keys);
   }

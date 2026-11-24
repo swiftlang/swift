@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -enable-experimental-feature Embedded -parse-as-library -c -o %t/main.o
-// RUN: %target-clang -x c -c %S/Inputs/bridge-object-retain-caller.c -o %t/caller.o
+// RUN: %target-clang -x c -c %S/Inputs/refcount-shims.c -o %t/caller.o
 // RUN: %target-embedded-link %target-clang-resource-dir-opt %t/main.o %t/caller.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
@@ -21,7 +21,7 @@
 // result reads as a large String whose storage pointer is the small String's
 // count/discriminator payload.
 
-@_silgen_name("call_swift_bridgeObjectRetain")
+@_silgen_name("test_bridgeObjectRetain")
 func call_swift_bridgeObjectRetain(_ object: UInt64) -> UInt64
 
 /// The bridge-object word of a String's underlying _StringObject.

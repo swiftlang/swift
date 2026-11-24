@@ -30,3 +30,5 @@ func checkSendableRef(k: borrowing SendableKlass) {
   takesSendable(SendableKlass.self) // Ok
   takesSendable(k.test) // Ok
 }
+
+takesSendable(MainActorStruct.self)

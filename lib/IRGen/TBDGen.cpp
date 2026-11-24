@@ -200,7 +200,7 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-    llvm::MemoryBuffer::getFile(FileName);
+      Ctx.SourceMgr.getFileSystem()->getBufferForFile(FileName);
   if (!FileBufOrErr) {
     Ctx.Diags.diagnose(SourceLoc(), diag::previous_installname_map_missing,
                        FileName);
@@ -210,7 +210,7 @@ TBDGenVisitor::parsePreviousModuleInstallNameMap() {
 
   // Use a new source manager instead of the one from ASTContext because we
   // don't want the Json file to be persistent.
-  SourceManager SM;
+  SourceManager SM(Ctx.SourceMgr.getFileSystem());
   yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, FileName),
                       SM.getLLVMSourceMgr());
   for (auto DI = Stream.begin(); DI != Stream.end(); ++ DI) {
@@ -429,10 +429,19 @@ bool TBDGenVisitor::willVisitDecl(Decl *D) {
   if (!D->isAvailableDuringLowering())
     return false;
 
-  // A @_silgen_name("...") function without a body only exists to
+  // A @_silgen_name("...") or @_extern function without a body only exists to
   // forward-declare a symbol from another library.
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
-    if (!AFD->hasBody() && AFD->getAttrs().hasAttribute<SILGenNameAttr>())
+    if (!AFD->hasBody() && (AFD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+                            AFD->getAttrs().hasAttribute<ExternAttr>()))
+      return false;
+
+  // Likewise for a @_silgen_name("...") or @_extern(c) global variable without
+  // an initial value. Computed properties never have one, so they don't count.
+  if (auto VD = dyn_cast<VarDecl>(D))
+    if (VD->isGlobalStorage() && !VD->hasInitialValue() &&
+        (VD->getAttrs().hasAttribute<SILGenNameAttr>() ||
+         ExternAttr::find(VD->getAttrs(), ExternKind::C)))
       return false;
 
   DeclStack.push_back(D);
@@ -463,6 +472,17 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
+  // A @_silgen_name("...") variable's storage uses that name, as in
+  // SILGenModule::getSILGlobalVariable.
+  auto silgenName = VD->getAttrs().getAttribute<SILGenNameAttr>();
+  if (silgenName && !silgenName->Name.empty()) {
+    std::string name = silgenName->Name.str();
+    if (silgenName->Raw)
+      name = "\1" + name;
+    addSymbol(name, SymbolSource::forGlobal(VD), SymbolFlags::Data);
+    return;
+  }
+
   Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
@@ -514,6 +534,10 @@ void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
 }
 
 void TBDGenVisitor::addFirstFileSymbols() {
+  // Embedded Swift does not use force-load symbols.
+  if (SwiftModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
   if (!Opts.ModuleLinkName.empty()) {
     // FIXME: We ought to have a symbol source for this.
     SmallString<32> buf;
@@ -530,6 +554,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
   opts.WitnessMethodElimination = Opts.WitnessMethodElimination;
   opts.VirtualFunctionElimination = Opts.VirtualFunctionElimination;
   opts.FragileResilientProtocols = Opts.FragileResilientProtocols;
+  opts.RelativeProtocolWitnessTables = Opts.RelativeProtocolWitnessTables;
 
   auto silVisitorCtx = SILSymbolVisitorContext(SwiftModule, opts);
   auto visitorCtx = IRSymbolVisitorContext{UniversalLinkInfo, silVisitorCtx};
@@ -695,6 +720,14 @@ class APIGenRecorder final : public APIRecorder {
     // should be SPIs.
     if (module->getLibraryLevel() < swift::LibraryLevel::API)
       return true;
+
+    // Symbols that belong to an extension itself are SPI if the extended
+    // nominal type is SPI, e.g. the conformance descriptors, witness tables
+    // and witness thunks of the conformances it declares.
+    if (auto *ext = dyn_cast<ExtensionDecl>(decl))
+      if (auto *nominal = ext->getExtendedNominal())
+        if (isSPI(nominal))
+          return true;
 
     if (auto value = dyn_cast<ValueDecl>(decl)) {
       auto accessScope =

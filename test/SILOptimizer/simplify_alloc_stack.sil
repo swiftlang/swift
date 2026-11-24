@@ -194,6 +194,42 @@ bb3:
   return %11 : $()
 }
 
+sil [ossa] @borrow_t_c : $@convention(method) (@in_guaranteed T) -> @guaranteed_address C
+
+// The payload is passed to a borrow accessor, and the accessor result is loaded in a later block which destroys the
+// payload and injects the no-payload case. The load is within the payload's lifetime, so the uses of the accessor
+// result don't prevent the optimization.
+//
+// CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_borrow_accessor_result :
+// CHECK:         [[A:%[0-9]+]] = alloc_stack $T
+// CHECK:         [[R:%[0-9]+]] = apply {{%[0-9]+}}([[A]])
+// CHECK:       bb1:
+// CHECK-NEXT:    load [copy] [[R]]
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'expand_alloc_stack_of_enum_borrow_accessor_result'
+sil [ossa] @expand_alloc_stack_of_enum_borrow_accessor_result : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  %3 = copy_value %0
+  store %3 to [init] %2
+  inject_enum_addr %1, #Optional.some!enumelt
+  %6 = unchecked_inplace_enum_data_addr %1, #Optional.some!enumelt
+  %7 = function_ref @borrow_t_c : $@convention(method) (@in_guaranteed T) -> @guaranteed_address C
+  %8 = apply %7(%6) : $@convention(method) (@in_guaranteed T) -> @guaranteed_address C
+  br bb1
+
+bb1:
+  %10 = load [copy] %8
+  destroy_value %10
+  destroy_addr %1
+  inject_enum_addr %1, #Optional.none!enumelt
+  destroy_addr %1
+  dealloc_stack %1
+  %16 = tuple ()
+  return %16
+}
+
 // CHECK-LABEL: sil [ossa] @different_cases_same_payload_type :
 // CHECK:         alloc_stack $S
 // CHECK:       } // end sil function 'different_cases_same_payload_type'

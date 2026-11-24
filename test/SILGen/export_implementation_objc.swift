@@ -1,0 +1,12 @@
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs) %s | %FileCheck %s
+// REQUIRES: objc_interop
+
+import Foundation
+
+@objc public class Horse : NSObject {
+  @export(implementation) @objc public dynamic var height: Int { 14 }
+}
+
+// CHECK-LABEL: sil private [thunk] [export_implementation] [ossa] @$s26export_implementation_objc5HorseC6heightSivgTo : $@convention(objc_method) (Horse) -> Int {
+// CHECK-LABEL: sil non_abi [serialized] [export_implementation] [ossa] @$s26export_implementation_objc5HorseC6heightSivg : $@convention(method) (@guaranteed Horse) -> Int {

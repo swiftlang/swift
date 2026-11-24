@@ -54,8 +54,8 @@ struct StructHoldingOutlined<T> {
 
 func foo() {}
 
-//   helper function: __swift_instantiateConcreteTypeFromMangledName
-// CHECK-LABEL: define {{.*}} @__swift_instantiateConcreteTypeFromMangledName(
+//   helper function: __swift_instantiateConcreteTypeFromMangledNameV2
+// CHECK-LABEL: define {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2(
 // CHECK-SAME: [[ATTRS_NOINLINE_READONLY_NOUNWIND_NOFRAME:#[0-9]+]]
 
 func use_metadata() -> Any.Type {

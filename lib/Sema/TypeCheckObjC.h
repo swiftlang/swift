@@ -131,6 +131,7 @@ private:
     case Accessor:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
 public:

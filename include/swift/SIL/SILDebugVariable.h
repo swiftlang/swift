@@ -35,6 +35,10 @@ inline llvm::hash_code hash_value(const SILDebugVariable &P);
 struct SILDebugVariable {
   friend llvm::hash_code hash_value(const SILDebugVariable &P);
 
+  /// The name of the artificial variable that stands for a function's
+  /// error-result slot, so the debugger can display the in-flight error.
+  static constexpr StringLiteral ErrorVariableName = "$error";
+
   StringRef Name;
   unsigned ArgNo : 16;
   unsigned Constant : 1;
@@ -79,9 +83,9 @@ struct SILDebugVariable {
   /// or nullptr if we don't have one.
   VarDecl *getDecl() const;
 
-  // We're not comparing DIExpr here because strictly speaking,
-  // DIExpr is not part of the debug variable. We simply piggyback
-  // it in this class so that's it's easier to carry DIExpr around.
+  // DIExpr is compared (and hashed) so that, e.g., different fragments of the
+  // same source variable are distinct keys.  Use withoutDIExpr() to compare
+  // just the underlying variable.
   bool operator==(const SILDebugVariable &V) const {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Type == V.Type && Loc == V.Loc && Scope == V.Scope &&
@@ -97,6 +101,9 @@ struct SILDebugVariable {
   bool isLet() const { return Name.size() && Constant; }
 
   bool isVar() const { return Name.size() && !Constant; }
+
+  /// Whether this is the artificial `$error` variable.
+  bool isErrorVariable() const { return Name == ErrorVariableName; }
 };
 
 /// Returns the hashcode for the new projection path.

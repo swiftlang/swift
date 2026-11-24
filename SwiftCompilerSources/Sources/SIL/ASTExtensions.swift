@@ -43,6 +43,12 @@ extension CanonicalType {
     precondition(isBox)
     return BoxFieldsArray(boxType: self, function: function)
   }
+
+  public func isTrivial(in function: Function) -> Bool {
+    let t = hasTypeParameter ? function.mapTypeIntoEnvironment(rawType).canonical
+                             : self
+    return t.loweredType(in: function).isTrivial(in: function)
+  }
 }
 
 extension Decl {
@@ -52,6 +58,14 @@ extension Decl {
 extension NominalTypeDecl {
   public func isResilient(in function: Function) -> Bool {
     function.bridged.isResilientNominalDecl(bridged)
+  }
+}
+
+extension EnumDecl {
+  /// True if all cases of this enum are known in `function`, i.e. it cannot gain cases in a future
+  /// version of its module.
+  public func isEffectivelyExhaustive(in function: Function) -> Bool {
+    function.bridged.isEffectivelyExhaustiveEnumDecl(bridged)
   }
 }
 
@@ -75,6 +89,13 @@ extension SubstitutionMap {
   public func getMethodSubstitutions(for method: Function, selfType: CanonicalType? = nil) -> SubstitutionMap {
     return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged,
                                                                           selfType?.bridged ?? BridgedCanType()))
+  }
+
+  /// Returns true if at least one replacement type of this substitution map (partially)
+  /// contains the corresponding replacement type of `other`.
+  /// Both substitution maps must have the same generic signature.
+  public func isGrowing(comparedTo other: SubstitutionMap) -> Bool {
+    return SubstitutionMap_isGrowing(bridged, other.bridged)
   }
 }
 

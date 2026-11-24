@@ -1098,15 +1098,22 @@ struct ConcurrencyStandardTypeDescriptors {
 /// is the conformance of that type to the GlobalActor protocol.
 typedef SWIFT_CC(swift) bool (*IsCurrentGlobalActor)(const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
+/// Function that determines whether a distributed actor instance is a 'remote'
+/// proxy. Remote proxies are allocated without storage for user-defined stored
+/// properties, so reflection must not read them.
+typedef SWIFT_CC(swift) bool (*IsDistributedActorRemote)(HeapObject *);
+
 /// Register various concurrency-related data and hooks needed in the Swift
 /// standard library / runtime. This includes type descriptors with standard
 /// manglings from the Concurrency runtime as well as a hook to check whether
-/// we are running on a specific global actor. Any pointers passed in here must
-/// be immortal.
+/// we are running on a specific global actor, and a hook to check whether a
+/// distributed actor instance is a remote proxy. Any pointers passed in here
+/// must be immortal.
 SWIFT_RUNTIME_STDLIB_SPI
 void _swift_registerConcurrencyRuntime(
     const ConcurrencyStandardTypeDescriptors *descriptors,
-    IsCurrentGlobalActor isCurrentGlobalActor);
+    IsCurrentGlobalActor isCurrentGlobalActor,
+    IsDistributedActorRemote isDistributedActorRemote);
 
 /// Initialize the value witness table for a struct using the provided like type
 /// as the basis for the layout.

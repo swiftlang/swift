@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-diagnose-valid-salvage -verify-additional-prefix salvage- -swift-version 5
-// RUN: %target-typecheck-verify-swift -solver-disable-diagnose-valid-salvage -swift-version 5
-
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -swift-version 5
 // REQUIRES: objc_interop
 
 // Note this cannot use the mock SDK Foundation because it lacks required
@@ -104,6 +102,18 @@ extension CGFloat {
   static let y: Double = 0
 }
 
+func testMinMax() {
+  func f1(x: CGFloat) -> Double? {
+    // FIXME: Broken with -solver-enable-promote-supertypes
+    return max(0, min(1, x))
+    // expected-error@-1 {{failed to produce diagnostic for expression; please submit a bug report}}
+  }
+
+  func f2(x: Double) -> CGFloat? {
+    return max(0, min(1, x))
+  }
+}
+
 // FIXME: This is all completely broken.
 func testLeadingDotAmbiguity() {
   func f1(_: CGFloat, _: CGFloat) {}
@@ -127,14 +137,14 @@ func testLeadingDotAmbiguity() {
   func f16(_: CGFloat?, _: Double?) {}
 
   func test1(z: Double) {
-    f1(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f2(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f3(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f4(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f5(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f6(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f7(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f8(max(.x, z), max(.y, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f1(max(.x, z), max(.y, z))
+    f2(max(.x, z), max(.y, z))
+    f3(max(.x, z), max(.y, z))
+    f4(max(.x, z), max(.y, z))
+    f5(max(.x, z), max(.y, z))
+    f6(max(.x, z), max(.y, z))
+    f7(max(.x, z), max(.y, z))
+    f8(max(.x, z), max(.y, z))
     f9(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f10(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.x, z), max(.y, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -146,10 +156,10 @@ func testLeadingDotAmbiguity() {
   }
 
   func test2(z: Double) {
-    f1(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f2(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f3(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f4(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f1(max(.y, z), max(.x, z))
+    f2(max(.y, z), max(.x, z))
+    f3(max(.y, z), max(.x, z))
+    f4(max(.y, z), max(.x, z))
     f5(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f6(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f7(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
@@ -158,10 +168,10 @@ func testLeadingDotAmbiguity() {
     f10(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f11(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
     f12(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f13(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f14(max(.y, z), max(.x, z))  // expected-error {{type 'Double' has no member 'y'}}
-    f15(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
-    f16(max(.y, z), max(.x, z))  // expected-salvage-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    f13(max(.y, z), max(.x, z))
+    f14(max(.y, z), max(.x, z))
+    f15(max(.y, z), max(.x, z))
+    f16(max(.y, z), max(.x, z))
   }
 }
 
@@ -227,4 +237,34 @@ func test_unapplied_3(_ blobs: [Blob]) {
 
   let _: CGFloat = blobs.map { $0.circumference }.reduce(0, +)
   let _: CGFloat = blobs.map { $0.circumference }.reduce(0.0, +)
+}
+
+func f1(_ value: Double) -> Double { return value }
+func f1(_ value: CGFloat) -> CGFloat { return value }
+
+func f2(_ value: UInt) -> UInt { return value }
+func f2(_ value: Double) -> Double { return value }
+func f2(_ value: CGFloat) -> CGFloat { return value }
+
+func g(_: Double, _: Double) {}
+func g(_: CGFloat, _: CGFloat) {}
+
+func testAmbiguousOverloads(x: UInt, y: CGFloat, z: Double) {
+  g(y, f1(CGFloat(x)))
+  g(z, f1(CGFloat(x)))
+  g(y, f1(Double(x)))
+  g(z, f1(Double(x)))
+  g(y, f1(y))
+  g(z, f1(z))
+  g(y, f1(z))
+  g(z, f1(y))
+
+  g(y, f2(CGFloat(x)))
+  g(z, f2(CGFloat(x)))
+  g(y, f2(Double(x)))
+  g(z, f2(Double(x)))
+  g(y, f2(y))
+  g(z, f2(z))
+  g(y, f2(z))
+  g(z, f2(y))
 }

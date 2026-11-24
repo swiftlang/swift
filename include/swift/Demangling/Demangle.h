@@ -135,6 +135,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ConstantPropStruct = 10,
   ClosurePropPreviousArg = 11,
   EscapingClosureProp = 12,
+  DifferentiableFunctionProp = 13,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -717,6 +718,7 @@ struct [[nodiscard]] ManglingError {
     MultiByteRelatedEntity,
     BadValueWitnessKind,
     NotAContextNode,
+    InvalidIdentifier,
   };
 
   Code        code;

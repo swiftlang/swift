@@ -14,9 +14,32 @@
 #include "swift/Basic/SourceManager.h"
 #include "clang/Basic/SourceManager.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 
 using namespace swift;
 using namespace swift::importer;
+
+/// Pick a virtual file name for a mirrored buffer that does not depend on how
+/// the file's path happened to be spelled at this point of use.
+static StringRef getStableVirtualFileName(StringRef presumedFile,
+                                          StringRef bufferIdentifier) {
+  if (presumedFile == bufferIdentifier)
+    return bufferIdentifier;
+
+  namespace path = llvm::sys::path;
+  SmallString<128> presumed{presumedFile};
+  SmallString<128> buffered{bufferIdentifier};
+  path::remove_dots(presumed, /*remove_dot_dot=*/true);
+  path::remove_dots(buffered, /*remove_dot_dot=*/true);
+
+  std::string presumedSlashes = path::convert_to_slash(presumed);
+  std::string bufferedSlashes = path::convert_to_slash(buffered);
+  bool sameFile =
+      path::is_style_windows(path::Style::native)
+          ? StringRef(presumedSlashes).equals_insensitive(bufferedSlashes)
+          : presumedSlashes == bufferedSlashes;
+  return sameFile ? bufferIdentifier : presumedFile;
+}
 
 static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
                                unsigned bufferID) {
@@ -73,7 +96,9 @@ SourceLoc ClangSourceBufferImporter::resolveSourceLocation(
   unsigned bufferLineNumber =
     clangSrcMgr.getLineNumber(decomposedLoc.first, decomposedLoc.second);
 
-  StringRef presumedFile = presumedLoc.getFilename();
+  StringRef presumedFile = getStableVirtualFileName(
+      presumedLoc.getFilename(),
+      swiftSourceManager.getIdentifierForBuffer(mirrorID));
   SourceLoc startOfLine = loc.getAdvancedLoc(-presumedLoc.getColumn() + 1);
 
   // FIXME: Virtual files can't actually model the EOF position correctly, so

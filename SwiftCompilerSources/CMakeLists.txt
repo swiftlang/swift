@@ -111,6 +111,11 @@ function(add_swift_compiler_modules_library name)
     endif()
   endforeach()
 
+  # FIXME: forward the C++ targets' other MSVC definitions here too, not just this one.
+  if(MSVC AND NOT LLVM_ENABLE_EH)
+    list(APPEND swift_compile_options "-Xcc" "-D_HAS_EXCEPTIONS=0")
+  endif()
+
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
       list(APPEND swift_compile_options
@@ -150,7 +155,13 @@ function(add_swift_compiler_modules_library name)
     list(APPEND swift_compile_options "-Xcc" "-DPURE_BRIDGING_MODE")
   endif()
 
-  if(NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
+  # LLVM_VERSION_MAJOR for Swift sources in the compiler, should they ever
+  # need it.
+  foreach(condition ${SWIFT_LLVM_VERSION_MAJOR_CONDITIONS})
+    list(APPEND swift_compile_options "-D${condition}")
+  endforeach()
+
+  if(DEFINED SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT AND NOT SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT)
     list(APPEND swift_compile_options "-Xfrontend" "-disable-legacy-type-info")
   endif()
 
@@ -194,6 +205,8 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+  # The host toolchain's lib/ when it's added to the search paths below.
+  set(host_toolchain_lib_dir "")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND swift_compile_options "-static")
@@ -220,6 +233,17 @@ function(add_swift_compiler_modules_library name)
     # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
     list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
 
+    # When LLVM is built as a DLL with clang-cl, its libraries are compiled with
+    # `/Zc:dllexportInlines-` (see `llvm_add_library` in AddLLVM.cmake). The
+    # C++ headers imported into Swift modules must be parsed with the same
+    # setting, otherwise the importer emits dllimport references to inline
+    # members that LLVM.dll does not export. `-fno-dllexport-inlines` is the
+    # cc1 spelling of that flag.
+    if(LLVM_BUILD_LLVM_DYLIB AND NOT LLVM_DYLIB_EXPORT_INLINES AND
+       MSVC AND CMAKE_CXX_COMPILER_ID MATCHES Clang)
+      list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fno-dllexport-inlines")
+    endif()
+
   elseif(swift_exec_bin_dir MATCHES ".*/swiftly/bin")
     # Detect and handle swiftly-managed hosts.
     execute_process(COMMAND swiftly use --print-location
@@ -231,10 +255,26 @@ function(add_swift_compiler_modules_library name)
     string(STRIP "${swiftly_dir}" swiftly_dir)
 
     list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
+    set(host_toolchain_lib_dir "${swiftly_dir}/usr/lib")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/lib")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+    set(host_toolchain_lib_dir "${swift_exec_bin_dir}/../lib")
+  endif()
+
+  # Subdirectory search over the host toolchain's lib/ finds the SwiftShims
+  # parent module maps in both swift/ and swift_static/ and redefines the
+  # module. Toolchains that have the parent module map don't need the search;
+  # older ones still rely on it. Darwin's driver already disables it.
+  if(NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND
+     host_toolchain_lib_dir AND
+     EXISTS "${host_toolchain_lib_dir}/swift/module.modulemap")
+    swift_supports_compiler_arguments(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH
+      -Xcc -fno-modulemap-allow-subdirectory-search)
+    if(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH)
+      list(APPEND swift_compile_options "-Xcc" "-fno-modulemap-allow-subdirectory-search")
+    endif()
   endif()
 
   set(all_obj_files)
@@ -370,7 +410,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.9)
+      set(min_supported_swift_version 6.2)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "

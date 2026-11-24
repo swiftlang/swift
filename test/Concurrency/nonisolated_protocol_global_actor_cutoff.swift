@@ -63,3 +63,35 @@ struct S2: NonisolatedRequirements {
   // expected-error@+1{{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
   var req = Req()
 }
+
+// Witnesses of an explicitly 'nonisolated' type don't take the isolation of
+// the requirements they satisfy.
+@MainActor
+protocol IsolatedMethodRequirement {
+  func req()
+}
+
+nonisolated struct G: IsolatedMethodRequirement {
+  func req() {}
+}
+
+protocol MainActorMethodRequirement {
+  @MainActor func req()
+}
+
+nonisolated struct H: MainActorMethodRequirement {
+  func req() {}
+}
+
+struct I: MainActorMethodRequirement {
+  // expected-note@+2{{calls to instance method 'req()' from outside of its actor context are implicitly asynchronous}}
+  // expected-note@+1{{main actor isolation inferred from conformance to protocol 'MainActorMethodRequirement'}}
+  func req() {}
+}
+
+nonisolated func probeNonisolatedTypes(g: G, h: H, i: I) {
+  g.req()
+  h.req()
+  // expected-error@+1{{call to main actor-isolated instance method 'req()' in a synchronous nonisolated context}}
+  i.req()
+}

@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AlwaysUnsafeAttribute
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // Uses of '@unsafe(always)' declarations must be acknowledged with 'unsafe'
 // even though strict memory safety checking is not enabled here.
@@ -38,7 +40,7 @@ func testTypeUses(value: AlwaysUnsafeType) {
   unsafe value.method()
 }
 
-// Only the always-unsafe use is reported in this language mode.
+// Only the always-unsafe use is reported, as with strict memory safety checking.
 @unsafe(always) func alwaysUnsafeValue() -> Int { 0 }
 
 @unsafe func unsafeValue() -> Int { 0 }
@@ -209,6 +211,68 @@ func testGenericArgumentOrder(x: Pair<MerelyUnsafeType, AlwaysUnsafeType>,
 
   _ = unsafe x
   _ = unsafe y
+}
+
+// -----------------------------------------------------------------------
+// Implicit conversions around the whole expression
+// -----------------------------------------------------------------------
+class AlwaysUnsafeBase { }
+@unsafe(always) class AlwaysUnsafeDerived: AlwaysUnsafeBase { override init() { } }
+
+func testErasureInReturn() -> Any {
+  return AlwaysUnsafeType()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeType'}}
+}
+
+func testOptionalInjectionInReturn() -> Int? {
+  alwaysUnsafeValue()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to unsafe global function 'alwaysUnsafeValue()'}}
+}
+
+func testUpcastInReturn() -> AlwaysUnsafeBase {
+  AlwaysUnsafeDerived()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeDerived'}}
+}
+
+func testConversionInInitializer() {
+  let _: Any = AlwaysUnsafeType()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to initializer 'init()' involves unsafe type 'AlwaysUnsafeType'}}
+
+  let _: () throws -> Void = alwaysUnsafeFunc
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to unsafe global function 'alwaysUnsafeFunc()'}}
+
+  let _: Any = unsafe AlwaysUnsafeType()
+  let _: () throws -> Void = unsafe alwaysUnsafeFunc
+}
+
+func testConversionInAssignment() {
+  var x: Int? = nil
+  x = alwaysUnsafeValue()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to unsafe global function 'alwaysUnsafeValue()'}}
+  x = unsafe alwaysUnsafeValue()
+  _ = x
+}
+
+struct HasAlwaysUnsafeMethod {
+  @unsafe(always) func value() -> Int { 0 }
+}
+
+func testOptionalChaining(h: HasAlwaysUnsafeMethod?) -> Int? {
+  _ = h?.value()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to unsafe instance method 'value()'}}
+
+  _ = unsafe h?.value()
+
+  return h?.value()
+  // expected-error@-1{{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}{{documentation-file=always-unsafe}}
+  // expected-note@-2{{reference to unsafe instance method 'value()'}}
 }
 
 // -----------------------------------------------------------------------

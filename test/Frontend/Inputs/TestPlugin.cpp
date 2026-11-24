@@ -25,7 +25,7 @@ void runTestPlugin(Function &F) {
   errs().write_escaped(F.getName()) << '\n';
 }
 
-struct TestPluginPass : PassInfoMixin<TestPluginPass> {
+struct TestPluginPass : OptionalPassInfoMixin<TestPluginPass> {
   PreservedAnalyses run(Function &F, FunctionAnalysisManager &) {
     runTestPlugin(F);
     return PreservedAnalyses::all();

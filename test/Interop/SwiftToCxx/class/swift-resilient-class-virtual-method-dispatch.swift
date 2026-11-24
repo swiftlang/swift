@@ -51,7 +51,7 @@
 // CHECK-NEXT:   }
 
 // CHECK:        BaseClass DerivedClass::virtualMethodInDerived(const BaseClass& x) noexcept {
-// CHECK-NEXT:   return _impl::_impl_BaseClass::makeRetained(Class::_impl::$s5Class07DerivedA0C015virtualMethodInB0yAA04BaseA0CAFFTj(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT:   return Class::_impl::_impl_BaseClass::makeRetained(Class::_impl::$s5Class07DerivedA0C015virtualMethodInB0yAA04BaseA0CAFFTj(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT:   }
 
 // CHECK:         swift::Int DerivedClass::getVirtualComputedProp() noexcept {
@@ -63,7 +63,7 @@
 // CHECK-NEXT:     }
 
 // CHECK:        BaseClass DerivedDerivedClass::virtualMethodInDerived(const BaseClass& x) noexcept {
-// CHECK-NEXT:     return _impl::_impl_BaseClass::makeRetained(Class::_impl::$s5Class07DerivedbA0C015virtualMethodInB0yAA04BaseA0CAFF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT:     return Class::_impl::_impl_BaseClass::makeRetained(Class::_impl::$s5Class07DerivedbA0C015virtualMethodInB0yAA04BaseA0CAFF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(x), ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT:     }
 
 // CHECK:        void DerivedDerivedClass::methodInDerivedDerived() noexcept {

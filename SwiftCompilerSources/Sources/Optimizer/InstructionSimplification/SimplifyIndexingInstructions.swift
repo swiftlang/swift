@@ -15,7 +15,14 @@ import SIL
 extension IndexAddrInst : Simplifiable, SILCombineSimplifiable {
 
   func simplify(_ context: SimplifyContext) {
-    if tryRemoveZeroIndex(context) {
+    if parentBlock.isDebugReconstructionBlock,
+       // This optimization is disabled (except in debug reconstruction blocks) to support old
+       // SDKs (swift < 6.5) where the stdlib doesn't use the UnsafePointer's `project` API for
+       // projecting array elements.
+       // Without `project` alias-analysis wouldn't detect detect potential aliasing of first
+       // array element addresses (where the index of `index_addr` is 0).
+       tryRemoveZeroIndex(context)
+    {
       return
     }
 
@@ -81,6 +88,18 @@ extension IndexAddrInst : Simplifiable, SILCombineSimplifiable {
   }
 }
 
+extension IndexAddrInst : DebugReconstructionBlockSimplifiable {
+  /// An undef base or index makes the whole address undef. Otherwise the regular
+  /// simplifications apply: `salvageDebugInfo` clones the index literal into the block, so
+  /// `index_addr %arg, (integer_literal 0)` is a shape it routinely produces.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+  }
+}
+
 extension IndexRawPointerInst : Simplifiable, SILCombineSimplifiable {
 
   func simplify(_ context: SimplifyContext) {
@@ -142,5 +161,15 @@ extension IndexRawPointerInst : Simplifiable, SILCombineSimplifiable {
     self.replace(with: newIndexRawPointer, context)
 
     return true
+  }
+}
+
+extension IndexRawPointerInst : DebugReconstructionBlockSimplifiable {
+  /// See `IndexAddrInst.simplifyForDebugReconstructionBlock`.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
   }
 }

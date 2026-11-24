@@ -13,11 +13,11 @@
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json F casFSRootID > %t/F_fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/F_fs.casid | %FileCheck %s -check-prefix FS_ROOT_F
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/F_fs.casid | %FileCheck %s -check-prefix FS_ROOT_F
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/Test_fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/Test_fs.casid | %FileCheck %s -check-prefix FS_ROOT_TEST
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/Test_fs.casid | %FileCheck %s -check-prefix FS_ROOT_TEST
 
 // FS_ROOT_E-NOT: layouts-{{.*}}.yaml
 // FS_ROOT_E: E.swiftinterface

@@ -59,6 +59,7 @@ convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
   case SILOptStrictConcurrency::Minimal:
     return StrictConcurrency::Minimal;
   }
+  llvm_unreachable("covered switch");
 }
 
 struct SILLLVMGenOptions {
@@ -478,6 +479,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
     if (!generatedMod)
       return 1;
 
+    generatedMod.getModule()->renumberMetadataForAssembly();
     generatedMod.getModule()->print(*outFile, nullptr);
     return 0;
   }

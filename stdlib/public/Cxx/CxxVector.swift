@@ -24,7 +24,8 @@ public protocol CxxVector<Element>: ExpressibleByArrayLiteral {
   mutating func push_back(_ element: Element)
 
   func size() -> Size
-  func __dataUnsafe() -> UnsafePointer<Element>?
+  @unsafe(always)
+  func data() -> UnsafePointer<Element>?
 }
 
 extension CxxVector {
@@ -56,9 +57,18 @@ extension CxxVector {
     @_lifetime(borrow self)
     @export(implementation)
     borrowing get {
-      let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
+      let buffer = unsafe UnsafeBufferPointer(start: self.data(), count: Int(self.size()))
       let span = unsafe Span(_unsafeElements: buffer)
       return unsafe _cxxOverrideLifetime(span, borrowing: self)
     }
+  }
+}
+
+extension CxxVector {
+  @available(*, deprecated, renamed: "data()")
+  @unsafe
+  @inlinable
+  public func __dataUnsafe() -> UnsafePointer<Element>? {
+    unsafe data()
   }
 }

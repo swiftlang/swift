@@ -271,7 +271,7 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
   if (!ty)
     return;
 
-  SmallPtrSet<TypeVariableType *, 4> typeVars;
+  SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   ty->getTypeVariables(typeVars);
   TypeVars.insert(typeVars.begin(), typeVars.end());
 }
@@ -279,7 +279,7 @@ void TypeVarRefCollector::inferTypeVars(Decl *D) {
 void TypeVarRefCollector::inferTypeVars(PackExpansionExpr *E) {
   auto expansionType = CS.getType(E)->castTo<PackExpansionType>();
 
-  SmallPtrSet<TypeVariableType *, 4> referencedVars;
+  SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
   expansionType->getTypeVariables(referencedVars);
   TypeVars.insert(referencedVars.begin(), referencedVars.end());
 }
@@ -336,9 +336,7 @@ TypeVarRefCollector::walkToStmtPre(Stmt *stmt) {
   if (auto *CE = dyn_cast<ClosureExpr>(DC)) {
     if (isa<ReturnStmt>(stmt) && DCDepth == 0 &&
         !Locator->directlyAt<ClosureExpr>()) {
-      SmallPtrSet<TypeVariableType *, 4> typeVars;
-      CS.getClosureType(CE)->getResult()->getTypeVariables(typeVars);
-      TypeVars.insert(typeVars.begin(), typeVars.end());
+      CS.getClosureType(CE)->getResult()->getTypeVariables(TypeVars);
     }
   }
   return Action::Continue(stmt);
@@ -379,7 +377,8 @@ namespace {
         if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
-        result.emplace_back(ty, arg.getLabel(), flags);
+        result.push_back(
+            AnyFunctionType::Param::bodyAccess(ty, arg.getLabel(), flags));
       }
     }
 
@@ -391,11 +390,12 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getType(), elt.getName());
+          result.push_back(
+              AnyFunctionType::Param::bodyAccess(elt.getType(), elt.getName()));
         return;
       }
       default:
-        result.emplace_back(ty, Identifier());
+        result.push_back(AnyFunctionType::Param::bodyAccess(ty, Identifier()));
       }
     }
 
@@ -709,8 +709,8 @@ namespace {
           IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(node)),
           FixImpact::InvalidAST);
 
-      // Ideally we wouldn't need a type variable here, but we don't have a
-      // suitable placeholder originator for all the cases here.
+      // Ideally we wouldn't need a type variable here, but it helps with
+      // diagnostics by allowing merging with generic parameter type vars.
       auto ty = CS.createTypeVariable(CS.getConstraintLocator(node),
                                       TVO_CanBindToHole);
       CS.recordTypeVariablesAsHoles(ty);
@@ -1058,7 +1058,7 @@ namespace {
       // If declaration is invalid, let's turn it into a potential hole
       // and keep generating constraints.
       // For code completion, we still resolve the overload and replace error
-      // types inside the function decl with placeholders
+      // types inside the function decl with holes
       // (in getTypeOfReference) so we can match non-error param types.
       if (!knownType && E->getDecl()->isInvalid() &&
           !CS.isForCodeCompletion()) {
@@ -1134,7 +1134,7 @@ namespace {
         CS.recordFix(
             IgnoreInvalidASTNode::create(CS, CS.getConstraintLocator(locator)));
 
-        return PlaceholderType::get(CS.getASTContext(), repr);
+        return HoleType::get(result);
       }
       // Diagnose top-level usages of placeholder types.
       if (auto *ty = dyn_cast<PlaceholderTypeRepr>(repr->getWithoutParens())) {
@@ -1406,7 +1406,7 @@ namespace {
           }
           CS.recordFix(IgnoreInvalidASTNode::create(
               CS, CS.getConstraintLocator(argLocator)));
-          result = PlaceholderType::get(ctx, specializationArg);
+          result = HoleType::get(result);
         }
         specializationArgTypes.push_back(result);
       }
@@ -1669,7 +1669,8 @@ namespace {
         if (numElements > 1) {
           bool isIniting =
               CS.getContextualTypePurpose(expr) == CTP_Initialization;
-          DE.diagnose(expr->getStartLoc(), diag::should_use_dictionary_literal,
+          DE.diagnose(expr->getStartLoc(),
+                      diag::should_use_dictionary_literal_not_array_literal,
                       contextualType->lookThroughAllOptionalTypes(), isIniting);
 
           auto diagnostic =
@@ -1927,13 +1928,13 @@ namespace {
 
             // If closure parameter couldn't be resolved, let's record
             // a fix to make sure that type resolution diagnosed the
-            // problem and replace it with a placeholder, so that solver
+            // problem and replace it with a hole, so that solver
             // can make forward progress (especially important for result
             // builders).
             if (declaredTy->hasError()) {
               CS.recordFix(AllowRefToInvalidDecl::create(
                   CS, CS.getConstraintLocator(param)));
-              declaredTy = PlaceholderType::get(CS.getASTContext(), param);
+              declaredTy = HoleType::get(declaredTy);
             }
 
             externalType = CS.replaceInferableTypesWithTypeVars(declaredTy,
@@ -1965,7 +1966,7 @@ namespace {
         // Explicitly-specified thrown type.
         if (closure->getExplicitThrownTypeRepr()) {
           if (Type explicitType = closure->getExplicitThrownType()) {
-            // The thrown type may have errors, open as placeholders if needed.
+            // The thrown type may have errors, open as holes if needed.
             return CS.replaceInferableTypesWithTypeVars(explicitType,
                                                         thrownErrorLocator);
           }
@@ -2433,14 +2434,9 @@ namespace {
         auto enumPattern = cast<EnumElementPattern>(pattern);
 
         // Create a type variable to represent the pattern.
-        //
-        // This type is contextually dependent in cases like `.a` where
-        // `patternType` represents an implicit base type of `.a` and so
-        // should be allowed to bind to a hole just like regular leading-dot
-        // syntax.
-        Type patternType =
+        auto *patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
+                                  TVO_CanBindToNoEscape);
 
         // Form the member constraint for a reference to a member of this
         // type.
@@ -2510,6 +2506,12 @@ namespace {
 
           baseType = parentType;
         } else {
+          // This type is contextually dependent in cases like `.a` where
+          // `patternType` represents an implicit base type of `.a` and so
+          // should be allowed to bind to a hole just like regular leading-dot
+          // syntax.
+          CS.recordPotentialHole(patternType);
+
           // Use the pattern type for member lookup.
           CS.addUnresolvedValueMemberConstraint(
               MetatypeType::get(patternType), enumPattern->getName(),
@@ -3338,7 +3340,7 @@ namespace {
           // resolved.
           if (args &&
               ctx.LangOpts.hasFeature(Feature::InferSendableFromCaptures)) {
-            SmallPtrSet<TypeVariableType *, 2> referencedVars;
+            SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
             for (const auto &arg : *args) {
               CS.getType(arg.getExpr())->getTypeVariables(referencedVars);
             }
@@ -3449,7 +3451,8 @@ namespace {
       // capability inference when there is no context.
       CS.addUnsolvedConstraint(Constraint::create(
           CS, ConstraintKind::FallbackType, kpTy,
-          BoundGenericType::get(kpDecl, /*parent=*/Type(), {root, value}),
+          NominalType::get(kpDecl, /*parent=*/Type(), {root, value},
+                           CS.getASTContext()),
           CS.getConstraintLocator(E, ConstraintLocator::FallbackType)));
 
       return kpTy;
@@ -4119,19 +4122,13 @@ bool ConstraintSystem::generateConstraints(
       convertType =
           convertType.transformRec([&](Type type) -> std::optional<Type> {
             auto *tyPtr = type.getPointer();
-            // Open a type variable for a placeholder type repr. Note we don't
-            // do this for arbitrary placeholders since they may be existing
-            // holes when e.g generating the constraints for a ReturnStmt in a
-            // closure.
+            // Open a type variable for a placeholder type.
             if (auto *placeholderTy = dyn_cast<PlaceholderType>(tyPtr)) {
-              auto originator = placeholderTy->getOriginator();
-              auto *typeRepr = originator.dyn_cast<TypeRepr *>();
-              if (!isa_and_nonnull<PlaceholderTypeRepr>(typeRepr))
-                return std::nullopt;
-
-              auto *loc = getConstraintLocator(
-                  convertTypeLocator,
-                  LocatorPathElt::PlaceholderType(typeRepr));
+              auto *loc = convertTypeLocator;
+              if (auto *repr = placeholderTy->getRepr()) {
+                loc = getConstraintLocator(
+                    loc, LocatorPathElt::PlaceholderType(repr));
+              }
               return createTypeVariable(loc, TVO_CanBindToNoEscape |
                                                  TVO_PrefersSubtypeBinding |
                                                  TVO_CanBindToHole);
@@ -4139,7 +4136,7 @@ bool ConstraintSystem::generateConstraints(
             // For ErrorTypes we want to eagerly produce a hole since we know
             // this is where the issue is.
             if (auto *errTy = dyn_cast<ErrorType>(tyPtr)) {
-              return PlaceholderType::get(getASTContext(), errTy);
+              return HoleType::get(errTy);
             }
             return std::nullopt;
           });
@@ -4269,6 +4266,7 @@ bool ConstraintSystem::generateConstraints(
     return false;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 Expr *ConstraintSystem::generateConstraints(Expr *expr, DeclContext *dc) {

@@ -176,8 +176,8 @@ RewriteSystem::decomposeTermIntoConformanceRuleLeftHandSides(
   // reduces to T in a single step, via a rule V.[P] => V, where
   // T == U.V.
   RewritePath steps;
-  bool simplified = simplify(term, &steps);
-  if (!simplified) {
+  bool wasReduced = reduce(term, &steps);
+  if (!wasReduced) {
     ABORT([&](auto &out) {
       out << "Term does not conform to protocol: " << term << "\n";
       dump(out);
@@ -553,7 +553,7 @@ void RewriteSystem::computeCandidateConformancePaths(
         //
         //   (Y.[P]) := (U.[domain(V)]) * (V.W.[P])
         //
-        // where Y is the simplified form of X.W.
+        // where Y is the normal form of X.W.
         } else if (rhs.isAnyConformanceRule() &&
                    !lhs.isSameElementRule() &&
                    (unsigned)(lhs.getLHS().end() - from) < rhs.getLHS().size()) {
@@ -578,9 +578,9 @@ void RewriteSystem::computeCandidateConformancePaths(
             llvm::dbgs() << "- X.W := " << xw << "\n";
           }
 
-          // Simplify X.W to Y.
+          // Reduce X.W to Y.
           MutableTerm y(xw);
-          (void) simplify(y);
+          (void) reduce(y);
 
           if (Debug.contains(DebugFlags::MinimalConformancesDetail)) {
             llvm::dbgs() << "- Y := " << y << "\n";
@@ -609,12 +609,12 @@ void RewriteSystem::computeCandidateConformancePaths(
           MutableTerm yp(y);
           yp.add(p);
 
-          // Simplify Y.[P] to Y. It must simplify to Y via a single
+          // Reduce Y.[P] to Y. It must reduce to Y via a single
           // rewrite step, but possibly via some other rule (Z.[P] => Z)
           // where Z is a suffix of Y. In this case, no equation
           // is recorded.
           RewritePath rewritePath;
-          bool result = simplify(yp, &rewritePath);
+          bool result = reduce(yp, &rewritePath);
           if (!result) {
             ABORT([&](auto &out) {
               out << "Does not conform to protocol: " << yp << "\n";
@@ -792,7 +792,7 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
     auto *proto = rule.getLHS().back().getProtocol();
 
     MutableTerm baseTerm(rule.getRHS());
-    (void) System.simplify(baseTerm);
+    (void) System.reduce(baseTerm);
 
     for (const auto &path : pair.second) {
       if (path.empty())
@@ -833,7 +833,7 @@ void MinimalConformances::verifyMinimalConformanceEquations() const {
         otherTerm.append(rule.getRHS());
       }
 
-      (void) System.simplify(otherTerm);
+      (void) System.reduce(otherTerm);
 
       if (baseTerm != otherTerm) {
         ABORT([&](auto &out) {

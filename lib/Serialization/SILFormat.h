@@ -210,7 +210,14 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
     SIL_EXTRA_STRING,
     SIL_DEBUG_RECONSTRUCTION_BLOCK,
+    SIL_STAGE,
   };
+
+  /// The module's SIL stage floor, written once at the head of the block, as a
+  /// single unabbreviated value. A function record carries its own stage, which
+  /// may be ahead of this one.
+  ///
+  /// The block has no abbrev ID left for this record. See writeSILBlock.
 
   using SILInstNoOperandLayout = BCRecordLayout<
     SIL_INST_NO_OPERAND,
@@ -373,9 +380,8 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
 
     SILTypeCategoryField, /// debug var type category
-    BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
-                          /// trace, hasDebugVar, isLet,
-                          /// isDenseMapSingleton(two bits), hasType,
+    BCFixed<9>,           /// hasReconstructionBlock, movableValueDebuginfo,
+                          /// trace, hasDebugVar, isLet, hasType,
                           /// hasScope, hasLoc, hasExpr
     BCArray<ValueIDField> /// operand info: operand, type, debug var info:
                           /// name, argno, optional stuff: typeid
@@ -432,6 +438,8 @@ namespace sil_block {
                      BCFixed<1>,  // is runtime accessible
                      BCFixed<1>,  // are lexical lifetimes force-enabled
                      BCFixed<1>,  // only referenced by debug info
+                     BCFixed<2>,  // SIL stage
+                     BCFixed<1>,  // ownership for trivial values
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
                      DeclIDField,  // SILFunction name or 0 (used ad-hoc requirement witness function)
@@ -446,6 +454,7 @@ namespace sil_block {
   using SILSpecializeAttrLayout =
       BCRecordLayout<SIL_SPECIALIZE_ATTR,
                      BCFixed<1>, // exported
+                     BCFixed<1>, // written as '@specialized'
                      BCFixed<1>, // specialization kind
                      GenericSignatureIDField, // specialized signature
                      DeclIDField, // Target SILFunction name or 0.
@@ -572,12 +581,13 @@ namespace sil_block {
     ValueIDField,         // callee value
     ActorIsolationField, // Caller Isolation if we have one. Unspecified otherwise.
     ActorIsolationField, // Callee Isolation if we have one. Unspecified otherwise.
+    BCFixed<1>,          // unresolved
     BCArray<ValueIDField> // a list of arguments
   >;
 
-  // SIL instructions with one type. (alloc_stack)
+  // SIL instructions with one type. (alloc_stack, alloc_box)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<5>, // Optional attributes
+                                          BCFixed<6>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)
@@ -589,7 +599,7 @@ namespace sil_block {
   using SILOneOperandExtraAttributeLayout = BCRecordLayout<
     SIL_ONE_OPERAND_EXTRA_ATTR,
     SILInstOpCodeField,
-    BCFixed<7>, // Optional attributes
+    BCFixed<8>, // Optional attributes
     TypeIDField, SILTypeCategoryField, ValueIDField
   >;
 

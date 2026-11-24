@@ -261,7 +261,7 @@ extension Float80: CustomReflectable {
 }
 #endif
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.0, *)
 extension UInt128: CustomReflectable {
   /// A mirror that reflects the `UInt128` instance.
   public var customMirror: Mirror {
@@ -269,7 +269,7 @@ extension UInt128: CustomReflectable {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.0, *)
 extension Int128: CustomReflectable {
   /// A mirror that reflects the `Int128` instance.
   public var customMirror: Mirror {

@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
-// RUN: %target-swift-emit-silgen -swift-version 5 %s | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -swift-version 5 -solver-enable-promote-supertypes
+// RUN: %target-swift-emit-silgen -swift-version 5 %s -solver-enable-promote-supertypes | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -405,9 +405,23 @@ do {
   }
 }
 
+// This example appears in the CoreGraphics overlay
+
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion30do_not_want_infinite_recursionySdSPys4Int8VGSgF : $@convention(thin) (Optional<UnsafePointer<Int8>>) -> Double {
+func do_not_want_infinite_recursion(_: UnsafePointer<CChar>?) -> Double {
+  return 0.0
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion30do_not_want_infinite_recursiony12CoreGraphics7CGFloatVSSF : $@convention(thin) (@guaranteed String) -> CGFloat {
+// CHECK: function_ref @$s34implicit_double_cgfloat_conversion30do_not_want_infinite_recursionySdSPys4Int8VGSgF : $@convention(thin) (Optional<UnsafePointer<Int8>>) -> Double
+// CHECK: return
+func do_not_want_infinite_recursion(_ str: String) -> CGFloat {
+  return CGFloat(do_not_want_infinite_recursion(str) as Double)
+}
+
+// CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
 func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
   // Make sure that @autoclosure thunk calls CGFloat./ and not Double./
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
   // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
   // CHECK-NEXT: {{.*}} = apply [[CGFLOAT_DIV_OP]]({{.*}}, %2) : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
   let ratio = v ?? (2.0 / 16.0)
@@ -416,10 +430,6 @@ func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
 
 // Make sure that optimizer doesn't favor CGFloat -> Double conversion
 // in presence of CGFloat initializer, otherwise it could lead to ambiguities.
-//
-// FIXME: This regressed with the real CGFloat.init overload set from the
-// SDK, but this test file previously used the mock SDK which masked the
-// regression.
 func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   func test(_: CGFloat) -> CGFloat { 0 }
   func test(_: Double) -> Double { 0 }
@@ -428,17 +438,36 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
 
   let arr = [test(CGFloat(v))]
   hasCGFloatElement(arr) // Ok
+
+  var total = 0.0 // This is Double by default
+  total += test(CGFloat(v)) + CGFloat(v)
+}
+
+protocol Shape {
+  func fill(_: Color)
+}
+
+struct Color {
+  func opacity(_: Double) -> Color {
+    self
+  }
+}
+
+// While SE-0307 says this should be rejected, it was accepted because of a bug.
+func test_broken_allowed_conversion(shape: any Shape, color: Color, x: Double) {
+  _ = shape.fill(color.opacity(CGFloat(x)))
 }
 
 // rdar://99352676
-// CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF3FooL_C6getBar12CoreGraphics7CGFloatVSgyF : $@convention(method) (@guaranteed Foo) -> Optional<CGFloat>
 func test_init_validation() {
   class Foo {
     static let bar = 100.0
 
+    // CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF3FooL_C6getBar12CoreGraphics7CGFloatVSgyF : $@convention(method) (@guaranteed Foo) -> Optional<CGFloat>
     func getBar() -> CGFloat? {
       return Self.bar
       // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
+      // CHECK: return
     }
   }
 }

@@ -504,7 +504,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - SeeAlso: `cancelAll()`
   /// - SeeAlso: `CancellationError.Reason`
-  @available(StdlibDeploymentTarget 6.5, *)
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
     _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))
@@ -872,7 +872,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// `CancellationError.Reason`.
   ///
   /// See ``TaskGroup/cancelAll(reason:)`` for details.
-  @available(StdlibDeploymentTarget 6.5, *)
+  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   public func cancelAll(reason: CancellationError.Reason) {
     _taskGroupCancelAllWithFlags(group: _group, flags: UInt(reason._rawValue))

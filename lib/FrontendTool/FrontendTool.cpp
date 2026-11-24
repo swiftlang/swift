@@ -98,6 +98,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
@@ -405,7 +406,6 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
       Instance.getASTContext().getClangModuleLoader());
   auto &ImporterOpts = Invocation.getClangImporterOptions();
   auto &PCHOutDir = ImporterOpts.PrecompiledHeaderOutputDir;
-  auto OutputBackend = Instance.getOutputBackend().clone();
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
@@ -655,7 +655,9 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
                 g);
 
         // If path is stdout, cannot read it back, so check for "-"
-        DEBUG_ASSERT(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
+        DEBUG_ASSERT(outputPath == "-" ||
+                     g.verifyReadsWhatIsWritten(outputPath,
+                                                Instance.getBaseFileSystem()));
 
         if (alsoEmitDotFile)
           g.emitDotFile(Instance.getOutputBackend(), outputPath,
@@ -1694,6 +1696,10 @@ static bool generateReproducer(CompilerInstance &Instance,
     return true;
   }
 
+  // The reproducer is written to its own directory, outside of the outputs of
+  // the compilation.
+  auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+
   auto &upstream = Instance.getObjectStore();
   auto &diags = Instance.getDiags();
   auto &casOpts = Instance.getInvocation().getCASOptions();
@@ -1894,35 +1900,13 @@ static bool generateReproducer(CompilerInstance &Instance,
       diags.diagnose(SourceLoc(), diag::error_load_input_from_cas, key);
       return std::nullopt;
     }
-    // Import the entire key.
+    // Import the entire key. This also imports all the CAS objects referenced
+    // by the key, e.g. the include tree for the dependency.
     auto imported = db->first->importObject(upstream, *ref);
     if (!imported) {
       diags.diagnose(SourceLoc(), diag::error_cas, "import input dependency",
                      toString(imported.takeError()));
       return std::nullopt;
-    }
-    auto importedProxy = db->first->getProxy(*imported);
-    if (!importedProxy) {
-      diags.diagnose(SourceLoc(), diag::error_cas, "load imported dependency",
-                     toString(importedProxy.takeError()));
-      return std::nullopt;
-    }
-    // If not a binary module, check command-line and import some of its inputs.
-    // The command-line entries are stored in the format specified in
-    // Frontend/CompileJobCacheKey.cpp, where each command-line entry is
-    // space-separated option and its argument (if applicable).
-    if (importedProxy->getNumReferences() > 0) {
-      if (auto err = iterateCommandLine(
-              upstream, *ref, [&](StringRef arg) -> llvm::Error {
-                if (arg.consume_front("-clang-include-tree-root ") ||
-                    arg.consume_front("-clang-include-tree-filelist "))
-                  importID(arg);
-                return llvm::Error::success();
-              })) {
-        diags.diagnose(SourceLoc(), diag::error_cas, "import dependency cmd",
-                       toString(std::move(err)));
-        return std::nullopt;
-      }
     }
     // Import the value.
     auto result = Instance.getActionCache().get(*id);
@@ -2384,14 +2368,19 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
       return false;
     }
 
-    // Embedded Swift does not support TBD.
-    if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
+    // Embedded Swift only validates the TBD when explicitly requested. It
+    // always uses cross-module optimization, which can give strong
+    // definitions to internal declarations that TBDGen cannot predict.
+    bool isEmbedded = Invocation.getLangOptions().hasFeature(Feature::Embedded);
+    if (isEmbedded && mode == FrontendOptions::TBDValidationMode::Default) {
       return false;
     }
 
     // Cross-module optimization does not support TBD.
-    if (Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Aggressive ||
-        Invocation.getSILOptions().CMOMode == CrossModuleOptimizationMode::Everything) {
+    if (!isEmbedded && (Invocation.getSILOptions().CMOMode ==
+                            CrossModuleOptimizationMode::Aggressive ||
+                        Invocation.getSILOptions().CMOMode ==
+                            CrossModuleOptimizationMode::Everything)) {
       return false;
     }
 
@@ -2595,7 +2584,9 @@ static bool performCompileStepsPostSILGen(
       return;
 
     SerializationOptions serializationOpts =
-        Invocation.computeSerializationOptions(outs, Instance.getMainModule());
+        Invocation.computeSerializationOptions(
+            outs, Instance.getMainModule(),
+            *Instance.getSourceMgr().getFileSystem());
 
     // Infer if this is an emit-module job part of an incremental build,
     // vs a partial emit-module job (with primary files) or other kinds.
@@ -2948,8 +2939,16 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   INITIALIZE_LLVM();
   llvm::EnablePrettyStackTraceOnSigInfoForThisThread();
 
+  // Create the file system that all other file system accesses go through.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> RealFS =
+      llvm::vfs::createPhysicalFileSystem();
+
+  // All file system accesses must go through the virtual file system or the
+  // output backend. Diagnose any that don't.
+  auto EnableSandbox = llvm::sys::sandbox::scopedEnable();
+
   std::unique_ptr<CompilerInstance> Instance =
-    std::make_unique<CompilerInstance>();
+      std::make_unique<CompilerInstance>(RealFS);
 
   CompilerInvocation Invocation;
 
@@ -2999,7 +2998,8 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   }
 
   SmallString<128> workingDirectory;
-  llvm::sys::fs::current_path(workingDirectory);
+  if (auto CWD = RealFS->getCurrentWorkingDirectory())
+    workingDirectory = *CWD;
 
   std::string MainExecutablePath =
       llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
@@ -3008,9 +3008,19 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 4> configurationFileBuffers;
   if (Invocation.parseArgs(Args, Instance->getDiags(),
                            &configurationFileBuffers, workingDirectory,
-                           MainExecutablePath)) {
+                           MainExecutablePath, RealFS)) {
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
+
+  // Only the actions that support compilation caching are sandboxed for now.
+  // In particular, dependency scanning is not sandboxed: it discovers the
+  // inputs of the compilation on the real file system, and the Clang
+  // dependency scanner runs the Clang driver, which accesses the real file
+  // system directly.
+  auto SandboxForAction = FrontendOptions::supportCompilationCaching(
+                              Invocation.getFrontendOptions().RequestedAction)
+                              ? llvm::sys::sandbox::scopedEnable()
+                              : llvm::sys::sandbox::scopedDisable();
 
   // Don't ask clients to report bugs when running a script in immediate mode.
   // When a script asserts the compiler reports the error with the same
@@ -3128,7 +3138,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (Invocation.getFrontendOptions().DeterministicCheck) {
     // Setup a verfication instance to run.
     std::unique_ptr<CompilerInstance> VerifyInstance =
-        std::make_unique<CompilerInstance>();
+        std::make_unique<CompilerInstance>(RealFS);
     // Add a null diagnostic consumer to the diagnostic engine so the
     // compilation will exercise all the diagnose code path but not emitting
     // anything.

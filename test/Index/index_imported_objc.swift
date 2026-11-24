@@ -86,7 +86,7 @@ func testEnumIndex() {
     case ErrCategory.A: break
     // CHECK: [[@LINE-1]]:22 | enumerator/Swift | A | c:@E@ErrCategory@ErrCategoryA | Ref,RelCont | rel: 1
     // CHECK: [[@LINE-2]]:10 | enum/Swift | ErrCategory | c:@E@ErrCategory | Ref,RelCont | rel: 1
-    // CHECK: [[@LINE-3]]:22 | enum/Swift | ErrCategory | c:@E@ErrCategory | Ref,RelCont | rel: 1
+    // CHECK-NOT: | c:@E@ErrCategory |
     case .B: break
     // CHECK: [[@LINE-1]]:11 | enumerator/Swift | B | c:@E@ErrCategory@ErrCategoryB | Ref,RelCont | rel: 1
   }

@@ -234,7 +234,7 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     // to false above so we shouldn't necessarily need to check whether or not the
     // option has been enabled.
     PTO.LoopUnrolling = true;
-    llvm::PassBuilder PB(TM.get(), PTO, P, &PIC);
+    llvm::PassBuilder PB(M->getContext(), TM.get(), PTO, P, &PIC);
 
     PB.registerPipelineParsingCallback(
                 [ModuleTriple](StringRef Name, llvm::ModulePassManager &PM,
@@ -289,7 +289,10 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
         return 1;
       }
     }
-    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "", false, false));
+    MPM.addPass(llvm::PrintModulePass(Out.get()->os(), "",
+                                      /*ShouldPreserveUseListOrder=*/false,
+                                      /*EmitSummaryIndex=*/false,
+                                      /*ShouldRenumberMetadata=*/true));
     MPM.run(*M, MAM);
   }
 

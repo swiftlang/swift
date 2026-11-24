@@ -127,6 +127,9 @@ internal var _emptyArrayStorage: __EmptyArrayStorage {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, types: Element)
+#endif
 @_fixed_layout
 @usableFromInline
 internal final class _ContiguousArrayStorage<
@@ -307,6 +310,12 @@ internal final class _ContiguousArrayStorage<
   internal final var _elementPointer: UnsafeMutablePointer<Element> {
     return unsafe UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
+
+#if hasFeature(TailAllocatedAttribute)
+  /// The number of elements allocated, for typed deallocation.
+  @export(implementation)
+  internal final var _tailCount: Int { countAndCapacity.capacity }
+#endif
 }
 
 @export(implementation)
@@ -855,6 +864,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  @_semantics("realloc_array_buffer")
   internal __consuming func _consumeAndCreateNew() -> _ContiguousArrayBuffer {
     return _consumeAndCreateNew(bufferIsUnique: false,
                                 minimumCapacity: count,
@@ -875,6 +885,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   @export(implementation)
   @inline(never)
   @_semantics("optimize.sil.specialize.owned2guarantee.never")
+  @_semantics("realloc_array_buffer")
   internal __consuming func _consumeAndCreateNew(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) -> _ContiguousArrayBuffer {
@@ -1141,6 +1152,10 @@ internal func _copyCollectionToContiguousArray<
     start: result.firstElementAddress,
     count: count)
   var (itr, end) = unsafe source._copyContents(initializing: p)
+  // `p` points into `result`'s storage. Keep `result` alive until all elements
+  // are written. Otherwise, if the returned array is unused, the optimizer may
+  // release the storage before `_copyContents` has initialized the elements.
+  _fixLifetime(result)
 
   _debugPrecondition(itr.next() == nil,
     "invalid Collection: more than 'count' elements in collection")

@@ -30,12 +30,12 @@ struct S {
 
   var member: Int {
     get {
-      discard x // expected-error {{'discard' statement can only appear in noncopyable type's member}}
+      discard x // expected-error {{'discard' statement can only appear in non-'Copyable' type's member}}
     }
   }
 
   __consuming func f() {
-    discard self // expected-error {{'discard' statement can only appear in noncopyable type's member}}
+    discard self // expected-error {{'discard' statement can only appear in non-'Copyable' type's member}}
   }
 }
 

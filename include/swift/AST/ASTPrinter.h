@@ -15,8 +15,10 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Basic/Range.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -139,10 +141,29 @@ class ASTPrinter {
   TypeOrExtensionDecl SynthesizeTarget;
   llvm::SmallPtrSet<const clang::Decl *, 8> printedClangDecl;
 
+  /// Scopes are stored by de Bruijn (depth, index), but printed as unique names
+  /// for readability. Tracks the names of the scope parameters at each depth,
+  /// to print relative `ScopeRef`s with absolute, non-shadowed names.
+  ///
+  /// TODO: Make names unique across the whole printed type once a type other
+  /// than a function type can contain scope parameters, like a tuple of
+  /// closures.
+  SmallVector<IntRange<unsigned>> EnclosingScopeParamNames;
+  unsigned NextScopeParamName = 0;
+
   void printTextImpl(StringRef Text);
 
 public:
   virtual ~ASTPrinter() {}
+
+  /// Reserves names for \p numScopeParams scope parameters of a function type
+  /// being printed, returning them.
+  IntRange<unsigned> pushScopeParams(unsigned numScopeParams);
+  void popScopeParams();
+
+  /// The name of the scope parameter a reference refers to, unless its binder
+  /// isn't being printed or doesn't bind it.
+  std::optional<unsigned> getScopeParamName(ScopeRef scope) const;
 
   virtual void printText(StringRef Text) = 0;
 
@@ -439,6 +460,17 @@ void printEnumElementsAsCases(
 void getInheritedForPrinting(
   const Decl *decl, const PrintOptions &options,
   llvm::SmallVectorImpl<InheritedEntry> &Results);
+
+/// Returns the most restrictive interface that \p D can be printed in, based
+/// on its formal access and whether it is SPI. `@usableFromInline` decls are
+/// treated as public. Decls that are unavailable at runtime in an
+/// availability domain that is `@_spiOnly` imported are treated as SPI in a
+/// -library-level=api module.
+InterfaceVisibility getInterfaceVisibility(const Decl *D);
+
+/// Returns the most restrictive visibility among all of the decls that \p ty
+/// references. A type that references no decls is public.
+InterfaceVisibility getInterfaceVisibility(Type ty);
 
 StringRef getAccessorKindString(AccessorKind value);
 

@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/OptionSet.h"
@@ -26,6 +27,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include <climits>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -161,9 +163,6 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
-  /// Verify ownership after every pass.
-  bool VerifyOwnershipAll = false;
-
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
 
@@ -205,6 +204,15 @@ public:
 
   /// Whether to skip declarations that are internal to the module.
   bool SkipNonExportableDecls = false;
+
+  /// The minimum access level of declarations printed into the generated C++
+  /// header, if it is set and the header has C++ content. The members that
+  /// the header references must be kept even when nothing in Swift uses them.
+  std::optional<AccessLevel> CxxHeaderMinAccess;
+
+  /// Whether the generated C++ header only prints declarations that are
+  /// '@_expose(Cxx)' or are members of such types.
+  bool CxxHeaderRequiresExposeAttr = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
@@ -249,9 +257,6 @@ public:
   /// The name of the SIL outputfile if compiled with SIL debugging
   /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
-
-  /// If set to true, compile with the SIL Ownership Model enabled.
-  bool VerifySILOwnership = true;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
@@ -321,10 +326,6 @@ public:
   /// Block expanding and register promotion more aggressively throughout the
   /// optimizer.
   bool UseAggressiveReg2MemForCodeSize = true;
-
-  /// Enable enforcement of lifetime dependencies on addressable arguments.
-  /// Temporarily used to bootstrap the AddressableParameters feature.
-  bool EnableAddressDependencies = true;
 
   // Whether to allow merging traps and cond_fails.
   bool MergeableTraps = false;

@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableParameters -verify %s
+// RUN: %target-swift-emit-sil -enable-lifetime-resolution -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableParameters -verify %s
 //
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_Lifetimes

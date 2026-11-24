@@ -20,6 +20,8 @@
 
 // CHECK: }
 
+// CHECK: swift::ThrowingResult<void> never() {{.*}} SWIFT_NORETURN_EXCEPT_ERRORS;
+
 @_expose(Cxx)
 public enum NaiveErrors : Error {
     case returnError
@@ -28,6 +30,11 @@ public enum NaiveErrors : Error {
     public func getMessage() {
         print(self)
     }
+}
+
+@_expose(Cxx)
+public func checkedVoid(_ fail: Bool) throws {
+  if fail { throw NaiveErrors.throwError }
 }
 
 @_expose(Cxx)
@@ -43,7 +50,27 @@ public func emptyThrowFunction() throws { print("passEmptyThrowFunction") }
 // CHECK: #else
 // CHECK: return swift::Expected<void>(swift::Error(opaqueError));
 // CHECK: #endif
-// CHECK: }
+// CHECK-NEXT: #ifndef __cpp_exceptions
+// CHECK-NEXT: return swift::Expected<void>();
+// CHECK-NEXT: #endif
+// CHECK-NEXT: }
+
+@_expose(Cxx)
+public func genericVoid<T>(_ value: T, _ fail: Bool) throws {
+  try checkedVoid(fail)
+}
+
+@_expose(Cxx)
+public func genericNever<T>(_ value: T) throws -> Never {
+  throw NaiveErrors.throwError
+}
+
+// Generic Void and Never results must not cast a GenericFunctionType to FunctionType.
+// CHECK: swift::ThrowingResult<void> genericNever
+// CHECK: abort();
+// CHECK: swift::ThrowingResult<void> genericVoid
+// CHECK: #ifndef __cpp_exceptions
+// CHECK-NEXT: return swift::Expected<void>();
 
 class TestDestroyed {
   deinit {
@@ -148,3 +175,28 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: #endif
 // CHECK: return SWIFT_RETURN_THUNK(swift::Int, returnValue);
 // CHECK: }
+
+@_expose(Cxx)
+public final class VoidMethods {
+  public init() {}
+  public func checked(_ fail: Bool) throws { try checkedVoid(fail) }
+  public func never() throws -> Never { throw NaiveErrors.throwError }
+}
+
+// Class self supplies the context; don't emit an unused placeholder.
+// CHECK: swift::ThrowingResult<void> VoidMethods::checked
+// CHECK-NEXT: void* opaqueError = nullptr;
+// CHECK-NOT: void* _ctx
+// CHECK: if (opaqueError != nullptr)
+// CHECK: return swift::Expected<void>();
+
+// A throwing Never method must not return a successful void result.
+// CHECK-LABEL: swift::ThrowingResult<void> VoidMethods::never() SWIFT_NORETURN_EXCEPT_ERRORS {
+// CHECK: if (opaqueError != nullptr)
+// CHECK-NEXT: #ifdef __cpp_exceptions
+// CHECK-NEXT: throw (swift::Error(opaqueError));
+// CHECK-NEXT: #else
+// CHECK-NEXT: return swift::Expected<void>(swift::Error(opaqueError));
+// CHECK-NEXT: #endif
+// CHECK-NEXT: abort();
+// CHECK-NEXT: }

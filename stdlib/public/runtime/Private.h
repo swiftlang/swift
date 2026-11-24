@@ -584,6 +584,10 @@ public:
   /// \param context When non-NULL, receives any information about the
   /// execution context that is required to use this conformance.
   ///
+  /// \param numParamsExemptFromInvertibleChecks The number of leading generic
+  /// parameters whose arguments are not checked against the implicit
+  /// invertible protocol requirements (Copyable, Escapable).
+  ///
   /// \returns the error if an error occurred, None otherwise.
   std::optional<TypeLookupError> _checkGenericRequirements(
       llvm::ArrayRef<GenericParamDescriptor> genericParams,
@@ -592,7 +596,8 @@ public:
       SubstGenericParameterRefFn substGenericParam,
       SubstGenericParameterOrdinalRefFn substGenericParamOrdinal,
       SubstDependentWitnessTableRefFn substWitnessTable,
-      ConformanceExecutionContext *context);
+      ConformanceExecutionContext *context,
+      unsigned numParamsExemptFromInvertibleChecks = 0);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -601,7 +606,7 @@ public:
   /// as to map the entire object readonly, or we might just want to avoid
   /// dirtying memory unnecessarily.
   template <class T>
-  static void assignUnlessEqual(T &dest, T newValue) {
+  inline void assignUnlessEqual(T &dest, T newValue) {
     if (dest != newValue)
       dest = newValue;
   }
@@ -748,6 +753,18 @@ public:
       const WitnessTable **conformance,
       bool prohibitIsolatedConformances);
 
+  /// Abort because a dynamic cast was handed a null type.
+  ///
+  /// The compiler emits these types, and a null one means it emitted a bad
+  /// reference (for example a mangled name the runtime could not resolve). The
+  /// resulting crash would otherwise be a bare null dereference somewhere inside
+  /// the casting machinery. These are deliberately out of line and not inlined,
+  /// so that the function name appears in the backtrace and says what happened.
+  SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+  void TARGET_TYPE_IS_NULL();
+  SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
+  void SOURCE_TYPE_IS_NULL();
+
   /// Construct type metadata for the given protocol.
   const Metadata *
   _getSimpleProtocolTypeMetadata(const ProtocolDescriptor *protocol);
@@ -820,6 +837,12 @@ public:
   extern SWIFT_CC(swift) bool (*__ptrauth_swift_is_global_actor_function
                                _swift_task_isCurrentGlobalActorHook)(
       const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
+
+  /// Hook function that calls into the concurrency library to check whether a
+  /// distributed actor instance is a remote proxy.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  extern SWIFT_CC(swift) bool (*__ptrauth_swift_concurrency_hook
+                               _swift_distributedActorIsRemoteHook)(HeapObject *);
 
 } // end namespace swift
 

@@ -58,6 +58,17 @@ class MinimalStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING', toolchain_dir + '/bin')
 
+        # FIXME: rdar://188503297
+        # In Xcode 27A5209h, ar, ranlib and lipo ignore LIBLTO_PATH and cannot
+        # read LLVM bitcode from the just-built LLVM. Use the just-built tools.
+        llvm_bin_dir = os.path.join(llvm_build_dir, 'bin')
+        self.cmake_options.define(
+            'CMAKE_AR:PATH', os.path.join(llvm_bin_dir, 'llvm-ar'))
+        self.cmake_options.define(
+            'CMAKE_RANLIB:PATH', os.path.join(llvm_bin_dir, 'llvm-ranlib'))
+        self.cmake_options.define(
+            'SWIFT_LIPO:PATH', os.path.join(llvm_bin_dir, 'llvm-lipo'))
+
         # Build the freestanding variant, with these options
         self.cmake_options.define('SWIFT_SDKS:STRING', 'FREESTANDING')
         self.cmake_options.define(

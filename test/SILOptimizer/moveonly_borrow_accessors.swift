@@ -129,3 +129,26 @@ func nctest() {
   k2 = NC()
   use(k2)
 }
+
+public enum NCKind: ~Copyable {
+  case a
+  case b
+}
+
+public struct NCKindWrapper: ~Copyable {
+  let _kind: NCKind
+
+  var kind: NCKind {
+    borrow {
+      return _kind
+    }
+  }
+}
+
+// rdar://189560375
+// After the object checker diagnoses the consume of the borrow accessor
+// result, the address checker must not delete the accessor's apply and its
+// users (here, the switch_enum terminator).
+func inoutSwitchOnBorrowAccessor(_ w: inout NCKindWrapper) {
+  if case .b = w.kind { return } // expected-error{{'w.kind' is borrowed and cannot be consumed}} expected-note{{consumed here}}
+}

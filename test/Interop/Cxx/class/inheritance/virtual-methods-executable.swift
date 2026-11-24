@@ -38,4 +38,13 @@ VirtualMethodsTestSuite.test("renamed virtual methods") {
   expectEqual(404, pvro.swiftName())
 }
 
+VirtualMethodsTestSuite.test("diamond through a virtual base") {
+  let d = DiamondThroughVirtualBase()
+  let copy = d
+  expectEqual(1, copy.v)
+  expectEqual(2, copy.l)
+  expectEqual(3, copy.r)
+  expectEqual(1, copy.getV())
+}
+
 runAllTests()

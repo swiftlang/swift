@@ -2,7 +2,7 @@
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift -parse-as-library -enable-experimental-feature Embedded -O -wmo -module-name=test %s -o %t/a.out
+// RUN: %target-build-swift -parse-as-library -enable-experimental-feature Embedded -O -wmo -module-name=test %s -o %t/a.out %target-embedded-posix-shim
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib

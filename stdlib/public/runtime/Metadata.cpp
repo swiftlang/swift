@@ -2537,7 +2537,7 @@ getPrespecializedTupleTypeMetadata(const TupleCacheEntry::Key &key) {
 
 /// Generic tuple value witness for 'allocateBuffer'
 template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
+inline OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
                                          const Metadata *metatype) {
   assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
   assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
@@ -3385,7 +3385,7 @@ namespace {
 /// In any reasonable calling convention the input and output function types
 /// should be ABI-compatible.
 template<typename Out, typename In>
-static constexpr Out pointer_function_cast(In *function) {
+inline constexpr Out pointer_function_cast(In *function) {
   return pointer_function_cast_impl<Out>::perform(function);
 }
 
@@ -5897,6 +5897,14 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   auto special = SpecialProtocol::None;
   if (key.NumProtocols == 1)
     special = key.Protocols[0].getSpecialProtocol();
+
+  // Only the plain `any Error` uses the boxed Error representation. Adding
+  // AnyObject or a superclass makes it a standard class existential, matching
+  // ExistentialLayout::isErrorExistential in the compiler.
+  if (special == SpecialProtocol::Error &&
+      (key.ClassConstraint != ProtocolClassConstraint::Any ||
+       key.SuperclassConstraint != nullptr))
+    special = SpecialProtocol::None;
 
   // Calculate the class constraint and number of witness tables for the
   // protocol set.

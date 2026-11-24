@@ -630,6 +630,7 @@ static bool restrictionIsStronger(const AvailabilityRestriction &lhs,
     return lhs.getAttr().getDeprecated().value() <
            rhs.getAttr().getDeprecated().value();
   }
+  llvm_unreachable("covered switch");
 }
 
 static void

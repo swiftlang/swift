@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "libsil"
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
@@ -31,6 +32,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -82,9 +84,6 @@ namespace {
     bool visitClassType(CanClassType type) {
       if (type->isForeignReferenceType())
         return true;
-      return false;
-    }
-    bool visitBoundGenericClassType(CanBoundGenericClassType type) {
       return false;
     }
     bool visitDynamicSelfType(CanDynamicSelfType type) {
@@ -159,12 +158,13 @@ TypeConverter::getDeclCaptureKind(CapturedValue capture,
 
   // If this is a noncopyable 'let' constant that is not a shared paramdecl or
   // used by a noescape capture, then we know it is boxed and want to pass it in
-  // its boxed form so we can obey Swift's capture reference semantics.
+  // its boxed form so we can obey Swift's capture reference semantics. An
+  // unannotated closure parameter is shared if the closure's type says so.
   if (!var->supportsMutation()
       && contextTy->isNoncopyable()
       && !capture.isNoEscape()) {
       auto *param = dyn_cast<ParamDecl>(var);
-      if (!param || (param->getValueOwnership() != ValueOwnership::Shared &&
+      if (!param || (param->getLoweredOwnership() != LoweredOwnership::Shared &&
                      !param->isSelfParameter())) {
         return CaptureKind::ImmutableBox;
       }
@@ -812,13 +812,16 @@ namespace {
       // stored in that existential. This is distinct from an ordinary
       // generic parameter constrained to a COM interface, which keeps its
       // opaque Swift generic representation.
-      if (type->is<ExistentialArchetypeType>() &&
-          llvm::any_of(type->getConformsTo(), [](ProtocolDecl *protocol) {
-            return protocol->isCOMInterface();
-          })) {
-        return asImpl().handleNonTrivialAggregate(
-            type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-                   isSensitive, DoesNotHaveRawPointer, IsLexical});
+      if (type->hasCOMInterfaceConstraint()) {
+        if (type->is<ExistentialArchetypeType>())
+          return asImpl().handleNonTrivialAggregate(
+              type, {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+                     isSensitive, DoesNotHaveRawPointer, IsLexical});
+        // AnyObject alone does not establish native reference counting for a
+        // COM value. Keep copies and destruction behind its value witnesses.
+        if (!type->getSuperclass())
+          return asImpl().handleAddressOnly(
+              type, getOpaqueSILTypeProperties(isSensitive));
       }
 
       // TODO: Add a HasOnlyDefaultDeinit "layout protocol".
@@ -907,22 +910,9 @@ namespace {
                                         isSensitive);
     }
 
-    RetTy visitBoundGenericClassType(CanBoundGenericClassType type,
-                                     AbstractionPattern origType,
-                                     IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyClassType(type, origType, type->getDecl(),
-                                        isSensitive);
-    }
-
     // Enums depend on their enumerators.
     RetTy visitEnumType(CanEnumType type, AbstractionPattern origType,
                         IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
-                                       isSensitive);
-    }
-    RetTy visitBoundGenericEnumType(CanBoundGenericEnumType type,
-                                    AbstractionPattern origType,
-                                    IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyEnumType(type, origType, type->getDecl(),
                                        isSensitive);
     }
@@ -930,12 +920,6 @@ namespace {
     // Structs depend on their physical fields.
     RetTy visitStructType(CanStructType type, AbstractionPattern origType,
                           IsTypeExpansionSensitive_t isSensitive) {
-      return asImpl().visitAnyStructType(type, origType, type->getDecl(),
-                                         isSensitive);
-    }
-    RetTy visitBoundGenericStructType(CanBoundGenericStructType type,
-                                      AbstractionPattern origType,
-                                      IsTypeExpansionSensitive_t isSensitive) {
       return asImpl().visitAnyStructType(type, origType, type->getDecl(),
                                          isSensitive);
     }
@@ -1066,12 +1050,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return getTrivialSILTypeProperties(isSensitive);
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       return mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -1143,6 +1122,12 @@ namespace {
       return B.getFunction().hasOwnershipForTrivialValues();
     }
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "TrivialTypeLowering");
+    }
+
     TrivialTypeLowering(SILType type, SILTypeProperties properties,
                         TypeExpansionContext forExpansion)
       : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -1264,7 +1249,7 @@ namespace {
         return;
       }
       if (B.getFunction().hasOwnership()
-          && B.getModule().getStage() == SILStage::Raw
+          && B.getFunction().getFunctionStage() == SILStage::Raw
           && value->isFromVarDecl()) {
         // Do not use destroy_value for trivial values. The lifetime introducer
         // may be implicitly copied and used outside of its original scope,
@@ -1428,6 +1413,19 @@ namespace {
                                        forExpansion) {
     }
 
+    void printAggregateTypeLayoutInfo(TypeConverter &TC,
+                                      llvm::raw_ostream &os,
+                                      unsigned indentation,
+                                      StringRef concreteTypeName) const {
+      printForAbstractTypeLayoutInfoBase(os, indentation, concreteTypeName);
+      os.indent(indentation + 2) << "childTypeLowerings:\n";
+      for (const auto &[index, child] : llvm::enumerate(getChildren(TC))) {
+        os.indent(indentation + 4) << "- index: " << index << "\n";
+        child.getLowering().printForAbstractTypeLayoutInfo(
+            TC, os, indentation + 6);
+      }
+    }
+
     /// CRTP Default implementation of destructuring an aggregate value.
     ///
     /// Uses getChildren() and emitRValueProject() to create projections for
@@ -1566,6 +1564,12 @@ namespace {
     using Super = LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "LoadableTupleTypeLowering");
+    }
+
     LoadableTupleTypeLowering(CanType type, SILTypeProperties properties,
                               TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
@@ -1631,6 +1635,12 @@ namespace {
         LoadableAggTypeLowering<LoadableStructTypeLowering, VarDecl *>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "LoadableStructTypeLowering");
+    }
+
     LoadableStructTypeLowering(CanType type, SILTypeProperties properties,
                                TypeExpansionContext forExpansion)
       : LoadableAggTypeLowering(type, properties, forExpansion) {}
@@ -1671,7 +1681,7 @@ namespace {
     void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1685,6 +1695,12 @@ namespace {
   /// A lowering for loadable but non-trivial enum types.
   class LoadableEnumTypeLowering final : public NonTrivialLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "LoadableEnumTypeLowering");
+    }
+
     LoadableEnumTypeLowering(CanType type, SILTypeProperties properties,
                              TypeExpansionContext forExpansion)
       : NonTrivialLoadableTypeLowering(SILType::getPrimitiveObjectType(type),
@@ -1732,6 +1748,13 @@ namespace {
                    NormalDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(
+          TC, os, indentation,
+          "NormalDifferentiableSILFunctionTypeLowering");
+    }
 
     SILValue emitRValueProject(
         SILBuilder &B, SILLocation loc, SILValue tupleValue,
@@ -1792,6 +1815,12 @@ namespace {
         LoadableAggTypeLowering<MoveOnlyLoadableStructTypeLowering, VarDecl *>;
 
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(TC, os, indentation,
+                                   "MoveOnlyLoadableStructTypeLowering");
+    }
+
     MoveOnlyLoadableStructTypeLowering(CanType type,
                                        SILTypeProperties properties,
                                        TypeExpansionContext forExpansion)
@@ -1832,9 +1861,20 @@ namespace {
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
+      if (loweringStyle == TypeExpansionKind::None)
+        return emitDestroyValue(B, loc, aggValue);
       // A value type with a deinit cannot be memberwise destroyed.
-      if (auto *nominal = getLoweredType().getNominalOrBoundGenericNominal()) {
+      if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
+          emitDestroyValue(B, loc, aggValue);
+          return;
+        }
+      }
+      for (auto *field :
+           getLoweredType().getStructDecl()->getStoredProperties()) {
+        auto fieldTy = getLoweredType().getFieldType(
+            field, B.getModule(), B.getFunction().getTypeExpansionContext());
+        if (!B.getFunction().isTypeABIAccessible(fieldTy)) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -1846,7 +1886,7 @@ namespace {
     void lowerChildren(TypeConverter &TC,
                        SmallVectorImpl<Child> &children) const override {
       auto silTy = getLoweredType();
-      auto structDecl = silTy.getStructOrBoundGenericStruct();
+      auto structDecl = silTy.getStructDecl();
       assert(structDecl);
 
       for (auto prop : structDecl->getStoredProperties()) {
@@ -1861,6 +1901,12 @@ namespace {
   class MoveOnlyLoadableEnumTypeLowering final
       : public NonTrivialLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyLoadableEnumTypeLowering");
+    }
+
     MoveOnlyLoadableEnumTypeLowering(CanType type,
                                      SILTypeProperties properties,
                                      TypeExpansionContext forExpansion)
@@ -1908,6 +1954,13 @@ namespace {
                    LinearDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    void printForAbstractTypeLayoutInfo(TypeConverter &TC, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printAggregateTypeLayoutInfo(
+          TC, os, indentation,
+          "LinearDifferentiableSILFunctionTypeLowering");
+    }
 
     SILValue emitRValueProject(
         SILBuilder &B, SILLocation loc, SILValue tupleValue,
@@ -1968,6 +2021,12 @@ namespace {
   /// A class for nonspecific loadable nontrivial types.
   class MiscNontrivialTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MiscNontrivialTypeLowering");
+    }
+
     MiscNontrivialTypeLowering(SILType type, SILTypeProperties properties,
                           TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2007,6 +2066,12 @@ namespace {
   /// loadable.
   class ReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "ReferenceTypeLowering");
+    }
+
     ReferenceTypeLowering(SILType type, SILTypeProperties properties,
                           TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
@@ -2038,6 +2103,12 @@ namespace {
   /// A class for move only types which are non-trivial and loadable
   class MoveOnlyReferenceTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyReferenceTypeLowering");
+    }
+
     MoveOnlyReferenceTypeLowering(SILType type, SILTypeProperties properties,
                                   TypeExpansionContext forExpansion)
         : LeafLoadableTypeLowering(type, properties, IsReferenceCounted,
@@ -2070,6 +2141,11 @@ namespace {
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   class Loadable##Name##TypeLowering final : public LeafLoadableTypeLowering { \
   public: \
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os, \
+                                     unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase( \
+          os, indentation, "Loadable" #Name "TypeLowering"); \
+    } \
     Loadable##Name##TypeLowering(SILType type, \
                                  TypeExpansionContext forExpansion, \
                                  SILTypeProperties props) \
@@ -2097,6 +2173,12 @@ namespace {
   /// A class for non-trivial, address-only types.
   class AddressOnlyTypeLowering : public TypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "AddressOnlyTypeLowering");
+    }
+
     AddressOnlyTypeLowering(SILType type, SILTypeProperties properties,
                             TypeExpansionContext forExpansion)
       : TypeLowering(type, properties, IsNotReferenceCounted,
@@ -2182,6 +2264,12 @@ namespace {
   /// A class for non-trivial, address-only, move only types.
   class MoveOnlyAddressOnlyTypeLowering : public TypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyAddressOnlyTypeLowering");
+    }
+
     MoveOnlyAddressOnlyTypeLowering(SILType type,
                                     SILTypeProperties properties,
                                     TypeExpansionContext forExpansion)
@@ -2192,7 +2280,10 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
                       SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      assert((B.getModule().getStage() == SILStage::Raw || isTake == true) &&
+      assert(((B.maybeGetFunction() ? B.getFunction().getFunctionStage()
+                                    : B.getModule().getStageFloor()) ==
+                  SILStage::Raw ||
+              isTake == true) &&
              "Can only copy move only values in Raw SIL");
       B.createCopyAddr(loc, src, dest, isTake, isInit);
     }
@@ -2270,6 +2361,12 @@ namespace {
   /// to catch obviously broken attempts to copy or destroy the buffer.
   class UnsafeValueBufferTypeLowering : public AddressOnlyTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "UnsafeValueBufferTypeLowering");
+    }
+
     UnsafeValueBufferTypeLowering(SILType type,
                                   TypeExpansionContext forExpansion,
                                   IsTypeExpansionSensitive_t isSensitive)
@@ -2299,6 +2396,12 @@ namespace {
   /// Lower address only types as opaque values.
   class OpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "OpaqueValueTypeLowering");
+    }
+
     OpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
                             TypeExpansionContext forExpansion)
       : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2312,6 +2415,18 @@ namespace {
       } else {
         SILValue value = emitLoadOfCopy(B, loc, src, isTake);
         emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
+    }
+
+    // Once AddressLowering has run the value really is in memory, so it has
+    // to be destroyed in place: loading an address-only type is invalid there.
+    // Mirrors the lowered-addresses branch in emitCopyInto() above.
+    void emitDestroyAddress(SILBuilder &B, SILLocation loc,
+                            SILValue addr) const override {
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createDestroyAddr(loc, addr);
+      } else {
+        LeafLoadableTypeLowering::emitDestroyAddress(B, loc, addr);
       }
     }
 
@@ -2360,6 +2475,12 @@ namespace {
   /// FIXME: When you remove an unreachable, just delete the method.
   class MoveOnlyOpaqueValueTypeLowering : public LeafLoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "MoveOnlyOpaqueValueTypeLowering");
+    }
+
     MoveOnlyOpaqueValueTypeLowering(SILType type,
                                     SILTypeProperties properties,
                                     TypeExpansionContext forExpansion)
@@ -2369,7 +2490,14 @@ namespace {
     void emitCopyInto(SILBuilder &B, SILLocation loc, SILValue src,
                       SILValue dest, IsTake_t isTake,
                       IsInitialization_t isInit) const override {
-      llvm_unreachable("copy into");
+      ASSERT(isTake && "Cannot copy a move-only value");
+      // A take is a move, which a non-Copyable value allows.
+      if (B.getFunction().hasLoweredAddresses()) {
+        B.createCopyAddr(loc, src, dest, IsTake, isInit);
+      } else {
+        SILValue value = emitLoadOfCopy(B, loc, src, IsTake);
+        emitStoreOfCopy(B, loc, value, dest, isInit);
+      }
     }
 
     // --- Same as LeafLoadableTypeLowering.
@@ -2387,7 +2515,7 @@ namespace {
 
     SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
                            SILValue value) const override {
-      assert(B.getModule().getStage() == SILStage::Raw &&
+      assert(B.getFunction().getFunctionStage() == SILStage::Raw &&
              "Can not copy a move only value in non-Raw SIL");
       return B.createCopyValue(loc, value);
     }
@@ -2400,6 +2528,12 @@ namespace {
 
   class TrivialOpaqueValueTypeLowering : public LoadableTypeLowering {
   public:
+    void printForAbstractTypeLayoutInfo(TypeConverter &, llvm::raw_ostream &os,
+                                     unsigned indentation) const override {
+      printForAbstractTypeLayoutInfoBase(os, indentation,
+                                      "TrivialOpaqueValueTypeLowering");
+    }
+
     TrivialOpaqueValueTypeLowering(SILType type, SILTypeProperties properties,
                                    TypeExpansionContext forExpansion)
         : LoadableTypeLowering(type, properties, IsNotReferenceCounted,
@@ -2492,7 +2626,8 @@ namespace {
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
       if (B.getFunction().hasOwnership() &&
-          B.getModule().getStage() == SILStage::Raw && value->isFromVarDecl()) {
+          B.getFunction().getFunctionStage() == SILStage::Raw &&
+          value->isFromVarDecl()) {
         // Do not use destroy_value for trivial values. The lifetime introducer
         // may be implicitly copied and used outside of its original scope,
         // which violates the invariants of destroy_value.
@@ -2607,13 +2742,7 @@ namespace {
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
       auto *layoutInfo = type->getLayoutInfoDecl();
-      // TODO: Remove this legacy fallback once every HiddenType carries an
-      // abstract layout.
-      if (!layoutInfo)
-        return handleTrivial(type,
-                             getTrivialSILTypeProperties(isSensitive));
-
-      assert(layoutInfo->Layout &&
+      assert(layoutInfo && layoutInfo->Layout &&
              "HiddenTypeLayoutInfoDecl should have abstract layout");
       auto properties = mergeIsTypeExpansionSensitive(
           isSensitive, layoutInfo->Layout->typeProperties);
@@ -2851,20 +2980,15 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
-      // Force address-only when the struct has hidden stored properties from
-      // an internal bridging header.
-      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
-        properties.setAddressOnly();
-        properties.setNonTrivial();
-        properties.setLexical(IsLexical);
-        return handleAddressOnly(structType, properties);
-      }
-
       if (D->isCxxNonTrivial()) {
         properties.setDefinitelyAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        auto *importer =
+            static_cast<ClangImporter *>(TC.Context.getClangModuleLoader());
+        if (importer->hasNonTrivialAssignmentOperator(D))
+          properties.setCustomAssign();
       }
 
       if (auto *clangDecl = D->getClangDecl()) {
@@ -3147,8 +3271,8 @@ namespace {
                                              TypeExpansionContext expansion) {
       TypeConverter::NonLayoutTypeRAII nonLayoutLowering(tc);
       SILTypeProperties props;
-      if (auto bgt = dyn_cast<BoundGenericType>(type)) {
-        for (auto paramType : bgt->getGenericArgs()) {
+      if (auto bgt = dyn_cast<NominalType>(type)) {
+        for (auto paramType : bgt.getGenericArgs()) {
           // Use an opaque abstraction pattern for the element type because
           // abstraction does not apply to the generic parameter itself.
           AbstractionPattern origElementType = AbstractionPattern::getOpaque();
@@ -3299,7 +3423,7 @@ static CanType computeLoweredOptionalType(TypeConverter &tc,
   }
 
   auto optDecl = tc.Context.getOptionalDecl();
-  return CanType(BoundGenericEnumType::get(optDecl, Type(), loweredObjectType));
+  return CanEnumType::get(optDecl, CanType(), loweredObjectType, tc.Context);
 }
 
 static CanType
@@ -3477,8 +3601,8 @@ bool TypeConverter::visitAggregateLeaves(
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
            isa<BuiltinFixedArrayType>(ty) ||
-           ty.getEnumOrBoundGenericEnum() ||
-           ty.getStructOrBoundGenericStruct();
+           ty.getEnumDecl() ||
+           ty.getStructDecl();
   };
   insertIntoWorklist(substType, origType, nullptr, std::nullopt);
   while (!worklist.empty()) {
@@ -3519,7 +3643,7 @@ bool TypeConverter::visitAggregateLeaves(
       } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
         insertIntoWorklist(array->getElementType(),
                            AbstractionPattern::getOpaque(), field, index);
-      } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
+      } else if (auto *decl = ty.getStructDecl()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
@@ -3534,7 +3658,7 @@ bool TypeConverter::visitAggregateLeaves(
           insertIntoWorklist(substFieldTy, origFieldType, structField,
                              std::nullopt);
         }
-      } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
+      } else if (auto *decl = ty.getEnumDecl()) {
         auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
@@ -4309,7 +4433,7 @@ getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
 
 static CanGenericSignature
 getCanonicalSignatureOrNull(GenericSignature sig) {
-  if (!sig || sig->areAllParamsConcrete())
+  if (!sig.isEffectivelyGeneric())
     return nullptr;
   return sig.getCanonicalSignature();
 }
@@ -4417,7 +4541,7 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
   GenericSignature sig = TC.getGenericSignatureWithCapturedEnvironments(c)
       .genericSig;
 
-  AnyFunctionType::Param param(
+  auto param = AnyFunctionType::Param::bodyAccess(
       inputType, Identifier(),
       ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
   // FIXME: Verify ExtInfo state is correct, not working by accident.
@@ -4440,9 +4564,10 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
   SmallVector<FunctionType::Param, 2> params;
 
   // Create the wrappedValue param
-  params.emplace_back(
+  params.push_back(FunctionType::Param::bodyAccess(
       wrappedValueType, Identifier(),
-      ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::LegacyOwned));
+      ParameterTypeFlags().withOwnershipSpecifier(
+          ParamSpecifier::LegacyOwned)));
 
   if (!isLocalContext) {
     CanType selfType = wrappedProperty->getDeclContext()
@@ -4450,9 +4575,9 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
                            ->getCanonicalType();
     selfType = sig.getReducedType(selfType);
     // Create the self param
-    params.emplace_back(
+    params.push_back(FunctionType::Param::bodyAccess(
         selfType, Identifier(),
-        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::InOut));
+        ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::InOut)));
   }
 
   CanType resultType = TupleType::getEmpty(TC.Context)->getCanonicalType();
@@ -4491,7 +4616,7 @@ static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
   CanType methodTy = CanFunctionType::get({}, {}, resultTy, info);
 
   auto sig = dd->getGenericSignatureOfContext();
-  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  FunctionType::Param args[] = {FunctionType::Param::bodyAccess(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
                                  llvm::ArrayRef(args), /* yields */ {},
                                  methodTy, extInfo);
@@ -4519,7 +4644,7 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 
   resultType = CanFunctionType::get({}, {}, resultType, extInfo);
   auto sig = cd->getGenericSignature();
-  FunctionType::Param args[] = {FunctionType::Param(classType)};
+  FunctionType::Param args[] = {FunctionType::Param::bodyAccess(classType)};
   return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig),
                                  llvm::ArrayRef(args), /* yields */ {},
                                  resultType, extInfo);
@@ -4605,19 +4730,18 @@ static CanAnyFunctionType getEntryPointInterfaceType(ASTContext &C) {
   if (auto PointerDecl = C.getUnsafeMutablePointerDecl()) {
     if (auto Int8Decl = C.getInt8Decl()) {
       Type Int8Ty = Int8Decl->getDeclaredInterfaceType();
-      Type PointerInt8Ty = BoundGenericType::get(PointerDecl,
-                                                 nullptr,
-                                                 Int8Ty);
+      Type PointerInt8Ty = NominalType::get(PointerDecl, nullptr,
+                                            Int8Ty, C);
       Type OptPointerInt8Ty = OptionalType::get(PointerInt8Ty);
-      PtrPtrInt8Ty = BoundGenericType::get(PointerDecl,
-                                           nullptr,
-                                           OptPointerInt8Ty)
+      PtrPtrInt8Ty = NominalType::get(PointerDecl, nullptr,
+                                      OptPointerInt8Ty, C)
         ->getCanonicalType();
     }
   }
 
   using Param = FunctionType::Param;
-  Param params[] = {Param(Int32Ty), Param(PtrPtrInt8Ty)};
+  Param params[] = {Param::bodyAccess(Int32Ty),
+                    Param::bodyAccess(PtrPtrInt8Ty)};
 
   auto rep = FunctionTypeRepresentation::CFunctionPointer;
   auto *clangTy = C.getClangFunctionType(params, Int32Ty, rep);
@@ -5107,7 +5231,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           //
           // However, only do this if its a 'let'; if the capture is
           // mutable, we're going to be capturing a box or an address.
-          if (captureType->getClassOrBoundGenericClass() &&
+          if (captureType->getClassDecl() &&
               capturedVar->isLet()) {
             // If we've already captured the same value already, just merge
             // flags.
@@ -5192,14 +5316,28 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
   collectConstantCaptures(fn);
 
-  // @_inheritActorContext(always) attribute allows implicit
-  // capture of isolation parameter from the context. This
-  // cannot be done as part of computing captures because
-  // isolation is not available at that point because it in
-  // turn depends on captures sometimes.
+  // Handle implicit isolation captures:
   if (auto *closure = fn.getClosureExpr()) {
+    // @_inheritActorContext(always) attribute allows implicit
+    // capture of isolation parameter from the context. This
+    // cannot be done as part of computing captures because
+    // isolation is not available at that point because it in
+    // turn depends on captures sometimes.
     if (closure->alwaysInheritsActorContext()) {
       auto isolation = closure->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        if (auto *var = isolation.getActorInstance()) {
+          recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
+        } else if (auto *actorExpr = isolation.getActorInstanceExpr()) {
+          recordCapture(CapturedValue(actorExpr, /*flags=*/0));
+        }
+      }
+    }
+  } else if (auto *deferBody = fn.getDeferBodyFuncDecl()) {
+    // A defer in a closure inherits the isolation of the closure, and may
+    // need to capture the actor it is isolated to.
+    if (deferBody->getCaptureInfo().needsImplicitIsolationCapture()) {
+      auto isolation = getActorIsolation(deferBody);
       if (isolation.isActorInstanceIsolated()) {
         if (auto *var = isolation.getActorInstance()) {
           recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
@@ -5234,9 +5372,11 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the result.
-  CaptureInfo info(Context, resultingCaptures,
-                   capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef(),
+  OptionSet<CaptureInfo::Flags> flags;
+  if (capturesGenericParams)
+    flags |= CaptureInfo::Flags::HasGenericParamCaptures;
+  CaptureInfo info(Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, flags, genericEnv.getArrayRef(),
                    capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
@@ -5456,6 +5596,16 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // Erased isolation is a restriction on the context value, so we can
   // remove it but not add it.
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
+    return ABIDifference::NeedsThunk;
+
+  // A noncopyable value needs a context of its own, which only it refers to,
+  // so forming one from a copyable thick function value needs a thunk. So
+  // does forming a nondeinitable value from any other thick function value,
+  // even from a noncopyable value with the same ABI. A thin function has no
+  // context, so thin-to-thick can form the value directly.
+  if (fnTy1->getExtInfo().hasContext() &&
+      ((fnTy2->isNoncopyable() && !fnTy1->isNoncopyable()) ||
+       (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable())))
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
@@ -5711,7 +5861,7 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
     TypeExpansionContext context, SILType enumType, EnumElementDecl *elt) {
 
-  auto *enumDecl = enumType.getEnumOrBoundGenericEnum();
+  auto *enumDecl = enumType.getEnumDecl();
 
   assert(elt->getDeclContext() == enumDecl);
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
@@ -5823,7 +5973,7 @@ void TypeConverter::setCaptureTypeExpansionContext(SILDeclRef constant,
 static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty,
                                      TypeExpansionContext expansion) {
-  if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = Ty.getStructDecl()) {
     assert(
         !structDecl->isResilient(&TC.M, expansion.getResilienceExpansion()) &&
         " FSO should not be trying to explode resilient (ie address-only) "
@@ -5857,7 +6007,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     return;
   }
 
-  if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = Ty.getEnumDecl()) {
     if (enumDecl->isIndirect()) {
       return;
     }
@@ -5920,32 +6070,59 @@ bool TypeLowering::isLoadableOrOpaque(const SILFunction &F) const {
   return isLoadable() || !F.hasLoweredAddresses();
 }
 
-void TypeLowering::print(llvm::raw_ostream &os) const {
+void TypeLowering::printProperties(llvm::raw_ostream &os,
+                                   unsigned indentation) const {
   auto BOOL = [&](bool b) -> StringRef {
     if (b)
       return "true";
     return "false";
   };
-  os << "Type Lowering for lowered type: " << LoweredType << ".\n"
-     << "Expansion: " << getResilienceExpansion() << "\n"
-     << "isTrivial: " << BOOL(Properties.isTrivial()) << ".\n"
-     << "isFixedABI: " << BOOL(Properties.isFixedABI()) << ".\n"
-     << "isAddressOnly: " << BOOL(Properties.isAddressOnly()) << ".\n"
-     << "isResilient: " << BOOL(Properties.isResilient()) << ".\n"
-     << "isTypeExpansionSensitive: "
-     << BOOL(Properties.isTypeExpansionSensitive()) << ".\n"
-     << "isInfinite: " << BOOL(Properties.isInfinite()) << ".\n"
-     << "isOrContainsRawPointer: " << BOOL(Properties.isOrContainsRawPointer())
-     << ".\n"
-     << "isLexical: " << BOOL(Properties.isLexical()) << ".\n"
-     << "isOrContainsPack: " << BOOL(Properties.isOrContainsPack()) << ".\n"
-     << "isAddressableForDependencies: "
-     << BOOL(Properties.isAddressableForDependencies()) << ".\n"
-     << "hasOnlyDefaultDeinit: "
-     << BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit) << ".\n"
-     << "definitelyIsAddressableForDependencies: " << BOOL(Properties.definitelyIsAddressableForDependencies()) << ".\n"
-     << "definitelyIsOrContainsRawLayout: " << BOOL(Properties.definitelyIsOrContainsRawLayout()) << ".\n"
-     << "\n";
+
+  auto printProperty = [&](StringRef name, StringRef value) {
+    os.indent(indentation) << name << ": " << value << ".\n";
+  };
+
+  os.indent(indentation) << "Expansion: " << getResilienceExpansion() << "\n";
+  printProperty("isTrivial", BOOL(Properties.isTrivial()));
+  printProperty("isEscapable", BOOL(Properties.isEscapable()));
+  printProperty("isNonTrivialOnlyBecauseNonEscapable",
+                BOOL(Properties.isNonTrivialOnlyBecauseNonEscapable()));
+  printProperty("isReferenceCounted", BOOL(isReferenceCounted()));
+  printProperty("isFixedABI", BOOL(Properties.isFixedABI()));
+  printProperty("isAddressOnly", BOOL(Properties.isAddressOnly()));
+  printProperty("isResilient", BOOL(Properties.isResilient()));
+  printProperty("isTypeExpansionSensitive",
+                BOOL(Properties.isTypeExpansionSensitive()));
+  printProperty("isInfinite", BOOL(Properties.isInfinite()));
+  printProperty("isOrContainsRawPointer",
+                BOOL(Properties.isOrContainsRawPointer()));
+  printProperty("isLexical", BOOL(Properties.isLexical()));
+  printProperty("isOrContainsPack", BOOL(Properties.isOrContainsPack()));
+  printProperty("isAddressableForDependencies",
+                BOOL(Properties.isAddressableForDependencies()));
+  printProperty("isOrContainsRawLayout",
+                BOOL(Properties.isOrContainsRawLayout()));
+  printProperty("hasOnlyDefaultDeinit",
+                BOOL(Properties.mayHaveCustomDeinit() == HasOnlyDefaultDeinit));
+  printProperty("isVeryLargeType", BOOL(Properties.isVeryLargeType()));
+  printProperty("definitelyIsAddressableForDependencies",
+                BOOL(Properties.definitelyIsAddressableForDependencies()));
+  printProperty("definitelyIsOrContainsRawLayout",
+                BOOL(Properties.definitelyIsOrContainsRawLayout()));
+  os << "\n";
+}
+
+void TypeLowering::print(llvm::raw_ostream &os) const {
+  os << "Type Lowering for lowered type: " << LoweredType << ".\n";
+  printProperties(os, 0);
+}
+
+void TypeLowering::printForAbstractTypeLayoutInfoBase(
+    llvm::raw_ostream &os, unsigned indentation,
+    llvm::StringRef concreteTypeName) const {
+  os.indent(indentation) << "TypeLowering:\n";
+  os.indent(indentation + 2) << "class: " << concreteTypeName << "\n";
+  printProperties(os, indentation + 2);
 }
 
 void TypeLowering::dump() const {

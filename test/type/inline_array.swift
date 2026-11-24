@@ -101,6 +101,26 @@ let _ = S<[_!of 3]>()
 let _ = S<[Int?of 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
 
+func testEnumElementPattern(_ x: Any) {
+  // FIXME: The diagnostic should only be emitted once.
+  enum E<T> { case x }
+  switch x {
+  case E<[Int of 3]>.x: ()
+    // expected-error@-1 2{{element count must precede inline array element type}}
+  default: ()
+  }
+  if case E<[Int of 3]>.x = x {}
+  // expected-error@-1 2{{element count must precede inline array element type}}
+  _ = {
+    switch x {
+      // FIXME: This should only be emitted once.
+    case E<[Int of 3]>.x: ()
+      // expected-error@-1 2{{element count must precede inline array element type}}
+    default: ()
+    }
+  }
+}
+
 func testEllipsis(_ of: Int) {
   // Make sure this isn't parsed as '<variadic-type> of <missing type>'
   let _ = [of...of]

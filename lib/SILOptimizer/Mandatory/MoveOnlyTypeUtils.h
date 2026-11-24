@@ -137,6 +137,7 @@ partialMutationFeature(PartialMutation::Kind kind) {
   case PartialMutation::Kind::Reinit:
     return {Feature::MoveOnlyPartialReinitialization};
   }
+  llvm_unreachable("covered switch");
 }
 
 /// How a partial mutation (consume/reinit) is illegal for diagnostic emission.

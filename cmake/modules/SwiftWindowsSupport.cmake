@@ -19,8 +19,9 @@ function(swift_windows_include_for_arch arch var)
   set(paths
       "${VCToolsInstallDir}/include"
       "${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt"
-      "${UniversalCRTSdkDir}/Include/${UCRTVersion}/shared"
-      "${UniversalCRTSdkDir}/Include/${UCRTVersion}/um")
+      "${WindowsSdkDir}/Include/${WindowsSDKVersion}/shared"
+      "${WindowsSdkDir}/Include/${WindowsSDKVersion}/um"
+      "${WindowsSdkDir}/Include/${WindowsSDKVersion}/winrt")
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
 
@@ -44,7 +45,7 @@ function(swift_windows_lib_for_arch arch var)
 
   list(APPEND paths
           "${UniversalCRTSdkDir}/Lib/${UCRTVersion}/ucrt/${ARCH}"
-          "${UniversalCRTSdkDir}/Lib/${UCRTVersion}/um/${ARCH}")
+          "${WindowsSdkDir}/Lib/${WindowsSDKVersion}/um/${ARCH}")
 
   set(${var} ${paths} PARENT_SCOPE)
 endfunction()
@@ -52,7 +53,9 @@ endfunction()
 function(swift_windows_get_sdk_vfs_overlay overlay)
   get_filename_component(VCToolsInstallDir ${VCToolsInstallDir} ABSOLUTE)
   get_filename_component(UniversalCRTSdkDir ${UniversalCRTSdkDir} ABSOLUTE)
+  get_filename_component(WindowsSdkDir ${WindowsSdkDir} ABSOLUTE)
   set(UCRTVersion ${UCRTVersion})
+  set(WindowsSDKVersion ${WindowsSDKVersion})
 
   # TODO(compnerd) use a target to avoid re-creating this file all the time
   configure_file("${SWIFT_SOURCE_DIR}/utils/WindowsSDKVFSOverlay.yaml.in"
@@ -72,10 +75,20 @@ function(swift_windows_cache_VCVARS)
   swift_verify_windows_VCVAR(VCToolsInstallDir)
   swift_verify_windows_VCVAR(UniversalCRTSdkDir)
   swift_verify_windows_VCVAR(UCRTVersion)
+  swift_verify_windows_VCVAR(WindowsSdkDir)
+  swift_verify_windows_VCVAR(WindowsSDKVersion)
 
   set(VCToolsInstallDir $ENV{VCToolsInstallDir} CACHE STRING "")
   set(UniversalCRTSdkDir $ENV{UniversalCRTSdkDir} CACHE STRING "")
   set(UCRTVersion $ENV{UCRTVersion} CACHE STRING "")
+  set(WindowsSdkDir $ENV{WindowsSdkDir} CACHE STRING "")
+  set(WindowsSDKVersion $ENV{WindowsSDKVersion} CACHE STRING "")
+
+  # VsDevCmd spells WindowsSDKVersion with a trailing path separator.
+  # Keep the cached value suitable for composing include and library paths.
+  string(REGEX REPLACE "[/\\\\]+$" "" WindowsSDKVersion
+         "${WindowsSDKVersion}")
+  set(WindowsSDKVersion "${WindowsSDKVersion}" CACHE STRING "" FORCE)
 endfunction()
 
 # NOTE(compnerd) we use a macro here as this modifies global variables
@@ -111,4 +124,3 @@ macro(swift_swap_compiler_if_needed target)
     endif()
   endif()
 endmacro()
-

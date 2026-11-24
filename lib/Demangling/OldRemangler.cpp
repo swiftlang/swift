@@ -643,6 +643,12 @@ ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::mangleTypeMetadataMangledNameRef(Node *node,
+                                                          unsigned depth) {
+  // not supported
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleTypeMetadataLazyCache(Node *node,
                                                      unsigned depth) {
   Buffer << "ML";
@@ -1833,7 +1839,13 @@ ManglingError Remangler::mangleImplErasedIsolation(Node *node, unsigned depth) {
 
 ManglingError Remangler::mangleImplCalledOnceFunction(Node *node,
                                                       unsigned depth) {
-  // The old mangler does not encode @called(once).
+  // The old mangler does not encode exactly-once.
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplCalledAtMostOnceFunction(Node *node,
+                                                            unsigned depth) {
+  // The old mangler does not encode at-most-once.
   return ManglingError::Success;
 }
 
@@ -3169,6 +3181,12 @@ ManglingError Remangler::mangleBackDeploymentFallback(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleBackDeploymentCopy(Node *node,
+                                                   unsigned depth) {
+  Buffer << "Twa";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleHasSymbolQuery(Node *node, unsigned depth) {
   Buffer << "TwS";
   return ManglingError::Success;
@@ -3207,5 +3225,10 @@ ManglingError Remangler::mangleMutateAccessor(Node *node, EntityContext &ctx,
 
 ManglingError Remangler::mangleCalledOnceFunctionType(Node *node,
                                                       unsigned depth) {
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
+ManglingError Remangler::mangleCalledAtMostOnceFunctionType(Node *node,
+                                                            unsigned depth) {
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }

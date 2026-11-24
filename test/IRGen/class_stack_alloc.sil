@@ -35,7 +35,8 @@ sil_vtable BigClass {}
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NEXT: call {{.*}} @swift_release(ptr %reference.new)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
 // CHECK-NEXT: ret void
 sil @simple_promote : $@convention(thin) () -> () {
 bb0:
@@ -85,7 +86,8 @@ bb0:
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NEXT: call {{.*}} @swift_setDeallocating(ptr %reference.new)
 // CHECK-NEXT: call swiftcc void @not_inlined_destructor(ptr %reference.new)
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
 // CHECK-NEXT: ret void
 sil @promoted_with_devirtualized_release : $@convention(thin) () -> () {
 bb0:
@@ -101,7 +103,7 @@ bb0:
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bare_alloc_ref
 // CHECK:         %reference.raw = alloca %[[C:[a-zA-Z0-9_]+]], align 8
-// CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.raw)
+// CHECK-NEXT:    call void @llvm.lifetime.end.p0(ptr %reference.raw)
 // CHECK-NEXT:    ret void
 sil @bare_alloc_ref : $@convention(thin) () -> () {
 bb0:
@@ -118,8 +120,9 @@ bb0:
 // CHECK-NEXT: [[M:%.*]] = extractvalue %swift.metadata_response [[MR]], 0
 // CHECK-NEXT: %reference.new = call ptr @swift_initStackObject(ptr [[M]], ptr %reference.raw)
 // CHECK-NOT: call
-// CHECK: call void @llvm.lifetime.end.p0(i64 -1, ptr %reference.new)
-// CHECK-NEXT: ret void
+//   No lifetime marker: the operand is the result of swift_initStackObject,
+//   not a static alloca, and lifetime markers are only valid on allocas.
+// CHECK: ret void
 sil @promoted_with_inlined_devirtualized_release : $@convention(thin) () -> () {
 bb0:
   %o1 = alloc_ref [stack] $TestClass
@@ -141,6 +144,75 @@ bb0:
   %o1 = alloc_ref [stack] $BigClass
   %d = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
   dealloc_ref %d : $BigClass
+  dealloc_stack_ref %o1 : $BigClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// The dealloc_ref operand reaches the stack allocation through a phi.
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @promoted_dealloc_ref_through_phi
+// CHECK:     @swift_initStackObject
+// CHECK-NOT: call void @swift_deallocClassInstance
+// CHECK:     ret void
+sil @promoted_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [stack] $TestClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d1 : $TestClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d2 : $TestClass)
+bb3(%p : $TestClass):
+  dealloc_ref %p : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// StripObjectHeaders marks such an object as bare, so its header is never
+// initialized and must not be passed to the runtime (rdar://192296774).
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @bare_dealloc_ref_through_phi
+// CHECK:     %reference.raw = alloca
+// CHECK-NOT: call {{.*}} @swift_
+// CHECK:     ret void
+sil @bare_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [bare] [stack] $TestClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d1 : $TestClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $TestClass of %o1 : $TestClass
+  br bb3(%d2 : $TestClass)
+bb3(%p : $TestClass):
+  dealloc_ref %p : $TestClass
+  dealloc_stack_ref %o1 : $TestClass
+
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @not_promoted_dealloc_ref_through_phi
+// CHECK:     @swift_allocObject
+// CHECK:     call void @swift_deallocClassInstance
+// CHECK:     ret void
+sil @not_promoted_dealloc_ref_through_phi : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%c : $Builtin.Int1):
+  %o1 = alloc_ref [stack] $BigClass
+  cond_br %c, bb1, bb2
+bb1:
+  %d1 = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
+  br bb3(%d1 : $BigClass)
+bb2:
+  %d2 = begin_dealloc_ref %o1 : $BigClass of %o1 : $BigClass
+  br bb3(%d2 : $BigClass)
+bb3(%p : $BigClass):
+  dealloc_ref %p : $BigClass
   dealloc_stack_ref %o1 : $BigClass
 
   %r = tuple()

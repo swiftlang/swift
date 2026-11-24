@@ -116,11 +116,12 @@ struct ModulePassContext : Context, CustomStringConvertible {
   ///
   /// Only a single `transform` can be alive at the same time, i.e. it's not allowed to nest
   /// calls to `transform`.
-  func transform(function: Function, _ runOnFunction: (FunctionPassContext) -> ()) {
+  func transform<T>(function: Function, _ runOnFunction: (FunctionPassContext) -> T) -> T {
     let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(function.bridged)
     let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
-    runOnFunction(nestedContext)
+    let r = runOnFunction(nestedContext)
     bridgedPassContext.deinitializedNestedPassContext()
+    return r
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
@@ -184,6 +185,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   /// The types of all non-copyable nominal types declared in this module for
   /// which IRGen may emit type metadata.
+  /// Also all exported type specializations.
   var typesWithEmittedMetadata: [Type] {
     var types: [Type] = []
     withUnsafeMutablePointer(to: &types) { typesPtr in
@@ -192,6 +194,21 @@ struct ModulePassContext : Context, CustomStringConvertible {
       }
     }
     return types
+  }
+
+  /// The conformances of all non-generic witness tables in this module which
+  /// IRGen emits eagerly, i.e. the ones of `@export(interface)` conformances.
+  /// Also the conformances of exported type specializations.
+  var conformancesWithEagerlyEmittedWitnessTables: [Conformance] {
+    var conformances: [Conformance] = []
+    withUnsafeMutablePointer(to: &conformances) { conformancesPtr in
+      bridgedPassContext.visitConformancesWithEagerlyEmittedWitnessTables(conformancesPtr) {
+        (conformancesPtr, bridgedConformance) in
+        conformancesPtr.assumingMemoryBound(to: [Conformance].self).pointee.append(
+          Conformance(bridged: bridgedConformance))
+      }
+    }
+    return conformances
   }
 
   func createEmptyFunction(
@@ -216,12 +233,6 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   func mangleAsyncRemoved(from function: Function) -> String {
     return String(taking: bridgedPassContext.mangleAsyncRemoved(function.bridged))
-  }
-
-  func mangle(withDeadArguments: [Int], from function: Function) -> String {
-    withDeadArguments.withBridgedArrayRef { bridgedArgIndices in
-      String(taking: bridgedPassContext.mangleWithDeadArgs(bridgedArgIndices, function.bridged))
-    }
   }
 
   func erase(function: Function) {

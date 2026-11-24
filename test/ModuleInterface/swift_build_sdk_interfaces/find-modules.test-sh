@@ -1,4 +1,5 @@
-RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output > %t.txt
+# Pipe through cat: on Windows, pool workers still starting up can overwrite output redirected straight to a file, so we do a hack with |cat
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output | cat > %t.txt
 RUN: %FileCheck %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 
@@ -10,7 +11,7 @@ CHECK-DAG: System/iOSSupport/usr/lib/swift{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz
 
 NEGATIVE-NOT: BAD
 
-RUN: env SDKROOT=%S/Inputs/mock-sdk/ %swift_build_sdk_interfaces -v -n -o %t/output > %t.txt
+RUN: env SDKROOT=%S/Inputs/mock-sdk/ %swift_build_sdk_interfaces -v -n -o %t/output | cat > %t.txt
 RUN: %FileCheck %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 
@@ -29,7 +30,7 @@ CHECK-WITH-STDLIB: Swift.swiftmodule{{\\|/}}{{abc|def}}.swiftinterface -o
 CHECK-WITH-STDLIB: .swiftinterface -o
 
 # ...unless we pass -skip-stdlib.
-RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -n -o %t/output -skip-stdlib > %t.txt
+RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -n -o %t/output -skip-stdlib | cat > %t.txt
 RUN: %FileCheck -check-prefix CHECK-SKIP-STDLIB %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE-SKIP-STDLIB %s < %t.txt
 
@@ -37,7 +38,7 @@ CHECK-SKIP-STDLIB: .swiftinterface -o
 NEGATIVE-SKIP-STDLIB-NOT: Swift.swiftmodule
 
 # Check custom searching based on positional arguments.
-RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/PrivateFrameworks > %t.txt
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/PrivateFrameworks | cat > %t.txt
 RUN: %FileCheck -check-prefix CHECK-CUSTOM-PATHS %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE-CUSTOM-PATHS %s < %t.txt
 
@@ -47,7 +48,7 @@ CHECK-CUSTOM-PATHS-DAG: usr/lib/swift{{\\|/}}Normal.swiftmodule{{\\|/}}xyz.swift
 CHECK-CUSTOM-PATHS-DAG: System/iOSSupport/usr/lib/swift{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftmodule
 NEGATIVE-CUSTOM-PATHS-NOT: System/Library/Frameworks/
 
-RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/Frameworks System/Library/PrivateFrameworks > %t.txt
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/Frameworks System/Library/PrivateFrameworks | cat > %t.txt
 RUN: %FileCheck -check-prefix CHECK-CUSTOM-PATHS -check-prefix CHECK-NORMAL-PATHS %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 

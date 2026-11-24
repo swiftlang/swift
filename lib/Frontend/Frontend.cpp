@@ -17,7 +17,6 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -37,7 +36,6 @@
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
-#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -59,6 +57,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
@@ -66,6 +65,9 @@
 using namespace swift;
 
 CompilerInstance::CompilerInstance() = default;
+CompilerInstance::CompilerInstance(
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
+    : SourceMgr(std::move(FS)) {}
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
@@ -161,6 +163,11 @@ CompilerInvocation::getSerializedDiagnosticsPathForAtMostOnePrimary() const {
   return getPrimarySpecificPathsForAtMostOnePrimary()
       .SupplementaryOutputs.LLVMBitcodeDiagnosticsPath;
 }
+std::string
+CompilerInvocation::getSARIFDiagnosticsPathForAtMostOnePrimary() const {
+  return getPrimarySpecificPathsForAtMostOnePrimary()
+      .SupplementaryOutputs.SARIFDiagnosticsPath;
+}
 std::string CompilerInvocation::getTBDPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
          "TBDPath only makes sense when the whole module can be seen");
@@ -204,7 +211,8 @@ std::string CompilerInvocation::getAPIDescriptorPathForWholeModule() const {
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
-    const SupplementaryOutputPaths &outs, const ModuleDecl *module) const {
+    const SupplementaryOutputPaths &outs, const ModuleDecl *module,
+    llvm::vfs::FileSystem &FS) const {
   const FrontendOptions &opts = getFrontendOptions();
 
   SerializationOptions serializationOpts;
@@ -228,8 +236,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.PublicDependentLibraries =
       getIRGenOptions().PublicLinkLibraries;
   serializationOpts.SDKName = getLangOptions().SDKName;
-  serializationOpts.SDKVersion = swift::getSDKBuildVersion(
-                                          getSearchPathOptions().getSDKPath());
+  serializationOpts.SDKVersion =
+      swift::getSDKBuildVersion(getSearchPathOptions().getSDKPath(), FS);
   serializationOpts.ABIDescriptorPath = outs.ABIDescriptorOutputPath.c_str();
   serializationOpts.emptyABIDescriptor = opts.emptyABIDescriptor;
 
@@ -495,7 +503,7 @@ void CompilerInstance::setupDependencyTrackerIfNeeded() {
   DepTracker = std::make_unique<DependencyTracker>(*collectionMode);
 }
 
-bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
+bool CompilerInstance::setupCASIfNeeded() {
   if (!getInvocation().requiresCAS())
     return false;
 
@@ -514,9 +522,16 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     }
     std::tie(CAS, ResultCache) = *MaybeDB;
   }
+  return false;
+}
+
+bool CompilerInstance::setupCompileJobBaseKeyIfNeeded(
+    ArrayRef<const char *> Args) {
+  if (!getInvocation().requiresCAS())
+    return false;
 
   // create baseline key.
-  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
+  auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args, *BaseFS);
   if (!BaseKey) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas,
                          "creating base cache key",
@@ -591,14 +606,14 @@ void CompilerInstance::setupCachingDiagnosticsProcessorIfNeeded() {
 bool CompilerInstance::setup(const CompilerInvocation &Invoke,
                              std::string &Error, ArrayRef<const char *> Args) {
   Invocation = Invoke;
+  BaseFS = SourceMgr.getFileSystem();
 
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
     return true;
   }
 
   setupDependencyTrackerIfNeeded();
-  setupOutputBackend();
 
   // If initializing the overlay file system fails there's no sense in
   // continuing because the compiler will read the wrong files.
@@ -606,6 +621,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
     Error = "Setting up virtual file system overlays failed";
     return true;
   }
+
+  // Compute the cache key after the CAS file system is set up so that a
+  // missing include tree is diagnosed with a better error message first.
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
+    return true;
+  }
+  setupOutputBackend();
   setUpLLVMArguments();
   setUpDiagnosticOptions();
 
@@ -665,10 +688,16 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
   // This is the fast path for setup an instance for replay but cannot run
   // regular compilation.
   Invocation = Invoke;
+  BaseFS = SourceMgr.getFileSystem();
 
   setSharedCASInstances(CAS, Cache);
-  if (setupCASIfNeeded(Args)) {
+  if (setupCASIfNeeded()) {
     Error = "Setting up CAS failed";
+    return true;
+  }
+
+  if (setupCompileJobBaseKeyIfNeeded(Args)) {
+    Error = "Setting up compile job cache key failed";
     return true;
   }
 
@@ -684,6 +713,51 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
           Invocation.getFrontendOptions().RequestedAction)) {
     Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
     return true;
+  }
+
+  if (!CASOpts.DepscanCASFileSystemRootID.empty() &&
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::ScanDependencies) {
+    if (CASOpts.requireCASFS()) {
+      Diagnostics.diagnose(
+          SourceLoc(), diag::error_option_incompatible, "-scanner-cas-fs",
+          "-clang-include-tree-root | -clang-include-tree-filelist | "
+          "-input-file-key | -bridging-header-pch-key");
+      return true;
+    }
+
+    auto reportError = [&](llvm::Error E) -> bool {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                           toString(std::move(E)));
+      return true;
+    };
+
+    auto ID = CAS->parseID(CASOpts.DepscanCASFileSystemRootID);
+    if (!ID)
+      return reportError(ID.takeError());
+    auto CASFS = llvm::cas::createCASFileSystem(CAS, *ID);
+    if (!CASFS)
+      return reportError(CASFS.takeError());
+
+    if (!CASOpts.CASFSEscapePaths.empty()) {
+      SmallVector<StringRef, 4> EscapePaths;
+      for (const auto &Path : CASOpts.CASFSEscapePaths) {
+        EscapePaths.push_back(Path);
+      }
+      auto SandboxFS = llvm::vfs::createSandboxingFileSystem(
+          SourceMgr.getFileSystem(), EscapePaths);
+      if (!SandboxFS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                             toString(SandboxFS.takeError()));
+        return true;
+      }
+      auto OverlayFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+          std::move(*CASFS));
+      OverlayFS->pushOverlay(std::move(*SandboxFS));
+      SourceMgr.setFileSystem(std::move(OverlayFS));
+    } else {
+      SourceMgr.setFileSystem(std::move(*CASFS));
+    }
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {
@@ -757,9 +831,9 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
            Invocation.getFrontendOptions().InputsAndOutputs.getAllInputs()) {
         StringRef InputPath = Input.getFileName();
         // An input that is not on disk is provided by the CAS file system.
-        if (InputPath == "-" || !llvm::sys::fs::exists(InputPath))
+        if (InputPath == "-" || !BaseFS->exists(InputPath))
           continue;
-        auto Buffer = llvm::MemoryBuffer::getFile(InputPath);
+        auto Buffer = BaseFS->getBufferForFile(InputPath);
         if (!Buffer) {
           Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
                                InputPath, Buffer.getError().message());
@@ -773,9 +847,11 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     SourceMgr.setFileSystem(std::move(OverlayVFS));
   }
 
+  // The files redirected by the overlays are read from the base file system,
+  // even when the CAS file system is used.
   auto ExpectedOverlay =
       Invocation.getSearchPathOptions().makeOverlayFileSystem(
-          SourceMgr.getFileSystem());
+          SourceMgr.getFileSystem(), BaseFS);
   if (!ExpectedOverlay) {
     llvm::handleAllErrors(
         ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
@@ -808,7 +884,9 @@ void CompilerInstance::setUpLLVMArguments() {
            i != e; ++i)
         Args.push_back(Invocation.getFrontendOptions().LLVMArgs[i].c_str());
       Args.push_back(nullptr);
-      llvm::cl::ParseCommandLineOptions(Args.size()-1, Args.data());
+      llvm::cl::ParseCommandLineOptions(Args.size() - 1, Args.data(),
+                                        /*Overview=*/"", /*Errs=*/nullptr,
+                                        SourceMgr.getFileSystem().get());
     }
   }
 }
@@ -818,7 +896,7 @@ void CompilerInstance::setUpDiagnosticOptions() {
   // the diagnostic engine. However, it needs to be reconfigured here in case
   // there is any new configuration that should effect diagnostics for the rest
   // of the compile.
-  Invocation.setUpDiagnosticEngine(Diagnostics);
+  Invocation.setUpDiagnosticEngine(Diagnostics, *SourceMgr.getFileSystem());
 }
 
 // The ordering of ModuleLoaders is important!
@@ -1856,6 +1934,11 @@ CompilerInstance::getSourceFileParsingOptions(bool forPrimary) const {
     opts |= ParsingFlags::SuppressWarnings;
   }
 
+  if (action == ActionType::ScanDependencies) {
+    // Leave source-file parse diagnostics to the compile job.
+    opts |= ParsingFlags::SuppressParserDiagnostics;
+  }
+
   // Turn off new parser round-trip and diagnostics checking for
   //   - secondary files
   //     - Only want to verify on primary files, no point checking more than
@@ -1995,7 +2078,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   {
     FrontendStatsTracer tracer(silModule->getASTContext().Stats,
                                "SIL verification, pre-optimization");
-    silModule->verify();
+    // OwnershipModelEliminator verifies ownership before lowering it.
+    silModule->verify(/*checkLinearLifetime=*/false);
   }
 
   performSILOptimizations(Invocation, silModule);
@@ -2029,74 +2113,6 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
 
-  if (opts.DumpAbstractLayout) {
-    auto &sf = getPrimaryOrMainSourceFile();
-
-    for (auto *decl : sf.getTopLevelDecls()) {
-      auto *structDecl = dyn_cast<StructDecl>(decl);
-      if (!structDecl)
-        continue;
-      if (auto layout = computeAbstractStructLayout(
-              structDecl, Invocation.getIRGenOptions())) {
-        llvm::outs() << structDecl->getName() << ":\n";
-        llvm::outs() << "  size: " << layout->typeLayout.size << "\n";
-        llvm::outs() << "  alignment: " << layout->typeLayout.alignment << "\n";
-        llvm::outs() << "  stride: " << layout->typeLayout.stride << "\n";
-        llvm::outs() << "  bitwiseCopyable: "
-                     << (layout->typeLayout.bitwiseCopyable ? "true" : "false")
-                     << "\n";
-        llvm::outs() << "  isOpaque: "
-                     << (layout->typeLayout.isOpaque ? "true" : "false") << "\n";
-        llvm::outs() << "  fields:\n";
-        for (auto &field : layout->fields) {
-          llvm::outs() << "    " << field.name << ": "
-                       << field.typeLayout.mangledName
-                       << ", offset=" << field.offset
-                       << ", size=" << field.typeLayout.size
-                       << ", isOpaque="
-                       << (field.typeLayout.isOpaque ? "true" : "false")
-                       << ", bitwiseCopyable="
-                       << (field.typeLayout.bitwiseCopyable ? "true" : "false")
-                       << "\n";
-        }
-      }
-    }
-  }
-
-  if (opts.DumpHiddenTypeLayouts) {
-    // Dump every hidden-type layout known to this compilation:
-    // both local and imported.
-    auto dumpHiddenLayouts = [](ModuleDecl *M) {
-      auto layouts = M->getSortedHiddenTypeLayouts();
-      if (layouts.empty())
-        return;
-      llvm::outs() << "Module: " << M->getName() << "\n";
-      for (auto &entry : layouts) {
-        const auto &layout = entry.second;
-        llvm::outs() << "  " << entry.first
-                     << ": size=" << layout.size
-                     << ", alignment=" << layout.alignment
-                     << ", stride=" << layout.stride
-                     << ", bitwiseCopyable="
-                     << (layout.bitwiseCopyable ? "true" : "false")
-                     << ", opaque=" << (layout.isOpaque ? "true" : "false")
-                     << "\n";
-      }
-    };
-
-    dumpHiddenLayouts(getMainModule());
-    SmallVector<ModuleDecl *, 8> sortedLoaded;
-    for (auto &entry : ctx.getLoadedModules())
-      sortedLoaded.push_back(entry.second);
-    llvm::sort(sortedLoaded, [](ModuleDecl *a, ModuleDecl *b) {
-      return a->getName().str() < b->getName().str();
-    });
-    for (ModuleDecl *M : sortedLoaded) {
-      if (M == getMainModule())
-        continue;
-      dumpHiddenLayouts(M);
-    }
-  }
 }
 
 bool CompilerInstance::isCancellationRequested() const {
@@ -2121,66 +2137,4 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
-}
-
-std::optional<AbstractStructLayout>
-swift::computeAbstractStructLayout(const StructDecl *decl,
-                                   const IRGenOptions &irgenOpts) {
-  auto *mod = decl->getModuleContext();
-  IRABIDetailsProvider abiProvider(*mod, irgenOpts);
-
-  uint64_t currentOffset = 0;
-  uint64_t maxAlignment = 1;
-  bool allBitwiseCopyable = true;
-  bool anyOpaque = false;
-  AbstractStructLayout result;
-
-  for (auto *field : decl->getStoredProperties()) {
-    auto fieldType = field->getInterfaceType();
-    auto *fieldNominal = fieldType->getAnyNominal();
-    if (!fieldNominal)
-      return std::nullopt;
-
-    AbstractFieldLayout entry;
-    entry.offset = 0;
-    entry.name = field->getName().str();
-
-    if (auto clangLayout = computeClangAbstractLayout(fieldNominal)) {
-      entry.typeLayout = *clangLayout;
-      if (!clangLayout->bitwiseCopyable)
-        allBitwiseCopyable = false;
-      if (clangLayout->isOpaque)
-        anyOpaque = true;
-    } else if (auto sizeAlign = abiProvider.getTypeSizeAlignment(fieldNominal)) {
-      entry.typeLayout.mangledName =
-          Mangle::ASTMangler(fieldNominal->getASTContext())
-              .mangleNominalType(fieldNominal);
-      entry.typeLayout.size = (uint64_t)sizeAlign->size;
-      entry.typeLayout.alignment = (uint64_t)sizeAlign->alignment;
-      entry.typeLayout.stride = llvm::alignTo(sizeAlign->size, sizeAlign->alignment);
-      entry.typeLayout.bitwiseCopyable = fieldType->isBitwiseCopyable();
-      // Hiding fields of Swift types isn't currently supported, so the layout
-      // can never be opaque.
-      entry.typeLayout.isOpaque = false;
-      if (!entry.typeLayout.bitwiseCopyable)
-        allBitwiseCopyable = false;
-    } else {
-      return std::nullopt;
-    }
-
-    uint64_t fieldOffset = llvm::alignTo(currentOffset, entry.typeLayout.alignment);
-    entry.offset = fieldOffset;
-    result.fields.push_back(entry);
-
-    currentOffset = fieldOffset + entry.typeLayout.size;
-    maxAlignment = std::max(maxAlignment, entry.typeLayout.alignment);
-  }
-
-  result.typeLayout.size = llvm::alignTo(currentOffset, maxAlignment);
-  result.typeLayout.alignment = maxAlignment;
-  result.typeLayout.stride = llvm::alignTo(result.typeLayout.size, maxAlignment);
-  result.typeLayout.bitwiseCopyable = allBitwiseCopyable;
-  result.typeLayout.isOpaque = anyOpaque;
-
-  return result;
 }

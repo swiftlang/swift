@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -verify %s
+
+// Negative tests for parsing the `diagnose` instruction's required `[kind]`
+// attribute.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Klass {}
+
+sil [ossa] @diagnose_missing_attribute : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  diagnose %1 : $Klass
+  // expected-error @-1 {{diagnose requires an attribute like '[unpermitted_copy]'}}
+  destroy_value %1 : $Klass
+  destroy_value %0 : $Klass
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @diagnose_invalid_attribute : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = copy_value %0 : $Klass
+  diagnose [bogus] %1 : $Klass
+  // expected-error @-1 {{Attribute '[bogus]' is not known to the diagnose instruction}}
+  destroy_value %1 : $Klass
+  destroy_value %0 : $Klass
+  %r = tuple ()
+  return %r : $()
+}

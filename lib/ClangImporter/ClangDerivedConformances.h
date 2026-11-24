@@ -18,16 +18,34 @@
 
 namespace swift {
 
-/// Whether a C++ record decl contains a type member named "iterator_category",
-/// a heuristic we use to determine whether that record type is an iterator.
-///
-/// This function returns true if there is exactly one public type member named
-/// "iterator_category", but does not look for inherited members. Note that, as
-/// a result of these limitations, it may return false even if that record type
-/// is usable as an iterator.
-bool hasIteratorCategory(const clang::CXXRecordDecl *clangDecl);
+/// Whether a C++ record decl has a public type member named "iterator_category"
+/// (or, from C++20 on, "iterator_concept"), a heuristic we use to determine
+/// whether that record type is an iterator. The member may be declared by the
+/// record itself, inherited from a base class, or provided by an explicit
+/// specialization of std::iterator_traits.
+bool hasIteratorCategoryOrIteratorConcept(
+    clang::Sema &sema, const clang::CXXRecordDecl *clangDecl);
 
 bool isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl);
+
+/// If \p decl is a constructor of a non-Escapable 'std::optional', cache the
+/// lifetime dependence of its result, at \p returnIdx, for \p result.
+///
+/// Returns true if it cached one. Returns false, leaving \p result to the
+/// general lifetime inference, if \p decl is not such a constructor, or if one
+/// of its arguments is neither the wrapped value nor a tag, so its dependence
+/// cannot be known.
+///
+/// 'std::optional' stores copies of its constructor arguments, so the result
+/// copies the lifetime of each argument. The 'std::nullopt_t' and
+/// 'std::in_place_t' tags carry no lifetime, so an optional constructed from
+/// tags alone, or from nothing, is immortal. This includes the constructor
+/// synthesized for 'CxxOptional', the internal base classes standard libraries
+/// build 'std::optional' on, and the constructors those classes inherit.
+bool inferStdOptionalConstructorDependence(ClangImporter::Implementation &Impl,
+                                           const clang::FunctionDecl *decl,
+                                           AbstractFunctionDecl *result,
+                                           size_t returnIdx);
 
 void deriveAutomaticCxxConformances(ClangImporter::Implementation &Impl,
                                     NominalTypeDecl *result,

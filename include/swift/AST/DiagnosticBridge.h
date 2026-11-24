@@ -21,7 +21,10 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
+#include <string>
 
 namespace swift {
 /// Declare the bridge between swift-syntax and swift-frontend for diagnostics
@@ -43,8 +46,12 @@ class DiagnosticBridge {
 
 public:
   /// Enqueue diagnostics.
+  ///
+  /// Pass \c std::nullopt for a diagnostic that has no source location: there
+  /// is no buffer to render it against, so only serialization records it and
+  /// \c flush ignores it.
   void enqueueDiagnostic(SourceManager &SM, const DiagnosticInfo &Info,
-                         unsigned innermostBufferID);
+                         std::optional<unsigned> innermostBufferID);
 
   /// Emit a single diagnostic without location information.
   void emitDiagnosticWithoutLocation(
@@ -53,6 +60,16 @@ public:
   /// Flush all enqueued diagnostics.
   void flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
              bool forceColors);
+
+  /// Discard the enqueued diagnostics without emitting them.
+  void clearQueuedDiagnostics();
+
+  /// Take the enqueued diagnostics as a SARIF log, leaving the queue empty.
+  ///
+  /// Returns an error if the log cannot be produced; the caller writes it out,
+  /// so that a failure to do so is reported like any other output.
+  llvm::Expected<std::string>
+  takeQueuedDiagnosticsAsSARIF(StringRef compilerVersion);
 
   /// Retrieve the stack of source buffers from the provided location out to
   /// a physical source file, with source buffer IDs for each step along the way

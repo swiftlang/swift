@@ -51,7 +51,7 @@ AsyncHandlerDesc AsyncHandlerDesc::get(const ValueDecl *Handler,
   auto HandlerParams = HandlerTy->getParams();
   if (HandlerParams.size() == 1) {
     auto ParamTy =
-        HandlerParams.back().getPlainType()->getAs<BoundGenericType>();
+        HandlerParams.back().getPlainType()->getAs<EnumType>();
     if (ParamTy && ParamTy->isResult()) {
       auto GenericArgs = ParamTy->getGenericArgs();
       assert(GenericArgs.size() == 2 && "Result should have two params");
@@ -147,13 +147,14 @@ std::optional<swift::Type> AsyncHandlerDesc::getErrorType() const {
           params().size() == 1 &&
           "Result handler should have the Result type as the only parameter");
       auto ResultType =
-          params().back().getPlainType()->getAs<BoundGenericType>();
+          params().back().getPlainType()->castTo<EnumType>();
       auto GenericArgs = ResultType->getGenericArgs();
       assert(GenericArgs.size() == 2 && "Result should have two params");
       // The second (last) generic parameter of the Result type is the error
       // type.
       return GenericArgs.back();
     }
+    llvm_unreachable("covered switch");
   } else {
     return std::nullopt;
   }
@@ -259,11 +260,12 @@ AsyncHandlerDesc::getSuccessParamAsyncReturnType(swift::Type Ty) const {
   }
   case HandlerType::RESULT: {
     // Result<T, U> maps to T.
-    return Ty->castTo<BoundGenericType>()->getGenericArgs()[0];
+    return Ty->castTo<EnumType>()->getGenericArgs()[0];
   }
   case HandlerType::INVALID:
     llvm_unreachable("Invalid handler type");
   }
+  llvm_unreachable("covered switch");
 }
 
 Identifier AsyncHandlerDesc::getAsyncReturnTypeLabel(size_t Index) const {

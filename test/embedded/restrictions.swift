@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -Wwarning EmbeddedRestrictions -verify-additional-prefix nonembedded-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -verify-additional-prefix embedded-
-// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_WEAK -DSUPPRESS_CASTS
+// RUN: %target-swift-frontend -typecheck %s -suppress-warnings -enable-experimental-feature Embedded -DSUPPRESS_CASTS
 // REQUIRES: swift_feature_Embedded
 
 // ---------------------------------------------------------------------------
@@ -34,28 +34,6 @@ struct SomeStruct {
       0
     }
   }
-}
-
-// ---------------------------------------------------------------------------
-// weak/unowned references
-// ---------------------------------------------------------------------------
-
-// Note: this have always been an error in Embedded Swift. Make sure they stay
-// that way, but are emitted as warnings when the restrictions are enabled.
-
-public class MyClass { }
-
-public struct MyStruct {
-  #if !SUPPRESS_WEAK
-  var normalVar: MyClass
-  weak var weakVar: MyClass? // expected-nonembedded-warning {{attribute 'weak' cannot be used in Embedded Swift}}
-  // expected-embedded-error@-1 {{attribute 'weak' cannot be used in Embedded Swift}}
-
-  unowned var unownedVar: MyClass // expected-nonembedded-warning {{attribute 'unowned' cannot be used in Embedded Swift}}
-  // expected-embedded-error @-1{{attribute 'unowned' cannot be used in Embedded Swift}}
-  #endif
-
-  unowned(unsafe) var unownedUnsafe: MyClass
 }
 
 // ---------------------------------------------------------------------------
@@ -189,3 +167,23 @@ func openme(p: any P) {
   // expected-warning@+1{{cannot open existential type 'any P' when passing it as an argument to global function 'acceptP' in Embedded Swift}}
   acceptP(p)
 }
+
+// ---------------------------------------------------------------------------
+// 'dynamic' and dynamic replacement are ignored
+// ---------------------------------------------------------------------------
+
+dynamic func dynamicFunc() { } // expected-warning{{global function 'dynamicFunc()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{1-9=}}
+
+struct HasDynamicMembers {
+  dynamic var stored: Int = 0 // expected-warning{{property 'stored' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic var computed: Int { 0 } // expected-warning{{property 'computed' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic subscript(i: Int) -> Int { i } // expected-warning{{subscript 'subscript(_:)' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+  dynamic init() { } // expected-warning{{initializer 'init()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+}
+
+class HasDynamicMethod {
+  dynamic func method() { } // expected-warning{{instance method 'method()' cannot be 'dynamic' in Embedded Swift; 'dynamic' will be ignored}}{{3-11=}}
+}
+
+@_dynamicReplacement(for: dynamicFunc()) // expected-warning{{global function 'replacementFunc()' cannot be a dynamic replacement in Embedded Swift; '@_dynamicReplacement' will be ignored}}{{1-42=}}
+func replacementFunc() { }

@@ -388,7 +388,7 @@ bool SILPerformanceInliner::isAutoDiffLinearMapWithControlFlow(
   // We now need to check if this argument is an enum and named like an autodiff
   // branch tracing enum.
   if (auto *arg = dyn_cast<SILFunctionArgument>(val)) {
-    if (auto *enumDecl = arg->getType().getEnumOrBoundGenericEnum()) {
+    if (auto *enumDecl = arg->getType().getEnumDecl()) {
       return enumDecl->getName().str().starts_with(
           LinearMapBranchTracingEnumPrefix);
     }
@@ -478,6 +478,13 @@ bool isAllocator(SILFunction *callee) {
 //   %topPb = partial_apply(..., %pb, ...)
 //   %tuple = tuple(..., %topPb)
 //   return %tuple
+// (IV), where %pb comes from (I), (II), or (III):
+//   %convertedPb = convert_function %pb to ...
+//   %subsetPb = partial_apply %subsetThunk(%convertedPb)
+//   %reabstractedPb = partial_apply %reabstractionThunk(%subsetPb)
+//   %topPb = partial_apply(..., %reabstractedPb, ...)
+//   %tuple = tuple(..., %topPb)
+//   return %tuple
 static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
   auto *applyOfVJP = dyn_cast<ApplyInst>(applySiteOfVJP.getInstruction());
   if (applyOfVJP == nullptr)
@@ -511,7 +518,46 @@ static bool hasPullbackOnlyDirectUses(FullApplySite applySiteOfVJP) {
     return use ? use->getUser() : nullptr;
   };
 
+  // Treat reabstraction thunks and AutoDiff subset
+  // parameter thunks as transparent adapters.
+  auto isPullbackAdapter = [](PartialApplyInst *pai, SILValue pullback) {
+    if (pai->getNumArguments() != 1 || pai->getArgument(0) != pullback ||
+        !pullback->getType().isFunction())
+      return false;
+
+    auto *callee = pai->getReferencedFunctionOrNull();
+    if (!callee)
+      return false;
+    if (callee->isThunk() == IsReabstractionThunk)
+      return true;
+
+    swift::Demangle::Context ctx;
+    if (auto *root = ctx.demangleSymbolAsNode(callee->getName())) {
+      return root->findByKind(
+                 swift::Demangle::Node::Kind::AutoDiffSubsetParametersThunk,
+                 /*maxDepth=*/1) != nullptr;
+    }
+    return false;
+  };
+
+  auto lookThroughSingleUseConversions = [&](SILValue value) {
+    while (auto *conversion =
+               dyn_cast_or_null<ConvertFunctionInst>(getSingleUser(value)))
+      value = conversion;
+    return value;
+  };
+
+  calleePullback = lookThroughSingleUseConversions(calleePullback);
   auto *pai = dyn_cast_or_null<PartialApplyInst>(getSingleUser(calleePullback));
+  while (pai && isPullbackAdapter(pai, calleePullback)) {
+    SILValue nextPullback = lookThroughSingleUseConversions(pai);
+    auto *next =
+        dyn_cast_or_null<PartialApplyInst>(getSingleUser(nextPullback));
+    if (!next)
+      break;
+    calleePullback = nextPullback;
+    pai = next;
+  }
   if (!pai)
     return false;
 
@@ -826,7 +872,7 @@ bool SILPerformanceInliner::isProfitableToInline(
         auto Subs = FAI.getSubstitutionMap();
 
         // Bail if it is not a generic call or inlining of generics is forbidden.
-        if (!EnableSILInliningOfGenerics || !Subs.hasAnySubstitutableParams())
+        if (!EnableSILInliningOfGenerics || !Subs.isEffectivelyGeneric())
           continue;
 
         if (!isa<FunctionRefInst>(def) && !isa<ClassMethodInst>(def) &&
@@ -863,10 +909,10 @@ bool SILPerformanceInliner::isProfitableToInline(
                      FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
-      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+      } else if (isa<LoadInst>(&I) || isa<LoadBorrowInst>(&I)) {
         // Check if it's a load from a stack location in the caller. Such a load
         // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(LI->getOperand()))
+        if (constTracker.isStackAddrInCaller(I.getOperand(0)))
           BlockW.updateBenefit(Benefit, RemovedLoadBenefit);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         // Check if it's a store to a stack location in the caller. Such a load
@@ -1481,9 +1527,12 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     // unconditionally inline the function.
     //
     // If for whatever reason we can not inline this function, inlineFullApply
-    // will assert, so we are safe making this assumption.
-    SILInliner::inlineFullApply(AI, SILInliner::InlineKind::PerformanceInline,
-                                FuncBuilder, deleter);
+    // will return nullptr.
+    if (!SILInliner::inlineFullApply(AI,
+                                     SILInliner::InlineKind::PerformanceInline,
+                                     FuncBuilder, deleter)) {
+      continue;
+    }
     // When inlining an OSSA function into a non-OSSA function, ownership of
     // nonescaping closures is lowered.  At that point, they are recognized as
     // stack users.  Since they weren't recognized as such before, they may not
@@ -1506,8 +1555,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
         invalidatedStackNesting = false;
       }
 
-      Caller->verify();
-      pm->runSwiftFunctionVerification(Caller);
+      pm->runVerification(Caller);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -1525,8 +1573,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // find into it, do so now. This makes it easier to catch verification bugs in
   // the inliner without running the entire inliner.
   if (EnableVerifyAfterInlining) {
-    Caller->verify();
-    pm->runSwiftFunctionVerification(Caller);
+    pm->runVerification(Caller);
   }
 
   return true;

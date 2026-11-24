@@ -7,12 +7,12 @@ protocol P<Primary> {
 
 extension P {
   func testCopyability(_ a: Self.Primary,
-                       _ b: Self.Secondary) {} // expected-error {{parameter of noncopyable type 'Self.Secondary'}} // expected-note 3{{}}
+                       _ b: Self.Secondary) {} // expected-error {{parameter of non-'Copyable' type 'Self.Secondary'}} // expected-note 3{{}}
 }
 
 extension P where Self.Primary: ~Copyable {
-  func withNoncopyablePrimary(_ a: Self.Primary,      // expected-error {{parameter of noncopyable type 'Self.Primary'}} // expected-note 3{{}}
-                              _ b: Self.Secondary) {} // expected-error {{parameter of noncopyable type 'Self.Secondary'}} // expected-note 3{{}}
+  func withNoncopyablePrimary(_ a: Self.Primary,      // expected-error {{parameter of non-'Copyable' type 'Self.Primary'}} // expected-note 3{{}}
+                              _ b: Self.Secondary) {} // expected-error {{parameter of non-'Copyable' type 'Self.Secondary'}} // expected-note 3{{}}
 }
 
 
@@ -21,7 +21,7 @@ protocol Derived5: Base {
   associatedtype Elm: ~Copyable
   // expected-warning@-1 {{redeclaration of associated type 'Elm' from protocol 'Base' is better expressed as a 'where' clause on the protocol}}
 
-  func check(_: Elm) // expected-error {{parameter of noncopyable type 'Self.Elm' must specify ownership}} // expected-note 3{{}}
+  func check(_: Elm) // expected-error {{parameter of non-'Copyable' type 'Self.Elm' must specify ownership}} // expected-note 3{{}}
 }
 
 protocol IterProto<Element>: ~Copyable {
@@ -41,7 +41,7 @@ protocol TestSameTypeInverses<A>: ~Copyable {
 
   associatedtype Two: Iterable
 
-  func check(_ one: One.Element) // expected-error {{parameter of noncopyable type 'Self.A' must specify ownership}} // expected-note 3{{}}
+  func check(_ one: One.Element) // expected-error {{parameter of non-'Copyable' type 'Self.A' must specify ownership}} // expected-note 3{{}}
   func check(_ one: Two.Element)
 }
 protocol Iterable<Element>: ~Copyable {
@@ -194,8 +194,8 @@ func doCopy<T>(_ t: T) {}
 
 func foo<T: Recur>(_ base: T,
                    _ lvl1: T.Assoc,
-                   _ lvl2: T.Assoc.Assoc,  // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
-                   _ lvl3: T.Assoc.Assoc.Assoc // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   _ lvl2: T.Assoc.Assoc,  // expected-error {{parameter of non-'Copyable' type 'T.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   _ lvl3: T.Assoc.Assoc.Assoc // expected-error {{parameter of non-'Copyable' type 'T.Assoc.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
                    ) {}
 
 protocol Dog {

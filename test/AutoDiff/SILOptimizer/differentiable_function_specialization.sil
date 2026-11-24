@@ -1,0 +1,988 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization -module-name src %s -o - | %FileCheck --check-prefixes=CHECK,NOCOMBINE %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization -sil-combine -module-name src %s -o - | %FileCheck --check-prefixes=CHECK,COMBINE %s
+
+// Derived from test/AutoDiff/validation-test/differentiable_function_specialization.swift.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Differentiation
+
+public protocol Test1Protocol {
+  func value() -> Double
+}
+
+public class Test2Base {
+  @_hasStorage public final let value: Double { get }
+  public init(_ value: Double)
+  deinit
+}
+
+@_inheritsConvenienceInitializers public class Test2Derived : Test2Base {
+  override init(_ value: Double)
+  deinit
+}
+
+//===----------------------------------------------------------------------===//
+// Test1
+//===----------------------------------------------------------------------===//
+
+sil [noinline] @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+
+sil @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil [transparent] [reabstraction_thunk] @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+
+sil [transparent] [reabstraction_thunk] @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+
+// CHECK:         // test1Entry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test1EntryySdAA13Test1Protocol_pF : $@convention(thin) (@in_guaranteed any Test1Protocol) -> Double {
+// CHECK:         bb0(%0 : $*any Test1Protocol):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test1WithSquare(_:)
+// CHECK-NEXT:      %[[#A01:]] = function_ref @$s3src15test1WithSquareyS4dYjrXEXEF64$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEFAA0iJ0_pTf1c_n :
+// CHECK-NEXT:      %[[#A02:]] = apply %[[#A01]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#A02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test1EntryySdAA13Test1Protocol_pF'
+
+// test1Entry(_:)
+sil [ossa] @$s3src10test1EntryySdAA13Test1Protocol_pF : $@convention(thin) (@in_guaranteed any Test1Protocol) -> Double {
+bb0(%0 : $*any Test1Protocol):
+  // function_ref test1Evaluate #1 (_:) in test1Entry(_:)
+  %2 = function_ref @$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @in_guaranteed any Test1Protocol) -> Double
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @in_guaranteed any Test1Protocol) -> Double
+  %4 = mark_dependence [nonescaping] %3 on %0
+  // function_ref test1WithSquare(_:)
+  %5 = function_ref @$s3src15test1WithSquareyS4dYjrXEXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double
+  destroy_value %4
+  return %6
+} // end sil function '$s3src10test1EntryySdAA13Test1Protocol_pF'
+
+// CHECK:         // specialized test1WithSquare(_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src15test1WithSquareyS4dYjrXEXEF64$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEFAA0iJ0_pTf1c_n : $@convention(thin) (@in_guaranteed any Test1Protocol) -> Double {
+// CHECK:         bb0(%0 : $*any Test1Protocol):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test1Evaluate #1 (_:) in test1Entry(_:)
+// CHECK-NEXT:      %[[#A03:]] = function_ref @$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0gH8FTJfSpSrS4dIegyd_Igydo_0gh4FTJrjK0S4dIegyd_Igydo_Tf1an_n :
+// CHECK-NEXT:      %[[#A04:]] = apply %[[#A03]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#A04]]
+// CHECK-NEXT:    } // end sil function '$s3src15test1WithSquareyS4dYjrXEXEF64$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEFAA0iJ0_pTf1c_n'
+
+// test1WithSquare(_:)
+sil hidden [noinline] [ossa] @$s3src15test1WithSquareyS4dYjrXEXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double):
+  // function_ref square(_:)
+  %2 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %3 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %4 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %5 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %6 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %8 = differentiable_function [parameters 0] [results 0] %5 with_derivative {%6, %7}
+  %9 = apply %0(%8) : $@noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  return %9
+} // end sil function '$s3src15test1WithSquareyS4dYjrXEXEF'
+
+// CHECK:         // specialized test1Evaluate #1 (_:) in test1Entry(_:)
+// CHECK-LABEL:   sil private [noinline] [ossa] @$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0gH8FTJfSpSrS4dIegyd_Igydo_0gh4FTJrjK0S4dIegyd_Igydo_Tf1an_n : $@convention(thin) (@in_guaranteed any Test1Protocol) -> Double {
+// CHECK:         bb0(%0 : @closureCapture $*any Test1Protocol):
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#A05:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#A06:]] = thin_to_thick_function %[[#A05]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#A07:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#A08:]] = thin_to_thick_function %[[#A07]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#A09:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#A10:]] = thin_to_thick_function %[[#A09]]
+// NOCOMBINE:       %[[#A11:]] = differentiable_function [parameters 0] [results 0] %[[#A06]] with_derivative {%[[#A08]], %[[#A10]]}
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#A12:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// CHECK:           %[[#A13:]] = open_existential_addr immutable_access %0 to $*@opened(2, any Test1Protocol) Self
+// CHECK:           %[[#A14:]] = witness_method $@opened(2, any Test1Protocol) Self, #Test1Protocol.value : <Self where Self : Test1Protocol> (Self) -> () -> Double, %[[#A13]] : $*@opened(2, any Test1Protocol) Self : $@convention(witness_method: Test1Protocol) <τ_0_0 where τ_0_0 : Test1Protocol> (@in_guaranteed τ_0_0) -> Double
+// CHECK-NEXT:      %[[#A15:]] = apply %[[#A14]]<@opened(2, any Test1Protocol) Self>(%[[#A13]])
+// NOCOMBINE:       %[[#A12:]] = differentiable_function_extract [vjp] %[[#A11]], forwarding: @guaranteed
+// CHECK:           %[[#A16:]] = apply %[[#A12]](%[[#A15]])
+// CHECK:           (%[[#A17:]], %[[#A18:]]) = destructure_tuple %[[#A16]]
+// CHECK:           %[[#A19:]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK:           %[[#A20:]] = struct $Double (%[[#A19]])
+// CHECK-NEXT:      %[[#A21:]] = apply %[[#A18]](%[[#A20]])
+// CHECK:           return %[[#A21]]
+// CHECK:         } // end sil function '$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0gH8FTJfSpSrS4dIegyd_Igydo_0gh4FTJrjK0S4dIegyd_Igydo_Tf1an_n'
+
+// test1Evaluate #1 (_:) in test1Entry(_:)
+sil private [noinline] [ossa] @$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @in_guaranteed any Test1Protocol) -> Double {
+bb0(%0 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, %1 : @closureCapture $*any Test1Protocol):
+  %3 = open_existential_addr immutable_access %1 to $*@opened(1, any Test1Protocol) Self
+  %4 = witness_method $@opened(1, any Test1Protocol) Self, #Test1Protocol.value : <Self where Self : Test1Protocol> (Self) -> () -> Double, %3 : $*@opened(1, any Test1Protocol) Self : $@convention(witness_method: Test1Protocol) <τ_0_0 where τ_0_0 : Test1Protocol> (@in_guaranteed τ_0_0) -> Double
+  %5 = apply %4<@opened(1, any Test1Protocol) Self>(%3) : $@convention(witness_method: Test1Protocol) <τ_0_0 where τ_0_0 : Test1Protocol> (@in_guaranteed τ_0_0) -> Double
+  %6 = differentiable_function_extract [original] %0
+  %7 = copy_value %6
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %8 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %9 = partial_apply [callee_guaranteed] %8(%7) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %10 = convert_function %9 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %11 = copy_value %10
+  destroy_value %10
+  %13 = convert_escape_to_noescape %11 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %14 = differentiable_function_extract [jvp] %0
+  %15 = copy_value %14
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %16 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %17 = partial_apply [callee_guaranteed] %16(%15) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %18 = convert_function %17 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %19 = copy_value %18
+  destroy_value %18
+  %21 = convert_escape_to_noescape %19 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %22 = differentiable_function_extract [vjp] %0
+  %23 = copy_value %22
+  %24 = partial_apply [callee_guaranteed] %16(%23) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %25 = convert_function %24 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %26 = copy_value %25
+  destroy_value %25
+  %28 = convert_escape_to_noescape %26 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %29 = differentiable_function [parameters 0] [results 0] %13 with_derivative {%21, %28}
+  %30 = apply %22(%5) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%31, %32) = destructure_tuple %30
+  %33 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %34 = struct $Double (%33)
+  %35 = apply %32(%34) : $@callee_guaranteed (Double) -> Double
+  destroy_value %29
+  destroy_value %32
+  destroy_value %11
+  destroy_value %19
+  destroy_value %26
+  return %35
+} // end sil function '$s3src10test1EntryySdAA13Test1Protocol_pF0B8EvaluateL_yS3dYjrXEF'
+
+//===----------------------------------------------------------------------===//
+// Test2
+//===----------------------------------------------------------------------===//
+
+sil [noinline] @$s3src13test2EvaluateyS2d_AA9Test2BaseCtF : $@convention(thin) (Double, @guaranteed Test2Base) -> Double
+
+sil @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+// CHECK:         // test2Entry(_:_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test2EntryyS2d_AA12Test2DerivedCtF : $@convention(thin) (Double, @guaranteed Test2Derived) -> Double {
+// CHECK:         bb0(%0 : $Double, %1 : @guaranteed $Test2Derived):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test2UseConverted(_:_:_:)
+// CHECK-NEXT:      %[[#B01:]] = function_ref @$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF029$s3src13test2EvaluateyS2d_AA9E7BaseCtFSdADSdIgygd_0ghi1_jekL9FTJfSUpSrSdADS3dIegyd_Igygdo_0ghi1_jekl4FTJrnO0SdADS3dIegyd_Igygdo_Tf1nna_n :
+// CHECK-NEXT:      %[[#B02:]] = apply %[[#B01]](%0, %1)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#B02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test2EntryyS2d_AA12Test2DerivedCtF'
+
+// test2Entry(_:_:)
+sil [ossa] @$s3src10test2EntryyS2d_AA12Test2DerivedCtF : $@convention(thin) (Double, @guaranteed Test2Derived) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $Test2Derived):
+  // function_ref test2Evaluate(_:_:)
+  %4 = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtF : $@convention(thin) (Double, @guaranteed Test2Base) -> Double
+  // function_ref forward-mode derivative of test2Evaluate(_:_:)
+  %5 = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of test2Evaluate(_:_:)
+  %6 = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> Double
+  %8 = convert_function %7 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> Double
+  %9 = thin_to_thick_function %5 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %10 = convert_function %9 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %11 = thin_to_thick_function %6 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %12 = convert_function %11 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %13 = differentiable_function [parameters 0] [results 0] %8 with_derivative {%10, %12}
+  // function_ref test2UseConverted(_:_:_:)
+  %14 = function_ref @$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> Double
+  %15 = apply %14(%0, %1, %13) : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> Double
+  return %15
+} // end sil function '$s3src10test2EntryyS2d_AA12Test2DerivedCtF'
+
+// CHECK:         // specialized test2UseConverted(_:_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF029$s3src13test2EvaluateyS2d_AA9E7BaseCtFSdADSdIgygd_0ghi1_jekL9FTJfSUpSrSdADS3dIegyd_Igygdo_0ghi1_jekl4FTJrnO0SdADS3dIegyd_Igygdo_Tf1nna_n : $@convention(thin) (Double, @guaranteed Test2Derived) -> Double {
+// CHECK:         bb0(%0 : $Double, %1 : @guaranteed $Test2Derived):
+// NOCOMBINE:       // function_ref test2Evaluate(_:_:)
+// NOCOMBINE-NEXT:  %[[#B03:]] = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtF :
+// NOCOMBINE:       %[[#B04:]] = thin_to_thick_function %[[#B03]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> Double
+// NOCOMBINE:       %[[#B05:]] = convert_function %[[#B04]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> Double
+// NOCOMBINE:       // function_ref forward-mode derivative of test2Evaluate(_:_:)
+// NOCOMBINE-NEXT:  %[[#B06:]] = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr :
+// NOCOMBINE:       %[[#B07:]] = thin_to_thick_function %[[#B06]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       %[[#B08:]] = convert_function %[[#B07]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       // function_ref reverse-mode derivative of test2Evaluate(_:_:)
+// NOCOMBINE-NEXT:  %[[#B09:]] = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr :
+// NOCOMBINE:       %[[#B10:]] = thin_to_thick_function %[[#B09]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       %[[#B11:]] = convert_function %[[#B10]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       %[[#B12:]] = differentiable_function [parameters 0] [results 0] %[[#B05]] with_derivative {%[[#B08]], %[[#B11]]}
+
+// COMBINE:         // function_ref test2Evaluate(_:_:)
+// COMBINE-NEXT:    %[[#B12:]] = function_ref @$s3src13test2EvaluateyS2d_AA9Test2BaseCtF :
+// COMBINE:         %[[#B13:]] = upcast %1 to $Test2Base
+// CHECK-NEXT:      %[[#B14:]] = apply %[[#B12]](%0,
+// NOCOMBINE-SAME:  %1)
+// COMBINE-SAME:    %[[#B13]])
+
+// CHECK:           return %[[#B14]]
+// CHECK:         } // end sil function '$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF029$s3src13test2EvaluateyS2d_AA9E7BaseCtFSdADSdIgygd_0ghi1_jekL9FTJfSUpSrSdADS3dIegyd_Igygdo_0ghi1_jekl4FTJrnO0SdADS3dIegyd_Igygdo_Tf1nna_n'
+
+// test2UseConverted(_:_:_:)
+sil hidden [noinline] [ossa] @$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $Test2Derived, %2 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double):
+  %6 = apply %2(%0, %1) : $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double
+  return %6
+} // end sil function '$s3src17test2UseConvertedyS2d_AA12Test2DerivedCS2d_ADYktYjrXEtF'
+
+//===----------------------------------------------------------------------===//
+// Test3
+//===----------------------------------------------------------------------===//
+
+// CHECK:         // specialized test3Forward<A>(_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src12test3Forwardyxx_xx_S2dYjrXEtXEtlFSd_Tg5019$sS3dIrgyd_SdIgygd_ef1_G57Iegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_nTf1nc_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#C01:]] = alloc_stack $Double
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#C02:]] = alloc_stack $Double
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized thunk for @callee_guaranteed (@unowned Double, @guaranteed @differentiable(reverse) @callee_guaranteed (@unowned Double) -> (@unowned Double)) -> (@unowned Double)
+// CHECK-NEXT:      %[[#C03:]] = function_ref @$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n014$s3src6squareyC1FS2dIgyd_0fC8FTJfSpSrS4dIegyd_Igydo_0fc4FTJrhI0S4dIegyd_Igydo_Tf1nna_n :
+// CHECK-NEXT:      %[[#C04:]] = apply %[[#C03]](%[[#C01]], %[[#C02]])
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#C05:]] = load [trivial] %[[#C01]]
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#C05]]
+// CHECK-NEXT:    } // end sil function '$s3src12test3Forwardyxx_xx_S2dYjrXEtXEtlFSd_Tg5019$sS3dIrgyd_SdIgygd_ef1_G57Iegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_nTf1nc_n'
+
+// specialized test3Forward<A>(_:_:)
+sil shared [noinline] [ossa] @$s3src12test3Forwardyxx_xx_S2dYjrXEtXEtlFSd_Tg5019$sS3dIrgyd_SdIgygd_ef1_G57Iegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_nTf1nc_n : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref specialized thunk for @callee_guaranteed (@unowned Double, @guaranteed @differentiable(reverse) @callee_guaranteed (@unowned Double) -> (@unowned Double)) -> (@unowned Double)
+  %1 = function_ref @$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n : $@convention(thin) (@in_guaranteed Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %2 = alloc_stack $Double
+  %3 = alloc_stack $Double
+  store %0 to [trivial] %3
+  // function_ref square(_:)
+  %7 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %8 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %9 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %10 = thin_to_thick_function %7 to $@noescape @callee_guaranteed (Double) -> Double
+  %11 = thin_to_thick_function %8 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %12 = thin_to_thick_function %9 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %13 = differentiable_function [parameters 0] [results 0] %10 with_derivative {%11, %12}
+  %14 = apply %1(%2, %3, %13) : $@convention(thin) (@in_guaranteed Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %15 = load [trivial] %2
+  dealloc_stack %3
+  dealloc_stack %2
+  return %15
+} // end sil function '$s3src12test3Forwardyxx_xx_S2dYjrXEtXEtlFSd_Tg5019$sS3dIrgyd_SdIgygd_ef1_G57Iegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_nTf1nc_n'
+
+// CHECK:         // specialized thunk for @callee_guaranteed (@unowned Double, @guaranteed @differentiable(reverse) @callee_guaranteed (@unowned Double) -> (@unowned Double)) -> (@unowned Double)
+// CHECK-LABEL:   sil shared [transparent] [reabstraction_thunk] [ossa] @$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n014$s3src6squareyC1FS2dIgyd_0fC8FTJfSpSrS4dIegyd_Igydo_0fc4FTJrhI0S4dIegyd_Igydo_Tf1nna_n : $@convention(thin) (@in_guaranteed Double) -> @out Double {
+// CHECK:         bb0(%0 : $*Double, %1 : $*Double):
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#C06:]] = load [trivial] %1
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test3Evaluate(_:_:)
+// CHECK-NEXT:      %[[#C07:]] = function_ref @$s3src13test3EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n :
+// CHECK-NEXT:      %[[#]] = apply %[[#C07]](%[[#C06]])
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#C08:]] = tuple ()
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#C08]]
+// CHECK-NEXT:    } // end sil function '$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n014$s3src6squareyC1FS2dIgyd_0fC8FTJfSpSrS4dIegyd_Igydo_0fc4FTJrhI0S4dIegyd_Igydo_Tf1nna_n'
+
+// specialized thunk for @callee_guaranteed (@unowned Double, @guaranteed @differentiable(reverse) @callee_guaranteed (@unowned Double) -> (@unowned Double)) -> (@unowned Double)
+sil shared [transparent] [reabstraction_thunk] [ossa] @$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n : $@convention(thin) (@in_guaranteed Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> @out Double {
+bb0(%0 : $*Double, %1 : $*Double, %2 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double):
+  // function_ref test3Evaluate(_:_:)
+  %3 = function_ref @$s3src13test3EvaluateyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %4 = load [trivial] %1
+  %5 = apply %3(%4, %2) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  store %5 to [trivial] %0
+  %7 = tuple ()
+  return %7
+} // end sil function '$sS3dIrgyd_SdIgygd_S3dIrgyd_SdIegngr_TR026$s3src13test3EvaluateyS2d_C7YjrXEtFTf3nnnpf_n'
+
+// CHECK:         // specialized test3Evaluate(_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src13test3EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#C09:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#C10:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#C11:]] = thin_to_thick_function %[[#C10]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#C12:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#C13:]] = thin_to_thick_function %[[#C12]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#C14:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#C15:]] = thin_to_thick_function %[[#C14]]
+// NOCOMBINE:       %[[#C16:]] = differentiable_function [parameters 0] [results 0] %[[#C11]] with_derivative {%[[#C13]], %[[#C15]]}
+// NOCOMBINE:       %[[#C09:]] = differentiable_function_extract [vjp] %[[#C16]], forwarding: @guaranteed
+// CHECK:           %[[#C17:]] = apply %[[#C09]](%0)
+// CHECK:           (%[[#]], %[[#C18:]]) = destructure_tuple %[[#C17]]
+// CHECK:           %[[#C19:]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK:           %[[#C20:]] = struct $Double (%[[#C19]])
+// CHECK-NEXT:      %[[#C21:]] = apply %[[#C18]](%[[#C20]])
+// CHECK:           return %[[#C21]]
+// CHECK:         } // end sil function '$s3src13test3EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n'
+
+// test3Evaluate(_:_:)
+sil hidden [noinline] [ossa] @$s3src13test3EvaluateyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double):
+  %4 = differentiable_function_extract [original] %1
+  %5 = copy_value %4
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %6 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %8 = convert_function %7 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %9 = copy_value %8
+  destroy_value %8
+  %11 = convert_escape_to_noescape %9 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %12 = differentiable_function_extract [jvp] %1
+  %13 = copy_value %12
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %14 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %15 = partial_apply [callee_guaranteed] %14(%13) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %16 = convert_function %15 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %17 = copy_value %16
+  destroy_value %16
+  %19 = convert_escape_to_noescape %17 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %20 = differentiable_function_extract [vjp] %1
+  %21 = copy_value %20
+  %22 = partial_apply [callee_guaranteed] %14(%21) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %23 = convert_function %22 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %24 = copy_value %23
+  destroy_value %23
+  %26 = convert_escape_to_noescape %24 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %27 = differentiable_function [parameters 0] [results 0] %11 with_derivative {%19, %26}
+  %28 = apply %20(%0) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%29, %30) = destructure_tuple %28
+  %31 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %32 = struct $Double (%31)
+  %33 = apply %30(%32) : $@callee_guaranteed (Double) -> Double
+  destroy_value %27
+  destroy_value %30
+  destroy_value %9
+  destroy_value %17
+  destroy_value %24
+  return %33
+} // end sil function '$s3src13test3EvaluateyS2d_S2dYjrXEtF'
+
+//===----------------------------------------------------------------------===//
+// Test4
+//===----------------------------------------------------------------------===//
+
+sil [transparent] [reabstraction_thunk] @$sS2dIegyd_S2dIegnr_TR18$s3src6squareyS2dFTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> @out Double
+
+sil [transparent] [reabstraction_thunk] @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJfSpSrTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+
+sil [transparent] [reabstraction_thunk] @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJrSpSrTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+
+// CHECK:         // test4Entry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test4EntryyS2dF : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// NOCOMBINE:       // function_ref specialized test4Evaluate<A, B>(_:_:)
+// NOCOMBINE-NEXT:  %[[#]] = function_ref @$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5 :
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test4Evaluate<A, B>(_:_:)
+// CHECK-NEXT:      %[[#D01:]] = function_ref @$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5011$sS2dIegyd_i24Iegnr_TR18$s3src6squareyI10FTf3nnpf_nxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_0h3S4dj28_Iegydo_S2dxq_Ri_zRi1_zRi0_zq2__r2__s7__r0_lyi32Isegnr_Iegnro_TR25$s3src6squareyI17FTJfSpSrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_0hnj1_o1_p1_q2_zr2_zs2_zq2__r2__s2__t1_uiv1_w1_xi4FTJrZ11SrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_Tf1na_n :
+// CHECK-NEXT:      %[[#D02:]] = apply %[[#D01]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#D02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test4EntryyS2dF'
+
+// test4Entry(_:)
+sil [ossa] @$s3src10test4EntryyS2dF : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %2 = function_ref @$sS2dIegyd_S2dIegnr_TR18$s3src6squareyS2dFTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> @out Double
+  %3 = thin_to_thick_function %2 to $@callee_guaranteed (@in_guaranteed Double) -> @out Double
+  %4 = convert_function %3 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>, forwarding: @owned
+  // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %5 = function_ref @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJfSpSrTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %6 = thin_to_thick_function %5 to $@callee_guaranteed (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %7 = convert_function %6 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>, forwarding: @owned
+  // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %8 = function_ref @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJrSpSrTf3nnpf_n : $@convention(thin) (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %9 = thin_to_thick_function %8 to $@callee_guaranteed (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %10 = convert_function %9 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>, forwarding: @owned
+  %11 = differentiable_function [parameters 0] [results 0] %4 with_derivative {%7, %10}
+  %14 = convert_escape_to_noescape %11 to $@differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  // function_ref specialized test4Evaluate<A, B>(_:_:)
+  %15 = function_ref @$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5 : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>) -> Double
+  %16 = apply %15(%0, %14) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>) -> Double
+  destroy_value %14
+  destroy_value %11
+  return %16
+} // end sil function '$s3src10test4EntryyS2dF'
+
+// CHECK:         // specialized test4Evaluate<A, B>(_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5011$sS2dIegyd_i24Iegnr_TR18$s3src6squareyI10FTf3nnpf_nxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_0h3S4dj28_Iegydo_S2dxq_Ri_zRi1_zRi0_zq2__r2__s7__r0_lyi32Isegnr_Iegnro_TR25$s3src6squareyI17FTJfSpSrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_0hnj1_o1_p1_q2_zr2_zs2_zq2__r2__s2__t1_uiv1_w1_xi4FTJrZ11SrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_Tf1na_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK:           // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double)
+// CHECK-NEXT:      %[[#D03:]] = function_ref @$sS2dIegyd_S2dIegnr_TR18$s3src6squareyS2dFTf3nnpf_n :
+// CHECK:           %[[#D04:]] = thin_to_thick_function %[[#D03]]
+// CHECK:           %[[#D05:]] = convert_function %[[#D04]] to $@callee_guaranteed @substituted
+// CHECK:           // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+// CHECK-NEXT:      %[[#D06:]] = function_ref @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJfSpSrTf3nnpf_n :
+// CHECK:           %[[#D07:]] = thin_to_thick_function %[[#D06]]
+// CHECK:           %[[#D08:]] = convert_function %[[#D07]] to $@callee_guaranteed @substituted
+// CHECK:           // function_ref specialized thunk for @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+// CHECK-NEXT:      %[[#D09:]] = function_ref @$sS4dIegyd_Iegydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR25$s3src6squareyS2dFTJrSpSrTf3nnpf_n :
+// CHECK:           %[[#D10:]] = thin_to_thick_function %[[#D09]]
+// CHECK:           %[[#D11:]] = convert_function %[[#D10]] to $@callee_guaranteed @substituted
+// CHECK:           %[[#D12:]] = differentiable_function [parameters 0] [results 0] %[[#D05]] with_derivative {%[[#D08]], %[[#D11]]}
+// CHECK:           %[[#D13:]] = convert_escape_to_noescape %[[#D12]] to $@differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+// CHECK:           %[[#D14:]] = begin_borrow %[[#D13]]
+// CHECK:           %[[#D15:]] = alloc_stack $Double
+// CHECK:           %[[#D16:]] = alloc_stack $Double
+// CHECK:           %[[#D17:]] = convert_function %[[#D14]] to $@differentiable(reverse) @noescape @callee_guaranteed (@in_guaranteed Double) -> @out Double
+// CHECK:           %[[#D18:]] = differentiable_function_extract [vjp] %[[#D17]] as $@noescape @callee_guaranteed
+// CHECK:           %[[#D19:]] = alloc_stack $Double
+// CHECK-NEXT:      %[[#D20:]] = apply %[[#D18]](%[[#D19]], %[[#D16]])
+// CHECK:           %[[#D21:]] = alloc_stack $Double
+// CHECK:           %[[#D22:]] = apply %[[#D20]](%[[#D15]], %[[#D21]])
+// CHECK:           %[[#D23:]] = load [trivial] %[[#D15]]
+// CHECK:           return %[[#D23]]
+// CHECK:         } // end sil function '$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5011$sS2dIegyd_i24Iegnr_TR18$s3src6squareyI10FTf3nnpf_nxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_0h3S4dj28_Iegydo_S2dxq_Ri_zRi1_zRi0_zq2__r2__s7__r0_lyi32Isegnr_Iegnro_TR25$s3src6squareyI17FTJfSpSrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_0hnj1_o1_p1_q2_zr2_zs2_zq2__r2__s2__t1_uiv1_w1_xi4FTJrZ11SrTf3nnpf_nxq_xq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyq0_q1_Isegnr_Ri_zRi1_zRi0_zRi__Ri1__Ri0__Ri_0_Ri1_0_Ri0_0_Ri_1_Ri1_1_Ri0_1_r2_lyS4dIsegnro_Tf1na_n'
+
+// specialized test4Evaluate<A, B>(_:_:)
+sil shared [noinline] [ossa] @$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5 : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>):
+  %2 = alloc_stack $Double
+  %5 = alloc_stack $Double
+  store %0 to [trivial] %5
+  %7 = convert_function %1 to $@differentiable(reverse) @noescape @callee_guaranteed (@in_guaranteed Double) -> @out Double
+  %8 = differentiable_function_extract [vjp] %7 as $@noescape @callee_guaranteed (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %9 = alloc_stack $Double
+  %10 = apply %8(%9, %5) : $@noescape @callee_guaranteed (@in_guaranteed Double) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  dealloc_stack %9
+  dealloc_stack %5
+  %13 = alloc_stack $Double
+  %14 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %15 = struct $Double (%14)
+  store %15 to [trivial] %13
+  %17 = apply %10(%2, %13) : $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  destroy_value %10
+  dealloc_stack %13
+  %20 = load [trivial] %2
+  dealloc_stack %2
+  return %20
+} // end sil function '$s3src13test4Evaluatey13TangentVectorQzx_q_xYjrXEt16_Differentiation14DifferentiableRzSFR_AeFR_AceFPQy_Rs_r0_lFSd_SdTg5'
+
+//===----------------------------------------------------------------------===//
+// Test6
+//===----------------------------------------------------------------------===//
+
+// CHECK:         // test6Entry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test6EntryyS2dF : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test6Forward(_:_:)
+// CHECK-NEXT:      %[[#F01:]] = function_ref @$s3src12test6ForwardyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n :
+// CHECK-NEXT:      %[[#F02:]] = apply %[[#F01]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#F02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test6EntryyS2dF'
+
+// test6Entry(_:)
+sil [ossa] @$s3src10test6EntryyS2dF : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref square(_:)
+  %2 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %3 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %4 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %5 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %6 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %8 = differentiable_function [parameters 0] [results 0] %5 with_derivative {%6, %7}
+  // function_ref test6Forward(_:_:)
+  %9 = function_ref @$s3src12test6ForwardyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %10 = apply %9(%0, %8) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  return %10
+} // end sil function '$s3src10test6EntryyS2dF'
+
+// CHECK:         // specialized test6Forward(_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src12test6ForwardyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test6Evaluate(_:_:)
+// CHECK-NEXT:      %[[#F03:]] = function_ref @$s3src13test6EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n :
+// CHECK-NEXT:      %[[#F04:]] = apply %[[#F03]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#F05:]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#F06:]] = struct_extract %0, #Double._value
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#F07:]] = builtin "fadd_FPIEEE64"(%[[#F06]], %[[#F05]]) : $Builtin.FPIEEE64
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#F08:]] = struct $Double (%[[#F07]])
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test6Evaluate(_:_:)
+// CHECK-NEXT:      %[[#F09:]] = function_ref @$s3src13test6EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n :
+// CHECK-NEXT:      %[[#F10:]] = apply %[[#F09]](%[[#F08]])
+// CHECK-NOT:       = apply %
+// CHECK:           %[[#F11:]] = struct $Double (%[[#F12:]])
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#F11]]
+// CHECK-NEXT:    } // end sil function '$s3src12test6ForwardyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n'
+
+// test6Forward(_:_:)
+sil hidden [noinline] [ossa] @$s3src12test6ForwardyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double):
+  // function_ref test6Evaluate(_:_:)
+  %4 = function_ref @$s3src13test6EvaluateyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %5 = apply %4(%0, %1) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %6 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %7 = struct_extract %0, #Double._value
+  %8 = builtin "fadd_FPIEEE64"(%7, %6) : $Builtin.FPIEEE64
+  %9 = struct $Double (%8)
+  %10 = apply %4(%9, %1) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %11 = struct_extract %5, #Double._value
+  %12 = struct_extract %10, #Double._value
+  %13 = builtin "fadd_FPIEEE64"(%11, %12) : $Builtin.FPIEEE64
+  %14 = struct $Double (%13)
+  return %14
+} // end sil function '$s3src12test6ForwardyS2d_S2dYjrXEtF'
+
+// CHECK:         // specialized test6Evaluate(_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src13test6EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#F13:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#F14:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#F15:]] = thin_to_thick_function %[[#F14]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#F16:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#F17:]] = thin_to_thick_function %[[#F16]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#F18:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#F19:]] = thin_to_thick_function %[[#F18]]
+// NOCOMBINE:       %[[#F20:]] = differentiable_function [parameters 0] [results 0] %[[#F15]] with_derivative {%[[#F17]], %[[#F19]]}
+// NOCOMBINE:       %[[#F13:]] = differentiable_function_extract [vjp] %[[#F20]], forwarding: @guaranteed
+// CHECK:           %[[#F21:]] = apply %[[#F13]](%0)
+// CHECK:           (%[[#]], %[[#F22:]]) = destructure_tuple %[[#F21]]
+// CHECK:           %[[#F23:]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK:           %[[#F24:]] = struct $Double (%[[#F23]])
+// CHECK-NEXT:      %[[#F25:]] = apply %[[#F22]](%[[#F24]])
+// CHECK:           return %[[#F25]]
+// CHECK:         } // end sil function '$s3src13test6EvaluateyS2d_S2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_Tf1na_n'
+
+// test6Evaluate(_:_:)
+sil hidden [noinline] [ossa] @$s3src13test6EvaluateyS2d_S2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double):
+  %4 = differentiable_function_extract [original] %1
+  %5 = copy_value %4
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %6 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %8 = convert_function %7 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %9 = copy_value %8
+  destroy_value %8
+  %11 = convert_escape_to_noescape %9 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %12 = differentiable_function_extract [jvp] %1
+  %13 = copy_value %12
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %14 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %15 = partial_apply [callee_guaranteed] %14(%13) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %16 = convert_function %15 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %17 = copy_value %16
+  destroy_value %16
+  %19 = convert_escape_to_noescape %17 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %20 = differentiable_function_extract [vjp] %1
+  %21 = copy_value %20
+  %22 = partial_apply [callee_guaranteed] %14(%21) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %23 = convert_function %22 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %24 = copy_value %23
+  destroy_value %23
+  %26 = convert_escape_to_noescape %24 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %27 = differentiable_function [parameters 0] [results 0] %11 with_derivative {%19, %26}
+  %28 = apply %20(%0) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%29, %30) = destructure_tuple %28
+  %31 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %32 = struct $Double (%31)
+  %33 = apply %30(%32) : $@callee_guaranteed (Double) -> Double
+  destroy_value %27
+  destroy_value %30
+  destroy_value %9
+  destroy_value %17
+  destroy_value %24
+  return %33
+} // end sil function '$s3src13test6EvaluateyS2d_S2dYjrXEtF'
+
+//===----------------------------------------------------------------------===//
+// Test7
+//===----------------------------------------------------------------------===//
+
+sil [noinline] @$s3src4cubeyS2dF : $@convention(thin) (Double) -> Double
+
+sil @$s3src4cubeyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil @$s3src4cubeyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+// CHECK:         // test7Entry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test7EntryyS2dF : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test7Evaluate(_:_:_:)
+// CHECK-NEXT:      %[[#G01:]] = function_ref @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_ACS2dIgyd_ADS4dIegyd_Igydo_AES4dIegyd_Igydo_Tf1naa_n :
+// CHECK-NEXT:      %[[#G02:]] = apply %[[#G01]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#G02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test7EntryyS2dF'
+
+// test7Entry(_:)
+sil [ossa] @$s3src10test7EntryyS2dF : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref square(_:)
+  %2 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %3 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %4 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %5 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %6 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %8 = differentiable_function [parameters 0] [results 0] %5 with_derivative {%6, %7}
+  %9 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %10 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %11 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %12 = differentiable_function [parameters 0] [results 0] %9 with_derivative {%10, %11}
+  // function_ref test7Evaluate(_:_:_:)
+  %13 = function_ref @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %14 = apply %13(%0, %8, %12) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  return %14
+} // end sil function '$s3src10test7EntryyS2dF'
+
+// CHECK:         // test7DistinctEntry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src18test7DistinctEntryyS2dF : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test7Evaluate(_:_:_:)
+// CHECK-NEXT:      %[[#G03:]] = function_ref @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_012$s3src4cubeyE1FS2dIgyd_0jefgH0S4dIegyd_Igydo_0jeigH0S4dIegyd_Igydo_Tf1naa_n :
+// CHECK-NEXT:      %[[#G04:]] = apply %[[#G03]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#G04]]
+// CHECK-NEXT:    } // end sil function '$s3src18test7DistinctEntryyS2dF'
+
+// test7DistinctEntry(_:)
+sil [ossa] @$s3src18test7DistinctEntryyS2dF : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref square(_:)
+  %2 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %3 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %4 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %5 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %6 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %8 = differentiable_function [parameters 0] [results 0] %5 with_derivative {%6, %7}
+  // function_ref cube(_:)
+  %9 = function_ref @$s3src4cubeyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of cube(_:)
+  %10 = function_ref @$s3src4cubeyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of cube(_:)
+  %11 = function_ref @$s3src4cubeyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %12 = thin_to_thick_function %9 to $@noescape @callee_guaranteed (Double) -> Double
+  %13 = thin_to_thick_function %10 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %14 = thin_to_thick_function %11 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %15 = differentiable_function [parameters 0] [results 0] %12 with_derivative {%13, %14}
+  // function_ref test7Evaluate(_:_:_:)
+  %16 = function_ref @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  %17 = apply %16(%0, %8, %15) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  return %17
+} // end sil function '$s3src18test7DistinctEntryyS2dF'
+
+// CHECK:         // specialized test7Evaluate(_:_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_ACS2dIgyd_ADS4dIegyd_Igydo_AES4dIegyd_Igydo_Tf1naa_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#G05:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#G06:]] = thin_to_thick_function %[[#G05]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#G07:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#G08:]] = thin_to_thick_function %[[#G07]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#G09:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#G10:]] = thin_to_thick_function %[[#G09]]
+// NOCOMBINE:       %[[#G11:]] = differentiable_function [parameters 0] [results 0] %[[#G06]] with_derivative {%[[#G08]], %[[#G10]]}
+// NOCOMBINE:       %[[#G12:]] = thin_to_thick_function %[[#G05]] to $@noescape @callee_guaranteed (Double) -> Double
+// NOCOMBINE:       %[[#G13:]] = thin_to_thick_function %[[#G07]] to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       %[[#G14:]] = thin_to_thick_function %[[#G09]] to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// NOCOMBINE:       %[[#G15:]] = differentiable_function [parameters 0] [results 0] %[[#G12]] with_derivative {%[[#G13]], %[[#G14]]}
+// NOCOMBINE:       %[[#G16:]] = differentiable_function_extract [vjp] %[[#G11]], forwarding: @guaranteed
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#G16:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// CHECK:           %[[#G17:]] = apply %[[#G16]](%0)
+// CHECK:           (%[[#G18:]], %[[#G19:]]) = destructure_tuple %[[#G17]]
+// CHECK:           %[[#G20:]] = struct $Double
+// CHECK-NEXT:      %[[#]] = apply %[[#G19]](%[[#G20]])
+// NOCOMBINE:       %[[#G16:]] = differentiable_function_extract [vjp] %[[#G15]], forwarding: @guaranteed
+// CHECK:           %[[#G21:]] = struct $Double
+// CHECK:           %[[#G22:]] = apply %[[#G16]](%[[#G21]])
+// CHECK:           (%[[#G23:]], %[[#G24:]]) = destructure_tuple %[[#G22]]
+// CHECK-NEXT:      %[[#G25:]] = apply %[[#G24]](%[[#G20]])
+// CHECK:           %[[#G26:]] = struct $Double (%[[#G27:]])
+// CHECK:           return %[[#G26]]
+// CHECK:         } // end sil function '$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_ACS2dIgyd_ADS4dIegyd_Igydo_AES4dIegyd_Igydo_Tf1naa_n'
+
+// CHECK:         // specialized test7Evaluate(_:_:_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_012$s3src4cubeyE1FS2dIgyd_0jefgH0S4dIegyd_Igydo_0jeigH0S4dIegyd_Igydo_Tf1naa_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#G28:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#G29:]] = thin_to_thick_function %[[#G28]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#G30:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#G31:]] = thin_to_thick_function %[[#G30]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#G32:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#G33:]] = thin_to_thick_function %[[#G32]]
+// NOCOMBINE:       %[[#G34:]] = differentiable_function [parameters 0] [results 0] %[[#G29]] with_derivative {%[[#G31]], %[[#G33]]}
+// NOCOMBINE:       // function_ref cube(_:)
+// NOCOMBINE-NEXT:  %[[#G35:]] = function_ref @$s3src4cubeyS2dF :
+// NOCOMBINE:       %[[#G36:]] = thin_to_thick_function %[[#G35]]
+// NOCOMBINE:       // function_ref forward-mode derivative of cube(_:)
+// NOCOMBINE-NEXT:  %[[#G37:]] = function_ref @$s3src4cubeyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#G38:]] = thin_to_thick_function %[[#G37]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of cube(_:)
+// NOCOMBINE-NEXT:  %[[#G39:]] = function_ref @$s3src4cubeyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#G40:]] = thin_to_thick_function %[[#G39]]
+// NOCOMBINE:       %[[#G41:]] = differentiable_function [parameters 0] [results 0] %[[#G36]] with_derivative {%[[#G38]], %[[#G40]]}
+// NOCOMBINE:       %[[#G42:]] = differentiable_function_extract [vjp] %[[#G34]], forwarding: @guaranteed
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#G42:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// COMBINE:         // function_ref reverse-mode derivative of cube(_:)
+// COMBINE-NEXT:    %[[#G43:]] = function_ref @$s3src4cubeyS2dFTJrSpSr :
+// CHECK:           %[[#G44:]] = apply %[[#G42]](%0)
+// CHECK:           (%[[#G45:]], %[[#G46:]]) = destructure_tuple %[[#G44]]
+// CHECK:           %[[#G47:]] = struct $Double (%[[#G48:]])
+// CHECK-NEXT:      %[[#]] = apply %[[#G46]](%[[#G47]])
+// NOCOMBINE:       %[[#G43:]] = differentiable_function_extract [vjp] %[[#G41]], forwarding: @guaranteed
+// CHECK:           %[[#G49:]] = struct $Double
+// CHECK:           %[[#G50:]] = apply %[[#G43]](%[[#G49]])
+// CHECK:           (%[[#G51:]], %[[#G52:]]) = destructure_tuple %[[#G50]]
+// CHECK-NEXT:      %[[#G53:]] = apply %[[#G52]](%[[#G47]])
+// CHECK:           %[[#G54:]] = struct $Double (%[[#G55:]])
+// CHECK:           return %[[#G54]]
+// CHECK:         } // end sil function '$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF18$s3src6squareyS2dFS2dIgyd_0dE8FTJfSpSrS4dIegyd_Igydo_0de4FTJrgH0S4dIegyd_Igydo_012$s3src4cubeyE1FS2dIgyd_0jefgH0S4dIegyd_Igydo_0jeigH0S4dIegyd_Igydo_Tf1naa_n'
+
+// test7Evaluate(_:_:_:)
+sil hidden [noinline] [ossa] @$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, %2 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double):
+  %6 = differentiable_function_extract [original] %1
+  %7 = copy_value %6
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %8 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %9 = partial_apply [callee_guaranteed] %8(%7) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %10 = convert_function %9 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %11 = copy_value %10
+  destroy_value %10
+  %13 = convert_escape_to_noescape %11 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %14 = differentiable_function_extract [jvp] %1
+  %15 = copy_value %14
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %16 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %17 = partial_apply [callee_guaranteed] %16(%15) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %18 = convert_function %17 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %19 = copy_value %18
+  destroy_value %18
+  %21 = convert_escape_to_noescape %19 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %22 = differentiable_function_extract [vjp] %1
+  %23 = copy_value %22
+  %24 = partial_apply [callee_guaranteed] %16(%23) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %25 = convert_function %24 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %26 = copy_value %25
+  destroy_value %25
+  %28 = convert_escape_to_noescape %26 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %29 = differentiable_function [parameters 0] [results 0] %13 with_derivative {%21, %28}
+  %30 = apply %22(%0) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%31, %32) = destructure_tuple %30
+  %33 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %34 = struct $Double (%33)
+  %35 = apply %32(%34) : $@callee_guaranteed (Double) -> Double
+  destroy_value %29
+  destroy_value %32
+  %38 = struct_extract %35, #Double._value
+  %39 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
+  %40 = float_literal $Builtin.FPIEEE64, 0x4000000000000000
+  %41 = struct_extract %0, #Double._value
+  %42 = builtin "fadd_FPIEEE64"(%41, %40) : $Builtin.FPIEEE64
+  %43 = differentiable_function_extract [original] %2
+  %44 = copy_value %43
+  %45 = partial_apply [callee_guaranteed] %8(%44) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %46 = convert_function %45 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %47 = copy_value %46
+  destroy_value %46
+  %49 = convert_escape_to_noescape %47 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %50 = differentiable_function_extract [jvp] %2
+  %51 = copy_value %50
+  %52 = partial_apply [callee_guaranteed] %16(%51) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %53 = convert_function %52 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %54 = copy_value %53
+  destroy_value %53
+  %56 = convert_escape_to_noescape %54 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %57 = differentiable_function_extract [vjp] %2
+  %58 = copy_value %57
+  %59 = partial_apply [callee_guaranteed] %16(%58) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %60 = convert_function %59 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %61 = copy_value %60
+  destroy_value %60
+  %63 = convert_escape_to_noescape %61 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %64 = differentiable_function [parameters 0] [results 0] %49 with_derivative {%56, %63}
+  %65 = struct $Double (%42)
+  %66 = apply %57(%65) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%67, %68) = destructure_tuple %66
+  %69 = apply %68(%34) : $@callee_guaranteed (Double) -> Double
+  destroy_value %64
+  destroy_value %68
+  %72 = struct_extract %69, #Double._value
+  %73 = builtin "fmul_FPIEEE64"(%39, %72) : $Builtin.FPIEEE64
+  %74 = builtin "fsub_FPIEEE64"(%38, %73) : $Builtin.FPIEEE64
+  %75 = struct $Double (%74)
+  destroy_value %11
+  destroy_value %19
+  destroy_value %26
+  destroy_value %47
+  destroy_value %54
+  destroy_value %61
+  return %75
+} // end sil function '$s3src13test7EvaluateyS2d_S2dYjrXES2dYjrXEtF'
+
+//===----------------------------------------------------------------------===//
+// Test8
+//===----------------------------------------------------------------------===//
+
+// CHECK:         // test8Entry(_:)
+// CHECK-LABEL:   sil [ossa] @$s3src10test8EntryyS2dF : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test8WithSquare(_:)
+// CHECK-NEXT:      %[[#H01:]] = function_ref @$s3src15test8WithSquareyS4dYjrXEXEF46$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEFSdTf1c_n :
+// CHECK-NEXT:      %[[#H02:]] = apply %[[#H01]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#H02]]
+// CHECK-NEXT:    } // end sil function '$s3src10test8EntryyS2dF'
+
+// test8Entry(_:)
+sil [ossa] @$s3src10test8EntryyS2dF : $@convention(thin) (Double) -> Double {
+bb0(%0 : $Double):
+  // function_ref test8Evaluate #1 (_:) in test8Entry(_:)
+  %2 = function_ref @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, Double) -> Double
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, Double) -> Double
+  // function_ref test8WithSquare(_:)
+  %4 = function_ref @$s3src15test8WithSquareyS4dYjrXEXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double
+  destroy_value %3
+  return %5
+} // end sil function '$s3src10test8EntryyS2dF'
+
+// CHECK:         // specialized test8WithSquare(_:)
+// CHECK-LABEL:   sil shared [noinline] [ossa] @$s3src15test8WithSquareyS4dYjrXEXEF46$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEFSdTf1c_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : $Double):
+// CHECK-NOT:       = apply %
+// CHECK:           // function_ref specialized test8Evaluate #1 (_:) in test8Entry(_:)
+// CHECK-NEXT:      %[[#H03:]] = function_ref @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n :
+// CHECK-NEXT:      %[[#H04:]] = apply %[[#H03]](%0)
+// CHECK-NOT:       = apply %
+// CHECK:           return %[[#H04]]
+// CHECK-NEXT:    } // end sil function '$s3src15test8WithSquareyS4dYjrXEXEF46$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEFSdTf1c_n'
+
+// test8WithSquare(_:)
+sil hidden [noinline] [ossa] @$s3src15test8WithSquareyS4dYjrXEXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double) -> Double {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double):
+  // function_ref square(_:)
+  %2 = function_ref @$s3src6squareyS2dF : $@convention(thin) (Double) -> Double
+  // function_ref forward-mode derivative of square(_:)
+  %3 = function_ref @$s3src6squareyS2dFTJfSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of square(_:)
+  %4 = function_ref @$s3src6squareyS2dFTJrSpSr : $@convention(thin) (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %5 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (Double) -> Double
+  %6 = thin_to_thick_function %3 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %8 = differentiable_function [parameters 0] [results 0] %5 with_derivative {%6, %7}
+  %9 = apply %0(%8) : $@noescape @callee_guaranteed (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double) -> Double
+  return %9
+} // end sil function '$s3src15test8WithSquareyS4dYjrXEXEF'
+
+// CHECK:         // specialized test8Evaluate #1 (_:) in test8Entry(_:)
+// CHECK-LABEL:   sil private [noinline] [ossa] @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n : $@convention(thin) (Double) -> Double {
+// CHECK:         bb0(%0 : @closureCapture $Double):
+// NOCOMBINE:       // function_ref square(_:)
+// NOCOMBINE-NEXT:  %[[#H05:]] = function_ref @$s3src6squareyS2dF :
+// NOCOMBINE:       %[[#H06:]] = thin_to_thick_function %[[#H05]]
+// NOCOMBINE:       // function_ref forward-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#H07:]] = function_ref @$s3src6squareyS2dFTJfSpSr :
+// NOCOMBINE:       %[[#H08:]] = thin_to_thick_function %[[#H07]]
+// NOCOMBINE:       // function_ref reverse-mode derivative of square(_:)
+// NOCOMBINE-NEXT:  %[[#H09:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#H10:]] = thin_to_thick_function %[[#H09]]
+// NOCOMBINE:       %[[#H11:]] = differentiable_function [parameters 0] [results 0] %[[#H06]] with_derivative {%[[#H08]], %[[#H10]]}
+// COMBINE:         // function_ref reverse-mode derivative of square(_:)
+// COMBINE-NEXT:    %[[#H12:]] = function_ref @$s3src6squareyS2dFTJrSpSr :
+// NOCOMBINE:       %[[#H12:]] = differentiable_function_extract [vjp] %[[#H11]], forwarding: @guaranteed
+// CHECK:           %[[#H13:]] = apply %[[#H12]](%0)
+// CHECK:           (%[[#H14:]], %[[#H15:]]) = destructure_tuple %[[#H13]]
+// CHECK:           %[[#H16:]] = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK:           %[[#H17:]] = struct $Double (%[[#H16]])
+// CHECK-NEXT:      %[[#H18:]] = apply %[[#H15]](%[[#H17]])
+// CHECK:           return %[[#H18]]
+// CHECK:         } // end sil function '$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF18$s3src6squareyS2dFS2dIgyd_0eF8FTJfSpSrS4dIegyd_Igydo_0ef4FTJrhI0S4dIegyd_Igydo_Tf1an_n'
+
+// test8Evaluate #1 (_:) in test8Entry(_:)
+sil private [noinline] [ossa] @$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF : $@convention(thin) (@guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, Double) -> Double {
+bb0(%0 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double, %1 : @closureCapture $Double):
+  %3 = differentiable_function_extract [original] %0
+  %4 = copy_value %3
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %5 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %7 = convert_function %6 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %8 = copy_value %7
+  destroy_value %7
+  %10 = convert_escape_to_noescape %8 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %11 = differentiable_function_extract [jvp] %0
+  %12 = copy_value %11
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %13 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %14 = partial_apply [callee_guaranteed] %13(%12) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %15 = convert_function %14 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %16 = copy_value %15
+  destroy_value %15
+  %18 = convert_escape_to_noescape %16 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %19 = differentiable_function_extract [vjp] %0
+  %20 = copy_value %19
+  %21 = partial_apply [callee_guaranteed] %13(%20) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %22 = convert_function %21 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %23 = copy_value %22
+  destroy_value %22
+  %25 = convert_escape_to_noescape %23 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %26 = differentiable_function [parameters 0] [results 0] %10 with_derivative {%18, %25}
+  %27 = apply %19(%1) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%28, %29) = destructure_tuple %27
+  %30 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %31 = struct $Double (%30)
+  %32 = apply %29(%31) : $@callee_guaranteed (Double) -> Double
+  destroy_value %26
+  destroy_value %29
+  destroy_value %8
+  destroy_value %16
+  destroy_value %23
+  return %32
+} // end sil function '$s3src10test8EntryyS2dF0B8EvaluateL_yS3dYjrXEF'

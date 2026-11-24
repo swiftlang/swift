@@ -962,6 +962,7 @@ Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO13sizedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO15countedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
+Added: _$ss13_SwiftifyInfoO9referenceyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
@@ -1370,6 +1371,9 @@ Added: __swift_isRestrictedProcess
 // cannot be copied. See CastConsumptionKind::TestOnly.
 Added: _swift_dynamicCastTest
 
+// Crash when an exactly-once closure is destroyed without being called.
+Added: _swift_onceClosureDestroyedError
+
 // Setter for typed willThrow hook.
 Added: __swift_setWillThrowTypedHandler
 
@@ -1378,3 +1382,15 @@ Added: _swift_tupleWitnesses_nonpod_inline
 Added: _swift_tupleWitnesses_nonpod_noninline
 Added: _swift_tupleWitnesses_pod_inline
 Added: _swift_tupleWitnesses_pod_noninline
+
+// Recover the dynamic type of a COM interface through ISwiftObject.
+Added: _swift_getCOMDynamicType
+
+// Cell and ConstCell
+Added: _$ss4CellVMa
+Added: _$ss4CellVMn
+Added: _$ss9ConstCellVMa
+Added: _$ss9ConstCellVMn
+
+// Removed: _createOffsetBasedKeyPath
+Removed: _$ss25_createOffsetBasedKeyPath4root5value6offsets03AnydE0CypXp_ypXpSitF

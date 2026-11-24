@@ -48,7 +48,8 @@ static llvm::cl::opt<bool>
 
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, SILPassManager *pm);
+                       SILBasicBlock *upToBB, SILPassManager *pm,
+                       bool ignoreCost);
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -70,11 +71,10 @@ hasLoopInvariantOperands(SILInstruction *inst, SILLoop *loop,
 
 /// We cannot duplicate blocks with AllocStack instructions (they need to be
 /// FIFO). Other instructions can be moved to the preheader.
-static bool
-canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
-                              SILBasicBlock *bb,
-                              SmallVectorImpl<SILInstruction *> &moves,
-                              SinkAddressProjections &sinkProj) {
+static bool canDuplicateOrMoveToPreheader(
+    SILLoop *loop, SILBasicBlock *preheader, SILBasicBlock *bb,
+    SmallVectorImpl<SILInstruction *> &moves, SinkAddressProjections &sinkProj,
+    bool ignoreCost) {
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
@@ -132,7 +132,7 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
     cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
+  return ignoreCost || cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -172,10 +172,7 @@ static void updateSSAForUseOfValue(
   // Instead we collect uses wrapping uses in branches specially so that we
   // can reconstruct the use even after the branch has been modified.
   SmallVector<UseWrapper, 8> storedUses;
-  for (auto *use : Res->getUses())
-    storedUses.push_back(UseWrapper(use));
-  for (auto useWrapper : storedUses) {
-    Operand *use = useWrapper;
+  for (auto *use : Res->getUses()) {
     SILInstruction *user = use->getUser();
     assert(user && "Missing user");
 
@@ -185,8 +182,9 @@ static void updateSSAForUseOfValue(
 
     assert(user->getParent() != EntryCheckBlock &&
            "The entry check block should dominate the header");
-    updater.rewriteUse(*use);
+    storedUses.push_back(UseWrapper(use));
   }
+  updater.rewriteUses(storedUses);
 
   replacePhisWithIncomingValues(pm, insertedPhis);
 }
@@ -229,8 +227,9 @@ static void rewriteNewLoopEntryCheckBlock(
   }
 }
 
-static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
-                                      SILLoopInfo *loopInfo, SILPassManager *pm) {
+bool swift::rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
+                                      SILLoopInfo *loopInfo, SILPassManager *pm,
+                                      bool ignoreCost) {
   auto *latch = loop->getLoopLatch();
   if (!latch) {
     LLVM_DEBUG(llvm::dbgs()
@@ -238,13 +237,14 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
     return false;
   }
 
-  bool didRotate = rotateLoop(
-      loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm);
+  bool didRotate =
+      rotateLoop(loop, domInfo, loopInfo,
+                 RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm,
+                 ignoreCost);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
-    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm)) {
+    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm, ignoreCost)) {
     }
 
   return didRotate;
@@ -293,7 +293,8 @@ static bool isSingleBlockLoop(SILLoop *L) {
 /// loop for termination.
 static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, SILPassManager *pm) {
+                       SILBasicBlock *upToBB, SILPassManager *pm,
+                       bool ignoreCost) {
   assert(loop != nullptr && domInfo != nullptr && loopInfo != nullptr
          && "Missing loop information");
 
@@ -339,7 +340,7 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   SmallVector<SILInstruction *, 8> moveToPreheader;
   SinkAddressProjections sinkProj;
   if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
-                                     sinkProj)) {
+                                     sinkProj, ignoreCost)) {
     LLVM_DEBUG(llvm::dbgs()
                << *loop << " instructions in header preventing rotating\n");
     return false;
@@ -447,6 +448,9 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The rotation and the critical-edge splitting above changed the CFG
   // significantly. Recompute dominance rather than updating it incrementally.
+  // The blocks created above were given fresh numbers via
+  // SILFunction::assignFreshBlockNumber() without bumping the numbering epoch,
+  // so both this dominator tree and the live loop info remain consistent.
   domInfo->recalculate(*header->getParent());
 
   // Beautify the IR. Move the old header to after the old latch as it is now
@@ -498,8 +502,8 @@ class LoopRotation : public SILFunctionTransform {
       while (!worklist.empty()) {
         SILLoop *loop = worklist.pop_back_val();
         changed |= canonicalizeLoop(loop, domInfo, loopInfo);
-        changed |=
-            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, getPassManager());
+        changed |= rotateLoopAtMostUpToLatch(
+            loop, domInfo, loopInfo, getPassManager(), /*ignoreCost=*/false);
       }
     }
 

@@ -5,6 +5,111 @@
 
 ## Swift (next)
 
+* [SE-0564][]:
+  A new form of `withContinuation` that accepts an `async` body and passes two halves of a
+  continuation: the `Continuation` that resumes it, and a new
+  `ContinuationWaiter` that waits for it. Waiting on the waiter can install
+  cancellation and priority escalation handlers that are active only while the
+  task is suspended on the continuation, so they never run before the
+  continuation is registered:
+
+  ```swift
+  func read(into buffer: ReadBuffer) async throws -> Int {
+    try await withContinuation(of: Int.self) { continuation, waiter in
+      let id = eventLoop.register(.read(fd, buffer), continuation)
+      return try await waiter.wait(onCancel: { _ in eventLoop.cancel(id) })
+    }
+  }
+  ```
+
+  `Continuation`, `UnsafeContinuation` and `CheckedContinuation` also have new
+  `resumeSynchronously` methods. An executor can use them to offer its current
+  execution context to the resumed task. If the task resumes on that executor,
+  it runs inline instead of being enqueued:
+
+  ```swift
+  completion.continuation.resumeSynchronously(
+    returning: completion.bytesRead,
+    isolatedTo: self.asUnownedSerialExecutor()
+  )
+  ```
+
+  Priority escalation handlers, including the handler of
+  `withTaskPriorityEscalationHandler`, are now called once with the task's
+  current priority as both arguments when they are installed. Thus, an
+  escalation that happens before the handler is installed is not missed.
+
+* [#88082][]:
+
+  Forward references to top-level script variables with storage are now
+  diagnosed as errors, matching the behavior for local variables:
+
+  ```swift
+  print(x) // error: use of global variable 'x' before its declaration
+  let x = 0
+  ```
+
+  Previously this would have accessed uninitialized memory. Such variables must
+  now be declared before their use. This change only affects script mode
+  (e.g `main.swift`), it does not apply to regular global variables, which
+  continue to be initialized lazily.
+
+* [SE-0478][]:
+  Introduced file-level default declarations for `nonisolated`, `@MainActor`,
+  `@available`, and `@diagnose`. A `default` declaration applies to all
+  top-level declarations in the file:
+
+  ```swift
+  default @MainActor
+  default @available(macOS 15, *)
+
+  func foo() {}             // @MainActor, available in macOS 15 or newer
+
+  nonisolated func bar() {} // nonisolated overrides @MainActor
+
+  @available(macOS 26, *)
+  func baz() {}             // narrows the default availability
+  ```
+
+  File defaults are applied before attributes and modifiers written on
+  individual declarations, so file default isolation and warning behavior can
+  be overridden and narrower availability can be specified for each
+  declaration.
+
+  During the evolution process, this feature existed under the experimental
+  feature named `DefaultIsolationPerFile`, but its scope expanded to a limited
+  set of other attributes.
+
+* [SE-0551][]:
+  `Span` and `MutableSpan` have new initializers that form a single-element span over a value, borrowing it (or mutating it) in place: `Span(ofOne:)` and `MutableSpan(ofOne:)`.
+  Because they do not need to copy the value, they can support noncopyable types.
+  `RawSpan` and `MutableRawSpan` have matching initializers over the bytes of a single value: `RawSpan(bytesOf:)` and `MutableRawSpan(bytesOf:)`.
+
+  ```swift
+  let header = PacketHeader(...)
+  let c = checksum(Span(ofOne: header).bytes) // borrows `header` in place
+
+  var timestamp = UInt64.zero
+  var bytes = MutableRawSpan(bytesOf: &timestamp)
+  parser.read(into: bytes)                    // writes into `timestamp`
+  ```
+
+  These initializers are safe alternatives for `withUnsafePointer(to:)`,
+  `withUnsafeMutablePointer(to:)`, `withUnsafeBytes(of:)` and
+  `withUnsafeMutableBytes(of:)`.
+
+* [SE-0526][]:
+  Introduced task deadlines, available as `withDeadline(in:)`, which runs
+  an operation within a time limit, and cancels the operation's scope when
+  the deadline is exceeded. Nested deadlines compose and the "nearest"
+  deadline is the effective one:
+
+  ```swift
+  let result = try await withDeadline(in: .seconds(5)) {
+    try await fetchUserData()
+  }
+  ```
+
 * Actors are now allowed to conform to protocols annotated with global actor
   attributes. To support this, actors will no longer infer invalid global actor
   annotations from isolated property wrappers, or from protocols with inferred
@@ -11272,6 +11377,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
+[SE-0478]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0478-default-isolation-typealias.md
 [SE-0491]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0491-module-selectors.md
 [SE-0489]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0489-codable-error-printing.md
 [SE-0493]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0493-defer-async.md
@@ -11280,6 +11386,9 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0508]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0508-array-expression-trailing-closures.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
+[SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
+[SE-0551]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0551-span-of-one.md
+[SE-0564]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0564-split-continuations.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
@@ -11324,4 +11433,5 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#70065]: <https://github.com/apple/swift/pull/70065>
 [#71075]: <https://github.com/apple/swift/pull/71075>
 [#78389]: <https://github.com/swiftlang/swift/pull/78389>
+[#88082]: <https://github.com/swiftlang/swift/pull/88082>
 [swift-syntax]: https://github.com/apple/swift-syntax

@@ -96,6 +96,10 @@ sil @addressable_noescape_arg : $@convention(thin) (@in_guaranteed Addressable) 
 [%0: noescape]
 }
 
+sil @scoped_dependent_inout_arg : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+
+sil @inherited_dependent_arg : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+
 // CHECK-LABEL: Address escape information for test_simple:
 // CHECK:       value:  %1 = struct_element_addr %0 : $*Str, #Str.a
 // CHECK-NEXT:    ==>   %7 = apply %6(%5) : $@convention(thin) (@in Int) -> ()
@@ -1023,6 +1027,55 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
+// CHECK-LABEL: Address escape information for escape_via_scoped_dependent_inout:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $Int
+// CHECK-NEXT: may alias
+// CHECK-LABEL: End function escape_via_scoped_dependent_inout
+sil [ossa] @escape_via_scoped_dependent_inout : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+
+  %f = function_ref @scoped_dependent_inout_arg : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@inout Int) -> @lifetime(borrow 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK-LABEL: Address escape information for noescape_via_inherited_dependence:
+// CHECK: pair 0 - 1
+// CHECK-NEXT:   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+// CHECK-NEXT:   %{{.*}} = alloc_stack $NE
+// CHECK-NEXT: no alias
+// CHECK-LABEL: End function noescape_via_inherited_dependence
+sil [ossa] @noescape_via_inherited_dependence : $@convention(thin) (@owned NE) -> () {
+bb0(%0 : @owned $NE):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $NE
+  store %0 to [init] %1
+
+  %f = function_ref @inherited_dependent_arg : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+  %a = apply %f(%1) : $@convention(thin) (@in_guaranteed NE) -> @lifetime(copy 0) @owned NE
+
+  fix_lifetime %a
+  fix_lifetime %1
+  destroy_value %a
+  destroy_addr %1
+  dealloc_stack %1
+
+  %9 = tuple ()
+  return %9 : $()
+}
+
 // CHECK-LABEL: Address escape information for escaping_pointer_through_function:
 // CHECK:       value:  %1 = alloc_stack $Int
 // CHECK-NEXT:    ==>   %4 = apply undef(%3) : $@convention(thin) (Builtin.RawPointer) -> UnsafeMutableRawBufferPointer
@@ -1092,4 +1145,38 @@ bb0(%0 : @guaranteed $Outer):
   dealloc_stack %1 : $*Outer
   %ret = tuple ()
   return %ret : $()
+}
+
+sil @mutate_xandint_i : $@convention(method) (@inout XandInt) -> @inout Int {
+[%0: read s1.v**]
+[global: ]
+bb0(%0 : $*XandInt):
+  %1 = struct_element_addr %0 : $*XandInt, #XandInt.i
+  return %1 : $*Int
+}
+
+sil @write_through_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// The address result of the mutate accessor escapes.
+//
+// CHECK-LABEL: Address escape information for test_mutate_accessor_result_escape:
+// CHECK:       value:  %1 = alloc_stack $XandInt
+// CHECK-NEXT:    ==>   %5 = apply %4(%1) : $@convention(method) (@inout XandInt) -> @inout Int
+// CHECK-NEXT:    ==>   %8 = apply %7(%6) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK:       End function test_mutate_accessor_result_escape
+sil @test_mutate_accessor_result_escape : $@convention(thin) (@owned XandInt) -> () {
+bb0(%0 : $XandInt):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $XandInt
+  store %0 to %1 : $*XandInt
+  fix_lifetime %1 : $*XandInt
+  %4 = function_ref @mutate_xandint_i : $@convention(method) (@inout XandInt) -> @inout Int
+  %5 = apply %4(%1) : $@convention(method) (@inout XandInt) -> @inout Int
+  %6 = address_to_pointer %5 : $*Int to $Builtin.RawPointer
+  %7 = function_ref @write_through_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*XandInt
+  dealloc_stack %1 : $*XandInt
+  %11 = tuple ()
+  return %11 : $()
 }

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -solver-enable-type-var-joins
 
 // REQUIRES: objc_interop
 
@@ -8,7 +8,7 @@ import CoreGraphics
 var roomName : String?
 
 if let realRoomName = roomName as! NSString { // expected-warning{{forced cast from 'String?' to 'NSString' only unwraps and bridges; did you mean to use '!' with 'as'?}}
-  // expected-error@-1{{initializer for conditional binding must have Optional type, not 'NSString'}}
+  // expected-warning@-1{{initializer for conditional binding has non-optional type 'NSString'}}
   // expected-warning@-2{{treating a forced downcast to 'NSString' as optional will never produce 'nil'}}
   // expected-note@-3{{add parentheses around the cast to silence this warning}}
   // expected-note@-4{{use 'as?' to perform a conditional downcast to 'NSString'}}
@@ -55,9 +55,13 @@ struct MyArray<Element> {} // expected-note {{'Element' declared as parameter to
 class A {
     var a: MyArray<Int>
     init() {
-        a = MyArray<Int // expected-error {{generic parameter 'Element' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
-       // expected-error@-1 {{binary operator '<' cannot be applied to operands of type 'MyArray<Element>.Type' and 'Int.Type'}}
-       // expected-error@-2 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
+        a = MyArray<Int
+        // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+        // expected-note@-2 {{required by referencing operator function '<' on 'Comparable' where 'Self' = 'any Any.Type'}}
+        // expected-error@-3 {{type 'any Any.Type' cannot conform to 'Comparable'}}
+        // expected-error@-4 {{generic parameter 'Element' could not be inferred}}
+        // expected-note@-5 {{explicitly specify the generic arguments to fix this issue}}
+        // expected-error@-6 {{cannot assign value of type 'Bool' to type 'MyArray<Int>'}}
     }
 }
 

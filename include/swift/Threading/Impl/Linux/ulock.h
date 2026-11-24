@@ -33,7 +33,9 @@
 
 #include <atomic>
 #include <cstdint>
+#include <cerrno>
 
+#include "swift/Threading/Errors.h"
 #include "swift/Threading/ThreadSanitizer.h"
 
 namespace swift {
@@ -53,19 +55,31 @@ inline int ulock_get_tid(void) {
 }
 
 inline int ulock_futex(ulock_t *lock, int op) {
-  return syscall(SYS_futex, lock, op | FUTEX_PRIVATE_FLAG, 0, nullptr, nullptr,
-                 0);
+  if (syscall(SYS_futex, lock, op | FUTEX_PRIVATE_FLAG, 0, nullptr, nullptr,
+              0) == 0)
+    return 0;
+  return errno;
 }
 
 inline void ulock_lock(ulock_t *lock) {
   const ulock_t tid = ulock_get_tid();
-  do {
+  for (;;) {
     ulock_t zero = 0;
     if (ulock_fastpath(__atomic_compare_exchange_n(lock, &zero, tid,
                                                    true, __ATOMIC_ACQUIRE,
                                                    __ATOMIC_RELAXED)))
       break;
-  } while (ulock_futex(lock, FUTEX_LOCK_PI) != 0);
+
+    int err = ulock_futex(lock, FUTEX_LOCK_PI);
+    if (err == 0)
+      break;
+    if (err != EAGAIN && err != EINTR) {
+      swift::threading::fatal("ulock_lock: FUTEX_LOCK_PI failed on %p "
+                              "(lock word 0x%x, tid %d): errno %d",
+                              lock, __atomic_load_n(lock, __ATOMIC_RELAXED),
+                              tid, err);
+    }
+  }
 
   tsan::acquire(lock);
 }
@@ -87,13 +101,23 @@ inline void ulock_unlock(ulock_t *lock) {
   tsan::release(lock);
 
   const ulock_t tid = ulock_get_tid();
-  do {
+  for (;;) {
     ulock_t expected = tid;
     if (ulock_fastpath(__atomic_compare_exchange_n(lock, &expected, 0,
                                                    true, __ATOMIC_RELEASE,
                                                    __ATOMIC_RELAXED)))
       break;
-  } while (ulock_futex(lock, FUTEX_UNLOCK_PI) != 0);
+
+    int err = ulock_futex(lock, FUTEX_UNLOCK_PI);
+    if (err == 0)
+      break;
+    if (err != EAGAIN && err != EINTR) {
+      swift::threading::fatal("ulock_unlock: FUTEX_UNLOCK_PI failed on %p "
+                              "(lock word 0x%x, tid %d): errno %d",
+                              lock, __atomic_load_n(lock, __ATOMIC_RELAXED),
+                              tid, err);
+    }
+  }
 }
 
 } // namespace linux

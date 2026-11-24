@@ -363,5 +363,5 @@ extension TestPrespecialized {
     }
 }
 
-// CHECK2: sil [_specialize exported: false, kind: full, where T == Klass1, U == FakeString] [_specialize exported: false, kind: full, where T == Int, U == Float] [ossa] @$s15specialize_attr20publicSpecializeThis_1uyx_q_tr0_lF
-// CHECK2: sil [_specialize exported: false, kind: full, where T == Int] [ossa] @$s15specialize_attr18TestPrespecializedV13testExtensionyyF
+// CHECK2: sil [specialized exported: false, kind: full, where T == Klass1, U == FakeString] [specialized exported: false, kind: full, where T == Int, U == Float] [ossa] @$s15specialize_attr20publicSpecializeThis_1uyx_q_tr0_lF
+// CHECK2: sil [specialized exported: false, kind: full, where T == Int] [ossa] @$s15specialize_attr18TestPrespecializedV13testExtensionyyF

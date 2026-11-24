@@ -42,7 +42,7 @@ public struct SubstitutionMap: CustomStringConvertible, NoReflectionChildren {
 
   public var isEmpty: Bool { bridged.isEmpty() }
 
-  public var hasAnySubstitutableParams: Bool { bridged.hasAnySubstitutableParams() }
+  public var isEffectivelyGeneric: Bool { bridged.isEffectivelyGeneric() }
 
   /// Applies `substitutionMap` to the replacement types of this substitution map.
   ///

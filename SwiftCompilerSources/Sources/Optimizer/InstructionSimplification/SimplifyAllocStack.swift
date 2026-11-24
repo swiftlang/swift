@@ -84,7 +84,7 @@ private extension AllocStackInst {
           dv.salvageEnumPayload(index: use.index, caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
         } else {
           // Kill the operand, and fix the type to be the enum type rather than the payload type.
-          dv.killOperand(index: use.index, withType: oldAllocType)
+          dv.killOperand(index: use.index, withType: oldAllocType, context)
         }
       case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
         break
@@ -428,14 +428,24 @@ private extension AllocStackInst {
           isCopy: ucca.isCopy)
         context.erase(instruction: ucca)
       case let dv as DebugValueInst:
-        if dv.location.isInlined || dv.debugReconstructionBlock != nil {
-          // We cannot change the type of an inlined instance of a variable
+        if self.type.isExistential || dv.debugVariable?.scope?.inlinedCallSite != nil
+            || dv.debugReconstructionBlock != nil {
+          // We cannot retype the debug_value of an existential: all debug_values of a variable
+          // must have the same type, and there may be other debug_values of the variable in the
+          // function, e.g. an `undef` marker which SILGen emits when a variable is consumed.
+          // Finding them would require iterating over the whole function.
+          //
+          // We also cannot change the type of an inlined instance of a variable
           // without renaming the inlined function to get a unique
           // specialization suffix (prior art exists in
           // SILCloner::remapFunction()).
-          // For now, just remove affected inlined variables.
-          dv.killOperand(index: use.index)
+          // For now, just remove affected variables.
+          dv.killOperand(index: use.index, context)
         } else {
+          // An existential archetype cannot be the type of a source variable. Therefore there
+          // are no SILGen'd debug_values of other types for the variable.
+          // Also, we must not keep the existential archetype in the debug_value, because it
+          // doesn't keep the defining instruction of the archetype alive.
           use.set(to: newAlloc, context)
         }
       default:
@@ -566,7 +576,7 @@ private extension DebugValueInst {
     guard operandType.objectType.isLoadable(in: self.parentFunction),
           enumType.isLoadable(in: self.parentFunction) else {
       // Kill the operand, and fix the type to be the enum type rather than the payload type.
-      self.killOperand(index: index, withType: enumType)
+      self.killOperand(index: index, withType: enumType, context)
       return
     }
 
@@ -594,6 +604,6 @@ private extension DebugValueInst {
     debugBB.eraseArgument(at: index, context)
     let newArg = debugBB.insertPhiArgument(
       atPosition: index, type: operandType, ownership: .none, context)
-    loadVal.operand.set(to: newArg, context)
+    loadVal.addressOperand.set(to: newArg, context)
   }
 }

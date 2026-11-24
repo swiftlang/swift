@@ -96,28 +96,50 @@ class C {
 
 // Never-returning expressions
 func haltAndCatchFire() -> Never { while true { } }
-let backupPlan: () -> Int = { haltAndCatchFire() }
-func missionCritical(storage: () -> String) {}
-missionCritical(storage: { haltAndCatchFire() })
 
-// https://github.com/apple/swift/issues/47540
-enum E { }
-func takesAnotherUninhabitedType(e: () -> E) {}
-takesAnotherUninhabitedType { haltAndCatchFire() }
+do {
+  let backupPlan: () -> Int = { haltAndCatchFire() }
+  let backupPlanResult: Int = { haltAndCatchFire() }()
 
-// Weak capture bug caught by rdar://problem/67351438
-class Y {
-  var toggle: Bool = false
+  func missionCritical(storage: () -> String) {}
 
-  func doSomething(animated: Bool, completionHandler: (Int, Int) -> Void) { }
+  missionCritical(storage: { haltAndCatchFire() })
+
+  // Broken behavior
+  func f1<T>(_: T, _: T) {}
+
+  let s = ""
+  f1(s, { fatalError() }())  // expected-error {{conflicting arguments to generic parameter 'T' ('String' vs. 'Never')}}
+
+  // Even more broken behavior
+  func f2<T>(_: T, _: T) -> Int {}
+  func f2<T>(_: T?, _: T?) -> String {}
+
+  let x = f2(s, { fatalError() }())  // accepted! but which overload?
+
+  let _: String = x  // oops?
 }
 
-class X {
-  private(set) var someY: Y!
+// https://github.com/apple/swift/issues/47540
+do {
+  enum E { }
+  func takesAnotherUninhabitedType(e: () -> E) {}
+  takesAnotherUninhabitedType { haltAndCatchFire() }
 
-  func doSomething() {
-    someY?.doSomething(animated: true, completionHandler: { [weak someY] _, _ in
-        someY?.toggle = true
-      })
+  // Weak capture bug caught by rdar://problem/67351438
+  class Y {
+    var toggle: Bool = false
+
+    func doSomething(animated: Bool, completionHandler: (Int, Int) -> Void) { }
+  }
+
+  class X {
+    private(set) var someY: Y!
+
+    func doSomething() {
+      someY?.doSomething(animated: true, completionHandler: { [weak someY] _, _ in
+          someY?.toggle = true
+        })
+    }
   }
 }

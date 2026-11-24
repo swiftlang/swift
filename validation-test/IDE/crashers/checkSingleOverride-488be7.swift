@@ -1,4 +1,4 @@
-// {"kind":"complete","signature":"checkSingleOverride(swift::ValueDecl*, swift::ValueDecl*)","signatureAssert":"Assertion failed: (!baseName.isSpecial() && \"Can't retrieve the identifier of a special base name\"), function getBaseIdentifier","signatureNext":"OverrideMatcher::checkPotentialOverrides"}
+// {"kind":"complete","signature":"checkSingleOverride(swift::ValueDecl*, swift::ValueDecl*)","signatureAssert":"Assertion failed: (!isSpecial() && \"Cannot retrieve identifier from special names\"), function getIdentifier","signatureNext":"OverrideMatcher::checkPotentialOverrides"}
 // RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
 class a { subscript(a) a { set } class b : a { override subscript(a) a {
 #^COMPLETE^#

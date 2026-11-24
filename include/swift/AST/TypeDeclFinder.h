@@ -18,21 +18,16 @@
 
 namespace swift {
 
-class BoundGenericType;
 class DeclRefTypeRepr;
 class NominalType;
 class TypeAliasType;
 
-/// Walks a Type to find all NominalTypes, BoundGenericTypes, and
-/// TypeAliasTypes.
+/// Walks a Type to find all NominalTypes and TypeAliasTypes.
 class TypeDeclFinder : public TypeWalker {
   Action walkToTypePre(Type T) override;
 
 public:
   virtual Action visitNominalType(NominalType *ty) {
-    return Action::Continue;
-  }
-  virtual Action visitBoundGenericType(BoundGenericType *ty) {
     return Action::Continue;
   }
   virtual Action visitTypeAliasType(TypeAliasType *ty) {
@@ -48,7 +43,6 @@ class SimpleTypeDeclFinder : public TypeDeclFinder {
   llvm::function_ref<Action(const TypeDecl *)> Callback;
 
   Action visitNominalType(NominalType *ty) override;
-  Action visitBoundGenericType(BoundGenericType *ty) override;
   Action visitTypeAliasType(TypeAliasType *ty) override;
 
 public:

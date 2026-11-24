@@ -60,6 +60,11 @@ void swapInts(int *p, int *q);
 void takesTrivialStruct(TrivialStruct s);
 TrivialStruct returnsTrivialStruct();
 
+// Non-trivial classes
+
+void takesNonTrivial(NonTrivialClass obj);
+NonTrivialClass returnsNonTrivial();
+
 // Overloads
 
 int overloadedByArity(int x);

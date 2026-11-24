@@ -114,6 +114,16 @@ private:
   /// A value of -2 means this is a debug-only block (no data).
   int index = -1;
 
+  /// A dense, contiguous number identifying this block within its function,
+  /// used by generic LLVM graph algorithms (dominator trees, loop info,
+  /// post-order iterators, ...) to index blocks in a vector.
+  ///
+  /// Unlike \c index (which is repurposed per-BasicBlockData), this number is a
+  /// persistent property of the block. It is assigned when the block is added
+  /// to a function and reassigned (compacted) by SILFunction::renumberBlocks().
+  /// A value of -1 means no number has been assigned yet.
+  int blockNumber = -1;
+
   /// Custom bits managed by BasicBlockBitfield.
   CustomBitsType customBits = 0;
   
@@ -171,6 +181,17 @@ public:
   /// Warning: This function is slow. Therefore it should only be used for
   ///          debug output.
   int getDebugID() const;
+
+  /// Returns the dense, contiguous number of this block within its function,
+  /// used by generic graph algorithms (e.g. LoopInfo) to index blocks in a
+  /// vector.
+  ///
+  /// The number is assigned when the block is added to a function; it stays
+  /// valid until SILFunction::renumberBlocks() compacts the numbering.
+  unsigned getNumber() const {
+    assert(blockNumber >= 0 && "block number not assigned");
+    return (unsigned)blockNumber;
+  }
 
   void setDebugName(llvm::StringRef name);
   std::optional<llvm::StringRef> getDebugName() const;
@@ -777,12 +798,6 @@ namespace llvm {
 
 template <> struct DenseMapInfo<swift::PhiOperand> {
   static swift::PhiOperand getEmptyKey() { return swift::PhiOperand(); }
-  static swift::PhiOperand getTombstoneKey() {
-    swift::PhiOperand phiOper;
-    phiOper.predBlock =
-        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
-    return phiOper;
-  }
   static unsigned getHashValue(swift::PhiOperand phiOper) {
     return llvm::hash_combine(phiOper.predBlock, phiOper.argIndex);
   }
@@ -793,12 +808,6 @@ template <> struct DenseMapInfo<swift::PhiOperand> {
 
 template <> struct DenseMapInfo<swift::PhiValue> {
   static swift::PhiValue getEmptyKey() { return swift::PhiValue(); }
-  static swift::PhiValue getTombstoneKey() {
-    swift::PhiValue phiValue;
-    phiValue.phiBlock =
-        llvm::DenseMapInfo<swift::SILBasicBlock *>::getTombstoneKey();
-    return phiValue;
-  }
   static unsigned getHashValue(swift::PhiValue phiValue) {
     return llvm::hash_combine(phiValue.phiBlock, phiValue.argIndex);
   }

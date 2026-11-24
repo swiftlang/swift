@@ -446,15 +446,15 @@ The SIL function the accessor actually dispatches to is selected by `IRGenModule
 
 There is one residual IRGen-side fixup: `argumentTypesBuffer` on the recipient is filled by `__getParameterTypeInfo` from demangling the regular distributed thunk's mangled name, which still says `any P` / `some P`. Since `any P` does not conform to `Codable`, `decodeNextArgument` would trap if invoked with that metadata. The accessor therefore overrides the runtime-loaded `argumentTy` with a compile-time reference to `$P`'s metadata before calling `decodeNextArgument` (see the `@Resolvable protocol param: override runtime-loaded metadata` block in `decodeArguments`).
 
-# Distributed in Embedded Swift (experimental)
+# Distributed in Embedded Swift
 
 Distributed is available in Embedded Swift, however Embedded comes with a number of limitations 
 that are necessary for Embedded platforms that make the existing non-Embedded runtime not compatible as-is.
 
-Currently Embedded Distributed is experimental, and you can enable like this: 
+Distributed actors are available whenever Embedded Swift is enabled; no additional feature flag is needed:
 
 ```
--enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed
+-enable-experimental-feature Embedded
 ```
 
 In Embedded Embedded, distributed actors use the same `DistributedActorSystem` protocol as usual, 

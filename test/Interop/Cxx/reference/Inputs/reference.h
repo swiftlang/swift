@@ -15,6 +15,8 @@ void setConstStaticIntRvalueRef(const int &&);
 
 auto getFuncRef() -> int (&)();
 auto getFuncRvalueRef() -> int (&&)();
+int callFuncRef(int (&)());
+int callFuncRvalueRef(int (&&)());
 
 using ConstIntRefTypealias = const int &;
 

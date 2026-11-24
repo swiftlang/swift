@@ -1,11 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -swift-version 6 -verify %t/protocols.swift %t/conformances.swift
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -enable-experimental-feature NoExplicitNonIsolated -typecheck -swift-version 6 -verify -verify-additional-prefix no-explicit-nonisolated- %t/protocols.swift %t/conformances.swift
+// RUN: %target-swift-frontend -typecheck -swift-version 6 -verify %t/protocols.swift %t/conformances.swift
+// RUN: %target-swift-frontend -enable-experimental-feature NoExplicitNonIsolated -typecheck -swift-version 6 -verify -verify-additional-prefix no-explicit-nonisolated- %t/protocols.swift %t/conformances.swift
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 // REQUIRES: swift_feature_NoExplicitNonIsolated
 
 //--- protocols.swift
@@ -65,7 +64,6 @@ class D {}
 extension D: SendableMetatypeProto {
   // expected-error@-1 {{conformance of 'D' to protocol 'SendableMetatypeProto' crosses into main actor-isolated code and can cause data races}}
   // expected-note@-2 {{turn data races into runtime errors with '@preconcurrency'}}
-  // expected-note@-3 {{isolate this conformance to the main actor with '@MainActor'}}
   func sm() {}
   // expected-note@-1 {{main actor-isolated instance method 'sm()' cannot satisfy nonisolated requirement}}
   // expected-note@-2 {{mark instance method 'sm()' 'nonisolated'}}

@@ -29,7 +29,7 @@ extension Foo {
         @_lifetime(borrow self)
         borrowing get {
             // FIXME: This error shouldn't be here.
-            guard let ptr = self._fastCharacterContents() else { // expected-error{{copy of noncopyable typed value}}
+            guard let ptr = self._fastCharacterContents() else { // expected-error{{copy of non-'Copyable' typed value}}
                 return nil
             }
             let length = self.length

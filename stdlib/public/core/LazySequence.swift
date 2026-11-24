@@ -132,7 +132,7 @@ public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
-  /// - See also: `elements`
+  /// - SeeAlso: ``elements``
   associatedtype Elements: Sequence = Self where Elements.Element == Element
 
   /// A sequence containing the same elements as this one, possibly with
@@ -173,7 +173,7 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceProtocol`
+/// - SeeAlso: ``LazySequenceProtocol``
 @frozen // lazy-performance
 public struct LazySequence<Base: Sequence> {
   @usableFromInline

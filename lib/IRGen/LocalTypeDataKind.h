@@ -250,14 +250,6 @@ namespace llvm {
 template <> struct DenseMapInfo<swift::irgen::LocalTypeDataKey> {
   using LocalTypeDataKey = swift::irgen::LocalTypeDataKey;
   using CanTypeInfo = DenseMapInfo<swift::CanType>;
-  static inline LocalTypeDataKey getEmptyKey() {
-    return { CanTypeInfo::getEmptyKey(),
-             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
-  }
-  static inline LocalTypeDataKey getTombstoneKey() {
-    return { CanTypeInfo::getTombstoneKey(),
-             swift::irgen::LocalTypeDataKind::forFormalTypeMetadata() };
-  }
   static unsigned getHashValue(const LocalTypeDataKey &key) {
     return detail::combineHashValue(CanTypeInfo::getHashValue(key.Type),
                                     key.Kind.getRawValue());

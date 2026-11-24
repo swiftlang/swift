@@ -608,6 +608,14 @@ static bool hasNoArgumentConstructor(ClassDecl *decl) {
     if (!ctor || ctor->isInvalid() || ctor->isUnavailable())
       continue;
 
+    // Only an initializer imported from a C++ constructor can construct the
+    // base subobject of a subclass of a C++ foreign reference type.
+    if (decl->isForeignReferenceType() &&
+        !decl->getASTContext()
+             .getClangModuleLoader()
+             ->getOriginalForeignReferenceConstructor(ctor))
+      continue;
+
     if (ctor->getParameters()->size() == 0)
       return true;
   }
@@ -1393,6 +1401,10 @@ InheritsSuperclassInitializersRequest::evaluate(Evaluator &eval,
 
   auto superclassDecl = decl->getSuperclassDecl();
   assert(superclassDecl);
+
+  // An imported C++ class does not inherit the initializers of its base either.
+  if (decl->hasClangNode() && superclassDecl->isForeignReferenceType())
+    return false;
 
   // If the superclass has known-missing designated initializers, inheriting
   // is unsafe.

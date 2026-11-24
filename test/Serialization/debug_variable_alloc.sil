@@ -1,0 +1,49 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -experimental-serialize-debug-info -emit-module -module-name alloc_debug_var -o %t/alloc_debug_var.swiftmodule %s
+// RUN: %target-sil-opt -emit-sorted-sil -sil-print-debuginfo %t/alloc_debug_var.swiftmodule | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -module-name alloc_debug_var -o %t/no_debug_info.swiftmodule %s
+// RUN: %target-sil-opt -emit-sorted-sil %t/no_debug_info.swiftmodule | %FileCheck %s --check-prefix=NODEBUG
+
+// alloc_stack and alloc_box debug variables are serialized when
+// -experimental-serialize-debug-info is used.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_alloc_box :
+// CHECK: alloc_box ${ var Builtin.Int64 }, var, name "z"
+// CHECK: } // end sil function 'test_alloc_box'
+// NODEBUG-LABEL: sil [serialized] [canonical] [stage=canonical] @test_alloc_box :
+// NODEBUG-NOT: name
+// NODEBUG: } // end sil function 'test_alloc_box'
+sil [serialized] @test_alloc_box : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var Builtin.Int64 }, var, name "z"
+  dealloc_box %0
+  %r = tuple ()
+  return %r : $()
+}
+
+// The location of both the variable and the instruction are kept.
+
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] @test_alloc_stack :
+// CHECK: alloc_stack $Builtin.Int64, var, name "x"
+// CHECK: alloc_stack $Builtin.Int64, let, name "y", argno 1, loc "a.swift":3:5
+// CHECK: alloc_stack $Builtin.Int64, var, (name "w", loc "b.swift":7:9), loc "a.swift":4:5
+// CHECK: } // end sil function 'test_alloc_stack'
+// NODEBUG-LABEL: sil [serialized] [canonical] [stage=canonical] @test_alloc_stack :
+// NODEBUG-NOT: name
+// NODEBUG: } // end sil function 'test_alloc_stack'
+sil [serialized] @test_alloc_stack : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int64, var, name "x"
+  %1 = alloc_stack $Builtin.Int64, let, name "y", argno 1, loc "a.swift":3:5
+  %2 = alloc_stack $Builtin.Int64, var, (name "w", loc "b.swift":7:9), loc "a.swift":4:5
+  dealloc_stack %2
+  dealloc_stack %1
+  dealloc_stack %0
+  %r = tuple ()
+  return %r : $()
+}

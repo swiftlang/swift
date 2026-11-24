@@ -261,9 +261,10 @@ static void synthesizeCodingKeysIfNeededForUnqualifiedLookup(ASTContext &ctx,
   }
 }
 
-LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
-                                            SourceLoc loc,
-                                            NLOptions options) {
+LookupResult
+TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name, SourceLoc loc,
+                               NLOptions options,
+                               llvm::function_ref<bool(ValueDecl *)> filter) {
   auto &ctx = dc->getASTContext();
 
   // HACK: Synthesize CodingKeys if needed.
@@ -281,6 +282,9 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                               options);
   for (auto idx : indices(lookup.allResults())) {
     const auto &found = lookup[idx];
+    if (filter && !filter(found.getValueDecl()))
+      continue;
+
     // Determine which type we looked through to find this result.
     Type foundInType;
 
@@ -641,6 +645,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
         !baseTypeOrNull->isExistentialType())
       return;
 
+    // Never correct 'self', we have specialized diagnostics for it.
+    if (corrections.WrittenName.isSimpleName(Ctx.Id_self))
+      return;
+
     const auto candidateName = decl->getName();
 
     // Don't waste time computing edit distances that are more than
@@ -849,6 +857,15 @@ public:
     if (existing != infos.end())
       return existing->getSecond();
 
+    auto info = computeFixItInfo(mod, sf.getMaxAccessLevelUsingImport(mod));
+    infos[mod] = info;
+    return info;
+  }
+
+  /// Computes the fix-it for an import of \p mod that is at least as
+  /// permissive as \p requiredAccessLevel.
+  MissingImportFixItInfo computeFixItInfo(ModuleDecl *mod,
+                                          AccessLevel requiredAccessLevel) {
     MissingImportFixItInfo info;
     info.moduleToImport = mod;
 
@@ -875,20 +892,18 @@ public:
     // Add an appropriate access level as long as it would not conflict with
     // existing imports that lack access levels.
     auto accessLevelForImport = [&]() -> std::optional<AccessLevel> {
-      auto maxAccessLevel = sf.getMaxAccessLevelUsingImport(mod);
       if (internalImportsByDefaultEnabled) {
-        if (!foundImport && maxAccessLevel <= AccessLevel::Internal)
+        if (!foundImport && requiredAccessLevel <= AccessLevel::Internal)
           return std::nullopt;
       }
 
       if (foundImport && !anyImportHasAccessLevel)
         return std::nullopt;
 
-      return maxAccessLevel;
+      return requiredAccessLevel;
     };
 
     info.accessLevel = accessLevelForImport();
-    infos[mod] = info;
     return info;
   }
 
@@ -967,6 +982,23 @@ static void emitMissingImportNoteAndFixIt(
   ctx.Diags
       .diagnose(loc, diag::candidate_add_import, fixItInfo.moduleToImport)
       .fixItInsert(loc, importText);
+}
+
+void swift::noteAddImportOfModule(SourceFile &sf, ModuleDecl *mod,
+                                  AccessLevel requiredAccessLevel) {
+  auto &ctx = sf.getASTContext();
+  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(&sf);
+  if (bestLoc.isInvalid())
+    return;
+
+  // An implementation-only import, required for consistency with the imports
+  // in other files, would not make the module a dependency for clients.
+  MissingImportFixItCache fixItCache(sf);
+  auto fixItInfo = fixItCache.computeFixItInfo(mod, requiredAccessLevel);
+  if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
+    return;
+
+  emitMissingImportNoteAndFixIt(bestLoc, fixItInfo, ctx);
 }
 
 static void

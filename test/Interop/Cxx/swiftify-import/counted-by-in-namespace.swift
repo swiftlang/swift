@@ -11,16 +11,16 @@
 enum foo {
   static func foo_func(_ p: UnsafeMutablePointer<CFloat>!, _ len: CInt)
   /// This is an auto-generated wrapper for safer interop
-  @_alwaysEmitIntoClient @_disfavoredOverload public static func foo_func(_ p: UnsafeMutableBufferPointer<CFloat>)
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public static func foo_func(_ p: UnsafeMutableBufferPointer<CFloat>)
   static func foo_func2(_ p: UnsafePointer<baz_t>!, _ len: baz_t)
   /// This is an auto-generated wrapper for safer interop
   @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-  @_alwaysEmitIntoClient @_disfavoredOverload public static func foo_func2(_ p: Span<baz_t>)
+  @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public static func foo_func2(_ p: Span<baz_t>)
   enum bar {
     static func bar_func(_ p: UnsafePointer<baz_t>!, _ len: baz_t)
     /// This is an auto-generated wrapper for safer interop
     @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-    @_alwaysEmitIntoClient @_disfavoredOverload public static func bar_func(_ p: Span<baz_t>)
+    @_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public static func bar_func(_ p: Span<baz_t>)
   }
 }
 //--- Inputs/module.modulemap

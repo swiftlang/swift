@@ -21,6 +21,7 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/MetadataValues.h"
 #include "llvm/ADT/PointerIntPair.h"
+#include "llvm/ADT/STLExtras.h"
 
 namespace swift {
 class AsyncTask;
@@ -225,6 +226,21 @@ public:
     /// to observe the `A` value, because it semantically will never observe a
     /// "pop" of the `B` value - it was spawned from a scope where only B was observable.
     void copyTo(AsyncTask *target);
+
+    /// The minimum number of bytes we need for `copyTo` to copy task local values into,
+    /// including the allocator's per-allocation overhead.
+    ///
+    /// A task whose first slab has (at least) this capacity copies the
+    /// bindings of this storage without allocating a new slab.
+    size_t copyToSlabCapacity() const;
+
+  private:
+    /// Calls \p body for exactly the items which `copyTo` copies,
+    /// up to the first stop-lookup marker.
+    void forEachValueItemToCopy(
+        llvm::function_ref<void(ValueItem *)> body) const;
+
+  public:
 
     /// Destroy and deallocate all items stored by this specific task.
     ///

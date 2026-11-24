@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
 
 // This file is meant to contain dataflow tests that are true leaks. It is
 // intended to test both that we are failing and that we are emitting

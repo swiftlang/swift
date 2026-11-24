@@ -16,21 +16,21 @@ public enum E3 {
 @usableFromInline
 enum E4 {}
 
-@nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+@nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
 struct Test {
-  @nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+  @nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
   var v: Int {
-    @nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+    @nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
     get { 0 }
   }
 
-  @nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+  @nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
   var v2: String = ""
   
-  @nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+  @nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
   func test() {}
 
-  @nonexhaustive // expected-error {{@nonexhaustive may only be used on 'enum' declarations}}
+  @nonexhaustive // expected-error {{'@nonexhaustive' may only be used on 'enum' declarations}}
   subscript(a: Int) -> Bool {
     get { false }
     set { }

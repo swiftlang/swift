@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+// A `checked_cast_addr_br` whose destination is (part of) checked storage
+// initializes it only on the success edge. This is the shape SILGen emits for
+// `let x = b as? NC`: the cast writes the payload of `x` and each edge then
+// injects the matching case.
+
+sil_stage raw
+
+import Swift
+
+protocol P : ~Copyable {}
+struct NC : P, ~Copyable {}
+
+// CHECK-LABEL: sil [ossa] @cast_into_optional_payload
+// CHECK:         [[X:%[0-9]+]] = alloc_stack {{.*}}$Optional<NC>
+// CHECK:         [[PAYLOAD:%[0-9]+]] = init_enum_data_addr [[X]]
+// CHECK:         checked_cast_addr_br take_always any P & ~Copyable in %0 to NC in [[PAYLOAD]], [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[FAILURE]]:
+// CHECK-NEXT:    inject_enum_addr [[X]], #Optional.none!enumelt
+// CHECK:       [[SUCCESS]]:
+// CHECK-NEXT:    inject_enum_addr [[X]], #Optional.some!enumelt
+// CHECK:         destroy_addr [[X]]
+// CHECK-NOT:     destroy_addr [[X]]
+// CHECK:       } // end sil function 'cast_into_optional_payload'
+sil [ossa] @cast_into_optional_payload : $@convention(thin) (@in any P & ~Copyable) -> () {
+bb0(%0 : $*any P & ~Copyable):
+  %1 = alloc_stack [lexical] [var_decl] $Optional<NC>, let, name "x"
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*Optional<NC>
+  %3 = init_enum_data_addr %2 : $*Optional<NC>, #Optional.some!enumelt
+  checked_cast_addr_br take_always any P & ~Copyable in %0 : $*any P & ~Copyable to NC in %3 : $*NC, bb2, bb1
+
+bb1:
+  inject_enum_addr %2 : $*Optional<NC>, #Optional.none!enumelt
+  br bb3
+
+bb2:
+  inject_enum_addr %2 : $*Optional<NC>, #Optional.some!enumelt
+  br bb3
+
+bb3:
+  %8 = load_borrow %2 : $*Optional<NC>
+  ignored_use %8 : $Optional<NC>
+  end_borrow %8 : $Optional<NC>
+  destroy_addr %2 : $*Optional<NC>
+  dealloc_stack %1 : $*Optional<NC>
+  %13 = tuple ()
+  return %13 : $()
+}

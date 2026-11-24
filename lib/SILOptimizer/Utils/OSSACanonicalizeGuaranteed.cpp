@@ -67,6 +67,40 @@ static void deleteCopyAndMoveChain(SILValue v, InstructionDeleter &deleter) {
 //                        MARK: Rewrite borrow scopes
 //===----------------------------------------------------------------------===//
 
+/// If \p use is an interior pointer operand, pass each transitive address use
+/// that it places on its base to \p visitor, stopping early if \p visitor
+/// returns false.
+///
+/// Returns false if the address uses cannot all be identified, or if \p visitor
+/// returns false for an identified address use. Returns true without calling \p
+/// visitor for any other kind of use.
+static bool
+visitInteriorPointerAddressUses(Operand *use,
+                                function_ref<bool(Operand *)> visitor) {
+  switch (use->getOperandOwnership()) {
+  case OperandOwnership::InteriorPointer:
+  case OperandOwnership::AnyInteriorPointer:
+    break;
+  default:
+    return true;
+  }
+  // The verifier requires every interior pointer operand to be recognized here.
+  InteriorPointerOperand interiorPointer(use);
+  assert(interiorPointer && "unhandled interior pointer operand");
+
+  SmallVector<Operand *, 8> addressUses;
+  if (interiorPointer.findTransitiveUses(&addressUses) !=
+      AddressUseKind::NonEscaping) {
+    return false;
+  }
+  for (auto *addressUse : addressUses) {
+    if (!visitor(addressUse)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 /// Does this instruction forward ownership, and can it be hoisted out of a
 /// borrow scope or sunk to its uses?
 ///
@@ -114,14 +148,16 @@ bool OSSACanonicalizeGuaranteed::isRewritableOSSAForward(SILInstruction *inst) {
   if (!canOpcodeForwardOwnedValues(forwardedOper))
     return false;
 
-  // Don't rewrite the forwarding of a non-copyable value with a deinit.
-  // Converting such a value to a guaranteed value would drop the call to its
-  // deinitializer (memberwise destruction is not equivalent to aggregate
-  // destruction for a type with a user-defined deinit).
-  if (forwardedOper->get()->getType().isValueTypeWithDeinit())
+  // Don't rewrite the forwarding of a non-copyable value.
+  // A consuming use of a non-copyable value cannot be rewritten to consume a
+  // copy on demand. Bailing out in the middle of the in-place rewriting would
+  // leave the SIL in an inconsistent state, e.g. with a leaking copy.
+  // Also, converting a value with a deinit to a guaranteed value would drop the
+  // call to its deinitializer.
+  if (forwardedOper->get()->getType().isMoveOnly())
     return false;
   for (auto result : inst->getResults()) {
-    if (result->getType().isValueTypeWithDeinit())
+    if (result->getType().isMoveOnly())
       return false;
   }
 
@@ -150,6 +186,10 @@ SILValue OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(SILValue def) {
       case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::Phi:
       case BorrowedValueKind::BeginApplyToken:
+      // FIXME: A borrow accessor result with a @guaranteed self could be
+      // handled like begin_borrow, but downstream utilities like
+      // filterOuterBorrowUseInsts do not support it yet.
+      case BorrowedValueKind::BorrowAccessor:
         break;
       }
     }
@@ -177,6 +217,7 @@ bool OSSACanonicalizeGuaranteed::computeBorrowLiveness() {
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
+  case BorrowedValueKind::BorrowAccessor:
     // TODO: Canonicalize load_borrow scope and phi once consolidateBorrowScope
     // can handle persistentCopies.
     return false;
@@ -272,13 +313,25 @@ bool OSSACanonicalizeGuaranteed::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::TrivialUse:
         llvm_unreachable("this operand cannot handle ownership");
 
-      case OperandOwnership::InteriorPointer:
-      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
         // Ignore uses that must be within the borrow scope.
         // Rewriting does not look through reborrowed values--it considers them
         // part of a separate lifetime.
+        break;
+
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
+        // Interior pointer uses must be within the borrow scope, so they can
+        // usually be ignored, unless the operand is an intermediate (i.e.
+        // non-persistent) copy. Rewriting looks through copies and moves, so we
+        // cannot skip in that case.
+        if (findDefInBorrowScope(use->get()) == use->get())
+          break;
+
+        if (!visitor.visitUse(use)) {
+          return false;
+        }
         break;
 
       case OperandOwnership::ForwardingUnowned:
@@ -371,6 +424,20 @@ public:
         // Bail out on dead borrow scopes and scopes with unknown uses.
         return false;
       }
+    }
+    // For interior pointers, record the transitive address uses as outer use
+    // points. Note: The logic in RewriteOuterBorrowUses::visitUse that checks
+    // whether an interior pointer is an outer use must visit the same set of
+    // uses.
+    if (!visitInteriorPointerAddressUses(use, [&](Operand *addressUse) {
+          auto *addressUser = addressUse->getUser();
+          if (!isUserInLiveOutBlock(addressUser)) {
+            useInsts.insert(addressUser);
+          }
+          return true;
+        })) {
+      // Bail out on escaping or unrecognized address uses.
+      return false;
     }
     return true;
   }
@@ -576,6 +643,14 @@ public:
         return true;
       }
     }
+    // Likewise, if this use is an interior pointer, check whether any of the
+    // address uses it places on its base are outside the current scope.
+    if (!visitInteriorPointerAddressUses(use, [&](Operand *addressUse) {
+          return !outerUseInsts.count(addressUse->getUser());
+        })) {
+      rewriteOuterUse(use);
+      return true;
+    }
     innerRewriter.visitUse(use);
     return true;
   }
@@ -729,6 +804,10 @@ void RewriteOuterBorrowUses::cleanupOuterValue(SILValue outerValue) {
         return true;
       });
     }
+    visitInteriorPointerAddressUses(use, [&](Operand *addressUse) {
+      outerUses.push_back(addressUse->getUser());
+      return true;
+    });
   }
   ValueLifetimeAnalysis lifetimeAnalysis(outerValue.getDefiningInstruction(),
                                          outerUses);

@@ -244,6 +244,7 @@ private:
     case Kind::ResolvedPluginConfig:
       return Members::indexOf<ResolvedPluginConfig>();
     }
+    llvm_unreachable("covered switch");
   };
   using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
 
@@ -491,6 +492,10 @@ public:
   /// Path to in-process plugin server shared library.
   std::string InProcessPluginServerPath;
 
+  /// Path to in-process plugin server shared library resolved by the
+  /// dependency scanner. Overrides 'InProcessPluginServerPath'.
+  std::string ResolvedInProcessPluginServerPath;
+
   /// Don't automatically add any import paths.
   bool SkipAllImplicitImportPaths = false;
 
@@ -580,10 +585,13 @@ public:
   /// Creates a filesystem taking into account any overlays specified in
   /// \c VFSOverlayFiles. Returns \p BaseFS if there were no overlays and
   /// \c FileError(s) if any error occurred while attempting to parse the
-  /// overlay files.
+  /// overlay files. The overlay files are read from \p BaseFS, and the files
+  /// they redirect to are read from \p ExternalFS, or from the real file
+  /// system if \p ExternalFS is null.
   llvm::Expected<llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>>
-  makeOverlayFileSystem(
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS) const;
+  makeOverlayFileSystem(llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> BaseFS,
+                        llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+                            ExternalFS = nullptr) const;
 
 public:
   /// Return a hash code of any components from these options that should

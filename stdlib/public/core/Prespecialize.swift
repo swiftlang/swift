@@ -163,7 +163,7 @@ extension _ArrayBuffer {
                where @_noMetadata Element : _Class)
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ArrayBuffer<Element> { Builtin.unreachable() }
+  __consuming func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ArrayBuffer<Element> { Builtin.unreachable() }
 
   @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
@@ -259,5 +259,5 @@ extension _ContiguousArrayBuffer {
                where @_noMetadata Element : _Class)
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ContiguousArrayBuffer<Element> { Builtin.unreachable() }
+  __consuming func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ContiguousArrayBuffer<Element> { Builtin.unreachable() }
 }

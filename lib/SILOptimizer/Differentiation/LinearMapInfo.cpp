@@ -303,8 +303,8 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
     if (param.isAutoDiffSemanticResult())
       flags = flags.withInOut(true);
 
-    params.push_back(
-        AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
+    params.push_back(AnyFunctionType::Param::bodyAccess(
+        param.getInterfaceType(), Identifier(), flags));
   }
 
   AnyFunctionType *astFnTy;
@@ -561,6 +561,16 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   if (auto inject = dyn_cast<InjectEnumAddrInst>(inst))
     if (shouldDifferentiateInjectEnumAddr(*inject, activityInfo, config))
       return true;
+
+  // Should differentiate `startAsyncLetWithLocalBuffer` with
+  // active result buffer
+  if (auto *bi = dyn_cast<BuiltinInst>(inst);
+      bi &&
+      bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+    auto resultBuf = bi->getArguments().back();
+    if (activityInfo.isActive(resultBuf, config))
+      return true;
+  }
 
   return false;
 }

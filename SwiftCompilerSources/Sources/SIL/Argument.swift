@@ -77,6 +77,10 @@ final public class FunctionArgument : Argument {
     bridged.FunctionArgument_isClosureCapture()
   }
 
+  public var isNoImplicitCopy: Bool {
+    bridged.FunctionArgument_isNoImplicitCopy()
+  }
+
   public var isSelf: Bool {
     parentFunction.argumentConventions.selfIndex == index
   }
@@ -358,7 +362,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
 }
 
 extension ArgumentConventions {
-  private func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
+  public func parameterIndex(ofArgumentIndex argIdx: Int) -> Int? {
     let firstParamIdx = firstParameterIndex  // bridging call
     return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
   }

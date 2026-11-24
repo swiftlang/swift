@@ -13,5 +13,5 @@ extension GenericClass {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} private void @runtime_registration
-// CHECK-NOT: @__swift_instantiateConcreteTypeFromMangledName
+// CHECK-NOT: @__swift_instantiateConcreteTypeFromMangledNameV2
 // CHECK: ret void

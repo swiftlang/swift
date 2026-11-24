@@ -1,0 +1,78 @@
+//===--- SIMDIntegerComparisons.swift.gyb ---------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SIMDIntegerComparisons.swift
+// RUN: %target-swift-frontend -primary-file %t/SIMDIntegerComparisons.swift -emit-ir | %FileCheck %t/SIMDIntegerComparisons.swift
+
+// Check that concrete comparisons between a vector and a scalar will reach
+// a vector comparison, rather than a loop.
+
+import Swift
+
+%{
+comparisons = [
+  ("==", "eq", "eq", "eq"),
+  ("!=", "ne", "ne", "ne"),
+  ("<",  "lt", "slt", "ult"),
+  ("<=", "le", "sle", "ule"),
+  (">",  "gt", "sgt", "ugt"),
+  (">=", "ge", "sge", "uge"),
+]
+# we don't need to check every operator for every type
+comparisonsSubset = [c for c in comparisons if c[0] == "<"]
+
+vectors = [
+  ('Int8',   '8',         16, 16, True,  comparisons),
+  ('UInt8',  '8',         16, 16, False, comparisons),
+  ('Int16',  '16',         8,  8, True,  comparisonsSubset),
+  ('UInt16', '16',         8,  8, False, comparisonsSubset),
+  ('Int32',  '32',         4,  4, True,  comparisonsSubset),
+  ('UInt32', '32',         4,  4, False, comparisonsSubset),
+  ('Int64',  '64',         2,  2, True,  comparisonsSubset),
+  ('UInt64', '64',         2,  2, False, comparisonsSubset),
+  ('Int',    '{{32|64}}',  2,  2, True,  comparisonsSubset),
+  ('UInt',   '{{32|64}}',  2,  2, False, comparisonsSubset),
+  ('Int32',  '32',         3,  4, True,  comparisonsSubset),
+  ('UInt8',  '8',          3,  4, False, comparisonsSubset),
+]
+}%
+%for (Scalar, bits, n, lanes, signed, ops) in vectors:
+% for (op, name, signedLLVM, unsignedLLVM) in ops:
+%  llvm = signedLLVM if signed else unsignedLLVM
+func cmp_${name}_${n}x${Scalar}_scalarRHS(
+  _ a: SIMD${n}<${Scalar}>, _ b: ${Scalar}
+) -> SIMDMask<SIMD${n}<${Scalar}>.MaskStorage> {
+  a .${op} b
+}
+// CHECK-LABEL: define{{.*}}cmp_${name}_${n}x${Scalar}_scalarRHS
+%  if n != lanes:
+// CHECK: [[SPLAT:%[0-9]+]] = insertelement <${lanes} x i${bits}> {{.*}}, i${bits} 0, i32 ${lanes-1}
+%  else:
+// CHECK: [[SPLAT:%[0-9]+]] = shufflevector <${lanes} x i${bits}> {{.*}}
+%  end
+// CHECK: icmp ${llvm} <${lanes} x i${bits}> {{%[0-9]+}}, [[SPLAT]]
+
+func cmp_${name}_${n}x${Scalar}_scalarLHS(
+  _ a: ${Scalar}, _ b: SIMD${n}<${Scalar}>
+) -> SIMDMask<SIMD${n}<${Scalar}>.MaskStorage> {
+  a .${op} b
+}
+// CHECK-LABEL: define{{.*}}cmp_${name}_${n}x${Scalar}_scalarLHS
+%  if n != lanes:
+// CHECK: [[SPLAT:%[0-9]+]] = insertelement <${lanes} x i${bits}> {{.*}}, i${bits} 0, i32 ${lanes-1}
+%  else:
+// CHECK: [[SPLAT:%[0-9]+]] = shufflevector <${lanes} x i${bits}> {{.*}}
+%  end
+// CHECK: icmp ${llvm} <${lanes} x i${bits}> [[SPLAT]], {{%[0-9]+}}
+
+% end
+%end

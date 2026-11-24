@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_feature_StaticExclusiveOnly
 
-@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' can only be applied to noncopyable types}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' can only be applied to non-'Copyable' types}}
 struct A {}
 
 @_staticExclusiveOnly // OK
@@ -50,19 +50,19 @@ func i() {
   }
 }
 
-@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' may only be used on 'struct' declarations}}
 enum J {}
 
-@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' may only be used on 'struct' declarations}}
 class K {}
 
-@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' may only be used on 'struct' declarations}}
 func l() {}
 
-@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' may only be used on 'struct' declarations}}
 let m = 123
 
-@_staticExclusiveOnly // expected-error {{@_staticExclusiveOnly may only be used on 'struct' declarations}}
+@_staticExclusiveOnly // expected-error {{'@_staticExclusiveOnly' may only be used on 'struct' declarations}}
 protocol N {}
 
 func o(_: consuming B) {} // OK

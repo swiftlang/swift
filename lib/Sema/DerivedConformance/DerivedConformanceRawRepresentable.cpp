@@ -26,8 +26,10 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/QuotedString.h"
 
 using namespace swift;
 
@@ -104,8 +106,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto *argList = ArgumentList::forImplicitCallTo(functionRef->getName(),
                                                     {selfRef, typeExpr}, C);
     Expr *call = CallExpr::createImplicit(C, functionRef, argList);
-    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
-      call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
+    call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
     auto *returnStmt = ReturnStmt::createImplicit(C, call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
@@ -403,6 +404,27 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   return initDecl;
 }
 
+static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
+                                                  ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+
+  std::string macro = "#_deriveRawRepresentable(";
+  auto os = llvm::raw_string_ostream(macro);
+  os << QuotedString(getNominalTypeInfoString(derived)) << ", ";
+
+  if (requirement->getBaseName() == C.Id_rawValue) {
+    os << QuotedString("varDef");
+  } else {
+    ASSERT(requirement->getBaseName().isConstructor());
+    os << QuotedString("initializer");
+  }
+  os << ")";
+  os.flush();
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveRawRepresentable);
+}
+
 bool DerivedConformance::canDeriveRawRepresentable(DeclContext *DC,
                                                    NominalTypeDecl *type) {
   auto enumDecl = dyn_cast<EnumDecl>(type);
@@ -471,11 +493,31 @@ ValueDecl *DerivedConformance::deriveRawRepresentable(ValueDecl *requirement) {
   if (!canDeriveRawRepresentable(cast<DeclContext>(ConformanceDecl), Nominal))
     return nullptr;
 
-  if (requirement->getBaseName() == Context.Id_rawValue)
-    return deriveRawRepresentable_raw(*this);
+  bool viaMacros =
+      Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros);
 
-  if (requirement->getBaseName().isConstructor())
-    return deriveRawRepresentable_init(*this);
+  if (requirement->getBaseName() == Context.Id_rawValue) {
+    if (!viaMacros)
+      return deriveRawRepresentable_raw(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(
+        *this, cast<VarDecl>(witness)->getAccessor(AccessorKind::Get));
+    return witness;
+  }
+
+  if (requirement->getBaseName().isConstructor()) {
+    if (!viaMacros)
+      return deriveRawRepresentable_init(*this);
+
+    auto *witness = deriveRawRepresentableViaMacros(*this, requirement);
+    if (!witness)
+      return nullptr;
+    maybeMarkAsInlinable(*this, cast<AbstractFunctionDecl>(witness));
+    return witness;
+  }
 
   Context.Diags.diagnose(requirement->getLoc(),
                          diag::broken_raw_representable_requirement);

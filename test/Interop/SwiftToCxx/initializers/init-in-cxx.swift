@@ -39,8 +39,7 @@ public struct FirstSmallStruct {
 
 // CHECK: class SWIFT_SYMBOL("s:4Init16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
-// CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept {
-// CHECK: }
+// CHECK: SWIFT_INLINE_THUNK FirstSmallStruct &operator =(const FirstSmallStruct &other) noexcept = default;
 // CHECK-NEXT:   SWIFT_INLINE_THUNK uint32_t getX() const noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructV1xs6UInt32Vvp");
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init() noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructVACycfc");
 // CHECK-NEXT:   static SWIFT_INLINE_THUNK FirstSmallStruct init(swift::Int x) noexcept SWIFT_SYMBOL("s:4Init16FirstSmallStructVyACSicfc");
@@ -143,16 +142,16 @@ public struct WrapOverloadedInits {
 // CHECK-NOT: WrapOverloadedInits init(
 
 // CHECK: BaseClass BaseClass::init(swift::Int x, swift::Int y) noexcept {
-// CHECK-NEXT: return _impl::_impl_BaseClass::makeRetained(Init::_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_BaseClass::makeRetained(Init::_impl::$s4Init9BaseClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<BaseClass>::getTypeMetadata()));
 
 // CHECK: DerivedClass DerivedClass::init(swift::Int x, swift::Int y) noexcept {
 // CHECK-NEXT: _impl::_impl_DerivedClass::makeRetained(Init::_impl::$s4Init12DerivedClassCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClass>::getTypeMetadata()));
 
 // CHECK: DerivedClassTwo DerivedClassTwo::init(swift::Int x, swift::Int y) noexcept {
-// CHECK-NEXT: return _impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_DerivedClassTwo::makeRetained(Init::_impl::$s4Init15DerivedClassTwoCyACSi_SitcfC(x, y, swift::TypeMetadataTrait<DerivedClassTwo>::getTypeMetadata()));
 
 // CHECK: FinalClass FinalClass::init(const FirstSmallStruct& prop) noexcept {
-// CHECK-NEXT: return _impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
+// CHECK-NEXT: return Init::_impl::_impl_FinalClass::makeRetained(Init::_impl::$s4Init10FinalClassCyAcA16FirstSmallStructVcfC(Init::_impl::swift_interop_passDirect_Init_uint32_t_0_4(Init::_impl::_impl_FirstSmallStruct::getOpaquePointer(prop)), swift::TypeMetadataTrait<FinalClass>::getTypeMetadata()));
 
 
 // CHECK:      SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const noexcept {

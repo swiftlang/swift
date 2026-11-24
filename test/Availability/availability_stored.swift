@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- %}
 
 // Code should type check with a new enough deployment target:
 // RUN: %target-swift-frontend -typecheck %s -target %target-cpu-apple-macos50
@@ -79,15 +80,17 @@ struct BadReferenceStruct1 { // expected-note 3 {{add '@available' attribute to 
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
@@ -122,15 +125,17 @@ struct BadReferenceStruct2 {
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
@@ -165,15 +170,17 @@ public struct PublicStruct {
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   public var computedWithInitialValue: NewStruct = .init() { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@+1 {{computed property with initial value cannot be marked potentially unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS 50, *)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked potentially unavailable with '@available'}}
   public var computedWithImplicitInitialValue: NewStruct? { // expected-error {{'NewStruct' is only available in macOS 50 or newer}}
     init { _ = newValue }
     get { x }

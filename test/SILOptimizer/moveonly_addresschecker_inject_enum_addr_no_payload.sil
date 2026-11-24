@@ -1,0 +1,84 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -sil-move-only-address-checker -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct NC : ~Copyable {
+  @_hasStorage var k: Klass { get }
+}
+
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @mutateNC : $@convention(method) (@inout NC) -> ()
+
+
+// rdar://181061095
+//
+// An `inject_enum_addr` of a case without a payload initializes the whole enum,
+// not just its tag. Previously, the checker treated it as only initializing the
+// tag, so a later use of the payload was considered live around the loop back
+// edge through the `.none` path, and the `destroy_addr` at the end of the loop
+// body was deleted without a replacement.
+//
+// CHECK-LABEL: sil [ossa] @injectNoneInLoop :
+// CHECK:       bb1:
+// CHECK:         [[BOX:%[^,]+]] = alloc_stack [lexical] $Optional<NC>
+// CHECK:         cond_br {{%[^,]+}}, [[SOME:bb[0-9]+]], [[NONE:bb[0-9]+]]
+// CHECK:       [[SOME]]:
+// CHECK-NOT:     destroy_addr
+// CHECK:         store {{%[^,]+}} to [init] [[BOX]]
+// CHECK:       [[NONE]]:
+// CHECK-NEXT:    inject_enum_addr [[BOX]] : $*Optional<NC>, #Optional.none!enumelt
+// CHECK:         apply {{%[^,]+}}({{%[^,]+}}) : $@convention(method) (@inout NC) -> ()
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    destroy_addr [[BOX]]
+// CHECK-NEXT:    dealloc_stack [[BOX]]
+// CHECK-NEXT:    cond_br
+// CHECK-LABEL: } // end sil function 'injectNoneInLoop'
+sil [ossa] @injectNoneInLoop : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = alloc_stack [lexical] $Optional<NC>
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2
+  cond_br %0, bb2, bb3
+
+bb2:
+  %5 = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %6 = apply %5() : $@convention(thin) () -> @owned NC
+  %7 = enum $Optional<NC>, #Optional.some!enumelt, %6
+  store %7 to [init] %3
+  br bb4
+
+bb3:
+  inject_enum_addr %3, #Optional.none!enumelt
+  br bb4
+
+bb4:
+  %12 = begin_access [modify] [static] %3
+  switch_enum_addr %12, case #Optional.some!enumelt: bb6, case #Optional.none!enumelt: bb5
+
+bb5:
+  end_access %12
+  unreachable
+
+bb6:
+  %16 = unchecked_inplace_enum_data_addr %12, #Optional.some!enumelt
+  %17 = function_ref @mutateNC : $@convention(method) (@inout NC) -> ()
+  %18 = apply %17(%16) : $@convention(method) (@inout NC) -> ()
+  end_access %12
+  destroy_addr %3
+  dealloc_stack %2
+  cond_br %1, bb7, bb8
+
+bb7:
+  br bb1
+
+bb8:
+  %24 = tuple ()
+  return %24
+}

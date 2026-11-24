@@ -4,8 +4,8 @@
 // RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules -emit-sorted-sil | %FileCheck -check-prefix=CHECK-RECOVERY %s
 // RUN: %target-sil-opt %t/Library.sib -I %S/Inputs/bad-modules -emit-sorted-sil | %FileCheck -check-prefix=CHECK-RECOVERY-NEGATIVE %s
 
-// CHECK-LABEL: sil_stage raw
-// CHECK-RECOVERY-LABEL: sil_stage raw
+// CHECK-LABEL: sil_stage canonical
+// CHECK-RECOVERY-LABEL: sil_stage canonical
 
 sil_stage raw
 import Types

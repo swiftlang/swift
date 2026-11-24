@@ -33,7 +33,8 @@ extension LazyCollectionProtocol {
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
-/// - See also: `LazySequenceProtocol`, `LazyCollection`
+/// - SeeAlso: ``LazySequenceProtocol``
+/// - SeeAlso: ``LazyCollectionProtocol``
 public typealias LazyCollection<T: Collection> = LazySequence<T>
 
 extension LazyCollection: Collection {

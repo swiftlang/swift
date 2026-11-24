@@ -22,6 +22,7 @@ import Swift
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `Span` are bounds-checked,
 /// ensuring spatial safety and avoiding buffer overflow errors.
+@backDeployed(before: SwiftStdlib 6.2)
 @frozen
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -133,11 +134,6 @@ extension Span where Element: ~Copyable {
   public init(
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
-    _precondition(
-      buffer._isWellAligned(),
-      "baseAddress must be properly aligned to access Element"
-    )
-
     let span = unsafe Span(
       _unchecked: UnsafeRawPointer(buffer.baseAddress),
       count: buffer.count
@@ -192,6 +188,20 @@ extension Span where Element: ~Copyable {
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
     self = unsafe _overrideLifetime(span, borrowing: pointer)
+  }
+
+  /// Create a span over a single value.
+  ///
+  /// The span has a `count` of 1, and borrows `value`.
+  ///
+  /// - Parameters:
+  ///   - value: a value to be borrowed by the span
+  @export(implementation)
+  @_lifetime(borrow value)
+  public init(ofOne value: borrowing @_addressable Element) {
+    let address = Builtin.unprotectedAddressOfBorrow(value)
+    let span = unsafe Span(_unchecked: .init(address), count: 1)
+    self = unsafe _overrideLifetime(span, borrowing: value)
   }
 }
 
@@ -396,14 +406,25 @@ extension Span where Element: BitwiseCopyable {
   @export(implementation)
   @unsafe
   @_lifetime(copy bytes)
+  public init(_unsafeBytes bytes: RawSpan) {
+    if MemoryLayout<Element>.stride == 1 {
+      let span = unsafe Self(_unchecked: bytes._pointer, count: bytes._count)
+      self = unsafe _overrideLifetime(span, copying: bytes)
+    } else {
+      let rawBuffer = unsafe UnsafeRawBufferPointer(
+        start: bytes._pointer, count: bytes.byteCount
+      )
+      let span = unsafe Self(_unsafeBytes: rawBuffer)
+      self = unsafe _overrideLifetime(span, copying: bytes)
+    }
+  }
+
+  @available(*, deprecated, renamed: "init(_unsafeBytes:)")
+  @export(implementation)
+  @unsafe
+  @_lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(
-      start: bytes._pointer, count: bytes.byteCount
-    )
-    let span = unsafe Span(_unsafeBytes: rawBuffer)
-    // As a trivial value, 'rawBuffer' does not formally depend on the
-    // lifetime of 'bytes'. Make the dependence explicit.
-    self = unsafe _overrideLifetime(span, copying: bytes)
+    self = unsafe Self(_unsafeBytes: bytes)
   }
 
   /// View initialized raw memory as a typed span.
@@ -419,11 +440,7 @@ extension Span where Element: BitwiseCopyable {
   @export(implementation)
   @_lifetime(copy bytes)
   public init(viewing bytes: RawSpan) where Element: ConvertibleFromBytes {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(
-      start: bytes._pointer, count: bytes.byteCount
-    )
-    let span = unsafe Span(_unsafeBytes: rawBuffer)
-    self = unsafe _overrideLifetime(span, copying: bytes)
+    self = unsafe Self(_unsafeBytes: bytes)
   }
 }
 
@@ -617,7 +634,11 @@ extension Span where Element: ~Copyable {
   public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Span(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in extracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Span(_unchecked: newStart, count: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
@@ -1012,22 +1033,6 @@ extension Span where Element: ~Copyable {
   @available(*, unavailable, renamed: "extracting(droppingLast:)")
   public func dropLast(_ k: Int = 1) -> Self {
     Builtin.unreachable()
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element == UInt8 {
-  /// View initialized raw memory as a span of bytes.
-  ///
-  /// - Parameters:
-  ///   - bytes: An existing `RawSpan`, which will define both this
-  ///            `Span`'s lifetime and the memory it represents.
-  @export(implementation)
-  @_lifetime(copy bytes)
-  public init(viewing bytes: RawSpan) {
-    let span = unsafe Self(_unchecked: bytes._pointer, count: bytes._count)
-    self = unsafe _overrideLifetime(span, copying: bytes)
   }
 }
 

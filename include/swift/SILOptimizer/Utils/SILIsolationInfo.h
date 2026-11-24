@@ -151,6 +151,7 @@ public:
     case Kind::ActorAsyncAllocatingInit:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator!=(const ActorInstance &other) const {
@@ -580,6 +581,11 @@ public:
   /// fn. If \p fn does not have an actor isolation set, returns an invalid
   /// SILIsolationInfo.
   static SILIsolationInfo getFunctionIsolation(SILFunction *fn);
+
+  /// Returns true if \p arg is a capture of a non-escaping at-most-once
+  /// closure that is inferred to be `sending`. That is every capture that
+  /// isn't explicitly `sending` and isn't an entry in a capture list.
+  static bool isInferredSendingClosureCapture(SILFunctionArgument *arg);
 
 private:
   /// A helper that defines at the SIL level what we considered Sendable.

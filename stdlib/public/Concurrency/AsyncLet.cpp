@@ -171,11 +171,16 @@ void swift::asyncLet_addImpl(AsyncTask *task, AsyncLet *asyncLet,
 
   // ok, now that the async let task actually is initialized: attach it to the
   // current task
-  bool addedRecord = addStatusRecordToSelf(record,
-      [&](ActiveTaskStatus parentStatus, ActiveTaskStatus& newStatus) {
-    updateNewChildWithParentAndGroupState(task, parentStatus, NULL);
-    return true;
-  });
+  //
+  // The child starts out cancelled if the code that creates it observes a
+  // cancellation of the task or of a scope.
+  bool addedRecord = addStatusRecordObservingCancellation(
+      swift_task_getCurrent(), record,
+      [&](std::optional<size_t> cancellationReason,
+          ActiveTaskStatus &newStatus) {
+        updateNewChildWithParentState(task, newStatus, cancellationReason);
+        return true;
+      });
   (void)addedRecord;
   assert(addedRecord);
 }

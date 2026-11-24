@@ -137,12 +137,18 @@ struct BridgedPostDomTree {
 
 struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef bool (* _Nonnull ChangeFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
+  typedef BridgedInstruction (* _Nonnull UpdateInstructionFn)(BridgedContext, BridgedInstruction);
 
   static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
                                          UpdateLifetimeValuesFn completeLifetimeFn);
   static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
+  static void registerDebugReconstructionSimplification(
+      UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
+      UpdateInstructionFn simplifyDebugReconstructionBlockFn);
+  static void registerBorrowAccessorFixup(ChangeFunctionFn fixupBorrowAccessorsFn);
 };
 
 struct BridgedLoopTree {
@@ -203,13 +209,24 @@ struct BridgedPassContext {
   /// Visits the type of every non-copyable nominal type declared in this
   /// module for which IRGen may emit type metadata (and therefore value
   /// witnesses, which destroy the type).
+  /// Also every exported type specialization.
   void visitTypesWithEmittedMetadata(
       void *_Nonnull context,
       void (*_Nonnull callback)(void *_Nonnull context, BridgedType type)) const;
 
+  /// Visits the conformance of every non-generic witness table in this module
+  /// which IRGen emits eagerly in Embedded Swift, i.e. the ones of
+  /// `@export(interface)` conformances.
+  /// Also the conformances of exported type specializations.
+  void visitConformancesWithEagerlyEmittedWitnessTables(
+      void *_Nonnull context,
+      void (*_Nonnull callback)(void *_Nonnull context,
+                                BridgedConformance conformance)) const;
+
   SWIFT_IMPORT_UNSAFE DevirtResult tryDevirtualizeApply(BridgedInstruction apply, bool isMandatory) const;
   bool tryOptimizeKeypath(BridgedInstruction apply) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedValue constantFoldBuiltin(BridgedInstruction builtin) const;
+  SWIFT_IMPORT_UNSAFE OptionalBridgedValue simplifyInstruction(BridgedInstruction inst) const;
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
                                                                  BridgedSubstitutionMap substitutions,
                                                                  bool convertIndirectToDirect,
@@ -219,6 +236,7 @@ struct BridgedPassContext {
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeKeyPathInst(BridgedInstruction kpi) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
+  bool unrollPackLoopsInFunction(BridgedFunction function) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
 
@@ -228,7 +246,27 @@ struct BridgedPassContext {
     SwiftInt otherArgIdx;
   };
 
+  struct DifferentiableFunctionArgMangling {
+    SwiftInt argIdx;
+    BridgedInstruction inst;
+    BridgedInstruction originalRoot;
+    BridgedInstruction jvpRoot;
+    BridgedInstruction vjpRoot;
+  };
+
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
+
+  struct SignatureSpecializedArgMangling {
+    SwiftInt argIdx;
+
+    enum class Kind {
+      ownedToGuaranteed, guaranteedToOwned, dead, explode
+    } kind;
+  };
+
+  BridgedOwnedString mangleWithSignatureSpecializedArgs(BridgedArrayRef bridgedArgSpecializations,
+                                                        bool resultOwnedToGuaranteed,
+                                                        BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
@@ -236,9 +274,12 @@ struct BridgedPassContext {
                                                       BridgedFunction bridgedOriginalFunction) const;
   BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
                                                 BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithDifferentiableFunctionArgs(
+      BridgedArrayRef bridgedDifferentiableFunctionArgs,
+      BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
-  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
+  bool inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
@@ -304,11 +345,11 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+  bool enableMandatoryVerification(BridgedFunction function) const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
   BRIDGED_INLINE bool noAllocations() const;
 
   // Temporary for AddressableParameters Bootstrapping.
-  BRIDGED_INLINE bool enableAddressDependencies() const;
 
   // Closure specializer
   SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
@@ -325,6 +366,16 @@ struct BridgedPassContext {
 };
 
 bool BeginApply_canInline(BridgedInstruction beginApply);
+
+struct BridgedInferredVariableName {
+  /// Empty if no name could be inferred.
+  BridgedStringRef name;
+  OptionalBridgedValue root;
+};
+
+/// See `VariableNameInferrer::inferNameAndRoot()`.
+BridgedInferredVariableName
+VariableNameInferrer_inferNameAndRoot(BridgedValue value);
 
 enum class BridgedDynamicCastResult {
   willSucceed,

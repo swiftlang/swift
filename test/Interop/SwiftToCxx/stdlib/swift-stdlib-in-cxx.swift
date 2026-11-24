@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence  -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence  -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters -enable-experimental-feature RawLayout
 // RUN: %FileCheck %s < %t/Swift.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
@@ -9,6 +9,7 @@
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_Reparenting
 // REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_RawLayout
 
 // CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
 
@@ -38,8 +39,22 @@
 // CHECK-NEXT: #endif
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~Array() noexcept {
 // CHECK: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK Array(Array &&other) noexcept {
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK Array &operator =(Array &&other) noexcept {
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: auto oldValue = static_cast<class Array &&>(*this);
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
-// CHECK: }
+// CHECK-NEXT: if (other._isMovedFrom()) {
+// CHECK-NEXT: _setMovedFrom();
+// CHECK-NEXT: return;
+// CHECK-NEXT: }
+// CHECK: vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT: }
 // CHECK: static SWIFT_INLINE_THUNK Array<T_0_0> init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK void append(const T_0_0& newElement) noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK T_0_0 removeAt(swift::Int index) noexcept SWIFT_SYMBOL({{.*}});
@@ -47,13 +62,12 @@
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCount() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK: SWIFT_INLINE_THUNK swift::Int getCapacity() const noexcept SWIFT_SYMBOL({{.*}});
 
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
-// CHECK: template<class T_0_0>
+// CHECK: class _impl_Array {
+// CHECK: struct TypeMetadataTrait<swift::Array<T_0_0>> {
+// CHECK: inline const constexpr bool isValueType<swift::Array<T_0_0>> = true;
+// CHECK: struct implClassFor<swift::Array<T_0_0>> { using type = swift::_impl::_impl_Array<T_0_0>; };
+// CHECK-NOT: isOpaqueLayout<swift::Array<T_0_0>>
+// CHECK: class _impl_Optional;
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
@@ -80,10 +94,30 @@
 // CHECK-NEXT: public:
 // CHECK-NEXT: SWIFT_INLINE_THUNK ~String() noexcept {
 // CHECK:  }
+// CHECK-NEXT:  SWIFT_INLINE_THUNK String(String &&other) noexcept {
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: }
+// CHECK-NEXT: SWIFT_INLINE_THUNK String &operator =(String &&other) noexcept {
+// CHECK-NEXT: if (this == &other) return *this;
+// CHECK-NEXT: auto oldValue = static_cast<class String &&>(*this);
+// CHECK-NEXT: ::swift::_impl::ValueTypeStorage::moveFrom<true>(*this, other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) noexcept {
-// CHECK:  }
+// CHECK-NEXT:  if (other._isMovedFrom()) {
+// CHECK-NEXT:  _setMovedFrom();
+// CHECK-NEXT:  return;
+// CHECK-NEXT:  }
+// CHECK:  vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
-// CHECK:  }
+// CHECK-NEXT:  if (_isMovedFrom() || other._isMovedFrom()) {
+// CHECK-NEXT:  *this = static_cast<class String>(other);
+// CHECK-NEXT:  return *this;
+// CHECK-NEXT:  }
+// CHECK:  vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:  return *this;
+// CHECK-NEXT:  }
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init() noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:  SWIFT_INLINE_THUNK void append(const String& other)
 // CHECK:  SWIFT_INLINE_THUNK __StringNested::UTF8View getUtf8() const noexcept SWIFT_SYMBOL({{.*}});
@@ -94,7 +128,7 @@
 // CHECK-NEXT:  static SWIFT_INLINE_THUNK String init(NSString * _Nonnull nsString) noexcept {
 // CHECK-NEXT:  auto result = _make();
 // CHECK-NEXT:  auto res = _impl::$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge void *)nsString);
-// CHECK-NEXT:  memcpy(result._getOpaquePointer(), &res, sizeof(res));
+// CHECK-NEXT:  memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &res, sizeof(res));
 // CHECK-NEXT:  return result;
 // CHECK-NEXT:  }
 // CHECK-EMPTY:
@@ -119,7 +153,13 @@
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
 // CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
-// CHECK: }
+// CHECK-NEXT: if (_isMovedFrom() || other._isMovedFrom()) {
+// CHECK-NEXT: *this = static_cast<class UTF8View>(other);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
+// CHECK: vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT: return *this;
+// CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK __StringNested::Index getStartIndex() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT:   SWIFT_INLINE_THUNK __StringNested::Index getEndIndex() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK:   SWIFT_INLINE_THUNK swift::Optional<__StringNested::Index> indexOffsetByLimitedBy(const __StringNested::Index& i, swift::Int n, const __StringNested::Index& limit) const noexcept SWIFT_SYMBOL({{.*}});

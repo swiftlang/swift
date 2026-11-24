@@ -713,10 +713,13 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
 
-/// Read the cancellation state and reason of the given task.
+/// Read the cancellation state and reason of the given task itself.
 ///
 /// This API exists to answer, in a single runtime call, if the passed in task
 /// is cancelled, and if so, what was its cancellation reason (if any).
+///
+/// This is the same as `swift_task_getIsCancelledWithReasonWithFlags` with
+/// `swift_task_is_cancelled_flag_TaskOnly`.
 ///
 /// ### Return value layout
 ///
@@ -744,9 +747,14 @@ enum swift_task_is_cancelled_flag : uint64_t {
   /// Effectively this is a backwards compatible mode.
   swift_task_is_cancelled_flag_None = 0x0,
 
-  /// Ignore any active cancellation shield and return the actual cancellation
-  /// state of the task.
-  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+  /// Only check the cancellation of the task itself. Cancellation shields and
+  /// cancellation scopes only affect the code that runs inside of them, so
+  /// they are not taken into account.
+  ///
+  /// Without this flag, the check reports the cancellation that the code the
+  /// task currently runs observes. Only the task itself observes its
+  /// cancellation shields and cancellation scopes.
+  swift_task_is_cancelled_flag_TaskOnly = 0x1,
 };
 
 /// Check if the task is cancelled.
@@ -756,6 +764,19 @@ enum swift_task_is_cancelled_flag : uint64_t {
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelledWithFlags(AsyncTask* task,
                                      swift_task_is_cancelled_flag flags);
+
+/// Read the cancellation state and reason of the given task.
+///
+/// The return value has the same layout as the one of
+/// `swift_task_getIsCancelledWithReason`.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+///
+/// Runtime availability: Swift 6.5.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+size_t swift_task_getIsCancelledWithReasonWithFlags(
+    AsyncTask *task, swift_task_is_cancelled_flag flags);
 
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
@@ -999,6 +1020,14 @@ bool swift_executor_isComplexEquality(SerialExecutorRef ref);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 uint64_t swift_task_getJobTaskId(Job *job);
 
+/// Return the 64bit TaskID of the currently-executing AsyncTask,
+/// or 0 if there is no current task. This is more efficient than getting
+/// the task object to Swift and then getting the ID from it.
+///
+/// Available: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getCurrentTaskId(void);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
@@ -1131,6 +1160,49 @@ void swift_continuation_throwingResume(AsyncTask *continuation);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_continuation_throwingResumeWithError(AsyncTask *continuation,
                                                 /* +1 */ SwiftError *error);
+
+/// Opaque handle to a split continuation, returned by
+/// swift_continuation_createSplit and consumed by the other
+/// swift_continuation_*Split entry points.
+struct SplitContinuation;
+
+/// Create a *split* continuation for a result of the given type.
+///
+/// Unlike swift_continuation_init, this does not bind the continuation to the
+/// current task or touch the task's execution state. It allocates the
+/// continuation's ContinuationAsyncContext (state Pending) and result storage
+/// sized for the resultType, and returns the split continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+SplitContinuation *
+swift_continuation_createSplit(const Metadata *resultType);
+
+/// Await a split continuation from the current task.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_continuation_awaitSplit(SplitContinuation *continuation);
+
+/// Destroy a split continuation created by swift_continuation_createSplit,
+/// after its result has been consumed by the await.  Frees the context and its
+/// result storage.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_destroySplit(SplitContinuation *continuation);
+
+/// Resume a continuation, offering the current thread to run the resumed task
+/// instead of enqueuing it.
+///
+/// `continuation` may be a normal continuation or a split continuation.
+/// If `error` is null, the continuation returns `result`, which is moved into
+/// the continuation; otherwise it throws `error`, and `result` is destroyed.
+/// Both are passed at +1.
+///
+/// If the executors passed match the awaiting task, the task runs on the
+/// current thread before this returns; otherwise it is enqueued.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_continuation_resumeOnExecutors(AsyncTask *continuation,
+                                          /* +1 */ OpaqueValue *result,
+                                          /* +1 */ SwiftError *error,
+                                          SerialExecutorRef serialExecutor,
+                                          TaskExecutorRef taskExecutor,
+                                          const Metadata *resultType);
 
 /// SPI helper to log a misuse of a `CheckedContinuation` to the appropriate places in the OS.
 extern "C" SWIFT_CC(swift)

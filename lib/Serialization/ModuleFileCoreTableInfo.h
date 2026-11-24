@@ -53,7 +53,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = readNext<uint16_t>(data);
-    unsigned dataLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -211,7 +211,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = readNext<uint16_t>(data);
-    unsigned dataLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return { keyLength, dataLength };
   }
 
@@ -326,7 +326,7 @@ public:
   }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
-    unsigned dataLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return { sizeof(uint32_t), dataLength };
   }
 
@@ -422,7 +422,7 @@ public:
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = readNext<uint16_t>(data);
-    unsigned dataLength = readNext<uint16_t>(data);
+    unsigned dataLength = readNext<uint32_t>(data);
     return {keyLength, dataLength};
   }
 

@@ -429,26 +429,6 @@ findClosureUse(Operand *initialOperand) {
 }
 
 //===----------------------------------------------------------------------===//
-//                             MARK: Diagnostics
-//===----------------------------------------------------------------------===//
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseError(const PartitionOp &op, Diag<T...> diag,
-                                        U &&...args) {
-  return siloptimizer::diagnoseError(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
-                                       U &&...args) {
-  return siloptimizer::diagnoseNote(
-      op.getSourceInst()->getFunction()->getASTContext(),
-      op.getSourceLoc().getSourceLoc(), diag, std::forward<U>(args)...);
-}
-
-//===----------------------------------------------------------------------===//
 //                           MARK: IsolationHistory
 //===----------------------------------------------------------------------===//
 
@@ -2386,12 +2366,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -2747,8 +2721,9 @@ void UseAfterSendDiagnosticInferrer::infer() {
   }
 
   if (auto *pai = dyn_cast<PartialApplyInst>(sendingOp->getUser())) {
-    // @called(once) closures can have both implicit and explicit `sending` captures.
-    if (pai->isCalledOnce()) {
+    // at-most-once closures can have both implicit and explicit
+    // `sending` captures.
+    if (pai->hasCalledAtMostOnceSemantics()) {
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
         return diagnosticEmitter.emitNamedUseofStronglySentValue(
             baseLoc, rootValueAndName->first);
@@ -3293,12 +3268,6 @@ private:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -3313,12 +3282,6 @@ private:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>
@@ -3712,14 +3675,14 @@ bool SentNeverSendableDiagnosticEmitter::emit() {
     }
 
     // Reaching this operand here means it was individually sent as a capture
-    // of a non-isolated `@called(once)` closure -- either because it was
-    // explicitly `sending`, or because it's an ordinary capture of a
-    // non-escaping closure (every non-Sendable capture of those is sent
-    // individually, independent of whether the closure as a whole is isolated.
+    // of a non-isolated at-most-once closure -- either because it was
+    // explicitly `sending`, or because it's an implicit capture of a
+    // non-escaping closure (every such non-Sendable capture is sent
+    // individually, independent of whether the closure as a whole is isolated).
     // Let's use the captured value's tracked isolation (when it is
     // actor-isolated) as the caller isolation.
     if (auto *pai = dyn_cast<PartialApplyInst>(op->getUser());
-        pai && pai->isCalledOnce()) {
+        pai && pai->hasCalledAtMostOnceSemantics()) {
       std::optional<ActorIsolation> callerIsolation;
       if (diagnosticEmitter.getIsolationRegionInfo()->hasActorIsolation())
         callerIsolation =
@@ -4052,12 +4015,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
     return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
   }
@@ -4066,12 +4023,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 };
 
@@ -4108,7 +4059,7 @@ static SILValue lookThroughAccess(SILValue value) {
     }
 
     if (auto *lbi = dyn_cast<LoadBorrowInst>(value)) {
-      value = lbi->getOperand();
+      value = lbi->getAddress();
       continue;
     }
 
@@ -4180,6 +4131,7 @@ public:
     case ReturnTerm:
       return std::get<Operand *>(value)->get();
     }
+    llvm_unreachable("covered switch");
   }
   CopyAddrInst *getCopyAddr() const { return std::get<CopyAddrInst *>(value); }
   StoreInst *getStore() const { return std::get<StoreInst *>(value); }
@@ -4200,6 +4152,7 @@ public:
     case ReturnTerm:
       return getReturnTerm()->getParentBlock();
     }
+    llvm_unreachable("covered switch");
   }
 
   SILInstruction *getDefiningInsertionPoint() const {
@@ -4217,6 +4170,7 @@ public:
     case ReturnTerm:
       return getReturnTerm()->getUser();
     }
+    llvm_unreachable("covered switch");
   }
 
   SILLocation getLoc() const {
@@ -4230,6 +4184,7 @@ public:
     case ReturnTerm:
       return getDefiningInsertionPoint()->getLoc();
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator==(SILValue otherValue) const {
@@ -4243,6 +4198,7 @@ public:
     case ReturnTerm:
       return lookThroughAccess(getValue()) == lookThroughAccess(otherValue);
     }
+    llvm_unreachable("covered switch");
   }
 
   static bool
@@ -4795,12 +4751,6 @@ public:
   }
 
   template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
     return diagnoseError(op->getUser()->getLoc(), diag,
                          std::forward<U>(args)...);
@@ -4815,12 +4765,6 @@ public:
   InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
                                   U &&...args) {
     return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
   }
 
   template <typename... T, typename... U>
@@ -5137,7 +5081,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   }
 
   auto *moduleDecl = error.op->getSourceInst()->getModule().getSwiftModule();
-  if (auto *nominal = type->getNominalOrBoundGenericNominal()) {
+  if (auto *nominal = type->getNominalDecl()) {
     // If the nominal type is in the current module, suggest adding `Sendable`
     // if it makes sense.
     if (nominal->getParentModule() == moduleDecl &&

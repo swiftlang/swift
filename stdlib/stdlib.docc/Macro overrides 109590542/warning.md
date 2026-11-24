@@ -17,5 +17,5 @@ string interpolation or concatenation,
 but they can use the multiline string literal syntax.
 -->
 
-- Parameter warning: The diagnostic message.
+- Parameter message: The diagnostic message.
 

@@ -14,16 +14,17 @@
 #define SWIFT_IRGEN_IRABIDETAILSPROVIDER_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "clang/AST/CharUnits.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
 
@@ -212,8 +213,32 @@ public:
 
   /// Returns the size and alignment for the given type, or \c None if the type
   /// is not a fixed layout type.
-  std::optional<SizeAndAlignment>
-  getTypeSizeAlignment(const NominalTypeDecl *TD);
+  std::optional<SizeAndAlignment> getTypeSizeAlignment(
+      const NominalTypeDecl *TD,
+      ResilienceExpansion expansion = ResilienceExpansion::Maximal);
+
+  struct ExtraInhabitant {
+    /// Significant bits and an invalid value, in target memory byte order.
+    SmallVector<uint8_t, 8> mask;
+    SmallVector<uint8_t, 8> value;
+  };
+
+  /// Returns an extra inhabitant whose representation is fixed for clients,
+  /// or \c None if the type has no statically known extra inhabitants.
+  std::optional<ExtraInhabitant>
+  getTypeExtraInhabitant(const NominalTypeDecl *TD);
+
+  /// Whether the type has a fixed layout and can be copied and taken with a
+  /// byte copy and destroyed without any action, using only properties visible
+  /// to clients.
+  bool isTypeTrivial(const NominalTypeDecl *TD);
+
+  /// Whether clients can move a value of this type by copying its bytes.
+  bool isTypeBitwiseTakable(const NominalTypeDecl *TD);
+
+  /// Whether the type has the representation and ownership operations of a
+  /// single native Swift reference, even outside its resilience domain.
+  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);
 
   /// Returns the abstract layout for a hidden nominal type.
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);

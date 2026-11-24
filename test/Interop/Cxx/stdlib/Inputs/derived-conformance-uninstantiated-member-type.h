@@ -7,10 +7,22 @@
 // an operator, or a member function template) that mentions const_iterator
 // would instantiate it first and hide the problem.
 
+namespace std {
+struct random_access_iterator_tag {};
+} // namespace std
+
 namespace __gnu_cxx {
 template <class Pointer, class Container>
 struct __normal_iterator {
   Pointer current;
+
+  typedef std::random_access_iterator_tag iterator_category;
+
+  auto operator*() const -> decltype(*current);
+  __normal_iterator &operator++();
+  bool operator==(const __normal_iterator &other) const;
+  long operator-(const __normal_iterator &other) const;
+  __normal_iterator &operator+=(long n);
 };
 } // namespace __gnu_cxx
 

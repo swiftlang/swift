@@ -8,6 +8,15 @@
 // RUN:     -debug-diagnostic-names                          \
 // RUN:     -import-objc-header %t/Library.h
 
+// RUN: %target-swift-frontend                               \
+// RUN:     %t/Downstream.swift                              \
+// RUN:     -typecheck -verify                               \
+// RUN:     -enable-builtin-module                           \
+// RUN:     -debug-diagnostic-names                          \
+// RUN:     -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple \
+// RUN:     -import-objc-header %t/Library.h
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 //--- Library.h
 
@@ -71,8 +80,13 @@ func take<T : BitwiseCopyable>(_ t: T) {}
 func passTenple(_ t: Tenple) { take(t) }
 func passInts128(_ t: Ints128) {
   take(t)
+  #if MODERN_C_ARRAYS
+  take(t.is[0])
+  take(t.is[17])
+  #else
   take(t.is.0)
   take(t.is.17)
+  #endif
 }
 func passVoidPointers(_ t: VoidPointers) { 
   take(t) 
@@ -80,7 +94,7 @@ func passVoidPointers(_ t: VoidPointers) {
 }
 func passIntsTrailing(_ t: IntsTrailing) {
   take(t) // expected-error{{type_does_not_conform_decl_owner}}
-          // expected-note@-14{{where_requirement_failure_one_subst}}
+          // expected-note@-19{{where_requirement_failure_one_subst}}
 }
 extension IntsTrailing2 : BitwiseCopyable {} //expected-error{{bitwise_copyable_outside_module}}
 func passIntsTrailing2(_ t: IntsTrailing2) {

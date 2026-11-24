@@ -29,3 +29,16 @@ public func testFullyCoveredSwitchClosedEnum(_ e: UnfairCoin) {
   case .tails: ()
   }
 }
+
+// CHECK-LABEL: sil @$s4Test40testFullyCoveredSwitchPlatformClosedEnumyySo0F10UnfairCoinVF : $@convention(thin) (PlatformUnfairCoin) -> () {
+// CHECK:         switch_enum %0 : $PlatformUnfairCoin, case #PlatformUnfairCoin.heads!enumelt: [[HEADSBB:bb[0-9]+]], case #PlatformUnfairCoin.tails!enumelt: [[TAILSBB:bb[0-9]+]], default [[DEFAULTBB:bb[0-9]+]]
+// CHECK:       [[TAILSBB]]:
+// CHECK-NOT:     unreachable
+// CHECK:       [[DEFAULTBB]]:
+// CHECK:       } // end sil function '$s4Test40testFullyCoveredSwitchPlatformClosedEnumyySo0F10UnfairCoinVF'
+public func testFullyCoveredSwitchPlatformClosedEnum(_ e: PlatformUnfairCoin) {
+  switch e {
+  case .heads: ()
+  case .tails: ()
+  }
+}

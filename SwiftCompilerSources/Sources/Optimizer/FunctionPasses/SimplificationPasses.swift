@@ -38,6 +38,9 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: true) {
+    if let forwardingInst = $0 as? ForwardingInstruction {
+      forwardingInst.simplifyForwardingInstruction($1)
+    }
     if let i = $0 as? OnoneSimplifiable {
       i.simplify($1)
     }
@@ -48,6 +51,9 @@ let simplificationPass = FunctionPass(name: "simplification") {
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: false) {
+    if let forwardingInst = $0 as? ForwardingInstruction {
+      forwardingInst.simplifyForwardingInstruction($1)
+    }
     if let i = $0 as? Simplifiable {
       i.simplify($1)
     }
@@ -58,6 +64,9 @@ let lateOnoneSimplificationPass = FunctionPass(name: "late-onone-simplification"
   (function: Function, context: FunctionPassContext) in
 
   runSimplification(on: function, context, preserveDebugInfo: true) {
+    if let forwardingInst = $0 as? ForwardingInstruction {
+      forwardingInst.simplifyForwardingInstruction($1)
+    }
     if let i = $0 as? LateOnoneSimplifiable {
       i.simplifyLate($1)
     } else if let i = $0 as? OnoneSimplifiable {

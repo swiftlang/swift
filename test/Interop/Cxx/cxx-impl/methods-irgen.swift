@@ -12,9 +12,6 @@
 
 // REQUIRES: swift_feature_CxxImplementation
 
-// Disable for 32-bit armv7 until we figure out a solution in #92467
-// XFAIL: OS=linux-androideabi
-
 import Methods
 
 
@@ -89,14 +86,16 @@ extension Holder {
   // CHECK-WIN-LABEL: define{{.*}} @"?spread@Holder@@QEBA?AUTriple@@H@Z"(ptr %0, ptr {{[^,]*}}sret
   @cxx @implementation
   public func spread(_ k: Int32) -> Triple {
-    return Triple(a: CLong(value), b: CLong(k), c: CLong(value + k))
+    return Triple(a: CLongLong(value), b: CLongLong(k), c: CLongLong(value + k))
   }
 
-  // static Triple Holder::makeTriple(long a);
-  // CHECK-SYSV-LABEL: define{{.*}} void @_ZN6Holder10makeTripleEl(ptr {{[^,]*}}sret{{[^,]*}} %0, i64 %1)
-  // CHECK-WIN-LABEL: define{{.*}} @"?makeTriple@Holder@@SA?AUTriple@@J@Z"(ptr {{[^,]*}}sret{{[^,]*}} %0, i32 %1)
+  // static Triple Holder::makeTriple(int a);
+  // CHECK-SYSV-LABEL: define{{.*}} void @_ZN6Holder10makeTripleEi(ptr {{[^,]*}}sret{{[^,]*}} %0, i32 %1)
+  // CHECK-WIN-LABEL: define{{.*}} @"?makeTriple@Holder@@SA?AUTriple@@H@Z"(ptr {{[^,]*}}sret{{[^,]*}} %0, i32 %1)
   @cxx @implementation
-  public static func makeTriple(_ a: CLong) -> Triple { return Triple(a: a, b: a, c: a) }
+  public static func makeTriple(_ a: Int32) -> Triple {
+    return Triple(a: CLongLong(a), b: CLongLong(a), c: CLongLong(a))
+  }
 }
 
 
@@ -130,7 +129,7 @@ extension NonTrivialReceiver {
 // CHECK-SYSV:   invoke i32 @_ZN4Pair6adjustEi(ptr %1, i32 5)
 // CHECK-SYSV:   invoke i32 @_ZN4Pair6adjustEii(ptr %1, i32 6, i32 7)
 // CHECK-SYSV:   invoke void @_ZNK6Holder6spreadEi(ptr {{[^,]*}}sret{{[^,]*}}, ptr %2, i32 8)
-// CHECK-SYSV:   invoke void @_ZN6Holder10makeTripleEl(ptr {{[^,]*}}sret{{[^,]*}}, i64 9)
+// CHECK-SYSV:   invoke void @_ZN6Holder10makeTripleEi(ptr {{[^,]*}}sret{{[^,]*}}, i32 9)
 public func callMethods(_ c: inout Counter, _ p: inout Pair, _ h: inout Holder) -> Int32 {
   var result = Counter.make(1).value
   c.add(2)

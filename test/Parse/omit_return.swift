@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -typecheck -verify
+// RUN: %target-swift-frontend %s -typecheck -verify -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %if swift_future %{ %target-swift-frontend %s -typecheck -verify -swift-version future -verify-additional-prefix future- %}
 
 // MARK: - Helpers
 
@@ -466,6 +467,7 @@ func ff_implicitTemporarilyEscapableExpr(_ cl: () -> Void) -> () -> Void {
 }
 
 func ff_implicitOpenExistentialExpr(_ f: SomeProto) -> String {
+// expected-future-error@-1 {{use of protocol 'SomeProto' as a type must be written 'any SomeProto'}}
     f.foo()
 }
 
@@ -474,7 +476,8 @@ func ff_implicitInjectIntoOptionalExpr(_ int: Int) -> Int? {
 }
 
 func ff_implicitTupleShuffle(_ input: (one: Int, two: Int)) -> (two: Int, one: Int) {
-    input // expected-warning {{implicit reordering of tuple elements from 'one:two:' to 'two:one:' is deprecated; this will be an error in a future Swift language mode}}
+    input // expected-swift5-warning {{implicit reordering of tuple elements from 'one:two:' to 'two:one:' is deprecated; this will be an error in a future Swift language mode}}
+    // expected-future-error@-1 {{cannot implicitly reorder tuple elements from 'one:two:' to 'two:one:'}}
 }
 
 func ff_implicitCollectionUpcast(_ derived: [Derived]) -> [Base] {
@@ -482,6 +485,7 @@ func ff_implicitCollectionUpcast(_ derived: [Derived]) -> [Base] {
 }
 
 func ff_implicitErasureExpr(_ conformer: SomeProtoConformer) -> SomeProto {
+// expected-future-error@-1 {{use of protocol 'SomeProto' as a type must be written 'any SomeProto'}}
     conformer
 }
 
@@ -526,8 +530,11 @@ func ff_conditional(_ condition: Bool) -> Int {
 }
 
 var __ff_implicitAssignExpr: Int = 0
+// expected-future-note@-1 {{mutation of this var is only permitted within the actor}}
 func ff_implicitAssignExpr(newValue: Int) -> Void {
+// expected-future-note@-1 {{add '@MainActor' to make global function 'ff_implicitAssignExpr(newValue:)' part of global actor 'MainActor'}}
     __ff_implicitAssignExpr = newValue
+    // expected-future-error@-1 {{main actor-isolated var '__ff_implicitAssignExpr' can not be mutated from a nonisolated context}}
 }
 
 func ff_implicitMemberAccessInit() -> Initable {

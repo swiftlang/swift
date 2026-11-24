@@ -256,7 +256,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
        &swiftOverlayDependenciesIDs](ModuleDependencyInfo &moduleDep) {
         moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
         moduleDep.setCrossImportOverlayDependencies(
-            crossImportOverlayDependenciesIDs);
+            ArrayRef(crossImportOverlayDependenciesIDs));
         moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
       };
 
@@ -285,7 +285,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
             getStringArray(bridgingModuleDependenciesArrayID);
         if (!bridgingModuleDeps)
           llvm::report_fatal_error("Bad bridging module dependencies");
-        llvm::StringSet<> alreadyAdded;
         std::vector<ModuleDependencyID> bridgingModuleDepIDs;
         for (const auto &mod : *bridgingModuleDeps)
           bridgingModuleDepIDs.push_back(
@@ -764,7 +763,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!headerModuleDependencies)
         llvm::report_fatal_error("Bad binary direct dependencies: no header "
                                  "import module dependencies");
-      llvm::StringSet<> alreadyAdded;
 
       std::vector<ModuleDependencyID> clangHeaderDependencyIDs;
       for (const auto &headerDepName : *headerModuleDependencies)
@@ -789,12 +787,14 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!hasCurrentModule)
         llvm::report_fatal_error("Unexpected CLANG_MODULE_DETAILS_NODE record");
       unsigned pcmOutputPathID, mappedPCMPathID, moduleMapPathID, contextHashID,
-          commandLineArrayID, fileDependenciesArrayID, clangIncludeTreeRootID,
+          commandLineArrayID, fileDependenciesArrayID,
+          directoryDependenciesArrayID, clangIncludeTreeRootID,
           moduleCacheKeyID, isSystem;
       ClangModuleDetailsLayout::readRecord(
           Scratch, pcmOutputPathID, mappedPCMPathID, moduleMapPathID,
           contextHashID, commandLineArrayID, fileDependenciesArrayID,
-          clangIncludeTreeRootID, moduleCacheKeyID, isSystem);
+          directoryDependenciesArrayID, clangIncludeTreeRootID,
+          moduleCacheKeyID, isSystem);
       auto pcmOutputPath = getIdentifier(pcmOutputPathID);
       if (!pcmOutputPath)
         llvm::report_fatal_error("Bad pcm output path");
@@ -813,6 +813,9 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       auto fileDependencies = getStringArray(fileDependenciesArrayID);
       if (!fileDependencies)
         llvm::report_fatal_error("Bad file dependencies");
+      auto directoryDependencies = getStringArray(directoryDependenciesArrayID);
+      if (!directoryDependencies)
+        llvm::report_fatal_error("Bad directory dependencies");
       auto clangIncludeTreeRoot = getIdentifier(clangIncludeTreeRootID);
       if (!clangIncludeTreeRoot)
         llvm::report_fatal_error("Bad clang include tree ID");
@@ -823,8 +826,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forClangModule(
           *pcmOutputPath, *mappedPCMPath, *moduleMapPath, *contextHash,
-          *commandLineArgs, *fileDependencies, linkLibraries,
-          *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
+          *commandLineArgs, *fileDependencies, *directoryDependencies,
+          linkLibraries, *clangIncludeTreeRoot, *moduleCacheKey, isSystem);
       addCommonDependencyInfo(moduleDep);
 
       cache.recordDependency(currentModuleName, std::move(moduleDep));
@@ -1050,12 +1053,13 @@ bool swift::dependencies::module_dependency_cache_serialization::
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
-    readInterModuleDependenciesCache(StringRef path,
-                                     ModuleDependenciesCache &cache,
-                                     llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
+    readInterModuleDependenciesCache(
+        StringRef path, ModuleDependenciesCache &cache,
+        llvm::sys::TimePoint<> &serializedCacheTimeStamp,
+        llvm::vfs::FileSystem &FS) {
   PrettyStackTraceStringAction stackTrace(
       "loading inter-module dependency graph", path);
-  auto buffer = llvm::MemoryBuffer::getFile(path);
+  auto buffer = FS.getBufferForFile(path);
   if (!buffer)
     return true;
 
@@ -1084,6 +1088,7 @@ enum ModuleIdentifierArrayKind : uint8_t {
   BridgingHeaderBuildCommandLine,
   NonPathCommandLine,
   FileDependencies,
+  DirectoryDependencies,
   VisibleClangModulesFromLookup,
   DependencyOnlyImports,
   LastArrayKind
@@ -1708,6 +1713,8 @@ void ModuleDependenciesCacheSerializer::writeModuleInfo(
                              ModuleIdentifierArrayKind::NonPathCommandLine),
         getIdentifierArrayID(moduleID,
                              ModuleIdentifierArrayKind::FileDependencies),
+        getIdentifierArrayID(moduleID,
+                             ModuleIdentifierArrayKind::DirectoryDependencies),
         getIdentifier(clangDeps->CASClangIncludeTreeRootID),
         getIdentifier(clangDeps->moduleCacheKey), clangDeps->IsSystem);
 
@@ -2000,6 +2007,9 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                        clangDeps->buildCommandLine);
         addStringArray(moduleID, ModuleIdentifierArrayKind::FileDependencies,
                        clangDeps->fileDependencies);
+        addStringArray(moduleID,
+                       ModuleIdentifierArrayKind::DirectoryDependencies,
+                       clangDeps->directoryDependencies);
         addIdentifier(clangDeps->CASClangIncludeTreeRootID);
         addIdentifier(clangDeps->moduleCacheKey);
         break;

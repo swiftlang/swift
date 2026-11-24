@@ -774,6 +774,11 @@ namespace {
       IGF.emit##Name##Destroy(addr, Refcounting); \
     } \
     StringRef getStructNameSuffix() const { return "." #name "ref"; } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -848,6 +853,11 @@ namespace {
     getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
       llvm_unreachable("should have overridden all actual uses of this"); \
     } \
+    void printForAbstractTypeLayoutInfo( \
+        IRGenModule &IGM, llvm::raw_ostream &OS, \
+        unsigned indentation) const override { \
+      printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this); \
+    } \
     std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
     createSerializableHiddenTypeInfoRepresentation( \
         IRGenModule &) const override { \
@@ -861,70 +871,82 @@ namespace {
 
 /// A type implementation for static reference storage class existential types
 /// that do not generate dynamic (i.e. runtime) logic.
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  class Name##ClassExistentialTypeInfo final \
-    : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
-                                           LoadableTypeInfo> { \
-  bool IsOptional; \
-  public: \
-    Name##ClassExistentialTypeInfo( \
-        ArrayRef<const ProtocolDecl *> storedProtocols, \
-        llvm::Type *ty, \
-        const SpareBitVector &spareBits, \
-        Size size, Alignment align, \
-        bool isOptional) \
-      : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
-                                      spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize, IsABIAccessible), \
-        IsOptional(isOptional) {} \
-    TypeLayoutEntry \
-    *buildTypeLayoutEntry(IRGenModule &IGM, \
-                          SILType T, \
-                          bool useStructLayouts) const override { \
-      if (!useStructLayouts) { \
-        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
-      } \
-      return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T, ScalarKind::TriviallyDestroyable); \
-    } \
-    const LoadableTypeInfo & \
-    getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const { \
-      if (!IGM.ObjCInterop) \
-        return IGM.getNativeObjectTypeInfo(); \
-      else \
-        return IGM.getUnknownObjectTypeInfo(); \
-    } \
-    unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
-      return getValueTypeInfoForExtraInhabitants(IGM) \
-                  .getFixedExtraInhabitantCount(IGM) - IsOptional; \
-    } \
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM, \
-                                       unsigned bits, \
-                                       unsigned index) const override { \
-      /* Note that we pass down the original bit-width. */ \
-      return getValueTypeInfoForExtraInhabitants(IGM) \
-                  .getFixedExtraInhabitantValue(IGM, bits, \
-                                                index + IsOptional); \
-    } \
-    llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, \
-                                         Address src, SILType T, \
-                                         bool isOutlined) const override { \
-      return PointerInfo::forHeapObject(IGF.IGM) \
-        .withNullable(IsNullable_t(IsOptional)) \
-        .getExtraInhabitantIndex(IGF, src); \
-    } \
-    /* FIXME -- Use REF_STORAGE_HELPER and make */ \
-    /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */ \
-    void emitValueRetain(IRGenFunction &IGF, llvm::Value *value, \
-                         Atomicity atomicity) const {} \
-    void emitValueRelease(IRGenFunction &IGF, llvm::Value *value, \
-                          Atomicity atomicity) const {} \
-    void emitValueFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {} \
-    std::unique_ptr<SerializableHiddenTypeInfoRepresentation> \
-    createSerializableHiddenTypeInfoRepresentation( \
-        IRGenModule &) const override { \
-      unsupportedSerializableHiddenTypeInfoRepresentation(); \
-    } \
-  };
+#define UNCHECKED_REF_STORAGE(Name, ...)                                     \
+    class Name##ClassExistentialTypeInfo final                                 \
+        : public ScalarExistentialTypeInfoBase<Name##ClassExistentialTypeInfo, \
+                                               LoadableTypeInfo> {             \
+      bool IsOptional;                                                         \
+                                                                               \
+    public:                                                                    \
+      Name##ClassExistentialTypeInfo(                                          \
+          ArrayRef<const ProtocolDecl *> storedProtocols, llvm::Type *ty,      \
+          const SpareBitVector &spareBits, Size size, Alignment align,         \
+          bool isOptional)                                                     \
+          : ScalarExistentialTypeInfoBase(storedProtocols, ty, size,           \
+                                          spareBits, align,                    \
+                                          IsTriviallyDestroyable, IsCopyable,  \
+                                          IsFixedSize, IsABIAccessible),       \
+            IsOptional(isOptional) {}                                          \
+      TypeLayoutEntry *                                                        \
+      buildTypeLayoutEntry(IRGenModule &IGM, SILType T,                        \
+                           bool useStructLayouts) const override {             \
+        if (!useStructLayouts) {                                               \
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);  \
+        }                                                                      \
+        return IGM.typeLayoutCache.getOrCreateScalarEntry(                     \
+            *this, T, ScalarKind::TriviallyDestroyable);                       \
+      }                                                                        \
+      const LoadableTypeInfo &                                                 \
+      getValueTypeInfoForExtraInhabitants(IRGenModule &IGM) const {            \
+        if (!IGM.ObjCInterop)                                                  \
+          return IGM.getNativeObjectTypeInfo();                                \
+        else                                                                   \
+          return IGM.getUnknownObjectTypeInfo();                               \
+      }                                                                        \
+      unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override { \
+        return getValueTypeInfoForExtraInhabitants(IGM)                        \
+                   .getFixedExtraInhabitantCount(IGM) -                        \
+               IsOptional;                                                     \
+      }                                                                        \
+      APInt getFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,      \
+                                         unsigned index) const override {      \
+        /* Note that we pass down the original bit-width. */                   \
+        return getValueTypeInfoForExtraInhabitants(IGM)                        \
+            .getFixedExtraInhabitantValue(IGM, bits, index + IsOptional);      \
+      }                                                                        \
+      llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,    \
+                                           SILType T,                          \
+                                           bool isOutlined) const override {   \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .getExtraInhabitantIndex(IGF, src);                                \
+      }                                                                        \
+      void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,        \
+                                Address dest, SILType T,                       \
+                                bool isOutlined) const override {              \
+        return PointerInfo::forHeapObject(IGF.IGM)                             \
+            .withNullable(IsNullable_t(IsOptional))                            \
+            .storeExtraInhabitant(IGF, index, projectValue(IGF, dest));        \
+      }                                                                        \
+      /* FIXME -- Use REF_STORAGE_HELPER and make */                           \
+      /* getValueTypeInfoForExtraInhabitants call llvm_unreachable() */        \
+      void emitValueRetain(IRGenFunction &IGF, llvm::Value *value,             \
+                           Atomicity atomicity) const {}                       \
+      void emitValueRelease(IRGenFunction &IGF, llvm::Value *value,            \
+                            Atomicity atomicity) const {}                      \
+      void emitValueFixLifetime(IRGenFunction &IGF,                            \
+                                llvm::Value *value) const {}                   \
+      void                                                                     \
+      printForAbstractTypeLayoutInfo(IRGenModule &IGM, llvm::raw_ostream &OS,  \
+                                     unsigned indentation) const override {    \
+        printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);        \
+      }                                                                        \
+      std::unique_ptr<SerializableHiddenTypeInfoRepresentation>                \
+      createSerializableHiddenTypeInfoRepresentation(                          \
+          IRGenModule &) const override {                                      \
+        unsupportedSerializableHiddenTypeInfoRepresentation();                 \
+      }                                                                        \
+    };
 #include "swift/AST/ReferenceStorage.def"
 #undef REF_STORAGE_HELPER
 } // end anonymous namespace
@@ -976,6 +998,12 @@ class OpaqueExistentialTypeInfo final :
             IsFixedSize, IsABIAccessible) {}
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1148,6 +1176,12 @@ class ClassExistentialTypeInfo final
     assert(refcounting == ReferenceCounting::Native ||
            refcounting == ReferenceCounting::Unknown ||
            refcounting == ReferenceCounting::ObjC);
+  }
+
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
   }
 
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
@@ -1490,6 +1524,12 @@ class ExistentialMetatypeTypeInfo final
       MetatypeTI(metatypeTI) {}
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1535,6 +1575,12 @@ class ErrorExistentialTypeInfo : public HeapTypeInfo<ErrorExistentialTypeInfo>
   ReferenceCounting Refcounting;
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1630,6 +1676,12 @@ class COMExistentialTypeInfo final
   }
 
 public:
+  void printForAbstractTypeLayoutInfo(
+      IRGenModule &IGM, llvm::raw_ostream &OS,
+      unsigned indentation) const override {
+    printForAbstractTypeLayoutInfoBase(IGM, OS, indentation, this);
+  }
+
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation>
   createSerializableHiddenTypeInfoRepresentation(
       IRGenModule &) const override {
@@ -1997,6 +2049,18 @@ static void bindArchetype(IRGenFunction &IGF,
     setWitnessTable(IGF, archetype, i, wtable);
   }
   assert(wtableI == wtables.size());
+}
+
+void irgen::bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                              CanArchetypeType archetype) {
+  // An opened foreign interface already points at its interface address point.
+  for (auto *protocol : archetype->getConformsTo()) {
+    if (!protocol->isCOMInterface())
+      continue;
+    IGF.setUnscopedLocalTypeData(
+        archetype, LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
+        llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0));
+  }
 }
 
 /// Emit protocol witness table pointers for the given protocol conformances,
@@ -2508,12 +2572,9 @@ static llvm::Function *getAllocateBoxedOpaqueExistentialBufferFunction(
           std::optional<uint64_t> maybeDescriptor;
           bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
           if (useMallocTypeDescriptor) {
-            auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
             llvm::SmallVector<SILType> fieldTypes;
-            fieldTypes.push_back(rawPointerType); // metadata pointer
-            fieldTypes.push_back(rawPointerType); // refcount word
-            maybeDescriptor =
-                computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+            maybeDescriptor = computeTypedMallocTypeDescriptor(
+                IGF.IGM, HeapHeaderKind::Swift, fieldTypes);
           }
           IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
           addressInBox =
@@ -2561,12 +2622,10 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
       bool useMallocTypeDescriptor = shouldUseMallocTypeDescriptor(IGF.IGM);
       std::optional<uint64_t> maybeDescriptor;
       if (useMallocTypeDescriptor) {
-        auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
         llvm::SmallVector<SILType> fieldTypes;
-        fieldTypes.push_back(rawPointerType); // metadata pointer
-        fieldTypes.push_back(rawPointerType); // refcount word
         fieldTypes.push_back(valueType);
-        maybeDescriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
+        maybeDescriptor = computeTypedMallocTypeDescriptor(
+            IGF.IGM, HeapHeaderKind::Swift, fieldTypes);
       }
       IGF.emitAllocBoxCall(metadata, maybeDescriptor, box, address);
       llvm::Value *addressInBox =
@@ -2642,6 +2701,15 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         // affect the caches.
         Builder.emitBlock(deallocateBB);
 
+        // Embedded Swift with -no-allocations never allocates a box, so this
+        // can't be reached, and must not refer to the deallocation functions.
+        if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+            IGM.getSILModule().getOptions().NoAllocations) {
+          IGF.emitTrap("deallocating a box with -no-allocations",
+                       /*EmitUnreachable*/ true);
+          return;
+        }
+
         // Project to the existential buffer address.
         auto existentialBuffer =
             existLayout.projectExistentialBuffer(IGF, existentialContainer);
@@ -2683,6 +2751,29 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         Builder.CreateRetVoid();
       },
       true /*noinline*/));
+}
+
+void irgen::emitEmbeddedExistentialBoxDeallocator(IRGenModule &IGM) {
+  // The Embedded casting runtime calls
+  // __swift_deallocate_boxed_opaque_existential_0 to free the box of an
+  // opaque existential after taking a non-`Copyable` payload out of it. Only
+  // compiled code knows how such a box was allocated (e.g. with
+  // TypedAllocation), so every Embedded module defines the helper.
+  //
+  // The helper only uses the existential buffer and the metadata slot, which
+  // are at the same place for any number of witness tables, so the `_0` one
+  // serves every opaque existential.
+  //
+  // With -no-allocations the helper traps instead (see above). Linking such a
+  // module with an allocating one gives two different definitions of this
+  // linkonce_odr helper, and the linker may keep the trapping one.
+  if (!IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+  // A module built only to be serialized emits no code at all.
+  if (IGM.getSILModule().getOptions().StopOptimizationAfterSerialization)
+    return;
+  (void)getDeallocateBoxedOpaqueExistentialBufferFunction(
+      IGM, OpaqueExistentialLayout(0));
 }
 
 void irgen::emitDeallocateBoxedOpaqueExistentialBuffer(
@@ -3201,6 +3292,16 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
         Builder.emitBlock(outlineBB);
         {
           ConditionalDominanceScope domScope(IGF);
+
+          // Embedded Swift with -no-allocations never allocates a box, so this
+          // can't be reached, and must not refer to the box release functions,
+          // which are not available in this mode.
+          if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+              IGM.getSILModule().getOptions().NoAllocations) {
+            IGF.emitTrap("destroying a boxed existential with -no-allocations",
+                         /*EmitUnreachable*/ true);
+            return;
+          }
 
           // swift_release(buffer[0])
           auto *referenceAddr =

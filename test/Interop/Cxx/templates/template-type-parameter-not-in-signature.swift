@@ -13,6 +13,7 @@ TemplateNotInSignatureTestSuite.test("Function with defaulted template type para
   let x: Int = multiTemplateTypeParamOneUsedInSignature(1, T: Int.self)
   expectEqual(x, 1)
   multiTemplateTypeParamNotUsedInSignatureWithUnrelatedParams(1, 1, T: Int32.self, U: Int.self)
+  expectEqual(multiTemplateTypeParamNotUsedInSignatureWithUnnamedParams(1, 1, T: Int32.self, U: Int.self), 7)
   let y: Int = templateTypeParamUsedInReturnType(10)
   expectEqual(y, 10)
 }
@@ -36,6 +37,7 @@ TemplateNotInSignatureTestSuite.test("Pointer types") {
 TemplateNotInSignatureTestSuite.test("Member function templates") {
   let s = Struct()
   s.templateTypeParamNotUsedInSignature(T: Int.self)
+  expectEqual(s.templateTypeParamNotUsedInSignatureWithUnnamedParam(1, T: Int.self), 8)
   let x: Int = templateTypeParamUsedInReturnType(42)
   expectEqual(x, 42)
 }

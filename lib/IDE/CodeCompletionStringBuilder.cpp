@@ -169,6 +169,7 @@ bool swift::ide::hasInterestingDefaultValue(const ParamDecl *param) {
   case DefaultArgumentKind::ExpressionMacro:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 void CodeCompletionStringBuilder::addChunkWithText(
@@ -247,7 +248,7 @@ void CodeCompletionStringBuilder::addCallArgument(
     }
   } else {
     llvm::SmallString<16> stash;
-    ChunkKind nameKind;
+    std::optional<ChunkKind> nameKind;
     StringRef nameStr;
     if (!Name.empty()) {
       nameKind = ChunkKind::CallArgumentName;
@@ -259,14 +260,14 @@ void CodeCompletionStringBuilder::addCallArgument(
       nameKind = ChunkKind::CallArgumentInternalName;
       nameStr = escapeKeyword(LocalName.str(), false, stash);
     }
-    if (!nameStr.empty()) {
+    if (nameKind) {
       if (UnderscoreEmptyArgumentLabel &&
           nameKind == ChunkKind::CallArgumentInternalName) {
         addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
         addChunkWithTextNoCopy(ChunkKind::Text, " ");
       }
 
-      addChunkWithText(nameKind, nameStr);
+      addChunkWithText(nameKind.value(), nameStr);
       addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
     }
   }

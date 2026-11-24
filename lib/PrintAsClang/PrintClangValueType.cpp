@@ -179,7 +179,8 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
               "_impl::$sSS10FoundationE36_"
               "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge "
               "void *)nsString);\n";
-        os << "    memcpy(result._getOpaquePointer(), &res, sizeof(res));\n";
+        os << "    memcpy(::swift::_impl::ValueTypeStorage::"
+              "getUninitializedStorage(result), &res, sizeof(res));\n";
         os << "    return result;\n";
         os << "  }\n";
       });
@@ -213,14 +214,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (typeDecl->hasGenericParamList()) {
     genericSignature = typeDecl->getGenericSignature();
     assert(cxx_translation::isExposableToCxx(genericSignature));
-
-    // FIXME: Can we make some better layout than opaque layout for generic
-    // types.
-  } else if (!typeDecl->isResilient()) {
+  }
+  bool isOpaqueLayout = declAndTypePrinter.isOpaqueLayout(typeDecl);
+  if (!isOpaqueLayout) {
     typeSizeAlign =
         interopContext.getIrABIDetails().getTypeSizeAlignment(typeDecl);
-    // typeSizeAlign can be null if this is not a fixed-layout type,
-    // e.g. it has resilient fields.
     if (typeSizeAlign && typeSizeAlign->size == 0) {
       // FIXME: How to represent 0 sized structs?
       declAndTypePrinter.getCxxDeclEmissionScope()
@@ -228,7 +226,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  bool isOpaqueLayout = !typeSizeAlign.has_value();
+  bool isNoncopyable =
+      cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
+  bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
+                   interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
+  auto extraInhabitant =
+      !isOpaqueLayout && !isTrivial
+          ? interopContext.getIrABIDetails().getTypeExtraInhabitant(typeDecl)
+          : std::nullopt;
+  bool hasInlineMovedFromState = extraInhabitant.has_value();
+  // A noncopyable wrapper must support moves. If there's no extra inhabitant
+  // to mark the moved-from state, moving the box leaves a null allocation.
+  bool usesBoxedStorage = isOpaqueLayout || (isNoncopyable && !extraInhabitant);
+  bool isSingleSwiftReference =
+      !isOpaqueLayout && !isNoncopyable && !typeDecl->isGenericContext() &&
+      interopContext.getIrABIDetails().isSingleSwiftRetainablePointer(typeDecl);
 
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredType()->getCanonicalType());
@@ -237,6 +249,24 @@ void ClangValueTypePrinter::printValueTypeDecl(
       interopContext.getIrABIDetails()
           .getTypeMetadataAccessFunctionGenericRequirementParameters(
               const_cast<NominalTypeDecl *>(typeDecl));
+  // Takes the stream explicitly, as the nested namespace printers shadow 'os'.
+  auto printVWTable = [&](raw_ostream &os) {
+    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
+        Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+  };
+  StringRef uninitializedStorage =
+      "::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this)";
+  auto printReferenceCountCall = [&](raw_ostream &os, StringRef function,
+                                     StringRef reference, unsigned indent = 4) {
+    os << std::string(indent, ' ');
+    ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
+    os << function << '(' << reference << ");\n";
+  };
+  std::string baseName;
+  {
+    llvm::raw_string_ostream baseNameOS(baseName);
+    ClangSyntaxPrinter(Context, baseNameOS).printBaseName(typeDecl);
+  }
 
   ClangSyntaxPrinter printer(Context, os);
   printer.printParentNamespaceForNestedTypes(typeDecl, [&](raw_ostream &os) {
@@ -275,8 +305,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
                                         StringRef vwTableName = "vwTable",
                                         StringRef enumVWTableName =
                                             "enumVWTable") {
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-          os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+      printVWTable(os);
       os << "    const auto *" << enumVWTableName << " = reinterpret_cast<";
       ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
       os << "EnumValueWitnessTable";
@@ -299,50 +328,175 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // Print out the destructor.
     os << "  ";
     printer.printInlineForThunk();
-    os << '~';
-    printer.printBaseName(typeDecl);
-    os << "() noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-    os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-    os << "  }\n";
+    os << '~' << baseName << "() noexcept";
+    if (isTrivial) {
+      os << " = default;\n";
+    } else {
+      os << " {\n";
+      if (hasInlineMovedFromState)
+        os << "    if (_isMovedFrom()) return;\n";
+      // A moved-from boxed object has no allocation.
+      if (usesBoxedStorage)
+        os << "    if (!_storage.isAllocated()) return;\n";
+      if (isSingleSwiftReference) {
+        os << "    void *reference;\n"
+              "    memcpy(&reference, _getOpaquePointer(), sizeof(reference));\n";
+        printReferenceCountCall(os, "swift_release", "reference");
+      } else {
+        printVWTable(os);
+        os << "    vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      }
+      os << "  }\n";
+    }
 
-    // copy constructor.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << "(const ";
-    printer.printBaseName(typeDecl);
-    os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-    if (isOpaqueLayout) {
-      os << "    _storage = ";
+    if (isNoncopyable) {
+      os << "  " << baseName << "(const " << baseName << " &) = delete;\n";
+      os << "  " << baseName << " &operator =(const " << baseName
+         << " &) = delete;\n";
+    }
+
+    if (hasInlineMovedFromState) {
+      StringRef moveFrom =
+          interopContext.getIrABIDetails().isTypeBitwiseTakable(typeDecl)
+              ? "::swift::_impl::ValueTypeStorage::moveFrom<true>"
+              : "::swift::_impl::ValueTypeStorage::moveFrom<false>";
+      // move constructor.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(" << baseName << " &&other) noexcept {\n";
+      os << "    " << moveFrom << "(*this, other);\n";
+      os << "  }\n";
+
+      // Destroy the old value after the transfer so its deinit observes the
+      // new value in 'this' and a moved-from source.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(" << baseName << " &&other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      os << "    auto oldValue = static_cast<class " << baseName
+         << " &&>(*this);\n";
+      os << "    " << moveFrom << "(*this, other);\n";
+      os << "    return *this;\n";
+      os << "  }\n";
+    }
+
+    if (!isNoncopyable) {
+      // copy constructor.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(const " << baseName << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // A copy of a moved-from object is moved from too.
+        if (usesBoxedStorage)
+          os << "    if (!other._storage.isAllocated()) return;\n";
+        if (hasInlineMovedFromState) {
+          os << "    if (other._isMovedFrom()) {\n";
+          os << "      _setMovedFrom();\n";
+          os << "      return;\n";
+          os << "    }\n";
+        }
+        if (isSingleSwiftReference) {
+          os << "    void *reference;\n"
+                "    memcpy(&reference, other._getOpaquePointer(), "
+                "sizeof(reference));\n";
+          printReferenceCountCall(os, "swift_retain", "reference");
+          os << "    memcpy(" << uninitializedStorage
+             << ", &reference, sizeof(reference));\n";
+        } else {
+          printVWTable(os);
+          if (usesBoxedStorage) {
+            os << "    _storage = ";
+            printer.printSwiftImplQualifier();
+            os << cxx_synthesis::getCxxOpaqueStorageClassName()
+               << "(vwTable->size, vwTable->getAlignment());\n";
+          }
+          os << "    vwTable->initializeWithCopy(" << uninitializedStorage
+             << ", const_cast<char *>(other._getOpaquePointer()), "
+                "metadata._0);\n";
+        }
+        os << "  }\n";
+      }
+
+      // copy assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(const " << baseName
+         << " &other) noexcept";
+      if (isTrivial) {
+        os << " = default;\n";
+      } else {
+        os << " {\n";
+        // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
+        // source into a new object and move that in. The 'class' keyword
+        // finds the type even when the parameter has the same name.
+        std::string copyOfOther = "static_cast<class " + baseName + ">(other)";
+        if (usesBoxedStorage) {
+          os << "    if (!_storage.isAllocated() || "
+                "!other._storage.isAllocated()) {\n";
+          os << "      *this = " << copyOfOther << ";\n";
+          os << "      return *this;\n";
+          os << "    }\n";
+        }
+        if (hasInlineMovedFromState) {
+          os << "    if (_isMovedFrom() || other._isMovedFrom()) {\n";
+          os << "      *this = " << copyOfOther << ";\n";
+          os << "      return *this;\n";
+          os << "    }\n";
+        }
+        if (isSingleSwiftReference) {
+          // Retain before releasing so self-assignment and aliases stay alive.
+          os << "    void *newReference;\n"
+                "    memcpy(&newReference, other._getOpaquePointer(), "
+                "sizeof(newReference));\n";
+          printReferenceCountCall(os, "swift_retain", "newReference");
+          os << "    void *oldReference;\n"
+                "    memcpy(&oldReference, _getOpaquePointer(), "
+                "sizeof(oldReference));\n"
+                "    memcpy(_getOpaquePointer(), &newReference, "
+                "sizeof(newReference));\n";
+          printReferenceCountCall(os, "swift_release", "oldReference");
+        } else {
+          printVWTable(os);
+          os << "    vwTable->assignWithCopy(_getOpaquePointer(), "
+                "const_cast<char "
+                "*>(other._getOpaquePointer()), metadata._0);\n";
+        }
+        os << "  return *this;\n";
+        os << "  }\n";
+      }
+    }
+
+    if (usesBoxedStorage) {
+      // move constructor. The Swift value stays in its allocation.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << "(" << baseName << " &&other) noexcept : _storage("
+         << "static_cast<";
       printer.printSwiftImplQualifier();
       os << cxx_synthesis::getCxxOpaqueStorageClassName()
-         << "(vwTable->size, vwTable->getAlignment());\n";
+         << " &&>(other._storage)) {}\n";
+
+      // move assignment.
+      os << "  ";
+      printer.printInlineForThunk();
+      os << baseName << " &operator =(" << baseName << " &&other) noexcept {\n";
+      os << "    if (this == &other) return *this;\n";
+      os << "    if (_storage.isAllocated()) {\n";
+      printVWTable(os);
+      os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      os << "    }\n";
+      // This also frees the old allocation.
+      os << "    _storage = static_cast<";
+      printer.printSwiftImplQualifier();
+      os << cxx_synthesis::getCxxOpaqueStorageClassName()
+         << " &&>(other._storage);\n";
+      os << "  return *this;\n";
+      os << "  }\n";
     }
-    os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
-          "const_cast<char "
-          "*>(other._getOpaquePointer()), metadata._0);\n";
-    os << "  }\n";
-
-    // copy assignment.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " &operator =(const ";
-    printer.printBaseName(typeDecl);
-    os << " &other) noexcept {\n";
-    ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-        os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-    os << "    vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char "
-          "*>(other._getOpaquePointer()), metadata._0);\n";
-    os << "  return *this;\n";
-    os << "  }\n";
-
-    // FIXME: implement the move assignment.
-    // FIXME: implement the move constructor.
+    // Inline copyable types without extra inhabitants fall back to copying.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -354,14 +508,20 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  ";
     printer.printInlineForThunk();
     printer.printBaseName(typeDecl);
-    if (isOpaqueLayout) {
+    if (usesBoxedStorage) {
       os << "(";
       printer.printSwiftImplQualifier();
       os << "ValueWitnessTable * _Nonnull vwTable) noexcept : "
             "_storage(vwTable->size, "
             "vwTable->getAlignment()) {}\n";
+    } else if (isTrivial) {
+      // A user-provided default constructor would make the C++ type nontrivial.
+      os << "() noexcept = default;\n";
     } else {
-      os << "() noexcept {}\n";
+      os << "() noexcept {";
+      if (hasInlineMovedFromState)
+        os << " _setMovedFrom(); ";
+      os << "}\n";
     }
     // Print out '_make' function which returns an unitialized instance for
     // passing to Swift.
@@ -369,10 +529,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
     printer.printInlineForThunk();
     printer.printBaseName(typeDecl);
     os << " _make() noexcept {";
-    if (isOpaqueLayout) {
+    if (usesBoxedStorage) {
       os << "\n";
-      ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(Context,
-          os, typeMetadataFuncName, typeMetadataFuncGenericParams);
+      printVWTable(os);
       os << "    return ";
       printer.printBaseName(typeDecl);
       os << "(vwTable);\n  }\n";
@@ -382,19 +541,22 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "(); }\n";
     }
     // Print out the private accessors to the underlying Swift value storage.
+    // Every use of a value by Swift goes through these, so they are where a
+    // moved-from value, which holds no Swift value, is caught. A Swift member
+    // named 'abort' must not replace the C function. 'OpaqueStorage' checks
+    // its own allocation.
+    StringRef storagePointer =
+        usesBoxedStorage ? "_storage.getOpaquePointer()" : "_storage";
+    StringRef movedFromCheck =
+        hasInlineMovedFromState ? "if (_isMovedFrom()) ::abort(); " : "";
     os << "  ";
     printer.printInlineForThunk();
-    os << "const char * _Nonnull _getOpaquePointer() const noexcept { return "
-          "_storage";
-    if (isOpaqueLayout)
-      os << ".getOpaquePointer()";
-    os << "; }\n";
+    os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
+       << movedFromCheck << "return " << storagePointer << "; }\n";
     os << "  ";
     printer.printInlineForThunk();
-    os << "char * _Nonnull _getOpaquePointer() noexcept { return _storage";
-    if (isOpaqueLayout)
-      os << ".getOpaquePointer()";
-    os << "; }\n";
+    os << "char * _Nonnull _getOpaquePointer() noexcept { " << movedFromCheck
+       << "return " << storagePointer << "; }\n";
     os << "\n";
     // Print out helper function for enums
     if (isa<EnumDecl>(typeDecl)) {
@@ -404,15 +566,14 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printEnumVWTableVariable();
       os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
             "metadata._0);\n";
-      os << "    return _getOpaquePointer();\n";
+      os << "    return " << uninitializedStorage << ";\n";
       os << "  }\n";
       os << "  ";
       printer.printInlineForThunk();
       os << "void _destructiveInjectEnumTag(unsigned tag) noexcept {\n";
       printEnumVWTableVariable();
-      os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), "
-            "tag, "
-            "metadata._0);\n";
+      os << "    enumVWTable->destructiveInjectEnumTag(" << uninitializedStorage
+         << ", tag, metadata._0);\n";
       os << "  }\n";
       os << "  ";
       printer.printInlineForThunk();
@@ -424,18 +585,46 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // Print out the storage for the value type.
     os << "  ";
-    if (isOpaqueLayout) {
+    if (usesBoxedStorage) {
       printer.printSwiftImplQualifier();
       os << cxx_synthesis::getCxxOpaqueStorageClassName() << " _storage;\n";
     } else {
       os << "alignas(" << typeSizeAlign->alignment << ") ";
       os << "char _storage[" << typeSizeAlign->size << "];\n";
     }
+    if (hasInlineMovedFromState) {
+      os << "  ";
+      printer.printInlineForHelperFunction();
+      os << "bool _isMovedFrom() const noexcept {\n    return ";
+      bool first = true;
+      for (unsigned i = 0; i < extraInhabitant->mask.size(); ++i) {
+        unsigned mask = extraInhabitant->mask[i];
+        if (!mask)
+          continue;
+        if (!first)
+          os << " &&\n           ";
+        first = false;
+        os << "(static_cast<unsigned char>(_storage[" << i << "]) & " << mask
+           << ") == " << (extraInhabitant->value[i] & mask);
+      }
+      os << ";\n  }\n";
+      os << "  ";
+      printer.printInlineForHelperFunction();
+      os << "void _setMovedFrom() noexcept {\n";
+      for (unsigned i = 0; i < extraInhabitant->mask.size(); ++i) {
+        if (extraInhabitant->mask[i])
+          os << "    _storage[" << i << "] = static_cast<char>("
+             << unsigned(extraInhabitant->value[i]) << ");\n";
+      }
+      os << "  }\n";
+    }
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, typeDecl);
     printGenericParamRefs(os);
     os << ";\n";
+
+    os << "  friend struct ::swift::_impl::ValueTypeStorage;\n";
 
     printer.printSwiftMangledNameForDebugger(typeDecl);
 
@@ -481,7 +670,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << "::_make();\n";
-          os << "    callable(result._getOpaquePointer());\n";
+          os << "    callable(::swift::_impl::ValueTypeStorage::"
+                "getUninitializedStorage(result));\n";
           os << "    return result;\n";
           os << "  }\n";
           // Print out helper function for initializeWithTake
@@ -489,10 +679,16 @@ void ClangValueTypePrinter::printValueTypeDecl(
           ClangSyntaxPrinter(Context, os).printInlineForThunk();
           os << "void initializeWithTake(char * _Nonnull "
                 "destStorage, char * _Nonnull srcStorage) {\n";
-          ClangValueTypePrinter::printValueWitnessTableAccessAsVariable(
-              Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
-          os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
-                "metadata._0);\n";
+          if (isTrivial) {
+            os << "    memcpy(destStorage, srcStorage, " << typeSizeAlign->size
+               << ");\n";
+          } else if (isSingleSwiftReference) {
+            os << "    memcpy(destStorage, srcStorage, sizeof(void *));\n";
+          } else {
+            printVWTable(os);
+            os << "    vwTable->initializeWithTake(destStorage, srcStorage, "
+                  "metadata._0);\n";
+          }
           os << "  }\n";
           os << "};\n";
         });
@@ -501,9 +697,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
   if (!isOpaqueLayout)
     printCValueTypeStorageStruct(cPrologueOS, typeDecl, *typeSizeAlign);
 
-  printTypeGenericTraits(
-      os, typeDecl, typeMetadataFuncName, typeMetadataFuncGenericParams,
-      typeDecl->getModuleContext(), declAndTypePrinter, isOpaqueLayout);
+  printTypeGenericTraits(os, typeDecl, typeMetadataFuncName,
+                         typeMetadataFuncGenericParams,
+                         typeDecl->getModuleContext(), declAndTypePrinter,
+                         isOpaqueLayout, usesBoxedStorage);
 }
 
 void ClangValueTypePrinter::printParameterCxxToCUseScaffold(
@@ -563,6 +760,13 @@ void ClangValueTypePrinter::printClangTypeSwiftGenericTraits(
   // Do not reference unspecialized templates.
   if (isa<clang::ClassTemplateDecl>(typeDecl->getClangDecl()))
     return;
+  // Do not reference anonymous types that can't be named in C++, like the enum
+  // from the C++ expansion of CF_OPTIONS, whose typedef names the underlying
+  // integer type instead of the enum.
+  if (const auto *tagDecl = dyn_cast<clang::TagDecl>(typeDecl->getClangDecl()))
+    if (tagDecl->getDeclName().isEmpty() &&
+        !tagDecl->getTypedefNameForAnonDecl())
+      return;
   auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadataAccessFunction(
       typeDecl->getDeclaredInterfaceType()->getCanonicalType());
   std::string typeMetadataFuncName = typeMetadataFunc.mangleAsString(typeDecl->getASTContext());
@@ -599,8 +803,13 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
           os << '>';
         },
         " && ");
-  } else
-    os << "true";
+  } else {
+    // A noncopyable argument would make the generic type conditionally
+    // noncopyable.
+    os << (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)
+               ? "false"
+               : "true");
+  }
   os << ";\n";
 
   os << "#pragma clang diagnostic pop\n";
@@ -613,7 +822,7 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     raw_ostream &os, const TypeDecl *typeDecl, StringRef typeMetadataFuncName,
     ArrayRef<GenericRequirement> typeMetadataFuncRequirements,
     const ModuleDecl *moduleContext, DeclAndTypePrinter &declAndTypePrinter,
-    bool isOpaqueLayout) {
+    bool isOpaqueLayout, bool usesBoxedStorage) {
   auto *NTD = dyn_cast<NominalTypeDecl>(typeDecl);
   ClangSyntaxPrinter printer(typeDecl->getASTContext(), os);
   if (typeDecl->hasClangNode()) {
@@ -711,12 +920,13 @@ void ClangValueTypePrinter::printTypeGenericTraits(
     printer.printNominalTypeReference(NTD, moduleContext);
     os << "> = true;\n";
   }
-  if (isOpaqueLayout) {
+  if (usesBoxedStorage) {
     assert(NTD && "not a nominal type?");
     assert(!isa<ClassDecl>(typeDecl) && !typeDecl->hasClangNode());
     if (printer.printNominalTypeOutsideMemberDeclTemplateSpecifiers(NTD))
       os << "template<>\n";
-    os << "inline const constexpr bool isOpaqueLayout<";
+    os << "inline const constexpr bool "
+       << (isOpaqueLayout ? "isOpaqueLayout" : "usesBoxedStorage") << "<";
     printer.printNominalTypeReference(NTD,
                                       /*moduleContext=*/nullptr);
     os << "> = true;\n";

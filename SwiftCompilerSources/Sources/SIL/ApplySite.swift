@@ -143,7 +143,7 @@ extension ApplySite {
   public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
 
   public var hasSubstitutions: Bool {
-    return substitutionMap.hasAnySubstitutableParams
+    return substitutionMap.isEffectivelyGeneric
   }
 
   public var isAsync: Bool {
@@ -195,6 +195,17 @@ extension ApplySite {
   /// This does not include the callee function operand.
   public var arguments: LazyMapSequence<OperandArray, Value> {
     argumentOperands.values
+  }
+
+  /// The `self` argument value, or nil if the callee has no `self` parameter.
+  /// `self` is always the last argument.
+  public var selfArgument: Value? {
+    functionConvention.hasSelfParameter ? arguments.last : nil
+  }
+
+  /// The `self` argument operand, or nil if the callee has no `self` parameter.
+  public var selfArgumentOperand: Operand? {
+    functionConvention.hasSelfParameter ? argumentOperands.last : nil
   }
 
   /// Returns true when this apply has per-argument SILLocations stored on it.
@@ -388,6 +399,10 @@ extension ApplySite {
 
   public var hasGuaranteedResult: Bool {
     functionConvention.hasGuaranteedResult
+  }
+
+  public var hasGuaranteedAddressResult: Bool {
+    functionConvention.hasGuaranteedAddressResult
   }
 }
 

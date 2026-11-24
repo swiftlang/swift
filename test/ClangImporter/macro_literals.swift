@@ -133,12 +133,16 @@ func testCStyleIntegerCasts() {
   // CHECK: %{{.*}} = struct $UInt32 (%[[P2]] : $Builtin.Int32), loc {{.*}}
   _ = CAST_TYPEDEF_UNSIGNED_MINUS_ONE as TEST_DWORD
 
-  // CHECK: %[[P3:.*]] = integer_literal $Builtin.Int{{[0-9]+}}, -1, loc {{.*}}
-  // CHECK: %{{.*}} = struct $Int (%[[P3]] : $Builtin.Int{{[0-9]+}}), loc {{.*}}
-  _ = CAST_SIZE_T_MINUS_ONE as Int
+  // CHECK: %[[P3:.*]] = integer_literal $Builtin.Int32, -2147483648, loc {{.*}}
+  // CHECK: %{{.*}} = struct $Int32 (%[[P3]] : $Builtin.Int32), loc {{.*}}
+  _ = CAST_SIGNED_UNSIGNED_HIGH_BIT as CInt
 
   // CHECK: %[[P4:.*]] = integer_literal $Builtin.Int{{[0-9]+}}, -1, loc {{.*}}
   // CHECK: %{{.*}} = struct $Int (%[[P4]] : $Builtin.Int{{[0-9]+}}), loc {{.*}}
+  _ = CAST_SIZE_T_MINUS_ONE as Int
+
+  // CHECK: %[[P5:.*]] = integer_literal $Builtin.Int{{[0-9]+}}, -1, loc {{.*}}
+  // CHECK: %{{.*}} = struct $Int (%[[P5]] : $Builtin.Int{{[0-9]+}}), loc {{.*}}
   _ = CAST_NSUINTEGER_MINUS_ONE as Int
 }
 

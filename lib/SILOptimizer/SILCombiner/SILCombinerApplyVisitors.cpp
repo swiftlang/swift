@@ -76,29 +76,8 @@ static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
   return true;
 }
 
-SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
-  // partial_apply without any substitutions or arguments is just a
-  // thin_to_thick_function. thin_to_thick_function supports only thin operands.
-  if (!pai->hasSubstitutions() && (pai->getNumArguments() == 0) &&
-      pai->getSubstCalleeType()->getRepresentation() ==
-          SILFunctionTypeRepresentation::Thin) {
-    if (!pai->isOnStack())
-      return Builder.createThinToThickFunction(pai->getLoc(), pai->getCallee(),
-                                               pai->getType());
-
-    // Remove dealloc_stack of partial_apply [stack].
-    // Iterating while delete use a copy.
-    SmallVector<Operand *, 8> uses(pai->getUses());
-    for (auto *use : uses)
-      if (auto *dealloc = dyn_cast<DeallocStackInst>(use->getUser()))
-        eraseInstFromFunction(*dealloc);
-    auto *thinToThick = Builder.createThinToThickFunction(
-        pai->getLoc(), pai->getCallee(), pai->getType());
-    replaceInstUsesWith(*pai, thinToThick);
-    eraseInstFromFunction(*pai);
-    return nullptr;
-  }
-
+SILInstruction *
+SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   // partial_apply %reabstraction_thunk_typeAtoB(
   //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
   // -> %closure_typeB
@@ -120,14 +99,85 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *pai) {
   return nullptr;
 }
 
+/// If \p callee is a conversion that an apply looks through to find a
+/// convert_function, returns the converted value. Otherwise, returns a null
+/// value.
+static SILValue lookThroughCalleeConversion(SILValue callee) {
+  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee))
+    return cee->getOperand();
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(callee))
+    return mdi->getValue();
+  if (auto *cvi = dyn_cast<CopyValueInst>(callee))
+    return cvi->getOperand();
+  return SILValue();
+}
+
+/// Returns true if \p AI is the only non-debug user of \p CFI and of each
+/// conversion between \p CFI and the callee of \p AI.
+static bool isOnlyUsedByApply(ConvertFunctionInst *CFI, FullApplySite AI) {
+  for (SILValue value = AI.getCallee(); value && hasOneNonDebugUse(value);
+       value = lookThroughCalleeConversion(value)) {
+    if (value == CFI)
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if \p pai consumes a noncopyable argument, either as a value
+/// or as an address that the closure's context owns.
+static bool consumesNoncopyableArgument(PartialApplyInst *pai) {
+  ApplySite site(pai);
+  return llvm::any_of(pai->getArgumentOperands(), [&](Operand &argOp) {
+    return (argOp.isConsuming() ||
+            site.hasContextOwnedAddressArgument(argOp)) &&
+           argOp.get()->getType().isMoveOnly();
+  });
+}
+
 SILInstruction *
 SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
   // We only handle simplification of static function references. If we don't
   // have one, bail.
+  //
+  // In OSSA the function value can be wrapped in several conversions and
+  // ownership instructions before it reaches the apply, e.g.
+  //   %1 = function_ref @f
+  //   %2 = thin_to_thick_function %1
+  //   %3 = convert_function %2, forwarding: @owned
+  //   %4 = begin_borrow %3
+  //   %5 = convert_function %4
+  //   apply %5(...)
+  // Look through all of them to find the underlying function reference.
   SILValue funcOper = CFI->getOperand();
-  if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper))
-    funcOper = TTI->getOperand();
+  bool strippedOwnershipInst = false;
+  for (;;) {
+    if (auto *TTI = dyn_cast<ThinToThickFunctionInst>(funcOper)) {
+      funcOper = TTI->getOperand();
+      continue;
+    }
+    if (auto *subCFI = dyn_cast<ConvertFunctionInst>(funcOper)) {
+      // Bypassing a withoutActuallyEscaping conversion would loose the
+      // guarantee that the closure does not escape.
+      if (subCFI->withoutActuallyEscaping())
+        break;
+      funcOper = subCFI->getOperand();
+      continue;
+    }
+    if (isa<BeginBorrowInst>(funcOper) || isa<CopyValueInst>(funcOper) ||
+        isa<MoveValueInst>(funcOper) || isa<BorrowedFromInst>(funcOper)) {
+      funcOper = cast<SingleValueInstruction>(funcOper)->getOperand(0);
+      strippedOwnershipInst = true;
+      continue;
+    }
+    break;
+  }
+
+  // If we looked through an ownership instruction, the underlying value's
+  // lifetime does not necessarily cover the apply. This is only guaranteed if
+  // the value has no ownership at all, which is the case for a function_ref.
+  if (strippedOwnershipInst && !isa<FunctionRefInst>(funcOper))
+    return nullptr;
 
   if (!isa<FunctionRefInst>(funcOper) &&
       // Optimizing partial_apply will then enable the partial_apply -> apply peephole.
@@ -147,6 +197,22 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (!ConvertCalleeTy->hasErrorResult() && isa<TryApplyInst>(AI)) {
     assert(SubstCalleeTy->hasErrorResult());
     return nullptr;
+  }
+
+  // The new apply uses the closure directly, but the convert_function still
+  // consumes it unless the old apply is the only user of each conversion
+  // between them, so that they're deleted along with the old apply. Later
+  // combines fix that up, but not when the new apply consumes a closure that
+  // the conversions make noncopyable, because they forward its ownership, or
+  // when the closure consumes a noncopyable argument, because combining the
+  // new apply with the partial_apply has to copy it.
+  if (AI.getFunction()->hasOwnership() && !isOnlyUsedByApply(CFI, AI)) {
+    if (auto *pai = dyn_cast<PartialApplyInst>(funcOper)) {
+      if ((ConvertCalleeTy->isCalleeConsumed() &&
+           CFI->getType().isMoveOnly()) ||
+          consumesNoncopyableArgument(pai))
+        return nullptr;
+    }
   }
 
   // Ok, we can now perform our transformation. Grab AI's operands and the
@@ -424,7 +490,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
       if (propDecl->hasClangNode() && propDecl->getInterfaceType()->isVoid())
         return false;
 
-      if (!parentTy.getStructOrBoundGenericStruct())
+      if (!parentTy.getStructDecl())
         hasOffset = false;
       break;
     }
@@ -474,7 +540,7 @@ bool swift::tryOptimizeKeypathOffsetOf(ApplyInst *AI,
     SILType intType = AI->getType().getOptionalObjectType();
     if (!intType)
       return false;
-    StructDecl *intDecl = intType.getStructOrBoundGenericStruct();
+    StructDecl *intDecl = intType.getStructDecl();
     if (!intDecl || intDecl->getStoredProperties().size() != 1)
       return false;
     VarDecl *member = intDecl->getStoredProperties()[0];
@@ -818,7 +884,7 @@ SILCombiner::buildConcreteOpenedExistentialInfoFromSoleConformingType(
     /// If the argtype is an opened existential conforming to a protocol type
     /// and that the protocol type has a sole conformance, then we can propagate
     /// concrete type for it as well.
-    ArchetypeType *archetypeTy;
+    ArchetypeType *archetypeTy = nullptr;
     if (isa<ExistentialArchetypeType>(SwiftArgType) &&
         (archetypeTy = dyn_cast<ArchetypeType>(SwiftArgType)) &&
         (archetypeTy->getConformsTo().size() == 1)) {
@@ -926,6 +992,44 @@ SILCombiner::buildConcreteOpenedExistentialInfo(Operand &ArgOperand) {
   // ArgOperand through the open_existential backward to an init_existential.
   ConcreteOpenedExistentialInfo COEI(ArgOperand);
   if (COEI.CEI) {
+    // An owned concrete value is consumed by the init_existential_ref, e.g.
+    //   %e = init_existential_ref %concrete     // %concrete is owned
+    //   %b = begin_borrow %e
+    //   %o = open_existential_ref %b
+    //   apply %f(%o)
+    // In this case, `%concrete` cannot be used at the apply.
+    bool concreteValueIsConsumed =
+        COEI.CEI->ConcreteValue &&
+        COEI.CEI->ConcreteValue->getOwnershipKind() == OwnershipKind::Owned;
+    // A guaranteed concrete value is not available at the apply if the
+    // existential is copied out of its borrow scope, e.g.
+    //   %b = begin_borrow %c
+    //   %e = init_existential_ref %b             // %b is guaranteed
+    //   %copy = copy_value %e
+    //   end_borrow %b
+    //   %o = open_existential_ref %copy
+    //   apply %f(%o)
+    bool concreteValueIsOutOfScope =
+        COEI.OAI.isExistentialValueCopied && COEI.CEI->ConcreteValue &&
+        COEI.CEI->ConcreteValue->getOwnershipKind() ==
+            OwnershipKind::Guaranteed;
+    if ((COEI.OAI.isExistentialValueFromValueHint || concreteValueIsConsumed ||
+         concreteValueIsOutOfScope) &&
+        COEI.OAI.OpenedArchetypeValue->getOwnershipKind() !=
+            OwnershipKind::Owned) {
+      // The init_existential_ref was found via the value hint of a
+      // `load_borrow` or its concrete operand is not available at the apply.
+      // But we know the concrete type and can just cast the opened value. An
+      // owned opened value is handled below.
+      if (isa<ExistentialArchetypeType>(COEI.CEI->ConcreteType))
+        return std::nullopt;
+      SILBuilderWithScope b(ArgOperand.getUser(), Builder);
+      COEI.CEI->ConcreteValue = b.createUncheckedRefCast(
+          RegularLocation::getAutoGeneratedLocation(),
+          COEI.OAI.OpenedArchetypeValue,
+          COEI.CEI->ConcreteValue->getType());
+      return COEI;
+    }
     auto ConcreteValue = COEI.CEI->ConcreteValue;
     if (ConcreteValue->getFunction()->hasOwnership() &&
         COEI.OAI.OpenedArchetypeValue->getOwnershipKind() ==
@@ -1644,7 +1748,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (!storageTy->is_ContiguousArrayStorage())
     return false;
 
-  auto boundGenericTy = dyn_cast<BoundGenericType>(storageTy);
+  auto boundGenericTy = dyn_cast<NominalType>(storageTy);
   if (!boundGenericTy)
     return false;
 
@@ -1652,7 +1756,7 @@ static bool shouldReplaceCallByMetadataConstructor(CanType storageMetaTy) {
   if (genericArgs.size() != 1)
     return false;
   auto ty = genericArgs[0]->getCanonicalType();
-  if (ty->getStructOrBoundGenericStruct() || ty->getEnumOrBoundGenericEnum() ||
+  if (ty->getStructDecl() || ty->getEnumDecl() ||
       isa<BuiltinVectorType>(ty) || isa<BuiltinIntegerType>(ty) ||
       isa<BuiltinFloatType>(ty) || isa<TupleType>(ty) ||
       isa<AnyFunctionType>(ty) || ty->isForeignReferenceType() ||
@@ -1680,17 +1784,8 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   SILValue callee = AI->getCallee();
-  for (;;) {
-    if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
-      callee = cee->getOperand();
-    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
-      callee = mdi->getValue();
-    } else if (auto *cvi = dyn_cast<CopyValueInst>(callee)) {
-      callee = cvi->getOperand();
-    } else {
-      break;
-    }
-  }
+  while (SILValue converted = lookThroughCalleeConversion(callee))
+    callee = converted;
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 

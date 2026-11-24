@@ -550,6 +550,8 @@ emitFixedSizeWitnessTablePack(IRGenFunction &IGF,
     auto *wtable =
         emitWitnessTableRef(IGF, packType.getElementType(i),
                             /*srcMetadataCache=*/&_metadata, conformance);
+    if (wtable->getType()->isIntegerTy())
+      wtable = IGF.Builder.CreateIntToPtr(wtable, IGF.IGM.WitnessTablePtrTy);
 
     IGF.Builder.CreateStore(wtable, slot);
   }
@@ -573,6 +575,8 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   // Emit the element witness table.
   auto *wtable = emitWitnessTableRef(IGF, instantiatedPatternTy,
                                      srcMetadataCache, instantiatedConformance);
+  if (wtable->getType()->isIntegerTy())
+    wtable = IGF.Builder.CreateIntToPtr(wtable, IGF.IGM.WitnessTablePtrTy);
   return wtable;
 }
 

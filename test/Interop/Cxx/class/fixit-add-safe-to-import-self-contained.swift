@@ -22,22 +22,16 @@ struct X {
 
 import Test
 
-public func test(x: X) {
-  // CHECK: note: annotate method 'test' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
-  // CHECK: int *test() { }
-  // CHECK: ^
-  // CHECK: SWIFT_RETURNS_INDEPENDENT_VALUE
-  
+public func test(x: inout X) {
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'test()'
+  // CHECK: note: this returns a pointer or reference into a type that owns its storage
   x.test()
-  
-  // CHECK: note: annotate method 'other' with SWIFT_RETURNS_INDEPENDENT_VALUE in C++ to make it available in Swift
-  // CHECK: Ptr other() { }
-  // CHECK: ^
-  // CHECK: SWIFT_RETURNS_INDEPENDENT_VALUE
-  
-  // CHECK: note: annotate type 'Ptr' with SWIFT_SELF_CONTAINED in C++ to make methods that return it available in Swift
-  // CHECK: struct Ptr {
-  // CHECK: ^
-  // CHECK: SWIFT_SELF_CONTAINED
+
+  // CHECK: error: expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'
+  // CHECK: unsafe
+  // CHECK: note: reference to unsafe instance method 'other()'
+  // CHECK: note: this returns a view into a type that owns its storage
   x.other()
 }

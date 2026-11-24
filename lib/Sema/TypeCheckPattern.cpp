@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -468,9 +469,22 @@ public:
     if (!referencedElement)
       return nullptr;
 
-    auto *base =
-        TypeExpr::createForMemberDecl(repr, ude->getNameLoc(), enumDecl);
-    base->setType(MetatypeType::get(ty));
+    // Re-resolve the base type to produce diagnostics. CSGen and
+    // `coercePatternToType` will handle unbound generics, placeholders are not
+    // currently handled correctly so are rejected for now.
+    // FIXME: Once we properly sink patterns into the constraint system we
+    // should aim to handle the EnumElementPattern resolution there instead of
+    // here.
+    auto baseTy = TypeResolution::resolveContextualType(
+        repr, DC, TypeResolverContext::InExpression,
+        // FIXME: Don't let unbound generic types escape type resolution.
+        // For now, just return the unbound generic type.
+        TypeResolution::defaultUnboundTypeOpener,
+        /*placeholderOpener*/ nullptr,
+        /*packElementOpener*/ nullptr);
+
+    auto *base = new (Context) TypeExpr(repr);
+    base->setType(MetatypeType::get(baseTy));
     return EnumElementPattern::create(base, ude->getDotLoc(), ude->getNameLoc(),
                                       ude->getName(), referencedElement,
                                       /*subPattern*/ nullptr, DC);
@@ -566,8 +580,9 @@ public:
                            TypeResolutionFlags::SilenceDiagnostics;
 
       // See first if the entire repr resolves to a type.
+      auto *baseRepr = qualIdentTR->getBase();
       const Type enumTy = TypeResolution::resolveContextualType(
-          qualIdentTR->getBase(), DC, options,
+          baseRepr, DC, options,
           // FIXME: Don't let unbound generic types escape type resolution.
           // For now, just return the unbound generic type.
           TypeResolution::defaultUnboundTypeOpener,
@@ -585,9 +600,22 @@ public:
       if (!referencedElement)
         return nullptr;
 
-      baseTE = TypeExpr::createForMemberDecl(
-          qualIdentTR->getBase(), qualIdentTR->getNameLoc(), enumDecl);
-      baseTE->setType(MetatypeType::get(enumTy));
+      // Re-resolve the base type to produce diagnostics. CSGen and
+      // `coercePatternToType` will handle unbound generics, placeholders are
+      // not currently handled correctly so are rejected for now.
+      // FIXME: Once we properly sink patterns into the constraint system we
+      // should aim to handle the EnumElementPattern resolution there instead of
+      // here.
+      auto baseTy = TypeResolution::resolveContextualType(
+          baseRepr, DC, TypeResolverContext::InExpression,
+          // FIXME: Don't let unbound generic types escape type resolution.
+          // For now, just return the unbound generic type.
+          TypeResolution::defaultUnboundTypeOpener,
+          /*placeholderOpener*/ nullptr,
+          /*packElementOpener*/ nullptr);
+
+      baseTE = new (Context) TypeExpr(baseRepr);
+      baseTE->setType(MetatypeType::get(baseTy));
     }
 
     assert(baseTE && baseTE->getType() && "Didn't initialize base expression?");
@@ -862,7 +890,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     // If we're type checking this pattern in a context that can provide type
     // information, then the lack of type information is not an error.
     if (options & TypeResolutionFlags::AllowUnspecifiedTypes)
-      return PlaceholderType::get(Context, P);
+      return PlaceholderType::get(Context, /*repr*/ nullptr);
 
     Context.Diags.diagnose(P->getLoc(), diag::cannot_infer_type_for_pattern);
     if (auto named = dyn_cast<NamedPattern>(P)) {
@@ -937,8 +965,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
                              diag::refutable_pattern_requires_initializer);
       return ErrorType::get(Context);
     }
-
-    return PlaceholderType::get(Context, P);
+    return PlaceholderType::get(Context, /*repr*/ nullptr);
   }
   llvm_unreachable("bad pattern kind!");
 }
@@ -1091,6 +1118,28 @@ NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
     return nullptr;
 
   return simplifyToBoolPattern(ctx, EP, BLE, patternTy);
+}
+
+/// Whether an `is` pattern over \p type, an Optional of a non-`Copyable`
+/// type, should cast the Optional as it stands rather than be consumed to
+/// produce a `.some` pattern.  Keep `.some` when:
+/// - a statically-true cast of the payload binds it (\p subPattern):
+///   matching `.some` and binding the payload needs no cast at all;
+/// - the Optional itself conforms to \p castType: that cast is a coercion,
+///   which would match `nil`.
+static bool isPatternCastsNoncopyableOptional(Type type, Type castType,
+                                              Pattern *subPattern,
+                                              DeclContext *dc) {
+  auto needsCheck = [](CheckedCastKind kind) {
+    return kind == CheckedCastKind::ValueCast ||
+           kind == CheckedCastKind::Unresolved;
+  };
+  auto payloadCastKind =
+      TypeChecker::noncopyableOptionalPayloadCastKind(type, castType, dc);
+  if (!payloadCastKind || (!needsCheck(*payloadCastKind) && subPattern))
+    return false;
+  return needsCheck(TypeChecker::typeCheckCheckedCast(
+      type, castType, CheckedCastContextKind::IsPattern, dc));
 }
 
 /// Perform top-down type coercion on the given pattern.
@@ -1257,10 +1306,10 @@ Pattern *TypeChecker::coercePatternToType(
         diag = isOptional ? diag::type_inferred_to_undesirable_type
                           : diag::type_inferred_to_uninhabited_tuple_type;
       } else {
-        assert((diagTy->is<EnumType>() || diagTy->is<BoundGenericEnumType>()) &&
-          "unknown structurally uninhabited type");
+        assert(diagTy->is<EnumType>() &&
+               "unknown structurally uninhabited type");
       }
-    } else if (auto *BST = diagTy->getAs<BoundGenericStructType>()) {
+    } else if (auto *BST = diagTy->getAs<NominalType>()) {
       if (BST->isArray())
         shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
@@ -1406,10 +1455,16 @@ Pattern *TypeChecker::coercePatternToType(
     SmallVector<Type, 2> castTypeOptionals;
     castType->lookThroughAllOptionalTypes(castTypeOptionals);
 
+    // An Optional of a non-`Copyable` type may be cast as it stands.
+    bool castsOptionalOfNC =
+        !type->hasError() &&
+        isPatternCastsNoncopyableOptional(type, castType, IP->getSubPattern(),
+                                          dc);
+
     // If we have extra optionals on the input type. Create ".some" patterns
     // wrapping the is pattern to balance out the optionals.
     int numExtraOptionals = inputTypeOptionals.size()-castTypeOptionals.size();
-    if (numExtraOptionals > 0) {
+    if (numExtraOptionals > 0 && !castsOptionalOfNC) {
       Pattern *sub = IP;
       auto extraOpts =
           llvm::drop_end(inputTypeOptionals, castTypeOptionals.size());
@@ -1422,7 +1477,8 @@ Pattern *TypeChecker::coercePatternToType(
 
       P = sub;
       return coercePatternToType(
-          pattern.forSubPattern(P, /*retainTopLevel=*/true), type, options,
+          pattern.forSubPattern(P, /*retainTopLevel=*/true), type,
+          options | TypeResolutionFlags::ImplicitlyUnwrappedIsPattern,
           tryRewritePattern);
     }
 
@@ -1439,8 +1495,10 @@ Pattern *TypeChecker::coercePatternToType(
 
       if (!(options.contains(TypeResolutionFlags::SilenceNeverWarnings) &&
             type->isNever())) {
+        // Name the payload, as for the `.some` pattern this stands for.
         diags
-            .diagnose(IP->getLoc(), diag::downcast_to_unrelated, type,
+            .diagnose(IP->getLoc(), diag::downcast_to_unrelated,
+                      castsOptionalOfNC ? type->getOptionalObjectType() : type,
                       IP->getCastType())
             .highlight(IP->getLoc())
             .highlight(IP->getCastTypeRepr()->getSourceRange());
@@ -1453,8 +1511,10 @@ Pattern *TypeChecker::coercePatternToType(
       // If this is an 'as' pattern coercing between two different types, then
       // it is "useful" because it is providing a different type to the
       // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
-      // types are the same, then produce a warning.
-      if (!IP->getSubPattern() || type->isEqual(IP->getCastType())) {
+      // types are the same, then produce a warning, unless optionals were
+      // implicitly unwrapped to get here, in which case the test can fail.
+      if (!options.contains(TypeResolutionFlags::ImplicitlyUnwrappedIsPattern) &&
+          (!IP->getSubPattern() || type->isEqual(IP->getCastType()))) {
         diags.diagnose(IP->getLoc(), diag::isa_is_always_true,
                        IP->getSubPattern() ? "as" : "is");
       }
@@ -1473,6 +1533,7 @@ Pattern *TypeChecker::coercePatternToType(
     
     // Coerce the subpattern to the destination type.
     if (Pattern *sub = IP->getSubPattern()) {
+      subOptions -= TypeResolutionFlags::ImplicitlyUnwrappedIsPattern;
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false),
           IP->getCastType(),
@@ -1581,9 +1642,12 @@ Pattern *TypeChecker::coercePatternToType(
     } else {
       // Check if the explicitly-written enum type matches the type we're
       // coercing to.
-      assert(!EEP->getParentType().isNull()
-             && "enum with resolved element doesn't specify parent type?!");
       auto parentTy = EEP->getParentType();
+      ASSERT(parentTy &&
+             "enum with resolved element doesn't specify parent type?!");
+      if (parentTy->hasError())
+        return nullptr;
+
       // If the type matches exactly, use it.
       if (parentTy->isEqual(type)) {
         enumTy = type;
@@ -1708,7 +1772,7 @@ Pattern *TypeChecker::coercePatternToType(
         SourceLoc loc = OP->getQuestionLoc();
         // Produce tailored diagnostic for if/let and other conditions.
         if (OP->isImplicit()) {
-          diagID = diag::condition_optional_element_pattern_not_valid_type;
+          diagID = diag::condition_binding_non_optional_type;
           loc = OP->getLoc();
         }
 
@@ -1753,6 +1817,26 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
 
     if (params[i].isInOut())
       param->setSpecifier(ParamDecl::Specifier::InOut);
+    
+    // For noncopyable parameters, the parameter always needs an ownership
+    // specifier.
+    if (!params[i].getParameterType()->isCopyable()) {
+      switch (params[i].getValueOwnership()) {
+      case ValueOwnership::Default:
+        // Not valid for a noncopyable parameter to lack an ownership
+        // specifier, but we have to gracefully handle invalid code.
+        break;
+      case ValueOwnership::InOut:
+        // Handled above.
+        break;
+      case ValueOwnership::Shared:
+        param->setSpecifier(ParamDecl::Specifier::Borrowing);
+        break;
+      case ValueOwnership::Owned:
+        param->setSpecifier(ParamDecl::Specifier::Consuming);
+        break;
+      }
+    }
 
     param->setInterfaceType(
         params[i].getParameterType()->mapTypeOutOfEnvironment());

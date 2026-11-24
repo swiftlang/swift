@@ -19,6 +19,8 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include <memory>
+
 using namespace swift;
 
 /// Print information about a
@@ -151,7 +153,8 @@ void printTripleInfo(const CompilerInvocation &invocation,
 
   clang::TargetOptions targetOpts;
   targetOpts.Triple = triple.str();
-  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, targetOpts);
+  std::unique_ptr<clang::TargetInfo> TI(
+      clang::TargetInfo::CreateTargetInfo(DE, targetOpts));
   out << "    \"pointerWidthInBits\": "
       << TI->getPointerWidth(clang::LangAS::Default) << ",\n";
   out << "    \"pointerWidthInBytes\": "

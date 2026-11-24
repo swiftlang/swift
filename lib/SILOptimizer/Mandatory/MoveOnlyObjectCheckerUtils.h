@@ -98,6 +98,15 @@ struct OSSACanonicalizer {
 
   bool foundFinalConsumingUses() const { return consumingBoundaryUsers.size(); }
 
+  /// Returns true if \p user is a partial_apply whose consuming use of a value
+  /// is diagnosed as a closure capture. The on-stack context of a noncopyable
+  /// closure instead owns the captures that the closure consumes, which makes
+  /// such a capture an ordinary consuming use.
+  static bool isDiagnosedAsClosureCapture(SILInstruction *user) {
+    auto *pai = dyn_cast<PartialApplyInst>(user);
+    return pai && !(pai->isOnStack() && pai->isNoncopyable());
+  }
+
   /// Helper method for hasPartialApplyConsumingUse and
   /// hasNonPartialApplyConsumingUse.
   static bool isPartialApplyUser(SILInstruction *user) {
@@ -106,11 +115,11 @@ struct OSSACanonicalizer {
     if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
       if (mtci->hasOwnedInitialKind()) {
         return llvm::any_of(mtci->getUses(), [](Operand *use) {
-          return isa<PartialApplyInst>(use->getUser());
+          return isDiagnosedAsClosureCapture(use->getUser());
         });
       }
     }
-    return isa<PartialApplyInst>(user);
+    return isDiagnosedAsClosureCapture(user);
   }
 
   static bool isNotPartialApplyUser(SILInstruction *user) {
@@ -119,11 +128,11 @@ struct OSSACanonicalizer {
     if (auto *mtci = dyn_cast<MoveOnlyWrapperToCopyableValueInst>(user)) {
       if (mtci->hasOwnedInitialKind()) {
         return llvm::any_of(mtci->getUses(), [](Operand *use) {
-          return !isa<PartialApplyInst>(use->getUser());
+          return !isDiagnosedAsClosureCapture(use->getUser());
         });
       }
     }
-    return !isa<PartialApplyInst>(user);
+    return !isDiagnosedAsClosureCapture(user);
   }
 
   bool hasPartialApplyConsumingUse() const {

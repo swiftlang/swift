@@ -174,7 +174,10 @@ private struct CollectedEffects {
       addEffects(.read, to: copy.source)
       addEffects(.write, to: copy.destination)
 
-      if !copy.isTakeOfSource {
+      if copy.isTakeOfSource {
+        // Conceptually, a take is also a write, because the stored value is not available anymore after the take.
+        addEffects(.write, to: copy.source)
+      } else {
         addEffects(.copy, to: copy.source)
       }
       if !copy.isInitializationOfDestination {
@@ -193,7 +196,14 @@ private struct CollectedEffects {
     case let store as StoreUnownedInst:
       addEffects(.write, to: store.destination)
 
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
+    case let load as LoadInst:
+      addEffects(.read, to: load.address)
+      if load.loadOwnership == .take {
+        // Conceptually, a take is also a write, because the stored value is not available anymore after the take.
+        addEffects(.write, to: load.address)
+      }
+
+    case is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       let addr = inst.operands[0].value
       addEffects(.read, to: addr)
 
@@ -237,6 +247,12 @@ private struct CollectedEffects {
       // releases moving above the fix_lifetime.
       addEffects(.read, to: fl.operand.value)
 
+    case let cast as UnconditionalCheckedCastInst:
+      if !cast.preservesReferenceCounts {
+        addEffects(.worstEffects, to: cast.operand.value)
+        globalEffects = .worstEffects
+      }
+
       // Instructions which have effects defined in SILNodes.def, but those effects are
       // not relevant for our purpose.
       // In most cases these conservative effects are there to prevent code re-scheduling within
@@ -246,7 +262,7 @@ private struct CollectedEffects {
       is BeginBorrowInst, is EndBorrowInst,
       is DebugValueInst, is KeyPathInst, is FixLifetimeInst,
       is EndApplyInst, is AbortApplyInst,
-      is EndCOWMutationInst, is UnconditionalCheckedCastInst,
+      is EndCOWMutationInst,
       is CondFailInst:
       break
 
@@ -591,8 +607,13 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
-    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
-         is DebugValueInst:
+    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is DestroyAddrInst, is DebugValueInst:
+      return .continueWalk
+
+    case let apply as ApplySite:
+      if let apply = apply as? ApplyInst, apply.functionConvention.hasAddressResult {
+        return .abortWalk
+      }
       return .continueWalk
 
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:

@@ -1,5 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name let_decls %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -module-name let_decls %s
 
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s

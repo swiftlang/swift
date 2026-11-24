@@ -34,6 +34,9 @@ internal func _swift_bufferAllocate(
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, types: Element)
+#endif
 @_fixed_layout
 open class ManagedBuffer<Header, Element: ~Copyable> {
   /// The stored `Header` instance.
@@ -44,6 +47,13 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   @_preInverseGenerics
   public final var header: Header
+
+  #if $Embedded
+  /// The number of tail-allocated elements, as passed to the allocation, for
+  /// typed deallocation and `capacity`.
+  @usableFromInline
+  internal final var _tailCount: Int
+  #endif
 
   #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
@@ -89,6 +99,10 @@ extension ManagedBuffer where Element: ~Copyable {
     let p = Builtin.allocWithTailElems_1(
          self,
          minimumCapacity._builtinWordValue, Element.self)
+    #if $Embedded
+    // Before the factory, which may read `capacity`.
+    p._tailCount = minimumCapacity
+    #endif
 
     let initHeaderVal = try factory(p)
     unsafe p.headerAddress.initialize(to: initHeaderVal)
@@ -108,11 +122,15 @@ extension ManagedBuffer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
+    #if $Embedded
+    return _tailCount
+    #else
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
     let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
+    #endif
   }
 
   @_preInverseGenerics
@@ -277,6 +295,7 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
+  @_unavailableInEmbedded
   public init(
     bufferClass: AnyClass,
     minimumCapacity: Int,
@@ -431,9 +450,15 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public var capacity: Int {
+    #if $Embedded
+    let managedBuffer: ManagedBuffer<Header, Element> =
+      Builtin.castFromNativeObject(_nativeBuffer)
+    return managedBuffer._tailCount
+    #else
     return (
       _capacityInBytes &- ManagedBufferPointer._elementOffset
     ) / MemoryLayout<Element>.stride
+    #endif
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -620,8 +645,14 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
+    #if $Embedded
+    let managedBuffer: ManagedBuffer<Header, Element> =
+      Builtin.castFromNativeObject(_nativeBuffer)
+    return unsafe managedBuffer.firstElementAddress
+    #else
     return unsafe (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
       to: Element.self)
+    #endif
   }
 
   /// Offset from the allocated storage for `self` to the `Element` storage

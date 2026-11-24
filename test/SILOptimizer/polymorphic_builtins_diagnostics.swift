@@ -1,5 +1,10 @@
 // RUN: %target-swift-frontend -emit-sil -enable-builtin-module -verify %s
 
+// Under opaque values AddressLowering runs before EmitDFDiagnostics, so the
+// diagnostic below inspects the address form of these builtins rather than the
+// value form SILGen emitted. The diagnostics must come out the same either way.
+// RUN: %target-swift-frontend -emit-sil -enable-builtin-module -verify -enable-sil-opaque-values %s
+
 import Builtin
 
 struct MyInt {

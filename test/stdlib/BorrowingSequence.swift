@@ -606,8 +606,6 @@ suite.test("ThrowingIterable/exact-limit-no-throw")
 }
 #endif
 
-#if false // error: lifetime-dependent variable '$generator' escapes its scope
-
 // MARK: - for-in loop tests
 
 suite.test("ForIn/basic-span")
@@ -858,8 +856,6 @@ suite.test("ForTryIn/rethrow")
     expectTrue(false)
   }
 }
-
-#endif
 
 // MARK: - Helpers
 

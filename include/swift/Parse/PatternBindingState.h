@@ -117,6 +117,7 @@ struct PatternBindingState {
     case Kind::InInOut:
       return VarDecl::Introducer::InOut;
     }
+    llvm_unreachable("covered switch");
   }
 
   PatternBindingState

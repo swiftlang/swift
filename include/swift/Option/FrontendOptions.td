@@ -286,10 +286,6 @@ def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
-def swift_module_file: Joined<["-"], "swift-module-file=">,
-  MetaVarName<"<name>=<path>">,
-  HelpText<"Specify Swift module input explicitly built from textual interface">;
-
 def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
   MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
   HelpText<"Specify the cross import module">;
@@ -308,6 +304,7 @@ def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -636,6 +633,11 @@ def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
   DebugCrashOpt, Flags<[HelpHidden]>,
   HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
 
+def debug_duplicate_closure_discriminators
+  : Flag<["-"], "debug-duplicate-closure-discriminators">,
+    Flags<[HelpHidden]>,
+    HelpText<"Assign all closures the same discriminator">;
+
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
 
@@ -785,13 +787,6 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
-def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
-  HelpText<"Dump abstract layout information for Clang-backed types">;
-
-def dump_hidden_type_layouts : Flag<["-"], "dump-hidden-type-layouts">,
-  HelpText<"Dump every hidden-type layout known to this compilation, "
-           "including those deserialized from imported swiftmodules">;
-
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -815,9 +810,6 @@ def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
 
 def version_independent_apinotes : Flag<["-"], "version-independent-apinotes">,
   HelpText<"Input clang modules carry all versioned APINotes">;
-
-def disable_sil_ownership_verifier : Flag<["-"], "disable-sil-ownership-verifier">,
-  HelpText<"Do not verify ownership invariants during SIL Verification ">;
 
 def suppress_static_exclusivity_swap : Flag<["-"], "suppress-static-exclusivity-swap">,
   HelpText<"Suppress static violations of exclusive access with swap()">;
@@ -1057,6 +1049,18 @@ def solver_enable_promote_supertypes : Flag<["-"], "solver-enable-promote-supert
 def solver_disable_promote_supertypes : Flag<["-"], "solver-disable-promote-supertypes">,
   HelpText<"Disable an experimental optimization which will be on by default at some point">;
 
+def solver_enable_short_conversions : Flag<["-"], "solver-enable-short-conversions">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_short_conversions : Flag<["-"], "solver-disable-short-conversions">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
+def solver_enable_extreme_edge_contraction : Flag<["-"], "solver-enable-extreme-edge-contraction">,
+  HelpText<"Enable an experimental optimization which will be on by default at some point">;
+
+def solver_disable_extreme_edge_contraction : Flag<["-"], "solver-disable-extreme-edge-contraction">,
+  HelpText<"Disable an experimental optimization which will be on by default at some point">;
+
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
@@ -1168,9 +1172,6 @@ def sil_verify_all : Flag<["-"], "sil-verify-all">,
 
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
-
-def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
-  HelpText<"Verify ownership after each transform">;
 
 def sil_region_isolation_assert_on_unknown_pattern :
   Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
@@ -1359,6 +1360,11 @@ def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">
 def type_info_dump_filter_EQ : Joined<["-"], "type-info-dump-filter=">,
   Flags<[FrontendOption]>,
   HelpText<"One of 'all', 'resilient' or 'fragile'">;
+
+def dump_abstract_type_layout_info_EQ :
+  Joined<["-"], "dump-abstract-type-layout-info=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Dump the selected compiler-facing layout information for serialized and recovered hidden types; one of 'sil-type', 'type-lowering', 'type-info', or 'all'">;
 
 def swift_async_frame_pointer_EQ : Joined<["-"], "swift-async-frame-pointer=">,
   Flags<[FrontendOption]>,
@@ -1686,18 +1692,22 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
   HelpText<"Cache Key for bridging header pch">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
+} // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
 def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
   HelpText<"Read the input files from disk and overlay them on the CAS file "
@@ -1735,12 +1745,6 @@ def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
 def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
   HelpText<"Write generated output from scanner for debugging purpose">,
   Flags<[HelpHidden]>;
-
-def enable_address_dependencies : Flag<["-"], "enable-address-dependencies">,
-  HelpText<"Enable enforcement of lifetime dependencies on addressable values.">;
-
-def disable_address_dependencies : Flag<["-"], "disable-address-dependencies">,
-  HelpText<"Disable enforcement of lifetime dependencies on addressable values.">;
 
 def gen_reproducer : Flag<["-"], "gen-reproducer">,
                      HelpText<"Generate a reproducer for current compilation.">;

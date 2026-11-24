@@ -52,10 +52,6 @@ Create a new range using the half-open range operator (`..<`).
 - ``Swift/Range/encode(to:)``
 - ``Swift/Range/init(from:)``
 
-### Destructuring a Range
-
-- ``destructure``
-
 ### Infrequently Used Functionality
 
 - ``Swift/Range/init(uncheckedBounds:)``

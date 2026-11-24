@@ -251,7 +251,7 @@ bool ProtocolConformance::isRetroactive() const {
   }
 
   auto conformingTypeDecl =
-      ConformingType->getNominalOrBoundGenericNominal();
+      ConformingType->getNominalDecl();
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
     if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
@@ -439,10 +439,8 @@ NormalProtocolConformance::getRequiredCodeGenerationModel() const {
 
   // A conformance in a generic context must be @export(implementation) in
   // Embedded Swift.
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (!sig->areAllParamsConcrete() && isEmbedded)
-      return CodeGenerationModel::Implementation;
-  }
+  if (isEmbedded && isEffectivelyGeneric())
+    return CodeGenerationModel::Implementation;
 
   // Synthesized conformances are always @export(implementation).
   if (isSynthesized())
@@ -469,6 +467,10 @@ NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
   return getDeclContext()->getParentModule()->codeGenerationModel();
 }
 
+bool NormalProtocolConformance::isEffectivelyGeneric() const {
+  return getDeclContext()->isEffectivelyGenericContext();
+}
+
 bool NormalProtocolConformance::isConformanceOfProtocol() const {
   return getDeclContext()->getSelfProtocolDecl() != nullptr;
 }
@@ -483,6 +485,27 @@ bool NormalProtocolConformance::isResilient() const {
     return false;
 
   return getDeclContext()->getParentModule()->isResilient();
+}
+
+bool NormalProtocolConformance::isOriginallyInSameModuleAsProtocol() const {
+  auto *nominal = getDeclContext()->getSelfNominalTypeDecl();
+  auto *protocol = getProtocol();
+  auto *conformanceModule = getDeclContext()->getParentModule();
+
+  StringRef nominalMovedFrom = nominal->getAlternateModuleName();
+  StringRef protocolMovedFrom = protocol->getAlternateModuleName();
+
+  // If neither was moved with @_originallyDefinedIn, compare their current
+  // modules directly and skip the string comparison.
+  if (nominalMovedFrom.empty() && protocolMovedFrom.empty())
+    return conformanceModule == protocol->getParentModule();
+
+  auto originalModule = [](StringRef movedFrom,
+                           ModuleDecl *currentModule) -> StringRef {
+    return movedFrom.empty() ? currentModule->getName().str() : movedFrom;
+  };
+  return originalModule(nominalMovedFrom, conformanceModule) ==
+         originalModule(protocolMovedFrom, protocol->getParentModule());
 }
 
 std::optional<ArrayRef<Requirement>>
@@ -1174,6 +1197,17 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
     auto kind = cast<BuiltinProtocolConformance>(this)
         ->getBuiltinConformanceKind();
 
+    // A missing conformance on a generic parameter might be satisfied by a
+    // more-concrete replacement. Ask the substitution for it.
+    if (kind == BuiltinConformanceKind::Missing &&
+        (origType->isTypeParameter() || origType->is<ArchetypeType>()) &&
+        !substType->isTypeParameter() &&
+        !substType->isTypeVariableOrMember()) {
+      if (auto found = IFS.lookupConformance(origType, getProtocol(),
+                                             /*level=*/0))
+        return found;
+    }
+
     auto *concrete = substType->getASTContext()
         .getBuiltinConformance(substType, getProtocol(), kind);
     return ProtocolConformanceRef(concrete);
@@ -1283,10 +1317,10 @@ void NominalTypeDecl::prepareConformanceTable() const {
     inverses.insert(InvertibleProtocolKind::Escapable);
 
   bool hasSuppressedConformances = false;
+  auto *classDecl = dyn_cast<ClassDecl>(this);
   for (auto ip : InvertibleProtocolSet::allKnown()) {
     if (!inverses.contains(ip) ||
-        (isa<ClassDecl>(this) &&
-         !ctx.LangOpts.hasFeature(Feature::MoveOnlyClasses))) {
+        (classDecl && !classDecl->canSuppressInvertible(ip))) {
       addSynthesized(ctx.getProtocol(getKnownProtocolKind(ip)));
     } else {
       hasSuppressedConformances = true;
@@ -1529,6 +1563,11 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
       trySynthesize(getKnownProtocolKind(ip));
 
     trySynthesize(KnownProtocolKind::BitwiseCopyable);
+
+    if (nominal->getASTContext().LangOpts.EnableCOMInterop)
+      if (auto *classDecl = dyn_cast<ClassDecl>(nominal))
+        if (classDecl->isCOMImplementation())
+          trySynthesize(KnownProtocolKind::ISwiftObject);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those
@@ -1652,6 +1691,7 @@ IterableDeclContext::getLocalConformances(ConformanceLookupKind lookupKind)
          case ConformanceLookupKind::NonStructural:
            return true;
          }
+         llvm_unreachable("covered switch");
       });
 
   // If we want to add structural conformances, do so now.

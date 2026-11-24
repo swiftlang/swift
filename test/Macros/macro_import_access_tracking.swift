@@ -90,6 +90,43 @@
 // RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
 // RUN:   -I %t %t/Client_MemberAttribute.swift
 
+// RUN: %target-swift-frontend -typecheck -verify -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnExtension.swift
+
+// RUN: %target-swift-frontend -typecheck -verify -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnEnum.swift
+
+// As for Client_InternalIsTooLow: the error is matched by an expansion block;
+// -verify-ignore-unrelated drops MacroLib interface noise.
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnExtension_InternalIsTooLow.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnEnum_InternalIsTooLow.swift
+// RUN: %target-swift-frontend -typecheck -verify -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnStruct.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnStruct_InternalIsTooLow.swift
+// RUN: %target-swift-frontend -typecheck -verify -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnClass.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -package-name pkg \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault \
+// RUN:   -load-plugin-library %t/%target-library-name(MacroDefinition) \
+// RUN:   -I %t %t/Client_NamedMemberOnClass_InternalIsTooLow.swift
+
 //--- MacroLib.swift
 public struct Helper {
   public init() {}
@@ -102,6 +139,11 @@ public macro PeerThatEmitsCode(_ codeString: String) =
 
 @attached(member, names: arbitrary)
 public macro MemberThatEmitsCode(_ codeString: String) =
+  #externalMacro(module: "MacroDefinition", type: "MemberThatEmitsCodeMacro")
+
+// Same emitter with declared names, so only lookups of those names expand it.
+@attached(member, names: named(helper))
+public macro NamedMemberThatEmitsCode(_ codeString: String) =
   #externalMacro(module: "MacroDefinition", type: "MemberThatEmitsCodeMacro")
 
 @attached(extension, names: arbitrary)
@@ -251,3 +293,99 @@ package import MacroLib // expected-no-diagnostics
 package class MemberAttributeService {
   package func doThing() {}
 }
+
+//--- Client_NamedMemberOnExtension.swift
+// Member macro with declared names on an extension adds a package member typed from MacroLib.
+package import MacroLib // expected-no-diagnostics
+
+package struct NamedMemberOnExtensionService {}
+
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+extension NamedMemberOnExtensionService {}
+
+//--- Client_NamedMemberOnEnum.swift
+// Same as Client_NamedMemberOnExtension, attached to an enum.
+package import MacroLib // expected-no-diagnostics
+
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package enum NamedMemberOnEnumService {
+  case a
+}
+
+//--- Client_NamedMemberOnExtension_InternalIsTooLow.swift
+// Negative guard: members a member macro adds to an extension are access-checked.
+internal import MacroLib // expected-note {{struct 'Helper' imported as 'internal' from 'MacroLib' here}}
+
+package struct NamedMemberInternalIsTooLowService {}
+
+// expected-note@+1 2 {{in expansion of macro 'NamedMemberThatEmitsCode' on extension of struct 'NamedMemberInternalIsTooLowService' here}}
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+extension NamedMemberInternalIsTooLowService {}
+/*
+expected-expansion@-2:47 {{
+  expected-error@1:13{{property cannot be declared package because its type uses an internal type}}
+  expected-note@1:13{{struct 'Helper' is imported by this file as 'internal' from 'MacroLib'}}
+}}
+*/
+
+//--- Client_NamedMemberOnEnum_InternalIsTooLow.swift
+// Same as Client_NamedMemberOnExtension_InternalIsTooLow, attached to an enum.
+internal import MacroLib // expected-note {{struct 'Helper' imported as 'internal' from 'MacroLib' here}}
+
+// expected-note@+1 2 {{in expansion of macro 'NamedMemberThatEmitsCode' on enum 'NamedMemberOnEnumInternalIsTooLowService' here}}
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package enum NamedMemberOnEnumInternalIsTooLowService {
+  case a
+}
+/*
+expected-expansion@-2:1 {{
+  expected-error@1:13{{property cannot be declared package because its type uses an internal type}}
+  expected-note@1:13{{struct 'Helper' is imported by this file as 'internal' from 'MacroLib'}}
+}}
+*/
+
+//--- Client_NamedMemberOnStruct.swift
+// Same as Client_NamedMemberOnExtension, attached to a struct.
+package import MacroLib // expected-no-diagnostics
+
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package struct NamedMemberOnStructService {
+}
+
+//--- Client_NamedMemberOnStruct_InternalIsTooLow.swift
+// Same as Client_NamedMemberOnExtension_InternalIsTooLow, attached to a struct.
+internal import MacroLib // expected-note {{struct 'Helper' imported as 'internal' from 'MacroLib' here}}
+
+// expected-note@+1 2 {{in expansion of macro 'NamedMemberThatEmitsCode' on struct 'NamedMemberOnStructInternalIsTooLowService' here}}
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package struct NamedMemberOnStructInternalIsTooLowService {
+}
+/*
+expected-expansion@-2:1 {{
+  expected-error@1:13{{property cannot be declared package because its type uses an internal type}}
+  expected-note@1:13{{struct 'Helper' is imported by this file as 'internal' from 'MacroLib'}}
+}}
+*/
+
+//--- Client_NamedMemberOnClass.swift
+// Same as Client_NamedMemberOnExtension, attached to a class.
+package import MacroLib // expected-no-diagnostics
+
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package class NamedMemberOnClassService {
+}
+
+//--- Client_NamedMemberOnClass_InternalIsTooLow.swift
+// Same as Client_NamedMemberOnExtension_InternalIsTooLow, attached to a class.
+internal import MacroLib // expected-note {{struct 'Helper' imported as 'internal' from 'MacroLib' here}}
+
+// expected-note@+1 2 {{in expansion of macro 'NamedMemberThatEmitsCode' on class 'NamedMemberOnClassInternalIsTooLowService' here}}
+@NamedMemberThatEmitsCode("package var helper: Helper { Helper() }")
+package class NamedMemberOnClassInternalIsTooLowService {
+}
+/*
+expected-expansion@-2:1 {{
+  expected-error@1:13{{property cannot be declared package because its type uses an internal type}}
+  expected-note@1:13{{struct 'Helper' is imported by this file as 'internal' from 'MacroLib'}}
+}}
+*/

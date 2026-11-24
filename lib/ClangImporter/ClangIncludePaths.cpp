@@ -21,16 +21,17 @@
 #include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Options/Options.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/WindowsDriver/MSVCPaths.h"
 
 using namespace swift;
 
 using Path = SmallString<128>;
 
-static std::optional<Path> getActualModuleMapPath(
-    StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
-    const llvm::Triple &triple, bool isArchSpecific,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
+static std::optional<Path>
+getActualModuleMapPath(StringRef name, SearchPathOptions &Opts,
+                       const LangOptions &LangOpts, const llvm::Triple &triple,
+                       bool isArchSpecific, llvm::vfs::FileSystem &vfs) {
   StringRef platform;
   if (swift::tripleIsMacCatalystEnvironment(triple))
     platform = "macosx";
@@ -55,8 +56,14 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
-      return result;
+    if (vfs.exists(result)) {
+      // A relative -resource-dir produces a relative path here, but the VFS
+      // overlay requires an absolute path for the file it redirects to.
+      // Only use this candidate if it can be resolved against the VFS's cwd.
+      std::error_code EC = vfs.makeAbsolute(result);
+      if (!EC)
+        return result;
+    }
   }
 
   StringRef SDKPath = Opts.getSDKPath();
@@ -72,8 +79,14 @@ static std::optional<Path> getActualModuleMapPath(
     // Only specify the module map if that file actually exists.  It may not;
     // for example in the case that `swiftc -target x86_64-unknown-linux-gnu
     // -emit-ir` is invoked using a Swift compiler not built for Linux targets.
-    if (vfs->exists(result))
-      return result;
+    if (vfs.exists(result)) {
+      // The SDK fallback can also be relative when -sdk is relative. Resolve
+      // it against the VFS's cwd to obtain an absolute redirect target, and
+      // only use it if that succeeds.
+      std::error_code EC = vfs.makeAbsolute(result);
+      if (!EC)
+        return result;
+    }
   }
 
   return std::nullopt;
@@ -102,16 +115,14 @@ static std::optional<Path> getLibStdCxxModuleMapPath(
     const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   return getActualModuleMapPath("libstdcxx.modulemap", opts, langOpts, triple,
-                                /*isArchSpecific*/ false, vfs);
+                                /*isArchSpecific*/ false, *vfs);
 }
 
-std::optional<SmallString<128>>
-swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
-                               const LangOptions &langOpts,
-                               const llvm::Triple &triple) {
+std::optional<SmallString<128>> swift::getCxxShimModuleMapPath(
+    SearchPathOptions &opts, const LangOptions &langOpts,
+    const llvm::Triple &triple, llvm::vfs::FileSystem &vfs) {
   return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
-                                /*isArchSpecific*/ false,
-                                llvm::vfs::createPhysicalFileSystem());
+                                /*isArchSpecific*/ false, vfs);
 }
 
 static llvm::opt::InputArgList
@@ -145,7 +156,7 @@ ClangImporter::createClangDriver(
 /// finding the include path for a specific library among a list of include
 /// paths.
 ///
-/// \return a path without dots (`../`, './').
+/// \return an absolute path without dots (`../`, './').
 static std::optional<Path> findFirstIncludeDir(
     const llvm::opt::InputArgList &args,
     const ArrayRef<const char *> expectedFileNames,
@@ -171,6 +182,10 @@ static std::optional<Path> findFirstIncludeDir(
     }
 
     if (allExpectedExist) {
+      // A relative SDK can produce relative include directories. The injected
+      // module map's virtual path must be absolute in the VFS overlay.
+      if (vfs->makeAbsolute(dir))
+        continue;
       // VFS does not allow mapping paths that contain `../` or `./`.
       llvm::sys::path::remove_dots(dir, /*remove_dot_dot=*/true);
       return dir;
@@ -224,9 +239,14 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList includeArgStrings;
-  const auto &clangToolchain = clangDriver.getToolChain(
-      clangDriverArgs, llvm::Triple(triple.normalize()));
-  clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs, includeArgStrings);
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    const auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(triple.normalize()));
+    clangToolchain.AddClangSystemIncludeArgs(clangDriverArgs,
+                                             includeArgStrings);
+  }
   auto parsedIncludeArgs = parseClangDriverArgs(clangDriver, includeArgStrings);
 
   // Find the include path that contains libc headers. We use three arbitrarily
@@ -246,7 +266,7 @@ getLibcFileMapping(const ASTContext &ctx, StringRef modulemapFileName,
   Path actualModuleMapPath;
   if (auto path = getActualModuleMapPath(modulemapFileName, ctx.SearchPathOpts,
                                          ctx.LangOpts, triple,
-                                         /*isArchSpecific*/ true, vfs))
+                                         /*isArchSpecific*/ true, *vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
@@ -304,10 +324,14 @@ static void getLibStdCxxFileMapping(
       ctx.ClangImporterOpts, ctx.SearchPathOpts, clangDriver);
 
   llvm::opt::ArgStringList stdlibArgStrings;
-  const auto &clangToolchain = clangDriver.getToolChain(
-      clangDriverArgs, llvm::Triple(triple.normalize()));
-  clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
-                                              stdlibArgStrings);
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    const auto &clangToolchain = clangDriver.getToolChain(
+        clangDriverArgs, llvm::Triple(triple.normalize()));
+    clangToolchain.AddClangCXXStdlibIncludeArgs(clangDriverArgs,
+                                                stdlibArgStrings);
+  }
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
 
   // If we were explicitly asked to not bring in the C++ stdlib, bail.
@@ -506,8 +530,7 @@ std::string GetPlatformAuxiliaryFile(StringRef Platform, StringRef File,
 
 void GetWindowsFileMappings(
     ClangInvocationFileMapping &fileMapping, const ASTContext &Context,
-    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS,
-    bool &requiresBuiltinHeadersInSystemModules) {
+    const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &driverVFS) {
   const llvm::Triple &Triple = Context.LangOpts.Target;
   const SearchPathOptions &SearchPathOpts = Context.SearchPathOpts;
   std::string AuxiliaryFile;
@@ -520,9 +543,13 @@ void GetWindowsFileMappings(
                                        Context.ClangImporterOpts, driverVFS);
   const llvm::opt::InputArgList Args = ClangImporter::createClangArgs(
       Context.ClangImporterOpts, Context.SearchPathOpts, Driver);
-  const clang::driver::ToolChain &ToolChain =
-      Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
-  llvm::vfs::FileSystem &VFS = ToolChain.getVFS();
+  const clang::driver::ToolChain *ToolChain = nullptr;
+  {
+    // The Clang driver is not sandboxed, as in clang.
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    ToolChain = &Driver.getToolChain(Args, llvm::Triple(Triple.normalize()));
+  }
+  llvm::vfs::FileSystem &VFS = ToolChain->getVFS();
 
   struct {
     std::string Path;
@@ -537,34 +564,56 @@ void GetWindowsFileMappings(
                              WindowsSDK.LibraryVersion)) {
     assert(WindowsSDK.MajorVersion > 8);
     llvm::SmallString<261> WinSDKInjection{WindowsSDK.Path};
-    llvm::sys::path::append(WinSDKInjection, "Include");
-    llvm::sys::path::append(WinSDKInjection, WindowsSDK.IncludeVersion, "um");
-    llvm::sys::path::append(WinSDKInjection, "module.modulemap");
+    llvm::sys::path::append(WinSDKInjection, "Include",
+                            WindowsSDK.IncludeVersion);
 
-    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk_um.modulemap",
+    llvm::SmallString<261> path{WinSDKInjection};
+
+    llvm::sys::path::append(path, "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winsdk.modulemap",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "WinSDK.apinotes");
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "um.modulemap");
+
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "um.modulemap", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "WinSDK.apinotes");
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "WinSDK.apinotes",
                                              VFS, SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
 
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::remove_filename(WinSDKInjection);
-    llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
-    AuxiliaryFile = GetPlatformAuxiliaryFile(
-        "windows", "winsdk_shared.modulemap", VFS, SearchPathOpts);
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "shared.modulemap");
+    AuxiliaryFile =
+        GetPlatformAuxiliaryFile("windows", "shared.modulemap", VFS,
+                                 SearchPathOpts);
     if (!AuxiliaryFile.empty())
-      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
-                                               AuxiliaryFile);
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "module.modulemap");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "winrt.modulemap", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
+
+    path.assign(WinSDKInjection);
+    llvm::sys::path::append(path, "winrt", "SwiftWinRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftWinRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(path.str(), AuxiliaryFile);
   }
 
+  llvm::SmallString<261> UCRTInclude;
   struct {
     std::string Path;
     std::string Version;
@@ -578,24 +627,22 @@ void GetWindowsFileMappings(
 
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "ucrt.modulemap", VFS,
                                              SearchPathOpts);
-    if (!AuxiliaryFile.empty()) {
-      // The ucrt module map has the C standard library headers all together.
-      // That leads to module cycles with the clang _Builtin_ modules. e.g.
-      // <fenv.h> on ucrt includes <float.h>. The clang builtin <float.h>
-      // include-nexts <float.h>. When both of those UCRT headers are in the
-      // ucrt module, there's a module cycle ucrt -> _Builtin_float -> ucrt
-      // (i.e. fenv.h (ucrt) -> float.h (builtin) -> float.h (ucrt)). Until the
-      // ucrt module map is updated, the builtin headers need to join the system
-      // modules. i.e. when the builtin float.h is in the ucrt module too, the
-      // cycle goes away. Note that -fbuiltin-headers-in-system-modules does
-      // nothing to fix the same problem with C++ headers, and is generally
-      // fragile.
+    if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(UCRTInjection),
                                                AuxiliaryFile);
-      requiresBuiltinHeadersInSystemModules = true;
-    }
+
+    UCRTInclude.assign(UCRTInjection);
+    llvm::sys::path::remove_filename(UCRTInclude);
+    llvm::SmallString<261> SwiftUCRT{UCRTInclude};
+    llvm::sys::path::append(SwiftUCRT, "SwiftUCRT.h");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "SwiftUCRT.h", VFS,
+                                             SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(SwiftUCRT),
+                                               AuxiliaryFile);
   }
 
+  llvm::SmallString<261> VCToolsInclude;
   struct {
     std::string Path;
     llvm::ToolsetLayout Layout;
@@ -604,15 +651,25 @@ void GetWindowsFileMappings(
                                           SearchPathOpts.getVCToolsVersion(),
                                           {}, VCTools.Path, VCTools.Layout) ||
       llvm::findVCToolChainViaEnvironment(VFS, VCTools.Path, VCTools.Layout) ||
-      llvm::findVCToolChainViaSetupConfig(VFS,
-                                          SearchPathOpts.getVCToolsVersion(),
-                                          VCTools.Path, VCTools.Layout)) {
+      [&] {
+        // FIXME: The Visual Studio installation should be discovered once by
+        // the dependency scanner and passed to the compilation with
+        // -visualc-tools-root and -visualc-tools-version, instead of being
+        // searched for by every compilation.
+        // Like the Clang driver, which is not sandboxed, this reads the
+        // default tools version of the Visual Studio installation from disk.
+        auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+        return llvm::findVCToolChainViaSetupConfig(
+            VFS, SearchPathOpts.getVCToolsVersion(), VCTools.Path,
+            VCTools.Layout);
+      }()) {
     assert(VCTools.Layout == llvm::ToolsetLayout::VS2017OrNewer &&
            "unsupported toolset layout (VS2017+ required)");
 
-    llvm::SmallString<261> VCToolsInjection{VCTools.Path};
-    llvm::sys::path::append(VCToolsInjection, "include");
+    VCToolsInclude.assign(VCTools.Path);
+    llvm::sys::path::append(VCToolsInclude, "include");
 
+    llvm::SmallString<261> VCToolsInjection{VCToolsInclude};
     llvm::sys::path::append(VCToolsInjection, "module.modulemap");
     AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "vcruntime.modulemap",
                                              VFS, SearchPathOpts);
@@ -627,46 +684,51 @@ void GetWindowsFileMappings(
     if (!AuxiliaryFile.empty())
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
+  }
 
-    // Because we wish to be backwards compatible with older Visual Studio
-    // releases, we inject empty headers which allow us to have definitions for
-    // modules referencing headers which may not exist. We stub out the headers
-    // with empty files to allow a single module definition to work across
-    // different MSVC STL releases.
-    //
-    // Each entry is annotated with the STL release that introduced the header.
-    // Once we no longer support Visual Studio releases older than a given
-    // release, the corresponding entries can be removed from this list.
-    static const char * const kInjectedHeaders[] = {
-      "__msvc_bit_utils.hpp",                    // VS 2022 17.8
-      "__msvc_chrono.hpp",                       // VS 2022 17.3
-      "__msvc_cxx_stdatomic.hpp",                // VS 2022 17.5
-      "__msvc_filebuf.hpp",                      // VS 2022 17.7
-      "__msvc_format_ucd_tables.hpp",            // VS 2022 17.3
-      "__msvc_formatter.hpp",                    // VS 2022 17.10
-      "__msvc_heap_algorithms.hpp",              // VS 2022 17.12
-      "__msvc_int128.hpp",                       // VS 2022 17.2
-      "__msvc_iter_core.hpp",                    // VS 2022 17.4
-      "__msvc_minmax.hpp",                       // VS 2022 17.10
-      "__msvc_ostream.hpp",                      // VS 2022 17.13
-      "__msvc_print.hpp",                        // VS 2022 17.7
-      "__msvc_ranges_to.hpp",                    // VS 2022 17.12
-      "__msvc_ranges_tuple_formatter.hpp",       // VS 2022 17.13
-      "__msvc_sanitizer_annotate_container.hpp", // VS 2022 17.6
-      "__msvc_string_view.hpp",                  // VS 2022 17.11
-      "__msvc_system_error_abi.hpp",             // VS 2019 16.6
-      "__msvc_threads_core.hpp",                 // VS 2022 17.11
-      "__msvc_tzdb.hpp",                         // VS 2019 16.10
-      "__msvc_xlocinfo_types.hpp",               // VS 2022 17.0
-    };
+  // Inject empty headers for APIs introduced after the oldest supported SDK
+  // and toolset releases, allowing one module definition to cover all of them.
+  // Once an older release is no longer supported, its entries can be removed.
+  enum class HeaderRoot { UCRT, VCTools };
+  static constexpr struct {
+    HeaderRoot Root;
+    StringLiteral Header;
+  } kInjectedHeaders[] = {
+      {HeaderRoot::UCRT, "stdalign.h"},                                 // Windows SDK 10.0.20348
+      {HeaderRoot::UCRT, "stdnoreturn.h"},                              // Windows SDK 10.0.20348
+      {HeaderRoot::VCTools, "__msvc_bit_utils.hpp"},                    // VS 2022 17.8
+      {HeaderRoot::VCTools, "__msvc_chrono.hpp"},                       // VS 2022 17.3
+      {HeaderRoot::VCTools, "__msvc_cxx_stdatomic.hpp"},                // VS 2022 17.5
+      {HeaderRoot::VCTools, "__msvc_filebuf.hpp"},                      // VS 2022 17.7
+      {HeaderRoot::VCTools, "__msvc_format_ucd_tables.hpp"},            // VS 2022 17.3
+      {HeaderRoot::VCTools, "__msvc_formatter.hpp"},                    // VS 2022 17.10
+      {HeaderRoot::VCTools, "__msvc_heap_algorithms.hpp"},              // VS 2022 17.12
+      {HeaderRoot::VCTools, "__msvc_int128.hpp"},                       // VS 2022 17.2
+      {HeaderRoot::VCTools, "__msvc_iter_core.hpp"},                    // VS 2022 17.4
+      {HeaderRoot::VCTools, "__msvc_minmax.hpp"},                       // VS 2022 17.10
+      {HeaderRoot::VCTools, "__msvc_ostream.hpp"},                      // VS 2022 17.13
+      {HeaderRoot::VCTools, "__msvc_print.hpp"},                        // VS 2022 17.7
+      {HeaderRoot::VCTools, "__msvc_ranges_to.hpp"},                    // VS 2022 17.12
+      {HeaderRoot::VCTools, "__msvc_ranges_tuple_formatter.hpp"},       // VS 2022 17.13
+      {HeaderRoot::VCTools, "__msvc_sanitizer_annotate_container.hpp"}, // VS 2022 17.6
+      {HeaderRoot::VCTools, "__msvc_string_view.hpp"},                  // VS 2022 17.11
+      {HeaderRoot::VCTools, "__msvc_system_error_abi.hpp"},             // VS 2019 16.6
+      {HeaderRoot::VCTools, "__msvc_threads_core.hpp"},                 // VS 2022 17.11
+      {HeaderRoot::VCTools, "__msvc_tzdb.hpp"},                         // VS 2019 16.10
+      {HeaderRoot::VCTools, "__msvc_xlocinfo_types.hpp"},               // VS 2022 17.0
+  };
 
-    for (const char * const header : kInjectedHeaders) {
-      llvm::sys::path::remove_filename(VCToolsInjection);
-      llvm::sys::path::append(VCToolsInjection, header);
-      if (!VFS.exists(VCToolsInjection))
-        fileMapping.overridenFiles.emplace_back(
-            llvm::MemoryBuffer::getMemBufferCopy("", VCToolsInjection));
-    }
+  for (const auto &[Root, Header] : kInjectedHeaders) {
+    StringRef IncludeRoot =
+        Root == HeaderRoot::UCRT ? UCRTInclude : VCToolsInclude;
+    if (IncludeRoot.empty())
+      continue;
+
+    llvm::SmallString<261> InjectedHeader{IncludeRoot};
+    llvm::sys::path::append(InjectedHeader, Header);
+    if (!VFS.exists(InjectedHeader))
+      fileMapping.overridenFiles.emplace_back(
+          llvm::MemoryBuffer::getMemBufferCopy("", InjectedHeader));
   }
 }
 } // namespace
@@ -746,8 +808,7 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
   if (ctx.LangOpts.EnableCXXInterop)
     getLibStdCxxFileMapping(result, ctx, vfs, suppressDiagnostic);
 
-  GetWindowsFileMappings(result, ctx, vfs,
-                         result.requiresBuiltinHeadersInSystemModules);
+  GetWindowsFileMappings(result, ctx, vfs);
 
   // push the redirect files into a YAML vfs overlay file.
   if (!result.redirectedFiles.empty()) {

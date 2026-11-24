@@ -53,6 +53,18 @@ RefCountingMethodsTestSuite.test("CRTP") {
   expectTrue(a.refCount < 10) // optimizations would affect the exact number
 }
 
+@inline(never)
+func makeAndDropCRTPDeleting() -> Int32 {
+  let a = CRTPDeletingDerived.create(123)!
+  return a.value
+}
+
+RefCountingMethodsTestSuite.test("CRTP release deletes the object") {
+  expectEqual(CRTPDeletingDerived.getDeleteCount(), 0)
+  expectEqual(makeAndDropCRTPDeleting(), 123)
+  expectEqual(CRTPDeletingDerived.getDeleteCount(), 1)
+}
+
 RefCountingMethodsTestSuite.test("virtual retain/release") {
   let a = VirtualRetainRelease(456)
   expectEqual(a.value, 456)

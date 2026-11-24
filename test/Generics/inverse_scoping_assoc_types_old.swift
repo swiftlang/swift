@@ -17,15 +17,15 @@ protocol Q<Primary>: ~Copyable {
 }
 
 extension Q {
-  func testCopyability(_ a: Self.Primary, // expected-error {{parameter of noncopyable type 'Self.Primary}} // expected-note 3{{}}
-                       _ b: Self.Secondary) {} // expected-error {{parameter of noncopyable type 'Self.Secondary}} // expected-note 3{{}}
+  func testCopyability(_ a: Self.Primary, // expected-error {{parameter of non-'Copyable' type 'Self.Primary}} // expected-note 3{{}}
+                       _ b: Self.Secondary) {} // expected-error {{parameter of non-'Copyable' type 'Self.Secondary}} // expected-note 3{{}}
 
   func testCopyability2(_ s: Self) {}
 }
 
 func genericFunc<T: Q>(_ t: T,
-                       _ a: T.Primary, // expected-error {{parameter of noncopyable type 'T.Primary}} // expected-note 3{{}}
-                       _ b: T.Secondary) {} // expected-error {{parameter of noncopyable type 'T.Secondary}} // expected-note 3{{}}
+                       _ a: T.Primary, // expected-error {{parameter of non-'Copyable' type 'T.Primary}} // expected-note 3{{}}
+                       _ b: T.Secondary) {} // expected-error {{parameter of non-'Copyable' type 'T.Secondary}} // expected-note 3{{}}
 
 
 protocol Foo<Inner>: ~Copyable {

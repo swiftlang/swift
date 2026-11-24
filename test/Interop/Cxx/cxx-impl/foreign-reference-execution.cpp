@@ -11,7 +11,7 @@
 // RUN:   -o %t/foreign-reference-execution-main.o
 // RUN: %target-interop-build-swift \
 // RUN:   -enable-experimental-feature CxxImplementation \
-// RUN:   -Xfrontend -disable-availability-checking \
+// RUN:   -target %target-swift-5.8-abi-triple \
 // RUN:   -module-name ForeignReferenceExecutionMain \
 // RUN:   -parse-as-library \
 // RUN:   -I %S/Inputs \
@@ -22,6 +22,7 @@
 // RUN: %target-run %t/foreign-reference-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: stdlib_5_8_runtime
 // REQUIRES: swift_feature_CxxImplementation
 
 #include <stdio.h>
@@ -50,6 +51,16 @@ int main() {
   printf("takesNullableNode=%d %d live=%d\n", takesNullableNodeRes,
          takesNullableNodeRes2, liveNodes);
   // CHECK: takesNullableNode=-1 42 live=0
+
+  // A reference to a pointer: the body reseats the caller's pointer,
+  // retaining the new referent and releasing the old one.
+  Node other{7};
+  Node *slot = &node;
+  reseatNode(slot, &other);
+  int readNodePtrRes = readNodePtr(slot);
+  printf("reseatNode=%d readNodePtr=%d live=%d\n", slot == &other,
+         readNodePtrRes, liveNodes);
+  // CHECK: reseatNode=1 readNodePtr=7 live=0
 
   // A retained result is returned at +1.
   Node *returned = returnsRetainedNode(&node);

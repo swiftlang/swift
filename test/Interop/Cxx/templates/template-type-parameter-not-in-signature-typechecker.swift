@@ -1,10 +1,31 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=default
+// RUN: %target-typecheck-verify-swift -I %S%{fs-sep}Inputs -cxx-interoperability-mode=default -strict-memory-safety -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}template-type-parameter-not-in-signature.h
 
 import TemplateTypeParameterNotInSignature
 
 public func callMemberFunctionTemplates(_ s: Struct) {
   s.templateTypeParamNotUsedInSignature(T: Int.self)
   let _: Int = s.templateTypeParamUsedInReturnType(0)
+}
+
+// The thunk that drops the metatype arguments has the attributes of the
+// specialization it calls.
+public nonisolated func callMemberFunctionTemplatesWithAttributes(
+    _ s: StructWithAttributes
+) {
+  s.templateTypeParamNotUsedInSignatureResult(T: Int.self)
+  s.templateTypeParamNotUsedInSignatureDeprecated(T: Int.self)
+  // expected-warning@-1 {{'templateTypeParamNotUsedInSignatureDeprecated(T:)' is deprecated: use something else}}
+  s.templateTypeParamNotUsedInSignatureUnavailable(T: Int.self)
+  // expected-error@-1 {{'templateTypeParamNotUsedInSignatureUnavailable(T:)' is unavailable: not here}}
+  s.templateTypeParamNotUsedInSignatureUnsafe(T: Int.self)
+  // expected-warning@-1 {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-2 {{reference to unsafe instance method 'templateTypeParamNotUsedInSignatureUnsafe(T:)'}}
+  s.templateTypeParamNotUsedInSignatureMainActor(T: Int.self)
+  // expected-warning@-1 {{call to main actor-isolated instance method 'templateTypeParamNotUsedInSignatureMainActor(T:)' in a synchronous nonisolated context}}
+  // So does the declaration rebuilt for an 'Int' result.
+  let _: Int = s.templateTypeParamUsedInReturnTypeUnsafe(0)
+  // expected-warning@-1 {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-2 {{reference to unsafe instance method 'templateTypeParamUsedInReturnTypeUnsafe'}}
 }
 
 public func callMutableMemberFunctionTemplate(_ s: inout Struct) {
@@ -30,12 +51,11 @@ public func callReferenceParamTemplates() {
   let _ = templateTypeParamNotUsedInSignatureWithRef(&x, U: Int.self)
 }
 
-// FIXME: Function templates with varargs are imported but marked unavailable
-// (see the corresponding -module-interface test), but the availability
-// diagnostic does not seem to fire on this call site.
 public func callVarargsTemplates() {
   templateTypeParamNotUsedInSignatureWithVarargs(T: Int.self, U: Int.self)
+  // expected-error@-1 {{'templateTypeParamNotUsedInSignatureWithVarargs(T:U:_:)' is unavailable: Variadic function is unavailable}}
   templateTypeParamNotUsedInSignatureWithVarargsAndUnrelatedParam(
+  // expected-error@-1 {{'templateTypeParamNotUsedInSignatureWithVarargsAndUnrelatedParam(_:T:U:V:_:)' is unavailable: Variadic function is unavailable}}
     0, T: Int.self, U: Int.self, V: Int.self)
 }
 

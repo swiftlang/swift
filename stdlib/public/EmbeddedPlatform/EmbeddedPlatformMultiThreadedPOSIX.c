@@ -23,6 +23,15 @@
 #include "swift/EmbeddedPlatform.h"
 
 #include <pthread.h>
+#include <stdio.h>
+
+void _swift_lockStandardOutput(void) {
+  flockfile(stdout);
+}
+
+void _swift_unlockStandardOutput(void) {
+  funlockfile(stdout);
+}
 
 static pthread_t swift_embedded_platform_main_thread;
 static pthread_key_t swift_embedded_platform_tls_keys[SWIFT_TLS_KEY_COUNT];

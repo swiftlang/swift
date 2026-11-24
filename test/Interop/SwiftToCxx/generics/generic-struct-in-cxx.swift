@@ -235,10 +235,12 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: static_assert(swift::isUsableInGenericContext<T_0_1>, "type cannot be used in a Swift generic context");
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ~GenericPair() noexcept {
+// CHECK-NEXT:     if (!_storage.isAllocated()) return;
 // CHECK-NEXT:     auto metadata = _impl::$s8Generics11GenericPairVMa(0, swift::TypeMetadataTrait<T_0_0>::getTypeMetadata(), swift::TypeMetadataTrait<T_0_1>::getTypeMetadata());
 
 // CHECK: swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
+// CHECK-NEXT: friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -265,7 +267,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-NEXT: template<class T>
 // CHECK-NEXT: static SWIFT_INLINE_PRIVATE_HELPER GenericPair<T_0_0, T_0_1> returnNewValue(T callable) {
 // CHECK-NEXT:   auto result = GenericPair<T_0_0, T_0_1>::_make();
-// CHECK-NEXT:   callable(result._getOpaquePointer());
+// CHECK-NEXT:   callable(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result));
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }
 

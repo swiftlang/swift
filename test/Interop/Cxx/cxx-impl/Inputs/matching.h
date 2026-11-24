@@ -45,10 +45,4 @@ T templateFunc(T x);
 
 int variadicFunc(int x, ...);
 
-// C++ references
-
-int takesConstRef(const int &x);
-void takesMutableRef(int &x);
-int &returnsMutableRef();
-
 #endif // !TEST_INTEROP_CXX_CXX_IMPL_MATCHING_H

@@ -501,6 +501,19 @@ func testImplicitWrapperWithResilientStruct() {
   // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter38testImplicitWrapperWithResilientStructyyFyAA010ProjectionF0Vy11def_structA1AVGcfu_yAHcfU_6$valueL_AHvpfW : $@convention(thin) (@in ProjectionWrapper<A>) -> @out ProjectionWrapper<A>
 }
 
+// A `$`-prefixed closure parameter is an implicit property wrapper parameter
+// with a same-named synthesized projection variable. A nested closure in the
+// body must not cause the projection's local discriminator to be assigned
+// twice.
+func testImplicitWrapperParamContainingNestedClosure() {
+  let _: (ProjectionWrapper<Int>) -> Void = { $value in
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter47testImplicitWrapperParamContainingNestedClosureyyFyAA010ProjectionF0VySiGcfu_ : $@convention(thin) (ProjectionWrapper<Int>) -> ()
+    _ = $value
+    _ = ({ 0 })()
+    // CHECK-LABEL: sil private [ossa] @$s26property_wrapper_parameter47testImplicitWrapperParamContainingNestedClosureyyFyAA010ProjectionF0VySiGcfu_yAEcfU_SiyXEfU_ : $@convention(thin) () -> Int
+  }
+}
+
 func takesAutoclosure(_: @autoclosure () -> Int) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_parameter12testCaptures3ref5valueySi_AA7WrapperVySiGtF : $@convention(thin) (Int, Wrapper<Int>) -> ()

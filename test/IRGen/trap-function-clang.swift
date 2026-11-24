@@ -14,7 +14,7 @@ import gizmo
 // TRAPFN_OPT: call void @llvm.trap() [[ATTR0:#[0-9]+]]
 
 // NOTRAPFN-LABEL: define hidden swiftcc void @"$s13trap_function18checkClangImporteryyF"
-// NOTRAPFN: call void @llvm.trap(){{$}}
+// NOTRAPFN: call void @llvm.trap()
 func checkClangImporter() {
   ackbar()
 }

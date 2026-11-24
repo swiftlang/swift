@@ -488,7 +488,7 @@ private:
         if (rhsInt == 0)
           return FoldingError(IllegalConstError::DivideByZero, sourceLocation);
         if (isSigned) // Check for overflow
-          auto divResult = lhsInt.sdiv_ov(rhsInt, overflow);
+          (void)lhsInt.sdiv_ov(rhsInt, overflow);
         result = isSigned ? lhsInt.srem(rhsInt) : lhsInt.urem(rhsInt);
       } else
         return FoldingError(IllegalConstError::UnsupportedBinaryOperator,

@@ -44,6 +44,9 @@ extension ApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
 
 extension TryApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if tryRemoveUninhabitedErrorEdge(of: self, context) {
+      return
+    }
     if context.tryDevirtualize(apply: self, isMandatory: false) != nil {
       return
     }
@@ -195,6 +198,38 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
     return true
   }
   return false
+}
+
+/// If the callee cannot construct its error - because the error type is uninhabited - the error
+/// branch of a `try_apply` is dead. This happens when a `throws(E)` function is specialized for
+/// `E == Never`.
+///
+///   try_apply %0() : $@convention(thin) () -> (Int, @error Never), normal bb1, error bb2
+/// ->
+///   %1 = apply [nothrow] %0() : $@convention(thin) () -> (Int, @error Never)
+///   br bb1(%1)
+///
+/// Without this, the rethrow in the error block survives to IRGen, which has to emit it as an
+/// unconditional trap - together with the (equally dead) test of the error result which reaches it.
+private func tryRemoveUninhabitedErrorEdge(of tryApply: TryApplyInst, _ context: SimplifyContext) -> Bool {
+  guard tryApply.functionConvention.hasUninhabitedErrorResult(in: tryApply.parentFunction) else {
+    return false
+  }
+
+  let builder = Builder(before: tryApply, context)
+  let apply = builder.createApply(function: tryApply.callee,
+                                  tryApply.substitutionMap,
+                                  arguments: Array(tryApply.arguments),
+                                  isNonThrowing: true,
+                                  isNonAsync: tryApply.isNonAsync,
+                                  specializationInfo: tryApply.specializationInfo,
+                                  argumentLocationsFrom: tryApply)
+  builder.createBranch(to: tryApply.normalBlock, arguments: [apply])
+  context.erase(instruction: tryApply)
+
+  // The error block is now unreachable and gets removed by the dead-block cleanup of the
+  // simplification pass.
+  return true
 }
 
 // The same as the previous function, just for try_apply instructions.

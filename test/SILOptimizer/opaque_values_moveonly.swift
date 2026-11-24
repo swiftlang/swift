@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -sil-verify-all -emit-sil -verify %s
 
 // Regression test for the following cases:
 
@@ -50,6 +50,41 @@ struct Loaner<T> {
   borrowing func method() -> T { value }
 }
 
+// The projection above must also apply to a `borrowing` non-`Copyable`
+// parameter that a closure captures, which copies the mark.
+
+protocol P: ~Copyable {}
+
+func check(_ x: borrowing any P & ~Copyable) -> Bool { true }
+func checkGeneric<T: ~Copyable>(_ x: borrowing T) -> Bool { true }
+
+func viaClosure(_ c: () -> Bool) -> Bool { c() }
+func viaAutoclosure(_ c: @autoclosure () -> Bool) -> Bool { c() }
+
+func existentialClosure(_ x: borrowing any P & ~Copyable) -> Bool {
+  viaClosure { check(x) }
+}
+
+func existentialAutoclosure(_ x: borrowing any P & ~Copyable) -> Bool {
+  viaAutoclosure(check(x))
+}
+
+func existentialAnd(_ x: borrowing any P & ~Copyable) -> Bool {
+  check(x) && check(x)
+}
+
+func genericClosure<T: ~Copyable>(_ x: borrowing T) -> Bool {
+  viaClosure { checkGeneric(x) }
+}
+
+struct Wrapper<T>: ~Copyable {
+  var value: T
+
+  func selfClosure() -> Bool {
+    viaClosure { checkGeneric(self) }
+  }
+}
+
 // Passing a stored `~Copyable` value as a `borrowing` argument produces, under
 // opaque values, a value-form copy that AddressLowering reifies into
 // `alloc_stack` + `copy_addr [init]` immediately before a
@@ -70,4 +105,54 @@ func borrowMe<T: ~Copyable>(_ n: borrowing T) {}
 
 func caller(_ h: Holder) {
   borrowMe(h.inner)
+}
+
+// A generic `~Copyable` `let` captured by a closure is an object under opaque
+// values. The closure may borrow it but not consume it.
+
+func take<T: ~Copyable>(_ n: consuming T) -> Bool { true }
+
+func readInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {
+  let n: T
+  n = a
+  return { checkGeneric(n) }()
+}
+
+func readInDefer<T: ~Copyable>(_ a: consuming T) {
+  let n: T
+  defer { _ = checkGeneric(n) }
+  n = a
+}
+
+func consumeInAutoclosure<T: ~Copyable>(_ a: consuming T, _ c: Bool) -> Bool {
+  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  n = a
+  return c && take(n) // expected-note {{consumed here}}
+}
+
+func consumeInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {
+  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  n = a
+  return { take(n) }() // expected-note {{consumed here}}
+}
+
+// A captured `var` stays in memory under opaque values and is borrowed and
+// consumed in place.
+
+func run(_ f: () -> ()) { f() }
+
+func borrowVarInClosure<T: ~Copyable>(_ a: consuming T, _ make: () -> T) {
+  var x = a
+  x = make()
+  run { _ = checkGeneric(x) }
+  _ = take(x)
+}
+
+func consumeVarInClosure<T: ~Copyable>(_ a: consuming T, _ make: () -> T) {
+  var x = a
+  run {
+    _ = take(x)
+    x = make()
+  }
+  _ = checkGeneric(x)
 }

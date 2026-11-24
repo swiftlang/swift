@@ -33,15 +33,15 @@ extension CxxRandomAccessCollection {
 
   @inlinable
   public var count: Int {
-    return Int(__endUnsafe() - __beginUnsafe())
+    return unsafe Int(end() - begin())
   }
 
   @inlinable
   @inline(__always)
   internal func _getRawIterator(at index: Int) -> RawIterator {
-    var rawIterator = self.__beginUnsafe()
+    var rawIterator = unsafe self.begin()
     rawIterator += RawIterator.Distance(index)
-    precondition(self.__endUnsafe() - rawIterator > 0,
+    unsafe precondition(self.end() - rawIterator > 0,
         "C++ iterator access out of bounds")
     return rawIterator
   }
@@ -62,10 +62,12 @@ public protocol CxxMutableRandomAccessCollection<Element>:
       where RawMutableIterator.Pointee == Element
 
   /// Do not implement this function manually in Swift.
-  mutating func __beginMutatingUnsafe() -> RawMutableIterator
+  @unsafe(always)
+  mutating func beginMutating() -> RawMutableIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func __endMutatingUnsafe() -> RawMutableIterator
+  @unsafe(always)
+  mutating func endMutating() -> RawMutableIterator
 }
 
 extension CxxMutableRandomAccessCollection {
@@ -77,11 +79,27 @@ extension CxxMutableRandomAccessCollection {
       yield self._getRawIterator(at: index).pointee
     }
     _modify {
-      var rawIterator = self.__beginMutatingUnsafe()
+      var rawIterator = unsafe self.beginMutating()
       rawIterator += RawMutableIterator.Distance(index)
-      precondition(self.__endMutatingUnsafe() - rawIterator > 0,
+      unsafe precondition(self.endMutating() - rawIterator > 0,
           "C++ iterator access out of bounds")
       yield &rawIterator.pointee
     }
+  }
+}
+
+extension CxxMutableRandomAccessCollection {
+  @available(*, deprecated, renamed: "beginMutating()")
+  @unsafe
+  @inlinable
+  public mutating func __beginMutatingUnsafe() -> RawMutableIterator {
+    unsafe beginMutating()
+  }
+
+  @available(*, deprecated, renamed: "endMutating()")
+  @unsafe
+  @inlinable
+  public mutating func __endMutatingUnsafe() -> RawMutableIterator {
+    unsafe endMutating()
   }
 }

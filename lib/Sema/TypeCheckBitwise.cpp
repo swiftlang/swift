@@ -47,6 +47,7 @@ bool isImplicit(BitwiseCopyableCheck check) {
   case BitwiseCopyableCheck::Implicit:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// The implicit check kind appropriate to \p nominal, if any.
@@ -371,6 +372,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
     // Infer conformance for imported foreign modules.
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 NormalProtocolConformance *

@@ -156,3 +156,23 @@ bb0(%0 : $*Builtin.NativeObject, %0a : @owned $Builtin.NativeObject, %0b : $*Bui
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// Check that the destructure_tuple peephole doesn't crash if the tuple
+// contains an empty tuple element, which doesn't have an element operand.
+//
+// CHECK-LABEL: sil [ossa] @tuple_addr_constructor_destructure_empty_elt : $@convention(thin) (Bool, @inout (Bool, ())) -> () {
+// CHECK: bb0({{%.*}} : $Bool, [[DEST:%.*]] : $*(Bool, ())):
+// CHECK: ([[ELT:%.*]], {{%.*}}) = destructure_tuple
+// CHECK: [[ADDR:%.*]] = tuple_element_addr [[DEST]] : $*(Bool, ()), 0
+// CHECK: store [[ELT]] to [trivial] [[ADDR]]
+// CHECK-NOT: tuple_addr_constructor
+// CHECK: } // end sil function 'tuple_addr_constructor_destructure_empty_elt'
+sil [ossa] @tuple_addr_constructor_destructure_empty_elt : $@convention(thin) (Bool, @inout (Bool, ())) -> () {
+bb0(%0 : $Bool, %1 : $*(Bool, ())):
+  %2 = tuple ()
+  %3 = tuple (%0 : $Bool, %2 : $())
+  (%4, %5) = destructure_tuple %3 : $(Bool, ())
+  tuple_addr_constructor [assign] %1 : $*(Bool, ()) with (%4 : $Bool)
+  %9999 = tuple ()
+  return %9999 : $()
+}

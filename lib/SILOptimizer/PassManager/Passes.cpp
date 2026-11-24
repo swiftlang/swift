@@ -47,7 +47,7 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the SILGen passes.
   // TODO: would be nice if we had a "SILGen stage".
-  if (Module.getStage() != SILStage::Raw)
+  if (Module.hasCommittedCanonical())
     return;
 
   // SILGen sets needBreakInfiniteLoops / needCompleteLifetimes on functions
@@ -65,8 +65,10 @@ void swift::runSILGenPasses(SILModule &Module, bool VerifySILGen) {
                           /*isMandatory*/ true);
 
   // Check linear OSSA lifetimes.
-  if (opts.VerifyAll || VerifySILGen)
-    Module.verifyOwnership();
+  if (opts.VerifyAll || VerifySILGen) {
+    SILPassManager pm(&Module, /*isMandatory=*/true, /*IRMod=*/nullptr);
+    pm.runMandatoryModuleVerification();
+  }
 }
 
 bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
@@ -82,7 +84,7 @@ bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
 
   // If we parsed a .sil file that is already in canonical form, don't rerun
   // the diagnostic passes.
-  if (Module.getStage() != SILStage::Raw)
+  if (Module.hasCommittedCanonical())
     return false;
 
   executePassPipelinePlan(&Module,
@@ -94,8 +96,11 @@ bool swift::runSILDiagnosticPasses(SILModule &Module, bool RunSILGenPasses) {
   if (opts.DebugSerialization)
     return Ctx.hadError();
 
-  // Generate diagnostics.
-  Module.setStage(SILStage::Canonical);
+  // Generate diagnostics. Committing the floor also advances every function
+  // that cleared the mandatory pipeline. This is the only commit point in the
+  // mandatory pipeline: the pipeline interleaves module passes, so no earlier
+  // point observes a function having cleared every mandatory pass.
+  Module.commitStage(SILStage::Canonical);
 
   // Verify the module, if required.
   if (opts.VerifyAll)
@@ -244,7 +249,7 @@ void swift::runSILLoweringPasses(SILModule &Module) {
                           SILPassPipelinePlan::getLoweringPassPipeline(opts),
                           /*isMandatory*/ true);
 
-  Module.setStage(SILStage::Lowered);
+  Module.commitStage(SILStage::Lowered);
 }
 
 /// Registered briged pass run functions.

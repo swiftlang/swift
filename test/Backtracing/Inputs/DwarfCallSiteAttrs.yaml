@@ -1,0 +1,118 @@
+## A hand-crafted ELF object holding a DWARF v5 compile unit with inlined
+## subroutines that leave out some of the call site attributes, which is
+## what compilers do for values that are zero -- see DwarfReaderLookups.swift.
+##
+## Layout (DIE offsets are used for DW_AT_abstract_origin):
+##   DIE @ 0x0d: DW_TAG_subprogram "callee"
+##   DIE: DW_TAG_subprogram "outer", [0x1000, 0x1100)
+##     DIE: inlined "callee" [0x1010, 0x1020), call_line 5, no call_column
+##     DIE: inlined "callee" [0x1030, 0x1040), no call_line, no call_column,
+##          no call_file
+##     DIE: inlined "callee" [0x1050, 0x1060), call_line 7 and call_column 9,
+##          both using DW_FORM_implicit_const
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_yes
+          Attributes: []
+        - Code:     0x02
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+        - Code:     0x03
+          Tag:      DW_TAG_subprogram
+          Children: DW_CHILDREN_yes
+          Attributes:
+            - Attribute: DW_AT_linkage_name
+              Form:      DW_FORM_string
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x04
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_data1
+        - Code:     0x05
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+        - Code:     0x06
+          Tag:      DW_TAG_inlined_subroutine
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_abstract_origin
+              Form:      DW_FORM_ref4
+            - Attribute: DW_AT_low_pc
+              Form:      DW_FORM_addr
+            - Attribute: DW_AT_high_pc
+              Form:      DW_FORM_data4
+            - Attribute: DW_AT_call_file
+              Form:      DW_FORM_data1
+            - Attribute: DW_AT_call_line
+              Form:      DW_FORM_implicit_const
+              Value:     7
+            - Attribute: DW_AT_call_column
+              Form:      DW_FORM_implicit_const
+              Value:     9
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+        - AbbrCode: 0x02
+          Values:
+            - CStr: "callee"
+        - AbbrCode: 0x03
+          Values:
+            - CStr: "outer"
+            - Value: 0x1000          # DW_AT_low_pc
+            - Value: 0x100           # DW_AT_high_pc (size)
+        - AbbrCode: 0x04
+          Values:
+            - Value: 0x0d            # DW_AT_abstract_origin -> "callee"
+            - Value: 0x1010
+            - Value: 0x10
+            - Value: 0x01            # DW_AT_call_file
+            - Value: 0x05            # DW_AT_call_line
+        - AbbrCode: 0x05
+          Values:
+            - Value: 0x0d
+            - Value: 0x1030
+            - Value: 0x10
+        - AbbrCode: 0x06
+          Values:
+            - Value: 0x0d
+            - Value: 0x1050
+            - Value: 0x10
+            - Value: 0x01
+        - AbbrCode: 0x00              # end of "outer"'s children
+        - AbbrCode: 0x00              # end of compile unit's children

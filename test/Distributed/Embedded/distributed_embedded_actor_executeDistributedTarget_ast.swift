@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend -dump-ast -enable-experimental-feature Embedded -enable-experimental-feature EmbeddedDistributed -parse-as-library -wmo -target %target-cpu-apple-macos14 -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -dump-ast -enable-experimental-feature Embedded -parse-as-library -wmo -target %target-cpu-apple-macos14 -module-name main %s %S/Runtime/Inputs/EmbeddedFakeActorSystem.swift 2>&1 | %FileCheck %s
 
 // REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
-// REQUIRES: swift_feature_EmbeddedDistributed
 // REQUIRES: optimized_stdlib
 
 // Pseudo code of the synthesized func:
@@ -52,9 +51,9 @@ distributed actor Greeter {
 // CHECK: declref_expr {{.*}}decl="Distributed.(file).RemoteCallTarget.identifierEquals
 
 // The matched branch: decode the argument, call the local impl, deliver the result.
-// CHECK: decl="{{.*}}EmbeddedFakeInvocationDecoder extension.decodeNextArgument{{.*}}Argument -> String)]"
+// CHECK: decl="{{.*}}EmbeddedFakeInvocationDecoder extension.decodeNextArgument{{.*}}
 // CHECK: decl="{{.*}}Greeter.hello(name:)
-// CHECK: decl="{{.*}}EmbeddedFakeResultHandler extension.onReturn{{.*}}Success -> String)]"
+// CHECK: decl="{{.*}}EmbeddedFakeResultHandler extension.onReturn
 
 // The dispatch must not touch String's UTF8 view for the comparison.
 // CHECK-NOT: decl="Swift.(file).String.UTF8View

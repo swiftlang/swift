@@ -105,7 +105,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
   SILType Type = AI->getType();
 
   TT = Type.getAs<TupleType>();
-  SD = Type.getStructOrBoundGenericStruct();
+  SD = Type.getStructDecl();
   bool HasUnrefField = AI->getElementType().aggregateHasUnreferenceableStorage();
 
   // Check that the allocated type is a struct or a tuple and that there are
@@ -243,6 +243,9 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
   // Create allocations for this instruction.
   llvm::SmallVector<AllocStackInst *, 4> NewAllocations;
   createAllocas(NewAllocations);
+  // Splitting storage preserves its lifetime relative to other allocations.
+  for (auto *NewAI : NewAllocations)
+    NewAI->setStackAllocationIsNested(AI->isStackAllocationNested());
   // Add the new allocations to the worklist for recursive processing.
   //
   // TODO: Change this into an assert. For some reason I am running into compile

@@ -53,6 +53,19 @@ namespace irgen {
                        CanSILFunctionType invokeTy,
                        ForeignFunctionInfo foreignInfo);
 
+  /// Whether global blocks (whose isa is _NSConcreteGlobalBlock) can be
+  /// emitted for the target.
+  bool canEmitGlobalBlocks(IRGenModule &IGM);
+
+  /// Emit a constant global block with the given invoke function and
+  /// constant capture value, which must not need to be retained or released.
+  llvm::Constant *emitGlobalBlock(IRGenModule &IGM,
+                                  CanSILBlockStorageType blockTy,
+                                  llvm::Constant *invokeFunction,
+                                  CanSILFunctionType invokeTy,
+                                  ForeignFunctionInfo foreignInfo,
+                                  llvm::Constant *capture);
+
   /// Emit a partial application thunk for a function pointer applied to a
   /// partial set of argument values.
   std::optional<StackAddress> emitFunctionPartialApplication(
@@ -63,7 +76,7 @@ namespace irgen {
       CanSILFunctionType outType, Explosion &out, bool isOutlined,
       StackAllocationIsNested_t isNested);
   CanType getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
-                                  bool isNoEscape);
+                                  bool capturesIndirectByAddress);
 
   /// Stub function that weakly links againt the swift_coroFrameAlloc
   /// function. This is required for back-deployment.

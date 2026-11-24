@@ -92,7 +92,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   //   strong_release %x
   // ```
   guard copy.parentFunction.hasOwnership ||
-        allocStack.isDestroyedOnAllPaths(context) ||
+        allocStack.isDestroyedOnAllPaths(after: copy, users: allocStackUses.users, context) ||
         // We can easily remove a dead alloc_stack
         allocStack.uses.ignore(user: copy).hasOnlyUsers(ofType: DeallocStackInst.self)
   else {
@@ -102,8 +102,11 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   var liverange = Liverange(context)
   defer { liverange.deinitialize() }
 
+  var projectionsToMove = Stack<SingleValueInstruction>(context)
+  defer { projectionsToMove.deinitialize() }
+
   guard liverange.compute(for: copy, users: allocStackUses.users),
-        liverange.areAllUsersInLiverange(of: allocStack),
+        liverange.collectProjectionsToMove(of: allocStack, into: &projectionsToMove),
         liverange.canExtendAccessScopes()
   else {
     return
@@ -114,6 +117,12 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
 
   if !copy.isTakeOfSource {
     removeDestroys(users: allocStackUses.users, context)
+  }
+
+  // Must happen before the `DeadProjectionDeleter`, which can erase some of the `projectionsToMove`.
+  let insertionPoint = copy.loadingInstruction.next!
+  for projection in projectionsToMove {
+    projection.move(before: insertionPoint, context)
   }
 
   // Dead projection instructions can appear outside of the liverange in case they were only
@@ -158,28 +167,26 @@ private extension AllocStackInst {
   ///   %x = load %allocStack   // looks like a load, but is a `load [take]`
   ///   strong_release %x
   /// ```
-  func isDestroyedOnAllPaths(_ context: FunctionPassContext) -> Bool {
-    var liferange = InstructionRange(begin: self, context)
+  /// The liferange begins at `copy`, which is the only write to the `alloc_stack`.
+  func isDestroyedOnAllPaths(after copy: CopyLikeInstruction, users: Stack<Instruction>,
+                             _ context: FunctionPassContext) -> Bool {
+    var liferange = InstructionRange(begin: copy, ends: users, context)
     defer { liferange.deinitialize() }
 
-    liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
-
-    guard liferange.exitBlocks.isEmpty else {
+    guard liferange.blockRange.isValid, liferange.exitBlocks.isEmpty else {
       // If there is no use on a path leaving the liverange, we don't know how the value is destroyed there.
       return false
     }
 
-    for use in uses {
-      switch use.instruction {
-      case is DeallocStackInst, is DestroyAddrInst:
+    for user in users where !liferange.contains(user) {
+      switch user {
+      case let destroy as DestroyAddrInst where destroy.destroyedAddress == self:
         break
-      case let c as CopyAddrInst where c.sourceOperand == use && c.isTakeOfSource:
+      case let c as CopyAddrInst where c.source == self && c.isTakeOfSource:
         break
       default:
-        if !liferange.contains(use.instruction) {
-          // A non-destroying instruction is at the end of the liferange -> we are missing a "real" destroy.
-          return false
-        }
+        // A non-destroying instruction is at the end of the liferange -> we are missing a "real" destroy.
+        return false
       }
     }
     return true
@@ -256,6 +263,9 @@ private struct UseCollector : AddressDefUseWalker {
     case let apply as ApplySite:
       // Remaining applies: `apply` and `try_apply`
       users.append(apply)
+      if let applyInst = apply as? ApplyInst, applyInst.functionConvention.hasAddressResult {
+        return .abortWalk
+      }
       return visitApply(address: address, apply: apply)
 
     case let yield as YieldInst:
@@ -285,7 +295,26 @@ private struct UseCollector : AddressDefUseWalker {
       }
       return .continueWalk
 
-    case is LoadInst, is FixLifetimeInst, is DestroyAddrInst, is SwitchEnumAddrInst:
+    case let load as LoadInst:
+      // In non-OSSA, a `load` of a non-trivial value doesn't copy the value. Uses of the loaded value
+      // require that the memory location is alive, but those uses are not considered in the liverange:
+      // ```
+      //   copy_addr %src to [init] %allocStack
+      //   %x = load %allocStack
+      //   destroy_addr %src
+      //   strong_retain %x       // use-after-free if %allocStack is replaced by %src
+      //   destroy_addr %allocStack
+      // ```
+      // TODO: remove this check once OSSA is enabled throughout the pipeline.
+      if !load.parentFunction.hasOwnership && !copy.isTakeOfSource &&
+         !load.type.isTrivialNonPointer(in: load.parentFunction)
+      {
+        return .abortWalk
+      }
+      users.append(load)
+      return .continueWalk
+
+    case is FixLifetimeInst, is DestroyAddrInst, is SwitchEnumAddrInst:
       users.append(address.instruction)
       return .continueWalk
 
@@ -409,10 +438,12 @@ private struct Liverange {
     return true
   }
 
-  /// Returns true if all users of `alloc_stack` are in the computed liverange.
-  /// This might not be the case if there are any users before the copy instruction.
+  /// Appends the address projections of `allocStack` which are located before the copy to `projections`,
+  /// each before its own users.
+  /// Returns false if any other user is outside the computed liverange, e.g. before the copy.
   /// Ignore `debug_value` because we can move this instruction easily.
-  func areAllUsersInLiverange(of allocStack: AllocStackInst) -> Bool {
+  func collectProjectionsToMove(of allocStack: AllocStackInst,
+                                into projections: inout Stack<SingleValueInstruction>) -> Bool {
     for user in allocStack.users {
       if !liverange.hasBeenPushed(user) {
         switch user {
@@ -421,6 +452,29 @@ private struct Liverange {
         case is DeallocStackInst, is DestroyAddrInst, is CopyAddrInst, is DebugValueInst:
           break
         default:
+          if !collectMovableProjection(user, into: &projections) {
+            return false
+          }
+        }
+      }
+    }
+    return true
+  }
+
+  private func collectMovableProjection(_ inst: Instruction,
+                                        into projections: inout Stack<SingleValueInstruction>) -> Bool {
+    guard let projection = inst as? SingleValueInstruction,
+          projection is StructElementAddrInst || projection is TupleElementAddrInst
+    else {
+      return false
+    }
+    projections.append(projection)
+    for user in projection.users where !liverange.hasBeenPushed(user) {
+      switch user {
+      case is DestroyAddrInst, is DebugValueInst:
+        break
+      default:
+        if !collectMovableProjection(user, into: &projections) {
           return false
         }
       }

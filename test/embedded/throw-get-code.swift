@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -parse-as-library -runtime-compatibility-version none -wmo %target-embedded-posix-shim) | %FileCheck %s
 
-// REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
@@ -49,11 +48,20 @@ func throwThemAll() {
   throwAndCatch(MyOtherError())
 }
 
-// CHECK: 0
-// CHECK: "My Error Domain"
+@main
+struct Main {
+  static func main() {
+    throwThemAll()
+  }
+}
+
+// Without type metadata the default `_code` of an enum can't use the case
+// index, so it is always 1.
 // CHECK: 1
-// CHECK: "My Error Domain"
-// CHECK: 2
-// CHECK: "My Error Domain"
-// CHECK: 12345
-// CHECK: "My Other Domain"
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 1
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 1
+// CHECK-NEXT: My Error Domain
+// CHECK-NEXT: 12345
+// CHECK-NEXT: My Other Domain

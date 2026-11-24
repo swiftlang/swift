@@ -165,3 +165,47 @@ public func sum<each T: P>(_ xs: repeat each T) -> Int {
 
 @inline(never)
 public func driver(_ a: A, _ b: B) -> Int { sum(a, b) }
+
+// rdar://182236134: @inline(always) generates worse parameter pack assembly
+@available(anyAppleOS 26.0, *)
+public protocol VectorArithmetic {
+    mutating func scale(by rhs: Double)
+}
+
+@available(anyAppleOS 26.0, *)
+public extension VectorArithmetic {
+    func scaled(by rhs: Double) -> Self {
+        var result = self
+        result.scale(by: rhs)
+        return result
+    }
+}
+
+@available(anyAppleOS 26.0, *)
+public struct AnimatableValues<each Value: VectorArithmetic>: VectorArithmetic {
+    public var value: (repeat each Value)
+
+    @inline(always)
+    public mutating func scale(by rhs: Double) {
+        value = (repeat (each value).scaled(by: rhs))
+    }
+}
+
+@available(anyAppleOS 26.0, *)
+extension Double: VectorArithmetic {
+    public mutating func scale(by rhs: Double) { self *= rhs }
+}
+
+// CHECK: define {{.*}} { double, double } @"$s19pack_specialization26scaledParameterPackInlined_2byAA16AnimatableValuesVySd_SdQPGAFn_SdtF"(double %0, double %1, double %2) {{.*}} {
+// CHECK-NEXT: entry:
+// CHECK-NEXT:   %3 = fmul double %0, %2
+// CHECK-NEXT:   %4 = fmul double %1, %2
+// CHECK-NEXT:   %5 = insertvalue { double, double } undef, double %3, 0
+// CHECK-NEXT:   %6 = insertvalue { double, double } %5, double %4, 1
+// CHECK-NEXT:   ret { double, double } %6
+// CHECK-NEXT: }
+@available(anyAppleOS 26.0, *)
+public func scaledParameterPackInlined(_ lhs: consuming AnimatableValues<Double, Double>, by rhs: Double) -> AnimatableValues<Double, Double> {
+    lhs.scale(by: rhs)
+    return lhs
+}

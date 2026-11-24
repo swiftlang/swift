@@ -1,0 +1,56 @@
+## A hand-crafted ELF object with a version 4 line number program whose header
+## has maximum_operations_per_instruction = 0, which is invalid.  The program
+## uses a special opcode, DW_LNS_advance_pc and DW_LNS_const_add_pc, all of
+## which divide by maximum_operations_per_instruction when executed.  The
+## reader has to treat the zero as 1 rather than trapping on the division.
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_stmt_list
+              Form:      DW_FORM_sec_offset
+  debug_info:
+    - Version: 4
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x0            # DW_AT_stmt_list
+  debug_line:
+    - Version:               4
+      MinInstLength:         1
+      MaxOpsPerInst:         0
+      DefaultIsStmt:         1
+      LineBase:              251
+      LineRange:             14
+      OpcodeBase:            13
+      StandardOpcodeLengths: [ 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 ]
+      IncludeDirs:           []
+      Files:
+        - Name:    a.c
+          DirIdx:  0
+          ModTime: 0
+          Length:  0
+      Opcodes:
+        - Opcode:     DW_LNS_extended_op
+          ExtLen:     9
+          SubOpcode:  DW_LNE_set_address
+          Data:       0x1000
+        - Opcode:     0x20            # special opcode
+        - Opcode:     DW_LNS_advance_pc
+          Data:       4
+        - Opcode:     DW_LNS_const_add_pc
+        - Opcode:     0x20            # special opcode
+        - Opcode:     DW_LNS_extended_op
+          ExtLen:     1
+          SubOpcode:  DW_LNE_end_sequence

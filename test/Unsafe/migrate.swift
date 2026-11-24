@@ -3,6 +3,7 @@
 // REQUIRES: concurrency
 
 @preconcurrency import _Concurrency
+// expected-warning@-1:24 {{'@preconcurrency' import is not memory-safe because it can silently introduce data races; add '@unsafe' to indicate that this is unsafe}}{{1-1=@unsafe }}
 
 @unsafe func f() { }
 
@@ -10,6 +11,15 @@ func g() {
   f() // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   // expected-note@-1{{reference to unsafe global function 'f()'}}
 }
+
+// Migration sees the code that builds once strict memory safety is enabled.
+#if hasFeature(StrictMemorySafety)
+func onlyWithStrictMemorySafety() {
+  f()
+  // expected-warning@-1:3 {{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
+  // expected-note@-2:3 {{reference to unsafe global function 'f()'}}
+}
+#endif
 
 protocol P {
   func f()

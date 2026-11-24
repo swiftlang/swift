@@ -18,21 +18,24 @@
 #endif
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/SILContext.h"
-#include "swift/SIL/SILCloner.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
+#include "swift/SIL/SILContext.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "swift/SIL/SILNode.h"
 #include "swift/SIL/Test.h"
-#include <string>
+#include "swift/SIL/TypeSubstCloner.h"
 #include <cstring>
 #include <stdio.h>
+#include <string>
 
 using namespace swift;
 
@@ -47,6 +50,11 @@ SwiftMetatype nodeMetatypes[(unsigned)SILNodeKind::Last_SILNode + 1];
 
 bool swiftModulesInitialized() {
   return nodeMetatypesInitialized;
+}
+
+bool SubstitutionMap_isGrowing(BridgedSubstitutionMap subs,
+                               BridgedSubstitutionMap comparedTo) {
+  return growingSubstitutions(comparedTo.unbridged(), subs.unbridged());
 }
 
 // Does return null if initializeSwiftModules() is never called.
@@ -209,12 +217,43 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   return BridgedOwnedString(str);
 }
 
+/// Returns the source range of the body of \p fn, if it has one.
+static SourceRange getBodySourceRange(const SILFunction *fn) {
+  auto loc = fn->getLocation();
+  if (auto *afd = loc.getAsASTNode<AbstractFunctionDecl>())
+    return afd->getBodySourceRange();
+  if (auto *closure = loc.getAsASTNode<AbstractClosureExpr>())
+    if (auto *body = closure->getBody())
+      return body->getSourceRange();
+  return loc.getSourceRange();
+}
+
+static bool isInRange(const SILFunction *fn, SourceRange range, SourceLoc loc) {
+  return loc.isValid() &&
+         (range.isInvalid() ||
+          fn->getASTContext().SourceMgr.containsLoc(range, loc));
+}
+
+bool BridgedFunction::isInSourceRange(swift::SourceLoc loc) const {
+  auto *fn = getFunction();
+  return isInRange(fn, fn->getLocation().getSourceRange(), loc);
+}
+
+bool BridgedFunction::isInBodySourceRange(swift::SourceLoc loc) const {
+  auto *fn = getFunction();
+  return isInRange(fn, getBodySourceRange(fn), loc);
+}
+
+swift::SourceLoc BridgedFunction::getBodyEndLoc() const {
+  return getBodySourceRange(getFunction()).End;
+}
+
 BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions,
                                                                BridgedCanType selfType) const {
   swift::SILFunction *f = getFunction();
   swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
 
-  if (!genericSig || genericSig->areAllParamsConcrete())
+  if (!genericSig.isEffectivelyGeneric())
     return swift::SubstitutionMap();
 
   SubstitutionMap contextSubs = contextSubstitutions.unbridged();
@@ -321,6 +360,49 @@ static SwiftInt getSpecializationLevelRecursive(StringRef funcName,
 SwiftInt BridgedFunction::specializationLevel() const {
   Demangle::StackAllocatedDemangler<1024> demangler;
   return getSpecializationLevelRecursive(getFunction()->getName(), demangler);
+}
+
+SwiftInt BridgedFunction::closureSpecializationLevel() const {
+  using namespace Demangle;
+  Demangle::StackAllocatedDemangler<1024> demangler;
+
+  // Count the function signature specializations which propagate closures:
+  //
+  // kind=Global
+  //   kind=FunctionSignatureSpecialization     // a closure specialization ...
+  //     kind=SpecializationPassID
+  //     kind=FunctionSignatureSpecializationParam
+  //       kind=FunctionSignatureSpecializationParamKind, index=5   // ClosureProp
+  //       ...
+  //   kind=FunctionSignatureSpecialization     // ... of a closure specialization
+  //     ...
+  //   kind=Function                            // ... of the original function
+  //
+  Node *root = demangler.demangleSymbol(getFunction()->getName());
+  if (!root || root->getKind() != Node::Kind::Global)
+    return 0;
+
+  SwiftInt level = 0;
+  for (Node *spec : *root) {
+    if (spec->getKind() != Node::Kind::FunctionSignatureSpecialization)
+      continue;
+    for (Node *param : *spec) {
+      if (param->getKind() != Node::Kind::FunctionSignatureSpecializationParam ||
+          param->getNumChildren() == 0)
+        continue;
+      Node *kindNd = param->getFirstChild();
+      if (kindNd->getKind() !=
+          Node::Kind::FunctionSignatureSpecializationParamKind)
+        continue;
+      auto kind = FunctionSigSpecializationParamKind(kindNd->getIndex());
+      if (kind == FunctionSigSpecializationParamKind::ClosureProp ||
+          kind == FunctionSigSpecializationParamKind::EscapingClosureProp) {
+        ++level;
+        break;
+      }
+    }
+  }
+  return level;
 }
 
 bool BridgedFunction::isAutodiffVJP() const {
@@ -559,6 +641,11 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
 static_assert(sizeof(BridgedLocation) >= sizeof(swift::SILDebugLocation),
               "BridgedLocation has wrong size");
 
+bool BridgedLocation::isReturnOrThrowStatement() const {
+  auto *stmt = getLoc().getLocation().getAsASTNode<Stmt>();
+  return stmt && isa<ReturnStmt, ThrowStmt>(stmt);
+}
+
 BridgedOwnedString BridgedLocation::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
@@ -610,7 +697,7 @@ convertCases(SILType enumTy, const void * _Nullable enumCases, SwiftInt numEnumC
   llvm::ArrayRef<BridgedCase> cases(static_cast<BridgedCase *>(enumCases),
                                     (unsigned)numEnumCases);
   llvm::SmallDenseMap<SwiftInt, swift::EnumElementDecl *> mappedElements;
-  swift::EnumDecl *enumDecl = enumTy.getEnumOrBoundGenericEnum();
+  swift::EnumDecl *enumDecl = enumTy.getEnumDecl();
   for (auto elemWithIndex : llvm::enumerate(enumDecl->getAllElements())) {
     mappedElements[elemWithIndex.index()] = elemWithIndex.value();
   }
@@ -836,6 +923,12 @@ void BridgedCloner::registerLocalArchetypeRemapping(
   cloner->registerLocalArchetypeRemapping(from.unbridged(), to.unbridged());
 }
 
+void BridgedCloner::registerConcreteLocalArchetypeMapping(
+    BridgedGenericEnvironment from, BridgedSubstitutionMap to) const {
+  cloner->registerConcreteLocalArchetypeMapping(from.unbridged(),
+                                                to.unbridged());
+}
+
 BridgedType BridgedCloner::getOpType(BridgedType type) const {
   return cloner->getOpType(type.unbridged());
 }
@@ -909,7 +1002,7 @@ void BridgedContext::addSpecializedDeinit(BridgedType nominalType,
                                           BridgedFunction deinitFunc) const {
   swift::SILType nominalTy = nominalType.unbridged();
   swift::SILMoveOnlyDeinit::create(*context->getModule(),
-                                   nominalTy.getNominalOrBoundGenericNominal(),
+                                   nominalTy.getNominalDecl(),
                                    nominalTy, swift::IsNotSerialized,
                                    deinitFunc.getFunction());
 }
@@ -1085,4 +1178,8 @@ void BridgedVerifier::verifierError(BridgedStringRef message,
                                     BridgedValue atValue) {
   verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
                       /*extraContext=*/nullptr);
+}
+
+void BridgedVerifier::verifyOwnership(BridgedValue value) {
+  SILValue(value.getSILValue()).verifyOwnership();
 }

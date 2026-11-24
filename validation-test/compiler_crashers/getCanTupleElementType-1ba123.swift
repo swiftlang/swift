@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"9be99b8e","signature":"getCanTupleElementType(swift::CanType, unsigned int)","signatureNext":"Lowering::AbstractionPattern::getTupleElementType"}
+// {"kind":"emit-silgen","original":"9be99b8e","signature":"getCanTupleElementType(swift::CanType, unsigned int)","signatureAssert":"Assertion failed: (Index < Length && \"Invalid index!\"), function operator[]","signatureNext":"Lowering::AbstractionPattern::getTupleElementType"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 @available(SwiftStdlib 5.9, *)
 struct a<each b> {

@@ -96,6 +96,10 @@ namespace irgen {
                                                    bool isOutlined);
   /// Deallocate the storage for an opaque existential in the existential
   /// container.
+  /// Define the helper that the Embedded casting runtime uses to free the box
+  /// of an opaque existential. Does nothing outside Embedded Swift.
+  void emitEmbeddedExistentialBoxDeallocator(IRGenModule &IGM);
+
   /// If the value is not stored inline, this will deallocate the box for the
   /// value.
   void emitDeallocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,
@@ -168,6 +172,10 @@ namespace irgen {
   /// Emit the existential metatype of a metatype.
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
                               SILType existentialType, Explosion &out);
+
+  /// Bind the interface adjustments for an opened foreign COM value.
+  void bindOpenedCOMExistentialArchetype(IRGenFunction &IGF,
+                                         CanArchetypeType archetype);
 
 } // end namespace irgen
 } // end namespace swift

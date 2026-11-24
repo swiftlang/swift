@@ -2,9 +2,8 @@
 // RUN: split-file %s %t
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_DefaultIsolationPerFile
 
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple %t/main.swift %t/concurrent.swift | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple %t/main.swift %t/concurrent.swift | %FileCheck %s
 
 //--- main.swift
 

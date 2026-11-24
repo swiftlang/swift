@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=0 -o /dev/null %s 2>&1
 
-// REQUIRES: asserts
-
 // This file has patterns in it that should not trigger the ownership verifier
 // so are considered positive checker patterns.
 

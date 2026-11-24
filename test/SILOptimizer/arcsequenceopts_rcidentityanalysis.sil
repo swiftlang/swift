@@ -725,3 +725,30 @@ bb0(%0 : $SContainer):
   %r = tuple()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @retain_release_end_init_let_ref :
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: return
+sil @retain_release_end_init_let_ref : $@convention(thin) (@owned Cls) -> @owned Cls {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  %1 = end_init_let_ref %0 : $Cls
+  strong_release %1 : $Cls
+  return %1 : $Cls
+}
+
+// CHECK-LABEL: sil @retain_release_end_init_let_ref_chain :
+// CHECK-NOT: strong_retain
+// CHECK-NOT: strong_release
+// CHECK: return
+sil @retain_release_end_init_let_ref_chain : $@convention(thin) (@owned Cls) -> @owned Cls {
+bb0(%0 : $Cls):
+  strong_retain %0 : $Cls
+  %1 = end_init_let_ref %0 : $Cls
+  %2 = unchecked_ref_cast %1 : $Cls to $C
+  %3 = end_init_let_ref %2 : $C
+  %4 = unchecked_ref_cast %3 : $C to $Cls
+  strong_release %4 : $Cls
+  return %4 : $Cls
+}

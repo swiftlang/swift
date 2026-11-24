@@ -355,3 +355,98 @@ TEST(MetadataReader, MangledNameAccumulationIsBounded) {
   EXPECT_GT(reader->getStringBytesRead(), uint64_t(512 * 1024));
   EXPECT_LT(reader->getStringBytesRead(), uint64_t(2 * 1024 * 1024));
 }
+
+namespace {
+/// Exposes the protected metadata reading entry points.
+struct MetadataReadingTestReader : TestMetadataReader {
+  using TestMetadataReader::TestMetadataReader;
+  using TestMetadataReader::readMetadata;
+  using TestMetadataReader::readMetadataAndSize;
+};
+} // end anonymous namespace
+
+// Test that existential metadata whose protocol count runs past the reader's
+// size limit fails to read.
+TEST(MetadataReader, OversizedExistentialMetadataFailsToRead) {
+  struct ExistentialMetadataBytes {
+    uint64_t Kind;
+    uint32_t Flags;
+    uint32_t NumProtocols;
+  };
+  static_assert(sizeof(ExistentialMetadataBytes) ==
+                    sizeof(TargetExistentialTypeMetadata<Runtime>),
+                "existential metadata layout changed");
+
+  ExistentialMetadataBytes metadata = {};
+  metadata.Kind = uint64_t(MetadataKind::Existential);
+  metadata.NumProtocols = 0x100000;
+
+  const uint64_t metadataAddr = 0x1000;
+  auto reader = std::make_shared<MockMemoryReader>();
+  reader->addMemory(metadataAddr, &metadata, sizeof(metadata));
+
+  MetadataReadingTestReader metadataReader(reader);
+  auto result =
+      metadataReader.readMetadataAndSize(RemoteAddress(metadataAddr, 0));
+  EXPECT_FALSE(result.first);
+  EXPECT_EQ(result.second, 0u);
+  EXPECT_FALSE(metadataReader.readMetadata(RemoteAddress(metadataAddr, 0)));
+}
+
+// Test that existential metadata whose protocol list can't be read fails to
+// read.
+TEST(MetadataReader, TruncatedExistentialMetadataFailsToRead) {
+  struct ExistentialMetadataBytes {
+    uint64_t Kind;
+    uint32_t Flags;
+    uint32_t NumProtocols;
+  };
+
+  ExistentialMetadataBytes metadata = {};
+  metadata.Kind = uint64_t(MetadataKind::Existential);
+  metadata.NumProtocols = 4;
+
+  const uint64_t metadataAddr = 0x1000;
+  auto reader = std::make_shared<MockMemoryReader>();
+  reader->addMemory(metadataAddr, &metadata, sizeof(metadata));
+
+  MetadataReadingTestReader metadataReader(reader);
+  auto result =
+      metadataReader.readMetadataAndSize(RemoteAddress(metadataAddr, 0));
+  EXPECT_FALSE(result.first);
+  EXPECT_EQ(result.second, 0u);
+  EXPECT_FALSE(metadataReader.readMetadata(RemoteAddress(metadataAddr, 0)));
+}
+
+// Test that a context descriptor whose trailing objects run past the reader's
+// size limit fails to read.
+TEST(MetadataReader, OversizedContextDescriptorFailsToRead) {
+  struct ProtocolDescriptorBytes {
+    uint32_t Flags;
+    int32_t Parent;
+    int32_t Name;
+    uint32_t NumRequirementsInSignature;
+    uint32_t NumRequirements;
+    int32_t AssociatedTypeNames;
+  };
+  static_assert(sizeof(ProtocolDescriptorBytes) ==
+                    sizeof(TargetProtocolDescriptor<Runtime>),
+                "protocol descriptor layout changed");
+
+  ProtocolDescriptorBytes descriptor = {};
+  descriptor.Flags =
+      ContextDescriptorFlags(ContextDescriptorKind::Protocol,
+                             /*isGeneric*/ false, /*isUnique*/ true,
+                             /*hasInvertibleProtocols*/ false,
+                             /*kindSpecificFlags*/ 0)
+          .getIntValue();
+  descriptor.NumRequirements = 0x100000;
+
+  const uint64_t descriptorAddr = 0x1000;
+  auto reader = std::make_shared<MockMemoryReader>();
+  reader->addMemory(descriptorAddr, &descriptor, sizeof(descriptor));
+
+  TestMetadataReader metadataReader(reader);
+  EXPECT_FALSE(
+      metadataReader.readContextDescriptor(RemoteAddress(descriptorAddr, 0)));
+}

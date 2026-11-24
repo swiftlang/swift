@@ -1318,3 +1318,39 @@ bb0(%0 : $Builtin.Word):
   return %32
 }
 
+struct AccessorS {
+  @_hasStorage var c: C
+  @_hasStorage var i: Int
+}
+
+sil_global @accessor_escape_global : $C
+
+// A borrow accessor of AccessorS.i which also stores self.c to a global.
+sil [ossa] @borrow_accessor_s_i_escaping_c : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int {
+bb0(%0 : $*AccessorS):
+  %1 = struct_element_addr %0, #AccessorS.c
+  %2 = load [copy] %1
+  %3 = global_addr @accessor_escape_global : $*C
+  store %2 to [assign] %3
+  %5 = struct_element_addr %0, #AccessorS.i
+  return %5
+}
+
+// The object escapes to a global in the body of the borrow accessor.
+// CHECK-LABEL: sil [ossa] @object_escapes_in_borrow_accessor_body :
+// CHECK:         alloc_ref $C
+// CHECK-LABEL: } // end sil function 'object_escapes_in_borrow_accessor_body'
+sil [ossa] @object_escapes_in_borrow_accessor_body : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_ref $C
+  %2 = struct $AccessorS (%1, %0)
+  %3 = alloc_stack $AccessorS
+  store %2 to [init] %3
+  %5 = function_ref @borrow_accessor_s_i_escaping_c : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %7 = load [trivial] %6
+  destroy_addr %3
+  dealloc_stack %3
+  return %7
+}
+

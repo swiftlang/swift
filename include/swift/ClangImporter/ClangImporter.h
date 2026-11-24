@@ -21,6 +21,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/Basic/DiagnosticOptions.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -49,6 +50,7 @@ namespace clang {
   class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
+  class GlobalDecl;
   class MacroInfo;
   class Module;
   class ModuleMacro;
@@ -119,18 +121,6 @@ enum OptionalTypeKind : unsigned {
 };
 enum { NumOptionalTypeKinds = 2 };
 
-/// Where a C++ record sits in libkern's OSObject hierarchy. This is used to
-/// decide whether to apply libkern's ownership convention.
-///
-/// Only meaningful when the 'LibkernOwnershipConventions' feature is enabled.
-enum class LibkernSubclass {
-  None,
-  OSObject,
-  /// OSIterator derives from OSObject, so a type that derives from OSIterator
-  /// also derives from OSObject.
-  OSIterator,
-};
-
 /// This interface is implemented by LLDB to serve as a fallback when Clang
 /// modules can't be imported from source in the debugger.
 ///
@@ -170,6 +160,50 @@ struct ClangInvocationFileMapping {
   SmallVector<std::unique_ptr<llvm::MemoryBuffer>, 2> overridenFiles;
 
   bool requiresBuiltinHeadersInSystemModules = false;
+};
+
+/// An owning, copyable snapshot of everything
+/// \c ClangImporter::computeClangImporterFileSystem needs from an \c ASTContext
+/// and its \c ClangInvocationFileMapping.
+///
+/// This exists so that clients which must build the ClangImporter file system
+/// more than once can do so without holding on to the \c ASTContext (and
+/// therefore the whole \c CompilerInstance) they derived it from. The Clang
+/// dependency scanner is the motivating case: it needs a *separate* file system
+/// instance per scanning worker, because it calls
+/// \c setCurrentWorkingDirectory on whatever file system it is handed, and
+/// several workers do so concurrently.
+struct ClangImporterVFSRecipe {
+  /// One in-memory file overlaid on top of the base file system.
+  struct OverridenFile {
+    std::string path;
+    /// The file's contents, which this recipe does not own.
+    ///
+    /// \c InMemoryFileSystem::addFileNoOwn does not copy contents either, so
+    /// this storage must outlive not just the recipe but every file system
+    /// built from it. It is owned by the \c allocateString callback given to
+    /// \c ClangImporter::computeClangImporterVFSRecipe, or -- if no callback was
+    /// given -- by the originating \c ClangInvocationFileMapping.
+    llvm::MemoryBufferRef contents;
+  };
+
+  /// Whether the base file system is immutable and must be used unmodified.
+  bool hasImmutableFileSystem = false;
+
+  /// Whether to dump the mapping to \c llvm::errs().
+  bool dumpClangDiagnostics = false;
+
+  /// Clang's '-working-directory', if one was specified.
+  std::optional<std::string> workingDirectory;
+
+  /// Redirected file mappings. These are applied to Clang via '-ivfsoverlay'
+  /// rather than by the computed file system; they are recorded here only
+  /// because their presence affects whether a file system is built at all, and
+  /// for diagnostic dumping.
+  SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// Files to overlay on top of the base file system.
+  SmallVector<OverridenFile, 2> overridenFiles;
 };
 
 /// Class that imports Clang modules into Swift, mapping directly
@@ -240,6 +274,27 @@ public:
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS,
       bool suppressDiagnostics = false,
       llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Snapshot the information needed to build the ClangImporter file system, so
+  /// that it can be built repeatedly and independently of \p ctx.
+  ///
+  /// \param allocateString If provided, the overriden files' contents are copied
+  /// into storage owned by the callback, and the returned recipe may outlive
+  /// \p ctx and \p fileMapping. Otherwise the recipe points into
+  /// \p fileMapping 's buffers and must not outlive them.
+  static ClangImporterVFSRecipe computeClangImporterVFSRecipe(
+      const ASTContext &ctx, const ClangInvocationFileMapping &fileMapping,
+      llvm::function_ref<StringRef(StringRef)> allocateString = nullptr);
+
+  /// Compute the file system used by the ClangImporter from a recipe.
+  ///
+  /// Each call layers fresh file systems on top of \p baseFS, so callers that
+  /// need independently mutable file systems (notably one per Clang dependency
+  /// scanning worker) get them by passing a freshly created \p baseFS.
+  static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  computeClangImporterFileSystem(
+      const ClangImporterVFSRecipe &recipe,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS);
 
   /// Install a helper object that can synthesize Clang Decls from debug
   /// info. Used by LLDB.
@@ -368,6 +423,10 @@ public:
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 
+  /// Returns the operator that was synthesized from \p decl , or \c nullptr if
+  /// there is none. \p decl is not an operator itself; it is the regular
+  /// function that a C++ operator was imported as, whose name starts with
+  /// `__operator`.
   FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
@@ -501,6 +560,10 @@ public:
   /// content. Delegates to clang for everything except construction of the
   /// replica.
   ///
+  /// \param cached If true, the emitted PCH is also published in the in-memory
+  /// module cache shared with the ClangImporter's CompilerInstance. This is
+  /// required whenever that instance is going to import the PCH afterwards.
+  ///
   /// \sa clang::GeneratePCHAction
   bool emitBridgingPCH(StringRef headerPath, StringRef outputPCHPath,
                        bool cached);
@@ -544,6 +607,7 @@ public:
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
+  CArrayProjection getVisibleCArrayProjection() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;
@@ -602,6 +666,12 @@ public:
 
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
+
+  void getMangledBaseObjectConstructorName(
+      raw_ostream &os, const clang::CXXConstructorDecl *ctor) const;
+
+  clang::GlobalDecl
+  getBaseObjectConstructor(const clang::CXXConstructorDecl *ctor) const;
 
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
@@ -667,9 +737,7 @@ public:
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) override;
 
-  Type importVarDeclType(const clang::VarDecl *clangDecl,
-                         VarDecl *swiftDecl,
-                         DeclContext *dc) override;
+  Type importVarDeclType(VarDecl *VD) override;
 
   std::optional<std::string>
   getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
@@ -713,6 +781,9 @@ public:
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
 
+  ConstructorDecl *
+  getRefCountedPtrBridgingCtor(NominalTypeDecl *smartPtr) override;
+
   bool needsClosureConstructor(
       const clang::CXXRecordDecl *recordDecl) const override;
 
@@ -753,6 +824,9 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
 
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
+  const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) override;
+  ValueDecl *getOverriddenSuperclassMember(const ValueDecl *decl) override;
   ValueDecl *getForwardingSource(const ValueDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
@@ -760,8 +834,14 @@ public:
   std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
 
-  /// Classify \p decl against libkern's OSObject hierarchy.
-  LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
+  UnusableForeignType exposesUnusableForeignType(Type type) override;
+
+  const clang::CXXMethodDecl *
+  lookupCXXAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
+
+  bool hasNonTrivialAssignmentOperator(const StructDecl *decl);
+
+  bool tryDefineCXXAssignmentOperatorBody(clang::CXXMethodDecl *assignOp);
 
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
@@ -846,9 +926,10 @@ struct CxxReferenceParameter {
   CxxReferenceParameterKind kind;
 };
 
-/// Classifies a C++ reference parameter type, or `None` if \p type is not a
-/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
-/// those must be imported as the pointee rather than as a pointer.
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a C++
+/// reference type or is a reference to a function. Every kind but `Mutating` is
+/// lowered indirectly, so those must be imported as the pointee rather than as
+/// a pointer.
 std::optional<CxxReferenceParameter>
 classifyCxxReferenceParameter(clang::QualType type);
 
@@ -894,11 +975,41 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
 
-/// Lookup and return the copy constructor of \a decl
+/// Returns the copy constructor of \p decl, or nullptr if it doesn't have a
+/// valid one, or if it is less accessible than \p maxAccess (e.g.,
+/// \c clang::AS_protected allows a public or protected copy constructor).
 ///
-/// Returns nullptr if \a decl doesn't have a valid copy constructor
-const clang::CXXConstructorDecl *
-findCopyConstructor(const clang::CXXRecordDecl *decl);
+/// Swift copies an address-only value of \p decl with its public copy
+/// constructor if there is one, and field by field otherwise.
+clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl,
+                    clang::AccessSpecifier maxAccess = clang::AS_public);
+
+/// Returns the destructor of \p decl, or nullptr if it has none or it is
+/// trivial.
+///
+/// Swift destroys an address-only value of \p decl with this destructor if
+/// there is one, and field by field otherwise.
+clang::CXXDestructorDecl *
+findNonTrivialDestructor(const clang::CXXRecordDecl *decl);
+
+/// Whether \p decl is a non-trivial C++ record.
+inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {
+  return decl->hasNonTrivialCopyConstructor() ||
+         decl->hasNonTrivialMoveConstructor() ||
+         decl->hasNonTrivialDestructor();
+}
+
+/// Whether \p type is an imported C++ class that C++ cannot pass in registers
+/// (a non-trivial copy or move constructor, or a non-trivial destructor).
+inline bool isNonTrivialCxxRecord(Type type) {
+  const auto *structDecl = type->getStructDecl();
+  if (!structDecl)
+    return false;
+  const auto *record =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  return record && isNonTrivialCxxRecord(record);
+}
 
 /// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
 ///
@@ -925,6 +1036,12 @@ bool isClangNamespace(const DeclContext *dc);
 
 /// Is this DeclContext a nominal type imported from a C++ `struct`/`class`?
 bool isClangCxxRecord(const DeclContext *dc);
+
+/// The C++ name of an overloaded operator, e.g. "operator==".
+StringRef getCxxOperatorName(clang::OverloadedOperatorKind op);
+
+/// The overloaded operator named \p name, e.g. "operator==", if any.
+std::optional<clang::OverloadedOperatorKind> getCxxOperatorKind(StringRef name);
 
 /// Enumerate and import all members of the C++ namespace represented by
 /// \p namespaceEnum, invoking \p emit once for each newly imported member.
@@ -991,10 +1108,9 @@ std::optional<ResultConvention>
 getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 
 /// Determines the ownership convention of functions that return libkern's
-/// OSObject or one of its subclasses.
+/// OSMetaClassBase or one of its subclasses.
 ///
-/// - Methods which start with "get" or "Get" and which are not returning
-///   a subclass of OSIterator are assumed to be getters.
+/// - Methods which start with "get" or "Get" are assumed to be getters.
 ///   They return at "+0" and the caller is not responsible for releasing the
 ///   returned object.
 ///
@@ -1005,31 +1121,6 @@ getOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
 getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl, ASTContext &ctx);
-
-enum class RefCountedPtrError {
-  NotAnnotated,
-  MissingToRawPointer,
-  ToRawPointerLookupFailure,
-  ToRawPointerLookupAmbiguity,
-  ToRawPointerNotFunction,
-  ToRawPointerWrongSignature,
-  CtorLookupAmbiguity,
-  CtorLookupFailure,
-  CtorWrongParamType
-};
-
-struct RefCountedPtrInfo {
-  ConstructorDecl *toSmartPtr;
-};
-
-struct RefCountedPtrRequestResult {
-  std::variant<RefCountedPtrInfo, RefCountedPtrError> result;
-  ValueDecl *toRawPtrFunc = nullptr;
-  StringRef toRawPtrName = "";
-};
-
-RefCountedPtrRequestResult
-getClangRefCountedSmartPointer(NominalTypeDecl *decl);
 
 /// Iterator categories, based on the std iterator tags
 enum class CxxIteratorCategory {
@@ -1109,6 +1200,10 @@ public:
   /// Always returns swift::AccessLevel::Public (i.e., corresponding to
   /// clang::AS_none) if this ClangInheritanceInfo::isInheriting() is \c false.
   AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
+
+  /// Like \c accessForBaseDecl(), but for a base member with \p memberAccess
+  /// in its own class. Returns \p memberAccess if not inheriting.
+  AccessLevel accessForBaseMember(AccessLevel memberAccess) const;
 
   /// Marks \param clonedDecl as unavailable (using \c @available) if it
   /// cannot be accessed from the derived class, either because \param baseDecl

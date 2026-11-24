@@ -317,6 +317,12 @@ private:
   llvm::DenseMap<const Decl *, Identifier> PrivateDiscriminatorsByValue;
   llvm::DenseMap<const Decl *, StringRef> FilenamesForPrivateValues;
 
+  /// Classes whose dependency types are currently being checked. A class
+  /// re-entered while in this set skips the checks, which avoids infinite
+  /// recursion when superclasses name each other, as in `class A: Base<B>`
+  /// and `class B: Base<A>`.
+  llvm::SmallDenseSet<serialization::DeclID, 4> ClassesResolvingDependencies;
+
   TinyPtrVector<Decl *> ImportDecls;
 
   /// Maps USRs to their deserialized comment object.
@@ -933,17 +939,6 @@ public:
     return Core->TargetTriple;
   }
 
-  /// Look up the layout of a hidden type by its mangled name. Returns
-  /// std::nullopt if this module does not define a layout for that mangled
-  /// name.
-  std::optional<AbstractTypeLayout>
-  lookupHiddenTypeLayout(StringRef mangledName) const {
-    auto it = Core->HiddenTypeLayouts.find(mangledName);
-    if (it == Core->HiddenTypeLayouts.end())
-      return std::nullopt;
-    return it->second;
-  }
-
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
@@ -978,6 +973,9 @@ public:
 
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) override;
+
+  virtual VarDecl *loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                               uint64_t contextData) override;
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;

@@ -8,6 +8,8 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+import difflib
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -468,10 +470,13 @@ def update_single_repository(pool_args: UpdateArguments):
 
         # It's important that we checkout, fetch, and rebase, in order.
         # .git/FETCH_HEAD updates the not-for-merge attributes based on
-        # which branch was checked out during the fetch.
+        # which branch was checked out during the fetch. Without history, the
+        # tags are not needed, and fetching each of them at depth 1 takes
+        # minutes in the larger repositories.
+        fetch_tags = [] if pool_args.skip_history else ["--tags"]
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes", "--tags"] + fetch_extra_args,
+            ["fetch", "--recurse-submodules=yes"] + fetch_tags + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -571,6 +576,37 @@ def get_scheme_map(
                 return v["repos"]
 
     return None
+
+
+def get_scheme_map_or_exit(
+    config: Dict[str, Any], scheme_name: str
+) -> Dict[str, str]:
+    """Like `get_scheme_map`, but exits with an error if the scheme is unknown.
+
+    Args:
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`
+        scheme_name (str): name of the scheme to look up in `config`
+
+    Returns:
+        Dict[str, str]: a mapping from repos to branches for the given scheme.
+    """
+
+    scheme_map = get_scheme_map(config, scheme_name)
+    if scheme_map is not None:
+        return scheme_map
+
+    print(
+        f"update-checkout error: unknown branch scheme '{scheme_name}'. "
+        "Add it to 'branch-schemes' in update-checkout-config.json, or pass "
+        "an existing scheme with --scheme."
+    )
+    aliases = [
+        alias for v in config["branch-schemes"].values() for alias in v["aliases"]
+    ]
+    close_matches = difflib.get_close_matches(scheme_name, aliases, n=5)
+    if close_matches:
+        print("Did you mean one of: " + ", ".join(close_matches) + "?")
+    sys.exit(1)
 
 
 def check_missing_clones(
@@ -730,9 +766,12 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
+    retried_update = exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)(
+        update_single_repository
+    )
     return (
         skipped_repositories,
-        ParallelRunner(update_single_repository, pool_args, args.n_processes).run(),
+        ParallelRunner(retried_update, pool_args, args.n_processes).run(),
     )
 
 
@@ -897,6 +936,9 @@ def obtain_all_additional_swift_sources(
 ):
     skipped_repositories = []
     pool_args = []
+    retried_obtain = exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)(
+        obtain_additional_swift_sources
+    )
     for repo_name, repo_info in config["repos"].items():
         repo_path = args.source_root.joinpath(repo_name)
         if repo_name in skip_repository_list:
@@ -915,7 +957,7 @@ def obtain_all_additional_swift_sources(
                         break
 
         else:
-            repo_exists = repo_path.joinpath(".git").is_dir()
+            repo_exists = repo_path.joinpath(".git").exists()
 
         if repo_exists:
             skipped_repositories.append(
@@ -961,7 +1003,7 @@ def obtain_all_additional_swift_sources(
         )
 
         if args.use_submodules:
-            obtain_additional_swift_sources(new_args)
+            retried_obtain(new_args)
         else:
             pool_args.append(new_args)
 
@@ -976,9 +1018,7 @@ def obtain_all_additional_swift_sources(
     _move_llvm_project_to_first_index(pool_args)
     return (
         skipped_repositories,
-        ParallelRunner(
-            obtain_additional_swift_sources, pool_args, args.n_processes
-        ).run(),
+        ParallelRunner(retried_obtain, pool_args, args.n_processes).run(),
     )
 
 
@@ -1109,6 +1149,43 @@ def load_config(configs: List[str]) -> Dict[str, Any]:
     return config
 
 
+def hash_files(paths: List[Path]) -> Dict[Path, Optional[str]]:
+    """Map each path to a digest of its contents (None if unreadable)."""
+    result: Dict[Path, Optional[str]] = {}
+    for path in paths:
+        try:
+            result[path] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            result[path] = None
+    return result
+
+
+def hash_config(config: Dict[str, Any]) -> str:
+    """A digest of the contents of a loaded configuration."""
+    return hashlib.sha256(
+        json.dumps(config, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def script_file_paths() -> List[Path]:
+    """The files that make up update-checkout itself."""
+    paths = sorted(SCRIPT_DIR.rglob("*.py"))
+    paths.append(SCRIPT_DIR.parent.parent.joinpath("update-checkout"))
+    return paths
+
+
+def restart_script():
+    """Re-exec update-checkout so that it picks up its updated sources."""
+    print("update-checkout has been updated; restarting.", flush=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    argv = [sys.executable] + sys.argv
+    if sys.platform == "win32":
+        # os.execv doesn't behave like a real exec on Windows.
+        sys.exit(subprocess.call(argv))
+    os.execv(sys.executable, argv)
+
+
 def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
     branch = branch.replace("* ", "")
@@ -1195,11 +1272,15 @@ def main() -> int:
     if scheme_name is None:
         scheme_name = config["default-branch-scheme"]
 
-    scheme_map = get_scheme_map(config, scheme_name)
+    scheme_map = get_scheme_map_or_exit(config, scheme_name)
 
-    @exponential_retry(max_retries=args.max_retries)
+    # Updating the swift repository can change update-checkout itself or its
+    # configuration, so remember what they looked like when we started.
+    script_hashes = hash_files(script_file_paths())
+
+    @exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)
     def do_checkout() -> int:
-        nonlocal config, scheme_map
+        nonlocal config, scheme_map, script_hashes
         clone_results = None
         skip_repo_list = []
         if args.clone or args.clone_with_ssh:
@@ -1234,7 +1315,7 @@ def main() -> int:
 
                 # Re-read the config after checkout.
                 config = load_config(args.configs)
-                scheme_map = get_scheme_map(config, scheme_name)
+                scheme_map = get_scheme_map_or_exit(config, scheme_name)
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)
@@ -1250,9 +1331,53 @@ def main() -> int:
                 "Call this script with --clone to get them."
             )
 
-        skipped_repositories, update_results = update_all_repositories(
-            args, config, scheme_name, scheme_map, cross_repos_pr
-        )
+        # If updating changes the configuration, the set of repositories and
+        # the branches/tags we want may be different, so start the update again
+        # with the new configuration.  A change to update-checkout itself means
+        # we need to restart the whole script to pick up the new code.
+        max_config_restarts = 3
+        restarts = 0
+        config_hash = hash_config(config)
+        while True:
+            skipped_repositories, update_results = update_all_repositories(
+                args, config, scheme_name, scheme_map, cross_repos_pr
+            )
+
+            if hash_files(script_file_paths()) != script_hashes:
+                if args.restart == "all":
+                    restart_script()
+                print(
+                    "update-checkout has been updated; re-run it to use the"
+                    " new version.",
+                    flush=True,
+                )
+                # Don't repeat the message on later passes.
+                script_hashes = hash_files(script_file_paths())
+
+            new_config = load_config(args.configs)
+            new_config_hash = hash_config(new_config)
+            if new_config_hash == config_hash:
+                break
+
+            if args.restart == "never":
+                print(
+                    "Configuration changed; re-run update-checkout to apply"
+                    " the changes.",
+                    flush=True,
+                )
+                break
+
+            if restarts >= max_config_restarts:
+                print(
+                    "update-checkout: configuration keeps changing; "
+                    "giving up on restarting the update."
+                )
+                break
+            restarts += 1
+            print("Configuration changed; restarting update.", flush=True)
+            config = new_config
+            config_hash = new_config_hash
+            scheme_map = get_scheme_map_or_exit(config, scheme_name)
         SkippedReason.print_skipped_repositories(skipped_repositories, "update")
 
         fail_count = 0

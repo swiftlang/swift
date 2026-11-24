@@ -43,6 +43,10 @@ set(${PROJECT_NAME}_VENDOR_MODULE_DIR "${CMAKE_SOURCE_DIR}/../cmake/modules/vend
 find_package(SwiftCore REQUIRED)
 find_package(SwiftOverlay REQUIRED)
 
+if(APPLE)
+  find_package(SwiftDarwin)
+endif()
+
 include(GNUInstallDirs)
 
 include(AvailabilityMacros)
@@ -51,6 +55,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 
 option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
@@ -76,6 +81,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   $<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>)
 
 find_package(SwiftSwiftDirectRuntime)
@@ -101,11 +107,13 @@ gyb_expand(FloatingPointDifferentiation.swift.gyb
   FloatingPointDifferentiation.swift)
 
 add_library(swift_Differentiation
+  AdditiveArithmeticDifferentiation.swift
   AnyDifferentiable.swift
   ArrayDifferentiation.swift
   Differentiable.swift
   DifferentialOperators.swift
   DifferentiationUtilities.swift
+  NumericDifferentiation.swift
   OptionalDifferentiation.swift
   $<$<BOOL:${${PROJECT_NAME}_ENABLE_VECTOR_TYPES}>:SIMDDifferentiation.swift>
   TgmathDerivatives.swift
@@ -123,6 +131,7 @@ set_target_properties(swift_Differentiation PROPERTIES
 target_link_libraries(swift_Differentiation PRIVATE
   swiftCore
   $<$<PLATFORM_ID:Android>:swiftAndroid>
+  $<$<PLATFORM_ID:Darwin>:swiftDarwin>
   $<$<PLATFORM_ID:Windows>:swiftCRT>
   $<$<PLATFORM_ID:WASI>:swiftWASILibc>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)

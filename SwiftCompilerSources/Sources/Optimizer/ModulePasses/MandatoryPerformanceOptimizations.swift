@@ -34,6 +34,7 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
   // Types whose deinits have already been specialized, shared across the whole
   // pass so that no aggregate is walked twice.
   var handledDeinitTypes = Set<Type>()
+  var specializationHistory = SpecializationHistory()
   // For embedded Swift, optimize all the functions (there cannot be any
   // generics, type metadata, etc.)
   if moduleContext.options.enableEmbeddedSwift {
@@ -50,11 +51,35 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // existentials -- are handled in `optimize` when their instructions are
     // visited.
     specializeDeinitsOfEmittedMetadata(moduleContext, &handledDeinitTypes, &worklist)
+
+    // IRGen also emits the metadata of exported type specializations eagerly,
+    // even if nothing in this module uses them. A class's metadata contains
+    // its vtable, whose entries must be specialized. Usually an instruction
+    // using the class triggers that (see `optimize`), but an exported class
+    // specialization may have no such use, so specialize its vtable here.
+    for type in moduleContext.typesWithEmittedMetadata where type.isClass {
+      Optimizer.specializeVTable(forClassType: type, errorLocation: .artificialUnreachableLocation,
+                                 history: &specializationHistory, moduleContext) {
+        worklist.pushIfNotVisited($0)
+      }
+    }
+
+    // Likewise, IRGen emits the witness tables of `@export(interface)`
+    // conformances eagerly. Their base-protocol and associated conformance
+    // entries point directly to the witness tables of the nested
+    // conformances, which must be specialized if they are generic (e.g. the
+    // `SubSequence: Collection` conformance `Slice<Self>: Collection`).
+    for conformance in moduleContext.conformancesWithEagerlyEmittedWitnessTables {
+      if specializeWitnessTable(for: conformance, errorLocation: .artificialUnreachableLocation,
+                                history: &specializationHistory, moduleContext) {
+        worklist.addWitnessMethods(of: conformance, moduleContext)
+      }
+    }
   } else {
     worklist.addAllMandatoryRequiredFunctions(of: moduleContext)
   }
 
-  optimizeFunctionsTopDown(using: &worklist, &handledDeinitTypes, moduleContext)
+  optimizeFunctionsTopDown(using: &worklist, &handledDeinitTypes, &specializationHistory, moduleContext)
 
   // It's not required to set the perf_constraint flag on all functions in embedded mode.
   // Embedded mode already implies that flag.
@@ -65,11 +90,13 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
                                       _ handledDeinitTypes: inout Set<Type>,
+                                      _ specializationHistory: inout SpecializationHistory,
                                       _ moduleContext: ModulePassContext) {
   while let f = worklist.pop() {
     moduleContext.transform(function: f) { context in
       if context.loadFunction(function: f, loadCalleesRecursively: true) {
-        optimize(function: f, context, moduleContext, &worklist, &handledDeinitTypes)
+        optimize(function: f, context, moduleContext, &worklist, &handledDeinitTypes,
+                 &specializationHistory)
       }
     }
 
@@ -135,7 +162,9 @@ fileprivate struct PathFunctionTuple: Hashable {
   var function: Function
 }
 
-private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist, _ handledDeinitTypes: inout Set<Type>) {
+private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext,
+                      _ worklist: inout FunctionWorklist, _ handledDeinitTypes: inout Set<Type>,
+                      _ specializationHistory: inout SpecializationHistory) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
 
   // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
@@ -150,10 +179,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
   }
 
   func specializeVTable(for type: Type, instruction: Instruction) {
+    // A class type containing archetypes can appear in the unspecialized code
+    // of a class-bound generic function (e.g. a witness thunk). There is
+    // nothing to specialize the vtable with, so don't.
     if context.options.enableEmbeddedSwift,
-       type.isClass
+       type.isClass,
+       !type.hasArchetype
     {
-      Optimizer.specializeVTable(forClassType: type, errorLocation: instruction.location, moduleContext) {
+      Optimizer.specializeVTable(forClassType: type, errorLocation: instruction.location,
+                                 history: &specializationHistory, moduleContext) {
         worklist.pushIfNotVisited($0)
       }
     }
@@ -238,8 +272,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         if context.options.enableEmbeddedSwift {
           specializeDeinitsOfMetadata(for: initExRef.instance.type)
           for c in initExRef.conformances where c.isConcrete {
-            specializeWitnessTable(for: c, moduleContext)
-            worklist.addWitnessMethods(of: c, moduleContext)
+            if specializeWitnessTable(for: c, errorLocation: initExRef.location,
+                                      history: &specializationHistory, moduleContext) {
+              worklist.addWitnessMethods(of: c, moduleContext)
+            }
           }
         }
 
@@ -247,8 +283,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         if context.options.enableEmbeddedSwift {
           specializeDeinitsOfMetadata(for: initExAddr.formalConcreteType.loweredType(in: function))
           for c in initExAddr.conformances where c.isConcrete && !c.protocol.isMarkerProtocol {
-            specializeWitnessTable(for: c, moduleContext)
-            worklist.addWitnessMethods(of: c, moduleContext)
+            if specializeWitnessTable(for: c, errorLocation: initExAddr.location,
+                                      history: &specializationHistory, moduleContext) {
+              worklist.addWitnessMethods(of: c, moduleContext)
+            }
           }
         }
 
@@ -267,8 +305,10 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
              .BuildOrdinarySerialExecutorRef,
              .BuildComplexEqualitySerialExecutorRef:
           let conformance = bi.substitutionMap.conformances[0]
-          specializeWitnessTable(for: conformance, moduleContext)
-          worklist.addWitnessMethods(of: conformance, moduleContext)
+          if specializeWitnessTable(for: conformance, errorLocation: bi.location,
+                                    history: &specializationHistory, moduleContext) {
+            worklist.addWitnessMethods(of: conformance, moduleContext)
+          }
 
         default:
           _ = devirtualizeDeinits(of: bi, isMandatory: true, simplifyCtxt)
@@ -307,6 +347,15 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       default:
         break
       }
+    }
+
+    if context.unrollPackLoops(in: function) {
+      changed = true
+    }
+
+    // Eliminate @pack_element types here to allow any applies that use them to be specialized.
+    if tryEliminateOpenedPackElementTypes(in: function, context) {
+      changed = true
     }
 
     _ = context.specializeApplies(in: function, isMandatory: true)
@@ -648,6 +697,11 @@ extension FunctionWorklist {
       case let apply as ApplySite:
         if let callee = apply.referencedFunction {
           pushIfNotVisited(callee)
+        }
+      case let thinToThick as ThinToThickFunctionInst:
+        // A closure without a context.
+        if let fri = thinToThick.operand.value as? FunctionRefInst {
+          pushIfNotVisited(fri.referencedFunction)
         }
       case let kpi as KeyPathInst:
         // A key path pattern's accessor thunks are referenced by the pattern

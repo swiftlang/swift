@@ -60,10 +60,12 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
   llvm::SetVector<StringRef> Modules;
 
   // Find the imports in the main Swift code.
-  // We don't need `getTopLevelDeclsForDisplay()` here because we only care
-  // about `ImportDecl`s.
+  // Use `getTopLevelDecls()` rather than `getDisplayDecls()` because we only
+  // care about `ImportDecl`s, macros cannot introduce imports, and
+  // `-emit-imported-modules` is a parse-only action that must not trigger
+  // macro resolution or expansion.
   llvm::SmallVector<Decl *, 32> Decls;
-  mainModule->getDisplayDecls(Decls);
+  mainModule->getTopLevelDecls(Decls);
   for (auto D : Decls) {
     auto ID = dyn_cast<ImportDecl>(D);
     if (!ID)

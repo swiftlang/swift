@@ -66,7 +66,7 @@ namespace foo {
 
 // expected-expansion@+10:141{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ p: UnsafeMutableBufferPointer<CFloat>, _ extra: foo.foo_t) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload public func bar(_ p: UnsafeMutableBufferPointer<CFloat>, _ extra: foo.foo_t) {|}}
 //   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bar(p.baseAddress, len, extra)|}}
 //   expected-remark@5{{macro content: |}|}}
@@ -77,7 +77,7 @@ namespace foo {
 __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(1), count: \"len\"))"))) void bar(float *p, int len, foo::foo_t extra);
 // expected-expansion@+16:94{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bar2(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bar2(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
 //   expected-remark@3{{macro content: |    let len = foo.foo_t(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}
 //   expected-remark@5{{macro content: |        unsafe $0|}}
@@ -95,7 +95,7 @@ void bar2(const foo::foo_t * __counted_by(len) p __noescape, foo::foo_t len, foo
 namespace baz {
   // expected-expansion@+17:100{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public static func baz_func(_ p: Span<foo.foo_t>, _ extra: foo.foo_t) {|}}
   //   expected-remark@4{{macro content: |    let len = foo.foo_t(exactly: p.count)!|}}
   //   expected-remark@5{{macro content: |    let _pPtr = p.withUnsafeBufferPointer {|}}

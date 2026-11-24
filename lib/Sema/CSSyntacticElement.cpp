@@ -101,15 +101,15 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
                               ConstraintLocator *locator, bool isIsolated,
                               ArrayRef<TypeVariableType *> extraTypeVars) {
   SmallVector<Constraint *, 4> constraints;
-  SmallVector<TypeVariableType *, 2> referencedVars;
-  referencedVars.append(extraTypeVars.begin(), extraTypeVars.end());
+  SmallPtrSetVector<TypeVariableType *, 4> referencedVars;
+  referencedVars.insert(extraTypeVars.begin(), extraTypeVars.end());
 
   if (locator->directlyAt<ClosureExpr>()) {
     auto *closure = castToExpr<ClosureExpr>(locator->getAnchor());
     // Conjunction associated with the body of the closure has to
     // reference a type variable representing closure type,
     // otherwise it would get disconnected from its contextual type.
-    referencedVars.push_back(cs.getType(closure)->castTo<TypeVariableType>());
+    referencedVars.insert(cs.getType(closure)->castTo<TypeVariableType>());
 
     // Result builder could be generic but attribute allows its use
     // in "unbound" form (i.e. `@Builder` where `Builder` is defined
@@ -121,11 +121,8 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     // Conjunction needs to reference all the type variables associated
     // with result builder just like parameters and result type of
     // the closure in order to stay connected to its context.
-    if (auto builder = cs.getAppliedResultBuilderTransform(closure)) {
-      SmallPtrSet<TypeVariableType *, 4> builderVars;
-      builder->builderType->getTypeVariables(builderVars);
-      referencedVars.append(builderVars.begin(), builderVars.end());
-    }
+    if (auto builder = cs.getAppliedResultBuilderTransform(closure))
+      builder->builderType->getTypeVariables(referencedVars);
 
     // Body of the closure is always isolated from its context, only
     // its individual elements are allowed access to type information
@@ -135,7 +132,7 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
 
   if (locator->isForSingleValueStmtConjunction()) {
     auto *SVE = castToExpr<SingleValueStmtExpr>(locator->getAnchor());
-    referencedVars.push_back(cs.getType(SVE)->castTo<TypeVariableType>());
+    referencedVars.insert(cs.getType(SVE)->castTo<TypeVariableType>());
 
     // Single value statement conjunctions are always isolated, as we want to
     // solve the branches independently of the rest of the system.
@@ -183,11 +180,11 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
   if (constraints.empty())
     return;
 
-  for (auto *externalVar : paramCollector.getTypeVars())
-    referencedVars.push_back(externalVar);
+  referencedVars.insert(paramCollector.getTypeVars().begin(),
+                        paramCollector.getTypeVars().end());
 
   cs.addUnsolvedConstraint(Constraint::createConjunction(
-      cs, constraints, isIsolated, locator, referencedVars));
+      cs, constraints, isIsolated, locator, referencedVars.getArrayRef()));
 }
 
 ElementInfo makeElement(ASTNode node, ConstraintLocator *locator,

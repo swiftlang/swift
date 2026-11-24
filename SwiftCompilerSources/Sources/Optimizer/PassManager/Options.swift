@@ -32,8 +32,9 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
-  func enableAddressDependencies() -> Bool {
-    _bridged.enableAddressDependencies()
+  /// False if the mandatory verification is disabled for `function`, e.g. with `-sil-verify-none`.
+  func enableMandatoryVerification(for function: Function) -> Bool {
+    _bridged.enableMandatoryVerification(function.bridged)
   }
 
   var noAllocations: Bool {

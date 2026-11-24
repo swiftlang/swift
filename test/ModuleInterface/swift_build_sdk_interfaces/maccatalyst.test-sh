@@ -1,4 +1,5 @@
-RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/maccatalyst-sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output > %t.txt
+# Pipe through cat: on Windows, pool workers still starting up can overwrite output redirected straight to a file.
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/maccatalyst-sdk/ -Fsystem-iosmac SECRET_SEARCH_PATH -v -n -o %t/output | cat > %t.txt
 RUN: %FileCheck %s < %t.txt
 RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
 

@@ -10,7 +10,19 @@ import SwiftShims
 
 class X {}
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @test_unchecked_ref_cast
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @load_borrow_with_value_hint : $@convention(thin) (@inout X, @owned X) -> ()
+// CHECK:   %3 = load_borrow %0 : $*X, value_hint %1 : $X
+// CHECK: } // end sil function 'load_borrow_with_value_hint'
+sil [serialized] [ossa] @load_borrow_with_value_hint : $@convention(thin) (@inout X, @owned X) -> () {
+bb0(%0 : $*X, %1 : @owned $X):
+  destroy_value %1 : $X
+  %3 = load_borrow %0 : $*X, value_hint %1 : $X
+  end_borrow %3 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @test_unchecked_ref_cast
 sil [serialized] [ossa] @test_unchecked_ref_cast : $@convention(thin) (@guaranteed AnyObject) -> @owned X {
 bb0(%0 : @guaranteed $AnyObject):
   // CHECK: %1 = unchecked_ref_cast %0 : $AnyObject to $X, forwarding: @unowned
@@ -23,7 +35,21 @@ struct Wrapper {
   var _k: X
 }
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed X {
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @unchecked_ownership :
+// CHECK:         %2 = unchecked_ownership %1 : $Wrapper, forwarding: @none
+// CHECK-LABEL: } // end sil function 'unchecked_ownership'
+sil [serialized] [ossa] @unchecked_ownership : $@convention(thin) (@inout X, @owned Wrapper) -> () {
+bb0(%0 : $*X, %1 : @owned $Wrapper):
+  %2 = unchecked_ownership %1, forwarding: @none
+  %3 = struct_extract %2, #Wrapper._k
+  destroy_value %1
+  %5 = load_borrow %0, value_hint %3
+  end_borrow %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed X {
 // CHECK: bb0(%0 : $*Wrapper):
 // CHECK:   %1 = struct_element_addr %0 : $*Wrapper, #Wrapper._k
 // CHECK:   %2 = load_borrow %1 : $*X
@@ -37,7 +63,7 @@ bb0(%0 : $*Wrapper):
   return_borrow %2 from_scopes (%2)
 }
 
-// CHECK-LABEL: sil [serialized] [canonical] [ossa] @reborrowTest :
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @reborrowTest :
 // CHECK:       bb1:
 // CHECK-NEXT:    {{%.*}} = begin_borrow %0 : $X
 // CHECK:       bb2:

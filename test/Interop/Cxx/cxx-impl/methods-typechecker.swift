@@ -141,10 +141,9 @@ extension Rejections {
 }
 
 
-// Virtual
+// A virtual method matches like a non-virtual one.
 
 extension Polymorphic {
-  // expected-error@+2{{instance method 'virtualMethod()' cannot implement C++ function 'virtualMethod' because virtual methods are not yet supported}}
   @cxx @implementation
   func virtualMethod() -> Int32 { return 0 }
 }
@@ -169,7 +168,6 @@ extension Widget {
   @cxx @implementation
   func tag() -> Int32 { return id }
 
-  // expected-error@+2{{instance method 'describe()' cannot implement C++ function 'describe' because virtual methods are not yet supported}}
   @cxx @implementation
   func describe() -> Int32 { return id }
 

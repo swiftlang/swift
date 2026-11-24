@@ -189,7 +189,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(InterpolatedStringLiteralExpr, LiteralExpr, 32+20,
-    : NumPadBits,
     InterpolationCount : 20,
     LiteralCapacity : 32
   );
@@ -211,7 +210,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TupleElementExpr, Expr, 32,
-    : NumPadBits,
     FieldNo : 32
   );
 
@@ -222,7 +220,6 @@ protected:
     /// Whether this tuple has label locations.
     HasElementNameLocations : 1,
 
-    : NumPadBits,
     NumElements : 32
   );
 
@@ -230,13 +227,13 @@ protected:
     FunctionRefInfo : 4
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SubscriptExpr, LookupExpr, 2,
+  SWIFT_INLINE_BITFIELD(SubscriptExpr, LookupExpr, 2,
     Semantics : 2 // an AccessSemantics
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(DynamicSubscriptExpr, DynamicLookupExpr);
 
-  SWIFT_INLINE_BITFIELD_FULL(UnresolvedMemberExpr, Expr, 4,
+  SWIFT_INLINE_BITFIELD(UnresolvedMemberExpr, Expr, 4,
     FunctionRefInfo : 4
   );
 
@@ -253,7 +250,7 @@ protected:
     StringEncoding : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(ObjectLiteralExpr, LiteralExpr, 3,
+  SWIFT_INLINE_BITFIELD(ObjectLiteralExpr, LiteralExpr, 3,
     LitKind : 3
   );
 
@@ -315,7 +312,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
-    : NumPadBits,
     Depth : 16
   );
 
@@ -339,18 +335,15 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErasureExpr, ImplicitConversionExpr, 32+20,
-    : NumPadBits,
-    NumConformances : 32,
-    NumArgumentConversions : 20
+    NumArgumentConversions : 20,
+    NumConformances : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(UnresolvedSpecializeExpr, Expr, 32,
-    : NumPadBits,
     NumUnresolvedParams : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CaptureListExpr, Expr, 32,
-    : NumPadBits,
     NumCaptures : 32
   );
 
@@ -385,7 +378,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
-    : NumPadBits,
     NumElements : 32
   );
 
@@ -394,7 +386,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TypeJoinExpr, Expr, 32,
-    : NumPadBits,
     NumElements : 32
   );
 
@@ -549,9 +540,24 @@ public:
   }
   void setImplicit(bool Implicit = true);
 
+  /// Specifies which expressions \c getReferencedDecl() looks through when an
+  /// expression forwards the reference of a sub-expression, such as an
+  /// implicit conversion, `try`, or `&`.
+  enum class ReferencedDeclLookThrough {
+    /// Look through every expression that forwards a reference.
+    All,
+    /// Look through every expression that forwards a reference, except
+    /// parentheses.
+    AllExceptParens,
+    /// Don't look through any expressions, and return a reference only if this
+    /// expression holds it directly.
+    None,
+  };
+
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
+  ConcreteDeclRef getReferencedDecl(ReferencedDeclLookThrough lookThrough =
+                                        ReferencedDeclLookThrough::All) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.
@@ -3367,10 +3373,20 @@ public:
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
 class FunctionConversionExpr : public ImplicitConversionExpr {
+  bool WithoutActuallyDeiniting = false;
+
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
     : ImplicitConversionExpr(ExprKind::FunctionConversion, subExpr, type) {}
-  
+
+  /// Whether this conversion deliberately drops the exactly-once guarantee of
+  /// the operand. Sema only forms such a conversion for a call to
+  /// \c withoutActuallyDeiniting(_:do:).
+  bool isWithoutActuallyDeiniting() const { return WithoutActuallyDeiniting; }
+  void setWithoutActuallyDeiniting(bool value = true) {
+    WithoutActuallyDeiniting = value;
+  }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::FunctionConversion;
   }
@@ -4159,8 +4175,12 @@ public:
   /// Whether this closure is Sendable.
   bool isSendable() const;
 
-  /// Whether this closure could be called at most once.
-  bool isCalledOnce() const;
+  /// Whether this closure can be called at most once, which is true for both
+  /// at-most-once and exactly-once closures.
+  bool hasCalledAtMostOnceSemantics() const;
+
+  /// Whether calling this closure consumes it.
+  bool isCallConsuming() const;
 
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
@@ -6106,7 +6126,8 @@ public:
     static Component
     forSubscript(ASTContext &ctx, ConcreteDeclRef subscript,
                  ArgumentList *argList, Type elementType,
-                 ArrayRef<ProtocolConformanceRef> indexHashables);
+                 ArrayRef<ProtocolConformanceRef> indexHashables,
+                 SourceLoc loc);
 
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {
@@ -6480,7 +6501,7 @@ public:
   /// True if this key path expression has a leading dot.
   bool expectsContextualRoot() const { return HasLeadingDot; }
 
-  BoundGenericType *getKeyPathType() const;
+  NominalType *getKeyPathType() const;
 
   Type getRootType() const;
   Type getValueType() const;

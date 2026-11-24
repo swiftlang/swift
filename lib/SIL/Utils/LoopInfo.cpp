@@ -12,6 +12,7 @@
 
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/Dominance.h"
+#include "llvm/Support/GenericLoopInfoImpl.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -27,10 +28,10 @@ void SILLoop::dump() const {
 #endif
 }
 
-SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) : Dominance(DT) {
-  LI.analyze(*Dominance);
+SILLoopInfo::SILLoopInfo(SILFunction *F, DominanceInfo *DT) {
+  LI.analyze(*DT);
 }
 
 void SILLoopInfo::verify() const {
-  LI.verify(*Dominance);
+  LI.verify();
 }

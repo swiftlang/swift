@@ -35,6 +35,7 @@ public struct FirstSmallStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs16FirstSmallStructV") FirstSmallStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK FirstSmallStruct(const FirstSmallStruct &other) noexcept {
+// CHECK-NEXT:   if (!other._storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs16FirstSmallStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -43,7 +44,7 @@ public struct FirstSmallStruct {
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
-// CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:   vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
 // CHECK-NEXT:  SWIFT_INLINE_THUNK FirstSmallStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) noexcept : _storage(vwTable->size, vwTable->getAlignment()) {}
@@ -62,6 +63,7 @@ public struct FirstSmallStruct {
 // CHECK-EMPTY:
 // CHECK-NEXT:  swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT:  friend class _impl::_impl_FirstSmallStruct;
+// CHECK-NEXT:  friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -106,8 +108,13 @@ public struct FirstSmallStruct {
     private let storedInt: Int32
 }
 // CHECK: class SWIFT_SYMBOL("s:7Structs12FrozenStructV") FrozenStruct final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenStruct() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct(const FrozenStruct &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenStruct &operator =(const FrozenStruct &other) noexcept = default;
 // CHECK:        alignas(4) char _storage[4];
 // CHECK-NEXT:   friend class _impl::_impl_FrozenStruct;
+// CHECK-NEXT:   friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push
@@ -117,6 +124,30 @@ public struct FirstSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: };
+
+// A frozen outer type can contain a field whose ownership may change.
+// Knowledge of that field inside its defining module is not a client promise.
+@frozen public struct FrozenWithResilientField {
+    public let value: FirstSmallStruct
+}
+
+// CHECK: class SWIFT_SYMBOL({{.*}}) FrozenWithResilientField final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~FrozenWithResilientField() noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->destroy(_getOpaquePointer(), metadata._0);
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenWithResilientField(const FrozenWithResilientField &other) noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:   }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK FrozenWithResilientField &operator =(const FrozenWithResilientField &other) noexcept {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK: class _impl_FrozenWithResilientField {
+// CHECK:   static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// CHECK-NEXT:     auto metadata =
+// CHECK:         vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
 
 public struct LargeStruct {
     public let x1: Int
@@ -134,6 +165,7 @@ public struct LargeStruct {
 // CHECK: class SWIFT_SYMBOL("s:7Structs11LargeStructV") LargeStruct final {
 // CHECK-NEXT: public:
 // CHECK: SWIFT_INLINE_THUNK LargeStruct(const LargeStruct &other) noexcept {
+// CHECK-NEXT:   if (!other._storage.isAllocated()) return;
 // CHECK-NEXT:   auto metadata = _impl::$s7Structs11LargeStructVMa(0);
 // CHECK-NEXT:   auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
 // CHECK-NEXT: #ifdef __arm64e__
@@ -142,7 +174,7 @@ public struct LargeStruct {
 // CHECK-NEXT:   auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
 // CHECK-NEXT:   _storage = swift::_impl::OpaqueStorage(vwTable->size, vwTable->getAlignment());
-// CHECK-NEXT:   vwTable->initializeWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:   vwTable->initializeWithCopy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT: }
 // CHECK: private:
 // CHECK-NEXT:  SWIFT_INLINE_THUNK LargeStruct(swift::_impl::ValueWitnessTable * _Nonnull vwTable) noexcept : _storage(vwTable->size, vwTable->getAlignment()) {}
@@ -161,6 +193,7 @@ public struct LargeStruct {
 // CHECK-EMPTY:
 // CHECK-NEXT:  swift::_impl::OpaqueStorage _storage;
 // CHECK-NEXT:  friend class _impl::_impl_LargeStruct;
+// CHECK-NEXT:  friend struct ::swift::_impl::ValueTypeStorage;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: #pragma clang diagnostic push

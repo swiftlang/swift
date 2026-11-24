@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sroa %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Pair {
+  var first: Builtin.Int32
+  var second: Builtin.Int64
+}
+
+struct Wrapper {
+  var pair: (Builtin.Int32, Builtin.Int64)
+  var flag: Builtin.Int1
+}
+
+// Splitting a non-nested allocation must preserve the marker on every field.
+// The field allocations are deallocated while a later allocation is still live.
+// CHECK-LABEL: sil [ossa] @non_nested_struct
+// CHECK:      [[FIRST:%.*]] = alloc_stack [non_nested] $Builtin.Int32
+// CHECK-NEXT: [[SECOND:%.*]] = alloc_stack [non_nested] $Builtin.Int64
+// CHECK:      [[LATER:%.*]] = alloc_stack $Builtin.Int8
+// CHECK:      dealloc_stack [[SECOND]]
+// CHECK-NEXT: dealloc_stack [[FIRST]]
+// CHECK-NEXT: dealloc_stack [[LATER]]
+sil [ossa] @non_nested_struct : $@convention(thin) (Pair) -> Builtin.Int32 {
+bb0(%value: $Pair):
+  %storage = alloc_stack [non_nested] $Pair
+  store %value to [trivial] %storage : $*Pair
+  %later = alloc_stack $Builtin.Int8
+  %first = struct_element_addr %storage : $*Pair, #Pair.first
+  %result = load [trivial] %first : $*Builtin.Int32
+  dealloc_stack %storage : $*Pair
+  dealloc_stack %later : $*Builtin.Int8
+  return %result : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [ossa] @non_nested_tuple
+// CHECK:      [[FIRST:%.*]] = alloc_stack [non_nested] $Builtin.Int32
+// CHECK-NEXT: [[SECOND:%.*]] = alloc_stack [non_nested] $Builtin.Int64
+// CHECK:      [[LATER:%.*]] = alloc_stack $Builtin.Int8
+// CHECK:      dealloc_stack [[SECOND]]
+// CHECK-NEXT: dealloc_stack [[FIRST]]
+// CHECK-NEXT: dealloc_stack [[LATER]]
+sil [ossa] @non_nested_tuple : $@convention(thin) ((Builtin.Int32, Builtin.Int64)) -> Builtin.Int32 {
+bb0(%value: $(Builtin.Int32, Builtin.Int64)):
+  %storage = alloc_stack [non_nested] $(Builtin.Int32, Builtin.Int64)
+  store %value to [trivial] %storage : $*(Builtin.Int32, Builtin.Int64)
+  %later = alloc_stack $Builtin.Int8
+  %first = tuple_element_addr %storage : $*(Builtin.Int32, Builtin.Int64), 0
+  %result = load [trivial] %first : $*Builtin.Int32
+  dealloc_stack %storage : $*(Builtin.Int32, Builtin.Int64)
+  dealloc_stack %later : $*Builtin.Int8
+  return %result : $Builtin.Int32
+}
+
+// The marker must survive recursive splitting from a struct into a tuple and
+// then into scalars, including the scalar field of the outer struct.
+// CHECK-LABEL: sil [ossa] @non_nested_recursive
+// CHECK:      [[FIRST:%.*]] = alloc_stack [non_nested] $Builtin.Int32
+// CHECK-NEXT: [[SECOND:%.*]] = alloc_stack [non_nested] $Builtin.Int64
+// CHECK-NEXT: [[FLAG:%.*]] = alloc_stack [non_nested] $Builtin.Int1
+// CHECK:      [[LATER:%.*]] = alloc_stack $Builtin.Int8
+// CHECK:      dealloc_stack [[FLAG]]
+// CHECK-NEXT: dealloc_stack [[SECOND]]
+// CHECK-NEXT: dealloc_stack [[FIRST]]
+// CHECK-NEXT: dealloc_stack [[LATER]]
+sil [ossa] @non_nested_recursive : $@convention(thin) (Wrapper) -> Builtin.Int32 {
+bb0(%value: $Wrapper):
+  %storage = alloc_stack [non_nested] $Wrapper
+  store %value to [trivial] %storage : $*Wrapper
+  %later = alloc_stack $Builtin.Int8
+  %pair = struct_element_addr %storage : $*Wrapper, #Wrapper.pair
+  %first = tuple_element_addr %pair : $*(Builtin.Int32, Builtin.Int64), 0
+  %result = load [trivial] %first : $*Builtin.Int32
+  dealloc_stack %storage : $*Wrapper
+  dealloc_stack %later : $*Builtin.Int8
+  return %result : $Builtin.Int32
+}
+
+// Ordinary nested storage must still produce nested field allocations.
+// CHECK-LABEL: sil [ossa] @nested_tuple
+// CHECK:      [[FIRST:%.*]] = alloc_stack $Builtin.Int32
+// CHECK-NEXT: [[SECOND:%.*]] = alloc_stack $Builtin.Int64
+// CHECK:      dealloc_stack [[SECOND]]
+// CHECK-NEXT: dealloc_stack [[FIRST]]
+sil [ossa] @nested_tuple : $@convention(thin) ((Builtin.Int32, Builtin.Int64)) -> Builtin.Int32 {
+bb0(%value: $(Builtin.Int32, Builtin.Int64)):
+  %storage = alloc_stack $(Builtin.Int32, Builtin.Int64)
+  store %value to [trivial] %storage : $*(Builtin.Int32, Builtin.Int64)
+  %first = tuple_element_addr %storage : $*(Builtin.Int32, Builtin.Int64), 0
+  %result = load [trivial] %first : $*Builtin.Int32
+  dealloc_stack %storage : $*(Builtin.Int32, Builtin.Int64)
+  return %result : $Builtin.Int32
+}

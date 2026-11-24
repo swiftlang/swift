@@ -122,6 +122,53 @@ func captureImmutableOwned<T>(_ t: T) {
 }
 func captureImmutableOwned_callee(_ cl: () -> ()) {}
 
+// CaptureKind::Immutable, canGuarantee=false, isPack=false, noncopyable and address-only
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF : {{.*}} {
+// CHECK:         [[BOX:%[^,]+]] = alloc_box ${ let MOAny }
+// CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
+// CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
+// CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_
+// CHECK:         [[MARKED:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ADDR]]
+// CHECK:         [[COPY:%[^,]+]] = load [copy] [[MARKED]]
+// CHECK:         [[CONTEXT:%[^,]+]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[COPY]])
+// CHECK:         [[NOESCAPE_CONTEXT:%[^,]+]] = convert_escape_to_noescape [not_guaranteed] [[CONTEXT]]
+// CHECK:         apply {{%[^,]+}}([[NOESCAPE_CONTEXT]])
+// CHECK:         destroy_value [[NOESCAPE_CONTEXT]]
+// CHECK:         destroy_value [[CONTEXT]]
+// CHECK-NOT:     destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF'
+// CHECK-LABEL: sil private [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_ : {{.*}} {
+// CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $MOAny):
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]
+// CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_'
+struct MOAny : ~Copyable { var a: Any }
+func captureImmutableOwnedNoncopyable() {
+  let mo = MOAny(a: 1)
+  captureImmutableOwned_callee {
+    _ = mo.a
+  }
+}
+
+// CaptureKind::Immutable, settable: an autoclosure reads a `let` initialized
+// after its declaration as an lvalue, an owned read that copies the capture.
+// CHECK-LABEL: sil private [transparent] [ossa] [opaque] @$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_ : {{.*}} {
+// CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $T,
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]
+// CHECK:         apply {{%[^,]+}}<T>([[COPY]],
+// CHECK:         destroy_value [[COPY]]
+// CHECK-LABEL: } // end sil function '$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_'
+func captureImmutableInitializedAfterDecl<T: Comparable>(_ a: T, _ b: T, _ c: Bool) -> Bool {
+  let n: T
+  if c {
+    n = a
+  } else {
+    n = b
+  }
+  return c && n > b
+}
+
 // CaptureKind::StorageAddress, isMoveOnlyWrapped=false, isPack=false
 // CHECK-LABEL: sil {{.*}}[ossa] [opaque] @$s22opaque_values_closures21captureStorageAddressyyAA1GVyxGzlF : {{.*}} {
 // CHECK:       bb0([[ADDR:%[^,]+]] :

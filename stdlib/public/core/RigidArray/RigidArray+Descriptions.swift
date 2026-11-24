@@ -15,9 +15,7 @@
 // extension RigidArray: CustomStringConvertible where Element: ~Copyable {
 // }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   internal var description: String {
     /// FIXME: Print the item descriptions when available.
     "<\(count) items>"
@@ -29,9 +27,7 @@ extension _RigidArray where Element: ~Copyable {
 // extension RigidArray: CustomDebugStringConvertible where Element: ~Copyable {
 // }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   internal var debugDescription: String {
     /// FIXME: Print the item descriptions when available.
     "<\(count) items>"

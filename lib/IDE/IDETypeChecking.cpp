@@ -120,7 +120,7 @@ PrintOptions PrintOptions::printTypeInterface(Type T,
   result.TransformContext = TypeTransformContext(T);
   result.printExtensionContentAsMembers = [T](const ExtensionDecl *ED) {
     return isExtensionApplied(
-        T->getNominalOrBoundGenericNominal()->getDeclContext(), T, ED);
+        T->getNominalDecl()->getDeclContext(), T, ED);
   };
   result.CurrentPrintabilityChecker.reset(new ModulePrinterPrintableChecker());
   return result;

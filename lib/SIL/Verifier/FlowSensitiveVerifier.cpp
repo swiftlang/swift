@@ -39,7 +39,10 @@ struct BBState {
 
   CFGState CFG = CFGState::Normal;
 
-  GetAsyncContinuationInstBase *GotAsyncContinuation = nullptr;
+  /// The continuation that has been obtained but not yet awaited: the result of
+  /// a `get_async_continuation*`, or of a `getSplitContinuationAddr` builtin
+  /// which binds a continuation created in another function to this one.
+  SILValue GotAsyncContinuation;
 
   BBState() = default;
 
@@ -339,7 +342,8 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
 
         // Also track begin_apply's token as an ActiveOp so we can also verify
         // its joint dominance.
-        if (auto *bai = dyn_cast<BeginApplyInst>(&i)) {
+        if (auto *bai = dyn_cast<BeginApplyInst>(&i);
+            bai && !bai->isUnresolved()) {
           state.handleScopeInst(bai->getTokenResult());
         }
         continue;
@@ -417,6 +421,20 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         continue;
       }
 
+      // getSplitContinuationAddr obtains a continuation for this function
+      // just as get_async_continuation does, so it is subject to the same
+      // must-be-awaited-exactly-once rules.
+      if (auto *bi = dyn_cast<BuiltinInst>(&i)) {
+        if (bi->getBuiltinInfo().ID ==
+            BuiltinValueKind::GetSplitContinuationAddr) {
+          require(!state.GotAsyncContinuation,
+                  "getSplitContinuationAddr while unawaited continuation is "
+                  "already active");
+          state.GotAsyncContinuation = bi;
+          continue;
+        }
+      }
+
       auto *term = dyn_cast<TermInst>(&i);
       if (!term)
         continue;
@@ -446,7 +464,7 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
           if (isa<ReturnInst>(term) &&
               F->getLoweredFunctionType()->getCoroutineKind() ==
                   SILCoroutineKind::YieldOnce &&
-              F->getModule().getStage() != SILStage::Raw) {
+              F->getFunctionStage() != SILStage::Raw) {
             require(state.CFG == CFGState::YieldOnceResume,
                     "encountered 'return' before yielding a value in "
                     "yield_once coroutine");
@@ -571,7 +589,7 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
               // so we can't assert it yet in the raw stage.
             } else if (F->getLoweredFunctionType()->getCoroutineKind() ==
                            SILCoroutineKind::YieldOnce &&
-                       F->getModule().getStage() != SILStage::Raw) {
+                       F->getFunctionStage() != SILStage::Raw) {
               insertedState.CFG = CFGState::YieldOnceResume;
             }
           }

@@ -31,6 +31,7 @@ set(SWIFT_BENCH_MODULES
     single-source/AnyHashableWithAClass
     single-source/Array2D
     single-source/ArrayAppend
+    single-source/ArrayCastTest
     single-source/ArrayInClass
     single-source/ArrayLiteral
     single-source/ArrayOfGenericPOD
@@ -42,6 +43,7 @@ set(SWIFT_BENCH_MODULES
     single-source/ArraySliceTests
     single-source/ArraySubscript
     single-source/ArrayTests
+    single-source/AssumeIsolated
     single-source/AsyncTree
     single-source/BinaryFloatingPointConversionFromBinaryInteger
     single-source/BinaryFloatingPointProperties
@@ -72,6 +74,7 @@ set(SWIFT_BENCH_MODULES
     single-source/DataBenchmarks
     single-source/DeadArray
     single-source/DevirtualizeProtocolComposition
+    single-source/DistributedThunkHop
     single-source/DictOfArraysToArrayOfDicts
     single-source/DictTest
     single-source/DictTest2
@@ -190,6 +193,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SortLettersInPlace
     single-source/SortStrings
     single-source/SpanTests
+    single-source/SpecializedWitnessTable
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
@@ -207,11 +211,13 @@ set(SWIFT_BENCH_MODULES
     single-source/StringSplitting
     single-source/StringSwitch
     single-source/StringTests
+    single-source/StringValidating
     single-source/StringWalk
     single-source/SubstringTest
     single-source/Suffix
     single-source/SuperChars
     single-source/TaskGroups
+    single-source/TaskIDBenchmark
     single-source/TaskLocalGet
     single-source/TaskRegistryStress
     single-source/ToddCoxeter
@@ -220,13 +226,17 @@ set(SWIFT_BENCH_MODULES
     single-source/UTF8Decode
     single-source/UTF16Decode
     single-source/Walsh
+    single-source/Concurrency/AsyncStreamYield
     single-source/Concurrency/ChildTaskCreation
+    single-source/Concurrency/ClockMeasure
+    single-source/Concurrency/ContinuationResume
     single-source/Concurrency/TaskIsCancelledCancellationScopes
     single-source/Concurrency/TaskDeadlines
     single-source/WithUnsafeCurrentTask
     single-source/WordCount
     single-source/XorLoop
     cxx-source/CreateObjects
+    cxx-source/CxxAssignment
     cxx-source/CxxSetToCollection
     cxx-source/CxxSpanTests
     cxx-source/CxxStringConversion

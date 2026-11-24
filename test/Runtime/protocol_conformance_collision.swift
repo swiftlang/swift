@@ -42,9 +42,13 @@ extension Set: P {
   }
 }
 
+// The existential is created in a non-optimized function. This makes sure that its
+// witness table is instantiated at runtime, and not statically specialized for
+// `Set<CFString>` with the `CFString: Hashable` conformance of this module.
 @_optimize(none)
-func firstHashValue(_ x: P) -> Int {
-  x.firstHashValue()
+func firstHashValue(_ s: Set<CFString>) -> Int {
+  let x: P = s
+  return x.firstHashValue()
 }
 
 let osHasWorkaround: Bool

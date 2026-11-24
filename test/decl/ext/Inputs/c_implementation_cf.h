@@ -25,3 +25,5 @@ CFTypeRef CImplReturnsRetainedCFTypeRef(void);
 
 // Not ownership-audited: imported as returning 'Unmanaged<CFTypeRef>?'.
 CFTypeRef CImplReturnsUnauditedCFTypeRef(void);
+
+#include "c_implementation_cf_audited.h"

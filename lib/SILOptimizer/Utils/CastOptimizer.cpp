@@ -502,13 +502,13 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     return std::nullopt;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
-                        sourceFormalType.getNominalOrBoundGenericNominal(),
+                        sourceFormalType.getNominalDecl(),
                         ctx.Id_bridgeToObjectiveC,
                         Identifier());
   ArrayRef<ValueDecl *> resultsRef(results);
   if (resultsRef.empty()) {
     mod->lookupMember(
-        results, sourceFormalType.getNominalOrBoundGenericNominal(),
+        results, sourceFormalType.getNominalDecl(),
         ctx.Id_bridgeToObjectiveC, Identifier());
     resultsRef = results;
   }
@@ -817,10 +817,10 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   // and that one of the types is a class and another one is a struct.
   if (source.isAnyExistentialType() || target.isAnyExistentialType() ||
       source->is<ArchetypeType>() || target->is<ArchetypeType>() ||
-      (source.getClassOrBoundGenericClass() &&
-       !target.getStructOrBoundGenericStruct()) ||
-      (target.getClassOrBoundGenericClass() &&
-       !source.getStructOrBoundGenericStruct()))
+      (source.getClassDecl() &&
+       !target.getStructDecl()) ||
+      (target.getClassDecl() &&
+       !source.getStructDecl()))
     return nullptr;
 
   // Casts involving non-bound generic types cannot be optimized.
@@ -865,6 +865,22 @@ CastOptimizer::optimizeBridgedCasts(SILDynamicCastInst dynamicCast) {
   llvm_unreachable("Unknown kind of bridging");
 }
 
+/// Whether \p dest must be preserved in mandatory passes.
+static bool isVariableStorage(SILValue dest) {
+  auto *ASI = dyn_cast<AllocStackInst>(dest);
+  return ASI && ASI->getVarInfo();
+}
+
+/// Marks the variable stored in \p dest as optimized out, for when the cast
+/// that initializes \p dest is removed.
+static void killDestVariable(SILBuilder &B, SILValue dest) {
+  auto *ASI = dyn_cast<AllocStackInst>(dest);
+  if (!ASI)
+    return;
+  if (auto varInfo = ASI->getVarInfo())
+    B.createDebugValue(ASI->getLoc(), SILUndef::get(ASI), *varInfo);
+}
+
 //===----------------------------------------------------------------------===//
 //                         Cast Optimizer Public API
 //===----------------------------------------------------------------------===//
@@ -902,6 +918,9 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
   }
 
   bool ResultNotUsed = !Dest || isa<AllocStackInst>(Dest);
+  // When preserving debug info, a variable counts as a use.
+  if (Dest && preserveDebugInfo && isVariableStorage(Dest))
+    ResultNotUsed = false;
   if (ResultNotUsed && Dest) {
     for (auto Use : Dest->getUses()) {
       auto *User = Use->getUser();
@@ -942,6 +961,7 @@ SILInstruction *CastOptimizer::simplifyCheckedCastAddrBranchInst(
       // A test_only cast has no destination, and so no destroys of one to
       // clean up.
       if (Dest) {
+        killDestVariable(Builder, Dest);
         for (auto iter = Dest->use_begin(); iter != Dest->use_end();) {
           SILInstruction *user = (*iter++)->getUser();
           if (isa<DestroyAddrInst>(user))
@@ -1254,7 +1274,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   SILDynamicCastInst dynamicCast(Inst);
 
-  auto Op = dynamicCast.getSource();
+  auto Op = lookThroughOwnershipInsts(dynamicCast.getSource());
 
   // Try to simplify checked_cond_br instructions using existential
   // metatypes by propagating a concrete type whenever it can be
@@ -1277,7 +1297,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
     // Operand of the existential_metatype instruction.
-    auto Op = EMI->getOperand();
+    auto Op = lookThroughOwnershipInsts(EMI->getOperand());
     auto EmiTy = EMI->getType();
 
     // %0 = alloc_stack $T
@@ -1345,10 +1365,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     // %1 = metatype $A.Type
     // checked_cast_br %1, ....
     if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
-      SILValue op = FoundIERI->getOperand();
+      SILValue op = lookThroughOwnershipInsts(FoundIERI->getOperand());
       if (auto *eir = dyn_cast<EndInitLetRefInst>(op))
         op = eir->getOperand();
-      if (!isa<AllocRefInst>(op))
+      if (!isa<AllocRefInst>(lookThroughOwnershipInsts(op)))
         return nullptr;
 
       // Get the type used to initialize the existential.
@@ -1619,6 +1639,9 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
     SILValue dest = dynamicCast.getDest();
     bool ResultNotUsed = isa<AllocStackInst>(dest);
     DestroyAddrInst *DestroyDestInst = nullptr;
+    // When preserving debug info, a variable counts as a use.
+    if (preserveDebugInfo && isVariableStorage(dest))
+      ResultNotUsed = false;
     if (ResultNotUsed) {
       for (auto Use : dest->getUses()) {
         auto *User = Use->getUser();
@@ -1638,6 +1661,7 @@ SILInstruction *CastOptimizer::optimizeUnconditionalCheckedCastAddrInst(
       SILBuilderWithScope B(Inst, builderContext);
       if (!Inst->isCopy())
         B.createDestroyAddr(Loc, dynamicCast.getSource());
+      killDestVariable(B, dest);
       if (DestroyDestInst)
         eraseInstAction(DestroyDestInst);
       eraseInstAction(Inst);

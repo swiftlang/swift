@@ -14,6 +14,18 @@ import AST
 import SIL
 import OptimizerBridging
 
+extension Value {
+  /// Infers a user-facing name for this value, such as `x` or `x.y`, along with the value that introduces the named
+  /// variable. See `VariableNameInferrer` in C++.
+  var inferredNameAndRoot: (name: String, root: Value)? {
+    let inferred = VariableNameInferrer_inferNameAndRoot(bridged)
+    guard let root = inferred.root.value else {
+      return nil
+    }
+    return (StringRef(bridged: inferred.name).string, root)
+  }
+}
+
 // Default to SIL.Type within the Optimizer module.
 typealias Type = SIL.`Type`
 
@@ -290,7 +302,11 @@ extension FullApplySite {
 }
 
 extension ApplySite {
-  func replace(withCallTo callee: Function, arguments newArguments: [Value], _ context: some MutatingContext) {
+  /// Replaces this apply with an apply of `callee`, taking all other properties from the original apply.
+  /// Returns the new apply.
+  @discardableResult
+  func replace(withCallTo callee: Function, arguments newArguments: [Value],
+               _ context: some MutatingContext) -> ApplySite {
     let builder = Builder(before: self, context)
     let calleeRef = builder.createFunctionRef(callee)
 
@@ -305,8 +321,11 @@ extension ApplySite {
                                          applyInst.substitutionMap,
                                          arguments: newArguments,
                                          isNonThrowing: applyInst.isNonThrowing,
+                                         isNonAsync: applyInst.isNonAsync,
+                                         specializationInfo: applyInst.specializationInfo,
                                          argumentLocationsFrom: self)
       applyInst.replace(with: newApply, context)
+      return newApply
 
     case let partialAp as PartialApplyInst:
       let newApply = builder.createPartialApply(function: calleeRef,
@@ -316,24 +335,31 @@ extension ApplySite {
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
                                                 isOnStack: partialAp.isOnStack,
                                                 isNested:  partialAp.isNested,
-                                                isCalledOnce: partialAp.isCalledOnce,
+                                                executionSemantics: partialAp.executionSemantics,
                                                 argumentLocationsFrom: self)
       partialAp.replace(with: newApply, context)
+      return newApply
 
     case let tryApply as TryApplyInst:
-      builder.createTryApply(function: calleeRef,
-                             tryApply.substitutionMap,
-                             arguments: newArguments,
-                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
-                             argumentLocationsFrom: self)
+      let newApply = builder.createTryApply(function: calleeRef,
+                                            tryApply.substitutionMap,
+                                            arguments: newArguments,
+                                            normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
+                                            isNonAsync: tryApply.isNonAsync,
+                                            specializationInfo: tryApply.specializationInfo,
+                                            argumentLocationsFrom: self)
       context.erase(instruction: tryApply)
+      return newApply
 
     case let beginApply as BeginApplyInst:
       let newApply = builder.createBeginApply(function: calleeRef,
                                               beginApply.substitutionMap,
                                               arguments: newArguments,
+                                              isNonThrowing: beginApply.isNonThrowing,
+                                              isNonAsync: beginApply.isNonAsync,
                                               argumentLocationsFrom: self)
       beginApply.replace(with: newApply, context)
+      return newApply
 
     default:
       fatalError("unknown apply")
@@ -462,6 +488,12 @@ extension Value {
     let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
+  }
+
+  /// Whether a use lets a pointer to this value escape, so that its liveness can't be derived from its uses.
+  /// An escape nested within a borrow scope is bounded by that scope instead.
+  var hasDirectPointerEscape: Bool {
+    uses.contains { $0.ownership == .pointerEscape || $0.ownership == .forwardingUnowned }
   }
 }
 
@@ -889,6 +921,28 @@ extension FunctionPassContext {
   }
 }
 
+extension MutatingContext {
+  /// Splits the block before `inst` into a diamond that branches on `condition`:
+  /// ```
+  ///   start:      cond_br condition, trueBlock, falseBlock
+  ///   trueBlock:  br cont
+  ///   falseBlock: br cont
+  ///   cont:       <inst> ...
+  /// ```
+  /// Returns the branch ending each side, before which that side's code is inserted.
+  func splitIntoDiamond(before inst: Instruction, on condition: Value) -> (ifTrue: BranchInst, ifFalse: BranchInst) {
+    let start = inst.parentBlock
+    let cont = splitBlock(before: inst)
+    let trueBlock = createBlock(after: start)
+    let falseBlock = createBlock(after: trueBlock)
+    let ifTrue = Builder(atEndOf: trueBlock, location: inst.location, self).createBranch(to: cont)
+    let ifFalse = Builder(atEndOf: falseBlock, location: inst.location, self).createBranch(to: cont)
+    Builder(atEndOf: start, location: inst.location, self)
+      .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
+    return (ifTrue, ifFalse)
+  }
+}
+
 extension BasicBlock {
   func dropAllReferences(_ context: FunctionPassContext) {
     for arg in arguments {
@@ -1006,6 +1060,12 @@ extension Function {
     }
     return dynamicSelf.uses.contains { $0.isTypeDependent }
   }
+
+  /// The blocks whose terminator exits the function. The CFG must not change while iterating.
+  /// NOTE: This scans the entire function!
+  var exitingBlocks: LazyFilterSequence<BasicBlockList> {
+    return blocks.lazy.filter { $0.terminator.isFunctionExiting }
+  }
 }
 
 extension FullApplySite {
@@ -1095,8 +1155,19 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
 
 func isCastSupportedInEmbeddedSwift(from sourceType: Type,
                                     to destType: Type ) -> Bool {
-  if !sourceType.isExistential {
+  // The runtime unwraps an Optional source, so an Optional of an existential
+  // works as well as the existential.
+  var source = sourceType.rawType
+  while source.isOptional {
+    source = source.optionalObjectType
+  }
+  if !source.isExistential {
     return false
+  }
+  // Unwrapping Optionals down to exactly the destination existential only
+  // checks for `nil`; the runtime answers it by matching metadata.
+  if destType.isExistential {
+    return source.canonical == destType.rawType.canonical
   }
   if destType.hasArchetype {
     return false
@@ -1255,8 +1326,8 @@ extension Type {
   }
 }
 
-/// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
-/// `copy_addr` and `load`-`store`-pairs.
+/// Used by LoopInvariantCodeMotion, TempLValueElimination and TempRValueElimination to make the optimization work
+/// by both, `copy_addr` and `load`-`store`-pairs.
 protocol CopyLikeInstruction: Instruction {
   var sourceAddress: Value { get }
   var destinationAddress: Value { get }
@@ -1281,12 +1352,19 @@ extension StoreInst: CopyLikeInstruction {
   private var load: LoadInst { source as! LoadInst }
 }
 
-func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
+/// Erase the functions that are not referenced.
+///
+/// If `ignoringDebuggerPreservation` is true, a private function is erased even if it is kept for
+/// the debugger at -Onone: it can't be used externally otherwise.
+func eraseIfDead(functions: [Function], _ context: ModulePassContext,
+                 ignoringDebuggerPreservation: Bool = false) {
   var toDelete = functions
   while true {
     var remaining = [Function]()
     for fn in toDelete {
-      if !fn.isPossiblyUsedExternally && !fn.isReferencedInModule {
+      let isUsedExternally = fn.isPossiblyUsedExternally &&
+        !(ignoringDebuggerPreservation && fn.linkage == .private)
+      if !isUsedExternally && !fn.isReferencedInModule {
         context.erase(function: fn)
       } else {
         remaining.append(fn)

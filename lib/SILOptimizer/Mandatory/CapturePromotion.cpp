@@ -589,8 +589,7 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
   if (SILValue value = getProjectBoxMappedVal(inst->getSingleOperand())) {
     getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     auto varInfo = *inst->getVarInfo();
-    if (varInfo.Scope)
-      varInfo.Scope = getOpScope(inst->getDebugScope());
+    varInfo.Scope = getOpScope(varInfo.Scope);
     // The operand is promoted from a project_box (address), to an object
     // type: strip the leading op_deref.
     ASSERT(!inst->getDebugReconstructionBlock() &&
@@ -643,7 +642,7 @@ void ClosureCloner::visitEndBorrowInst(EndBorrowInst *inst) {
   SILValue operand = inst->getOperand();
 
   if (auto *lbi = dyn_cast<LoadBorrowInst>(operand)) {
-    SILValue op = lbi->getOperand();
+    SILValue op = lbi->getAddress();
     // When we check if we can do this, we only need to look through a single
     // struct_element_addr since when checking if this is safe, we only look
     // through a single struct_element_addr.
@@ -705,7 +704,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
   getBuilder().setCurrentDebugScope(getOpScope(lbi->getDebugScope()));
   assert(lbi->getFunction()->hasOwnership() &&
          "We should only see a load borrow in ownership qualified SIL");
-  if (SILValue value = getProjectBoxMappedVal(lbi->getOperand())) {
+  if (SILValue value = getProjectBoxMappedVal(lbi->getAddress())) {
     // Loads of the address argument get eliminated completely; the uses of
     // the loads get mapped to uses of the new object type argument.
     //
@@ -717,7 +716,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     return;
   }
 
-  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getOperand());
+  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getAddress());
   if (!seai) {
     SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
     return;
@@ -1365,30 +1364,31 @@ examineAllocBoxInst(AllocBoxInst *abi, ReachabilityInfo &ri,
              << "Checking for any mutations that invalidate captures...\n");
   // Loop over all mutations to possibly invalidate captures.
   for (auto *use : state.accumulatedMutations) {
-    auto iter = im.begin();
-    while (iter != im.end()) {
-      auto *user = use->getUser();
-      auto *pai = iter->first;
+    auto *user = use->getUser();
+    // NOTE: We must not erase from \p im while iterating over it. Erasing from
+    // a DenseMap invalidates every iterator into it, since the surviving
+    // entries may be relocated to close the hole left behind. Use remove_if,
+    // which performs all of the erasures in a single pass, instead.
+    im.remove_if([&](const auto &entry) {
+      auto *pai = entry.first;
       // The mutation invalidates a capture if it occurs in a block reachable
       // from the block the partial_apply is in, or if it is in the same
       // block is after the partial_apply.
-      if (ri.isReachable(pai->getParent(), user->getParent()) ||
-          (pai->getParent() == user->getParent() && isAfter(pai, user))) {
-        // If our partial apply is concurrent and we can not promote this, emit
-        // a warning that shows the variable, where the variable is captured,
-        // and the mutation that we found.
-        if (pai->getFunctionType()->isSendable()) {
-          diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
-        }
+      if (!ri.isReachable(pai->getParent(), user->getParent()) &&
+          !(pai->getParent() == user->getParent() && isAfter(pai, user)))
+        return false;
 
-        LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
-        LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
-        auto prev = iter++;
-        im.erase(prev);
-        continue;
+      // If our partial apply is concurrent and we can not promote this, emit a
+      // warning that shows the variable, where the variable is captured, and
+      // the mutation that we found.
+      if (pai->getFunctionType()->isSendable()) {
+        diagnoseInvalidCaptureByConcurrentClosure(abi, pai, state, user);
       }
-      ++iter;
-    }
+
+      LLVM_DEBUG(llvm::dbgs() << "    Invalidating: " << *pai);
+      LLVM_DEBUG(llvm::dbgs() << "    Because of user: " << *user);
+      return true;
+    });
 
     // If there are no valid captures left, then stop.
     if (im.empty()) {
@@ -1580,7 +1580,8 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
       pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isCalledOnce(), pai->isOnStack(), pai->isStackAllocationNested(),
+      pai->getExecutionSemantics(), pai->isOnStack(),
+      pai->isStackAllocationNested(),
       /*SpecializationInfo=*/nullptr, ApplySite(pai).getArgumentLocs());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();

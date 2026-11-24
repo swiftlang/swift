@@ -167,6 +167,10 @@ void swift::rewriting::applyInverses(
 
   // Summarize the inverses and diagnose ones that are incorrect.
   llvm::DenseMap<CanType, InvertibleProtocolSet> inverses;
+
+  // The inverses stated on each subject, before same-type constraints merge
+  // subjects together.
+  llvm::DenseMap<CanType, InvertibleProtocolSet> statedInverses;
   for (auto inverse : inverseList) {
     auto canSubject =
         stripBoundDependentMemberTypes(inverse.subject)->getCanonicalType();
@@ -209,15 +213,37 @@ void swift::rewriting::applyInverses(
       continue;
     }
 
+    auto inverseKind = inverse.getKind();
+    statedInverses[canSubject].insert(inverseKind);
+
     auto &state = inverses[representativeSubject];
 
     // Check if this inverse has already been seen.
-    auto inverseKind = inverse.getKind();
     if (state.contains(inverseKind))
       continue;
 
     state.insert(inverseKind);
     inverses[representativeSubject] = state;
+  }
+
+  // If Copyable implies Deinitable, then `~Deinitable` requires `~Copyable` on
+  // the same subject, even if a same-type constraint makes the subject
+  // equivalent to one that suppresses Copyable.
+  bool copyableImpliesDeinitable =
+      InverseRequirement::copyableImpliesDeinitable(ctx);
+  if (copyableImpliesDeinitable) {
+    for (auto inverse : inverseList) {
+      if (inverse.getKind() != InvertibleProtocolKind::Deinitable)
+        continue;
+      auto canSubject =
+          stripBoundDependentMemberTypes(inverse.subject)->getCanonicalType();
+      auto found = statedInverses.find(canSubject);
+      if (found != statedInverses.end() &&
+          !found->second.contains(InvertibleProtocolKind::Copyable)) {
+        errors.push_back(
+            RequirementError::forDeinitableInverseRequiresNoncopyable(inverse));
+      }
+    }
   }
 
   // Fast-path: if there are no valid inverses or same-type constraints, then
@@ -227,7 +253,12 @@ void swift::rewriting::applyInverses(
   }
 
   // Scan the structural requirements and cancel out any inferred requirements
-  // based on the inverses we saw.
+  // based on the inverses we saw. A subject that suppresses Copyable still
+  // needs the Deinitable default, which Copyable would otherwise imply.
+  SmallVector<StructuralRequirement, 2> deinitableDefaults;
+  auto *deinitableProto = copyableImpliesDeinitable
+                              ? ctx.getProtocol(KnownProtocolKind::Deinitable)
+                              : nullptr;
   result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
     auto req = structReq.req;
 
@@ -260,6 +291,18 @@ void swift::rewriting::applyInverses(
       return false;
     }
     auto recordedInverses = foundInverses->getSecond();
-    return recordedInverses.contains(*proto);
+    if (!recordedInverses.contains(*proto))
+      return false;
+
+    if (*proto == InvertibleProtocolKind::Copyable && deinitableProto &&
+        !recordedInverses.contains(InvertibleProtocolKind::Deinitable)) {
+      deinitableDefaults.push_back(
+          {{RequirementKind::Conformance, req.getFirstType(),
+            deinitableProto->getDeclaredInterfaceType()},
+           structReq.loc});
+    }
+    return true;
   }), result.end());
+
+  result.append(deinitableDefaults);
 }

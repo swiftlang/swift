@@ -162,6 +162,10 @@ struct AddressableInt {
   }
 }
 
+struct NCAddressableIntHolder: ~Copyable {
+  var addressableInt: AddressableInt
+}
+
 @_addressableForDependencies
 struct AddressableObject {
   let object: AnyObject
@@ -783,13 +787,19 @@ func testBorrowedAddressableInt(arg: Holder) -> Int {
 }
 
 // unsafeAddress generates an addressable value.
-// Error returning a dependence on its local scope.
+// rdar://155572008: the dependence on the unsafeAddress projection is forwarded to 'arg'.
 @_lifetime(borrow arg)
 func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   arg.addressableInt.span()
-  // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-} // expected-note  {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Variation of testBorrowedAddressableIntReturn: project through UnsafeMutableBufferPointer's unsafeAddress
+// subscript, then a stored property of a ~Copyable element.
+@_lifetime(borrow arg)
+func testBorrowedAddressableIntBufferReturn(arg: UnsafeMutableBufferPointer<NCAddressableIntHolder>, i: Int)
+  -> Span<Int> {
+  arg[i].addressableInt.span()
+}
 
 // =============================================================================
 // Closures

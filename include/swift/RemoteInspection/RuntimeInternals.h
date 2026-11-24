@@ -158,6 +158,13 @@ struct FutureAsyncContextPrefix {
   typename Runtime::StoredPointer ErrorResult;
 };
 
+/// Precedes the bare initial `AsyncContext` of a synchronous operation task.
+template <typename Runtime>
+struct SynchronousDiscardingContextPrefix {
+  typename Runtime::StoredSignedPointer Function;
+  typename Runtime::StoredPointer ClosureContext;
+};
+
 template <typename Runtime>
 struct alignas(2 * sizeof(typename Runtime::StoredPointer))
     ActiveActorStatusWithEscalation {
@@ -196,15 +203,28 @@ struct TaskGroupTaskStatusRecord : TaskStatusRecord<Runtime> {
   typename Runtime::StoredPointer FirstChild;
 };
 
+/// Mirror of `TaskDependencyStatusRecord` in include/swift/ABI/TaskStatus.h.
+template <typename Runtime>
+struct TaskDependencyStatusRecord : TaskStatusRecord<Runtime> {
+  // A union whose largest member is a SerialExecutorRef.
+  typename Runtime::StoredPointer DependentOn[2];
+  uint32_t DependencyKind;
+  typename Runtime::StoredPointer NextWaitingTask;
+
+  static const uint32_t WaitingOnTask = 1;
+};
+
 template <typename Runtime>
 struct ChildFragment {
   typename Runtime::StoredPointer Parent;
   typename Runtime::StoredPointer NextChild;
+  typename Runtime::StoredPointer PrevChild;
 };
 
 template <typename Runtime>
 struct GroupChildFragment {
   typename Runtime::StoredPointer Group;
+  typename Runtime::StoredPointer NextReadyTaskAndErrorFlag;
 };
 
 /// Mirror of `AsyncTask::NameFragment` in include/swift/ABI/Task.h.

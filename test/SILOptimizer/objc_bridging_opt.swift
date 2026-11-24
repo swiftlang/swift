@@ -95,6 +95,24 @@ func testNonOptionalNullString() {
   useNSString(returnNullNSString())
 }
 
+@inline(never)
+func testMutableString() {
+  let x = NSMutableString()
+  let s = (x as String)
+  let y = s as NSString
+  x.append("abc")
+  let z = s as NSString
+  print(s.count, y.length, z.length)
+}
+
+@inline(never)
+func testOptionalMutableString(_ x: NSMutableString?) {
+  let s = (x as String?)
+  let y = s as NSString?
+  x?.append("abc")
+  let z = s as NSString?
+  print(s!.count, y!.length, z!.length)
+}
 
 // CHECK-LABEL: testNonOptionalString
 print("testNonOptionalString:")
@@ -153,5 +171,19 @@ print("end")
 print("testNonOptionalNullString:")
 // CHECK-NEXT: <empty>
 testNonOptionalNullString()
+// CHECK-NEXT: end
+print("end")
+
+// CHECK-LABEL: testMutableString
+print("testMutableString:")
+// CHECK-NEXT: 0 0 0
+testMutableString()
+// CHECK-NEXT: end
+print("end")
+
+// CHECK-LABEL: testOptionalMutableString
+print("testOptionalMutableString:")
+// CHECK-NEXT: 0 0 0
+testOptionalMutableString(NSMutableString())
 // CHECK-NEXT: end
 print("end")

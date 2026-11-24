@@ -102,7 +102,7 @@ func transpose(v: Float) -> Float
 
 func testLocalTransposeRegistration() {
   // Transpose registration can only be non-local.
-  // expected-error @+1 {{attribute '@transpose' can only be used in a non-local scope}}
+  // expected-error @+1 {{'@transpose' can only be used in a non-local scope}}
   @transpose(of: +)
   func transpose(_ x: Float) -> (Float, Float)
 }

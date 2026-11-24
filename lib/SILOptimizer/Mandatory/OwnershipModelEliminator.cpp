@@ -213,6 +213,11 @@ struct OwnershipModelEliminatorVisitor
     return true;
   }
 
+  bool visitUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    eraseInstructionAndRAUW(uoi, uoi->getOperand());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);
@@ -328,16 +333,20 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
 }
 
 bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // Break down the load borrow into an unqualified load.
-  auto newLoad =
-      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
-        return b.createLoad(loc, lbi->getOperand(),
-                            LoadOwnershipQualifier::Unqualified);
-      });
+  SILValue newValue;
+  if (lbi->hasValueHint()) {
+    newValue = lbi->getValueHint();
+  } else {
+    // Break down the load borrow into an unqualified load.
+    newValue = withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+          return b.createLoad(loc, lbi->getAddress(),
+                              LoadOwnershipQualifier::Unqualified);
+        });
+  }
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  eraseInstructionAndRAUW(lbi, newLoad);
+  eraseInstructionAndRAUW(lbi, newValue);
   return true;
 }
 
@@ -480,25 +489,32 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   // Escaping closures don't need attention beyond what we already perform.
   if (!inst->isOnStack())
     return false;
-  
-  // A nonescaping closure borrows its captures, but now that we've lowered
-  // those borrows away, we need to make those dependence relationships explicit
-  // so that the optimizer continues respecting them.
+
+  // A nonescaping closure borrows its captures (note that a noncopyable
+  // closure is allowed to also consume its captures), but now
+  // that we've lowered those borrows away, we need to make those dependence
+  // relationships explicit so that the optimizer continues respecting them.
   MarkDependenceInst *firstNewMDI = nullptr;
   auto newValue = withBuilder<SILValue>(inst->getNextInstruction(),
                                         [&](SILBuilder &b, SILLocation loc) {
     SILValue newValue = inst;
-    for (auto op : inst->getArguments()) {
+    for (auto &argOp : inst->getArgumentOperands()) {
+      SILValue op = argOp.get();
       // Trivial types have infinite lifetimes already.
       if (op->getType().isTrivial(*inst->getFunction())) {
-        break;
+        continue;
       }
       // Address operands should already have their dependence marked, since
       // borrowing doesn't model values in memory.
       if (op->getType().isAddress()) {
-        break;
+        continue;
       }
-      
+
+      // In the noncopyable case, consumed captures don't need the
+      // dependence but the borrowed ones still do.
+      if (!inst->contextBorrowsArgument(argOp))
+        continue;
+
       // If this is a nontrivial value argument, insert the mark_dependence.
       auto mdi = b.createMarkDependence(loc, newValue, op,
                                         MarkDependenceKind::Escaping);
@@ -541,7 +557,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto loc = destroy->getLoc();
   auto operand = destroy->getOperand();
   auto operandTy = operand->getType();
-  NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
+  NominalTypeDecl *nominalDecl = operandTy.getNominalDecl();
 
   if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {
@@ -796,26 +812,31 @@ static bool stripOwnership(SILFunction &func) {
   func.setOwnershipEliminated();
 
   // Now that we are in non-ossa, create dealloc_stack at partial_apply's
-  // lifetime ends
+  // lifetime ends. If a call consumes the context of a noncopyable closure,
+  // the `dealloc_stack` may need its nesting fixed afterwards, e.g. if the
+  // context is allocated before a stack location that is deallocated after the
+  // call.
+  bool madeChange = false;
   for (auto &it : lifetimeEnds) {
     auto *pai = it.first;
     for (auto *lifetimeEnd : it.second) {
-      // A `@called(once)` closure's context can be consumed directly by a
+      // A noncopyable closure's context can be consumed directly by a
       // `try_apply`, which is a terminator, so the `dealloc_stack` has to
       // go at the start of every successor block instead.
       if (auto *term = dyn_cast<TermInst>(lifetimeEnd)) {
         for (auto *successor : term->getSuccessorBlocks()) {
           SILBuilderWithScope(successor->begin())
               .createDeallocStack(lifetimeEnd->getLoc(), pai);
+          madeChange = true;
         }
         continue;
       }
       SILBuilderWithScope(lifetimeEnd->getNextInstruction())
           .createDeallocStack(lifetimeEnd->getLoc(), pai);
+      madeChange = true;
     }
   }
 
-  bool madeChange = false;
   SmallVector<SILInstruction *, 32> createdInsts;
   OwnershipModelEliminatorVisitor visitor(func);
 
@@ -914,8 +935,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
             "Found verification error when verifying before lowering "
             "ownership. Please re-run with -sil-verify-all to identify the "
             "actual pass that introduced the verification error.");
-        f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
-        getPassManager()->runSwiftFunctionVerification(&f);
+        // The mandatory verification checks linear lifetimes and additional
+        // OSSA invariants, such as borrowed-from and reborrow flags. In
+        // contrast to the SIL verifier, it also runs in compilers built without
+        // assertions.
+        getPassManager()->runVerification(&f);
       }
 
       if (stripOwnership(f)) {

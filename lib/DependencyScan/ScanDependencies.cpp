@@ -207,6 +207,35 @@ private:
       commandline.push_back(arg);
     }
 
+    // Pass the in-process plugin server path if any library plugin above is
+    // loaded in-process.
+    auto &inProcPluginServerPath =
+        instance.getInvocation().getSearchPathOptions().InProcessPluginServerPath;
+    bool needInProcPluginServer = llvm::any_of(
+        depInfo.getMacroDependencies(), [](const auto &macro) {
+          return !macro.second.LibraryPath.empty() &&
+                 macro.second.ExecutablePath.empty();
+        });
+    if (needInProcPluginServer && !inProcPluginServerPath.empty()) {
+      commandline.push_back("-resolved-in-process-plugin-server-path");
+      commandline.push_back(mapPath(inProcPluginServerPath));
+    }
+
+    // If the localized messages in the toolchain are used, pass their
+    // directory so the main module reads them from the CASFS.
+    auto &invocation = instance.getInvocation();
+    if (depInfo.isSwiftSourceModule() &&
+        invocation.getCASOptions().EnableCaching) {
+      std::string localizationPath = invocation.getLocalizationPath(
+          *instance.getSourceMgr().getFileSystem());
+      if (!localizationPath.empty() &&
+          localizationPath !=
+              invocation.getDiagnosticOptions().LocalizationPath) {
+        commandline.push_back("-localization-path");
+        commandline.push_back(scanner.remapPath(localizationPath));
+      }
+    }
+
     // Update CAS dependencies.
     if (auto err = collectCASDependencies(depInfo))
       return err;
@@ -433,7 +462,7 @@ private:
     auto sdkPath = instance.getASTContext().SearchPathOpts.getSDKPath();
     SwiftInterfaceModuleOutputPathResolution::setOutputPath(
         outputPath, moduleID.ModuleName, interfacePath, sdkPath, CI,
-        extraArgsList);
+        extraArgsList, *instance.getSourceMgr().getFileSystem());
 
     return;
   }
@@ -446,6 +475,17 @@ private:
     commandline.push_back(outputName.str());
 
     return;
+  }
+
+  void trackMacroPlugins(const ModuleDependencyInfo &dependencyInfo) {
+    for (const auto &entry : dependencyInfo.getMacroDependencies()) {
+      // An executable plugin has no library and is the implementation itself,
+      // so it needs to be tracked. The plugin server paired with a library is
+      // from the toolchain and covered by the compiler version.
+      const auto &plugin = entry.second;
+      tracker->trackFile(plugin.LibraryPath.empty() ? plugin.ExecutablePath
+                                                    : plugin.LibraryPath);
+    }
   }
 
   bool collectCASDependencies(ModuleDependencyInfo &dependencyInfoCopy) {
@@ -461,10 +501,7 @@ private:
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       StringRef readLegacyTypeInfoPath =
           instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
       if (!readLegacyTypeInfoPath.empty()) {
@@ -510,10 +547,7 @@ private:
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
@@ -548,7 +582,8 @@ private:
       for (auto &c : ArrayRef<std::string>(commandLine).drop_front(1))
         Args.push_back(c.c_str());
 
-    auto base = createCompileJobBaseCacheKey(CAS, Args);
+    auto base = createCompileJobBaseCacheKey(
+        CAS, Args, *instance.getSourceMgr().getFileSystem());
     if (!base) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cache_key_creation,
                                    moduleID.ModuleName,
@@ -915,6 +950,7 @@ static swiftscan_dependency_graph_t generateFullDependencyGraph(
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
+            create_set(clangDeps->directoryDependencies),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
       }
@@ -1394,8 +1430,22 @@ performModuleScanImpl(
     SwiftDependencyScanningService &service, CompilerInstance *instance,
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
+  // Configure the scanning service before creating the scanner, and therefore
+  // before any Clang scanning worker builds its file system.
+  if (service.setupDependencyScanningService(*instance))
+    return std::make_error_code(std::errc::invalid_argument);
+
   const ASTContext &ctx = instance->getASTContext();
   const FrontendOptions &opts = instance->getInvocation().getFrontendOptions();
+
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
+
   // Load the dependency cache if -reuse-dependency-scan-cache
   // is specified
   if (opts.ReuseDependencyScannerCache) {
@@ -1406,7 +1456,8 @@ performModuleScanImpl(
     llvm::sys::TimePoint<> serializedCacheTimeStamp;
     bool loadFailure =
         module_dependency_cache_serialization::readInterModuleDependenciesCache(
-            cachePath, cache, serializedCacheTimeStamp);
+            cachePath, cache, serializedCacheTimeStamp,
+            *instance->getSourceMgr().getFileSystem());
     if (opts.EmitDependencyScannerCacheRemarks && loadFailure)
       ctx.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
                          cachePath);
@@ -1415,21 +1466,21 @@ performModuleScanImpl(
       auto mainModuleID =
           ModuleDependencyID{instance->getMainModule()->getNameStr().str(),
                              ModuleDependencyKind::SwiftSource};
+      // Load clang module names to capture their defined module map.
+      std::vector<StringRef> clangModuleNames;
+      for (const auto &entry :
+           cache.getDependenciesMap(ModuleDependencyKind::Clang))
+        clangModuleNames.push_back(entry.getKey());
+      const llvm::StringMap<std::string> clangModuleMapFiles =
+          scanner.findClangModuleMapFiles(clangModuleNames);
       incremental::validateInterModuleDependenciesCache(
           mainModuleID, cache, instance->getSharedCASInstance(),
           instance->getSharedCacheInstance(), serializedCacheTimeStamp,
           *instance->getSourceMgr().getFileSystem(), ctx.Diags,
-          opts.EmitDependencyScannerCacheRemarks);
+          [&](StringRef dir) { return service.isDirectoryInvalidated(dir); },
+          clangModuleMapFiles, opts.EmitDependencyScannerCacheRemarks);
     }
   }
-
-  auto expectedScannerPtr =
-      ModuleDependencyScanner::create(service, instance, cache);
-
-  if (!expectedScannerPtr)
-    return expectedScannerPtr.getError();
-
-  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1481,6 +1532,11 @@ static llvm::ErrorOr<swiftscan_import_set_t> performModulePrescanImpl(
     SwiftDependencyScanningService &service, CompilerInstance *instance,
     ModuleDependenciesCache &cache,
     DepScanInMemoryDiagnosticCollector *diagnosticCollector) {
+  // Configure the scanning service before creating the scanner, and therefore
+  // before any Clang scanning worker builds its file system.
+  if (service.setupDependencyScanningService(*instance))
+    return std::make_error_code(std::errc::invalid_argument);
+
   // Setup the scanner
   auto expectedScannerPtr =
       ModuleDependencyScanner::create(service, instance, cache);
@@ -1529,8 +1585,6 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
       ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(CI.getMainModule()->getNameStr().str(),
                                 CI.getInvocation().getModuleScanningHash());
-  if (service->setupCachingDependencyScanningService(CI))
-    return true;
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
@@ -1544,12 +1598,7 @@ bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
                         dependencies))
     return true;
 
-  // This process succeeds regardless of whether any errors occurred.
-  // FIXME: We shouldn't need this, but it's masking bugs in our scanning
-  // logic where we don't create a fresh context when scanning Swift interfaces
-  // that includes their own command-line flags.
-  ctx.Diags.resetHadAnyError();
-  return false;
+  return ctx.hadError();
 }
 
 bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
@@ -1599,20 +1648,36 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
   }
 }
 
+static void noteScanExitStatus(const ScanQueryContext &queryContext,
+                               std::error_code error) {
+  auto &instance = *queryContext.ScanInstance;
+  if (auto *stats = instance.getStatsReporter()) {
+    bool failed = error || instance.getASTContext().hadError() ||
+                  (queryContext.InMemoryDiagnosticCollector &&
+                   queryContext.InMemoryDiagnosticCollector->hadError());
+    stats->noteCurrentProcessExitStatus(failed ? EXIT_FAILURE : EXIT_SUCCESS);
+  }
+}
+
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 swift::dependencies::performModuleScan(SwiftDependencyScanningService &service,
                                        ModuleDependenciesCache &cache,
                                        ScanQueryContext &queryContext) {
-  return performModuleScanImpl(service, queryContext.ScanInstance.get(), cache,
-                               queryContext.InMemoryDiagnosticCollector.get());
+  auto result =
+      performModuleScanImpl(service, queryContext.ScanInstance.get(), cache,
+                            queryContext.InMemoryDiagnosticCollector.get());
+  noteScanExitStatus(queryContext, result.getError());
+  return result;
 }
 
 llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
     SwiftDependencyScanningService &service, ModuleDependenciesCache &cache,
     ScanQueryContext &queryContext) {
-  return performModulePrescanImpl(
-      service, queryContext.ScanInstance.get(), cache,
-      queryContext.InMemoryDiagnosticCollector.get());
+  auto result =
+      performModulePrescanImpl(service, queryContext.ScanInstance.get(), cache,
+                               queryContext.InMemoryDiagnosticCollector.get());
+  noteScanExitStatus(queryContext, result.getError());
+  return result;
 }
 
 void swift::dependencies::incremental::validateInterModuleDependenciesCache(
@@ -1620,11 +1685,14 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks) {
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
   outOfDateModuleScan(rootModuleID, cache, cas, actionCache, cacheTimeStamp, fs,
-                      diags, emitRemarks, visited, modulesRequiringRescan);
+                      diags, isDirectoryInvalidated, clangModuleMapFiles,
+                      emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
   // Regardless of invalidation, always re-scan main module.
@@ -1636,7 +1704,10 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks, ModuleDependencyIDSet &visited,
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks,
+    ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
   // Visit the module's dependencies
   bool hasOutOfDateModuleDependency = false;
@@ -1644,7 +1715,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
       outOfDateModuleScan(depID, cache, cas, actionCache, cacheTimeStamp, fs,
-                          diags, emitRemarks, visited, modulesRequiringRescan);
+                          diags, isDirectoryInvalidated, clangModuleMapFiles,
+                          emitRemarks, visited, modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
     // already known to be out of date.
@@ -1657,9 +1729,9 @@ void swift::dependencies::incremental::outOfDateModuleScan(
       diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_upstream,
                      moduleID.ModuleName);
     modulesRequiringRescan.insert(moduleID);
-  } else if (!verifyModuleDependencyUpToDate(moduleID, cache, cas, actionCache,
-                                             cacheTimeStamp, fs, diags,
-                                             emitRemarks))
+  } else if (!verifyModuleDependencyUpToDate(
+                 moduleID, cache, cas, actionCache, cacheTimeStamp, fs, diags,
+                 isDirectoryInvalidated, clangModuleMapFiles, emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
@@ -1670,7 +1742,9 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags, bool emitRemarks) {
+    DiagnosticEngine &diags,
+    llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
   auto verifyInputOlderThanCacheTimeStamp = [&cacheTimeStamp, &fs, &diags,
                                              emitRemarks](StringRef moduleName,
@@ -1780,10 +1854,36 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
       return false;
 
   // Check header/modulemap source files for a Clang dependency
-  if (const auto &clangModuleDetails = moduleInfo.getAsClangModule())
+  if (const auto &clangModuleDetails = moduleInfo.getAsClangModule()) {
+    // Check if a different module map now defines this module.
+    if (auto it = clangModuleMapFiles.find(moduleID.ModuleName);
+        it == clangModuleMapFiles.end()) {
+      // Skip over the module if is not in the map.
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_module_map_not_found,
+                       moduleID.ModuleName);
+    } else if (it->getValue() != clangModuleDetails->moduleMapFile) {
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_module_map,
+                       moduleID.ModuleName, clangModuleDetails->moduleMapFile,
+                       it->getValue());
+      return false;
+    }
+
     for (const auto &fileInput : clangModuleDetails->fileDependencies)
       if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, fileInput))
         return false;
+
+    // Check whether any directory dependency was invalidated
+    for (const auto &dir : clangModuleDetails->directoryDependencies) {
+      if (isDirectoryInvalidated(dir)) {
+        if (emitRemarks)
+          diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_directory,
+                         moduleID.ModuleName, dir);
+        return false;
+      }
+    }
+  }
 
   return true;
 }

@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %t
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -I %t -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -sdk %clang-importer-sdk -I %t -verify-additional-prefix future- %}
 // REQUIRES: objc_interop
 
 import Foundation
@@ -9,11 +10,16 @@ open class InvalidOpenExtension {
   open var openVar: Int { 3 } // No warning: Pure Swift properties can be open inside the class declaration.
 }
 extension InvalidOpenExtension {
-  open func nonObjcOpenMethod() { } // expected-warning {{non-'@objc' instance method declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
-  open class func nonObjcOpenMethod() { } // expected-warning {{non-'@objc' class method declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
-  open var nonObjcOpenVar: Int { 3 }  // expected-warning {{non-'@objc' property declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
-  open subscript(_ index: Int) -> Int { 3 } // expected-warning {{non-'@objc' subscript declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
-  open convenience init(index: Int) { self.init() } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}} // expected-warning {{non-'@objc' initializer declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}}
+  open func nonObjcOpenMethod() { } // expected-swift6-warning {{non-'@objc' instance method declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
+  // expected-future-error@-1 {{non-'@objc' instance method declared in extension cannot be overridden; use 'public' instead}}
+  open class func nonObjcOpenMethod() { } // expected-swift6-warning {{non-'@objc' class method declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
+  // expected-future-error@-1 {{non-'@objc' class method declared in extension cannot be overridden; use 'public' instead}}
+  open var nonObjcOpenVar: Int { 3 }  // expected-swift6-warning {{non-'@objc' property declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
+  // expected-future-error@-1 {{non-'@objc' property declared in extension cannot be overridden; use 'public' instead}}
+  open subscript(_ index: Int) -> Int { 3 } // expected-swift6-warning {{non-'@objc' subscript declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}} {{3-7=public}}
+  // expected-future-error@-1 {{non-'@objc' subscript declared in extension cannot be overridden; use 'public' instead}}
+  open convenience init(index: Int) { self.init() } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}} // expected-swift6-warning {{non-'@objc' initializer declared in extension cannot be overridden; use 'public' instead; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{non-'@objc' initializer declared in extension cannot be overridden; use 'public' instead}}
 
   @objc open func objcOpenMethod() { } // No warning: @objc methods can be open inside extensions. 
   @objc open var objcOpenVar: Int { 3 } // No warning: @objc methods can be open inside extensions. 

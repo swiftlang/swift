@@ -20,6 +20,7 @@
 
 // CHECK: cake_current/cake.swift:39:15: error: ABI breakage: struct C6 is now with @frozen
 // CHECK: cake_current/cake.swift:41:13: error: ABI breakage: enum IceKind is now without @frozen
+// CHECK: cake_current/cake.swift:269:13: error: ABI breakage: func untypedToTypedThrows() has thrown error type change from any Swift.Error to cake.TypedThrowsError
 
 
 

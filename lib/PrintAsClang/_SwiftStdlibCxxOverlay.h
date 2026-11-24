@@ -43,7 +43,7 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
 #else
     auto res = _impl::$sS2SycfC();
 #endif
-    memcpy(_getOpaquePointer(), &res, sizeof(res));
+    memcpy(_storage, &res, sizeof(res));
     return;
   }
 #ifdef __EmbeddedSwift__
@@ -51,7 +51,7 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
 #else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(cString);
 #endif
-  memcpy(_getOpaquePointer(), &res, sizeof(res));
+  memcpy(_storage, &res, sizeof(res));
 }
 
 /// Constructs a Swift string from a C++ string.
@@ -61,7 +61,7 @@ SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
 #else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
 #endif
-  memcpy(_getOpaquePointer(), &res, sizeof(res));
+  memcpy(_storage, &res, sizeof(res));
 }
 
 /// Casts the Swift String value to a C++ std::string.
@@ -372,11 +372,8 @@ private:
 template<>
 class Expected<void> {
 public:
-  /// Default
-  Expected() noexcept {
-    new (&buffer) Error();
-    has_val = false;
-  }
+  /// Default: a successful `void` result.
+  Expected() noexcept { has_val = true; }
 
   Expected(const swift::Error &error_val) noexcept {
     new (&buffer) Error(error_val);
@@ -385,9 +382,7 @@ public:
 
   /// Copy
   Expected(Expected const& other) noexcept {
-    if (other.has_value())
-      abort();
-    else
+    if (!other.has_value())
       new (&buffer) Error(other.error());
 
     has_val = other.has_value();
@@ -397,7 +392,10 @@ public:
   // FIXME: Implement move semantics when move swift values is possible
   [[noreturn]] Expected(Expected&&) noexcept { abort(); }
 
-  ~Expected() noexcept { reinterpret_cast<swift::Error *>(buffer)->~Error(); }
+  ~Expected() noexcept {
+    if (!has_value())
+      reinterpret_cast<swift::Error *>(buffer)->~Error();
+  }
 
   /// assignment
   constexpr auto operator=(Expected&& other) noexcept = delete;

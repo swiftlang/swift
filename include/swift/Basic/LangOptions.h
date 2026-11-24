@@ -679,6 +679,10 @@ namespace swift {
     /// if a deserialization failure is found; this flag causes the build to fail fast instead.
     bool AbortOnDeserializationFailForPackageCMO = false;
 
+    /// Returns the same discriminator for every ClosureExpr. Testing purposes
+    /// only.
+    bool DebugDuplicateClosureDiscriminators = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
@@ -1113,8 +1117,16 @@ namespace swift {
     /// Enable type variable joins. This will be on by default eventually.
     bool SolverEnableTypeVariableJoins = false;
 
-    /// Enable type variable joins. This will be on by default eventually.
+    /// Enable supertype binding promotion. This will be on by default eventually.
     bool SolverEnablePromoteSupertypes = false;
+
+    /// Enable modeling optional conversions without disjunctions.
+    /// This will be on by default eventually.
+    bool SolverEnableShortConversions = false;
+
+    /// Enable more conditions for edge contraction for closure parameters.
+    /// This will be on by default eventually.
+    bool SolverEnableExtremeEdgeContraction = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

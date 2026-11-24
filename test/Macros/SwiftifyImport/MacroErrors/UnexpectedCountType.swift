@@ -15,7 +15,7 @@ func myFunc(_ ptr: UnsafePointer<CInt>, _ len: String) {
 // CHECK:@__swiftmacro_4main6myFunc15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) @_disfavoredOverload
 // CHECK-NEXT:func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:    let len = String(exactly: ptr.count)!
 // CHECK-NEXT:    return unsafe myFunc(ptr.baseAddress!, len)

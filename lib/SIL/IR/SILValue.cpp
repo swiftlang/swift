@@ -192,8 +192,7 @@ bool ValueBase::isGuaranteedForwarding() const {
   if (phi && phi->isPhi()) {
     return phi->isGuaranteedForwarding();
   }
-
-  return isBorrowAccessorResult();
+  return false;
 }
 
 bool ValueBase::isBeginApplyToken() const {
@@ -214,6 +213,22 @@ bool ValueBase::isBorrowAccessorResult() const {
       apply->getSubstCalleeConv().funcTy->getSingleResult().getConvention();
   return resultConvention == ResultConvention::Guaranteed ||
          resultConvention == ResultConvention::GuaranteedAddress;
+}
+
+bool ValueBase::isGuaranteedCoroutineYield() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+
+  // Only the yielded values are interesting; skip the token and the
+  // callee-allocation result.
+  auto *bai = result->getParent<BeginApplyInst>();
+  auto yieldedValues = bai->getYieldedValues();
+  unsigned index = result->getIndex();
+  if (index >= yieldedValues.size())
+    return false;
+
+  return bai->getSubstCalleeConv().getYields()[index].isGuaranteedInCallee();
 }
 
 bool ValueBase::hasDebugTrace() const {

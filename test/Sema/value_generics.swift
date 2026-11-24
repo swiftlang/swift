@@ -222,3 +222,36 @@ struct H<let I: Int> { // expected-note {{'I' previously declared here}}
 }
 
 typealias J = E<Int, 123>.b // expected-error {{static property 'b' is not a member type of 'E<Int, 123>'}}
+
+struct PackAndValue<each T, let N: Int> {} // expected-note {{generic struct 'PackAndValue' declared here}}
+
+func packAndValueConcrete(_: PackAndValue<Int, String, 2>) {}
+func packAndValueEmptyPack(_: PackAndValue<2>) {}
+func packAndValueExpansion<each U>(_: PackAndValue<repeat each U, 3>) {}
+func packAndValueExpansionWithValue<each U, let M: Int>(_: PackAndValue<repeat each U, M>) {}
+func packAndValueExpansionMixed<each U>(_: PackAndValue<Int, repeat each U, Bool, 4>) {}
+
+func packAndValueTypeForValue(_: PackAndValue<Int, Bool>) {} // expected-error {{cannot pass type 'Bool' as a value for generic value 'N'}}
+func packAndValueExpansionForValue<each U>(_: PackAndValue<Int, repeat each U>) {} // expected-error {{generic type 'PackAndValue' specialized with mismatched type parameter pack}}
+
+struct ValueAndPack<let N: Int, each T> {}
+
+func valueAndPackExpansion<each U>(_: ValueAndPack<3, repeat each U>) {}
+
+func packAndValueInExpression<each U>(_: repeat each U) {
+  _ = PackAndValue<repeat each U, 3>()
+}
+
+func packAndValueIntegersInPack(_: PackAndValue<1, 2, 3>) {}
+// expected-error@-1 {{cannot use value type '1' for generic argument 'each T'}}
+// expected-error@-2 {{cannot use value type '2' for generic argument 'each T'}}
+
+// A type with value parameters but no parameter packs still rejects pack
+// expansions.
+struct ValueOnly<let N: Int> {}
+
+func valueOnlyExpansion<each U>(_: ValueOnly<repeat each U>) {}
+// expected-error@-1 {{pack expansion 'repeat each U' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
+
+func inlineArrayExpansion<each U>(_: InlineArray<repeat each U, Int>) {}
+// expected-error@-1 {{pack expansion 'repeat each U' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}

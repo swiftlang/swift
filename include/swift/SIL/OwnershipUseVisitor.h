@@ -315,11 +315,20 @@ bool OwnershipUseVisitor<Impl>::visitInnerBorrowScopeEnd(Operand *borrowEnd) {
       return handleUsePoint(borrowEnd,
                             UseLifetimeConstraint::NonLifetimeEnding);
     }
-    LLVM_FALLTHROUGH;
+    break;
   }
+  case OperandOwnership::TrivialUse:
+    // A partial_apply [on_stack] that was stored into a stack slot can be
+    // destroyed there.
+    if (isa<DestroyAddrInst>(borrowEnd->getUser())) {
+      return handleUsePoint(borrowEnd,
+                            UseLifetimeConstraint::NonLifetimeEnding);
+    }
+    break;
   default:
-    llvm_unreachable("expected borrow scope end");
+    break;
   }
+  llvm_unreachable("expected borrow scope end");
 }
 
 /// Recursively visit all uses that contribute to the ownership live range of \p
@@ -347,12 +356,14 @@ bool OwnershipUseVisitor<Impl>::visitInteriorUses(SILValue ssaDef) {
   case OwnershipKind::Unowned:
     llvm_unreachable("requires an owned or guaranteed orignalDef");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   switch (use->getOperandOwnership()) {
   case OperandOwnership::NonUse:
+  case OperandOwnership::DebugUse:
     return true;
 
   case OperandOwnership::ForwardingConsume:
@@ -379,7 +390,6 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
 
@@ -394,12 +404,14 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::GuaranteedForwarding:
     llvm_unreachable("ownership incompatible with an owned value");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   switch (use->getOperandOwnership()) {
   case OperandOwnership::NonUse:
+  case OperandOwnership::DebugUse:
     return true;
 
   case OperandOwnership::PointerEscape:
@@ -415,7 +427,6 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
-  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
   case OperandOwnership::EndBorrow:
@@ -458,6 +469,7 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::DestroyingConsume:
     llvm_unreachable("ownership incompatible with a guaranteed value");
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename Impl>
@@ -497,6 +509,8 @@ bool OwnershipUseVisitor<Impl>::visitInteriorPointerUses(Operand *use) {
       return false;
   }
   for (auto *interiorUse : interiorUses) {
+    if (interiorUse->getOperandOwnership() == OperandOwnership::DebugUse)
+      continue;
     if (!handleUsePoint(interiorUse, UseLifetimeConstraint::NonLifetimeEnding))
       return false;
   }

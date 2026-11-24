@@ -25,6 +25,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/InternalMacro.h"
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PluginLoader.h"
@@ -281,9 +282,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
   if (!libraryPath.empty()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.CASOpts.HasImmutableFileSystem
-                  ? llvm::vfs::createPhysicalFileSystem()
-                  : ctx.SourceMgr.getFileSystem();
+    auto fs = ctx.getPluginLoader().getPluginLoadingFS();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
       return llvm::createStringError(err, err.message());
     }
@@ -852,6 +851,7 @@ static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
     return GeneratedSourceInfo::Name##MacroExpansion;
 #include "swift/Basic/MacroRoles.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // If this storage declaration is a variable with an explicit initializer,
@@ -1118,6 +1118,7 @@ static uint8_t getRawMacroRole(MacroRole role) {
   case MacroRole::Preamble: return 9;
   case MacroRole::Body: return 10;
   }
+  llvm_unreachable("covered switch");
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 
@@ -1167,6 +1168,10 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::Kind::Internal:
+    // Internal macros are only ever attached; they are never freestanding.
     return nullptr;
 
   case MacroDefinition::Kind::Builtin: {
@@ -1294,6 +1299,7 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
   switch (auto definition = macro->getDefinition()) {
   case MacroDefinition::Kind::Expanded:
   case MacroDefinition::Kind::External:
+  case MacroDefinition::Kind::Internal:
   case MacroDefinition::Kind::Invalid:
   case MacroDefinition::Kind::Undefined:
     break;
@@ -1535,6 +1541,17 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  case MacroDefinition::Kind::Internal: {
+    // Internal macros are implemented directly in the compiler and have
+    // direct access to the AST. They still produce source text that we parse
+    // into a macro-expansion buffer below.
+    std::string result =
+        macroDef.getInternalMacro()->expandAttached(ctx, attachedTo);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
+  }
+
   case MacroDefinition::Kind::Expanded: {
     // Expand the definition with the given arguments.
     auto result = expandMacroDefinition(
@@ -1688,6 +1705,10 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::Kind::Internal:
+    // Internal macros attach to declarations, not closures.
     return nullptr;
 
   case MacroDefinition::Kind::Builtin: {
@@ -2034,6 +2055,16 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    // An extension macro attached to a protocol cannot add new conformances.
+    // Instead, treat the protocols this protocol already inherits from as
+    // already present, so the macro is not asked to add them. Protocols have
+    // no conformance table, so don't use 'lookupConformance' for them.
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!proto->inheritsFrom(protocol))
+        introducedConformances.push_back(protocol);
+      continue;
+    }
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
 

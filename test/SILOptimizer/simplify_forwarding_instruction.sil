@@ -1,0 +1,101 @@
+// RUN: %target-sil-opt %s -simplification -enable-sil-verify-all | %FileCheck %s
+
+import Swift
+import Builtin
+
+class Base {}
+class Obj : Base {}
+
+struct S {
+  let b: Base
+  let i: Int
+}
+
+struct Pair {
+  let a: Base
+  let b: Base
+}
+
+sil_global private @gobj : $Obj = {
+  %initval = object $Obj ()
+}
+
+sil @getBase : $@convention(thin) () -> @owned Base
+
+// A `global_value` refers to a statically allocated object and therefore has no ownership. The
+// forwarding ownership of its users must be updated accordingly. Otherwise their result is still
+// owned and the destroy_value is kept alive.
+// CHECK-LABEL: sil [ossa] @forwarding_chain_of_global_value :
+// CHECK:         [[G:%[0-9]+]] = global_value @gobj
+// CHECK:         [[U:%[0-9]+]] = upcast [[G]] to $Base{{.*}}ownership: none
+// CHECK:         [[S:%[0-9]+]] = struct $S ([[U]], %0){{.*}}ownership: none
+// CHECK-NEXT:    fix_lifetime [[S]]
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'forwarding_chain_of_global_value'
+sil [ossa] @forwarding_chain_of_global_value : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_value @gobj : $Obj
+  %2 = upcast %1 : $Obj to $Base
+  %3 = struct $S (%2 : $Base, %0 : $Int)
+  fix_lifetime %3 : $S
+  destroy_value %3 : $S
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// The `struct` also forwards another owned value, so its ownership must not be set to none.
+// Otherwise the destroy of that other value would be lost.
+// CHECK-LABEL: sil [ossa] @dont_update_ownership_of_other_forwarded_value :
+// CHECK:         [[O:%[0-9]+]] = apply
+// CHECK:         destroy_value [[O]]
+// CHECK:       } // end sil function 'dont_update_ownership_of_other_forwarded_value'
+sil [ossa] @dont_update_ownership_of_other_forwarded_value : $@convention(thin) () -> () {
+bb0:
+  %1 = global_value @gobj : $Obj
+  %2 = upcast %1 : $Obj to $Base
+  %3 = function_ref @getBase : $@convention(thin) () -> @owned Base
+  %4 = apply %3() : $@convention(thin) () -> @owned Base
+  %5 = struct $Pair (%2 : $Base, %4 : $Base)
+  destroy_value %5 : $Pair
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// An `end_lifetime` of a value without ownership is a no-op and can be removed.
+// CHECK-LABEL: sil [ossa] @remove_end_lifetime_of_none_ownership :
+// CHECK:         fix_lifetime
+// CHECK-NOT:     end_lifetime
+// CHECK:       } // end sil function 'remove_end_lifetime_of_none_ownership'
+sil [ossa] @remove_end_lifetime_of_none_ownership : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = global_value @gobj : $Obj
+  %2 = upcast %1 : $Obj to $Base
+  %3 = struct $S (%2 : $Base, %0 : $Int)
+  fix_lifetime %3 : $S
+  end_lifetime %3 : $S
+  %6 = tuple ()
+  return %6 : $()
+}
+
+struct NC : ~Copyable {
+  let i: Int
+}
+
+sil @useNC : $@convention(thin) (@guaranteed NC) -> ()
+
+// A move-only value is always owned, even if all its operands are trivial.
+// CHECK-LABEL: sil [ossa] @dont_set_none_ownership_of_move_only_value :
+// CHECK:         [[S:%[0-9]+]] = struct $NC (%0), forwarding: @owned
+// CHECK:         apply {{%[0-9]+}}([[S]])
+// CHECK:         end_lifetime [[S]]
+// CHECK:       } // end sil function 'dont_set_none_ownership_of_move_only_value'
+sil [ossa] @dont_set_none_ownership_of_move_only_value : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = struct $NC (%0 : $Int)
+  %2 = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed NC) -> ()
+  end_lifetime %1 : $NC
+  %5 = tuple ()
+  return %5 : $()
+}

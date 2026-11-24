@@ -240,13 +240,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   // ABI Note: @abi needed because the mangling otherwise conflicts with the
   // legacy @_unsafeInheritExecutor declaration.
   @abi(
-    nonisolated(nonsending) func withValueNonisolatedNonsending<R>(
+    nonisolated(nonsending) func withValueNonisolatedNonsending<R: ~Copyable>(
       _ valueDuringOperation: Value,
       operation: nonisolated(nonsending) () async throws -> R,
       file: String, line: UInt
     ) async throws -> R
   )
-  public nonisolated(nonsending) func withValue<R>(
+  public nonisolated(nonsending) func withValue<R: ~Copyable>(
     _ valueDuringOperation: Value,
     operation: nonisolated(nonsending) () async throws -> R,
     file: String = #fileID, line: UInt = #line
@@ -314,7 +314,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @export(implementation)
   @discardableResult
   @available(SwiftStdlib 5.1, *)
-  internal nonisolated(nonsending) func withValueImpl<R>(
+  internal nonisolated(nonsending) func withValueImpl<R: ~Copyable>(
     _ valueDuringOperation: __owned Value,
     operation: nonisolated(nonsending) () async throws -> R,
     file: String = #fileID, line: UInt = #line
@@ -369,6 +369,23 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   }
 
 
+  // Copyable-result overload; restores the more-specialized tie-break and the
+  // original ABI symbol. The ~Copyable overload below is the documented entry point
+  @inlinable
+  @discardableResult
+  public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
+                           file: String = #fileID, line: UInt = #line) rethrows -> R {
+#if $BuiltinAddTaskLocalValue
+    let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
+    defer { Builtin.removeTaskLocalValue(binding) }
+#else
+    _taskLocalValuePush(key: key, value: valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
+
+    return try operation()
+  }
+
   /// Binds the task-local to the specific value for the duration of the
   /// synchronous operation.
   ///
@@ -386,10 +403,13 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// If this method is called form a context where no current Swift concurrency task
   /// is available, a fallback thread-local is used to manage the task locals and
   /// all existing semantics of task-locals are upheld as-if a task was actually available.
-  @inlinable
+  @export(implementation)
   @discardableResult
-  public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
-                           file: String = #fileID, line: UInt = #line) rethrows -> R {
+  @available(SwiftStdlib 5.1, *)
+  public func withValue<R: ~Copyable>(
+    _ valueDuringOperation: Value, operation: () throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) rethrows -> R {
 #if $BuiltinAddTaskLocalValue
     let binding = Builtin.addTaskLocalValue(key, valueDuringOperation)
     defer { Builtin.removeTaskLocalValue(binding) }

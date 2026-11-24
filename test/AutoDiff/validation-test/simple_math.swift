@@ -1,15 +1,16 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-parse-stdlib)
 
 // NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
 // Temporarily disabled because forward-mode is not at feature parity with reverse-mode.
 // UN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -Xllvm -sil-print-types -Xllvm -sil-print-after=differentiation %s -emit-sil -o /dev/null -module-name null 2>&1 | %FileCheck %s
 
 // REQUIRES: executable_test
 
 import StdlibUnittest
 import DifferentiationUnittest
+import Swift
 
 var SimpleMathTests = TestSuite("SimpleMath")
 
@@ -513,5 +514,15 @@ SimpleMathTests.test("Adjoint value accumulation for aggregate lhs and concrete 
 // CHECK: {{.*}} = apply [[PLUS_EQUAL]]<Float>([[TMP_RES_ADJ_STRUCT_FIELD]], [[TMP_RES_ADJ_STRUCT_ADD_ELT]], {{.*}}) : $@convention(witness_method: AdditiveArithmetic) <τ_0_0 where τ_0_0 : AdditiveArithmetic> (@inout τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> ()
 // CHECK: [[RES_STRUCT:%.*]] = load [trivial] [[TMP_RES_ADJ_STRUCT]] : $*SmallTestModel.TangentVector 
 // CHECK: return [[RES_STRUCT]] : $SmallTestModel.TangentVector
+
+SimpleMathTests.test("PointerToAddress") {
+  func identity(_ x: Float) -> Float {
+    var y = x
+    return Builtin.load(Builtin.addressof(&y))
+  }
+
+  expectEqual((value: 3.0, gradient: 1.0), valueWithGradient(at: Float(3), of: identity))
+}
+
 
 runAllTests()

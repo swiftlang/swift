@@ -229,6 +229,7 @@ std::string ASTScopeImpl::getClassName() const {
 #define SCOPE_NODE(Name) case ScopeKind::Name: return #Name "Scope";
 #include "swift/AST/ASTScopeNodes.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 std::string GenericTypeOrExtensionScope::getClassName() const {
@@ -249,6 +250,7 @@ NullablePtr<Decl> ASTScopeImpl::getDeclIfAny() const {
 #include "swift/AST/ASTScopeNodes.def"
       return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 NullablePtr<Stmt> ASTScopeImpl::getStmtIfAny() const {
@@ -265,6 +267,7 @@ NullablePtr<Stmt> ASTScopeImpl::getStmtIfAny() const {
 #include "swift/AST/ASTScopeNodes.def"
       return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
@@ -281,6 +284,7 @@ NullablePtr<Expr> ASTScopeImpl::getExprIfAny() const {
 #include "swift/AST/ASTScopeNodes.def"
       return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ASTScopeImpl::isDeclAttribute() const {
@@ -295,6 +299,7 @@ bool ASTScopeImpl::isDeclAttribute() const {
 #include "swift/AST/ASTScopeNodes.def"
       return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 SourceManager &ASTScopeImpl::getSourceManager() const {

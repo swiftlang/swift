@@ -42,6 +42,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -121,7 +122,7 @@ class SILGenModule;
 } // namespace Lowering
 
 /// A stage of SIL processing.
-enum class SILStage {
+enum class SILStage : uint8_t {
   /// "Raw" SIL, emitted by SILGen, but not yet run through guaranteed
   /// optimization and diagnostic passes.
   ///
@@ -149,6 +150,17 @@ enum class SILStage {
   /// stage of SIL as "address lowering".
   Lowered,
 };
+
+/// The last SILStage. Update it when a stage is added after it: code that
+/// stores a stage in a fixed number of bits checks its width against this.
+constexpr SILStage LastSILStage = SILStage::Lowered;
+
+/// The textual spelling of \p stage, as it appears in a `sil_stage` line and in
+/// a function's `[stage=...]` attribute.
+StringRef getSILStageName(SILStage stage);
+
+/// The stage spelled \p name, or None if \p name spells no stage.
+std::optional<SILStage> getSILStageByName(StringRef name);
 
 /// A SIL module. The SIL module owns all of the SILFunctions generated
 /// when a Swift compilation context is lowered to SIL.
@@ -265,8 +277,17 @@ private:
 
   /// Lookup table for specialized witness tables from conformances.
   /// Currently only used in embedded mode.
+  ///
+  /// Keyed by the canonical conformance (see getSpecializedWitnessTableKey),
+  /// because conformances which only differ in type sugar share a witness
+  /// table symbol.
   llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
   specializedWitnessTableMap;
+
+  static const ProtocolConformance *
+  getSpecializedWitnessTableKey(const ProtocolConformance *C) {
+    return const_cast<ProtocolConformance *>(C)->getCanonicalConformance();
+  }
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
@@ -313,6 +334,8 @@ private:
   /// deinits must be specialized before IRGen runs.
   std::vector<SILType> noncopyableTypesWithEmittedMetadata;
 
+  std::vector<CanType> exportedTypeSpecializations;
+
   /// Declarations which are externally visible.
   ///
   /// These are method declarations which are referenced from inlinable
@@ -349,8 +372,9 @@ private:
   llvm::DenseMap<std::pair<Decl *, VarDecl *>, unsigned> fieldIndices;
   llvm::DenseMap<EnumElementDecl *, unsigned> enumCaseIndices;
 
-  /// The stage of processing this module is at.
-  SILStage Stage;
+  /// A lower bound on the stage of every function in the module's function
+  /// list. Erased (zombie) functions are not in the list and are not covered.
+  SILStage StageFloor;
 
   /// The set of deserialization notification handlers.
   DeserializationNotificationHandlerSet deserializationNotificationHandlers;
@@ -383,6 +407,13 @@ private:
   /// functions.
   using LocalArchetypeKey = std::pair<GenericEnvironment *, SILFunction *>;
   llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
+
+  /// The keys of RootLocalArchetypeDefs whose value is a PlaceholderValue.
+  /// This lets reclaimUnresolvedLocalArchetypeDefinitions() visit only the
+  /// placeholders instead of the whole map: it is called once per function by
+  /// some clients (e.g. CrossModuleOptimization), so scanning the module-wide
+  /// map there is quadratic in the number of local archetypes in the module.
+  llvm::DenseSet<LocalArchetypeKey> UnresolvedLocalArchetypeKeys;
 
   /// The number of PlaceholderValues in RootLocalArchetypeDefs.
   int numUnresolvedLocalArchetypes = 0;
@@ -425,6 +456,11 @@ private:
   // Specialization attributes which need to be added to a function once it is created.
   // The key of this map is the function name.
   llvm::StringMap<std::vector<SILSpecializeAttr *>> pendingSpecializeAttrs;
+
+  /// The exported specialized bodies, e.g. 'sum<Int>', that '@specialized'
+  /// declarations without a body or extensions ask for, in this module or in
+  /// imported ones, each with whether this module creates it.
+  llvm::StringMap<bool> exportedSpecializationsOfImportedFunctions;
 
   SILModule(llvm::PointerUnion<FileUnit *, ModuleDecl *> context,
             Lowering::TypeConverter &TC, const SILOptions &Options,
@@ -705,6 +741,17 @@ public:
     noncopyableTypesWithEmittedMetadata.push_back(type);
   }
 
+  /// The specializations that exported '@specialized' attributes on types
+  /// declared in this module declare. In Embedded Swift, this module emits
+  /// their metadata.
+  ArrayRef<CanType> getExportedTypeSpecializations() const {
+    return exportedTypeSpecializations;
+  }
+
+  void addExportedTypeSpecialization(CanType type) {
+    exportedTypeSpecializations.push_back(type);
+  }
+
   using moveonlydeinit_iterator = SILMoveOnlyDeinitListType::iterator;
   using moveonlydeinit_const_iterator =
       SILMoveOnlyDeinitListType::const_iterator;
@@ -895,8 +942,13 @@ public:
 
   /// Attempt to deserialize witness table for protocol conformance \p PC.
   ///
+  /// If \p referencedFromInitExistential is true, then in Embedded Swift the
+  /// witness tables of the conformances it references are deserialized as
+  /// well, as for a conformance used to form an existential.
+  ///
   /// Returns true if linking succeeded, false otherwise.
-  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode);
+  bool linkWitnessTable(ProtocolConformance *PC, LinkingMode LinkMode,
+                        bool referencedFromInitExistential = false);
 
   /// Check if a given function exists in any of the modules.
   /// i.e. it can be linked by linkFunction.
@@ -1000,13 +1052,46 @@ public:
       const ClassDecl *decl, SILLinkage linkage,
       ArrayRef<SILDefaultOverrideTable::Entry> entries);
 
-  /// Return the stage of processing this module is at.
-  SILStage getStage() const { return Stage; }
+  /// Return a lower bound on the stage of every function in the function list.
+  /// SILFunction::create() seeds a new function from it and commitStage()
+  /// sweeps the list up to it.
+  ///
+  /// For a per-function query, read SILFunction::getFunctionStage(), which may
+  /// be ahead of the floor.
+  SILStage getStageFloor() const { return StageFloor; }
 
-  /// Advance the module to a further stage of processing.
-  void setStage(SILStage s) {
-    assert(s >= Stage && "regressing stage?!");
-    Stage = s;
+  /// True once the module has committed to at least Canonical, so the mandatory
+  /// pipeline will not run. It may have completed, or the input may have been
+  /// canonical already.
+  bool hasCommittedCanonical() const {
+    return StageFloor >= SILStage::Canonical;
+  }
+
+  /// True once the module has committed the module-wide SIL stage floor to
+  /// Lowered. Read this only for a question about the Lowered stage itself,
+  /// such as whether an instruction is legal here.
+  bool hasCommittedLowered() const { return StageFloor >= SILStage::Lowered; }
+
+  /// True once LoadableByAddress may have rewritten function types, so a
+  /// verifier type-equality check must be skipped. It changes large loadable
+  /// parameters and results to indirect, rewriting a nested function type
+  /// wherever it appears, an aggregate field included.
+  ///
+  /// This is a conservative approximation keyed to the stage floor. Under
+  /// -enable-sil-opaque-values, AddressLowering also rewrites function types,
+  /// before the floor reaches Lowered, and this still answers false then.
+  bool haveFunctionTypesBeenRewritten() const {
+    return StageFloor >= SILStage::Lowered;
+  }
+
+  /// Advance the module to s and sweep every function behind it up to it.
+  /// The stage only ever moves forward.
+  void commitStage(SILStage s) {
+    assert(s >= StageFloor && "regressing stage floor?!");
+    StageFloor = s;
+    for (SILFunction &f : *this)
+      if (f.getFunctionStage() < s)
+        f.setFunctionStage(s);
   }
 
   /// True if -enable-sil-opaque-values was passed. Address-only types are
@@ -1038,23 +1123,18 @@ public:
   /// fetched in the given module?
   bool isTypeMetadataForLayoutAccessible(SILType type);
 
-  void verify(bool isCompleteOSSA = true,
-              bool checkLinearLifetime = true) const;
+  void verify(bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify(CalleeCache *calleeCache,
-              bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
-  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
-  /// blocks.
+  /// Run the SIL verifier on SIL with incomplete OSSA lifetimes, e.g. before
+  /// SILGenCleanup. Linear lifetimes are not checked.
   void verifyIncompleteOSSA() const {
-    verify(/*isCompleteOSSA=*/false);
+    verify(/*checkLinearLifetime=*/false);
   }
-
-  /// Check linear OSSA lifetimes, assuming complete OSSA.
-  void verifyOwnership() const;
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
@@ -1186,6 +1266,23 @@ public:
   void addPendingSpecializeAttr(StringRef functionName, SILSpecializeAttr *attr) {
     pendingSpecializeAttrs[functionName].push_back(attr);
   }
+
+  /// Records the exported specialized body of \p target, a function of another
+  /// module, for \p specializedSig, which a '@specialized' declaration without
+  /// a body or extension asks for: in this module if \p createdHere, else in
+  /// an imported module.
+  void addExportedSpecializationOfImportedFunction(
+      SILDeclRef target, GenericSignature specializedSig, bool createdHere);
+
+  /// Whether \p name is such an exported specialized body.
+  bool isExportedSpecializationOfImportedFunction(StringRef name) const {
+    return exportedSpecializationsOfImportedFunctions.contains(name);
+  }
+
+  /// Whether this module creates \p name, such an exported specialized body.
+  bool createsExportedSpecializationOfImportedFunction(StringRef name) const {
+    return exportedSpecializationsOfImportedFunctions.lookup(name);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
@@ -1210,7 +1307,7 @@ void verificationFailure(
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 
 inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
-  switch (mod.getStage()) {
+  switch (mod.getStageFloor()) {
   case SILStage::Raw:
     // In raw SIL, lexical markers are used for diagnostics and are always
     // present.
@@ -1224,6 +1321,7 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Print a simple description of a SILModule for the request evaluator.

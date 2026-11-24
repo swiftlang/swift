@@ -15,7 +15,6 @@
 // extension UniqueArray: CustomStringConvertible where Element: ~Copyable {
 // }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   public var description: String {
     /// FIXME: Print the item descriptions when available.
@@ -28,7 +27,6 @@ extension UniqueArray where Element: ~Copyable {
 // extension UniqueArray: CustomDebugStringConvertible where Element: ~Copyable {
 // }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   public var debugDescription: String {
     /// FIXME: Print the item descriptions when available.

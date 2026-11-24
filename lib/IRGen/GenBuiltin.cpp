@@ -278,7 +278,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SILType loweredTy = IGF.IGM.getLoweredType(boundTy);
     std::optional<uint64_t> descriptor;
-    if (boundTy->getClassOrBoundGenericClass()) {
+    if (boundTy->getClassDecl()) {
       // For a class, describe the heap object.
       auto &classTI = IGF.IGM.getTypeInfo(loweredTy).as<ClassTypeInfo>();
       auto &classLayout = classTI.getClassLayout(
@@ -287,8 +287,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, loweredTy);
     } else {
       SmallVector<SILType, 1> fieldTypes{loweredTy};
-      descriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes,
-                                                    /*isArray=*/false);
+      descriptor = computeTypedMallocTypeDescriptor(
+          IGF.IGM, HeapHeaderKind::None, fieldTypes);
     }
     if (descriptor) {
       out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor));
@@ -437,6 +437,38 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  case BuiltinValueKind::CreateSplitContinuation: {
+    // Ignore the metatype argument; the result type comes from the
+    // substitution.
+    (void)args.claimAll();
+    auto resultTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto metadata = IGF.emitTypeMetadataRef(resultTy);
+    auto call = IGF.Builder.CreateCall(
+        IGF.IGM.getContinuationCreateSplitFunctionPointer(), {metadata});
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    // The call returns the RawUnsafeContinuation for the new continuation.
+    auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
+    out.add(IGF.Builder.CreateBitOrPointerCast(call,
+                                               rawContTI.getStorageType()));
+    return;
+  }
+
+  case BuiltinValueKind::GetSplitContinuationAddr: {
+    // Binding the continuation to this frame is done by the
+    // await_async_continuation that consumes this value, which reads this
+    // builtin's operands directly. Here it is simply forwarded.
+    auto continuation = args.claimNext();
+    (void)args.claimAll();
+    out.add(continuation);
+    return;
+  }
+
+  case BuiltinValueKind::DestroySplitContinuation: {
+    auto continuation = args.claimNext();
+    IGF.emitDestroySplitContinuation(continuation);
+    return;
+  }
+
   case BuiltinValueKind::BuildMainActorExecutorRef: {
     emitBuildMainActorExecutorRef(IGF, out);
     return;
@@ -543,6 +575,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   // FIXME: We could generate the code to dynamically report the overflow if the
   // third argument is true. Now, we just ignore it.
+
+#define BUILTIN_BINARY_OPERATION_RELAXED(id, name, strictID, attrs, overload)  \
+  case BuiltinValueKind::id: {                                                 \
+    llvm::Value *lhs = args.claimNext();                                       \
+    llvm::Value *rhs = args.claimNext();                                       \
+    llvm::FastMathFlags fmf;                                                   \
+    fmf.setAllowContract();                                                    \
+    fmf.setAllowReassoc();                                                     \
+    fmf.setNoSignedZeros();                                                    \
+    llvm::FMFSource source(fmf);                                               \
+    llvm::Value *v = IGF.Builder.Create##strictID##FMF(lhs, rhs, source);      \
+    return out.add(v);                                                         \
+  }
 
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
   case BuiltinValueKind::id:                                          \
@@ -686,7 +731,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     llvm::Value *alloc;
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, HeapHeaderKind::None, fieldTypes,
+            TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       alloc = IGF.emitAllocRawTypedCall(size, alignMask, descriptorConst,
@@ -709,7 +755,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, HeapHeaderKind::None, fieldTypes,
+            TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       IGF.emitDeallocRawTypedCall(pointer, size, alignMask, descriptorConst);
@@ -726,14 +773,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // Fixed header layout: heap object header (metadata + refcount) followed
     // by the error box's type pointer and error conformance pointer.
     auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
-    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
-                                       rawPointerType, rawPointerType};
+    SmallVector<SILType, 2> fieldTypes{rawPointerType, rawPointerType};
     auto *typedMetadata =
         IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrTy);
-    auto *alloc = IGF.emitAllocObjectCall(
-        typedMetadata, size, alignMask,
-        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes),
-        "builtin-allocErrorBoxTyped");
+    auto *alloc =
+        IGF.emitAllocObjectCall(typedMetadata, size, alignMask,
+                                computeTypedMallocTypeDescriptor(
+                                    IGF.IGM, HeapHeaderKind::Swift, fieldTypes),
+                                "builtin-allocErrorBoxTyped");
     out.add(IGF.Builder.CreateBitCast(alloc, IGF.IGM.Int8PtrTy));
     return;
   }
@@ -743,13 +790,12 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto size = args.claimNext();
     auto alignMask = args.claimNext();
     auto rawPointerType = SILType::getRawPointerType(IGF.IGM.Context);
-    SmallVector<SILType, 4> fieldTypes{rawPointerType, rawPointerType,
-                                       rawPointerType, rawPointerType};
+    SmallVector<SILType, 2> fieldTypes{rawPointerType, rawPointerType};
     auto *object =
         IGF.Builder.CreateBitCast(pointer, IGF.IGM.RefCountedPtrTy);
-    emitDeallocateHeapObject(
-        IGF, object, size, alignMask,
-        computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes));
+    emitDeallocateHeapObject(IGF, object, size, alignMask,
+                             computeTypedMallocTypeDescriptor(
+                                 IGF.IGM, HeapHeaderKind::Swift, fieldTypes));
     return;
   }
 
@@ -1321,24 +1367,26 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     llvm::Value *src = args.claimNext();
     llvm::Value *count = args.claimNext();
 
+    auto tyPair = getLoweredTypeAndTypeInfo(
+        IGF.IGM, substitutions.getReplacementTypes()[0]);
+    SILType elemTy = tyPair.first;
+    const TypeInfo &elemTI = tyPair.second;
+
+    // Do nothing for zero-sized POD array elements. The addresses of empty
+    // values are meaningless and may be undef, so even copying one stride
+    // through them would be undefined behavior.
+    if (llvm::Constant *SizeConst = elemTI.getStaticSize(IGF.IGM)) {
+      auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
+      if (SizeInt->getSExtValue() == 0 &&
+          elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
+              IsTriviallyDestroyable)
+        return;
+    }
+
     // In Embedded Swift we don't have metadata and witness tables, so we can't
     // just use TypeInfo's initialize... and assign... APIs, which need
     // metadata to emit calls. Emit a loop to process elements directly instead.
     if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
-      auto tyPair = getLoweredTypeAndTypeInfo(
-          IGF.IGM, substitutions.getReplacementTypes()[0]);
-      SILType elemTy = tyPair.first;
-      const TypeInfo &elemTI = tyPair.second;
-
-      // Do nothing for zero-sized POD array elements.
-      if (llvm::Constant *SizeConst = elemTI.getStaticSize(IGF.IGM)) {
-        auto *SizeInt = cast<llvm::ConstantInt>(SizeConst);
-        if (SizeInt->getSExtValue() == 0 &&
-            elemTI.isTriviallyDestroyable(ResilienceExpansion::Maximal) ==
-                IsTriviallyDestroyable)
-          return;
-      }
-
       llvm::Value *firstSrcElem = IGF.Builder.CreatePtrToInt(
           IGF.Builder.CreateBitCast(src, IGM.PtrTy), IGF.IGM.IntPtrTy);
       llvm::Value *firstDestElem = IGF.Builder.CreatePtrToInt(
@@ -1412,46 +1460,41 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
       return;
     }
 
-    auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
-                                             substitutions.getReplacementTypes()[0]);
-
     dest = IGF.Builder.CreateBitCast(dest, IGM.PtrTy);
     src = IGF.Builder.CreateBitCast(src, IGM.PtrTy);
-    Address destArray = valueTy.second.getAddressForPointer(dest);
-    Address srcArray = valueTy.second.getAddressForPointer(src);
+    Address destArray = elemTI.getAddressForPointer(dest);
+    Address srcArray = elemTI.getAddressForPointer(src);
     
     switch (Builtin.ID) {
     case BuiltinValueKind::CopyArray:
-      valueTy.second.initializeArrayWithCopy(IGF, destArray, srcArray, count,
-                                             valueTy.first);
+      elemTI.initializeArrayWithCopy(IGF, destArray, srcArray, count, elemTy);
       break;
     case BuiltinValueKind::TakeArrayNoAlias:
-      valueTy.second.initializeArrayWithTakeNoAlias(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.initializeArrayWithTakeNoAlias(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::TakeArrayFrontToBack:
-      valueTy.second.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray,
-                                                        count, valueTy.first);
+      elemTI.initializeArrayWithTakeFrontToBack(IGF, destArray, srcArray, count,
+                                                elemTy);
       break;
     case BuiltinValueKind::TakeArrayBackToFront:
-      valueTy.second.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray,
-                                                        count, valueTy.first);
+      elemTI.initializeArrayWithTakeBackToFront(IGF, destArray, srcArray, count,
+                                                elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayNoAlias:
-      valueTy.second.assignArrayWithCopyNoAlias(IGF, destArray, srcArray, count,
-                                                valueTy.first);
+      elemTI.assignArrayWithCopyNoAlias(IGF, destArray, srcArray, count,
+                                        elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
-      valueTy.second.assignArrayWithCopyFrontToBack(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.assignArrayWithCopyFrontToBack(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::AssignCopyArrayBackToFront:
-      valueTy.second.assignArrayWithCopyBackToFront(IGF, destArray, srcArray,
-                                                    count, valueTy.first);
+      elemTI.assignArrayWithCopyBackToFront(IGF, destArray, srcArray, count,
+                                            elemTy);
       break;
     case BuiltinValueKind::AssignTakeArray:
-      valueTy.second.assignArrayWithTake(IGF, destArray, srcArray, count,
-                                         valueTy.first);
+      elemTI.assignArrayWithTake(IGF, destArray, srcArray, count, elemTy);
       break;
     default:
       llvm_unreachable("out of sync with if condition");
@@ -1648,7 +1691,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     // strategy for it. Just call the vwt function. Otherwise, we know that this
     // is at least an enum and can optimize away some of the cost of getEnumTag.
     if (!ty.is<ArchetypeType>()) {
-      assert(ty.getEnumOrBoundGenericEnum() && "expected enum type in "
+      assert(ty.getEnumDecl() && "expected enum type in "
              "getEnumTag builtin!");
 
       auto &strategy = getEnumImplStrategy(IGF.IGM, ty);
@@ -1775,6 +1818,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::DistributedActorAsAnyActor:
   case BuiltinValueKind::TypeJoin:
   case BuiltinValueKind::TriggerFallbackDiagnostic:
+  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
     llvm_unreachable("IRGen unimplemented for this builtin!");
   }
 }

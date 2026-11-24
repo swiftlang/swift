@@ -38,6 +38,7 @@ class ActorIsolation;
 enum class CodeGenerationModel: uint8_t;
 class SILInstruction;
 class SILModule;
+enum class SILStage : uint8_t;
 class SILFunctionBuilder;
 class SILProfiler;
 class BasicBlockBitfield;
@@ -117,10 +118,17 @@ public:
   create(SILModule &M, GenericSignature specializedSignature,
          ArrayRef<Type> typeErasedParams, bool exported,
          SpecializationKind kind, SILFunction *target, Identifier spiGroup,
-         const ModuleDecl *spiModule, AvailabilityRange availability);
+         const ModuleDecl *spiModule, AvailabilityRange availability,
+         bool isSpecializedSpelling = false);
 
   bool isExported() const {
     return exported;
+  }
+
+  /// Whether this attribute was written as `@specialized` rather than
+  /// `@_specialize`.
+  bool isSpecializedSpelling() const {
+    return specializedSpelling;
   }
 
   bool isFullSpecialization() const {
@@ -159,6 +167,8 @@ public:
     return spiGroup;
   }
 
+  /// The module where the attribute is written, whether or not it has an SPI
+  /// group.
   const ModuleDecl *getSPIModule() const {
     return spiModule;
   }
@@ -172,6 +182,7 @@ public:
 private:
   SpecializationKind kind;
   bool exported;
+  bool specializedSpelling = false;
   GenericSignature specializedSignature;
   GenericSignature unerasedSpecializedSignature;
   llvm::SmallVector<Type, 2> typeErasedParams;
@@ -367,6 +378,22 @@ private:
   /// block indices.
   unsigned BlockListChangeIdx = 0;
 
+  /// An upper bound (exclusive) on the block numbers currently handed out via
+  /// SILBasicBlock::getNumber(). This is reset to size() by renumberBlocks()
+  /// and bumped by assignFreshBlockNumber() so that blocks created after a
+  /// renumbering (e.g. by critical-edge splitting) can be numbered uniquely
+  /// without invalidating an already-computed dominator tree or loop info.
+  unsigned NextBlockNumber = 0;
+
+  /// The block-numbering epoch (see getBlockNumberEpoch()). Bumped only when
+  /// existing block numbers are reassigned by renumberBlocks(). Assigning a
+  /// fresh number to a brand-new block does not change it, so generic graph
+  /// algorithms indexed by block number (dominator trees, loop info) stay valid
+  /// across block insertions. This is distinct from BlockListChangeIdx, which
+  /// tracks BasicBlockData validity and changes when the Data-vector indices
+  /// are reassigned.
+  unsigned BlockNumberEpoch = 0;
+
   /// The isolation of this function.
   ActorIsolation actorIsolation;
 
@@ -494,12 +521,29 @@ private:
   unsigned NeedBreakInfiniteLoops : 1;
   unsigned NeedCompleteLifetimes : 1;
 
-  /// Set when this function's arguments and instructions have been lowered to
-  /// address form by the AddressLowering function pass.
+  /// Set by mandatory generic specialization if specializations of this
+  /// generic function form an infinitely growing loop.
+  /// Note that this flag is not serialized.
+  unsigned HasInfiniteSpecializationLoop : 1;
+
+  /// Set when this function's body is in lowered-address form before its stage
+  /// says so. See the rule in the SILFunction constructor.
   unsigned HasLoweredAddresses : 1;
   
   /// Set when this function gives trivial values explicit ownership.
   unsigned HasOwnershipForTrivialValues : 1;
+
+  /// Set while value lifetimes (inits, destroys, assigns) are undetermined.
+  /// Relaxes the SILVerifier. This flag is cleared by LifetimeResolution.
+  unsigned HasUnresolvedLifetimes : 1;
+
+  static constexpr unsigned NumFunctionStageBits = 2;
+
+  /// This function's pipeline stage. Seeded at creation to the module's stage
+  /// floor and raised with it by SILModule::commitStage, so a live function is
+  /// never below the floor. It may be ahead of the floor. An erased (zombie)
+  /// function is not raised and can fall behind.
+  unsigned FunctionStage : NumFunctionStageBits;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -782,7 +826,7 @@ public:
   /// - AddressLowering has individually lowered this function
   /// - The function arrived already canonical via deserialization
   /// - In a non-opaque-values build,
-  /// - Once the module has committed past SILStage::Raw.
+  /// - Once this function's stage is past SILStage::Raw.
   bool hasLoweredAddresses() const;
 
   void setHasLoweredAddresses(bool val = true) { HasLoweredAddresses = val; }
@@ -793,6 +837,24 @@ public:
   void setOwnershipForTrivialValues(bool val = true) {
     HasOwnershipForTrivialValues = val; 
   }
+
+  bool hasUnresolvedLifetimes() const { return HasUnresolvedLifetimes; }
+  void setHasUnresolvedLifetimes(bool val = true) {
+    HasUnresolvedLifetimes = val;
+  }
+
+  /// This function's SIL stage. Read this for a per-function legality query,
+  /// such as whether an instruction is still legal here. For a live function it
+  /// is never below the module's stage floor, and may be ahead of it.
+  SILStage getFunctionStage() const { return SILStage(FunctionStage); }
+
+  /// Advance this function's stage. A stage only ever moves forward.
+  void setFunctionStage(SILStage stage);
+
+  /// Take the facts a whole-function clone inherits from the function it was
+  /// derived from: the address-lowering form, whether its lifetimes are
+  /// unresolved, and the SIL stage.
+  void inheritDerivedFrom(const SILFunction *from);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
     return ForceEnableLexicalLifetimes_t(ForceEnableLexicalLifetimes);
@@ -899,8 +961,9 @@ public:
 
   // Returns true if the function has any generic arguments.
   bool isGeneric() const {
-    auto s = getLoweredFunctionType()->getInvocationGenericSignature();
-    return s && !s->areAllParamsConcrete();
+    return getLoweredFunctionType()
+        ->getInvocationGenericSignature()
+        .isEffectivelyGeneric();
   }
 
   /// Returns true if this function ie either a class method, or a
@@ -1065,6 +1128,21 @@ public:
   bool needsStackProtection() const { return stackProtection; }
   void setNeedStackProtection(bool needSP) { stackProtection = needSP; }
 
+  /// Whether this function is the specialized body that an exported
+  /// `@specialized` attribute exports, such as `sum<Int>` for
+  /// `@specialized(exported: true, where T == Int) func sum<T>`. This holds both
+  /// in the defining module, which creates the body, and in its clients, which
+  /// deserialize it. The defining module owns the only definition, so clients
+  /// reference it instead of emitting their own.
+  bool isExportedSpecialization() const;
+
+  /// Whether this function, another module's, has a body from which this
+  /// module can create the exported specialized bodies that a '@specialized'
+  /// declaration without a body or extension asks for (see EagerSpecializer).
+  /// The exporting module and its clients share this predicate, so that
+  /// clients only use the bodies the exporting module created.
+  bool hasBodyForImportedSpecialization() const;
+
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }
 
@@ -1159,6 +1237,15 @@ public:
 
   void setIsPerformanceConstraint(bool flag = true) {
     IsPerformanceConstraint = flag;
+  }
+
+  // see `HasInfiniteSpecializationLoop`
+  bool hasInfiniteSpecializationLoop() const {
+    return HasInfiniteSpecializationLoop;
+  }
+
+  void setHasInfiniteSpecializationLoop(bool flag = true) {
+    HasInfiniteSpecializationLoop = flag;
   }
 
   /// True if the current pass has deleted any basic blocks.
@@ -1603,6 +1690,52 @@ public:
   const_iterator end() const { return BlockList.end(); }
   unsigned size() const { return BlockList.size(); }
 
+  /// Compacts block numbers so that every block is numbered in the range
+  /// [0, size()), matching the block's position in the block list. This is the
+  /// numbering exposed via SILBasicBlock::getNumber() and consumed by generic
+  /// graph algorithms such as llvm::LoopInfoBase.
+  ///
+  /// Blocks are numbered automatically when added to a function, so this is
+  /// only needed to compact the numbering (e.g. to bound the size of a vector
+  /// indexed by block number). It bumps the numbering epoch (see
+  /// getBlockNumberEpoch()) if any number actually changed, which invalidates
+  /// any dominator tree / loop info computed against the old numbering.
+  void renumberBlocks() {
+    bool numbersChanged = false;
+    unsigned idx = 0;
+    for (SILBasicBlock &block : *this) {
+      if (block.blockNumber != (int)idx) {
+        numbersChanged = true;
+        block.blockNumber = idx;
+      }
+      ++idx;
+    }
+    NextBlockNumber = idx;
+    if (numbersChanged)
+      ++BlockNumberEpoch;
+  }
+
+  /// Assigns \p block a fresh, unique block number without renumbering the
+  /// other blocks or bumping the numbering epoch (see getBlockNumberEpoch()).
+  ///
+  /// This is called automatically when a block is added to a function, so that
+  /// SILBasicBlock::getNumber() is always valid and generic graph algorithms
+  /// that are updated incrementally (e.g. a dominator tree during
+  /// critical-edge splitting) can incorporate the new block without a full
+  /// renumbering, which would invalidate them.
+  void assignFreshBlockNumber(SILBasicBlock &block) {
+    block.blockNumber = NextBlockNumber++;
+  }
+
+  /// Returns an upper bound (exclusive) on the numbers returned by
+  /// SILBasicBlock::getNumber(), suitable for sizing a vector indexed by block
+  /// number.
+  unsigned getMaxBlockNumber() const { return NextBlockNumber; }
+
+  /// Returns the current block-numbering epoch. This changes whenever block
+  /// numbers are reassigned, allowing consumers to detect stale numbers.
+  unsigned getBlockNumberEpoch() const { return BlockNumberEpoch; }
+
   SILBasicBlock &front() { return *begin(); }
   const SILBasicBlock &front() const { return *begin(); }
 
@@ -1792,35 +1925,19 @@ public:
   /// invariants.
   void verify(CalleeCache *calleeCache = nullptr,
               DominanceInfo *dominanceInfo = nullptr,
-              bool SingleFunction = true, bool isCompleteOSSA = true,
+              bool SingleFunction = true,
               bool checkLinearLifetime = true) const;
 
-  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
-  /// blocks.
+  /// Run the SIL verifier on SIL with incomplete OSSA lifetimes, e.g. before
+  /// SILGenCleanup. Linear lifetimes are not checked.
   void verifyIncompleteOSSA() const {
     verify(/*calleeCache*/ nullptr, /*dominanceInfo=*/nullptr,
-           /*SingleFunction=*/true, /*completeOSSALifetimes=*/false);
+           /*SingleFunction=*/true, /*checkLinearLifetime=*/false);
   }
 
   /// Verifies the lifetime of memory locations in the function.
   void verifyMemoryLifetime(CalleeCache *calleeCache,
                             DeadEndBlocks *deadEndBlocks);
-
-  /// Verifies ownership of the function.
-  /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks
-  /// and calls verifyOwnership(DeadEndBlocks *deadEndBlocks)
-  void verifyOwnership() const;
-
-  /// Run the SIL ownership verifier to check that all values with ownership
-  /// have a linear lifetime. Regular OSSA invariants are checked separately in
-  /// normal SIL verification.
-  ///
-  /// \p deadEndBlocks is nullptr when OSSA lifetimes are complete.
-  ///
-  /// NOTE: The ownership verifier is run when performing normal IR
-  /// verification, so this verification can be viewed as a subset of
-  /// SILFunction::verify(checkLinearLifetimes=true).
-  void verifyOwnership(DeadEndBlocks *deadEndBlocks) const;
 
   /// Verify that all non-cond-br critical edges have been split.
   ///

@@ -243,7 +243,6 @@ public:
   SILInstruction *visitSILInstruction(SILInstruction *I) { return nullptr; }
 
   /// Instruction visitors.
-  SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
@@ -284,9 +283,7 @@ public:
   SILInstruction *
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
   
-  SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
-  SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);

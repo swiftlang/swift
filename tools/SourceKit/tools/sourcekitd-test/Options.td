@@ -90,6 +90,9 @@ def print_raw_response : Flag<["-"], "print-raw-response">,
 def dont_print_response : Flag<["-"], "dont-print-response">,
   HelpText<"Do not print the response">;
 
+def allow_error_response : Flag<["-"], "allow-error-response">,
+  HelpText<"Print an error response to stdout and continue with the next request">;
+
 def group_name : Separate<["-"], "group-name">,
   HelpText<"Module group name to print">;
 

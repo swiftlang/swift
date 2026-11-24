@@ -10,7 +10,6 @@
 // REQUIRES: OS=macosx || OS=windows-msvc
 
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 #if !BRIDGING_HEADER
@@ -18,6 +17,10 @@ import StdVector
 #endif
 import CxxStdlib
 
+// This test makes sure that, after C++20 and on platforms where std::contiguous_iterator_tag is available, 
+// we pick up the conformance to `UnsafeCxxContiguousIterator`. 
+// This conformances allows `nextSpan()` to return a span containing all std::vector elements, 
+// instead of a single element (like it does for C++ iterators that conform only to `UnsafeCxxInputIterator`).
 var StdVectorBorrowingIteratorTestSuite = TestSuite("StdVectorBorrowingIterator")
 
 StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_4).code {

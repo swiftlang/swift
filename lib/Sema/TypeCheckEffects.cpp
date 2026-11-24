@@ -243,6 +243,7 @@ static bool classifyWitness(ModuleDecl *module,
       // If something was invalid, just assume it has the effect.
       return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ConformanceHasEffectRequest::evaluate(
@@ -336,10 +337,12 @@ private:
   PolymorphicEffectKind ReasyncKind = PolymorphicEffectKind::None;
   SubstitutionMap Substitutions;
   SelfApplyExpr *AppliedSelf = nullptr;
+  DeclRefExpr *LoadedParameterRef = nullptr;
 
 public:
-  explicit AbstractFunction(Kind kind, Expr *fn)
-    : TheKind(kind) {
+  explicit AbstractFunction(Kind kind, Expr *fn,
+                            DeclRefExpr *loadedParameterRef = nullptr)
+      : TheKind(kind), LoadedParameterRef(loadedParameterRef) {
     TheExpr = fn;
   }
 
@@ -424,6 +427,7 @@ public:
       return params->get(origIndex)->getInterfaceType();
     }
     }
+    llvm_unreachable("covered switch");
   }
 
   Type getOrigParamSelfType() const {
@@ -440,6 +444,7 @@ public:
 
       return Type();
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isAutoClosure() const {
@@ -459,6 +464,20 @@ public:
   ParamDecl *getParameter() const {
     assert(getKind() == Kind::Parameter);
     return TheParameter;
+  }
+
+  /// The function-typed parameter that an opaque function loads, consumes, or
+  /// copies, if any.
+  ParamDecl *getLoadedParameter() const {
+    if (auto *ref = getLoadedParameterRef())
+      return cast<ParamDecl>(ref->getDecl());
+    return nullptr;
+  }
+
+  /// The reference to the parameter returned by getLoadedParameter(), if any.
+  DeclRefExpr *getLoadedParameterRef() const {
+    assert(getKind() == Kind::Opaque);
+    return LoadedParameterRef;
   }
   Expr *getOpaqueFunction() const {
     assert(getKind() == Kind::Opaque);
@@ -483,6 +502,7 @@ public:
     case Kind::Function:
       return getFunction()->getExplicitSafety();
     }
+    llvm_unreachable("covered switch");
   }
 
   static AbstractFunction getAppliedFn(ApplyExpr *apply,
@@ -512,6 +532,7 @@ public:
     case Kind::Parameter:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   static AbstractFunction decomposeFunction(Expr *fn,
@@ -519,6 +540,10 @@ public:
                                             Expr **calleeFn) {
     assert(fn->getValueProvidingExpr() == fn);
 
+    // The callee before looking through a `consume`, `copy`, or load, if any,
+    // and whether a load was looked through.
+    Expr *calleeBeforeLookThrough = nullptr;
+    bool sawLoad = false;
     while (true) {
       // Look through Optional unwraps.
       if (auto conversion = dyn_cast<ForceValueExpr>(fn)) {
@@ -544,9 +569,46 @@ public:
       } else if (auto actorIsolationErasure =
                      dyn_cast<ActorIsolationErasureExpr>(fn)) {
         fn = actorIsolationErasure->getSubExpr()->getValueProvidingExpr();
+        // Look through `consume`.
+      } else if (auto consume = dyn_cast<ConsumeExpr>(fn)) {
+        if (!calleeBeforeLookThrough)
+          calleeBeforeLookThrough = fn;
+        fn = consume->getSubExpr()->getValueProvidingExpr();
+        // Look through `copy`.
+      } else if (auto copy = dyn_cast<CopyExpr>(fn)) {
+        if (!calleeBeforeLookThrough)
+          calleeBeforeLookThrough = fn;
+        fn = copy->getSubExpr()->getValueProvidingExpr();
+        // Look through a load, which would be necessary for a mutable
+        // parameter.
+      } else if (auto load = dyn_cast<LoadExpr>(fn)) {
+        if (!sawLoad) {
+          if (!calleeBeforeLookThrough)
+            calleeBeforeLookThrough = fn;
+          sawLoad = true;
+          fn = load->getSubExpr()->getValueProvidingExpr();
+        }
       } else {
         break;
       }
+    }
+
+    // If we found a callee that takes a consumed, copied, or loaded argument,
+    // classify it as opaque. If an argument to the callee is a parameter of the
+    // caller, remember that so that a call of that parameter can still be
+    // rethrowing-only in the parameter's own function (see
+    // classifyFunctionBody).
+    if (calleeBeforeLookThrough) {
+      auto *declRef = dyn_cast<DeclRefExpr>(fn);
+      auto *param = declRef ? dyn_cast<ParamDecl>(declRef->getDecl()) : nullptr;
+      if (!param || !param->getInterfaceType()
+                         ->lookThroughAllOptionalTypes()
+                         ->is<AnyFunctionType>())
+        declRef = nullptr;
+      fn = calleeBeforeLookThrough;
+      if (calleeFn)
+        *calleeFn = fn;
+      return AbstractFunction(Kind::Opaque, fn, declRef);
     }
 
     // Tell our caller about the callee, if they asked for it.
@@ -1128,6 +1190,7 @@ public:
     case EffectKind::Throws: return onlyThrowing();
     case EffectKind::Unsafe: return onlyUnsafe();
     }
+    llvm_unreachable("covered switch");
   }
 
   static Classification forConditionalPlaceholder(
@@ -1144,6 +1207,7 @@ public:
     case EffectKind::Unsafe:
       llvm_unreachable("Never propagate unsafe through function bodies");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return a throwing classification.
@@ -1414,6 +1478,10 @@ public:
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
 
+  /// Caches whether each parameter is only ever read, if the classifier is
+  /// checking a `rethrows` or `reasync` function. See isOnlyReadParam().
+  llvm::DenseMap<ParamDecl *, bool> *OnlyReadParams = nullptr;
+
   ApplyClassifier(ASTContext &ctx) : Ctx(ctx) { }
 
   DeclContext *getPolymorphicEffectDeclContext(EffectKind kind) const {
@@ -1422,6 +1490,7 @@ public:
     case EffectKind::Async: return ReasyncDC;
     case EffectKind::Unsafe: return nullptr;
     }
+    llvm_unreachable("covered switch");
   }
 
   Classification classifyConformance(ProtocolConformanceRef conformanceRef,
@@ -1703,8 +1772,13 @@ public:
       // @unsafe, we diagnose the safety of the arguments---not the function
       // itself.
       if (fnRef.getExplicitSafety() == ExplicitSafety::Unspecified) {
-        if (calleeFn)
+        if (calleeFn) {
           assumedSafeArguments->insert(calleeFn);
+
+          if (fnRef.getKind() == AbstractFunction::Opaque)
+            if (auto *paramRef = fnRef.getLoadedParameterRef())
+              assumedSafeArguments->insert(paramRef);
+        }
 
         if (auto appliedSelf = fnRef.getAppliedSelf())
           assumedSafeArguments->insert(appliedSelf);
@@ -2055,6 +2129,7 @@ public:
       // the pointers does not introduce a memory-safety issue.
       return Classification();
     }
+    llvm_unreachable("covered switch");
   }
 
 private:
@@ -2066,6 +2141,19 @@ private:
                        EffectKind kind) {
     switch (fn.getKind()) {
     case AbstractFunction::Opaque: {
+      // A load, `consume`, or `copy` of a parameter of the function whose body
+      // is being checked still produces the parameter's argument if the
+      // function only ever reads the parameter.
+      if (auto *param = fn.getLoadedParameter();
+          param &&
+          getPolymorphicEffectDeclContext(kind) == param->getDeclContext() &&
+          isOnlyReadParam(param)) {
+        SubstitutionMap subs;
+        if (auto genericEnv =
+                param->getDeclContext()->getGenericEnvironmentOfContext())
+          subs = genericEnv->getForwardingSubstitutionMap();
+        return classifyParameterBody(param, subs, reason, kind);
+      }
       return classifyArgumentByType(fn.getType(), fn.getSubstitutions(),
                                     ConditionalEffectKind::Always, reason,
                                     kind);
@@ -2107,6 +2195,80 @@ private:
 
     return classifyArgumentByType(
         param->getInterfaceType(), subs, conditional, reason, kind);
+  }
+
+  /// Returns true if every reference to \p param, a parameter of the
+  /// `rethrows` or `reasync` function being checked, reads it. If that is the
+  /// case then the parameter always holds the argument it was passed.
+  ///
+  /// The actor isolation checker classifies references to mutable locals in a
+  /// similar way (see \c mutableLocalVarParent in TypeCheckConcurrency.cpp).
+  bool isOnlyReadParam(ParamDecl *param) {
+    if (param->isInOut())
+      return false;
+    if (param->isImmutableInFunctionBody())
+      return true;
+    ASSERT(OnlyReadParams);
+    auto known = OnlyReadParams->find(param);
+    if (known != OnlyReadParams->end())
+      return known->second;
+
+    auto *fn = cast<AbstractFunctionDecl>(param->getDeclContext());
+    auto *body = fn->getBody(/*canSynthesize=*/false);
+
+    class ReferenceFinder : public ASTWalker {
+      ParamDecl *Param;
+      llvm::SmallPtrSet<Expr *, 4> LoadedRefs;
+
+      /// Returns the reference that \p load reads, looking through the
+      /// optional unwraps that the load reads through.
+      static Expr *getLoadedRef(LoadExpr *load) {
+        Expr *E = load->getSubExpr();
+        while (true) {
+          E = E->getSemanticsProvidingExpr();
+          if (auto *bind = dyn_cast<BindOptionalExpr>(E))
+            E = bind->getSubExpr();
+          else if (auto *force = dyn_cast<ForceValueExpr>(E))
+            E = force->getSubExpr();
+          else
+            return E;
+        }
+      }
+
+    public:
+      bool IsOnlyRead = true;
+
+      explicit ReferenceFinder(ParamDecl *param) : Param(param) {}
+
+      bool isReferenceToParam(Expr *E) {
+        auto *declRef = dyn_cast<DeclRefExpr>(E);
+        return declRef && declRef->getDecl() == Param;
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+        if (auto *load = dyn_cast<LoadExpr>(E)) {
+          if (auto *ref = getLoadedRef(load)) {
+            if (isReferenceToParam(ref))
+              LoadedRefs.insert(ref);
+          }
+        } else if (isReferenceToParam(E) && E->getType() &&
+                   E->getType()->hasLValueType() && !LoadedRefs.contains(E)) {
+          IsOnlyRead = false;
+        }
+        if (!IsOnlyRead)
+          return Action::Stop();
+        return Action::Continue(E);
+      }
+    };
+
+    bool isOnlyRead = false;
+    if (body) {
+      ReferenceFinder finder(param);
+      body->walk(finder);
+      isOnlyRead = finder.IsOnlyRead;
+    }
+    (*OnlyReadParams)[param] = isOnlyRead;
+    return isOnlyRead;
   }
 
   bool isLocallyDefinedInPolymorphicEffectDeclContext(DeclContext *DC,
@@ -3178,6 +3340,7 @@ public:
     case PotentialEffectReason::Kind::SubscriptAccess:
       return "subscript access";
     }
+    llvm_unreachable("covered switch");
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
@@ -3424,6 +3587,7 @@ public:
     case PotentialEffectReason::Kind::SubscriptAccess:
       return 5;
     }
+    llvm_unreachable("covered switch");
   }
 
   void diagnoseAsyncInIllegalContext(DiagnosticEngine &Diags, ASTNode node) {
@@ -3538,6 +3702,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   DeclContext *RethrowsDC = nullptr;
   DeclContext *ReasyncDC = nullptr;
+
+  /// Whether each mutable parameter is only ever read, shared by the
+  /// classifiers that getApplyClassifier() creates.
+  mutable llvm::DenseMap<ParamDecl *, bool> OnlyReadParams;
   Context CurContext;
 
   class ContextFlags {
@@ -3645,10 +3813,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   struct DiagnosticInfo {
     DiagnosticInfo(Expr &failingExpr,
                    PotentialEffectReason reason,
-                   bool downgradeToWarning) :
+                   bool downgradeToWarning,
+                   ActorIsolation contextIsolation) :
       reason(reason),
       expr(failingExpr),
-      downgradeToWarning(downgradeToWarning) {}
+      downgradeToWarning(downgradeToWarning),
+      contextIsolation(contextIsolation) {}
 
     /// Reason for throwing
     PotentialEffectReason reason;
@@ -3658,6 +3828,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
     /// Whether the error should be downgraded to a warning.
     bool downgradeToWarning;
+
+    /// The isolation of the failing expression's context.
+    ActorIsolation contextIsolation;
   };
 
   SmallVector<Expr *, 4> errorOrder;
@@ -4276,6 +4449,7 @@ private:
     classifier.DC = CurContext.getDeclContext();
     classifier.RethrowsDC = RethrowsDC;
     classifier.ReasyncDC = ReasyncDC;
+    classifier.OnlyReadParams = &OnlyReadParams;
     return classifier;
   }
 
@@ -4399,7 +4573,8 @@ private:
           errorOrder.push_back(anchor);
         uncoveredAsync[anchor].emplace_back(
             *expr, classification.getAsyncReason(),
-            classification.shouldDowngradeToWarning());
+            classification.shouldDowngradeToWarning(),
+            getActorIsolationOfContext(CurContext.getDeclContext()));
       }
     }
 
@@ -4675,27 +4850,23 @@ private:
         auto unsafeUses = classification.getUnsafeUses();
         SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
                                                  unsafeUses.end());
-        bool anyAlways = retainUnsafeUsesToDiagnose(
-            usesToDiagnose, /*includeMerelyUnsafe=*/Ctx.LangOpts.hasFeature(
-                Feature::StrictMemorySafety, /*allowMigration=*/true));
+        bool anyAlways = retainUnsafeUsesToDiagnose(usesToDiagnose);
 
-        if (!usesToDiagnose.empty()) {
-          auto insertionLoc = S->getPattern()->getStartLoc();
-          Ctx.Diags.diagnose(S->getForLoc(),
-                             anyAlways
-                                 ? diag::for_always_unsafe_without_unsafe
-                                 : diag::for_unsafe_without_unsafe)
-            .fixItInsert(insertionLoc, "unsafe ")
-            // As above: the marker doesn't survive interface printing.
-            .warnInSwiftInterface(CurContext.getDeclContext());
+        auto insertionLoc = S->getPattern()->getStartLoc();
+        Ctx.Diags.diagnose(S->getForLoc(),
+                           anyAlways
+                               ? diag::for_always_unsafe_without_unsafe
+                               : diag::for_unsafe_without_unsafe)
+          .fixItInsert(insertionLoc, "unsafe ")
+          // As above: the marker doesn't survive interface printing.
+          .warnInSwiftInterface(CurContext.getDeclContext());
 
-          for (auto unsafeUse : usesToDiagnose) {
-            // If we don't have a source location for this use, use the
-            // location of the `for` instead.
-            if (unsafeUse.getLocation().isInvalid())
-              unsafeUse.replaceLocation(S->getForLoc());
-            diagnoseUnsafeUse(unsafeUse);
-          }
+        for (auto unsafeUse : usesToDiagnose) {
+          // If we don't have a source location for this use, use the
+          // location of the `for` instead.
+          if (unsafeUse.getLocation().isInvalid())
+            unsafeUse.replaceLocation(S->getForLoc());
+          diagnoseUnsafeUse(unsafeUse);
         }
       }
     }
@@ -4854,7 +5025,7 @@ private:
               if (var->isAsyncLet()) {
                 Ctx.Diags.diagnose(declR->getLoc(),
                                    diag::async_let_without_await, var);
-                continue;
+                break;
               }
             }
           }
@@ -4862,12 +5033,12 @@ private:
         case PotentialEffectReason::Kind::PropertyAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 1);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::SubscriptAccess:
           Ctx.Diags.diagnose(diag.expr.getStartLoc(),
                              diag::async_access_without_await, 2);
-          continue;
+          break;
 
         case PotentialEffectReason::Kind::ByClosure:
         case PotentialEffectReason::Kind::ByDefaultClosure:
@@ -4889,7 +5060,7 @@ private:
                                   diag::async_access_without_await, 0);
                break;
            }
-          continue;
+          break;
          }
 
          auto *call = dyn_cast<ApplyExpr>(&diag.expr);
@@ -4917,10 +5088,34 @@ private:
                               diag::async_access_without_await, 0);
          }
 
-         continue;
+         break;
         }
       }
+
+      noteActorInstanceMayNotBeGlobalActor(diag);
     }
+  }
+
+  /// Note when the isolation crossing that made an expression implicitly
+  /// 'async' is between a global actor and an instance of its actor type.
+  static void noteActorInstanceMayNotBeGlobalActor(const DiagnosticInfo &info) {
+    std::optional<ActorIsolation> target;
+    const Expr *selfArgument = nullptr;
+    if (auto *apply = dyn_cast<ApplyExpr>(&info.expr)) {
+      target = apply->isImplicitlyAsync();
+      if (auto *selfApply =
+              dyn_cast<SelfApplyExpr>(apply->getFn()->getValueProvidingExpr()))
+        selfArgument = selfApply->getBase();
+    } else if (auto *lookup = dyn_cast<LookupExpr>(&info.expr)) {
+      target = lookup->isImplicitlyAsync();
+      selfArgument = lookup->getBase();
+    } else if (auto *declRef = dyn_cast<DeclRefExpr>(&info.expr)) {
+      target = declRef->isImplicitlyAsync();
+    }
+
+    if (target)
+      swift::noteActorInstanceMayNotBeGlobalActor(
+          info.expr.getLoc(), info.contextIsolation, *target, selfArgument);
   }
 
   /// Check whether the given error points to an attempt to access
@@ -4949,6 +5144,7 @@ private:
                                    LanguageMode::v6)
           .fixItInsert(fixItLoc, insertText)
           .highlight(anchor->getSourceRange());
+      noteActorInstanceMayNotBeGlobalActor(errorInfo);
       return true;
     };
 
@@ -5013,28 +5209,36 @@ private:
     return false;
   }
 
+  /// Whether the given anchor was synthesized by the compiler. Implicit
+  /// conversions, existential openings, and optional chains wrap user-written
+  /// code, so look through them.
+  static bool isSynthesizedAnchor(const Expr *anchor) {
+    while (anchor) {
+      if (auto conversion = dyn_cast<ImplicitConversionExpr>(anchor))
+        anchor = conversion->getSubExpr();
+      else if (auto open = dyn_cast<OpenExistentialExpr>(anchor))
+        anchor = open->getSubExpr();
+      else if (auto optEval = dyn_cast<OptionalEvaluationExpr>(anchor))
+        anchor = optEval->getSubExpr();
+      else
+        return anchor->isImplicit();
+    }
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                                                /*allowMigration=*/true);
-
     // Compiler-synthesized code cannot be annotated with 'unsafe' by hand, so
     // an always-unsafe use there isn't actionable. Treat it as merely unsafe,
     // which keeps it out of the way unless strict memory safety checking asked
     // to hear about unsafe code at all.
     bool isSynthesized =
-        (anchor && anchor->isImplicit()) || isSynthesizedContext();
-    if (isSynthesized && !strictSafety)
-      return;
+        isSynthesizedAnchor(anchor) || isSynthesizedContext();
 
     SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
                                              unsafeUses.end());
-    bool anyAlways = retainUnsafeUsesToDiagnose(
-        usesToDiagnose, /*includeMerelyUnsafe=*/strictSafety);
-    if (isSynthesized)
-      anyAlways = false;
-    if (usesToDiagnose.empty())
-      return;
+    bool anyAlways =
+        !isSynthesized && retainUnsafeUsesToDiagnose(usesToDiagnose);
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");
     Ctx.Diags.diagnose(anchor->getStartLoc(),
@@ -5307,8 +5511,7 @@ static ThrownErrorClassification classifyThrownErrorType(Type type) {
 
   // All three cases come up. The first one from the "real" witness matcher,
   // and the other two from associated type inference.
-  if (type->hasTypeVariableOrPlaceholder() ||
-      type->hasTypeParameter() ||
+  if (type->hasTypeVariableOrHole() || type->hasTypeParameter() ||
       type->hasPrimaryArchetype())
     return ThrownErrorClassification::Dependent;
 

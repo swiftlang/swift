@@ -17,7 +17,7 @@ func testNonisolatedNonsendingFunctionType() {
 
 // MANGLED-LABEL: define hidden swiftcc void @"$s42nonisolated_nonsending_metadata_backdeploy37testNonisolatedNonsendingFunctionTypeyyF"()
 // MANGLED-NEXT: entry:
-// MANGLED-NEXT:   call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSiyYaKYCcMD")
+// MANGLED-NEXT:   call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSiyYaKYCcMd", ptr @"$sSiyYaKYCcMR")
 // MANGLED-NEXT:   call swiftcc void @"$s42nonisolated_nonsending_metadata_backdeploy11useMetatypeyyypXpF"(ptr
 // MANGLED-NEXT:   ret void
 // MANGLED-NEXT: }

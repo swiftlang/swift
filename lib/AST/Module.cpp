@@ -188,6 +188,17 @@ class swift::SourceLookupCache {
   /// Top-level macros that produce arbitrary names.
   SmallVector<MissingDecl *, 4> TopLevelArbitraryMacros;
 
+  /// The module-scope declarations with unique macro names introduced by the
+  /// first NumIndexedMacroExpansionFiles macro expansion files of the module,
+  /// paired with the files that introduced them, indexed by base name.
+  llvm::DenseMap<DeclBaseName,
+                 SmallVector<std::pair<const SourceFile *, ValueDecl *>, 1>>
+      UniqueMacroNameDecls;
+
+  /// The number of macro expansion files of the module whose declarations have
+  /// been added to UniqueMacroNameDecls.
+  unsigned NumIndexedMacroExpansionFiles = 0;
+
   SmallVector<llvm::PointerUnion<Decl *, MacroExpansionExpr *>, 4>
       MayHaveAuxiliaryDecls;
   void populateAuxiliaryDeclCache();
@@ -200,6 +211,12 @@ public:
   void lookupValue(DeclName Name, NLKind LookupKind,
                    OptionSet<ModuleLookupFlags> Flags,
                    SmallVectorImpl<ValueDecl*> &Result);
+
+  /// Returns the module-scope declarations with the unique macro name \p name
+  /// introduced by the macro expansion files of \p module, paired with the
+  /// files that introduced them.
+  ArrayRef<std::pair<const SourceFile *, ValueDecl *>>
+  getUniqueMacroNameDecls(const ModuleDecl &module, DeclBaseName name);
 
   /// Retrieves all the operator decls. The order of the results is not
   /// guaranteed to be meaningful.
@@ -288,7 +305,11 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
       if (onlyDerivatives)
         if (AbstractFunctionDecl *AFD = getDerivative())
           CustomDerivatives.push_back(AFD);
-      if (!onlyOperators && !onlyDerivatives && VD->hasName()) {
+      // Skip a '@specialized' declaration without a body so that calls in this
+      // module still find the imported declaration: it names that declaration
+      // instead of declaring one.
+      if (!onlyOperators && !onlyDerivatives && VD->hasName() &&
+          !SpecializedAttr::isSpecializationDeclaration(VD)) {
         TopLevelValues.add(VD);
         if (VD->getAttrs().hasAttribute<CustomAttr>())
           MayHaveAuxiliaryDecls.push_back(VD);
@@ -503,6 +524,11 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
     for (auto macroNames : introducedNames) {
       auto macroRef = macroNames.getFirst();
       for (auto name : macroNames.getSecond()) {
+        // Unique names are only visible inside the macro expansion that
+        // introduced them, not at module scope.
+        if (name == UniqueMacroNamePlaceholder)
+          continue;
+
         auto *placeholder = MissingDecl::forUnexpandedMacro(macroRef, anchorDecl);
         name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
       }
@@ -561,10 +587,7 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
   // FIXME: We need to not consider auxiliary decls if we're doing lookup
   // from inside a macro argument at module scope.
   populateAuxiliaryDeclCache();
-  DeclName keyName = MacroDecl::isUniqueMacroName(Name.getBaseName())
-    ? UniqueMacroNamePlaceholder
-    : Name;
-  auto auxDecls = TopLevelAuxiliaryDecls.find(keyName);
+  auto auxDecls = TopLevelAuxiliaryDecls.find(Name);
 
   // Check macro expansions that could produce this name.
   SmallVector<MissingDecl *, 4> unexpandedDecls;
@@ -592,6 +615,41 @@ void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
           }
         });
   }
+}
+
+ArrayRef<std::pair<const SourceFile *, ValueDecl *>>
+SourceLookupCache::getUniqueMacroNameDecls(const ModuleDecl &module,
+                                           DeclBaseName name) {
+  // Only peer, declaration, and code item macros can introduce module-scope
+  // declarations.
+  const MacroRoles moduleScopeDeclRoles = MacroRoles(MacroRole::Peer) |
+                                          MacroRole::Declaration |
+                                          MacroRole::CodeItem;
+
+  // Index the macro expansion files created since the last lookup. Re-read the
+  // list on each iteration instead of holding on to it, so that files created
+  // while indexing are handled safely.
+  while (NumIndexedMacroExpansionFiles <
+         module.getMacroExpansionFiles().size()) {
+    auto *sourceFile =
+        module.getMacroExpansionFiles()[NumIndexedMacroExpansionFiles++];
+    auto role = sourceFile->getFulfilledMacroRole();
+    if (!role || !moduleScopeDeclRoles.contains(*role))
+      continue;
+
+    for (auto *decl : sourceFile->getTopLevelDecls()) {
+      auto *value = dyn_cast<ValueDecl>(decl);
+      if (value && value->getDeclContext()->isModuleScopeContext() &&
+          MacroDecl::isUniqueMacroName(value->getBaseName()))
+        UniqueMacroNameDecls[value->getBaseName()].push_back(
+            {sourceFile, value});
+    }
+  }
+
+  auto found = UniqueMacroNameDecls.find(name);
+  if (found == UniqueMacroNameDecls.end())
+    return {};
+  return found->second;
 }
 
 void SourceLookupCache::getPrecedenceGroups(
@@ -660,12 +718,8 @@ void SourceLookupCache::lookupVisibleDecls(ImportPath::Access AccessPath,
 
   populateAuxiliaryDeclCache();
   SmallVector<MissingDecl *, 4> unexpandedDecls;
-  for (auto &entry : TopLevelAuxiliaryDecls) {
-    for (auto &decl : entry.second) {
-      (void) decl;
-      unexpandedDecls.append(entry.second.begin(), entry.second.end());
-    }
-  }
+  for (auto &entry : TopLevelAuxiliaryDecls)
+    unexpandedDecls.append(entry.second.begin(), entry.second.end());
 
   // Store macro expanded decls in a 'SmallSetVector' because different
   // MissingDecls might be created by a single macro expansion. (e.g. multiple
@@ -949,6 +1003,29 @@ void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
   FORWARD(lookupValue, (Name, LookupKind, Flags, Result));
 }
 
+void ModuleDecl::lookupUniqueMacroNameInEnclosingExpansions(
+    DeclName name, SourceLoc loc, SmallVectorImpl<ValueDecl *> &results) {
+  ASSERT(MacroDecl::isUniqueMacroName(name.getBaseName()));
+  if (!isParsedModule(this))
+    return;
+
+  SmallVector<const SourceFile *, 2> expansionFiles;
+  for (auto *sourceFile = getSourceFileContainingLocation(loc);
+       sourceFile && sourceFile->Kind == SourceFileKind::MacroExpansion;
+       sourceFile = sourceFile->getEnclosingSourceFile())
+    expansionFiles.push_back(sourceFile);
+  if (expansionFiles.empty())
+    return;
+
+  for (auto &entry :
+       getSourceLookupCache().getUniqueMacroNameDecls(*this,
+                                                      name.getBaseName())) {
+    if (llvm::is_contained(expansionFiles, entry.first) &&
+        entry.second->getName().matchesRef(name))
+      results.push_back(entry.second);
+  }
+}
+
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
   for (auto file : getFiles()) {
     auto TD = file->lookupLocalType(MangledName);
@@ -994,6 +1071,20 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
   } else if (isa<ModuleDecl>(containerDecl)) {
     assert(container == this);
     this->lookupValue(name, NLKind::QualifiedLookup, results);
+
+    // Unique macro names aren't visible at module scope, but a lookup by
+    // mangled name can still refer to one introduced by an expanded macro.
+    // FIXME: lookupValue() doesn't find these. Clients looking up by mangled
+    // name should either provide a source location or use a dedicated entry
+    // point.
+    if (MacroDecl::isUniqueMacroName(name.getBaseName()) &&
+        isParsedModule(this)) {
+      for (auto &entry : getSourceLookupCache().getUniqueMacroNameDecls(
+               *this, name.getBaseName())) {
+        if (entry.second->getName().matchesRef(name))
+          results.push_back(entry.second);
+      }
+    }
   } else if (!isa<GenericTypeDecl>(containerDecl)) {
     // If ExtensionDecl, then use ExtensionDecl::lookupDirect instead.
     llvm_unreachable("This context does not support lookup.");
@@ -1180,6 +1271,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
@@ -1568,11 +1660,11 @@ void ModuleDecl::getDisplayDeclsRecursivelyAndImports(
   // Look up imports recursively.
   collectExportedImports(this, importCollector);
   for (const auto &QI : importCollector.qualifiedImports) {
-    auto Module = QI.getFirst();
+    auto Module = QI.first;
     if (importCollector.imports.contains(Module))
       continue;
 
-    auto &Decls = QI.getSecond();
+    auto &Decls = QI.second;
     results.append(Decls.begin(), Decls.end());
   }
 
@@ -1826,8 +1918,8 @@ void SourceFile::getImplicitImportsForModuleInterface(
 
 void SourceFile::dumpSeparatelyImportedOverlays() const {
   for (auto &pair : separatelyImportedOverlays) {
-    auto &underlying = std::get<0>(pair);
-    auto &overlays = std::get<1>(pair);
+    auto &underlying = pair.first;
+    auto &overlays = pair.second;
 
     llvm::errs() << (void*)underlying << " ";
     underlying->dump(llvm::errs());
@@ -2318,43 +2410,6 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
-// Hidden-Type Layouts
-//===----------------------------------------------------------------------===//
-
-void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
-                                        const AbstractTypeLayout &layout) {
-  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
-  if (!result.second) {
-    ASSERT(result.first->second.size == layout.size &&
-           result.first->second.alignment == layout.alignment &&
-           result.first->second.stride == layout.stride &&
-           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
-           result.first->second.isOpaque == layout.isOpaque &&
-           "conflicting hidden-type layouts for the same mangled name");
-  }
-}
-
-std::optional<AbstractTypeLayout>
-ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
-  auto it = HiddenTypeLayouts.find(mangledName);
-  if (it == HiddenTypeLayouts.end())
-    return std::nullopt;
-  return it->second;
-}
-
-SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
-ModuleDecl::getSortedHiddenTypeLayouts() const {
-  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
-  result.reserve(HiddenTypeLayouts.size());
-  for (auto &entry : HiddenTypeLayouts)
-    result.emplace_back(entry.getKey(), entry.getValue());
-  llvm::sort(result, [](const auto &a, const auto &b) {
-    return a.first < b.first;
-  });
-  return result;
-}
-
-//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -2451,7 +2506,7 @@ findDeclaredCrossImportOverlays(Identifier bystanderName,
 void ModuleDecl::getDeclaredCrossImportBystanders(
     SmallVectorImpl<Identifier> &otherModules) {
   for (auto &pair : declaredCrossImports)
-    otherModules.push_back(std::get<0>(pair));
+    otherModules.push_back(pair.first);
 }
 
 void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
@@ -2494,8 +2549,8 @@ void ModuleDecl::findDeclaredCrossImportOverlaysTransitive(
     }
 
     for (auto &pair: current->declaredCrossImports) {
-      Identifier &bystander = std::get<0>(pair);
-      for (auto *file: std::get<1>(pair)) {
+      Identifier &bystander = pair.first;
+      for (auto *file: pair.second) {
         auto overlays = file->getOverlayModuleNames(current, unused, bystander);
         for (Identifier overlay: overlays) {
           addOverlay(overlay);
@@ -2514,9 +2569,9 @@ namespace {
                                      CrossImportMap modCrossImports) {
     auto ret = std::find_if(modCrossImports.begin(), modCrossImports.end(),
                             [&](CrossImportMap::iterator::value_type &pair) {
-      for (OverlayFile *file: std::get<1>(pair)) {
+      for (OverlayFile *file: pair.second) {
         ArrayRef<Identifier> overlays = file->getOverlayModuleNames(
-            mod, SourceLoc(), std::get<0>(pair));
+            mod, SourceLoc(), pair.first);
         if (std::find(overlays.begin(), overlays.end(),
                       overlay->getName()) != overlays.end())
           return true;
@@ -3595,6 +3650,9 @@ SourceFile::SourceFile(ModuleDecl &M, SourceFileKind K,
     assert(!problem && "multiple main files?");
     (void)problem;
   }
+
+  if (Kind == SourceFileKind::MacroExpansion)
+    M.addMacroExpansionFile(this);
 
   M.getASTContext().SourceMgr.recordSourceFile(bufferID, this);
 }

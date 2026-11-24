@@ -13,9 +13,12 @@
 #include "SILGenDynamicCast.h"
 
 #include "Initialization.h"
+#include "LValue.h"
 #include "RValue.h"
 #include "Scope.h"
 #include "ExitableFullExpr.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -52,6 +55,49 @@ CastStrategy Lowering::computeCastStrategy(SILGenFunction &SGF,
           SGF.SGM.M, SGF.F.hasLoweredAddresses(), sourceType, targetType))
     return CastStrategy::Scalar;
   return CastStrategy::Address;
+}
+
+/// Whether a cast to \p targetType may use isolated conformances.
+///
+/// This is a property of the target type alone, so every way of emitting a
+/// checked cast has to reach the same answer -- including the type-test form,
+/// which does not go through CheckedCastEmitter.
+static CastingIsolatedConformances
+computeIsolatedConformances(CanType targetType) {
+  // Non-existential types don't carry conformances, so we always allow
+  // isolated conformances.
+  if (!targetType->isAnyExistentialType())
+    return CastingIsolatedConformances::Allow;
+
+  // If there is a conformance to SendableMetatype, then this existential
+  // can leave the current isolation domain.
+  ASTContext &ctx = targetType->getASTContext();
+  Type checkType;
+  if (auto existentialMetatype = targetType->getAs<ExistentialMetatypeType>())
+    checkType = existentialMetatype->getInstanceType();
+  else
+    checkType = targetType;
+
+  // If there are no non-marker protocols in the existential, there's no
+  // need to prohibit isolated conformances.
+  auto layout = checkType->getExistentialLayout();
+  if (!layout.containsNonMarkerProtocols())
+    return CastingIsolatedConformances::Allow;
+
+  // If the type conforms to SendableMetatype, prohibit isolated
+  // conformances.
+  auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+  if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
+    return CastingIsolatedConformances::Prohibit;
+
+  return CastingIsolatedConformances::Allow;
+}
+
+/// The CheckedCastInstOptions for a cast to \p targetType.
+static CheckedCastInstOptions
+computeCheckedCastOptions(CanType targetType) {
+  return CheckedCastInstOptions()
+      .withIsolatedConformances(computeIsolatedConformances(targetType));
 }
 
 namespace {
@@ -368,38 +414,7 @@ namespace {
 
   private:
     CheckedCastInstOptions computedOptions() const {
-      return CheckedCastInstOptions()
-        .withIsolatedConformances(computedIsolatedConformances());
-    }
-    
-    CastingIsolatedConformances computedIsolatedConformances() const {
-      // Non-existential types don't carry conformances, so we always allow
-      // isolated conformances.
-      if (!TargetType->isAnyExistentialType())
-        return CastingIsolatedConformances::Allow;
-
-      // If there is a conformance to SendableMetatype, then this existential
-      // can leave the current isolation domain.
-      ASTContext &ctx = TargetType->getASTContext();
-      Type checkType;
-      if (auto existentialMetatype = TargetType->getAs<ExistentialMetatypeType>())
-        checkType = existentialMetatype->getInstanceType();
-      else
-        checkType = TargetType;
-
-      // If there are no non-marker protocols in the existential, there's no
-      // need to prohibit isolated conformances.
-      auto layout = checkType->getExistentialLayout();
-      if (!layout.containsNonMarkerProtocols())
-        return CastingIsolatedConformances::Allow;
-
-      // If the type conforms to SendableMetatype, prohibit isolated
-      // conformances.
-      auto proto = ctx.getProtocol(KnownProtocolKind::SendableMetatype);
-      if (proto && lookupConformance(checkType, proto, /*allowMissing=*/false))
-        return CastingIsolatedConformances::Prohibit;
-
-      return CastingIsolatedConformances::Allow;
+      return computeCheckedCastOptions(TargetType);
     }
   };
 } // end anonymous namespace
@@ -634,9 +649,173 @@ RValue Lowering::emitConditionalCheckedCast(
   return RValue(SGF, loc, optTargetType->getCanonicalType(), result);
 }
 
+/// Formally, `case is T` has the same meaning as `case _ as T`;
+/// they both verify the type without binding any payload in the result.
+bool Lowering::patternNeedsNoPayload(const Pattern *pattern) {
+  // True for `case is T`
+  if (!pattern)
+    return true;
+  // True for `case _ as T` (and variations thereof)
+  return isa<AnyPattern>(pattern->getSemanticsProvidingPattern());
+}
+
+/// A coercion cannot fail, and with no payload bound there is nothing left for
+/// the pattern to do, so it matches every value just as `_` does.
+bool Lowering::isWildcardIsPattern(const IsPattern *pattern) {
+  return pattern->getCastKind() == CheckedCastKind::Coercion &&
+         patternNeedsNoPayload(pattern->getSubPattern());
+}
+
+/// True if a cast from \p sourceType to \p targetType can be answered by a
+/// non-consuming type test rather than going through the full dynamic
+/// cast machinery used by `as?`
+bool Lowering::canUseTypeTestForIsa(SILGenFunction &SGF, CanType sourceType,
+                                    CanType targetType,
+                                    CheckedCastKind castKind) {
+  if (castKind != CheckedCastKind::ValueCast)
+    return false;
+
+  // COM has its own lowering and consumption kind
+  if (targetType->lookThroughAllOptionalTypes()->isCOMExistentialType() ||
+      sourceType->lookThroughAllOptionalTypes()->isCOMExistentialType())
+    return false;
+
+  // Scalar casts -- class and metatype references -- keep the ordinary
+  // lowering: a scalar cast yields its result as a block argument and carries
+  // no consumption kind, so it cannot express a test.
+  // Note: computeCastStrategy() doesn't work here; before AddressLowering,
+  // Opaque Values makes everything scalar. IRGen sees this after
+  // AddressLowering, so ask what will be true there.
+  if (canIRGenUseScalarCheckedCastInstructions(SGF.SGM.M, sourceType,
+                                              targetType))
+    return false;
+
+  // The test reads the source where it already lives, so it has to be at the
+  // abstraction level the instruction expects. The ordinary path reabstracts to
+  // the most general pattern first; where that would actually change the
+  // lowering, leave it to do so.
+  AbstractionPattern mostGeneral = SGF.SGM.Types.getMostGeneralAbstraction();
+  if (SGF.getTypeLowering(mostGeneral, sourceType).getLoweredType() !=
+      SGF.getTypeLowering(sourceType).getLoweredType())
+    return false;
+
+  return true;
+}
+
+void Lowering::emitTypeTestForIsa(SILGenFunction &SGF, SILLocation loc,
+                                  ManagedValue subjectAddr,
+                                  CanType sourceType, CanType targetType,
+                                  SILBasicBlock *trueBB,
+                                  SILBasicBlock *falseBB,
+                                  ProfileCounter trueCount,
+                                  ProfileCounter falseCount) {
+  assert(subjectAddr.getType().isAddress() &&
+         "type test needs the existential in memory");
+
+  // Emit `checked_cast_addr_br test_only` with no destination
+  SGF.B.createCheckedCastAddrBranch(
+      loc, computeCheckedCastOptions(targetType),
+      CastConsumptionKind::TestOnly,
+      subjectAddr.getValue(), sourceType, SILValue(), targetType, trueBB,
+      falseBB, trueCount, falseCount);
+}
+
+/// Return \p value in memory, borrowing it into a temporary if it is not an
+/// address already, so the casting runtime has something to read.
+///
+/// The caller must have established a FormalEvaluationScope covering the use of
+/// the returned value, which has to outlive the test's terminator.
+static ManagedValue emitTypeTestSubjectInMemory(SILGenFunction &SGF,
+                                                SILLocation loc,
+                                                ManagedValue value) {
+  // If the operand is an address, we can use it directly
+  if (value.getType().isAddress())
+    return value;
+
+  // If it's not an address, borrow the value into a temporary
+  // allocation for the casting runtime.
+  SILValue temp = SGF.emitTemporaryAllocation(loc, value.getType());
+  ManagedValue borrowed =
+      SGF.emitFormalEvaluationManagedBeginBorrow(loc, value.getValue());
+  return SGF.emitFormalEvaluationManagedStoreBorrow(loc, borrowed.getValue(),
+                                                    temp);
+}
+
+/// Borrow the storage \p operand names so a type test can read it without
+/// copying or consuming it.
+ManagedValue Lowering::emitTypeTestOperand(SILGenFunction &SGF,
+                                           Expr *operand) {
+  ManagedValue value;
+  if (Expr *storage = SGF.findStorageReferenceExprForMoveOnly(
+          operand, StorageReferenceOperationKind::Borrow)) {
+    // Named storage (local, global, stored propery, parameter)
+    // should be borrowed in place
+    LValue lv = SGF.emitLValue(storage, SGFAccessKind::BorrowedAddressRead);
+    value = SGF.emitBorrowedLValue(operand, std::move(lv));
+  } else {
+    // Temporary value is owned by us
+    value =
+        SGF.emitRValueAsSingleValue(operand, SGFContext::AllowImmediatePlusZero);
+  }
+
+  // Either branch above can yield a value that would need to be in
+  // memory for the cast functions to use.
+  return emitTypeTestSubjectInMemory(SGF, operand, value);
+}
+
 SILValue Lowering::emitIsa(SILGenFunction &SGF, SILLocation loc,
                            Expr *operand, Type targetType,
                            CheckedCastKind castKind) {
+  // A noncopyable existential can answer this without giving up its payload.
+  // Do that before anything below materializes the operand: the ordinary path
+  // extracts the payload only to destroy it, which for a noncopyable source
+  // means the query consumes what it was asked about.
+  {
+    auto sourceType =
+        operand->getType()->getWithoutSpecifierType()->getCanonicalType();
+    auto targetCanType = targetType->getCanonicalType();
+
+    // FIXME: The `isNoncopyable()` restriction shouldn't be needed here,
+    // but that actually changes the behavior of some Copyable casts where
+    // Sema and the runtime disagree.
+    if (castKind == CheckedCastKind::Coercion && sourceType->isNoncopyable()) {
+      FormalEvaluationScope borrowScope(SGF);
+      (void)emitTypeTestOperand(SGF, operand);
+      auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+      return SGF.B.createIntegerLiteral(loc, i1Ty, 1);
+    }
+    if (canUseTypeTestForIsa(SGF, sourceType, targetCanType, castKind)) {
+      auto i1Ty = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+
+      // The borrow of the subject has to outlive the terminator, so this scope
+      // is closed in the continuation block, after both edges have merged.
+      FormalEvaluationScope borrowScope(SGF);
+      ManagedValue addr = emitTypeTestOperand(SGF, operand);
+
+      ExitableFullExpr scope(SGF, CleanupLocation(loc));
+      SILBasicBlock *trueBB = SGF.createBasicBlock();
+      SILBasicBlock *falseBB = SGF.createBasicBlock();
+      emitTypeTestForIsa(SGF, loc, addr, sourceType, targetCanType, trueBB,
+                         falseBB);
+
+      SGF.B.emitBlock(trueBB);
+      SILValue yes = SGF.B.createIntegerLiteral(loc, i1Ty, 1);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, yes);
+
+      SGF.B.emitBlock(falseBB);
+      SILValue no = SGF.B.createIntegerLiteral(loc, i1Ty, 0);
+      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc, no);
+
+      SILBasicBlock *contBB = scope.exit();
+      return contBB->createPhiArgument(i1Ty, OwnershipKind::None);
+    }
+  }
+
+  // The lowering below consumes its operand. Computing a closure's captures
+  // assumes that this only happens for a cast that involves a COM existential
+  // or a value whose representation depends on abstraction (see
+  // FindCapturedVars::isBorrowingIsCheck()).
+
   // Handle collection downcasts separately.
   if (castKind == CheckedCastKind::ArrayDowncast ||
       castKind == CheckedCastKind::DictionaryDowncast ||

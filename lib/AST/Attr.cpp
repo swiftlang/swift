@@ -18,6 +18,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -27,10 +29,13 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/Strings.h"
@@ -76,6 +81,7 @@ LLVM_ATTRIBUTE_USED StringRef swift::getDeclAttrKindID(DeclAttrKind kind) {
     return #CLASS;
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
@@ -248,6 +254,106 @@ void LifetimeTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+ScopedTypeAttr::ScopedTypeAttr(SourceLoc atLoc, SourceLoc kwLoc,
+                               SourceRange parens,
+                               ArrayRef<ScopeRestrictionRepr> restrictions)
+    : SimpleTypeAttr(atLoc, kwLoc, parens) {
+  Bits.ScopedTypeAttr.NumRestrictions = restrictions.size();
+  ASSERT(Bits.ScopedTypeAttr.NumRestrictions == restrictions.size());
+  llvm::uninitialized_copy(restrictions, getTrailingObjects());
+}
+
+ScopedTypeAttr *
+ScopedTypeAttr::create(const ASTContext &ctx, SourceLoc atLoc, SourceLoc kwLoc,
+                       SourceRange parens,
+                       ArrayRef<ScopeRestrictionRepr> restrictions) {
+  ASSERT(!restrictions.empty());
+  void *mem =
+      ctx.Allocate(totalSizeToAlloc<ScopeRestrictionRepr>(restrictions.size()),
+                   alignof(ScopedTypeAttr));
+  return new (mem) ScopedTypeAttr(atLoc, kwLoc, parens, restrictions);
+}
+
+static void printScopeName(ASTPrinter &printer, Identifier name) {
+  if (name.is("immortal"))
+    printer << "`immortal`";
+  else
+    printer.printName(name, PrintNameContext::Attribute);
+}
+
+static void printScope(ASTPrinter &printer, ScopeRepr scope) {
+  switch (scope.getKind()) {
+  case ScopeRepr::Kind::ScopeName:
+    printScopeName(printer, scope.getScopeName().getIdentifier());
+    return;
+  case ScopeRepr::Kind::AccessedValue:
+    printer << "&";
+    printScopeName(printer, scope.getAccessedValue());
+    return;
+  case ScopeRepr::Kind::Self:
+    printer << "self";
+    return;
+  case ScopeRepr::Kind::AccessedSelf:
+    printer << "&self";
+    return;
+  case ScopeRepr::Kind::Immortal:
+    printer << "immortal";
+    return;
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+static void printScopeParams(ASTPrinter &printer,
+                             ArrayRef<Located<ScopeName>> params) {
+  printer.printAttrName("@_scopeParams");
+  printer << "(";
+  interleave(
+      params,
+      [&](Located<ScopeName> param) {
+        printScopeName(printer, param.Item.getIdentifier());
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+}
+
+void ScopedTypeAttr::printImpl(ASTPrinter &printer,
+                               const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_scoped");
+  printer << "(";
+  interleave(
+      getRestrictions(),
+      [&](const ScopeRestrictionRepr &restriction) {
+        if (auto label = restriction.getLabel()) {
+          printer.printName(label->Item.getIdentifier(),
+                            PrintNameContext::Attribute);
+          printer << ": ";
+        }
+
+        printScope(printer, restriction.getScope());
+      },
+      [&] { printer << ", "; });
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void AccessScopeTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@_accessScope");
+  printer << "(";
+  printScope(printer, getScope());
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void ScopeParamsTypeAttr::printImpl(ASTPrinter &printer,
+                                    const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printScopeParams(printer, getParamList()->getParams());
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 void ConventionTypeAttr::printImpl(ASTPrinter &printer,
                                    const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
@@ -307,19 +413,32 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
 }
 
 const char *
-CalledTypeAttr::getSemanticsName(CalledTypeAttr::Semantics semantics) {
+swift::getExecutionSemanticsAttrSpelling(ExecutionSemantics semantics) {
   switch (semantics) {
-  case CalledTypeAttr::Semantics::Once:
-    return "once";
+  case ExecutionSemantics::AtMostOnce:
+    return "@callable(once)";
+  case ExecutionSemantics::Once:
+    return "@once";
   }
   llvm_unreachable("bad kind");
 }
 
-void CalledTypeAttr::printImpl(ASTPrinter &printer,
-                               const PrintOptions &options) const {
+const DeclAttribute *
+swift::getExecutionSemanticsAttr(const DeclAttributes &attrs,
+                                 const SourceManager &SM) {
+  const DeclAttribute *once = attrs.getAttribute<OnceAttr>();
+  const DeclAttribute *callable = attrs.getAttribute<CallableAttr>();
+  if (!once || !callable)
+    return once ? once : callable;
+  return SM.isBefore(callable->getLocation(), once->getLocation()) ? callable
+                                                                   : once;
+}
+
+void CallableTypeAttr::printImpl(ASTPrinter &printer,
+                                 const PrintOptions &options) const {
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
-  printer.printAttrName("@called");
-  printer << "(" << getSemanticsName() << ")";
+  printer.printAttrName(
+      getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
@@ -400,6 +519,7 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   case DeclAttrKind::CLASS: return static_cast<const CLASS##Attr *>(this)->clone(ctx);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 bool DeclAttribute::canClone() const {
@@ -411,6 +531,7 @@ bool DeclAttribute::canClone() const {
     return static_cast<const CLASS##Attr *>(this)->canClone();
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Ensure that every DeclAttribute subclass implements its own isEquivalent().
@@ -432,6 +553,7 @@ bool DeclAttribute::isEquivalent(const DeclAttribute *other, Decl *attachedTo) c
                 static_cast<const CLASS##Attr *>(other), attachedTo);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 const BackDeployedAttr *
@@ -917,8 +1039,18 @@ void DeclAttributes::print(ASTPrinter &Printer, const PrintOptions &Options,
           swiftVersionAvailableAttribute.emplace(*semanticAttr);
         else if (semanticAttr->isPackageDescriptionVersionSpecific())
           packageDescriptionVersionAvailableAttribute.emplace(*semanticAttr);
-        else
-          shortAvailableAttributes.push_back(*semanticAttr);
+        else {
+          // Separate attributes can specify the same domain, but a combined
+          // short-form attribute must mention each domain only once. Preserve
+          // the strongest introduction requirement when coalescing them.
+          auto existing = llvm::find_if(shortAvailableAttributes, [&](auto attr) {
+            return attr.getDomain() == semanticAttr->getDomain();
+          });
+          if (existing == shortAvailableAttributes.end())
+            shortAvailableAttributes.push_back(*semanticAttr);
+          else if (existing->getIntroduced() < semanticAttr->getIntroduced())
+            *existing = *semanticAttr;
+        }
 
         continue;
       }
@@ -1127,7 +1259,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
             D->getResolvedCustomAttrType(const_cast<CustomAttr *>(attr))) {
       // Print custom attributes only if the attribute decl is accessible.
       // FIXME: rdar://85477478 They should be rejected.
-      if (auto attrDecl = type->getNominalOrBoundGenericNominal()) {
+      if (auto attrDecl = type->getNominalDecl()) {
         if (attrDecl->getFormalAccess() < Options.AccessFilter) {
           return false;
         }
@@ -1236,7 +1368,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   switch (getKind()) {
   case DeclAttrKind::Semantics:
     Printer.printAttrName("@_semantics");
-    Printer << "(\"" << cast<SemanticsAttr>(this)->Value << "\")";
+    {
+      StringRef value = cast<SemanticsAttr>(this)->Value;
+      // Older compilers don't understand the kind of an OS version query
+      // function.
+      if (Options.SuppressOSVersionQueryKind &&
+          parseOSVersionQuerySemanticsAttr(value))
+        value = semantics::AVAILABILITY_OSVERSION;
+      Printer << "(\"" << value << "\")";
+    }
     break;
 
   case DeclAttrKind::Alignment:
@@ -1386,6 +1526,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::TailAllocated: {
+    auto *attr = cast<TailAllocatedAttr>(this);
+    Printer.printAttrName("@_tailAllocated");
+    Printer << "(counts: " << attr->getCountsName();
+    auto types = attr->getTypes();
+    auto reprs = attr->getTypeReprs();
+    for (unsigned i = 0, e = types.size(); i != e; ++i) {
+      Printer << (i == 0 ? ", types: " : ", ");
+      if (types[i])
+        types[i].print(Printer, Options);
+      else
+        reprs[i]->print(Printer, Options);
+    }
+    Printer << ")";
+    break;
+  }
+
   case DeclAttrKind::Target: {
     Printer.printAttrName("@_target");
     Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
@@ -1481,8 +1638,9 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
     Printer << "@" << getAttrName() << "(";
 
-    // The non-underscored @specialize attribute currently does not support
-    // parameters so lets not print them.
+    // The non-underscored @specialized attribute only supports 'exported'.
+    if (attr->isPublic() && attr->isExported())
+      Printer << "exported: true, ";
     if (!attr->isPublic()) {
       auto exported = attr->isExported() ? "true" : "false";
       auto kind = attr->isPartialSpecialization() ? "partial" : "full";
@@ -1513,11 +1671,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       }
     }
     SmallVector<Requirement, 4> requirementsScratch;
-    auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    auto specializedSig = attr->getSpecializedSignature(FnDecl);
+    auto *GC = D->getAsGenericContext();
+    auto specializedSig = attr->getSpecializedSignature(D);
     auto requirements = specializedSig.getRequirements();
-    if (FnDecl && FnDecl->getGenericSignature()) {
-      auto genericSig = FnDecl->getGenericSignature();
+    if (GC && GC->getGenericSignature()) {
+      auto genericSig = GC->getGenericSignature();
 
       if (auto sig = specializedSig) {
         requirementsScratch = sig.requirementsNotSatisfiedBy(genericSig);
@@ -1870,6 +2028,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::ScopeParams:
+    printScopeParams(Printer,
+                     cast<ScopeParamsAttr>(this)->getParamList()->getParams());
+    break;
+
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
     if (!attr->isUnderscored() || Options.SuppressLifetimes) {
@@ -1891,6 +2054,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                                       const_cast<VarDecl *>(cast<VarDecl>(D)));
     if (abiDecl) {
       PrintOptions::OverrideScope scope(Options);
+
+      // The counterpart borrows its implementation info from its API
+      // counterpart, so print it the way it was written: with its own
+      // introducer and without accessors.
+      OVERRIDE_PRINT_OPTION(scope, PrintPropertyAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, PrintSubscriptAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, InferPropertyIntroducerFromAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, PrintPatternBindingIntroducerAsWritten,
+                            true);
 
       // Don't print any attributes marked with `ForbiddenInABIAttr`.
       // (Reminder: There is manual logic in `PrintAST::printAttributes()`
@@ -1926,6 +2098,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     }
     break;
   }
+
+  case DeclAttrKind::Callable:
+    Printer.printAttrName(
+        getExecutionSemanticsAttrSpelling(ExecutionSemantics::AtMostOnce));
+    break;
 
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
@@ -2109,6 +2286,14 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DeclAttrKind::SynthesizedProtocol:
     return "<<synthesized protocol>>";
+  case DeclAttrKind::CArrayProjection:
+    switch (cast<CArrayProjectionAttr>(this)->getProjection()) {
+    case CArrayProjection::Modern: return "_cArrayProjection(modern)";
+    case CArrayProjection::Legacy: return "_cArrayProjection(legacy)";
+    case CArrayProjection::HiddenStorage:
+      return "_cArrayProjection(hiddenStorage)";
+    }
+    llvm_unreachable("unknown CArrayProjection");
   case DeclAttrKind::Specialized:
     return "specialized";
   case DeclAttrKind::Specialize:
@@ -2185,13 +2370,14 @@ StringRef DeclAttribute::getAttrName() const {
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   case DeclAttrKind::Nonexhaustive:
     return "nonexhaustive";
-  case DeclAttrKind::Called:
-    switch (cast<CalledAttr>(this)->getSemantics()) {
-    case ExecutionSemantics::Once:
-      return "called(once)";
-    }
+  case DeclAttrKind::Callable:
+    return "callable(once)";
   case DeclAttrKind::Target:
     return "_target";
+  case DeclAttrKind::TailAllocated:
+    return "_tailAllocated";
+  case DeclAttrKind::ScopeParams:
+    return "_scopeParams";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -2476,6 +2662,52 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                            ErrorType::get(ctx));
 }
 
+TailAllocatedAttr *TailAllocatedAttr::createParsed(
+    ASTContext &ctx, SourceLoc atLoc, SourceRange range, Identifier countsName,
+    SourceLoc countsNameLoc, ArrayRef<TypeRepr *> typeReprs) {
+  return new (ctx) TailAllocatedAttr(
+      countsName, countsNameLoc, ctx.AllocateCopy(typeReprs),
+      ctx.Allocate<Type>(typeReprs.size()), atLoc, range, /*implicit=*/false);
+}
+
+TailAllocatedAttr *TailAllocatedAttr::create(
+    ASTContext &ctx, Identifier countsName, ArrayRef<Type> types, bool implicit,
+    LazyMemberLoader *resolver, uint64_t resolverContextData) {
+  auto *attr = new (ctx) TailAllocatedAttr(
+      countsName, SourceLoc(), /*typeReprs=*/{}, ctx.AllocateCopy(types),
+      SourceLoc(), SourceRange(), implicit);
+  attr->Resolver = resolver;
+  attr->ResolverContextData = resolverContextData;
+  return attr;
+}
+
+ArrayRef<Type> TailAllocatedAttr::getResolvedTypes(ClassDecl *owner) const {
+  return evaluateOrDefault(owner->getASTContext().evaluator,
+                           ResolveTailAllocatedTypesRequest{
+                               owner, const_cast<TailAllocatedAttr *>(this)},
+                           {});
+}
+
+VarDecl *TailAllocatedAttr::getCountsDecl(ClassDecl *owner) const {
+  return evaluateOrDefault(owner->getASTContext().evaluator,
+                           TailAllocatedCountsDeclRequest{
+                               owner, const_cast<TailAllocatedAttr *>(this)},
+                           nullptr);
+}
+
+bool TailAllocatedAttr::isEquivalent(const TailAllocatedAttr *other,
+                                     Decl *attachedTo) const {
+  if (getCountsName() != other->getCountsName())
+    return false;
+
+  auto CD = dyn_cast<ClassDecl>(attachedTo);
+  if (!CD)
+    return true;
+
+  return llvm::equal(getResolvedTypes(CD), other->getResolvedTypes(CD),
+                     eqTypes);
+}
+
 bool RawLayoutAttr::isEquivalent(const RawLayoutAttr *other,
                                  Decl *attachedTo) const {
   if (shouldMoveAsLikeType() != other->shouldMoveAsLikeType())
@@ -2607,12 +2839,15 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(
+  auto *attr = new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
       DomainOrIdentifier, implicit ? SourceLoc() : DomainLoc, getKind(),
       Message, Rename, Introduced, implicit ? SourceRange() : IntroducedRange,
       Deprecated, implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
+  if (!implicit)
+    attr->setMacroLoc(MacroLoc);
+  return attr;
 }
 
 bool AvailableAttr::isEquivalent(const AvailableAttr *other,
@@ -2923,8 +3158,209 @@ ValueDecl * AbstractSpecializeAttr::getTargetFunctionDecl(const ValueDecl *onDec
                            nullptr);
 }
 
-GenericSignature AbstractSpecializeAttr::getSpecializedSignature(
-    const AbstractFunctionDecl *onDecl) const {
+/// Whether \p decl is emitted into clients: '@_transparent' (unless implicit,
+/// like synthesized accessors) or the explicit 'implementation' model, which a
+/// synthesized member takes from its type or extension.
+static bool isEmittedIntoClient(const Decl *decl) {
+  auto *transparent = decl->getAttrs().getAttribute<TransparentAttr>();
+  if ((transparent && !transparent->isImplicit()) ||
+      decl->isAlwaysEmittedIntoClient())
+    return true;
+  auto *parent = decl->getDeclContext()->getAsDecl();
+  return cast<ValueDecl>(decl)->isSynthesized() && parent &&
+         parent->isAlwaysEmittedIntoClient();
+}
+
+void SpecializedAttr::getModulesWithUsedSpecializations(
+    const ModuleDecl *module, SmallVectorImpl<ModuleDecl *> &result) {
+  // All its own imports, then their public ones.
+  SmallVector<ImportedModule, 32> stack;
+  module->getImportedModules(stack, ModuleDecl::getImportFilterLocal());
+  llvm::SmallPtrSet<ModuleDecl *, 32> visited;
+  while (!stack.empty()) {
+    auto *next = stack.pop_back_val().importedModule;
+    if (next == module || !visited.insert(next).second)
+      continue;
+    result.push_back(next);
+    next->getImportedModules(stack, {ModuleDecl::ImportFilterKind::Exported,
+                                     ModuleDecl::ImportFilterKind::Default});
+  }
+}
+
+/// Whether the module being compiled takes the exported '@specialized'
+/// extensions of \p module into account: only if it is that module or links
+/// it (see getModulesWithUsedSpecializations).
+static bool usesSpecializationsOf(const ModuleDecl *module) {
+  auto *main = module->getASTContext().MainModule;
+  if (!main || module == main)
+    return true;
+  SmallVector<ModuleDecl *, 32> modules;
+  SpecializedAttr::getModulesWithUsedSpecializations(main, modules);
+  return llvm::is_contained(modules, module);
+}
+
+/// The '@specialized' attributes that specialize \p nominal, each with the
+/// declaration it is on: the type's own, and the exported ones on extensions of
+/// it in other modules that the module being compiled uses.
+static SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2>
+getTypeSpecializedAttrs(const NominalTypeDecl *nominal) {
+  SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2> result;
+  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>())
+    result.push_back({nominal, attr});
+  for (auto *extension :
+       const_cast<NominalTypeDecl *>(nominal)->getExtensions())
+    if (extension->getModuleContext() != nominal->getModuleContext())
+      for (auto *attr : extension->getAttrs().getAttributes<SpecializedAttr>())
+        if (attr->isExported() &&
+            usesSpecializationsOf(extension->getModuleContext()))
+          result.push_back({extension, attr});
+  return result;
+}
+
+void SpecializedAttr::getTypeLevelSpecializations(
+    const AbstractFunctionDecl *member,
+    SmallVectorImpl<TypeLevelSpecialization> &result) {
+  // Only members declared in the type's own module.
+  auto *nominal = member->getDeclContext()->getSelfNominalTypeDecl();
+  if (!nominal || nominal->getModuleContext() != member->getModuleContext())
+    return;
+  // Not members with generic parameters of their own, e.g. 'map<U>'.
+  auto memberSig = member->getGenericSignature();
+  auto typeSig = nominal->getGenericSignature();
+  if (!memberSig || !typeSig ||
+      memberSig.getGenericParams().size() != typeSig.getGenericParams().size())
+    return;
+
+  // Whether an exported specialization of the member can be used by clients:
+  // they only see public members, and the library can't own the specialized
+  // body of code that is emitted into its clients.
+  auto *accessor = dyn_cast<AccessorDecl>(member);
+  bool clientsCanUse =
+      member->getFormalAccessScope().isPublic() &&
+      !isEmittedIntoClient(member) &&
+      !(accessor && isEmittedIntoClient(accessor->getStorage()));
+  for (auto [attrDecl, attr] : getTypeSpecializedAttrs(nominal)) {
+    auto typeSpecializedSig = attr->getSpecializedSignature(attrDecl);
+    if (!typeSpecializedSig)
+      continue;
+    // An exported specialization only for a member clients can use.
+    if (attr->isExported() && !clientsCanUse)
+      continue;
+    // The non-exported form adds a fast path to the generic member that calls
+    // the specialization, which EagerSpecializer can't build for a coroutine
+    // accessor (e.g. 'modify'). Such an accessor gets no fast path; calls with
+    // concrete types are still specialized as usual.
+    if (!attr->isExported() && accessor && accessor->isCoroutine())
+      continue;
+    // Add the type's requirements (e.g. 'T == Int') to the member's own
+    // signature, which also has the constraints of its extension, if any.
+    auto sigWithError = buildGenericSignatureWithError(
+        member->getASTContext(), memberSig, {},
+        SmallVector<Requirement, 2>(typeSpecializedSig.getRequirements()),
+        DefaultRequirementOptions());
+    // Skip the member if the requirements conflict (e.g. 'T == Int' with
+    // 'T: StringProtocol' from its extension) or leave a generic parameter
+    // unbound.
+    auto sig = sigWithError.getPointer();
+    if (sigWithError.getInt().contains(
+            GenericSignatureErrorFlags::HasInvalidRequirements) ||
+        !sig || !llvm::all_of(sig.getGenericParams(), [&](auto param) {
+          return sig->isConcreteType(param);
+        }))
+      continue;
+    result.push_back({sig, attr->isExported(), attrDecl->getModuleContext()});
+  }
+}
+
+void SpecializedAttr::getExportedTypeSpecializations(
+    const Decl *decl, SmallVectorImpl<CanType> &result) {
+  auto *nominal = decl->getAsGenericContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto sig = attr->getSpecializedSignature(decl);
+    if (!attr->isExported() || !sig)
+      continue;
+    // Reduce 'Box<T>' to the specialized type, e.g. 'Box<Int>'; only fully
+    // concrete types.
+    auto type = sig.getReducedType(nominal->getDeclaredInterfaceType());
+    if (!type->hasTypeParameter())
+      result.push_back(type);
+  }
+}
+
+ModuleDecl *SpecializedAttr::getExportedTypeSpecializationOwner(CanType type) {
+  // Only in Embedded Swift does a module own generic metadata. Otherwise the
+  // runtime instantiates it.
+  auto *nominal = type->getAnyNominal();
+  if (!nominal || !nominal->isGenericContext() ||
+      !nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return nullptr;
+  for (auto [attrDecl, attr] : getTypeSpecializedAttrs(nominal)) {
+    SmallVector<CanType, 2> types;
+    getExportedTypeSpecializations(attrDecl, types);
+    if (llvm::is_contained(types, type))
+      return attrDecl->getModuleContext();
+  }
+  return nullptr;
+}
+
+bool SpecializedAttr::isExportedConformanceSpecialization(
+    const ProtocolConformance *conformance) {
+  auto *specialized = dyn_cast<SpecializedProtocolConformance>(conformance);
+  // Marker and Objective-C protocols have no witness table, and clients can
+  // only use conformances to protocols they can see.
+  auto *proto = conformance->getProtocol();
+  if (!specialized || proto->isMarkerProtocol() || proto->isObjC() ||
+      !proto->getFormalAccessScope().isPublic())
+    return false;
+  auto type = specialized->getType()->getCanonicalType();
+  auto *generic = specialized->getGenericConformance();
+  auto *owner = getExportedTypeSpecializationOwner(type);
+  if (!owner)
+    return false;
+  // Only conformances declared in the type's module or in the owner, e.g. one
+  // with an exported '@specialized' extension of the type.
+  auto *module = generic->getDeclContext()->getParentModule();
+  if (module != type->getAnyNominal()->getParentModule() && module != owner)
+    return false;
+  // A conformance emitted into clients isn't the library's.
+  if (generic->getExplicitCodeGenerationModel() ==
+      CodeGenerationModel::Implementation)
+    return false;
+  // An unavailable one, e.g. '@_unavailableInEmbedded', has no witness table.
+  if (auto *decl = generic->getDeclContext()->getAsDecl())
+    if (decl->isUnavailable())
+      return false;
+  // A conditional conformance needs requirements the type satisfies.
+  if (checkRequirements(specialized->getConditionalRequirements()) !=
+      CheckRequirementsResult::Success)
+    return false;
+  return true;
+}
+
+/// Identifies a '@specialized' declaration without a body, which exports a
+/// specialization of an imported module's function (see the declaration).
+bool SpecializedAttr::isSpecializationDeclaration(const Decl *decl) {
+  auto *func = dyn_cast<AbstractFunctionDecl>(decl);
+  // Also with an invalid '@specialized', e.g. one naming nothing. A body macro
+  // (a custom attribute) adds the body later.
+  if (!func || isa<AccessorDecl>(func) || func->hasBody() ||
+      !func->getAttrs().hasAttribute<SpecializedAttr>(/*AllowInvalid=*/true) ||
+      func->getAttrs().hasAttribute<CustomAttr>())
+    return false;
+  // A free function, or a member in an extension of another module's type.
+  auto *dc = func->getDeclContext();
+  if (!dc->isModuleScopeContext() && !isa<ExtensionDecl>(dc))
+    return false;
+  // Declarations in module interfaces and SIL files have no bodies anyway.
+  auto *file = dc->getParentSourceFile();
+  return file && (file->Kind == SourceFileKind::Library ||
+                  file->Kind == SourceFileKind::Main);
+}
+
+GenericSignature
+AbstractSpecializeAttr::getSpecializedSignature(const Decl *onDecl) const {
   return evaluateOrDefault(onDecl->getASTContext().evaluator,
                            SerializeAttrGenericSignatureRequest{
                                onDecl, const_cast<AbstractSpecializeAttr *>(this)},

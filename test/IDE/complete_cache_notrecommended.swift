@@ -43,7 +43,7 @@ func testSyncMember(obj: MyActor) -> Int {
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated({#(message): String#})[#Void#]; name=preconditionIsolated(:)
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated()[#Void#]; name=assertIsolated()
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated({#(message): String#})[#Void#]; name=assertIsolated(:)
-// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assumeIsolated({#(operation): (isolated MyActor) throws -> Sendable##(isolated MyActor) throws -> Sendable#})[' rethrows'][#Sendable#]; name=assumeIsolated(:)
+// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assumeIsolated({#(operation): (isolated MyActor) throws(Error) -> Sendable & ~Copyable##(isolated MyActor) throws(Error) -> Sendable & ~Copyable#})[' throws'][#Sendable & ~Copyable#]; name=assumeIsolated(:)
 }
 
 func testSyncMember(obj: MyActor) async -> Int {
@@ -59,7 +59,7 @@ func testSyncMember(obj: MyActor) async -> Int {
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated({#(message): String#})[#Void#]; name=preconditionIsolated(:)
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated()[#Void#]; name=assertIsolated()
 // MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assertIsolated({#(message): String#})[#Void#]; name=assertIsolated(:)
-// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assumeIsolated({#(operation): (isolated MyActor) throws -> Sendable##(isolated MyActor) throws -> Sendable#})[' rethrows'][#Sendable#]; name=assumeIsolated(:)
+// MEMBER_IN_ASYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: assumeIsolated({#(operation): (isolated MyActor) throws(Error) -> Sendable & ~Copyable##(isolated MyActor) throws(Error) -> Sendable & ~Copyable#})[' throws'][#Sendable & ~Copyable#]; name=assumeIsolated(:)
 }
 
 // RUN: %empty-directory(%t)

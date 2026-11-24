@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-feature DefaultIsolationPerFile -typecheck -verify %s
-
-// REQUIRES: swift_feature_DefaultIsolationPerFile
+// RUN: %target-swift-frontend -typecheck -verify %s
 
 default @diagnose(DeprecatedDeclaration, as: error)
 

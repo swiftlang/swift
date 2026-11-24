@@ -1238,10 +1238,13 @@ public:
 class SpecializeAttributeScope final : public ASTScopeImpl {
 public:
   AbstractSpecializeAttr *const specializeAttr;
-  AbstractFunctionDecl *const whatWasSpecialized;
+  /// The function or extension with the attribute, whose generic parameters
+  /// its 'where' clause refers to. (A type's attribute needs no such scope: it
+  /// is in the type's own scope.)
+  GenericContext *const whatWasSpecialized;
 
   SpecializeAttributeScope(AbstractSpecializeAttr *specializeAttr,
-                           AbstractFunctionDecl *whatWasSpecialized)
+                           GenericContext *whatWasSpecialized)
       : ASTScopeImpl(ScopeKind::SpecializeAttribute),
         specializeAttr(specializeAttr), whatWasSpecialized(whatWasSpecialized) {
   }

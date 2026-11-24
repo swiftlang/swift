@@ -64,7 +64,7 @@ private struct OverflowCheckRemover {
   }
 
   mutating func run() {
-    let reversePostOrder = computeReversePostOrder()
+    let reversePostOrder = function.postOrderBlocks(context).reversed()
 
     // Forward scan: use control flow and previously seen overflow checks to remove overflow checks.
     // A reverse-post-order walk guarantees a dominating block (and its constraints) is seen before
@@ -107,32 +107,6 @@ private struct OverflowCheckRemover {
         }
       }
     }
-  }
-
-  /// Returns the blocks of `function` in reverse post order.
-  private func computeReversePostOrder() -> [BasicBlock] {
-    var visited = BasicBlockSet(context)
-    defer { visited.deinitialize() }
-
-    var postOrder: [BasicBlock] = []
-    var worklist: [(block: BasicBlock, nextSuccessor: Int)] = []
-
-    visited.insert(function.entryBlock)
-    worklist.append((function.entryBlock, 0))
-    while let top = worklist.last {
-      let successors = top.block.successors
-      if top.nextSuccessor < successors.count {
-        worklist[worklist.count - 1].nextSuccessor += 1
-        let successor = successors[top.nextSuccessor]
-        if visited.insert(successor) {
-          worklist.append((successor, 0))
-        }
-      } else {
-        postOrder.append(top.block)
-        worklist.removeLast()
-      }
-    }
-    return postOrder.reversed()
   }
 
   private mutating func tryToRemoveCondFail(_ condFail: CondFailInst) -> Bool {

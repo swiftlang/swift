@@ -101,11 +101,11 @@ sil @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed Gen
 // CHECK:   return %2
 // CHECK: }
 // CHECK: Address:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
-// CHECK: Base: %0 = argument of bb0 : $*GenWrapper<T>
+// CHECK: Base: %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 // CHECK: end running test 1 of 2 on test_borrow_base: get_access_base with: %2
 // CHECK: begin running test 2 of 2 on test_borrow_base: swift_get_access_base with: %2
 // CHECK: Address:   %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
-// CHECK: Base: argument - %0 = argument of bb0 : $*GenWrapper<T>
+// CHECK: Base: borrowMutateAccessor - %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
 
 sil [ossa] @test_borrow_base : $@convention(thin) <T> (@in_guaranteed GenWrapper<T>) -> @guaranteed_address T {
 bb0(%0 : $*GenWrapper<T>):

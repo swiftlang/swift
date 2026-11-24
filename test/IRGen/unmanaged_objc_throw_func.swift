@@ -49,19 +49,15 @@ import Foundation
 // CHECK-NEXT: br i1 %[[T7]], label %[[L4:.+]], label %[[L5:.+]]
 
 // CHECK: [[L5]]:                                     ; preds = %[[L1]]
-// CHECK-NEXT: br label %[[L6:.+]]
-
-// CHECK: [[L6]]:                                     ; preds = %[[L5]]
-// CHECK-NEXT: %[[T9:.+]] = phi ptr [ %{{.+}}, %[[L5]] ]
 // CHECK-NEXT: %[[T10:.+]] = call swiftcc ptr @"$s10Foundation22_convertErrorToNSErrorySo0E0Cs0C0_pF"(ptr %[[T6]]) #{{[0-9]+}}
-// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %[[T9]], ptr %{{.+}}) #{{[0-9]+}}
+// CHECK: call swiftcc void @"$sSA7pointeexvs"(ptr noalias %{{.+}}, ptr %{{.+}}, ptr %{{.+}}) #{{[0-9]+}}
 // CHECK: br label %[[L7:.+]]
 
 // CHECK: [[L4]]:                                     ; preds = %[[L1]]
 // CHECK-NEXT: call void @swift_errorRelease(ptr %[[T6]]) #{{[0-9]+}}
 // CHECK-NEXT: br label %[[L7]]
 
-// CHECK: [[L7]]:                                     ; preds = %[[L6]], %[[L4]]
+// CHECK: [[L7]]:                                     ; preds = %[[L5]], %[[L4]]
 // CHECK-NEXT: br label %[[L3]]
 
 // CHECK: [[L3]]:                                     ; preds = %[[L2]], %[[L7]]

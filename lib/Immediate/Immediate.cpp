@@ -107,7 +107,10 @@ static bool tryLoadLibrary(LinkLibrary linkLib,
       stem = std::move(path);
     } else {
       // FIXME: Try the appropriate extension for the current platform?
+#if !defined(_WIN32)
+      // Shared libraries on Windows don't have a "lib" prefix.
       stem = "lib";
+#endif
       stem += path;
       stem += LTDL_SHLIB_EXT;
     }

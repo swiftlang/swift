@@ -253,7 +253,8 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
   Printer << (decl->getFormalAccess() == AccessLevel::Public ? "public " : "");
 
   if (identifier == C.Id_remoteCall) {
-    Printer << "func remoteCall<Act, Err, Res>("
+    Printer << "nonisolated(nonsending) "
+               "func remoteCall<Act, Err, Res>("
                "on actor: Act, "
                "target: RemoteCallTarget, "
                "invocation: inout InvocationEncoder, "
@@ -265,7 +266,8 @@ static bool diagnoseMissingAdHocProtocolRequirement(ASTContext &C, Identifier id
                "Err: Error, "
                "Res: SerializationRequirement";
   } else if (identifier == C.Id_remoteCallVoid) {
-    Printer << "func remoteCallVoid<Act, Err>("
+    Printer << "nonisolated(nonsending) "
+               "func remoteCallVoid<Act, Err>("
                "on actor: Act, "
                "target: RemoteCallTarget, "
                "invocation: inout InvocationEncoder, "
@@ -715,13 +717,6 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
   // A 'distributed actor' cannot double as an actor system.
   if (nominal->isDistributedActor()) {
     nominal->diagnose(diag::distributed_actor_cannot_be_actor_system);
-    return true;
-  }
-
-  auto &C = nominal->getASTContext();
-  if (C.LangOpts.hasFeature(Feature::Embedded) &&
-      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed)) {
-    nominal->diagnose(diag::distributed_embedded_requires_feature);
     return true;
   }
 
@@ -1202,18 +1197,6 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
   recordRequiredImportAccessLevelForDecl(distributedActorProto, nominal,
                                          nominal->getEffectiveAccess(), loc);
-
-  // Embedded distributed support is gated behind an experimental feature that
-  // is not available in production compilers. Reject distributed actors under
-  // Embedded Swift unless the feature is enabled. Protocols are skipped: the
-  // `DistributedActor` protocol (and refinements) reach this check too, and the
-  // gate concerns concrete actors that would trigger embedded synthesis.
-  if (C.LangOpts.hasFeature(Feature::Embedded) &&
-      !C.LangOpts.hasFeature(Feature::EmbeddedDistributed) &&
-      !isa<ProtocolDecl>(nominal)) {
-    nominal->diagnose(diag::distributed_embedded_requires_feature);
-    return;
-  }
 
   // In Embedded Swift the serialization surface is monomorphized: every
   // recordArgument / decodeNextArgument / onReturn call, and the synthesized

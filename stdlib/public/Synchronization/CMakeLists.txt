@@ -94,6 +94,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-enable-experimental-feature" "RawLayout"
   "-enable-experimental-feature" "StaticExclusiveOnly"
   "-enable-experimental-feature" "Extern"
+  "-enable-experimental-feature" "BackDeployFrozenValueTypes"
   "-strict-memory-safety"
 )
 
@@ -157,6 +158,7 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    -Xfrontend -enable-sil-opaque-values
   LINK_FLAGS
     "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT
@@ -172,7 +174,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
-  # The EmbeddedPlatform bridging header annotates C declarations with Clang
+  # The SwiftPlatform module's headers annotate C declarations with Clang
   # bounds-safety attributes (__counted_by / __sized_by), which the importer
   # expands via the `_SwiftifyImport` macro from the SwiftMacros compiler
   # plugin. Point at the freshly-built plugin directory (`SWIFT_HOST_PLUGINS_DIR`,
@@ -181,15 +183,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(_embedded_synchronization_swift_flags
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
-    -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/swift/EmbeddedPlatform.h
-    # Precompile the bridging header into a stable, per-module location rather
-    # than a randomly-named temporary directory. Without this the transient PCH
-    # path leaks into the debug info (the DW_AT_LLVM_include_path of the __ObjC
-    # module), which makes the -g output non-deterministic and trips the
-    # check-incremental determinism check. -pch-output-dir gives the PCH a
-    # content-hashed name in this directory, so the recorded path is stable.
-    -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedSynchronizationPCH
-    -enable-experimental-feature LiteralExpressions)
+    -enable-experimental-feature LiteralExpressions
+    -Xfrontend -enable-sil-opaque-values)
 
   # wasm32 builds the full Synchronization library plus its wasm-specific
   # mutex implementation.
@@ -219,6 +214,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
     GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
     SWIFT_COMPILE_FLAGS ${_embedded_synchronization_swift_flags}
+    DEPENDS copy_embedded_swift_platform_header
     SKIP_ARCH_REGEX "^wasm32$" "^avr$"
     INSTALL_IN_COMPONENT stdlib
   )

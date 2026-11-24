@@ -127,6 +127,12 @@ private func devirtualizeFixedSizeArray(destroy: some DevirtualizableDestroy,
   }
   let elementType = destroy.type.builtinFixedArrayElementType(in: destroy.parentFunction)
 
+  // We cannot destroy elements which are not ABI accessible in the function, e.g.
+  // an internal type with a deinit from another module.
+  guard elementType.isABIAccessible(in: destroy.parentFunction) else {
+    return false
+  }
+
   let destroyAddr = destroy.materializeAsDestroyAddr(context)
 
   let builder = Builder(before: destroyAddr, context)
@@ -162,7 +168,11 @@ private extension DevirtualizableDestroy {
   var type: Type { operand.value.type }
 
   func devirtualizeEnumPayloads(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let cases = type.getEnumCases(in: parentFunction) else {
+    guard let cases = type.getEnumCases(in: parentFunction),
+          // We cannot destroy payloads which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          cases.allPayloadsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -212,7 +222,11 @@ extension DestroyValueInst : DevirtualizableDestroy {
   }
 
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
 
@@ -256,6 +270,12 @@ extension DestroyValueInst : DevirtualizableDestroy {
 
   fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let elements = type.tupleElements
+
+    // We cannot destroy elements which are not ABI accessible in the function, e.g.
+    // an internal type with a deinit from another module.
+    guard elements.allSatisfy({ $0.isABIAccessible(in: parentFunction) }) else {
+      return false
+    }
 
     defer {
       context.erase(instruction: self)
@@ -321,7 +341,11 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
 
-    guard let fields = type.getNominalFields(in: parentFunction) else {
+    guard let fields = type.getNominalFields(in: parentFunction),
+          // We cannot destroy fields which are not ABI accessible in the function, e.g.
+          // an internal type from another module.
+          fields.allFieldsAreABIAccessible(in: parentFunction)
+    else {
       return false
     }
     defer {
@@ -364,6 +388,12 @@ extension DestroyAddrInst : DevirtualizableDestroy {
   fileprivate func devirtualizeTupleElements(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
     let builder = Builder(before: self, context)
     let elements = type.tupleElements
+
+    // We cannot destroy elements which are not ABI accessible in the function, e.g.
+    // an internal type with a deinit from another module.
+    guard elements.allSatisfy({ $0.isABIAccessible(in: parentFunction) }) else {
+      return false
+    }
 
     defer {
       context.erase(instruction: self)
@@ -476,10 +506,18 @@ private extension EnumCases {
   func allPayloadsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.payload?.isTrivial(in: function) ?? true })
   }
+
+  func allPayloadsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.payload?.isABIAccessible(in: function) ?? true })
+  }
 }
 
 private extension NominalFieldsArray {
   func allFieldsAreTrivial(in function: Function) -> Bool {
     allSatisfy({ $0.isTrivial(in: function)})
+  }
+
+  func allFieldsAreABIAccessible(in function: Function) -> Bool {
+    allSatisfy({ $0.isABIAccessible(in: function) })
   }
 }

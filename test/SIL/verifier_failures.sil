@@ -87,6 +87,19 @@ sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
   return %retval : $()
 }
 
+// CHECK-LABEL: Begin Error in function diagnose_after_raw
+// CHECK:       SIL verification failed: Only valid in Raw SIL! Should have been eliminated by /some/ diagnostic pass
+// CHECK:       Verifying instruction:
+// CHECK:            [[ARGUMENT:%[^,]+]] = argument
+// CHECK:       ->   diagnose [unpermitted_copy] [[ARGUMENT]]
+// CHECK-LABEL: End Error in function diagnose_after_raw
+sil [ossa] @diagnose_after_raw : $@convention(thin) (@guaranteed C) -> () {
+entry(%c : @guaranteed $C):
+  diagnose [unpermitted_copy] %c : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
 // CHECK-LABEL: Begin Error in function abort_apply_callee_allocated_coro
 // CHECK:       SIL verification failed: abort_apply of callee-allocated yield-once coroutine!?
 // CHECK:       Verifying instruction:
@@ -173,6 +186,31 @@ bb2:
   %7 = end_apply %4 as $()
   unwind
 }
+
+// An ordinary closure that isn't on the stack owns its captures, even the ones
+// that its function borrows, so it can't capture an exactly-once value.
+// CHECK-LABEL: Begin Error in function escaping_closure_borrows_called_exactly_once
+// CHECK:       SIL verification failed: only a nondeinitable closure can capture a nondeinitable function value
+// CHECK-LABEL: End Error in function escaping_closure_borrows_called_exactly_once
+sil [ossa] @escaping_closure_borrows_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  return %pa : $@callee_guaranteed () -> ()
+}
+
+// CHECK-LABEL: Begin Error in function escaping_closure_consumes_called_exactly_once
+// CHECK:       SIL verification failed: only a nondeinitable closure can capture a nondeinitable function value
+// CHECK-LABEL: End Error in function escaping_closure_consumes_called_exactly_once
+sil [ossa] @escaping_closure_consumes_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @consume_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  return %pa : $@callee_guaranteed () -> ()
+}
+
+sil @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+sil @consume_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
 
 // CHECK-LABEL: Begin Error in function private_without_body
 // CHECK: SIL verification failed: internal/private function must have a body

@@ -12,25 +12,14 @@
 ///
 /// The implementation of the global executor when using Dispatch.
 ///
-/// This file is included into GlobalExecutor.cpp only when Dispatch
-/// integration is enabled.  It is expected to define the following
-/// functions:
-///   swift_task_asyncMainDrainQueueImpl
-///   swift_task_checkIsolatedImpl
-///   swift_task_donateThreadToGlobalExecutorUntilImpl
-///   swift_task_enqueueGlobalImpl
-///   swift_task_enqueueGlobalWithDeadlineImpl
-///   swift_task_enqueueGlobalWithDelayImpl
-///   swift_task_enqueueMainExecutorImpl
-///   swift_task_getMainExecutorImpl
-///   swift_task_isMainExecutorImpl
-/// as well as any Dispatch-specific functions for the runtime.
+/// It defines the Dispatch-specific functions for the runtime and, in
+/// Embedded builds, the executor entrypoints declared in
+/// SwiftPlatform/Concurrency.h and ExecutorImpl.h.
 ///
 ///===------------------------------------------------------------------===///
 
 #include <cstddef>
 
-#include "swift/Basic/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
@@ -45,19 +34,27 @@
 #if defined(dispatch_STATIC)
 #pragma comment(lib, "dispatch.lib")
 #endif
-#else
-#include <dlfcn.h>
 #endif
 #endif
 
+#if defined(__APPLE__)
 #if __has_include(<dispatch/private.h>)
 #include <dispatch/private.h>
-#define SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE 1
+#else
+/// Apple's libdispatch always exports this, but the public SDK doesn't declare
+/// it.
+extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
+                                        dispatch_qos_class_t qos);
+#endif
 #endif
 
 #include "Error.h"
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "SwiftPlatform/Concurrency.h"
+#endif
 
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000ull
@@ -65,84 +62,62 @@
 
 using namespace swift;
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+extern "C" SWIFT_CC(swift)
+SwiftExecutorRef swift_embedded_dispatch_getMainExecutor();
+
+static SwiftExecutorRef embeddedMainExecutor() {
+  return swift_embedded_dispatch_getMainExecutor();
+}
+
+static bool isEmbeddedMainExecutor(SwiftExecutorRef executor) {
+  return swift_executor_getIdentity(executor) ==
+         swift_executor_getIdentity(embeddedMainExecutor());
+}
+#endif
+
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   SwiftJob *job = (SwiftJob*) _job;
+#if SWIFT_CONCURRENCY_EMBEDDED
+  auto executor =
+      job->schedulerPrivate[SwiftJobDispatchQueueIndex] ==
+              dispatch_get_main_queue()
+          ? embeddedMainExecutor()
+          : swift_executor_generic();
+  swift_job_run(job, executor);
+#else
   auto metadata =
       reinterpret_cast<const DispatchClassMetadata *>(job->metadata);
   metadata->VTableInvoke(job, nullptr, 0);
+#endif
 }
 
-/// The type of a function pointer for enqueueing a Job object onto a dispatch
-/// queue.
-typedef void (*dispatchEnqueueFuncType)(dispatch_queue_t queue, void *obj,
-                                        dispatch_qos_class_t qos);
-
-/// Initialize dispatchEnqueueFunc and then call through to the proper
-/// implementation.
-static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
-                                          dispatch_qos_class_t qos);
-
-/// A function pointer to the function used to enqueue a Job onto a dispatch
-/// queue. Initially set to initializeDispatchEnqueueFunc, so that the first
-/// call will initialize it. initializeDispatchEnqueueFunc sets it to point
-/// either to dispatch_async_swift_job when it's available, otherwise to
-/// dispatchEnqueueDispatchAsync.
-static std::atomic<dispatchEnqueueFuncType> dispatchEnqueueFunc{
-    initializeDispatchEnqueueFunc};
-
-/// A small adapter that dispatches a Job onto a queue using dispatch_async_f.
-static void dispatchEnqueueDispatchAsync(dispatch_queue_t queue, void *obj,
-                                         dispatch_qos_class_t qos) {
-  dispatch_async_f(queue, obj, __swift_run_job);
-}
-
-static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
-                                          dispatch_qos_class_t qos) {
-  dispatchEnqueueFuncType func = nullptr;
-
-  // Always fall back to plain dispatch_async_f for back-deployed concurrency.
-#if !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
-#if SWIFT_CONCURRENCY_HAS_DISPATCH_PRIVATE
-  if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
-    func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
-#elif defined(_WIN32)
-#if SwiftConcurrency_HAS_DISPATCH_ASYNC_SWIFT_JOB
-#if defined(dispatch_STATIC)
-  func = dispatch_async_swift_job;
-#else
-  func = function_cast<dispatchEnqueueFuncType>(
-      GetProcAddress(LoadLibraryW(L"dispatch.dll"),
-      "dispatch_async_swift_job"));
-#endif
-#endif
-#else
-  func = function_cast<dispatchEnqueueFuncType>(
-      dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
-#endif
-#endif
-
-  if (!func)
-    func = dispatchEnqueueDispatchAsync;
-
-  dispatchEnqueueFunc.store(func, std::memory_order_relaxed);
-
-  func(queue, obj, qos);
-}
-
-/// Enqueue a Job onto a dispatch queue using dispatchEnqueueFunc.
+/// Enqueue a Job onto a dispatch queue.
 static void dispatchEnqueue(dispatch_queue_t queue, SwiftJob *job,
                             dispatch_qos_class_t qos, void *executorQueue) {
   job->schedulerPrivate[Job::DispatchQueueIndex] = executorQueue;
-  dispatchEnqueueFunc.load(std::memory_order_relaxed)(queue, job, qos);
+  // Embedded jobs do not use DispatchClassMetadata, so they must use the
+  // dispatch_async_f callback instead of dispatch_async_swift_job.
+#if defined(__APPLE__) && !SWIFT_CONCURRENCY_EMBEDDED
+  // dispatch_async_swift_job is SPI available in macOS 12 and iOS 15, so older
+  // deployment targets need the dispatch_async_f fallback below.
+  if (__builtin_available(macOS 12.0, iOS 15.0, tvOS 15.0, watchOS 8.0, *)) {
+    dispatch_async_swift_job(queue, job, qos);
+    return;
+  }
+#endif
+  dispatch_async_f(queue, job, __swift_run_job);
 }
 
 static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
-#if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
+#if defined(__APPLE__)
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static constexpr size_t dispatchQueueCooperativeFlag = 4;
+#endif
 #else
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
@@ -152,18 +127,12 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   if (numericPriority >= globalQueueCacheCount)
     swift_Concurrency_fatalError(0, "invalid job priority %#zx", numericPriority);
 
-#ifdef SWIFT_CONCURRENCY_BACK_DEPLOYMENT
-  std::memory_order loadOrder = std::memory_order_acquire;
-#else
-  std::memory_order loadOrder = std::memory_order_relaxed;
-#endif
-
   auto *ptr = &globalQueueCache[numericPriority];
-  auto queue = ptr->load(loadOrder);
+  auto queue = ptr->load(std::memory_order_relaxed);
   if (SWIFT_LIKELY(queue))
     return queue;
 
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
+#if !defined(__APPLE__)
   const int DISPATCH_QUEUE_WIDTH_MAX_LOGICAL_CPUS = -3;
 
   // Create a new cooperative concurrent queue and swap it in.
@@ -185,9 +154,11 @@ static dispatch_queue_t getGlobalQueue(SwiftJobPriority priority) {
   // If we don't have a queue cached for this priority, cache it now. This may
   // race with other threads doing this at the same time for this priority, but
   // that's OK, they'll all end up writing the same value.
+#if !SWIFT_CONCURRENCY_EMBEDDED
   if (runtime::environment::concurrencyEnableCooperativeQueues())
     queue = dispatch_get_global_queue((dispatch_qos_class_t)priority,
                                       dispatchQueueCooperativeFlag);
+#endif
   // If dispatch doesn't support dispatchQueueCooperativeFlag, it will return
   // NULL. Fall back to a standard global queue.
   if (!queue)
@@ -253,6 +224,24 @@ void swift_dispatchEnqueueGlobal(SwiftJob *job) {
   dispatchEnqueue(queue, job, (dispatch_qos_class_t)priority,
                   DISPATCH_QUEUE_GLOBAL_EXECUTOR);
 }
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+static void dispatchEnqueueWithDelay(SwiftJobDelay delay, SwiftJob *job) {
+  assert(job && "no job provided");
+
+  SwiftJobPriority priority = swift_job_getPriority(job);
+  auto queue = getTimerQueue(priority);
+
+  job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
+      DISPATCH_QUEUE_GLOBAL_EXECUTOR;
+
+  if (delay > static_cast<SwiftJobDelay>(INT64_MAX))
+    delay = INT64_MAX;
+
+  dispatch_after_f(dispatch_time(DISPATCH_TIME_NOW, delay), queue, job,
+                   &__swift_run_job);
+}
+#endif
 
 #define DISPATCH_UP_OR_MONOTONIC_TIME_MASK  (1ULL << 63)
 #define DISPATCH_WALLTIME_MASK  (1ULL << 62)
@@ -412,3 +401,38 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
   auto queue = reinterpret_cast<dispatch_queue_t>(_queue);
   dispatchEnqueue(queue, (SwiftJob *)job, (dispatch_qos_class_t)priority, queue);
 }
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+
+void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
+  swift_dispatchEnqueueGlobal(job);
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+                                           SwiftJob *job) {
+  dispatchEnqueueWithDelay(delay, job);
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_task_enqueueGlobalWithDeadlineImpl(long long sec, long long nsec,
+                                              long long tsec, long long tnsec,
+                                              int clock, SwiftJob *job) {
+  swift_dispatchEnqueueWithDeadline(true, sec, nsec, tsec, tnsec, clock, job);
+}
+
+void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
+  swift_dispatchEnqueueMain(job);
+}
+
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
+  return embeddedMainExecutor();
+}
+
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
+  return isEmbeddedMainExecutor(executor);
+}
+
+void _swift_concurrency_asyncMain(void) { dispatch_main(); }
+
+#endif // SWIFT_CONCURRENCY_EMBEDDED

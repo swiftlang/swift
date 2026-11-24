@@ -39,6 +39,11 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (SILDeclRef::declHasNonUniqueDefinition(D))
     return FormalLinkage::PublicUnique;
 
+  // A back-deployed type is emitted into each client that uses it.
+  if (auto nominal = dyn_cast<NominalTypeDecl>(D))
+    if (nominal->isBackDeployedIntoClient())
+      return FormalLinkage::PublicNonUnique;
+
   if (D->getModuleContext()->isAggressiveCMOEnabled())
     return FormalLinkage::PublicUnique;
 
@@ -90,6 +95,11 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
 
+  // The conformances declared alongside a back-deployed type are emitted
+  // into each client that uses the type.
+  if (typeDecl->emitsConformanceIntoClient(C->getDeclContext()))
+    return SILLinkage::Shared;
+
   // In embedded Swift, conformances get special treatment.
   auto &ctx = typeDecl->getASTContext();
   if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
@@ -138,6 +148,7 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     case AccessLevel::Open:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILModule::isTypeMetadataAccessible(CanType type) {
@@ -154,7 +165,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Ignore non-nominal types -- except for opaque result types which can be
     // private and in a different translation unit in which case they can't be
     // accessed.
-    ValueDecl *decl = type.getNominalOrBoundGenericNominal();
+    ValueDecl *decl = type.getNominalDecl();
     if (!decl)
       decl = isa<OpaqueTypeArchetypeType>(type)
                  ? cast<OpaqueTypeArchetypeType>(type)->getDecl()
@@ -252,7 +263,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
 
     Action walkToTypePre(Type ty) override {
       // Non-nominal types are always available.
-      auto decl = ty->getNominalOrBoundGenericNominal();
+      auto decl = ty->getNominalDecl();
       if (!decl)
         return Action::Continue;
       
@@ -316,6 +327,88 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
   return M.isTypeMetadataAccessible(type.getASTType());
 }
 
+/// Returns true if the type metadata of \p type can be used for value
+/// operations in code which is compiled with \p forExpansion.
+///
+/// Code with minimal resilience expansion (i.e. serialized code) can be inlined
+/// into other modules. Therefore the metadata must not only be accessible in
+/// this module, but from any module.
+static bool isTypeMetadataAccessibleForExpansion(
+    SILModule &M, SILType type, TypeExpansionContext forExpansion) {
+  if (!isTypeMetadataForLayoutAccessible(M, type))
+    return false;
+  if (forExpansion.getResilienceExpansion() == ResilienceExpansion::Maximal)
+    return true;
+
+  switch (getTypeLinkage(type.getASTType())) {
+  case FormalLinkage::PublicUnique:
+  case FormalLinkage::PublicNonUnique:
+  case FormalLinkage::PackageUnique:
+    return true;
+  case FormalLinkage::HiddenUnique:
+  case FormalLinkage::Private:
+    return false;
+  }
+  llvm_unreachable("bad linkage");
+}
+
+/// Returns true if a value of the fixed-ABI type \p type can be destroyed
+/// using only type metadata which is accessible in code compiled with
+/// \p forExpansion.
+static bool canDestroyFixedABIValue(SILModule &M, SILType type,
+                                    TypeExpansionContext forExpansion) {
+  type = type.removingMoveOnlyWrapper();
+  if (!type.isMoveOnly(/*orWrapped=*/false))
+    return true;
+  auto props = M.Types.getTypeProperties(type, forExpansion);
+  if (props.isInfinite() ||
+      props.mayHaveCustomDeinit() == HasOnlyDefaultDeinit)
+    return true;
+
+  if (auto *nominal = type.getNominalDecl()) {
+    if (isTypeMetadataAccessibleForExpansion(M, type, forExpansion))
+      return true;
+    if (nominal->hasValueTypeDestructor())
+      return false;
+    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+      for (VarDecl *field : structDecl->getStoredProperties()) {
+        if (!canDestroyFixedABIValue(
+                M, type.getFieldType(field, M, forExpansion), forExpansion))
+          return false;
+      }
+      return true;
+    }
+    if (auto *enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      for (EnumElementDecl *elt : enumDecl->getAllElements()) {
+        if (elt->hasAssociatedValues() &&
+            !canDestroyFixedABIValue(
+                M, type.getEnumElementType(elt, M, forExpansion),
+                forExpansion))
+          return false;
+      }
+      return true;
+    }
+    return true;
+  }
+
+  if (auto tupleType = type.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleType->getNumElements(); i < e; ++i) {
+      if (!canDestroyFixedABIValue(M, type.getTupleElementType(i),
+                                   forExpansion))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto fixedArray = type.getAs<BuiltinFixedArrayType>()) {
+    return canDestroyFixedABIValue(
+        M, M.Types.getLoweredType(fixedArray->getElementType(), forExpansion),
+        forExpansion);
+  }
+
+  return true;
+}
+
 /// Can we perform value operations on the given type?  We have no way
 /// of doing value operations on resilient-layout types from other modules
 /// that are ABI-private to their defining module.  But if the type is not
@@ -323,9 +416,8 @@ static bool isTypeMetadataForLayoutAccessible(SILModule &M, SILType type) {
 /// value witness table stored there.
 bool SILModule::isTypeABIAccessible(SILType type,
                                     TypeExpansionContext forExpansion) {
-  // Fixed-ABI types can have value operations done without metadata.
   if (Types.getTypeProperties(type, forExpansion).isFixedABI())
-    return true;
+    return canDestroyFixedABIValue(*this, type, forExpansion);
 
   assert(!type.is<ReferenceStorageType>() &&
          !type.is<SILFunctionType>() &&

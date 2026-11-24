@@ -35,6 +35,7 @@ struct ParsedSpecAttr {
   Identifier spiGroupID;
   ModuleDecl *spiModule;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
+  bool specializedSpelling;
 };
 
 /// The parser for an individual SIL function.
@@ -342,6 +343,9 @@ public:
     SourceLoc Tmp;
     return parseTypedValueRef(Result, Tmp, B);
   }
+  /// Parses `$T * %count : $Builtin.IntN` after `[tail_elems`.
+  bool parseTailElems(SmallVectorImpl<SILType> &ElementTypes,
+                      SmallVectorImpl<SILValue> &ElementCounts, SILBuilder &B);
   bool parseSILOpcode(SILInstructionKind &Opcode, SourceLoc &OpcodeLoc,
                       StringRef &OpcodeName);
   bool parseSILDebugVar(SILDebugVariable &Var);

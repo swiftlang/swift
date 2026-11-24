@@ -1,0 +1,77 @@
+// RUN: %target-swift-frontend -g -Onone -emit-irgen %s | %FileCheck %s
+//
+// Regression test for rdar://189141000: each fragment of a variable described
+// by op_tuple_fragment / op_fragment debug_values in the same scope must get
+// its own -Onone shadow copy. Shadow-copy slots used to be keyed only by
+// {ArgNo, Scope, Name}, so all fragments shared one alloca: differently-typed
+// fragments tripped emitShadowCopy's "bad scope?" assertion, and same-typed
+// fragments silently overwrote each other, so the debugger showed the last
+// fragment's value for all of them.
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+struct S {
+  var a: Builtin.Int64
+  var b: Builtin.Int64
+}
+
+sil_scope 1 { loc "t.swift":1:1 parent @mixed_tuple_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int1) -> () }
+
+// CHECK-LABEL: define {{.*}} @mixed_tuple_fragments
+// CHECK-DAG: %[[R0:result\.debug[0-9]*]] = alloca i64
+// CHECK-DAG: #dbg_declare(ptr %[[R0]], ![[RESULT:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+// CHECK-DAG: %[[R1:result\.debug[0-9]*]] = alloca i1
+// CHECK-DAG: #dbg_declare(ptr %[[R1]], ![[RESULT]], !DIExpression(DW_OP_LLVM_fragment, 64, 1)
+// CHECK-DAG: %[[R2:result\.debug[0-9]*]] = alloca i1
+// CHECK-DAG: #dbg_declare(ptr %[[R2]], ![[RESULT]], !DIExpression(DW_OP_LLVM_fragment, 72, 1)
+// CHECK-DAG: store i64 %0, ptr %[[R0]]
+// CHECK-DAG: store i1 %1, ptr %[[R1]]
+// CHECK-DAG: store i1 %1, ptr %[[R2]]
+// CHECK: ret void
+sil @mixed_tuple_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int1):
+  debug_value %0 : $Builtin.Int64, let, name "result", type $(Builtin.Int64, Builtin.Int1, Builtin.Int1), expr op_tuple_fragment:$(Builtin.Int64, Builtin.Int1, Builtin.Int1):0, loc "t.swift":2:7, scope 1
+  debug_value %1 : $Builtin.Int1, let, name "result", type $(Builtin.Int64, Builtin.Int1, Builtin.Int1), expr op_tuple_fragment:$(Builtin.Int64, Builtin.Int1, Builtin.Int1):1, loc "t.swift":2:7, scope 1
+  debug_value %1 : $Builtin.Int1, let, name "result", type $(Builtin.Int64, Builtin.Int1, Builtin.Int1), expr op_tuple_fragment:$(Builtin.Int64, Builtin.Int1, Builtin.Int1):2, loc "t.swift":2:7, scope 1
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_scope 2 { loc "t.swift":3:1 parent @same_type_tuple_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () }
+
+// CHECK-LABEL: define {{.*}} @same_type_tuple_fragments
+// CHECK-DAG: %[[P0:pair\.debug[0-9]*]] = alloca i64
+// CHECK-DAG: #dbg_declare(ptr %[[P0]], ![[PAIR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+// CHECK-DAG: %[[P1:pair\.debug[0-9]*]] = alloca i64
+// CHECK-DAG: #dbg_declare(ptr %[[P1]], ![[PAIR]], !DIExpression(DW_OP_LLVM_fragment, 64, 64)
+// CHECK-DAG: store i64 %0, ptr %[[P0]]
+// CHECK-DAG: store i64 %1, ptr %[[P1]]
+// CHECK: ret void
+sil @same_type_tuple_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, name "pair", type $(Builtin.Int64, Builtin.Int64), expr op_tuple_fragment:$(Builtin.Int64, Builtin.Int64):0, loc "t.swift":4:7, scope 2
+  debug_value %1 : $Builtin.Int64, let, name "pair", type $(Builtin.Int64, Builtin.Int64), expr op_tuple_fragment:$(Builtin.Int64, Builtin.Int64):1, loc "t.swift":4:7, scope 2
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_scope 3 { loc "t.swift":5:1 parent @struct_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () }
+
+// CHECK-LABEL: define {{.*}} @struct_fragments
+// CHECK-DAG: %[[S0:s\.debug[0-9]*]] = alloca i64
+// CHECK-DAG: #dbg_declare(ptr %[[S0]], ![[SVAR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+// CHECK-DAG: %[[S1:s\.debug[0-9]*]] = alloca i64
+// CHECK-DAG: #dbg_declare(ptr %[[S1]], ![[SVAR]], !DIExpression(DW_OP_LLVM_fragment, 64, 64)
+// CHECK-DAG: store i64 %0, ptr %[[S0]]
+// CHECK-DAG: store i64 %1, ptr %[[S1]]
+// CHECK: ret void
+sil @struct_fragments : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  debug_value %0 : $Builtin.Int64, let, name "s", type $S, expr op_fragment:#S.a, loc "t.swift":6:7, scope 3
+  debug_value %1 : $Builtin.Int64, let, name "s", type $S, expr op_fragment:#S.b, loc "t.swift":6:7, scope 3
+  %r = tuple ()
+  return %r : $()
+}

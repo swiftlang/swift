@@ -215,7 +215,7 @@ protected:
     SHARED_FIELD(DestroyValueInst, uint8_t
         deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
-    SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
+    SHARED_FIELD(ConvertFunctionInst, uint8_t conversionKind);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
     SHARED_FIELD(GlobalValueInst, bool isBare);
     SHARED_FIELD(RawPointerToRefInst, bool immortal);
@@ -235,7 +235,6 @@ protected:
                  lexical : 1,
                  fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
-                 hasInvalidatedVarInfo : 1,
                  isNested : 1);
 
     SHARED_FIELD(AllocBoxInst, uint8_t
@@ -254,6 +253,9 @@ protected:
 
     SHARED_FIELD(AllocPackMetadataInst, uint8_t
       isNested : 1);
+
+    SHARED_FIELD(DeallocRefInst, uint8_t
+      numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(PartialApplyInst, uint8_t
                  isNested : 1);

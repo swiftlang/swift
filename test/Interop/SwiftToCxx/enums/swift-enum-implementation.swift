@@ -48,6 +48,10 @@ public struct S {
 }
 
 // CHECK:      class SWIFT_SYMBOL("s:5Enums1EO") E final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E(const E &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E &operator =(const E &other) noexcept = default;
 // CHECK:        enum class cases {
 // CHECK-NEXT:     x SWIFT_SYMBOL("s:5Enums1EO1xyACSdcACmF"),
 // CHECK-NEXT:     y SWIFT_SYMBOL("s:5Enums1EO1yyACSVSgcACmF"),
@@ -139,7 +143,7 @@ public struct S {
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
 // CHECK-NEXT:     enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), metadata._0);
-// CHECK-NEXT:     return _getOpaquePointer();
+// CHECK-NEXT:     return ::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this);
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK void _destructiveInjectEnumTag(unsigned tag) noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
@@ -150,7 +154,7 @@ public struct S {
 // CHECK-NEXT:     auto *vwTable = *vwTableAddr;
 // CHECK-NEXT: #endif
 // CHECK-NEXT:     const auto *enumVWTable = reinterpret_cast<swift::_impl::EnumValueWitnessTable *>(vwTable);
-// CHECK-NEXT:     enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), tag, metadata._0);
+// CHECK-NEXT:     enumVWTable->destructiveInjectEnumTag(::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this), tag, metadata._0);
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK unsigned _getEnumTag() const noexcept {
 // CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
@@ -170,17 +174,14 @@ public struct S {
 // CHECK-NEXT: class _impl_E {
 // CHECK-NEXT: public:
 // CHECK:        static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
-// CHECK-NEXT:     auto metadata = _impl::$s5Enums1EOMa(0);
-// CHECK-NEXT:     auto *vwTableAddr = reinterpret_cast<swift::_impl::ValueWitnessTable **>(metadata._0) - 1;
-// CHECK-NEXT: #ifdef __arm64e__
-// CHECK-NEXT:     auto *vwTable = reinterpret_cast<swift::_impl::ValueWitnessTable *>(ptrauth_auth_data(reinterpret_cast<void *>(*vwTableAddr), ptrauth_key_process_independent_data, ptrauth_blend_discriminator(vwTableAddr, 11839)));
-// CHECK-NEXT: #else
-// CHECK-NEXT:     auto *vwTable = *vwTableAddr;
-// CHECK-NEXT: #endif
-// CHECK-NEXT:     vwTable->initializeWithTake(destStorage, srcStorage, metadata._0);
+// CHECK-NEXT:     memcpy(destStorage, srcStorage, {{[0-9]+}});
 // CHECK-NEXT:   }
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) E2 final {
+// CHECK-NEXT: public:
+// CHECK-NEXT:   SWIFT_INLINE_THUNK ~E2() noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2(const E2 &other) noexcept = default;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK E2 &operator =(const E2 &other) noexcept = default;
 // CHECK: SWIFT_INLINE_THUNK operator cases() const {
 // CHECK: }
 // CHECK-NEXT: }
@@ -191,7 +192,7 @@ public struct S {
 // CHECK:      namespace Enums SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Enums") {
 // CHECK:        SWIFT_INLINE_THUNK E E::_impl_x::operator()(double val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(0);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -209,7 +210,7 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_y::operator()(void const * _Nullable val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(1);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -229,7 +230,7 @@ public struct S {
 // CHECK-NEXT:     auto result = E::_make();
 // CHECK-NEXT:     alignas(S) unsigned char buffer[sizeof(S)];
 // CHECK-NEXT:     auto *valCopy = new(buffer) S(val);
-// CHECK-NEXT:     swift::_impl::implClassFor<S>::type::initializeWithTake(result._getOpaquePointer(), swift::_impl::implClassFor<S>::type::getOpaquePointer(*valCopy));
+// CHECK-NEXT:     swift::_impl::implClassFor<S>::type::initializeWithTake(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), swift::_impl::implClassFor<S>::type::getOpaquePointer(*valCopy));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(2);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -247,7 +248,7 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_w::operator()(swift::Int val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(3);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }
@@ -265,7 +266,7 @@ public struct S {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK E E::_impl_auto::operator()(void * _Nonnull val) const {
 // CHECK-NEXT:     auto result = E::_make();
-// CHECK-NEXT:     memcpy(result._getOpaquePointer(), &val, sizeof(val));
+// CHECK-NEXT:     memcpy(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), &val, sizeof(val));
 // CHECK-NEXT:     result._destructiveInjectEnumTag(4);
 // CHECK-NEXT:     return result;
 // CHECK-NEXT:   }

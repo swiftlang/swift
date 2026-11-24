@@ -304,6 +304,8 @@ private enum DwarfError: Error {
   case badRangeListEntry(Dwarf_Byte)
   case missingRngListsSection
   case missingRngListsBase
+  case badUnit
+  case badReference(UInt64)
 }
 
 // .. Dwarf utilities for ImageSource ..........................................
@@ -564,10 +566,38 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var attributes: [(Dwarf_Attribute, Dwarf_Form, Int64?)]
   }
 
+  /// The abbreviations for a unit.  Compilers number these sequentially from
+  /// 1, so we keep those in an array and look them up without hashing; any
+  /// that don't fit that pattern go in a dictionary.
+  struct AbbrevTable {
+    private var dense: [AbbrevInfo?] = [nil]
+    private var sparse: [DwarfAbbrev: AbbrevInfo] = [:]
+
+    subscript(abbrev: DwarfAbbrev) -> AbbrevInfo? {
+      get {
+        if abbrev < UInt64(dense.count) {
+          return dense[Int(abbrev)] ?? sparse[abbrev]
+        }
+        return sparse[abbrev]
+      }
+    }
+
+    mutating func insert(_ info: AbbrevInfo, for abbrev: DwarfAbbrev) {
+      if abbrev < UInt64(dense.count) {
+        dense[Int(abbrev)] = info
+      } else if abbrev == UInt64(dense.count) {
+        dense.append(info)
+      } else {
+        sparse[abbrev] = info
+      }
+    }
+  }
+
   var infoSection: ImageSource
   var abbrevSection: ImageSource
   var lineSection: ImageSource?
   var addrSection: ImageSource?
+  var arangesSection: ImageSource?
   var strSection: ImageSource?
   var lineStrSection: ImageSource?
   var strOffsetsSection: ImageSource?
@@ -577,14 +607,33 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
   typealias DwarfAbbrev = UInt64
 
-  struct Unit {
-    var baseOffset: Address
-    var version: Int
-    var isDwarf64: Bool
-    var unitType: Dwarf_UnitType
-    var addressSize: Int
-    var abbrevOffset: Address
-    var dieBounds: Bounds
+  /// A DWARF unit.
+  ///
+  /// Creating a `Unit` only requires its header, which is cheap to read; the
+  /// remaining state is filled in on demand.  Call `resolve(_:)` to read the
+  /// attributes of the unit's root DIE, and `scan(_:)` to find the functions
+  /// and inlined call sites that it contains.
+  final class Unit {
+    let baseOffset: Address
+    let version: Int
+    let isDwarf64: Bool
+    let unitType: Dwarf_UnitType
+    let addressSize: Int
+    let abbrevOffset: Address
+    let dieBounds: Bounds
+
+    /// True for a unit that we made up from a `.debug_line` program header
+    /// because there is no `.debug_info`; it has no DIEs.
+    let isLineOnly: Bool
+
+    enum State {
+      case unresolved
+      case resolved
+      case failed
+    }
+
+    // Set by resolve(_:)
+    var state: State = .unresolved
 
     var lowPC: Address?
 
@@ -594,15 +643,50 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var loclistsBase: UInt64?
     var rnglistsBase: UInt64?
 
-    var abbrevs: [DwarfAbbrev: AbbrevInfo]
-
-    var tag: Dwarf_Tag
+    var tag: Dwarf_Tag?
     var attributes: [Dwarf_Attribute:DwarfValue] = [:]
+
+    // Full paths of the files in the line number table, filled in as needed
+    var filePaths: [String?] = []
+
+    // Set by scan(_:)
+    var callSites: RangeIndex<CallSiteInfo>?
+    var functions: RangeIndex<FunctionInfo>?
+
+    init(baseOffset: Address,
+         version: Int,
+         isDwarf64: Bool,
+         unitType: Dwarf_UnitType,
+         addressSize: Int,
+         abbrevOffset: Address,
+         dieBounds: Bounds,
+         isLineOnly: Bool = false) {
+      self.baseOffset = baseOffset
+      self.version = version
+      self.isDwarf64 = isDwarf64
+      self.unitType = unitType
+      self.addressSize = addressSize
+      self.abbrevOffset = abbrevOffset
+      self.dieBounds = dieBounds
+      self.isLineOnly = isLineOnly
+    }
+
+    var name: String {
+      if let value = attributes[.DW_AT_name],
+         case let .string(theName) = value {
+        return theName
+      }
+      return "<unknown at \(hex(baseOffset))>"
+    }
   }
 
+  /// The units in `.debug_info`, in section order.  These only have valid
+  /// headers until they are resolved.
   var units: [Unit] = []
 
-  var lineNumberInfo: [DwarfLineNumberInfo] = []
+  private var abbrevCache: [Address: AbbrevTable] = [:]
+
+  private var lineNumberInfoCache: [UInt64: DwarfLineNumberInfo?] = [:]
 
   struct RangeListInfo {
     var length: UInt64
@@ -619,19 +703,30 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   @_specialize(kind: full, where S == Elf32Image)
   @_specialize(kind: full, where S == Elf64Image)
   init(source: Source, shouldSwap: Bool = false) throws {
-    // ###TODO: This should be optional, because we can have just line number
-    //          information.  We should test that, too.
-    guard let abbrevSection = source.getDwarfSection(.debugAbbrev),
-          let infoSection = source.getDwarfSection(.debugInfo) else {
-      throw DwarfError.noDebugInformation
+    // We can get by with just a line number program, so .debug_info and
+    // .debug_abbrev are optional as long as there's a .debug_line.
+    let debugInfo = source.getDwarfSection(.debugInfo)
+    let debugAbbrev = source.getDwarfSection(.debugAbbrev)
+    let debugLine = source.getDwarfSection(.debugLine)
+
+    if debugInfo == nil || debugAbbrev == nil {
+      guard debugLine != nil else {
+        throw DwarfError.noDebugInformation
+      }
+      isLineOnly = true
     }
 
-    self.infoSection = infoSection
-    self.abbrevSection = abbrevSection
+    self.infoSection = debugInfo ?? ImageSource(
+      unowned: UnsafeRawBufferPointer(start: nil, count: 0),
+      isMappedImage: false)
+    self.abbrevSection = debugAbbrev ?? ImageSource(
+      unowned: UnsafeRawBufferPointer(start: nil, count: 0),
+      isMappedImage: false)
 
     addrSection = source.getDwarfSection(.debugAddr)
+    arangesSection = source.getDwarfSection(.debugARanges)
     strSection = source.getDwarfSection(.debugStr)
-    lineSection = source.getDwarfSection(.debugLine)
+    lineSection = debugLine
     lineStrSection = source.getDwarfSection(.debugLineStr)
     strOffsetsSection = source.getDwarfSection(.debugStrOffsets)
     rangesSection = source.getDwarfSection(.debugRanges)
@@ -639,45 +734,18 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
     self.source = source
     self.shouldSwap = shouldSwap
-    self.lineNumberInfo = try readLineNumberInfo()
-    self.units = try readUnits()
 
-    // On DWARF 4 and earlier, we need to fix up a couple of things in the
-    // line number info; these are explicitly included in DWARF 5 so that
-    // we can strip everything except line number information.
-    for n in 0..<lineNumberInfo.count {
-      if lineNumberInfo[n].version >= 5 {
-        continue
-      }
-
-      for unit in self.units {
-        if let lineBase = unit.lineBase,
-           lineNumberInfo[n].baseOffset == lineBase {
-          var filename = "<unknown>"
-          if let nameVal = unit.attributes[.DW_AT_name],
-             case let .string(theName) = nameVal {
-            filename = theName
-          }
-          var dirname = "."
-          if let dirVal = unit.attributes[.DW_AT_comp_dir],
-             case let .string(theDir) = dirVal {
-            dirname = theDir
-          }
-
-          lineNumberInfo[n].directories[0] = dirname
-          lineNumberInfo[n].files[0] = DwarfFileInfo(
-            path: filename,
-            directoryIndex: 0,
-            timestamp: nil,
-            size: nil,
-            md5sum: nil
-          )
-          lineNumberInfo[n].addressSize = unit.addressSize
-          break
-        }
-      }
+    // We only read the unit headers here; everything else is done lazily.
+    if isLineOnly {
+      self.units = try readLineOnlyUnits()
+    } else {
+      self.units = try readUnitHeaders()
     }
   }
+
+  /// True if there is no `.debug_info`, in which case all we have is the
+  /// line number programs and our units are made up from those.
+  private(set) var isLineOnly = false
 
   private func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
     if shouldSwap {
@@ -687,7 +755,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
-  private func readUnits() throws -> [Unit] {
+  private func readUnitHeaders() throws -> [Unit] {
     let end = infoSection.bytes.count
     var units: [Unit] = []
     var cursor = ImageSourceCursor(source: infoSection)
@@ -776,73 +844,51 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
       dieBounds = Bounds(base: cursor.pos, size: next - cursor.pos)
 
-      let abbrevs = try readAbbrevs(at: abbrevOffset)
+      units.append(Unit(baseOffset: base,
+                        version: Int(version),
+                        isDwarf64: dwarf64,
+                        unitType: unitType,
+                        addressSize: Int(addressSize),
+                        abbrevOffset: abbrevOffset,
+                        dieBounds: dieBounds))
 
-      let abbrev = try cursor.readULEB128()
+      cursor.pos = next
+    }
 
-      guard let abbrevInfo = abbrevs[abbrev] else {
-        throw DwarfError.missingAbbrev(abbrev)
+    return units
+  }
+
+  /// Make a unit for each line number program in `.debug_line`, for when we
+  /// don't have any DIEs.
+  private func readLineOnlyUnits() throws -> [Unit] {
+    guard let lineSection else {
+      return []
+    }
+
+    let end = lineSection.bytes.count
+    var units: [Unit] = []
+    var cursor = ImageSourceCursor(source: lineSection)
+
+    while cursor.pos < end {
+      let base = cursor.pos
+      let (length, dwarf64) = try cursor.readDwarfLength()
+      let (next, ov) = cursor.pos.addingReportingOverflow(length)
+      guard !ov && next <= end else {
+        throw DwarfError.badLineProgramLength
       }
-      let tag = abbrevInfo.tag
 
-      var unit = Unit(baseOffset: base,
-                      version: Int(version),
+      // We don't know the real address size; line number programs find out
+      // for themselves from DW_LNE_set_address.
+      let unit = Unit(baseOffset: base,
+                      version: 0,
                       isDwarf64: dwarf64,
-                      unitType: unitType,
-                      addressSize: Int(addressSize),
-                      abbrevOffset: abbrevOffset,
-                      dieBounds: dieBounds,
-                      abbrevs: abbrevs,
-                      tag: tag)
-
-      let attrPos = cursor.pos
-      let firstPass = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: false
-      )
-
-      if let value = firstPass[.DW_AT_addr_base],
-         case let .sectionOffset(offset) = value {
-        unit.addrBase = offset
-      }
-      if let value = firstPass[.DW_AT_str_offsets_base],
-         case let .sectionOffset(offset) = value {
-        unit.strOffsetsBase = offset
-      }
-      if let value = firstPass[.DW_AT_loclists_base],
-         case let .sectionOffset(offset) = value {
-        unit.loclistsBase = offset
-      }
-      if let value = firstPass[.DW_AT_rnglists_base],
-         case let .sectionOffset(offset) = value {
-        unit.rnglistsBase = offset
-      }
-      if let value = firstPass[.DW_AT_stmt_list],
-         case let .sectionOffset(offset) = value {
-        unit.lineBase = offset
-      }
-      if let value = firstPass[.DW_AT_low_pc],
-         case let .address(lowPC) = value {
-        unit.lowPC = lowPC
-      }
-
-      // Re-read the attributes, with indirect fetching enabled;
-      // we can't do this in one step because attributes might be using
-      // indirections based on the base attributes, and those can come
-      // after the data needed to decode them.
-      cursor.pos = attrPos
-
-      let attributes = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: true
-      )
-
-      unit.attributes = attributes
-
+                      unitType: .DW_UT_compile,
+                      addressSize: 0,
+                      abbrevOffset: 0,
+                      dieBounds: Bounds(base: 0, size: 0),
+                      isLineOnly: true)
+      unit.lineBase = base
+      unit.state = .resolved
       units.append(unit)
 
       cursor.pos = next
@@ -851,274 +897,400 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     return units
   }
 
-  private func readLineNumberInfo() throws -> [DwarfLineNumberInfo] {
+  /// Read the attributes of the root DIE of `unit`, if we haven't already.
+  func resolve(_ unit: Unit) throws {
+    switch unit.state {
+      case .resolved:
+        return
+      case .failed:
+        throw DwarfError.badUnit
+      case .unresolved:
+        break
+    }
+
+    do {
+      try _resolve(unit)
+      unit.state = .resolved
+    } catch {
+      unit.state = .failed
+      throw error
+    }
+  }
+
+  private func _resolve(_ unit: Unit) throws {
+    var cursor = ImageSourceCursor(source: infoSection,
+                                   offset: unit.dieBounds.base)
+
+    let abbrevTable = try abbrevs(for: unit)
+    let abbrev = try cursor.readULEB128()
+
+    guard let abbrevInfo = abbrevTable[abbrev] else {
+      throw DwarfError.missingAbbrev(abbrev)
+    }
+
+    unit.tag = abbrevInfo.tag
+
+    let attrPos = cursor.pos
+    let firstPass = try readDieAttributes(
+      at: &cursor,
+      unit: unit,
+      abbrevInfo: abbrevInfo,
+      shouldFetchIndirect: false
+    )
+
+    if let value = firstPass[.DW_AT_addr_base],
+       case let .sectionOffset(offset) = value {
+      unit.addrBase = offset
+    }
+    if let value = firstPass[.DW_AT_str_offsets_base],
+       case let .sectionOffset(offset) = value {
+      unit.strOffsetsBase = offset
+    }
+    if let value = firstPass[.DW_AT_loclists_base],
+       case let .sectionOffset(offset) = value {
+      unit.loclistsBase = offset
+    }
+    if let value = firstPass[.DW_AT_rnglists_base],
+       case let .sectionOffset(offset) = value {
+      unit.rnglistsBase = offset
+    }
+    if let value = firstPass[.DW_AT_stmt_list],
+       case let .sectionOffset(offset) = value {
+      unit.lineBase = offset
+    }
+    if let value = firstPass[.DW_AT_low_pc],
+       case let .address(lowPC) = value {
+      unit.lowPC = lowPC
+    }
+
+    // Re-read the attributes, with indirect fetching enabled;
+    // we can't do this in one step because attributes might be using
+    // indirections based on the base attributes, and those can come
+    // after the data needed to decode them.
+    cursor.pos = attrPos
+
+    unit.attributes = try readDieAttributes(
+      at: &cursor,
+      unit: unit,
+      abbrevInfo: abbrevInfo,
+      shouldFetchIndirect: true
+    )
+
+    // If DW_AT_low_pc used one of the DW_FORM_addrx forms, we couldn't decode
+    // it until we had the address base.  It's the base address for range
+    // lists, so it matters.
+    if unit.lowPC == nil,
+       let value = unit.attributes[.DW_AT_low_pc],
+       case let .address(lowPC) = value {
+      unit.lowPC = lowPC
+    }
+  }
+
+  private func abbrevs(
+    for unit: Unit
+  ) throws -> AbbrevTable {
+    if let abbrevs = abbrevCache[unit.abbrevOffset] {
+      return abbrevs
+    }
+
+    let abbrevs = try readAbbrevs(at: unit.abbrevOffset)
+    abbrevCache[unit.abbrevOffset] = abbrevs
+    return abbrevs
+  }
+
+  /// Find the index of the unit whose header starts at `offset`.
+  private func unitIndex(forBaseOffset offset: Address) -> Int? {
+    var min = 0, max = units.count
+    while min < max {
+      let mid = min + (max - min) / 2
+      let base = units[mid].baseOffset
+      if base == offset {
+        return mid
+      } else if base < offset {
+        min = mid + 1
+      } else {
+        max = mid
+      }
+    }
+    return nil
+  }
+
+  /// Read the line number program header at `offset` in `.debug_line`.
+  ///
+  /// Returns `nil` if there is no usable header there (for instance because
+  /// the version is not one that we support).
+  private func readLineNumberInfo(
+    at offset: UInt64
+  ) throws -> DwarfLineNumberInfo? {
     guard let lineSection = lineSection else {
-      return []
+      return nil
     }
 
     let end = lineSection.bytes.count
-    var result: [DwarfLineNumberInfo] = []
-    var cursor = ImageSourceCursor(source: lineSection, offset: 0)
+    var cursor = ImageSourceCursor(source: lineSection, offset: offset)
 
-    while cursor.pos < end {
-      // 6.2.4 The Line Number Program Header
+    guard cursor.pos < end else {
+      return nil
+    }
 
-      // .1 unit_length
-      let baseOffset = cursor.pos
-      let (length, dwarf64) = try cursor.readDwarfLength()
-      if length == 0 {
-        break
+    // 6.2.4 The Line Number Program Header
+
+    // .1 unit_length
+    let baseOffset = cursor.pos
+    let (length, dwarf64) = try cursor.readDwarfLength()
+    if length == 0 {
+      return nil
+    }
+
+    let (nextOffset, ov) = cursor.pos.addingReportingOverflow(length)
+    guard !ov && nextOffset <= end else {
+      throw DwarfError.badLineProgramLength
+    }
+
+    // .2 version
+    let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
+
+    if version < 2 || version > 5 {
+      return nil
+    }
+
+    var addressSize: Int? = nil
+    var segmentSelectorSize: Int? = nil
+
+    if version == 5 {
+      // .3 address_size
+      addressSize = Int(try cursor.read(as: Dwarf_Byte.self))
+
+      // .4 segment_selector_size
+      segmentSelectorSize = Int(try cursor.read(as: Dwarf_Byte.self))
+    }
+
+    // .5 header_length
+    let headerLength: UInt64
+    if dwarf64 {
+      headerLength = maybeSwap(try cursor.read(as: Dwarf_Xword.self))
+    } else {
+      headerLength = UInt64(maybeSwap(try cursor.read(as: Dwarf_Word.self)))
+    }
+
+    // .6 minimum_instruction_length
+    let minimumInstructionLength = UInt(try cursor.read(as: Dwarf_Byte.self))
+
+    let maximumOpsPerInstruction: UInt
+    if version >= 4 {
+      // .7 maximum_operations_per_instruction
+      // A value of zero is invalid, but we treat it as 1 to avoid dividing
+      // by zero when executing the line number program.
+      maximumOpsPerInstruction = max(
+        UInt(try cursor.read(as: Dwarf_Byte.self)), 1
+      )
+    } else {
+      maximumOpsPerInstruction = 1
+    }
+
+    // .8 default_is_stmt
+    let defaultIsStmt = try cursor.read(as: Dwarf_Byte.self) != 0
+
+    // .9 line_base
+    let lineBase = try cursor.read(as: Dwarf_Sbyte.self)
+
+    // .10 line_range
+    let lineRange = try cursor.read(as: Dwarf_Byte.self)
+
+    // .11 opcode_base
+    let opcodeBase = try cursor.read(as: Dwarf_Byte.self)
+    guard opcodeBase >= 1 else {
+      throw DwarfError.badLineNumberHeader
+    }
+
+    // .12 standard_opcode_lengths
+    var standardOpcodeLengths: [UInt64] = [0]
+    for _ in 1..<Int(opcodeBase) {
+      let length = try cursor.readULEB128()
+      standardOpcodeLengths.append(length)
+    }
+
+    var dirNames: [String] = []
+    var fileInfo: [DwarfFileInfo] = []
+
+    if version >= 2 && version <= 4 {
+      // .11 include_directories
+
+      // Prior to version 5, the compilation directory is not included; put
+      // a placeholder here for now, which we'll fix later.
+      dirNames.append(".")
+
+      while true {
+        guard let path = try cursor.readString() else {
+          throw DwarfError.badString
+        }
+
+        if path == "" {
+          break
+        }
+
+        dirNames.append(path)
       }
 
-      let (nextOffset, ov) = cursor.pos.addingReportingOverflow(length)
-      guard !ov && nextOffset <= end else {
-        throw DwarfError.badLineProgramLength
+      // .12 file_names
+
+      // Prior to version 5, the compilation unit's filename is not included;
+      // put a placeholder here for now, which we'll fix up later.
+      fileInfo.append(DwarfFileInfo(
+          path: "<unknown>",
+          directoryIndex: 0,
+          timestamp: nil,
+          size: nil,
+          md5sum: nil))
+
+      while true {
+        guard let path = try cursor.readString() else {
+          throw DwarfError.badString
+        }
+
+        if path == "" {
+          break
+        }
+
+        let dirIndex = try cursor.readULEB128(as: Int.self)
+        let timestamp = try cursor.readULEB128(as: Int.self)
+        let size = try cursor.readULEB128()
+
+        fileInfo.append(DwarfFileInfo(
+            path: path,
+            directoryIndex: dirIndex,
+            timestamp: timestamp != 0 ? timestamp : nil,
+            size: size != 0 ? size : nil,
+            md5sum: nil))
+      }
+    } else if version == 5 {
+      // .13/.14 directory_entry_format
+      var dirEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
+      let dirEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
+      for _ in 0..<dirEntryFormatCount {
+        let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
+        let form = try cursor.readULEB128(as: Dwarf_Form.self)
+
+        dirEntryFormat.append((type, form))
       }
 
-      // .2 version
-      let version = Int(maybeSwap(try cursor.read(as: Dwarf_Half.self)))
-
-      if version < 2 || version > 5 {
-        cursor.pos = nextOffset
-        continue
-      }
-
-      var addressSize: Int? = nil
-      var segmentSelectorSize: Int? = nil
-
-      if version == 5 {
-        // .3 address_size
-        addressSize = Int(try cursor.read(as: Dwarf_Byte.self))
-
-        // .4 segment_selector_size
-        segmentSelectorSize = Int(try cursor.read(as: Dwarf_Byte.self))
-      }
-
-      // .5 header_length
-      let headerLength: UInt64
-      if dwarf64 {
-        headerLength = maybeSwap(try cursor.read(as: Dwarf_Xword.self))
-      } else {
-        headerLength = UInt64(maybeSwap(try cursor.read(as: Dwarf_Word.self)))
-      }
-
-      // .6 minimum_instruction_length
-      let minimumInstructionLength = UInt(try cursor.read(as: Dwarf_Byte.self))
-
-      let maximumOpsPerInstruction: UInt
-      if version >= 4 {
-        // .7 maximum_operations_per_instruction
-        maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
-      } else {
-        maximumOpsPerInstruction = 1
-      }
-
-      // .8 default_is_stmt
-      let defaultIsStmt = try cursor.read(as: Dwarf_Byte.self) != 0
-
-      // .9 line_base
-      let lineBase = try cursor.read(as: Dwarf_Sbyte.self)
-
-      // .10 line_range
-      let lineRange = try cursor.read(as: Dwarf_Byte.self)
-
-      // .11 opcode_base
-      let opcodeBase = try cursor.read(as: Dwarf_Byte.self)
-      guard opcodeBase >= 1 else {
+      guard dirEntryFormat.count > 0 else {
         throw DwarfError.badLineNumberHeader
       }
 
-      // .12 standard_opcode_lengths
-      var standardOpcodeLengths: [UInt64] = [0]
-      for _ in 1..<Int(opcodeBase) {
-        let length = try cursor.readULEB128()
-        standardOpcodeLengths.append(length)
-      }
+      // .15 directories_count
+      let dirCount = try cursor.readULEB128(as: Int.self)
 
-      var dirNames: [String] = []
-      var fileInfo: [DwarfFileInfo] = []
+      // .16 directories
+      for _ in 0..<dirCount {
+        var attributes: [Dwarf_Lhdr_Format: DwarfValue] = [:]
+        for (type, form) in dirEntryFormat {
+          attributes[type] = try read(form: form,
+                        at: &cursor,
+                        addressSize: addressSize ?? 4,
+                        isDwarf64: dwarf64,
+                        unit: nil,
+                        shouldFetchIndirect: true)
+        }
 
-      if version >= 2 && version <= 4 {
-        // .11 include_directories
-
-        // Prior to version 5, the compilation directory is not included; put
-        // a placeholder here for now, which we'll fix later.
-        dirNames.append(".")
-
-        while true {
-          guard let path = try cursor.readString() else {
-            throw DwarfError.badString
-          }
-
-          if path == "" {
-            break
-          }
-
+        if let pathVal = attributes[.DW_LNCT_path],
+           case let .string(path) = pathVal {
           dirNames.append(path)
+        } else {
+          dirNames.append("<unknown>")
+        }
+      }
+
+      // .17/.18 file_name_entry_format
+      var fileEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
+      let fileEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
+      for _ in 0..<fileEntryFormatCount {
+        let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
+        let form = try cursor.readULEB128(as: Dwarf_Form.self)
+
+        fileEntryFormat.append((type, form))
+      }
+
+      guard fileEntryFormat.count > 0 else {
+        throw DwarfError.badLineNumberHeader
+      }
+
+      // .19 file_names_count
+      let fileCount = try cursor.readULEB128(as: Int.self)
+
+      // .20 file_names
+      for _ in 0..<fileCount {
+        var attributes: [Dwarf_Lhdr_Format: DwarfValue] = [:]
+        for (type, form) in fileEntryFormat {
+          attributes[type] = try read(form: form,
+                        at: &cursor,
+                        addressSize: addressSize ?? 4,
+                        isDwarf64: dwarf64,
+                        unit: nil,
+                        shouldFetchIndirect: true)
         }
 
-        // .12 file_names
+        let path: String
+        if let pathVal = attributes[.DW_LNCT_path],
+           case let .string(thePath) = pathVal {
+          path = thePath
+        } else {
+          path = "<unknown>"
+        }
 
-        // Prior to version 5, the compilation unit's filename is not included;
-        // put a placeholder here for now, which we'll fix up later.
+        let dirIndex = attributes[.DW_LNCT_directory_index]?.intValue()
+        let timestamp = attributes[.DW_LNCT_timestamp]?.intValue()
+        let size = attributes[.DW_LNCT_size]?.uint64Value()
+        let md5sum: [UInt8]?
+        if let md5sumVal = attributes[.DW_LNCT_MD5],
+           case let .data(theSum) = md5sumVal {
+          md5sum = theSum
+        } else {
+          md5sum = nil
+        }
+
         fileInfo.append(DwarfFileInfo(
-                          path: "<unknown>",
-                          directoryIndex: 0,
-                          timestamp: nil,
-                          size: nil,
-                          md5sum: nil))
-
-        while true {
-          guard let path = try cursor.readString() else {
-            throw DwarfError.badString
-          }
-
-          if path == "" {
-            break
-          }
-
-          let dirIndex = try cursor.readULEB128(as: Int.self)
-          let timestamp = try cursor.readULEB128(as: Int.self)
-          let size = try cursor.readULEB128()
-
-          fileInfo.append(DwarfFileInfo(
-                            path: path,
-                            directoryIndex: dirIndex,
-                            timestamp: timestamp != 0 ? timestamp : nil,
-                            size: size != 0 ? size : nil,
-                            md5sum: nil))
-        }
-      } else if version == 5 {
-        // .13/.14 directory_entry_format
-        var dirEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
-        let dirEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
-        for _ in 0..<dirEntryFormatCount {
-          let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
-          let form = try cursor.readULEB128(as: Dwarf_Form.self)
-
-          dirEntryFormat.append((type, form))
-        }
-
-        guard dirEntryFormat.count > 0 else {
-          throw DwarfError.badLineNumberHeader
-        }
-
-        // .15 directories_count
-        let dirCount = try cursor.readULEB128(as: Int.self)
-
-        // .16 directories
-        for _ in 0..<dirCount {
-          var attributes: [Dwarf_Lhdr_Format: DwarfValue] = [:]
-          for (type, form) in dirEntryFormat {
-            attributes[type] = try read(form: form,
-                                        at: &cursor,
-                                        addressSize: addressSize ?? 4,
-                                        isDwarf64: dwarf64,
-                                        unit: nil,
-                                        shouldFetchIndirect: true)
-          }
-
-          if let pathVal = attributes[.DW_LNCT_path],
-             case let .string(path) = pathVal {
-            dirNames.append(path)
-          } else {
-            dirNames.append("<unknown>")
-          }
-        }
-
-        // .17/.18 file_name_entry_format
-        var fileEntryFormat: [(Dwarf_Lhdr_Format, Dwarf_Form)] = []
-        let fileEntryFormatCount = Int(try cursor.read(as: Dwarf_Byte.self))
-        for _ in 0..<fileEntryFormatCount {
-          let type = try cursor.readULEB128(as: Dwarf_Lhdr_Format.self)
-          let form = try cursor.readULEB128(as: Dwarf_Form.self)
-
-          fileEntryFormat.append((type, form))
-        }
-
-        guard fileEntryFormat.count > 0 else {
-          throw DwarfError.badLineNumberHeader
-        }
-
-        // .19 file_names_count
-        let fileCount = try cursor.readULEB128(as: Int.self)
-
-        // .20 file_names
-        for _ in 0..<fileCount {
-          var attributes: [Dwarf_Lhdr_Format: DwarfValue] = [:]
-          for (type, form) in fileEntryFormat {
-            attributes[type] = try read(form: form,
-                                        at: &cursor,
-                                        addressSize: addressSize ?? 4,
-                                        isDwarf64: dwarf64,
-                                        unit: nil,
-                                        shouldFetchIndirect: true)
-          }
-
-          let path: String
-          if let pathVal = attributes[.DW_LNCT_path],
-             case let .string(thePath) = pathVal {
-            path = thePath
-          } else {
-            path = "<unknown>"
-          }
-
-          let dirIndex = attributes[.DW_LNCT_directory_index]?.intValue()
-          let timestamp = attributes[.DW_LNCT_timestamp]?.intValue()
-          let size = attributes[.DW_LNCT_size]?.uint64Value()
-          let md5sum: [UInt8]?
-          if let md5sumVal = attributes[.DW_LNCT_MD5],
-             case let .data(theSum) = md5sumVal {
-            md5sum = theSum
-          } else {
-            md5sum = nil
-          }
-
-          fileInfo.append(DwarfFileInfo(
-                            path: path,
-                            directoryIndex: dirIndex,
-                            timestamp: timestamp,
-                            size: size,
-                            md5sum: md5sum))
-        }
+            path: path,
+            directoryIndex: dirIndex,
+            timestamp: timestamp,
+            size: size,
+            md5sum: md5sum))
       }
-
-      // The actual program comes next
-      guard nextOffset >= cursor.pos else {
-        throw DwarfError.badLineProgramLength
-      }
-
-      let program = try cursor.source[cursor.pos..<nextOffset]
-      cursor.pos = nextOffset
-
-      result.append(DwarfLineNumberInfo(
-                      pathSeparator: Source.pathSeparator,
-                      baseOffset: baseOffset,
-                      version: version,
-                      addressSize: addressSize,
-                      selectorSize: segmentSelectorSize,
-                      headerLength: headerLength,
-                      minimumInstructionLength: minimumInstructionLength,
-                      maximumOpsPerInstruction: maximumOpsPerInstruction,
-                      defaultIsStmt: defaultIsStmt,
-                      lineBase: lineBase,
-                      lineRange: lineRange,
-                      opcodeBase: opcodeBase,
-                      standardOpcodeLengths: standardOpcodeLengths,
-                      directories: dirNames,
-                      files: fileInfo,
-                      program: program,
-                      shouldSwap: shouldSwap
-                    ))
     }
 
-    return result
+    // The actual program comes next
+    guard nextOffset >= cursor.pos else {
+      throw DwarfError.badLineProgramLength
+    }
+
+    let program = try cursor.source[cursor.pos..<nextOffset]
+
+    return DwarfLineNumberInfo(
+      pathSeparator: Source.pathSeparator,
+      baseOffset: baseOffset,
+      version: version,
+      addressSize: addressSize,
+      selectorSize: segmentSelectorSize,
+      headerLength: headerLength,
+      minimumInstructionLength: minimumInstructionLength,
+      maximumOpsPerInstruction: maximumOpsPerInstruction,
+      defaultIsStmt: defaultIsStmt,
+      lineBase: lineBase,
+      lineRange: lineRange,
+      opcodeBase: opcodeBase,
+      standardOpcodeLengths: standardOpcodeLengths,
+      directories: dirNames,
+      files: fileInfo,
+      program: program,
+      shouldSwap: shouldSwap,
+      sequences: nil
+    )
   }
 
   private func readAbbrevs(
     at offset: UInt64
-  ) throws -> [DwarfAbbrev: AbbrevInfo] {
-    var abbrevs: [DwarfAbbrev: AbbrevInfo] = [:]
+  ) throws -> AbbrevTable {
+    var abbrevs = AbbrevTable()
     var cursor = ImageSourceCursor(source: abbrevSection, offset: offset)
     while true {
       let abbrev = try cursor.readULEB128()
@@ -1149,9 +1321,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         }
       }
 
-      abbrevs[abbrev] = AbbrevInfo(tag: tag,
-                                   hasChildren: children != .DW_CHILDREN_no,
-                                   attributes: attributes)
+      abbrevs.insert(AbbrevInfo(tag: tag,
+                                hasChildren: children != .DW_CHILDREN_no,
+                                attributes: attributes),
+                     for: abbrev)
     }
 
     return abbrevs
@@ -1188,6 +1361,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         case let .unsignedInt16(value): return UInt64(value)
         case let .unsignedInt32(value): return UInt64(value)
         case let .unsignedInt64(value): return value
+        case let .signedInt64(value): return value >= 0 ? UInt64(value) : nil
         default:
           return nil
       }
@@ -1531,6 +1705,144 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
+  /// Skip over a single attribute value without decoding it, which saves
+  /// allocating the value.  Forms that we don't know how to skip cheaply
+  /// are decoded and discarded.
+  private func skip(form: Dwarf_Form,
+                    at cursor: inout ImageSourceCursor,
+                    unit: Unit,
+                    constantValue: Int64?) throws {
+    switch form {
+      case .DW_FORM_flag_present, .DW_FORM_implicit_const:
+        break
+      case .DW_FORM_data1, .DW_FORM_ref1, .DW_FORM_flag,
+           .DW_FORM_addrx1, .DW_FORM_strx1:
+        cursor.pos += 1
+      case .DW_FORM_data2, .DW_FORM_ref2, .DW_FORM_addrx2,
+           .DW_FORM_strx2:
+        cursor.pos += 2
+      case .DW_FORM_addrx3, .DW_FORM_strx3:
+        cursor.pos += 3
+      case .DW_FORM_data4, .DW_FORM_ref4, .DW_FORM_addrx4,
+           .DW_FORM_strx4, .DW_FORM_ref_sup4:
+        cursor.pos += 4
+      case .DW_FORM_data8, .DW_FORM_ref8, .DW_FORM_ref_sig8,
+           .DW_FORM_ref_sup8:
+        cursor.pos += 8
+      case .DW_FORM_data16:
+        cursor.pos += 16
+      case .DW_FORM_sec_offset, .DW_FORM_strp, .DW_FORM_line_strp,
+           .DW_FORM_strp_sup, .DW_FORM_ref_addr:
+        cursor.pos += unit.isDwarf64 ? 8 : 4
+      case .DW_FORM_udata, .DW_FORM_sdata, .DW_FORM_ref_udata,
+           .DW_FORM_addrx, .DW_FORM_strx, .DW_FORM_loclistx,
+           .DW_FORM_rnglistx:
+        _ = try cursor.readULEB128()
+      case .DW_FORM_block, .DW_FORM_exprloc:
+        let length = try cursor.readULEB128()
+        cursor.pos += length
+      case .DW_FORM_block1:
+        cursor.pos += UInt64(try cursor.read(as: UInt8.self))
+      case .DW_FORM_block2:
+        cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt16.self)))
+      case .DW_FORM_block4:
+        cursor.pos += UInt64(maybeSwap(try cursor.read(as: UInt32.self)))
+      default:
+        _ = try read(form: form,
+                     at: &cursor,
+                     addressSize: unit.addressSize,
+                     isDwarf64: unit.isDwarf64,
+                     unit: unit,
+                     shouldFetchIndirect: false,
+                     constantValue: constantValue)
+    }
+  }
+
+  /// Skip over the attributes of a DIE without decoding them, which saves
+  /// allocating the values (and the dictionary to hold them) for DIEs that
+  /// we don't care about.
+  private func skipDieAttributes(
+    at cursor: inout ImageSourceCursor,
+    unit: Unit,
+    abbrevInfo: AbbrevInfo
+  ) throws {
+    for (_, form, constantValue) in abbrevInfo.attributes {
+      try skip(form: form, at: &cursor, unit: unit,
+               constantValue: constantValue)
+    }
+  }
+
+  /// The attributes of a function or inlined call site DIE that we use.
+  /// Reading these directly, rather than building a dictionary of all of
+  /// the attributes, is considerably cheaper.
+  struct FunctionAttributes {
+    var name: DwarfValue?
+    var linkageName: DwarfValue?
+    var abstractOrigin: Address?
+    var specification: Address?
+    var lowPC: DwarfValue?
+    var highPC: DwarfValue?
+    var ranges: DwarfValue?
+    var callFile: DwarfValue?
+    var callLine: DwarfValue?
+    var callColumn: DwarfValue?
+  }
+
+  private func readFunctionAttributes(
+    at cursor: inout ImageSourceCursor,
+    unit: Unit,
+    abbrevInfo: AbbrevInfo
+  ) throws -> FunctionAttributes {
+    var result = FunctionAttributes()
+
+    for (attribute, form, constantValue) in abbrevInfo.attributes {
+      switch attribute {
+        case .DW_AT_name, .DW_AT_linkage_name,
+             .DW_AT_abstract_origin, .DW_AT_specification,
+             .DW_AT_low_pc, .DW_AT_high_pc, .DW_AT_ranges,
+             .DW_AT_call_file, .DW_AT_call_line, .DW_AT_call_column:
+          let value = try read(form: form,
+                               at: &cursor,
+                               addressSize: unit.addressSize,
+                               isDwarf64: unit.isDwarf64,
+                               unit: unit,
+                               shouldFetchIndirect: true,
+                               constantValue: constantValue)
+          switch attribute {
+            case .DW_AT_name:
+              result.name = value
+            case .DW_AT_linkage_name:
+              result.linkageName = value
+            case .DW_AT_abstract_origin:
+              if case let .reference(ref) = value {
+                result.abstractOrigin = ref
+              }
+            case .DW_AT_specification:
+              if case let .reference(ref) = value {
+                result.specification = ref
+              }
+            case .DW_AT_low_pc:
+              result.lowPC = value
+            case .DW_AT_high_pc:
+              result.highPC = value
+            case .DW_AT_ranges:
+              result.ranges = value
+            case .DW_AT_call_file:
+              result.callFile = value
+            case .DW_AT_call_line:
+              result.callLine = value
+            default:
+              result.callColumn = value
+          }
+        default:
+          try skip(form: form, at: &cursor, unit: unit,
+                   constantValue: constantValue)
+      }
+    }
+
+    return result
+  }
+
   private func readDieAttributes(
     at cursor: inout ImageSourceCursor,
     unit: Unit,
@@ -1538,6 +1850,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     shouldFetchIndirect: Bool
   ) throws -> [Dwarf_Attribute:DwarfValue] {
     var attributes: [Dwarf_Attribute:DwarfValue] = [:]
+    attributes.reserveCapacity(abbrevInfo.attributes.count)
 
     for (attribute, form, constantValue) in abbrevInfo.attributes {
       attributes[attribute] = try read(form: form,
@@ -1743,7 +2056,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     }
   }
 
-  struct CallSiteInfo {
+  struct CallSiteInfo: DwarfRanged {
     var depth: Int
     var rawName: String?
     var name: String?
@@ -1754,97 +2067,41 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var column: Int
   }
 
-  private func buildCallSiteInfo(
-    depth: Int,
+  /// Call `fn` with every (lowPC, highPC) range described by the
+  /// `DW_AT_low_pc`/`DW_AT_high_pc` or `DW_AT_ranges` attributes of a DIE.
+  private func forEachAddressRange(
+    of attributes: [Dwarf_Attribute:DwarfValue],
     unit: Unit,
-    attributes: [Dwarf_Attribute:DwarfValue],
-    _ fn: (CallSiteInfo) -> ()
+    _ fn: (Address, Address) -> ()
   ) throws {
-    guard let abstractOriginVal = attributes[.DW_AT_abstract_origin],
-          let callFile = attributes[.DW_AT_call_file]?.uint64Value(),
-          let callLine = attributes[.DW_AT_call_line]?.uint64Value(),
-          let callColumn = attributes[.DW_AT_call_column]?.uint64Value(),
-          case let .reference(abstractOrigin) = abstractOriginVal else {
-      return
-    }
+    try forEachAddressRange(lowPC: attributes[.DW_AT_low_pc],
+                            highPC: attributes[.DW_AT_high_pc],
+                            ranges: attributes[.DW_AT_ranges],
+                            unit: unit,
+                            fn)
+  }
 
-    var cursor = ImageSourceCursor(source: infoSection,
-                                   offset: abstractOrigin)
-    var abbrev = try cursor.readULEB128()
-    if abbrev == 0 {
-      return
-    }
+  private func forEachAddressRange(
+    of attributes: FunctionAttributes,
+    unit: Unit,
+    _ fn: (Address, Address) -> ()
+  ) throws {
+    try forEachAddressRange(lowPC: attributes.lowPC,
+                            highPC: attributes.highPC,
+                            ranges: attributes.ranges,
+                            unit: unit,
+                            fn)
+  }
 
-    guard let abbrevInfo = unit.abbrevs[abbrev] else {
-      throw DwarfError.missingAbbrev(abbrev)
-    }
-
-    let tag = abbrevInfo.tag
-
-    if tag != .DW_TAG_subprogram {
-      return
-    }
-
-    var refAttrs = try readDieAttributes(
-      at: &cursor,
-      unit: unit,
-      abbrevInfo: abbrevInfo,
-      shouldFetchIndirect: true
-    )
-
-    if let specificationVal = refAttrs[.DW_AT_specification],
-       case let .reference(specification) = specificationVal {
-      cursor = ImageSourceCursor(source: infoSection,
-                                 offset: specification)
-      abbrev = try cursor.readULEB128()
-      if abbrev == 0 {
-        return
-      }
-
-      guard let abbrevInfo = unit.abbrevs[abbrev] else {
-        throw DwarfError.missingAbbrev(abbrev)
-      }
-
-      let tag = abbrevInfo.tag
-      if tag != .DW_TAG_subprogram {
-        return
-      }
-
-      refAttrs = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: true
-      )
-    }
-
-    var name: String? = nil
-    var rawName: String? = nil
-
-    if let nameVal = refAttrs[.DW_AT_name],
-       case let .string(theName) = nameVal {
-      name = theName
-    }
-
-    if let linkageNameVal = refAttrs[.DW_AT_linkage_name],
-       case let .string(theRawName) = linkageNameVal {
-      rawName = theRawName
-    } else {
-      rawName = name
-    }
-
-    var filename: String = "<unknown>"
-    for info in lineNumberInfo {
-      if info.baseOffset == unit.lineBase {
-        if let ndx = Int(exactly: callFile) {
-          filename = info.fullPathForFile(index: ndx)
-        }
-        break
-      }
-    }
-
-    if let lowPCVal = attributes[.DW_AT_low_pc],
-       let highPCVal = attributes[.DW_AT_high_pc],
+  private func forEachAddressRange(
+    lowPC lowPCAttr: DwarfValue?,
+    highPC highPCAttr: DwarfValue?,
+    ranges: DwarfValue?,
+    unit: Unit,
+    _ fn: (Address, Address) -> ()
+  ) throws {
+    if let lowPCVal = lowPCAttr,
+       let highPCVal = highPCAttr,
        case let .address(lowPC) = lowPCVal {
       let highPC: Address
       if case let .address(highPCAddr) = highPCVal {
@@ -1856,6 +2113,169 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         return
       }
 
+      fn(lowPC, highPC)
+    } else if let rangeVal = ranges {
+      try forEachRange(of: rangeVal, unit: unit, fn)
+    }
+  }
+
+  /// Find the unit whose DIEs contain the given `.debug_info` offset.
+  private func unit(containing offset: Address) -> Unit? {
+    var lo = 0
+    var hi = units.count
+    while lo < hi {
+      let mid = lo + (hi - lo) / 2
+      if units[mid].baseOffset <= offset {
+        lo = mid + 1
+      } else {
+        hi = mid
+      }
+    }
+    guard lo > 0 else {
+      return nil
+    }
+    let candidate = units[lo - 1]
+    return offset >= candidate.dieBounds.base && offset < candidate.dieBounds.end
+      ? candidate : nil
+  }
+
+  /// Read the attributes of a subprogram DIE that is referenced from
+  /// another DIE.
+  ///
+  /// The referenced DIE may live in a different unit from the referring
+  /// one (for example in a partial unit produced by `dwz`), so we need to
+  /// use that unit's abbreviations and base offset to decode it.
+  ///
+  /// - Parameter offset: The `.debug_info` offset of the referenced DIE.
+  ///
+  /// - Returns: The attributes of the DIE, or `nil` if it is a null entry
+  ///   or is not a subprogram.
+  private func readReferencedSubprogram(
+    at offset: Address
+  ) throws -> FunctionAttributes? {
+    guard let target = unit(containing: offset) else {
+      throw DwarfError.badReference(offset)
+    }
+    try resolve(target)
+
+    var cursor = ImageSourceCursor(source: infoSection, offset: offset)
+    let abbrev = try cursor.readULEB128()
+    if abbrev == 0 {
+      return nil
+    }
+
+    guard let abbrevInfo = try abbrevs(for: target)[abbrev] else {
+      throw DwarfError.missingAbbrev(abbrev)
+    }
+
+    if abbrevInfo.tag != .DW_TAG_subprogram {
+      return nil
+    }
+
+    return try readFunctionAttributes(
+      at: &cursor,
+      unit: target,
+      abbrevInfo: abbrevInfo
+    )
+  }
+
+  /// The names of a function, taking into account any it inherits through
+  /// `DW_AT_abstract_origin` and `DW_AT_specification`.
+  struct ReferencedNames {
+    var name: String?
+    var linkageName: String?
+  }
+
+  /// Names of the subprograms at given `.debug_info` offsets; many inlined
+  /// call sites refer to the same abstract origin.
+  private var referencedNamesCache: [Address: ReferencedNames?] = [:]
+
+  /// Find the names of a DIE, following the references that it inherits
+  /// attributes through (which can be chained).  Attributes on the DIE
+  /// itself take precedence over inherited ones.  Returns `nil` if one of
+  /// the references doesn't lead to a `DW_TAG_subprogram`.
+  private func inheritedNames(
+    of attributes: FunctionAttributes
+  ) throws -> ReferencedNames? {
+    var nameVal = attributes.name
+    var linkageNameVal = attributes.linkageName
+    var current = attributes
+
+    // Don't loop forever if the DWARF is malformed
+    for _ in 0..<8 {
+      guard let target = current.abstractOrigin ?? current.specification else {
+        break
+      }
+
+      guard let next = try readReferencedSubprogram(at: target) else {
+        return nil
+      }
+      if nameVal == nil {
+        nameVal = next.name
+      }
+      if linkageNameVal == nil {
+        linkageNameVal = next.linkageName
+      }
+      current = next
+    }
+
+    var result = ReferencedNames()
+    if let nameVal, case let .string(theName) = nameVal {
+      result.name = theName
+    }
+    if let linkageNameVal, case let .string(theRawName) = linkageNameVal {
+      result.linkageName = theRawName
+    }
+    return result
+  }
+
+  /// Find the names of the subprogram DIE at `offset`.
+  private func names(ofSubprogramAt offset: Address) throws
+    -> ReferencedNames? {
+    if let cached = referencedNamesCache[offset] {
+      return cached
+    }
+
+    var result: ReferencedNames? = nil
+    if let attributes = try readReferencedSubprogram(at: offset) {
+      result = try inheritedNames(of: attributes)
+    }
+    referencedNamesCache[offset] = .some(result)
+    return result
+  }
+
+  private func buildCallSiteInfo(
+    depth: Int,
+    unit: Unit,
+    attributes: FunctionAttributes,
+    _ fn: (CallSiteInfo) -> ()
+  ) throws {
+    guard let abstractOrigin = attributes.abstractOrigin else {
+      return
+    }
+
+    // Compilers leave out DW_AT_call_line and DW_AT_call_column when they
+    // are zero, and DW_AT_call_file when there isn't one.
+    let callFile = attributes.callFile?.uint64Value()
+    let callLine = attributes.callLine?.uint64Value() ?? 0
+    let callColumn = attributes.callColumn?.uint64Value() ?? 0
+
+    // Attributes on a DIE override those it inherits from its specification;
+    // in particular the specification might have a different (e.g. C4/D4)
+    // linkage name from the definition (C2/D2).
+    guard let names = try names(ofSubprogramAt: abstractOrigin) else {
+      return
+    }
+
+    let name = names.name
+    let rawName = names.linkageName ?? name
+
+    var filename: String = "<unknown>"
+    if let callFile, let ndx = Int(exactly: callFile) {
+      filename = pathForFile(index: ndx, in: unit)
+    }
+
+    try forEachAddressRange(of: attributes, unit: unit) { lowPC, highPC in
       fn(CallSiteInfo(
            depth: depth,
            rawName: rawName,
@@ -1865,22 +2285,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
            filename: filename,
            line: Int(clamping: callLine),
            column: Int(clamping: callColumn)))
-    } else if let rangeVal = attributes[.DW_AT_ranges] {
-      try forEachRange(of: rangeVal, unit: unit) { lowPC, highPC in
-        fn(CallSiteInfo(
-             depth: depth,
-             rawName: rawName,
-             name: name,
-             lowPC: lowPC,
-             highPC: highPC,
-             filename: filename,
-             line: Int(callLine),
-             column: Int(callColumn)))
-      }
     }
   }
 
-  struct FunctionInfo {
+  struct FunctionInfo: DwarfRanged {
     var depth: Int
     var rawName: String
     var name: String?
@@ -1891,145 +2299,125 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   private func buildFunctionInfo (
     depth: Int,
     unit: Unit,
-    attributes: [Dwarf_Attribute:DwarfValue],
+    attributes: FunctionAttributes,
     _ fn: (FunctionInfo) -> ()
   ) throws {
-    var name: String? = nil
-    var refAttrs = attributes
-
-    if let specificationVal = refAttrs[.DW_AT_specification],
-       case let .reference(specification) = specificationVal {
-      var cursor = ImageSourceCursor(source: infoSection,
-                                     offset: specification)
-      let abbrev = try cursor.readULEB128()
-      if abbrev == 0 {
-        return
-      }
-
-      guard let abbrevInfo = unit.abbrevs[abbrev] else {
-        throw DwarfError.missingAbbrev(abbrev)
-      }
-
-      let tag = abbrevInfo.tag
-      if tag != .DW_TAG_subprogram {
-        return
-      }
-
-      refAttrs = try readDieAttributes(
-        at: &cursor,
-        unit: unit,
-        abbrevInfo: abbrevInfo,
-        shouldFetchIndirect: true
-      )
+    // Out-of-line instances of inlined functions get their names from their
+    // abstract origin, and definitions get them from their declaration.
+    guard let names = try inheritedNames(of: attributes) else {
+      return
     }
 
-    if let nameVal = refAttrs[.DW_AT_name],
-       case let .string(theName) = nameVal {
-      name = theName
-    }
+    let name = names.name
+    let rawName = names.linkageName ?? name ?? "<unknown>"
 
-    let rawName: String
-
-    if let linkageNameVal = refAttrs[.DW_AT_linkage_name],
-       case let .string(theRawName) = linkageNameVal {
-      rawName = theRawName
-    } else {
-      rawName = name ?? "<unknown>"
-    }
-
-    if let lowPCVal = attributes[.DW_AT_low_pc],
-       let highPCVal = attributes[.DW_AT_high_pc],
-       case let .address(lowPC) = lowPCVal {
-      let highPC: Address
-      if case let .address(highPCAddr) = highPCVal {
-        highPC = highPCAddr
-      } else if let highPCOffset = highPCVal.uint64Value() {
-        let (sum, ov) = lowPC.addingReportingOverflow(highPCOffset)
-        highPC = ov ? .max : sum
-      } else {
-        return
-      }
-
+    try forEachAddressRange(of: attributes, unit: unit) { lowPC, highPC in
       fn(FunctionInfo(
            depth: depth,
            rawName: rawName,
            name: name,
            lowPC: lowPC,
            highPC: highPC))
-    } else if let rangeVal = attributes[.DW_AT_ranges] {
-      try forEachRange(of: rangeVal, unit: unit) { lowPC, highPC in
-        fn(FunctionInfo(
-             depth: depth,
-             rawName: rawName,
-             name: name,
-             lowPC: lowPC,
-             highPC: highPC))
-      }
     }
   }
 
-  private lazy var _lazyInfo: (callSites: [CallSiteInfo],
-                               functions: [FunctionInfo]) = _scanUnits()
+  // .. Line number information ................................................
 
-  var inlineCallSites: [CallSiteInfo] {
-    _lazyInfo.callSites
+  /// Get the line number program for `unit`, reading it if necessary.
+  /// Get the full path for a file in the line number table for `unit`.
+  /// Many call sites share a file, so we remember the paths.
+  private func pathForFile(index: Int, in unit: Unit) -> String {
+    if index >= 0 && index < unit.filePaths.count,
+       let path = unit.filePaths[index] {
+      return path
+    }
+
+    guard let info = lineNumberInfo(for: unit) else {
+      return "<unknown>"
+    }
+
+    let path = info.fullPathForFile(index: index)
+    if index >= 0 && index < info.files.count {
+      if unit.filePaths.count < info.files.count {
+        unit.filePaths += [String?](repeating: nil,
+                                    count: info.files.count
+                                      - unit.filePaths.count)
+      }
+      unit.filePaths[index] = path
+    }
+    return path
   }
 
-  var functions: [FunctionInfo] {
-    _lazyInfo.functions
+  private func lineNumberInfo(for unit: Unit) -> DwarfLineNumberInfo? {
+    // Units that we found using .debug_aranges won't have been resolved yet,
+    // and we need their root DIE attributes to find the line number program.
+    guard (try? resolve(unit)) != nil,
+          let lineBase = unit.lineBase else {
+      return nil
+    }
+
+    if let cached = lineNumberInfoCache[lineBase] {
+      return cached
+    }
+
+    var result = try? readLineNumberInfo(at: lineBase)
+
+    // On DWARF 4 and earlier, we need to fix up a couple of things in the
+    // line number info; these are explicitly included in DWARF 5 so that
+    // we can strip everything except line number information.
+    if var info = result, info.version < 5 {
+      var filename = "<unknown>"
+      if let nameVal = unit.attributes[.DW_AT_name],
+         case let .string(theName) = nameVal {
+        filename = theName
+      }
+      var dirname = "."
+      if let dirVal = unit.attributes[.DW_AT_comp_dir],
+         case let .string(theDir) = dirVal {
+        dirname = theDir
+      }
+
+      info.directories[0] = dirname
+      info.files[0] = DwarfFileInfo(
+        path: filename,
+        directoryIndex: 0,
+        timestamp: nil,
+        size: nil,
+        md5sum: nil
+      )
+      if !unit.isLineOnly {
+        info.addressSize = unit.addressSize
+      }
+      result = info
+    }
+
+    lineNumberInfoCache[lineBase] = .some(result)
+    return result
   }
 
-  func lookupInlineCallSites(
-    at address: Address
-  ) -> ArraySlice<CallSiteInfo> {
-    var min = 0
-    var max = inlineCallSites.count
+  /// Get the line number info for `unit`, with its sequences indexed.
+  ///
+  /// We index the sequences the first time that we need to look something
+  /// up; scanning a unit doesn't need the line number program itself.
+  private func indexedLineNumberInfo(
+    for unit: Unit
+  ) -> DwarfLineNumberInfo? {
+    guard var info = lineNumberInfo(for: unit) else {
+      return nil
+    }
 
-    while min < max {
-      let mid = min + (max - min) / 2
-      let callSite = inlineCallSites[mid]
-
-      if callSite.lowPC <= address && callSite.highPC > address {
-        var first = mid, last = mid
-        while first > 0
-                && inlineCallSites[first - 1].lowPC <= address
-                && inlineCallSites[first - 1].highPC > address {
-          first -= 1
-        }
-        while last < inlineCallSites.count - 1
-                && inlineCallSites[last + 1].lowPC <= address
-                && inlineCallSites[last + 1].highPC > address {
-          last += 1
-        }
-
-        return inlineCallSites[first...last]
-      } else if callSite.highPC <= address {
-        min = mid + 1
-      } else if callSite.lowPC > address {
-        max = mid
+    if info.sequences == nil {
+      do {
+        try info.buildSequenceIndex()
+      } catch {
+        info.sequences = RangeIndex(sortedElements: [])
+      }
+      if let lineBase = unit.lineBase {
+        lineNumberInfoCache[lineBase] = .some(info)
       }
     }
 
-    return []
-  }
-
-  func lookupFunction(
-    at address: Address
-  ) -> FunctionInfo? {
-    var min = 0, max = functions.count
-    while min < max {
-      let mid = min + (max - min) / 2
-      let function = functions[mid]
-
-      if function.lowPC <= address && function.highPC > address {
-        return function
-      } else if function.highPC <= address {
-        min = mid + 1
-      } else if function.lowPC > address {
-        max = mid
-      }
-    }
-    return nil
+    return info
   }
 
   typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
@@ -2037,118 +2425,531 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   func sourceLocation(
     for address: Address
   ) throws -> SourceLocation? {
-    var result: SourceLocation? = nil
-    var prevState: DwarfLineNumberState? = nil
+    for unit in unitsContaining(address) {
+      guard var info = indexedLineNumberInfo(for: unit) else {
+        continue
+      }
 
-    for ndx in 0..<lineNumberInfo.count {
-      var info = lineNumberInfo[ndx]
-      try info.executeProgram { (state, done) in
-        if let oldState = prevState,
-           address >= oldState.address && address < state.address {
-          result = SourceLocation(
-            path: oldState.path,
-            line: oldState.line,
-            column: oldState.column
+      // Only run the sequences that cover the address, in program order
+      var candidates: [DwarfLineSequence] = []
+      info.sequences?.forEachContaining(address) { candidates.append($0) }
+      candidates.sort { $0.offset < $1.offset }
+
+      for sequence in candidates {
+        var found: (file: Int, line: Int, column: Int)? = nil
+        var prevState: DwarfLineNumberState? = nil
+
+        try info.executeProgram(from: sequence.offset,
+                                recordFiles: false) { (state, _, done) in
+          if let oldState = prevState,
+             address >= oldState.address && address < state.address {
+            found = (oldState.file, oldState.line, oldState.column)
+            done = true
+          }
+
+          if state.endSequence {
+            prevState = nil
+            done = true
+          } else {
+            prevState = state
+          }
+        }
+
+        if let found {
+          return SourceLocation(
+            path: info.fullPathForFile(index: found.file),
+            line: found.line,
+            column: found.column
           )
-          done = true
+        }
+      }
+    }
+
+    return nil
+  }
+
+  // .. Address map ............................................................
+
+  struct UnitRange: DwarfRanged {
+    var lowPC: Address
+    var highPC: Address
+    var unitIndex: Int
+  }
+
+  /// Maps addresses to the units whose code covers them, so that we only
+  /// need to look at the DIEs for units that are relevant to a given address.
+  private lazy var addressMap: RangeIndex<UnitRange> = buildAddressMap()
+
+  /// Units that we couldn't get any address ranges for, because their root
+  /// DIE doesn't have `DW_AT_low_pc`/`DW_AT_high_pc` or `DW_AT_ranges` (and
+  /// they aren't in `.debug_aranges`).  They might still contain functions,
+  /// or have a line number program that tells us where their code is.
+  private var unmappedUnits: [Int] = []
+
+  /// Maps addresses to the `unmappedUnits` that contain functions or inlined
+  /// call sites covering them.  The only way to find out is to scan them, so
+  /// we do that the first time that we need it.
+  private lazy var unmappedUnitMap: RangeIndex<UnitRange> =
+    buildUnmappedUnitMap()
+
+  /// Sort `ranges` by `lowPC`, merging the ranges that overlap or touch and
+  /// belong to the same unit.
+  ///
+  /// A unit only says that it *might* cover an address, so merging its own
+  /// ranges doesn't change what we find, and leaves fewer ranges that
+  /// overlap each other.  We don't merge ranges from different units, since
+  /// we need all of the units that might cover an address.
+  private func sortAndCoalesce(_ ranges: inout [UnitRange]) {
+    ranges.sort { $0.lowPC < $1.lowPC }
+
+    // The merged range for a unit starts where its first range does, so as
+    // we go in `lowPC` order we only ever need to extend the last range that
+    // we kept for the unit, and the result stays sorted.
+    var lastKept = [Int](repeating: -1, count: units.count)
+    var kept = 0
+
+    for ndx in ranges.indices {
+      let range = ranges[ndx]
+      let last = lastKept[range.unitIndex]
+
+      if last >= 0 && range.lowPC <= ranges[last].highPC {
+        ranges[last].highPC = Swift.max(ranges[last].highPC, range.highPC)
+      } else {
+        ranges[kept] = range
+        lastKept[range.unitIndex] = kept
+        kept += 1
+      }
+    }
+
+    ranges.removeSubrange(kept...)
+  }
+
+  private func buildUnmappedUnitMap() -> RangeIndex<UnitRange> {
+    // Make sure that we've found the unmapped units
+    _ = addressMap
+
+    var ranges: [UnitRange] = []
+    for ndx in unmappedUnits {
+      let unit = units[ndx]
+      scan(unit)
+
+      for function in unit.functions!.elements {
+        ranges.append(UnitRange(lowPC: function.lowPC,
+                                highPC: function.highPC,
+                                unitIndex: ndx))
+      }
+      for callSite in unit.callSites!.elements {
+        ranges.append(UnitRange(lowPC: callSite.lowPC,
+                                highPC: callSite.highPC,
+                                unitIndex: ndx))
+      }
+
+      // A unit with only line number information (for instance because it
+      // was built with -gline-tables-only) has no function DIEs, so the
+      // only addresses that we know it covers are the ones that its line
+      // number program does.
+      if let sequences = indexedLineNumberInfo(for: unit)?.sequences {
+        for sequence in sequences.elements {
+          ranges.append(UnitRange(lowPC: sequence.lowPC,
+                                  highPC: sequence.highPC,
+                                  unitIndex: ndx))
+        }
+      }
+    }
+
+    sortAndCoalesce(&ranges)
+    return RangeIndex(sortedElements: ranges)
+  }
+
+  private func buildAddressMap() -> RangeIndex<UnitRange> {
+    var ranges: [UnitRange] = []
+    var covered = [Bool](repeating: false, count: units.count)
+
+    // Prefer .debug_aranges, which lets us avoid looking at the units at all.
+    if let arangesSection, !isLineOnly {
+      do {
+        try readARanges(arangesSection, into: &ranges, covered: &covered)
+      } catch {
+        swift_reportWarning(0,
+                            """
+                              swift-runtime: warning: unable to read \
+                              .debug_aranges: \(error)\n
+                              """)
+      }
+    }
+
+    // Otherwise, we have to look at the root DIE of the unit.
+    for (ndx, unit) in units.enumerated() {
+      if covered[ndx] || unit.unitType == .DW_UT_type
+           || unit.unitType == .DW_UT_split_type {
+        continue
+      }
+
+      do {
+        try resolve(unit)
+
+        var foundRange = false
+        try forEachAddressRange(of: unit.attributes, unit: unit) {
+          lowPC, highPC in
+          foundRange = true
+          if lowPC < highPC {
+            ranges.append(UnitRange(lowPC: lowPC,
+                                    highPC: highPC,
+                                    unitIndex: ndx))
+          }
         }
 
-        if state.endSequence {
-          prevState = nil
-        } else {
-          prevState = state
+        if !foundRange {
+          unmappedUnits.append(ndx)
         }
+      } catch {
+        swift_reportWarning(0,
+                            """
+                              swift-runtime: warning: unable to determine \
+                              address range for DWARF unit \(unit.name): \
+                              \(error)\n
+                              """)
+      }
+    }
+
+    sortAndCoalesce(&ranges)
+    return RangeIndex(sortedElements: ranges)
+  }
+
+  /// Read the address ranges from `.debug_aranges`, marking the units that
+  /// they cover in `covered`.
+  private func readARanges(
+    _ section: ImageSource,
+    into ranges: inout [UnitRange],
+    covered: inout [Bool]
+  ) throws {
+    let end = section.bytes.count
+    var cursor = ImageSourceCursor(source: section)
+
+    while cursor.pos < end {
+      // See 6.1.2 Lookup by Address
+      let setStart = cursor.pos
+
+      // .1 unit_length
+      let (length, dwarf64) = try cursor.readDwarfLength()
+      let (setEnd, ov) = cursor.pos.addingReportingOverflow(length)
+      guard !ov && setEnd <= end else {
+        throw DwarfError.badUnitLength
+      }
+
+      // .2 version
+      let version = maybeSwap(try cursor.read(as: Dwarf_Half.self))
+
+      // .3 debug_info_offset
+      let infoOffset: Address
+      if dwarf64 {
+        infoOffset = maybeSwap(try cursor.read(as: Dwarf_Xword.self))
+      } else {
+        infoOffset = Address(maybeSwap(try cursor.read(as: Dwarf_Word.self)))
+      }
+
+      // .4 address_size
+      let addressSize = Int(try cursor.read(as: Dwarf_Byte.self))
+
+      // .5 segment_selector_size
+      let segmentSelectorSize = Int(try cursor.read(as: Dwarf_Byte.self))
+
+      defer {
+        cursor.pos = setEnd
+      }
+
+      guard version == 2,
+            addressSize == 4 || addressSize == 8,
+            segmentSelectorSize == 0,
+            let unitNdx = unitIndex(forBaseOffset: infoOffset) else {
+        continue
+      }
+
+      // The tuples are aligned to twice the address size, relative to the
+      // start of the set.
+      let tupleSize = Address(addressSize * 2)
+      let headerSize = cursor.pos - setStart
+      cursor.pos = setStart + (headerSize + tupleSize - 1) / tupleSize * tupleSize
+
+      while cursor.pos + tupleSize <= setEnd {
+        let start = try readAddress(at: &cursor, addressSize: addressSize)
+        let size = try readAddress(at: &cursor, addressSize: addressSize)
+
+        if start == 0 && size == 0 {
+          break
+        }
+
+        let (stop, overflow) = start.addingReportingOverflow(size)
+        if size == 0 {
+          continue
+        }
+
+        ranges.append(UnitRange(lowPC: start,
+                                highPC: overflow ? .max : stop,
+                                unitIndex: unitNdx))
+      }
+
+      covered[unitNdx] = true
+    }
+  }
+
+  /// Find the units that might contain code at `address`.
+  private func unitsContaining(_ address: Address) -> [Unit] {
+    var indices: [Int] = []
+    addressMap.forEachContaining(address) { indices.append($0.unitIndex) }
+    unmappedUnitMap.forEachContaining(address) { indices.append($0.unitIndex) }
+    indices.sort()
+
+    var result: [Unit] = []
+    var prev = -1
+    for ndx in indices where ndx != prev {
+      result.append(units[ndx])
+      prev = ndx
+    }
+    return result
+  }
+
+  // .. Scanning units .........................................................
+
+  private struct SortKey {
+    var lowPC: UInt64
+    var depth: Int
+    var index: Int
+  }
+
+  /// Sort by `lowPC`, with deeper entries first when they start at the same
+  /// address.  We sort small plain-old-data keys rather than the elements
+  /// themselves, because the elements contain strings and so are expensive
+  /// to move around.
+  private func sortedByAddress<T: DwarfRanged>(
+    _ elements: [T], depth: (T) -> Int
+  ) -> [T] {
+    var keys: [SortKey] = []
+    keys.reserveCapacity(elements.count)
+    for (index, element) in elements.enumerated() {
+      keys.append(SortKey(lowPC: element.lowPC, depth: depth(element),
+                      index: index))
+    }
+
+    keys.sort {
+      if $0.lowPC != $1.lowPC { return $0.lowPC < $1.lowPC }
+      if $0.depth != $1.depth { return $0.depth > $1.depth }
+      return $0.index < $1.index
+    }
+
+    return keys.map { elements[$0.index] }
+  }
+
+  /// Scan the DIEs in `unit`, recording the functions and inlined call sites
+  /// that it contains.  This only happens once for each unit.
+  private func scan(_ unit: Unit) {
+    if unit.callSites != nil && unit.functions != nil {
+      return
+    }
+
+    if unit.isLineOnly {
+      unit.callSites = RangeIndex(sortedElements: [])
+      unit.functions = RangeIndex(sortedElements: [])
+      return
+    }
+
+    var callSites: [CallSiteInfo] = []
+    var functions: [FunctionInfo] = []
+
+    do {
+      try resolve(unit)
+
+      let abbrevTable = try abbrevs(for: unit)
+      var cursor = ImageSourceCursor(source: infoSection,
+                                     offset: unit.dieBounds.base)
+      var depth = 0
+
+      while cursor.pos < unit.dieBounds.end {
+        let abbrev = try cursor.readULEB128()
+
+        if abbrev == 0 {
+          depth -= 1
+          if depth == 0 {
+            break
+          }
+          continue
+        }
+
+        guard let abbrevInfo = abbrevTable[abbrev] else {
+          throw DwarfError.missingAbbrev(abbrev)
+        }
+
+        let tag = abbrevInfo.tag
+
+        if tag != .DW_TAG_inlined_subroutine && tag != .DW_TAG_subprogram {
+          try skipDieAttributes(at: &cursor,
+                                unit: unit,
+                                abbrevInfo: abbrevInfo)
+          if abbrevInfo.hasChildren {
+            depth += 1
+          }
+          continue
+        }
+
+        let attributes = try readFunctionAttributes(
+          at: &cursor,
+          unit: unit,
+          abbrevInfo: abbrevInfo
+        )
+
+        if tag == .DW_TAG_inlined_subroutine {
+          try buildCallSiteInfo(depth: depth,
+                                unit: unit,
+                                attributes: attributes) {
+            callSites.append($0)
+          }
+        } else if tag == .DW_TAG_subprogram {
+          try buildFunctionInfo(depth: depth,
+                                unit: unit,
+                                attributes: attributes) {
+            functions.append($0)
+          }
+        }
+
+        if abbrevInfo.hasChildren {
+          depth += 1
+        }
+      }
+    } catch {
+      swift_reportWarning(0,
+                          """
+                            swift-runtime: warning: unable to fetch inline \
+                            frame data for DWARF unit \(unit.name): \(error)\n
+                            """)
+    }
+
+    callSites = sortedByAddress(callSites) { $0.depth }
+    functions = sortedByAddress(functions) { $0.depth }
+
+    unit.callSites = RangeIndex(sortedElements: callSites)
+    unit.functions = RangeIndex(sortedElements: functions)
+  }
+
+  /// All of the inlined call sites in the image, sorted by address.
+  ///
+  /// This scans every unit, so it should only be used for diagnostics.
+  var inlineCallSites: [CallSiteInfo] {
+    var result: [CallSiteInfo] = []
+    for unit in units {
+      scan(unit)
+      result.append(contentsOf: unit.callSites!.elements)
+    }
+    return sortedByAddress(result) { $0.depth }
+  }
+
+  /// All of the functions in the image, sorted by address.
+  ///
+  /// This scans every unit, so it should only be used for diagnostics.
+  var functions: [FunctionInfo] {
+    var result: [FunctionInfo] = []
+    for unit in units {
+      scan(unit)
+      result.append(contentsOf: unit.functions!.elements)
+    }
+    return sortedByAddress(result) { $0.depth }
+  }
+
+  func lookupInlineCallSites(
+    at address: Address
+  ) -> ArraySlice<CallSiteInfo> {
+    var result: [CallSiteInfo] = []
+
+    for unit in unitsContaining(address) {
+      scan(unit)
+      unit.callSites!.forEachContaining(address) { result.append($0) }
+    }
+
+    // Callers expect the innermost call site first.  Sorting by address
+    // doesn't give us that, because a site with more than one range doesn't
+    // nest consistently by address; the depth of the DIE does.
+    result.sort { $0.depth > $1.depth || ($0.depth == $1.depth
+                                            && $0.lowPC > $1.lowPC) }
+    return result[...]
+  }
+
+  func lookupFunction(
+    at address: Address
+  ) -> FunctionInfo? {
+    var result: FunctionInfo? = nil
+
+    for unit in unitsContaining(address) {
+      scan(unit)
+      unit.functions!.forEachContaining(address) { function in
+        // Prefer the function that starts closest to the address, and
+        // the most deeply nested one if there's more than one.
+        if let best = result,
+           best.lowPC > function.lowPC
+             || (best.lowPC == function.lowPC && best.depth >= function.depth) {
+          return
+        }
+        result = function
       }
     }
 
     return result
   }
 
-  private func _scanUnits()
-    -> (callSites: [CallSiteInfo],
-        functions: [FunctionInfo]) {
+}
 
-    var callSites: [CallSiteInfo] = []
-    var functions: [FunctionInfo] = []
+/// Something that covers a range of addresses.
+@available(BacktracingDT 6.2, *)
+protocol DwarfRanged {
+  var lowPC: UInt64 { get }
+  var highPC: UInt64 { get }
+}
 
-    for unit in units {
-      do {
-        var cursor = ImageSourceCursor(source: infoSection,
-                                       offset: unit.dieBounds.base)
-        var depth = 0
+/// An immutable collection of address ranges that can efficiently find all of
+/// the ranges that contain a particular address.
+@available(BacktracingDT 6.2, *)
+struct RangeIndex<Element: DwarfRanged> {
+  private(set) var elements: [Element]
 
-        while cursor.pos < unit.dieBounds.end {
-          let abbrev = try cursor.readULEB128()
+  /// The greatest `highPC` of the elements up to and including each index.
+  private var maxHighPC: [UInt64]
 
-          if abbrev == 0 {
-            depth -= 1
-            if depth == 0 {
-              break
-            }
-            continue
-          }
+  /// - Parameter sortedElements: Elements, sorted by `lowPC`.
+  init(sortedElements: [Element]) {
+    var maxHighPC: [UInt64] = []
+    maxHighPC.reserveCapacity(sortedElements.count)
 
-          guard let abbrevInfo = unit.abbrevs[abbrev] else {
-            throw DwarfError.missingAbbrev(abbrev)
-          }
+    var highest: UInt64 = 0
+    for element in sortedElements {
+      highest = Swift.max(highest, element.highPC)
+      maxHighPC.append(highest)
+    }
 
-          let tag = abbrevInfo.tag
+    self.elements = sortedElements
+    self.maxHighPC = maxHighPC
+  }
 
-          let attributes = try readDieAttributes(
-            at: &cursor,
-            unit: unit,
-            abbrevInfo: abbrevInfo,
-            shouldFetchIndirect: (tag == .DW_TAG_inlined_subroutine
-                                    || tag == .DW_TAG_subprogram)
-          )
-
-          if tag == .DW_TAG_inlined_subroutine {
-            try buildCallSiteInfo(depth: depth,
-                                  unit: unit,
-                                  attributes: attributes) {
-              callSites.append($0)
-            }
-          } else if tag == .DW_TAG_subprogram {
-            try buildFunctionInfo(depth: depth,
-                                  unit: unit,
-                                  attributes: attributes) {
-              functions.append($0)
-            }
-          }
-
-          if abbrevInfo.hasChildren {
-            depth += 1
-          }
-        }
-      } catch {
-        let name: String
-        if let value = unit.attributes[.DW_AT_name],
-           case let .string(theName) = value {
-          name = theName
-        } else {
-          name = "<unknown at \(hex(unit.baseOffset))>"
-        }
-        swift_reportWarning(0,
-                            """
-                              swift-runtime: warning: unable to fetch inline \
-                              frame data for DWARF unit \(name): \(error)\n
-                              """)
+  /// Call `fn` for every element that contains `address`, from the highest
+  /// `lowPC` to the lowest.
+  func forEachContaining(_ address: UInt64, _ fn: (Element) -> ()) {
+    // Find the first element that starts after the address
+    var min = 0, max = elements.count
+    while min < max {
+      let mid = min + (max - min) / 2
+      if elements[mid].lowPC <= address {
+        min = mid + 1
+      } else {
+        max = mid
       }
     }
 
-    callSites.sort(
-      by: { (a, b) in
-        a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth > b.depth
-      })
-
-    functions.sort(
-      by: { (a, b) in
-        a.lowPC < b.lowPC || (a.lowPC == b.lowPC) && a.depth > b.depth
-      })
-
-    return (callSites: callSites, functions: functions)
+    // Then walk backwards until nothing earlier can possibly cover it
+    var ndx = min - 1
+    while ndx >= 0 && maxHighPC[ndx] > address {
+      if elements[ndx].highPC > address {
+        fn(elements[ndx])
+      }
+      ndx -= 1
+    }
   }
-
 }
 
 struct DwarfFileInfo {
@@ -2165,7 +2966,6 @@ struct DwarfLineNumberState: CustomStringConvertible {
   var address: Address
   var opIndex: UInt
   var file: Int
-  var path: String
   var line: Int
   var column: Int
   var isStmt: Bool
@@ -2203,6 +3003,16 @@ struct DwarfLineNumberState: CustomStringConvertible {
   }
 }
 
+/// A sequence in a line number program.
+@available(BacktracingDT 6.2, *)
+struct DwarfLineSequence: DwarfRanged {
+  var lowPC: UInt64
+  var highPC: UInt64
+
+  /// The offset of the start of the sequence within the program.
+  var offset: UInt64
+}
+
 @available(BacktracingDT 6.2, *)
 struct DwarfLineNumberInfo {
   typealias Address = UInt64
@@ -2226,6 +3036,63 @@ struct DwarfLineNumberInfo {
   var program: ImageSource
   var shouldSwap: Bool
 
+  /// An index of the sequences in the program, built by `buildSequenceIndex()`.
+  var sequences: RangeIndex<DwarfLineSequence>?
+
+  /// Run the whole program once, recording where each sequence starts and
+  /// the addresses that it covers, so that lookups can run just the
+  /// sequence that they need.
+  mutating func buildSequenceIndex() throws {
+    var found: [DwarfLineSequence] = []
+    var start: UInt64 = 0
+    var low: UInt64? = nil
+
+    try executeProgram { (state, next, done) in
+      if state.endSequence {
+        if let low, low < state.address {
+          found.append(DwarfLineSequence(lowPC: low,
+                                         highPC: state.address,
+                                         offset: start))
+        }
+        start = next
+        low = nil
+      } else if low == nil {
+        low = state.address
+      }
+    }
+
+    found.sort { $0.lowPC < $1.lowPC || ($0.lowPC == $1.lowPC
+                                           && $0.offset < $1.offset) }
+    sequences = RangeIndex(sortedElements: found)
+  }
+
+  /// Whether `path` is absolute, rather than relative to some directory.
+  private func isAbsolute(_ path: String) -> Bool {
+    if path.hasPrefix(pathSeparator) {
+      return true
+    }
+
+    // Paths from Windows toolchains might use either kind of separator, and
+    // might start with a drive letter.
+    if pathSeparator == "\\" {
+      if path.hasPrefix("/") {
+        return true
+      }
+
+      var chars = path.utf8.makeIterator()
+      if let drive = chars.next(),
+         (drive | 0x20) >= UInt8(ascii: "a"),
+         (drive | 0x20) <= UInt8(ascii: "z"),
+         chars.next() == UInt8(ascii: ":"),
+         let sep = chars.next(),
+         sep == UInt8(ascii: "\\") || sep == UInt8(ascii: "/") {
+        return true
+      }
+    }
+
+    return false
+  }
+
   /// Compute the full path for a file, given its index in the file table.
   func fullPathForFile(index: Int) -> String {
     if index >= files.count {
@@ -2233,16 +3100,27 @@ struct DwarfLineNumberInfo {
     }
 
     let info = files[index]
-    if info.path.hasPrefix(pathSeparator) {
+    if isAbsolute(info.path) {
       return info.path
     }
 
-    let dirName: String
-    if let dirIndex = info.directoryIndex,
-       dirIndex < directories.count {
+    // The directory index is optional in DWARF 5; if it's missing, the file
+    // is relative to the compilation directory, which is directory 0.
+    let dirIndex = info.directoryIndex ?? 0
+
+    var dirName: String
+    if dirIndex < directories.count {
       dirName = directories[dirIndex]
     } else {
       dirName = "<unknown>"
+    }
+
+    // A relative directory is relative to the compilation directory, unless
+    // we don't know what that is (in which case it's "." or empty).
+    if dirIndex != 0 && dirIndex < directories.count && !isAbsolute(dirName),
+       let compDir = directories.first,
+       compDir != "." && compDir != "" {
+      dirName = "\(compDir)\(pathSeparator)\(dirName)"
     }
 
     return "\(dirName)\(pathSeparator)\(info.path)"
@@ -2250,11 +3128,21 @@ struct DwarfLineNumberInfo {
 
   /// Execute the line number program, calling a closure for every line
   /// table entry.
+  ///
+  /// - Parameters:
+  ///   - offset: Where in the program to start; this must be the start of a
+  ///     sequence, as the state is reset to its initial value.
+  ///   - recordFiles: Whether `DW_LNE_define_file` should add to `files`.
+  ///     Only the first complete run over the program should do this.
+  ///   - line: Called for every row; the `UInt64` is the program offset
+  ///     immediately after the instruction that produced the row.
   mutating func executeProgram(
-    line: (DwarfLineNumberState, inout Bool) -> ()
+    from offset: UInt64 = 0,
+    recordFiles: Bool = true,
+    line: (DwarfLineNumberState, UInt64, inout Bool) -> ()
   ) throws {
     let end = UInt64(clamping: program.bytes.count)
-    var cursor = ImageSourceCursor(source: program)
+    var cursor = ImageSourceCursor(source: program, offset: offset)
 
     func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
       if shouldSwap {
@@ -2268,7 +3156,6 @@ struct DwarfLineNumberInfo {
       address: 0,
       opIndex: 0,
       file: 1,
-      path: fullPathForFile(index: 1),
       line: 1,
       column: 0,
       isStmt: defaultIsStmt,
@@ -2300,7 +3187,7 @@ struct DwarfLineNumberInfo {
         state.opIndex = newOp
         state.line = state.line &+ Int(lineBase) + Int(lineAdvance)
 
-        line(state, &done)
+        line(state, cursor.pos, &done)
 
         state.discriminator = 0
         state.basicBlock = false
@@ -2314,11 +3201,13 @@ struct DwarfLineNumberInfo {
         switch opcode {
           case .DW_LNE_end_sequence:
             state.endSequence = true
-            line(state, &done)
+            line(state, cursor.pos, &done)
             state = initialState
           case .DW_LNE_set_address:
             let address: UInt64
-            guard let addressSize = addressSize else {
+            // If we don't know the address size, it's the rest of the opcode
+            guard let addressSize = addressSize
+                    ?? (length > 1 ? Int(length - 1) : nil) else {
               throw DwarfError.unspecifiedAddressSize
             }
             switch addressSize {
@@ -2337,13 +3226,15 @@ struct DwarfLineNumberInfo {
             let directoryIndex = try cursor.readULEB128(as: Int.self)
             let timestamp = try cursor.readULEB128(as: Int.self)
             let size = try cursor.readULEB128()
-            files.append(DwarfFileInfo(
-                           path: path,
-                           directoryIndex: directoryIndex,
-                           timestamp: timestamp != 0 ? timestamp : nil,
-                           size: size != 0 ? size : nil,
-                           md5sum: nil
-                         ))
+            if recordFiles {
+              files.append(DwarfFileInfo(
+                             path: path,
+                             directoryIndex: directoryIndex,
+                             timestamp: timestamp != 0 ? timestamp : nil,
+                             size: size != 0 ? size : nil,
+                             md5sum: nil
+                           ))
+            }
           case .DW_LNE_set_discriminator:
             let discriminator = try cursor.readULEB128(as: UInt.self)
             state.discriminator = discriminator
@@ -2357,7 +3248,7 @@ struct DwarfLineNumberInfo {
         // Standard opcode
         switch opcode {
           case .DW_LNS_copy:
-            line(state, &done)
+            line(state, cursor.pos, &done)
             state.discriminator = 0
             state.basicBlock = false
             state.prologueEnd = false
@@ -2375,7 +3266,6 @@ struct DwarfLineNumberInfo {
           case .DW_LNS_set_file:
             let file = try cursor.readULEB128(as: Int.self)
             state.file = file
-            state.path = fullPathForFile(index: state.file)
           case .DW_LNS_set_column:
             let column = try cursor.readULEB128(as: Int.self)
             state.column = column
@@ -2436,13 +3326,20 @@ public func testDwarfReaderFor(path: String) -> Bool {
     }
 
     print("Units:")
-    print(reader.units)
+    for unit in reader.units {
+      try? reader.resolve(unit)
+      print("  \(unit.name)")
+    }
 
     print("Functions:")
     print(reader.functions)
 
     print("Call Sites:")
     print(reader.inlineCallSites)
+
+    print("Line Program:")
+    _ = try? reader.sourceLocation(for: 0x1000)
+    print("  executed")
     return true
   } else if let elfImage = try? Elf64Image(source: source) {
     print("\(path) is a 64-bit ELF image")
@@ -2457,6 +3354,7 @@ public func testDwarfReaderFor(path: String) -> Bool {
 
     print("Units:")
     for unit in reader.units {
+      try? reader.resolve(unit)
       if let value = unit.attributes[.DW_AT_name],
          case let .string(name) = value {
         print("  \(name)")
@@ -2470,6 +3368,70 @@ public func testDwarfReaderFor(path: String) -> Bool {
 
     print("Call Sites:")
     print(reader.inlineCallSites)
+
+    print("Line Program:")
+    _ = try? reader.sourceLocation(for: 0x1000)
+    print("  executed")
+    return true
+  } else {
+    print("\(path) is not an ELF image")
+    return false
+  }
+}
+
+@available(BacktracingDT 6.2, *)
+private func printDwarfLookups<S: DwarfSource & AnyObject>(
+  _ reader: DwarfReader<S>,
+  at addresses: [UInt64]
+) {
+  for address in addresses {
+    print("address \(hex(address, width: 0)):")
+
+    // N.B. This needs to come first; looking up functions resolves the units
+    // that cover the address, and we want to test that we can find line
+    // numbers without that having happened.
+    if let location = try? reader.sourceLocation(for: address) {
+      print("  location: \(location.path):\(location.line):"
+              + "\(location.column)")
+    }
+
+    if let function = reader.lookupFunction(at: address) {
+      print("  function: \(function.rawName)")
+    } else {
+      print("  function: <none>")
+    }
+
+    for site in reader.lookupInlineCallSites(at: address) {
+      print("  inline: \(site.rawName ?? "<none>") "
+              + "\(site.filename):\(site.line):\(site.column)")
+    }
+  }
+}
+
+/// Look up each of `addresses` in the DWARF in the ELF image at `path`, and
+/// print the source location, the function and the inline call sites
+/// (innermost first) that we find for it.
+@_spi(DwarfTest)
+@available(BacktracingDT 6.2, *)
+public func testDwarfLookupsFor(path: String, addresses: [UInt64]) -> Bool {
+  guard let source = try? ImageSource(path: path) else {
+    print("\(path) was not accessible")
+    return false
+  }
+
+  if let elfImage = try? Elf32Image(source: source) {
+    guard let reader = try? DwarfReader(source: elfImage) else {
+      print("Unable to create reader")
+      return false
+    }
+    printDwarfLookups(reader, at: addresses)
+    return true
+  } else if let elfImage = try? Elf64Image(source: source) {
+    guard let reader = try? DwarfReader(source: elfImage) else {
+      print("Unable to create reader")
+      return false
+    }
+    printDwarfLookups(reader, at: addresses)
     return true
   } else {
     print("\(path) is not an ELF image")

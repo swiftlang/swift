@@ -198,6 +198,7 @@ static inline bool isBorrowAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline bool isReadAccess(SGFAccessKind kind) {
@@ -218,6 +219,7 @@ static inline bool isConsumeAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a read access kind, does it require an owned result?
@@ -589,7 +591,14 @@ public:
     ~AddressableBuffer();
   };
   llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
-    
+
+  /// The function argument of a parameter that the caller passes by address
+  /// but that opaque values represent as a guaranteed object. The address of
+  /// such a parameter is value_to_address of this argument. The value that the
+  /// parameter is bound to can be a copy of it, which has a different address.
+  llvm::DenseMap<ParamDecl *, SILFunctionArgument *>
+      GuaranteedIndirectArguments;
+
   AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   /// Establish the scope for the addressable buffer that might be allocated
@@ -704,6 +713,12 @@ public:
                                                            CanType refType,
                                                            SILValue addr,
                                                            SGFContext C);
+
+  /// Whether the initializer that the current `self.init` or `super.init`
+  /// delegates to borrows `self` rather than consuming it. This is the case for
+  /// the C++ constructor of a C++ foreign reference type.
+  bool isInitDelegationBorrowingSelf() const;
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
@@ -984,6 +999,10 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
+  /// Enter the debug scope at the closing brace of the block that \p Loc
+  /// ends. Code emitted when falling off the end of a block runs there.
+  void enterBlockEndDebugScope(CleanupLocation Loc);
+
   InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
@@ -1027,6 +1046,22 @@ public:
   /// Generates code for a class (isolated-)deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
+
+  /// The `@_tailAllocated` element types of \p classType's class, substituted
+  /// for it, as formal types and lowered with the owner's generic abstraction
+  /// (which the SIL verifier requires of `alloc_ref` and `dealloc_ref`).
+  /// Returns false if the class has none or this isn't Embedded Swift.
+  bool getTailAllocatedElementTypes(CanType classType,
+                                    SmallVectorImpl<CanType> &formalTypes,
+                                    SmallVectorImpl<SILType> &loweredTypes);
+
+  /// The tail elements of a `@_tailAllocated` class instance, for its
+  /// `dealloc_ref`: the attribute's element types and the counts read from its
+  /// counts property. Empty if the class has none or this isn't Embedded
+  /// Swift.
+  void emitTailAllocatedElements(SILLocation loc, SILValue selfValue,
+                                 SmallVectorImpl<SILType> &tailTypes,
+                                 SmallVectorImpl<SILValue> &tailCounts);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
@@ -1885,6 +1920,9 @@ public:
   void emitExprInto(Expr *E, Initialization *I,
                     std::optional<SILLocation> L = std::nullopt);
 
+  /// Borrow the given expression into a borrow binding's Initialization.
+  void emitBorrowInto(Expr *E, Initialization *I, SILLocation loc);
+
   /// Emit the given expression as an r-value.
   RValue emitRValue(Expr *E, SGFContext C = SGFContext());
 
@@ -2325,8 +2363,9 @@ public:
                        SILValue selfValue,
                        SILDeclRef methodConstant,
                        SubstitutionMap subMap);
-  
-  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr);
+
+  SILValue emitMetatypeOfValue(SILLocation loc, Expr *baseExpr,
+                               CanType resultType = CanType());
 
   void emitReturnExpr(SILLocation loc, Expr *ret);
 
@@ -2443,9 +2482,10 @@ public:
                             bool canUnwind, SubstitutionMap subs,
                             ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token,
-                               SILValue allocation);
+  SILValue emitEndApplyWithRethrow(SILLocation loc,
+                                   MultipleValueInstructionResult *token,
+                                   SILValue allocation,
+                                   SILType resultType);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);
@@ -2878,6 +2918,10 @@ public:
   /// Given a function representing a distributed actor factory, emits the
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
+
+  /// Emits a call to `__isRemoteActor(self)` and returns the unwrapped i1.
+  SILValue emitDistributedActorIsRemote(SILLocation Loc, SILValue selfValue,
+                                        Type selfTy);
 
   void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
                                      Type selfTy, SILBasicBlock *isRemoteBB,
@@ -3425,6 +3469,10 @@ public:
   /// marker for lifetime resolution so that it can reason about the formal
   /// scopes of variables.
   void enterLetBindingFormalScopeCleanup(VarDecl *vd);
+
+  /// Are we using the SILMoveOnlyWrappedType to check bindings that are
+  /// @noImplicitCopy?
+  bool usingWrapperTypeImplicitCopyEnforcement();
 };
 
 

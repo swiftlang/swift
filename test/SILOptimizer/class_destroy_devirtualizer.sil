@@ -42,6 +42,49 @@ bb0:
   return %r
 }
 
+// A class reference which is casted to a `Builtin.BridgeObject` before it's destroyed.
+// This is what an array buffer looks like after stack promotion.
+// CHECK-LABEL: sil [ossa] @devirtualize_bridge_object :
+// CHECK:         [[A:%[0-9]+]] = alloc_ref
+// CHECK:         [[E:%.*]] = end_cow_mutation
+// CHECK-NEXT:    [[C:%.*]] = unchecked_ref_cast [[E]] to $B
+// CHECK-NEXT:    [[BD:%.*]] = begin_dealloc_ref [[C]] of [[A]]
+// CHECK-NOT:     destroy_value
+// CHECK:         [[D:%[0-9]+]] = function_ref @$s4test1BCfD
+// CHECK-NEXT:    apply [[D]]([[BD]])
+// CHECK-NEXT:    dealloc_stack_ref [[A]]
+// CHECK:       } // end sil function 'devirtualize_bridge_object'
+sil [ossa] @devirtualize_bridge_object : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  %2 = unchecked_ref_cast %1 to $Builtin.BridgeObject
+  %3 = end_cow_mutation %2
+  destroy_value %3
+  dealloc_stack_ref %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @devirtualize_native_object :
+// CHECK:         [[A:%[0-9]+]] = alloc_ref
+// CHECK:         [[N:%.*]] = unchecked_ref_cast [[A]] to $Builtin.NativeObject
+// CHECK-NEXT:    [[C:%.*]] = unchecked_ref_cast [[N]] to $B
+// CHECK-NEXT:    [[BD:%.*]] = begin_dealloc_ref [[C]] of [[A]]
+// CHECK-NOT:     destroy_value
+// CHECK:         [[D:%[0-9]+]] = function_ref @$s4test1BCfD
+// CHECK-NEXT:    apply [[D]]([[BD]])
+// CHECK-NEXT:    dealloc_stack_ref [[A]]
+// CHECK:       } // end sil function 'devirtualize_native_object'
+sil [ossa] @devirtualize_native_object : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_ref [stack] $B
+  %2 = unchecked_ref_cast %1 to $Builtin.NativeObject
+  destroy_value %2
+  dealloc_stack_ref %1
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [ossa] @dont_devirtualize_heap_allocated :
 // CHECK:         alloc_ref
 // CHECK-NEXT:    destroy_value

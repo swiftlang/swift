@@ -7,7 +7,7 @@
 // RUN:   %s -o %t/deps.json -swift-version 5 -cache-compile-job -cas-path %t/cas -plugin-path %swift-plugin-dir
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json MyApp casFSRootID > %t/fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/fs.casid | %FileCheck %s --check-prefix=FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/fs.casid | %FileCheck %s --check-prefix=FS
 
 // FS: SwiftMacros
 

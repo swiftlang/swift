@@ -17,10 +17,17 @@
 // REQUIRES: executable_test
 
 #include <assert.h>
+#include <type_traits>
 #include "structs.h"
 
 int main() {
   using namespace Structs;
+
+  static_assert(std::is_trivial<FrozenStruct>::value, "");
+  static_assert(!std::is_trivially_copyable<FirstSmallStruct>::value, "");
+  static_assert(!std::is_trivially_destructible<FirstSmallStruct>::value, "");
+  static_assert(!std::is_trivially_copyable<FrozenWithResilientField>::value, "");
+  static_assert(!std::is_trivially_destructible<FrozenWithResilientField>::value, "");
 
   auto largeStruct = createLargeStruct(11);
   assert(largeStruct.getX1() == 11);

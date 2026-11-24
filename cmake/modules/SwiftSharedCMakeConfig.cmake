@@ -1,5 +1,6 @@
 include(CMakeParseArguments)
 
+include(CheckCCompilerFlag)
 include(CheckCXXCompilerFlag)
 
 macro(swift_common_standalone_build_config_llvm product)
@@ -283,6 +284,7 @@ macro(swift_common_cxx_warnings)
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=switch>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unused>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=uninitialized>
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=conditional-uninitialized>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unreachable-code>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=implicit-fallthrough>)
     endif()
@@ -302,10 +304,25 @@ macro(swift_common_cxx_warnings)
       $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=c++98-compat-extra-semi>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=gnu>
 
-      $<$<COMPILE_LANGUAGE:С,CXX>:-Wimplicit-fallthrough>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Wimplicit-fallthrough>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Wunreachable-code>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Woverloaded-virtual>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-nested-anon-types>)
+  endif()
+
+  # Checked separately: GCC rejects this unknown option and older Clang warns
+  # about it on every file.
+  check_c_compiler_flag("-Wlifetime-safety-permissive"
+    C_SUPPORTS_LIFETIME_SAFETY_PERMISSIVE_FLAG)
+  if(C_SUPPORTS_LIFETIME_SAFETY_PERMISSIVE_FLAG)
+    add_compile_options(
+      $<$<COMPILE_LANGUAGE:C>:-Wlifetime-safety-permissive>)
+  endif()
+  check_cxx_compiler_flag("-Wlifetime-safety-permissive"
+    CXX_SUPPORTS_LIFETIME_SAFETY_PERMISSIVE_FLAG)
+  if(CXX_SUPPORTS_LIFETIME_SAFETY_PERMISSIVE_FLAG)
+    add_compile_options(
+      $<$<COMPILE_LANGUAGE:CXX>:-Wlifetime-safety-permissive>)
   endif()
 
   # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all

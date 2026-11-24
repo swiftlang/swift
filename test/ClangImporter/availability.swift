@@ -69,6 +69,22 @@ func test_unavailable_accessors(_ obj: UnavailableAccessors,
   _ = subReadOnly[0] // expected-error {{getter for 'subscript(_:)' is unavailable}}
 }
 
+func test_unavailable_mirrored_accessors(_ obj: UnavailableAccessorsAdopter) {
+  _ = obj.getterUnavailableMirrored // expected-error {{getter for 'getterUnavailableMirrored' is unavailable}}
+  obj.getterUnavailableMirrored = 0
+
+  _ = obj.setterUnavailableMirrored
+  obj.setterUnavailableMirrored = 0 // expected-error {{setter for 'setterUnavailableMirrored' is unavailable}}
+}
+
+func test_unavailable_import_as_member_accessors(_ s: inout ImportedAccessors) {
+  _ = s.getterFirst
+  s.getterFirst = 0 // expected-error {{setter for 'getterFirst' is unavailable}}
+
+  _ = s.setterFirst // expected-error {{getter for 'setterFirst' is unavailable}}
+  s.setterFirst = 0
+}
+
 func test_deprecated(_ s:UnsafeMutablePointer<CChar>, _ obj: AccessorDeprecations,
     _ sub: DeprecatedSubscript,
     _ subGetter: DeprecatedGetterSubscript,

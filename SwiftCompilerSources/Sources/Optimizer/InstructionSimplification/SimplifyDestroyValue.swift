@@ -32,9 +32,18 @@ extension DestroyValueInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
 
-    if let forwardingInst = destroyedValue.asOptimizableForwardingInstruction {
+    if let forwardingInst = destroyedValue.asOptimizableForwardingInstruction,
+       // The transformation handles all destroys of `forwardingInst` at once. Only do it for the
+       // first destroy. Otherwise we would get quadratic complexity if `forwardingInst` has
+       // many destroys, because `tryRemoveForwardingInstruction` iterates over all uses.
+       isFirstDestroy(of: forwardingInst)
+    {
       tryRemoveForwardingInstruction(forwardingInst, context)
     }
+  }
+
+  private func isFirstDestroy(of value: Value) -> Bool {
+    return value.uses.first(where: { $0.instruction is DestroyValueInst })?.instruction == self
   }
 
   /// Moves a `destroy_value` of a phi argument to the phi's predecessor blocks.
@@ -176,13 +185,15 @@ private extension Value {
     // an infinite simplification loop in MandatoryPerformanceOptimizations because there we "split" such
     // destroys again when de-virtualizing deinits of non-copyable types.
     //
+    case let cast as UnconditionalCheckedCastInst:
+      return cast.preservesReferenceCounts ? cast : nil
+
     case is TupleInst,
          is RefToBridgeObjectInst,
          is ConvertFunctionInst,
          is ThinToThickFunctionInst,
          is UpcastInst,
          is UncheckedRefCastInst,
-         is UnconditionalCheckedCastInst,
          is BridgeObjectToRefInst,
          is InitExistentialRefInst,
          is OpenExistentialRefInst:

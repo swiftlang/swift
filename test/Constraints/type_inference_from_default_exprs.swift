@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -parse-as-library -emit-library -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/%target-library-name(InferViaDefaults)
-// RUN: %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s
+// RUN: %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s -swift-version future -verify-additional-prefix future- %}
 
 import InferViaDefaults
 
@@ -219,6 +220,9 @@ class Storage { // expected-note {{class 'Storage' is not '@usableFromInline' or
 extension Storage {
   struct Test {
     static let test = CustomStorage<String>("") // triggers default type request
+    // expected-error@-1 {{static property 'test' is not concurrency-safe because non-'Sendable' type 'CustomStorage<String>' may have shared mutable state}}
+    // expected-note@-2 {{add '@MainActor' to make static property 'test' part of global actor 'MainActor'}}
+    // expected-note@-3 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
   }
 }
 
@@ -237,6 +241,7 @@ class BaseStorage<T> : Storage, StorageType {
 }
 
 final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inherited init
+  // expected-note@-1 {{generic class 'CustomStorage' does not conform to the 'Sendable' protocol}}
 }
 
 // https://github.com/apple/swift/issues/61061
@@ -278,8 +283,12 @@ func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x 
 // https://github.com/swiftlang/swift/issues/72199
 enum S72199_1 {
   func testS72199_1<T>(_: T = 42, _: [T]) {}
-  // expected-warning@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1; this will be an error in a future Swift language mode}}
+  // expected-swift6-warning@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
 }
+
+func testS72199<T>(_: T = 42, _: [T]) {}
+// expected-error@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1}}
 
 func testS72199_2<T: P>(x: T.X, y: T = S()) { } // Ok
 func testS72199_3<each T: P>(xs: repeat (each T).X, ys: (repeat each T) = (S(), S())) {} // Ok

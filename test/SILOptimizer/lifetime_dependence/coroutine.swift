@@ -80,7 +80,7 @@ func use(_ o : borrowing View) {}
 //
 // CHECK-LABEL: sil hidden @$s9coroutine20testDoubleNestedRead2ncyAA11NCContainerVn_tF : $@convention(thin) (@owned NCContainer) -> () {
 // CHECK: bb0(%0 : $NCContainer):
-// CHECK:   [[NC:%.*]] = alloc_stack [lexical] [var_decl] $NCContainer, var, name "nc", type $NCContainer
+// CHECK:   [[NC:%.*]] = alloc_stack [lexical] [var_decl] $NCContainer, var, name "nc", argno 1
 // CHECK:   store %0 to [[NC]]
 //       let wrapper = nc.wrapper
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[NC]]

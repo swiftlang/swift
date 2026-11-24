@@ -16,7 +16,7 @@ public func myFunc(_ ptr: UnsafeMutableRawPointer, _ size: CInt) {
 @__swiftmacro_4test6myFunc15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-@_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
+@_alwaysEmitIntoClient @inline(always) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc(_ ptr: inout MutableRawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
     let _ptrPtr = ptr.withUnsafeMutableBytes {

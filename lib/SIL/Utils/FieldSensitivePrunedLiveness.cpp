@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILBasicBlock.h"
+#include "llvm/ADT/SmallSet.h"
 #define DEBUG_TYPE "sil-move-only-checker"
 
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
@@ -43,7 +45,7 @@ static llvm::cl::opt<bool> EmitLogging(
 // We can only analyze components of structs whose storage is fully accessible
 // from Swift.
 static StructDecl *getFullyReferenceableStruct(SILType ktypeTy) {
-  auto structDecl = ktypeTy.getStructOrBoundGenericStruct();
+  auto structDecl = ktypeTy.getStructDecl();
   if (!structDecl || structDecl->hasUnreferenceableStorage())
     return nullptr;
   return structDecl;
@@ -102,7 +104,7 @@ uint32_t TypeConverter::getTypeSubElementCount(SILType type,
     return number;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     unsigned numElements = 0;
     for (auto *eltDecl : enumDecl->getAllElements()) {
       if (!eltDecl->hasAssociatedValues())
@@ -508,7 +510,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
                         [&](unsigned index) { return bv[index]; });
   };
 
-  if (auto *structDecl = type.getStructOrBoundGenericStruct()) {
+  if (auto *structDecl = type.getStructDecl()) {
     unsigned start = startEltOffset;
     for (auto *varDecl : structDecl->getStoredProperties()) {
       auto nextType = type.getFieldType(varDecl, fn);
@@ -536,7 +538,7 @@ void TypeTreeLeafTypeRange::constructFilteredProjections(
     return;
   }
 
-  if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+  if (auto *enumDecl = type.getEnumDecl()) {
     struct ElementRecord {
       EnumElementDecl *element;
       unsigned start;
@@ -690,8 +692,10 @@ void TypeTreeLeafTypeRange::get(
     return;
   }
 
-  // An `inject_enum_addr` only initializes the enum tag.
-  if (isa<InjectEnumAddrInst>(op->getUser())) {
+  // An `inject_enum_addr` of a case with a payload only initializes the enum
+  // tag: the payload was already initialized via `init_enum_data_addr`.
+  if (auto *ieai = dyn_cast<InjectEnumAddrInst>(op->getUser());
+      ieai && ieai->getElement()->hasAssociatedValues()) {
     // Subtract the deinit bit, if any: the discriminator bit is before it:
     //
     // [ case1 bits ..., case2 bits, ..., discriminator bit, deinit bit ]
@@ -1231,6 +1235,7 @@ static StringRef getStringRef(FieldSensitivePrunedLiveBlocks::IsLive isLive) {
   case FieldSensitivePrunedLiveBlocks::LiveOut:
     return "LiveOut";
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename LivenessWithDefs>
@@ -1384,8 +1389,31 @@ static FunctionTest FieldSensitiveMultiDefUseLiveRangeTest(
 bool FieldSensitiveMultiDefPrunedLiveRange::isUserBeforeDef(
     SILInstruction *user, unsigned element) const {
   auto *block = user->getParent();
-  if (!isDefBlock(block, element))
-    return false;
+  if (!isDefBlock(block, element)) {
+    // Check if any predecessor blocks are a def block for this element.
+    llvm::SmallSet<SILBasicBlock*, 4> seenPreds;
+    SmallVector<SILBasicBlock *, 4> workBlocks;
+    workBlocks.push_back(block);
+    
+    while (!workBlocks.empty()) {
+      auto workBlock = workBlocks.pop_back_val();
+      for (auto pred : workBlock->getPredecessorBlocks()) {
+        if (seenPreds.contains(pred)) {
+          continue;
+        }
+        
+        if (isDefBlock(pred, element)) {
+          return false;
+        }
+        
+        seenPreds.insert(pred);
+        workBlocks.push_back(pred);
+      }
+    }
+    // If the element has no defs before this block, then the use is definitely
+    // before any defs.
+    return true;
+  }
 
   if (llvm::any_of(block->getArguments(), [this, element](SILArgument *arg) {
         return isDef(arg, element);

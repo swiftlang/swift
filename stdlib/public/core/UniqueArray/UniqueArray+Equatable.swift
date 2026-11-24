@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   @export(implementation)
   public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
@@ -18,9 +17,7 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray: Equatable where Element: Equatable & ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public static func ==(
     left: borrowing Self,

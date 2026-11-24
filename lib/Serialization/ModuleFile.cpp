@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ModuleFile.h"
+#include "swift/AST/AbstractLayout.h"
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "ModuleFileCoreTableInfo.h"
@@ -271,10 +272,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
-
-  // Propagate any deserialized hidden-type layouts onto the AST.
-  for (auto &entry : Core->HiddenTypeLayouts)
-    M->recordHiddenTypeLayout(entry.getKey(), entry.getValue());
 
   // The real (on-disk) name of the module should be checked here as that's the
   // actually loaded module. In case module aliasing is used when building the main

@@ -22,7 +22,7 @@ using namespace swift::diag;
 using namespace swift::unittests;
 
 TEST_F(LocalizationTest, TestStringsSerialization) {
-  StringsLocalizationProducer strings(DiagsPath);
+  StringsLocalizationProducer strings(getDiagsBuffer());
 
   auto dbFile = createTemporaryFile("en", "db");
 
@@ -54,7 +54,7 @@ TEST_F(LocalizationTest, TestSerializationOfEmptyFile) {
   SerializedLocalizationWriter writer;
   ASSERT_FALSE(writer.emit(dbFile));
 
-  StringsLocalizationProducer strings(DiagsPath);
+  StringsLocalizationProducer strings(getDiagsBuffer());
 
   // Reading of the empty `db` file should always return default message.
   {
@@ -80,7 +80,7 @@ TEST_F(LocalizationTest, TestSerializationWithGaps) {
     includedMessages.flip(position);
   }
 
-  StringsLocalizationProducer strings(DiagsPath);
+  StringsLocalizationProducer strings(getDiagsBuffer());
   auto dbFile = createTemporaryFile("en", "db");
 
   {

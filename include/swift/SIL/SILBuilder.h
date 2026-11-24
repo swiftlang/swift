@@ -379,7 +379,7 @@ public:
       SILFunctionTypeIsolation resultIsolation,
       PartialApplyInst::OnStackKind onStack =
           PartialApplyInst::OnStackKind::NotOnStack,
-      bool isCalledOnce = false);
+      std::optional<ExecutionSemantics> executionSemantics = std::nullopt);
 
   //===--------------------------------------------------------------------===//
   // CFG Manipulation
@@ -592,7 +592,7 @@ public:
       ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
       SILFunctionTypeIsolation ResultIsolation =
           SILFunctionTypeIsolation::forUnknown(),
-      bool IsCalledOnce = false,
+      std::optional<ExecutionSemantics> Semantics = std::nullopt,
       PartialApplyInst::OnStackKind OnStack =
           PartialApplyInst::OnStackKind::NotOnStack,
       StackAllocationIsNested_t IsNested = StackAllocationIsNested,
@@ -610,8 +610,8 @@ public:
            "Args");
     return insert(PartialApplyInst::create(
         getSILDebugLocation(Loc), Fn, Args, Subs, CalleeConvention,
-        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested,
-        IsCalledOnce, ArgLocs));
+        ResultIsolation, *F, SpecializationInfo, OnStack, IsNested, Semantics,
+        ArgLocs));
   }
 
   BeginApplyInst *createBeginApply(
@@ -619,12 +619,13 @@ public:
       ArrayRef<SILValue> args, ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
       std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
-      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt) {
+      std::optional<ArrayRef<SILLocation>> argLocs = std::nullopt,
+      bool isUnresolved = false) {
     ASSERT((!argLocs || argLocs->empty() || argLocs->size() == args.size()) &&
            "createBeginApply argLocs, when supplied, must be parallel to args");
     return insert(BeginApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, options, C.silConv, *F,
-        specializationInfo, isolationCrossing, argLocs));
+        specializationInfo, isolationCrossing, argLocs, isUnresolved));
   }
 
   AbortApplyInst *createAbortApply(SILLocation loc, SILValue beginApply) {
@@ -868,11 +869,11 @@ public:
     lowering.emitLoweredStore(*this, Loc, Value, Addr, Qual, ExpansionKind);
   }
 
-  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV) {
+  LoadBorrowInst *createLoadBorrow(SILLocation Loc, SILValue LV, SILValue valueHint = SILValue()) {
     ASSERT(isLoadableOrOpaque(LV->getType()) &&
            !LV->getType().isTrivial(getFunction()));
     return insert(new (getModule())
-                      LoadBorrowInst(getSILDebugLocation(Loc), LV));
+                      LoadBorrowInst(getSILDebugLocation(Loc), LV, valueHint));
   }
 
   BeginBorrowInst *createBeginBorrow(
@@ -982,10 +983,11 @@ public:
                                      SILAccessKind accessKind,
                                      SILAccessEnforcement enforcement,
                                      bool noNestedConflict,
-                                     bool fromBuiltin) {
+                                     bool fromBuiltin,
+                                     bool isUnresolved = false) {
     return insert(new (getModule()) BeginAccessInst(
         getSILDebugLocation(loc), address, accessKind, enforcement,
-        noNestedConflict, fromBuiltin));
+        noNestedConflict, fromBuiltin, isUnresolved));
   }
 
   EndAccessInst *createEndAccess(SILLocation loc, SILValue address,
@@ -1102,6 +1104,13 @@ public:
       SILLocation Loc, ArrayRef<SILValue> operands, SILDebugVariable Var,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
+
+  /// Create a debug_value for an undef empty tuple. Used when the type of the
+  /// variable cannot be represented.
+  DebugValueInst *createVoidVariableDebugValue(
+      SILLocation Loc, SILDebugVariable Var,
+      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
+      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -1246,20 +1255,21 @@ public:
                                                      base, inToken, tokenTy));
   }
 
-  ConvertFunctionInst *createConvertFunction(SILLocation Loc, SILValue Op,
-                                             SILType Ty,
-                                             bool WithoutActuallyEscaping) {
-    return createConvertFunction(Loc, Op, Ty, WithoutActuallyEscaping,
+  ConvertFunctionInst *
+  createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
+                        ConvertFunctionInst::Kind ConversionKind =
+                            ConvertFunctionInst::Kind::Ordinary) {
+    return createConvertFunction(Loc, Op, Ty, ConversionKind,
                                  Op->getOwnershipKind());
   }
 
   ConvertFunctionInst *
   createConvertFunction(SILLocation Loc, SILValue Op, SILType Ty,
-                        bool WithoutActuallyEscaping,
+                        ConvertFunctionInst::Kind ConversionKind,
                         ValueOwnershipKind forwardingOwnershipKind) {
-    return insert(ConvertFunctionInst::create(
-        getSILDebugLocation(Loc), Op, Ty, getModule(), F,
-        WithoutActuallyEscaping, forwardingOwnershipKind));
+    return insert(ConvertFunctionInst::create(getSILDebugLocation(Loc), Op, Ty,
+                                              getModule(), F, ConversionKind,
+                                              forwardingOwnershipKind));
   }
 
   ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,
@@ -1474,7 +1484,7 @@ public:
     ASSERT(!operand->getType().isTrivial(getFunction()) &&
            "Should not be passing trivial values to this api. Use instead "
            "emitCopyValueOperation");
-    ASSERT((getModule().getStage() == SILStage::Raw
+    ASSERT((getFunction().getFunctionStage() == SILStage::Raw
             || !operand->getType().isMoveOnly())
            && "should not be copying move-only values in canonical SIL");
     return insert(new (getModule())
@@ -1580,6 +1590,11 @@ public:
         getSILDebugLocation(loc), src));
   }
 
+  ValueToAddressInst *createValueToAddress(SILLocation loc, SILValue src) {
+    return insert(new (getModule())
+                      ValueToAddressInst(getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
@@ -1599,6 +1614,13 @@ public:
                                                    SILValue Operand) {
     return insert(new (getModule()) UncheckedOwnershipInst(
         getSILDebugLocation(Loc), Operand, Operand->getOwnershipKind()));
+  }
+
+  UncheckedOwnershipInst *createUncheckedOwnership(SILLocation Loc,
+                                  SILValue Operand,
+                                  ValueOwnershipKind forwardingOwnershipKind) {
+    return insert(new (getModule()) UncheckedOwnershipInst(
+        getSILDebugLocation(Loc), Operand, forwardingOwnershipKind));
   }
 
   UnconditionalCheckedCastInst *
@@ -2110,7 +2132,7 @@ public:
     SILType opTy = operand->getType();
     if (opTy.is<TupleType>())
       return createDestructureTuple(loc, operand);
-    if (opTy.getStructOrBoundGenericStruct())
+    if (opTy.getStructDecl())
       return createDestructureStruct(loc, operand);
     llvm_unreachable("Can not emit a destructure for this type of operand.");
   }
@@ -2474,6 +2496,12 @@ public:
                       ExtendLifetimeInst(getSILDebugLocation(Loc), Operand));
   }
 
+  DiagnoseInst *createDiagnose(SILLocation Loc, SILValue Operand,
+                               DiagnoseInst::DiagnoseKind Kind) {
+    return insert(new (getModule()) DiagnoseInst(getSILDebugLocation(Loc),
+                                                 Operand, Kind));
+  }
+
   UncheckedOwnershipConversionInst *
   createUncheckedOwnershipConversion(SILLocation Loc, SILValue Operand,
                                      ValueOwnershipKind Kind) {
@@ -2594,9 +2622,13 @@ public:
     return insert(new (getModule())
                     DeallocStackRefInst(getSILDebugLocation(Loc), operand));
   }
-  DeallocRefInst *createDeallocRef(SILLocation Loc, SILValue operand) {
-    return insert(new (getModule()) DeallocRefInst(
-        getSILDebugLocation(Loc), operand));
+  DeallocRefInst *
+  createDeallocRef(SILLocation Loc, SILValue operand,
+                   ArrayRef<SILType> ElementTypes = {},
+                   ArrayRef<SILValue> ElementCountOperands = {}) {
+    return insert(DeallocRefInst::create(getSILDebugLocation(Loc),
+                                         getFunction(), operand, ElementTypes,
+                                         ElementCountOperands));
   }
   DeallocPartialRefInst *createDeallocPartialRef(SILLocation Loc,
                                                  SILValue operand,
@@ -3434,6 +3466,10 @@ private:
 /// SIL instructions.
 class SILBuilderWithScope : public SILBuilder {
   void inheritScopeFrom(SILInstruction *I) {
+    // Instructions in a debug reconstruction block are scaffolding for a DWARF
+    // expression rather than real code, so they carry no debug scope.
+    if (I->getParent() && I->getParent()->isDebugReconstructionBlock())
+      return;
     ASSERT(I->getDebugScope() && "instruction has no debug scope");
     SILBasicBlock::iterator II(*I);
     auto End = I->getParent()->end();

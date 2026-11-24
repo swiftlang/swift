@@ -203,7 +203,7 @@ AbstractionPattern AbstractionPattern::getCXXFunctionalConstructor(
       clangImporter->extractCXXFunctionType(functionalTypeDecl);
   auto ctorClangType =
       clangCtx
-          .getFunctionType(clangCtx.getRecordType(functionalTypeDecl),
+          .getFunctionType(clangCtx.getCanonicalTagType(functionalTypeDecl),
                            {clang::QualType(clangFunctionType, 0)},
                            clang::FunctionProtoType::ExtProtoInfo())
           .getTypePtr();
@@ -263,6 +263,24 @@ bool AbstractionPattern::isConcreteType() const {
           GenericSig->isConcreteType(getType()));
 }
 
+// COM-constrained parameters need their value witnesses even with an AnyObject
+// constraint. A concrete superclass establishes the reference representation;
+// an opened existential already has its interface pointer representation.
+static bool hasOpaqueCOMRepresentation(CanType type,
+                                       CanGenericSignature signature) {
+  if (auto element = dyn_cast<PackElementType>(type))
+    type = element.getPackType();
+  if (auto archetype = dyn_cast<ArchetypeType>(type))
+    return !isa<ExistentialArchetypeType>(archetype) &&
+           !archetype->getSuperclass() &&
+           archetype->hasCOMInterfaceConstraint();
+  return type->isTypeParameter() && signature &&
+         !signature->getSuperclassBound(type) &&
+         llvm::any_of(
+             signature->getRequiredProtocols(type),
+             [](ProtocolDecl *protocol) { return protocol->isCOMInterface(); });
+}
+
 bool AbstractionPattern::requiresClass() const {
   switch (getKind()) {
   case Kind::Opaque:
@@ -271,6 +289,8 @@ bool AbstractionPattern::requiresClass() const {
   case Kind::Discard:
   case Kind::ClangType: {
     auto type = getType();
+    if (hasOpaqueCOMRepresentation(type, getGenericSignatureOrNull()))
+      return false;
     if (auto element = dyn_cast<PackElementType>(type))
       type = element.getPackType();
     if (auto archetype = dyn_cast<ArchetypeType>(type))
@@ -287,7 +307,7 @@ bool AbstractionPattern::requiresClass() const {
     }
     return false;
   }
-    
+
   default:
     return false;
   }
@@ -301,6 +321,8 @@ LayoutConstraint AbstractionPattern::getLayoutConstraint() const {
   case Kind::Discard:
   case Kind::ClangType: {
     auto type = getType();
+    if (hasOpaqueCOMRepresentation(type, getGenericSignatureOrNull()))
+      return LayoutConstraint();
     if (auto archetype = dyn_cast<ArchetypeType>(type)) {
       return archetype->getLayoutConstraint();
     } else if (isa<DependentMemberType>(type) ||
@@ -400,6 +422,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
   case Kind::Invalid:
     llvm_unreachable("asking invalid abstraction pattern");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::isNoncopyable(CanType substTy) const {
@@ -1564,6 +1587,31 @@ unsigned AbstractionPattern::getFlattenedValueCount() const {
 }
 
 AbstractionPattern
+AbstractionPattern::getFunctionYieldType(unsigned index) const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return *this;
+  case Kind::Type: {
+    if (isTypeParameterOrOpaqueArchetype())
+      return getOpaque();
+
+    auto yieldType =
+        cast<AnyFunctionType>(getType()).getYields()[index].getType();
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignatureForFunctionComponent(),
+                              yieldType->getCanonicalType());
+  }
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return getOpaque();
+  default:
+    llvm_unreachable("does not have function yields");
+  }
+
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
   case Kind::Opaque:
@@ -1716,6 +1764,10 @@ ParameterTypeFlags
 AbstractionPattern::getFunctionParamFlags(unsigned index) const {
   return cast<AnyFunctionType>(getType()).getParams()[index]
            .getParameterFlags();
+}
+
+YieldTypeFlags AbstractionPattern::getFunctionYieldFlags(unsigned index) const {
+  return cast<AnyFunctionType>(getType()).getYields()[index].getFlags();
 }
 
 bool
@@ -2309,6 +2361,7 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2351,6 +2404,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2386,6 +2440,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::arePackElementsPassedIndirectly(TypeConverter &TC) const {
@@ -2464,6 +2519,7 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && CXXMethod == other.CXXMethod
       && OtherData == other.OtherData;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace {
@@ -2669,8 +2725,8 @@ public:
       if (auto dynB = origInstance->getAs<DynamicSelfType>()) {
         origInstance = dynB->getSelfType();
       }
-      if (auto aClass = substInstance->getClassOrBoundGenericClass()) {
-        if (auto bClass = origInstance->getClassOrBoundGenericClass()) {
+      if (auto aClass = substInstance->getClassDecl()) {
+        if (auto bClass = origInstance->getClassDecl()) {
           if (aClass != bClass) {
             return bClass;
           }
@@ -2778,11 +2834,6 @@ public:
                                         newReplacements,
                                         ArrayRef<ProtocolConformanceRef>{});
     return bga->getWithSubstitutions(newSubs);
-  }
-
-  CanType visitBoundGenericType(CanBoundGenericType bgt,
-                                AbstractionPattern pattern) {
-    return handleGenericNominalType(pattern, bgt);
   }
 
   CanType visitPackType(CanPackType pack, AbstractionPattern pattern) {
@@ -2971,7 +3022,7 @@ public:
                                          AbstractionPattern yieldPattern) {
     SmallVector<FunctionType::Param, 4> newParams;
     auto addParam = [&](ParameterTypeFlags oldFlags, CanType newType) {
-      newParams.push_back(FunctionType::Param(
+      newParams.push_back(FunctionType::Param::bodyAccess(
           newType, /*label*/ Identifier(), oldFlags.withVariadic(false),
           /*internal label*/ Identifier()));
     };

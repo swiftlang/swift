@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Adds an element to the end of the array.
   ///
@@ -21,7 +20,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Parameter item: The element to append to the collection.
   ///
   /// - Complexity: O(1) as amortized over many invocations on the same array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(_ item: consuming Element) {
     _ensureFreeCapacity(1)
@@ -29,7 +27,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Append a given number of items to the end of this array by populating
   /// an output span.
@@ -51,7 +48,6 @@ extension UniqueArray where Element: ~Copyable {
   ///       output span before it returns (or before it throws an error).
   ///
   /// - Complexity: O(`uninitializedCount`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append<E: Error>(
     addingCount newItemCount: Int,
@@ -64,7 +60,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Moves the elements of a buffer to the end of this array, leaving the
   /// buffer uninitialized.
@@ -78,7 +73,6 @@ extension UniqueArray where Element: ~Copyable {
   ///        the array.
   ///
   /// - Complexity: O(`count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(
     moving items: UnsafeMutableBufferPointer<Element>
@@ -98,7 +92,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    - items: An output span whose contents need to be appended to this array.
   ///
   /// - Complexity: O(`items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(
     moving items: inout OutputSpan<Element>
@@ -112,7 +105,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: Copyable {
   /// Copies the elements of a buffer to the end of this array.
   ///
@@ -126,7 +118,6 @@ extension UniqueArray where Element: Copyable {
   ///
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(
     copying newElements: UnsafeBufferPointer<Element>
@@ -147,7 +138,6 @@ extension UniqueArray where Element: Copyable {
   ///
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(
     copying newElements: UnsafeMutableBufferPointer<Element>
@@ -166,7 +156,6 @@ extension UniqueArray where Element: Copyable {
   ///
   /// - Complexity: O(`newElements.count`) when amortized over many
   ///     invocations on the same array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(copying newElements: Span<Element>) {
     _ensureFreeCapacity(newElements.count)
@@ -188,7 +177,6 @@ extension UniqueArray where Element: Copyable {
   ///
   /// - Complexity: O(*m*), where *m* is the length of `newElements`, when
   ///     amortized over many invocations over the same array.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func append(copying newElements: some Sequence<Element>) {
     let done: Void? = newElements.withContiguousStorageIfAvailable { buffer in

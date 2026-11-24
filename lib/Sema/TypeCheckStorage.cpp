@@ -4257,8 +4257,7 @@ std::optional<bool> HasStorageRequest::getCachedResult() const {
 
 void HasStorageRequest::cacheResult(bool hasStorage) const {
   AbstractStorageDecl *decl = std::get<0>(getStorage());
-  decl->LazySemanticInfo.HasStorageComputed = true;
-  decl->LazySemanticInfo.HasStorage = hasStorage;
+  decl->setHasStorage(hasStorage);
 
   // Add an attribute for printing, but only to VarDecls.
   if (isa<ParamDecl>(decl))

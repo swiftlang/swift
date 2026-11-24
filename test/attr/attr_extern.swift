@@ -91,6 +91,11 @@ func funcScopeC() {
 @_extern(c, "c_value")
 var nonFunc: Int = 0 // expected-error{{'@_extern' variable cannot have an initializer}}
 
+// Forward references of extern vars is fine
+_ = forwardRef
+@_extern(c, "c_value2")
+var forwardRef: Int
+
 @_extern(c, "with_body")
 func withInvalidBody() {} // expected-error {{unexpected body of function declaration}}
 
@@ -140,23 +145,23 @@ func throwsFuncC() throws // expected-error {{raising errors from C functions is
 @_extern(c)
 func genericFuncC<T>(_: T) // expected-error {{'T' cannot be represented in C}}
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_Wasm()
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_Wasm()
 
-@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}} expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an '@_silgen_name' declaration}} expected-error {{'@_extern' cannot be applied to an '@_cdecl' declaration}}
 @_cdecl("another_c_name")
 @_silgen_name("another_sil_name")
 func withAtSILGenName_CDecl_C()

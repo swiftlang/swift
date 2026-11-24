@@ -62,6 +62,7 @@ llvm::StringRef PrunedLiveBlocks::getStringRef(IsLive isLive) const {
   case LiveOut:
     return "LiveOut";
   }
+  llvm_unreachable("covered switch");
 }
 
 void PrunedLiveBlocks::print(llvm::raw_ostream &OS) const {
@@ -208,6 +209,7 @@ branchMeet(PrunedLiveness::LifetimeEnding const lhs,
     case PrunedLiveness::LifetimeEnding::Value::NonUse:
       return NonUse;
     }
+    llvm_unreachable("covered switch");
   };
   auto toRegular =
       [](BranchLifetimeEnding const ending) -> PrunedLiveness::LifetimeEnding {
@@ -219,6 +221,7 @@ branchMeet(PrunedLiveness::LifetimeEnding const lhs,
     case NonUse:
       return PrunedLiveness::LifetimeEnding::Value::NonUse;
     }
+    llvm_unreachable("covered switch");
   };
   return toRegular(std::min(toBranch(lhs), toBranch(rhs)));
 }
@@ -308,6 +311,8 @@ AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
   SmallVector<Operand *, 8> uses;
   auto useKind = InteriorPointerOperand(operand).findTransitiveUses(&uses);
   for (auto *use : uses) {
+    if (use->getOperandOwnership() == OperandOwnership::DebugUse)
+      continue;
     updateForUse(use->getUser(), /*lifetimeEnding*/ false);
   }
   if (uses.empty()) {
@@ -351,6 +356,10 @@ LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
   for (Operand *use : value->getUses()) {
     switch (use->getOperandOwnership()) {
     case OperandOwnership::NonUse:
+      break;
+    case OperandOwnership::DebugUse:
+      // A debug_value is allowed to be outside the lifetime of its operand,
+      // don't extend liveness for it.
       break;
     case OperandOwnership::Borrow:
       summary.meet(updateForBorrowingOperand(use));

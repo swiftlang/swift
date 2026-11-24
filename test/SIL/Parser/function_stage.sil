@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt %s -sil-verify-all | %FileCheck %s
+
+// A function may be ahead of the module's stage floor. Check that the stage
+// prints, parses, and round-trips, and that a function sitting at the floor
+// prints nothing extra.
+
+sil_stage raw
+
+import Builtin
+
+// A function ahead of the floor carries its stage.
+//
+// CHECK-LABEL: sil [stage=canonical] [ossa] @ahead_of_floor
+sil [stage=canonical] [ossa] @ahead_of_floor : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A function at the floor does not. `sil_stage` above already says where it is.
+//
+// CHECK-LABEL: sil [ossa] @at_floor
+// CHECK-NOT:   [stage=
+sil [ossa] @at_floor : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Writing the floor's own stage explicitly is accepted, and prints nothing,
+// because the attribute is emitted only on divergence.
+//
+// CHECK-LABEL: sil [ossa] @explicitly_at_floor
+// CHECK-NOT:   [stage=
+sil [stage=raw] [ossa] @explicitly_at_floor : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The stage is a phase and `[canonical]` is provenance. They are independent,
+// and both survive a round trip.
+//
+// CHECK-LABEL: sil [canonical] [stage=canonical] [ossa] @provenance_and_stage
+sil [canonical] [stage=canonical] [ossa] @provenance_and_stage : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}

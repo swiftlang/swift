@@ -206,11 +206,16 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // generated header would make the C++ client fail to launch when back
   // deployed.
   auto isAvailableAtDeploymentTarget = [&](Type type) {
-    auto nominal = type->getNominalOrBoundGenericNominal();
+    auto nominal = type->getNominalDecl();
     if (!nominal)
       return false;
     if (embedded)
       return true;
+    // A back-deployed type has availability going back past the deployment
+    // target, but the generated header refers to the OS's metadata for it, and
+    // that doesn't exist when the target's runtime is older.
+    if (nominal->isBackDeployedIntoClient())
+      return false;
     return AvailabilityRange::forDeploymentTarget(astContext)
         .isContainedIn(AvailabilityInference::availableRange(nominal));
   };
@@ -231,7 +236,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
   for (Type type : supportedPrimitiveTypes) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
-        type->getNominalOrBoundGenericNominal());
+        type->getNominalDecl());
 
     if (!isCForwardDefinition) {
       os << "template<>\n";

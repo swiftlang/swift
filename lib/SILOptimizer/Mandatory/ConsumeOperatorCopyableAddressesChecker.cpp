@@ -2127,6 +2127,9 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
     return MoveConstraint::forGuaranteed(!info.isConsumedInCaller());
   }
+  case AccessRepresentation::Kind::BorrowMutateAccessor:
+    // Conservatively reject for now.
+    return MoveConstraint::Illegal;
   case AccessRepresentation::Kind::Nested: {
     auto *bai = cast<BeginAccessInst>(base.getBaseAddress());
     if (bai->getAccessKind() == SILAccessKind::Init ||
@@ -2139,6 +2142,7 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     // Conservatively reject for now.
     return MoveConstraint::Illegal;
   }
+  llvm_unreachable("covered switch");
 }
 
 // Returns true if we emitted a diagnostic and handled the single block
@@ -2571,7 +2575,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    assert(fn->getModule().getStage() == SILStage::Raw &&
+    assert(fn->getModule().getStageFloor() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
     llvm::SmallSetVector<SILValue, 32> addressesToCheck;

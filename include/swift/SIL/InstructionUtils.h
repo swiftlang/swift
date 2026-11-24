@@ -145,6 +145,13 @@ bool isMoveOnlyWrapperUse(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool onlyAffectsRefCount(SILInstruction *user);
 
+/// Prior to ClosureLifetimeFixup, a non-escaping closure is an escaping
+/// partial_apply converted by convert_escape_to_noescape [not_guaranteed]. If
+/// ClosureLifetimeFixup will promote \p pai to a partial_apply [on_stack],
+/// return that conversion. Otherwise, return nullptr.
+ConvertEscapeToNoEscapeInst *
+getNonEscapingClosureConversion(PartialApplyInst *pai);
+
 /// Returns true if the given user instruction checks the ref count of a
 /// pointer.
 bool mayCheckRefCount(SILInstruction *User);
@@ -177,6 +184,32 @@ RuntimeEffect getRuntimeEffect(SILInstruction *inst, SILType &impactType);
 /// If V is a function closure, return the reaching set of partial_apply's.
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);
+
+/// Return true if this function is known to be non-escaping.
+///
+/// This must only return true if the closure was also deemed non-escaping in
+/// Sema, or if MandatoryAllocBoxToStack proved that the closure does not escape
+/// when it promoted a box that the closure captures.
+///
+/// This must always return true for any closure with @inout_aliasable parameter
+/// conventions, because passes like AccessEnforcementSelection assume that
+/// convention only applies to non-escaping closures.
+///
+/// This may conservatively return false for any non-escaping closures that
+/// don't happen to use @inout_aliasable.
+bool isNonEscapingClosure(CanSILFunctionType funcTy);
+
+/// Like findClosuresForFunctionValue, but only return the closures that are
+/// non-escaping, either because \p V has a @noescape function type, or because
+/// the closure has an @inout_aliasable capture (isNonEscapingClosure). The
+/// closure stored in an escaping block can't be found, so none is returned for
+/// it. An escaping closure is only returned if its function is a specialization
+/// created by AllocBoxToStack, because it was formed from a promoted box. An
+/// invalid escaping capture of an inout parameter is not returned.
+///
+/// \p V may be a function type or an Optional function type.
+void findNonEscapingClosuresForFunctionValue(
+    SILValue V, TinyPtrVector<PartialApplyInst *> &results);
 
 /// Given a polymorphic builtin \p bi that may be generic and thus have in/out
 /// params, stash all of the information needed for either specializing while

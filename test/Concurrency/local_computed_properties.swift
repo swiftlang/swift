@@ -26,9 +26,9 @@ class MainActorClass {
     _ = y
   }
 
-  // CHECK-LABEL: // getter of z #1 in MainActorClass.testComputedGetSet()
+  // CHECK-LABEL: // specialized getter of z #1 in MainActorClass.testComputedGetSet()
   // CHECK-NEXT:  // Isolation: global_actor. type: MainActor
-  // CHECK-LABEL: // setter of z #1 in MainActorClass.testComputedGetSet()
+  // CHECK-LABEL: // specialized setter of z #1 in MainActorClass.testComputedGetSet()
   // CHECK-NEXT:  // Isolation: global_actor. type: MainActor
   func testComputedGetSet() {
     var holder = field

@@ -13,7 +13,7 @@ struct Obj {
 
 func filter_async<T>(fn1: () -> T) -> T { fn1() }
 func filter_async<T>(fn2: () async -> T) -> T { fatalError() }
-func filter_async(_: String) -> Void {}
+func filter_async<T>(_: T) -> Void {}
 
 var a: String? = nil
 

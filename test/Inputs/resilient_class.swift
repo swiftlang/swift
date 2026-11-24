@@ -104,3 +104,19 @@ open class ResilientConcreteOutsideChild : ResilientGenericOutsideParent<String>
     super.classMethod()
   }
 }
+
+
+// Resilient class returning an optional frozen struct
+
+@frozen public struct FiveBytes {
+  public var a: UInt32
+  public var b: UInt8
+}
+
+open class ResilientOptionalResult {
+  public init() {}
+
+  open func get(_ isSome: Bool) -> FiveBytes? {
+    return isSome ? FiveBytes(a: 1, b: 2) : nil
+  }
+}

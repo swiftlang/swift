@@ -54,6 +54,8 @@ SWIFT_RUNTIME_EXPORT uint64_t _swift_concurrency_task_registry_addr = 0;
 
 #ifdef _WIN32
 // We'll probably want dbghelp.h here
+#include <stdio.h>
+#include <stdlib.h>
 #else
 #include <cxxabi.h>
 #endif
@@ -140,6 +142,9 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   NULL,
 
   // closeFds
+  false,
+
+  // hookFailFast
   false,
 };
 
@@ -246,12 +251,46 @@ bool isStdinATty()
 #endif
 }
 
+#ifdef _WIN32
+// Returns the NT headers for the given module, or NULL if `hModule` is NULL
+// or the DOS/NT signatures don't check out.
+const IMAGE_NT_HEADERS *getNtHeaders(HMODULE hModule)
+{
+  if (!hModule)
+    return nullptr;
+
+  auto dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER *>(hModule);
+  if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    return nullptr;
+
+  auto ntHeaders = reinterpret_cast<const IMAGE_NT_HEADERS *>(
+    reinterpret_cast<const BYTE *>(hModule) + dosHeader->e_lfanew);
+  if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
+    return nullptr;
+
+  return ntHeaders;
+}
+
+// Returns true if this process is a GUI-subsystem (IMAGE_SUBSYSTEM_WINDOWS_GUI)
+// executable, as opposed to a console-subsystem one.  This is a property of
+// the executable file itself, unlike GetConsoleWindow(), which only tells you
+// whether a console happens to be attached right now.
+bool isGUISubsystem()
+{
+  const IMAGE_NT_HEADERS *ntHeaders = getNtHeaders(GetModuleHandleW(NULL));
+  if (!ntHeaders)
+    return false;
+
+  return ntHeaders->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI;
+}
+#endif
+
 #endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
 void _swift_processBacktracingSetting(llvm::StringRef key, llvm::StringRef value);
 void _swift_parseBacktracingSettings(const char *);
 
-#if DEBUG_BACKTRACING
+#if DEBUG_BACKTRACING && SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 const char *algorithmToString(UnwindAlgorithm algorithm) {
   switch (algorithm) {
   case UnwindAlgorithm::Auto: return "Auto";
@@ -371,7 +410,11 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 
   // If we're outputting to a file, then the defaults are different
-  if (_swift_backtraceSettings.outputTo == OutputTo::File) {
+  if (_swift_backtraceSettings.outputTo == OutputTo::File
+#ifdef _WIN32
+      || _swift_backtraceSettings.outputTo == OutputTo::EventLog
+#endif
+      ) {
     if (_swift_backtraceSettings.interactive == OnOffTty::TTY)
       _swift_backtraceSettings.interactive = OnOffTty::Off;
     if (_swift_backtraceSettings.color == OnOffTty::TTY)
@@ -427,6 +470,16 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 
   if (_swift_backtraceSettings.outputTo == OutputTo::Auto) {
+#ifdef _WIN32
+    // GUI-subsystem programs don't have a console by default, and we don't
+    // want to pop up a spurious console window just to report a crash that
+    // the program may barely log at all.  If one has gone to the trouble of
+    // creating/attaching a console of its own, though, honor it and write
+    // there like we would for a console-subsystem program.
+    if (isGUISubsystem() && !GetConsoleWindow())
+      _swift_backtraceSettings.outputTo = OutputTo::EventLog;
+    else
+#endif
     if (_swift_backtraceSettings.interactive == OnOffTty::On)
       _swift_backtraceSettings.outputTo = OutputTo::Stdout;
     else
@@ -435,7 +488,11 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (_swift_backtraceSettings.color == OnOffTty::TTY) {
     bool outputToIsTty;
-    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+    if (_swift_backtraceSettings.outputTo == OutputTo::Stderr
+#ifdef _WIN32
+        || _swift_backtraceSettings.outputTo == OutputTo::Console
+#endif
+        )
       outputToIsTty = isStderrATty();
     else
       outputToIsTty = isStdoutATty();
@@ -747,6 +804,10 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     _swift_backtraceSettings.cache = parseBoolean(value);
   } else if (key.equals_insensitive("close-fds")) {
     _swift_backtraceSettings.closeFds = parseBoolean(value);
+#ifdef _WIN32
+  } else if (key.equals_insensitive("hook-fail-fast")) {
+    _swift_backtraceSettings.hookFailFast = parseBoolean(value);
+#endif
   } else if (key.equals_insensitive("output-to")) {
     if (value.equals_insensitive("auto"))
       _swift_backtraceSettings.outputTo = OutputTo::Auto;
@@ -754,6 +815,12 @@ _swift_processBacktracingSetting(llvm::StringRef key,
       _swift_backtraceSettings.outputTo = OutputTo::Stdout;
     else if (value.equals_insensitive("stderr"))
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
+#ifdef _WIN32
+    else if (value.equals_insensitive("console"))
+      _swift_backtraceSettings.outputTo = OutputTo::Console;
+    else if (value.equals_insensitive("eventlog"))
+      _swift_backtraceSettings.outputTo = OutputTo::EventLog;
+#endif
     else {
       size_t len = value.size();
       char *path = (char *)std::malloc(len + 1);
@@ -812,8 +879,8 @@ _swift_parseBacktracingSettings(const char *settings)
 {
   const char *ptr = settings;
   const char *key = ptr;
-  const char *keyEnd;
-  const char *value;
+  const char *keyEnd = nullptr;
+  const char *value = nullptr;
   const char *valueEnd;
   enum {
     ScanningKey,
@@ -1029,7 +1096,7 @@ _swift_backtrace_demangle(const char *mangledName,
     // This is a Swift mangling
     auto options = DemangleOptions::SimplifiedUIDemangleOptions();
     auto result = Demangle::demangleSymbolAsString(name, options);
-    size_t bufferSize;
+    size_t bufferSize = 0;
 
     if (outputBufferSize) {
       bufferSize = *outputBufferSize;
@@ -1057,7 +1124,7 @@ _swift_backtrace_demangle(const char *mangledName,
     char *result = abi::__cxa_demangle(mangledName, nullptr, &resultLen, &status);
 
     if (result) {
-      size_t bufferSize;
+      size_t bufferSize = 0;
 
       if (outputBufferSize) {
         bufferSize = *outputBufferSize;
@@ -1304,18 +1371,19 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   #if defined(_WIN32)
   HANDLE hOutput =
     GetStdHandle(_swift_backtraceSettings.outputTo == OutputTo::Stderr
+                 || _swift_backtraceSettings.outputTo == OutputTo::Console
                     ? STD_ERROR_HANDLE
                     : STD_OUTPUT_HANDLE);
   #endif
 
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
-  #if DEBUG_BACKTRACING
+  #if DEBUG_BACKTRACING && defined(_WIN32)
     const char *message = "**backtracer disabled** ";
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   #endif
   return false;
 #else
-  #if DEBUG_BACKTRACING
+  #if DEBUG_BACKTRACING && defined(_WIN32)
     const char *message = "preparing to launch backtracer... ";
     WriteFile(hOutput, message, strlen(message), NULL, NULL);
   #endif
@@ -1413,6 +1481,14 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   case OutputTo::File:
     backtracer_argv[30] = swiftBacktraceOutputPath;
     break;
+#ifdef _WIN32
+  case OutputTo::Console:
+    backtracer_argv[30] = "console";
+    break;
+  case OutputTo::EventLog:
+    backtracer_argv[30] = "eventlog";
+    break;
+#endif
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
@@ -1523,13 +1599,19 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   memset(&startupInfo, 0, sizeof(startupInfo));
   startupInfo.cb = sizeof(startupInfo);
 
+  DWORD dwCreationFlags = 0;
+  if (isGUISubsystem()
+      && !GetConsoleWindow()
+      && _swift_backtraceSettings.outputTo != OutputTo::Console)
+    dwCreationFlags |= CREATE_NO_WINDOW;
+
   // Create the backtracer process
   BOOL bRet = CreateProcessW(swiftBacktracePath,
                              cmdline_wbuf,
                              NULL,
                              NULL,
                              FALSE,
-                             0,
+                             dwCreationFlags,
                              swiftBacktraceEnv,
                              NULL,
                              &startupInfo,
@@ -1537,10 +1619,10 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   if (!bRet) {
     #if DEBUG_BACKTRACING
       char message[256];
-      int len = snprintf_s(message, sizeof(message),
-                          "swift runtime: %lu return code for CreateProcessW (%ls) ",
-                          (unsigned long)bRet,
-                          swiftBacktracePath);
+      int len = snprintf(message, sizeof(message),
+                         "swift runtime: error %lu from CreateProcessW (%ls) ",
+                         (unsigned long)GetLastError(),
+                         swiftBacktracePath);
       if (len > 0) {
         DWORD written;
         WriteFile(hOutput, message, (DWORD)len, &written, NULL);
