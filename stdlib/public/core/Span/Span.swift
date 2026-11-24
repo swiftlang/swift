@@ -768,6 +768,22 @@ extension Span where Element: ~Copyable  {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: ~Copyable {
+  /// The address of the viewed memory, or `nil` if the span is empty and
+  /// has no address.
+  ///
+  /// This is an implementation detail of the standard library. It lets the
+  /// async variants of the pointer-providing methods, which are in the
+  /// `_Concurrency` module, build their pointers like the synchronous ones.
+  @export(implementation)
+  @unsafe
+  public var _unsafePointer: UnsafeRawPointer? {
+    unsafe _pointer
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Span where Element: BitwiseCopyable {
 
   /// Calls the given closure with a pointer to the underlying bytes of

@@ -30,7 +30,8 @@
 
 ### Performing Unsafe Access
 
-- ``withUnsafeBytes(_:)``
+- ``withUnsafeBytes(_:)-7vz3n``
+- ``withUnsafeBytes(_:)-9cf94``
 
 ### Extracting Span Contents
 

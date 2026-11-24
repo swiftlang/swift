@@ -26,8 +26,10 @@
 
 ### Performing Unsafe Access
 
-- ``withUnsafeBytes(_:)``
-- ``withUnsafeMutableBytes(_:)``
+- ``withUnsafeBytes(_:)-4x01m``
+- ``withUnsafeBytes(_:)-3osc``
+- ``withUnsafeMutableBytes(_:)-61toa``
+- ``withUnsafeMutableBytes(_:)-78bws``
 
 ### Loading Contents into Types
 
