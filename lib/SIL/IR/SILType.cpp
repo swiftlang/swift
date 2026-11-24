@@ -1397,6 +1397,13 @@ bool SILType::mayHaveCustomDeinit(const SILFunction &function) const {
   return properties.mayHaveCustomDeinit();
 }
 
+bool SILType::isOrContainsRawLayout(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
+  auto properties = function.getTypeProperties(contextType);
+  return properties.isOrContainsRawLayout();
+}
+
 namespace swift::test {
 // Arguments:
 // - SILValue: value

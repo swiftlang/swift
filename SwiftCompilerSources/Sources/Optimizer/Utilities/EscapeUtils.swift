@@ -674,7 +674,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                 onlyResultDependsOnAddress(of: apply, argOp: argOp) {
         // The address is only captured by the result. Constructing a mutable address from an
         // `@in_guaranteed` argument is undefined behavior (except for `@_rawLayout` types, which
-        // are not handled here), so the result can only read it.
+        // are excluded by `onlyResultDependsOnAddress`), so the result can only read it.
         switch visitor.visitBorrowedAddressableCapture(operand: argOp, path: path) {
         case .continueWalk:
           break
@@ -732,8 +732,14 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 
   /// True if `argOp` is `@in_guaranteed` and only `apply`'s result depends on its address.
   /// Checks the convention, because a `.scope` dependence can also be an inout dependence.
+  /// Returns false if the type may be or contain a `@_rawLayout` type (e.g. `Atomic`, `Mutex`),
+  /// because such storage can be mutated through a borrow via `Builtin.addressOfRawLayout`,
+  /// e.g. `InlineArray<N, Atomic<Int>>.span` followed by a `store` to an element.
+  /// `@_rawLayout` types are always non-copyable, so only non-copyable types need the check.
   private func onlyResultDependsOnAddress(of apply: ApplySite, argOp: Operand) -> Bool {
-    guard apply.convention(of: argOp) == .indirectInGuaranteed else {
+    let argType = argOp.value.type
+    guard apply.convention(of: argOp) == .indirectInGuaranteed,
+          !(argType.isMoveOnly && argType.isOrContainsRawLayout(in: apply.parentFunction)) else {
       return false
     }
 
