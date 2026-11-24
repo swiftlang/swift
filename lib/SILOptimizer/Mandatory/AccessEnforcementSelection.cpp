@@ -13,19 +13,8 @@
 /// This pass eliminates 'unknown' access enforcement by selecting either
 /// static or dynamic enforcement.
 ///
-/// TODO: This is currently a module transform so that it can process closures
-/// after analyzing their parent scope. This isn't a big problem now because
-/// AccessMarkerElimination is also a module pass that follows this pass, so all
-/// markers will still be present when this pass runs. However, we would like to
-/// mostly eliminate module transforms. This could be done by changing the
-/// PassManager to follow ClosureScopeAnalysis. A new ClosureTransform type
-/// would be pipelined just like FunctionTransform, but would have an entry
-/// point that handled a parent closure scope and all its children in one
-/// invocation. For function pipelining to be upheld, we would need to verify
-/// that BasicCalleeAnalysis never conflicts with ClosureScopeAnalysis. i.e. we
-/// could never create a caller->callee edge when the callee is passed as a
-/// function argument. Normal FunctionTransforms would then be called on each
-/// closure function and its parent scope before calling the ClosureTransform.
+/// It runs per closure group, so that it can process closures after analyzing
+/// their parent scope (ClosureFunctionOrder).
 ///
 /// FIXME: handle boxes used by copy_value when neither copy is captured.
 ///
@@ -33,16 +22,18 @@
 
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "access-enforcement-selection"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 
@@ -59,6 +50,244 @@ static void setDynamicEnforcement(BeginAccessInst *access) {
 
   LLVM_DEBUG(llvm::dbgs() << "Dynamic Access: " << *access);
 }
+
+//===----------------------------------------------------------------------===//
+//                         Closure scope order
+//===----------------------------------------------------------------------===//
+
+// Handle both partial_apply and directly applied closures of the form:
+//   %f = function_ref @... : $(...inout_aliasable...) -> ...
+//   apply %f(...)
+// A closure that captures only boxes needs no order: an access through a box
+// argument is always dynamic.
+static SILFunction *getAddressCaptureCallee(ApplySite apply) {
+  // Only track scopes of non-escaping closures.
+  auto calleeTy = apply.getCallee()->getType().castTo<SILFunctionType>();
+  if (!isNonEscapingClosure(calleeTy))
+    return nullptr;
+  return apply.getCalleeFunction();
+}
+
+namespace {
+
+// A function is a node in this graph if it either refers to a closure or is
+// itself a closure.
+//
+// The graph is represented with a vector of forward edges from "scope
+// functions" to closures, sorted by function index, and the set of closures
+// that have a scope.
+class ClosureGraph {
+  struct Edge {
+    SILFunction *from;
+    SILFunction *to;
+
+    bool operator<(const Edge &other) const {
+      unsigned from1 = from->getIndex();
+      unsigned from2 = other.from->getIndex();
+      if (from1 != from2)
+        return from1 < from2;
+
+      return to->getIndex() < other.to->getIndex();
+    }
+  };
+
+  // A set of edges in the relational mapping from a function to the set of
+  // nonescaping closures that are referenced within its body.
+  //
+  // from: parent function
+  //   to: nonescaping child closure
+  llvm::SmallVector<Edge, 8> functionToClosures;
+
+  // Every closure that a scope edge reaches.
+  llvm::SmallPtrSet<SILFunction *, 8> reachableClosures;
+
+public:
+  /// Records all closure scopes among \p functions.
+  explicit ClosureGraph(ArrayRef<SILFunction *> functions);
+
+  /// The edges from \p scopeFunc to the closures it references.
+  ArrayRef<Edge> getFunctionToClosureEdges(SILFunction *scopeFunc) const {
+    auto first =
+        llvm::partition_point(functionToClosures, [&](const Edge &edge) {
+          return edge.from->getIndex() < scopeFunc->getIndex();
+        });
+    auto last =
+        std::find_if(first, functionToClosures.end(),
+                     [&](const Edge &edge) { return edge.from != scopeFunc; });
+    return ArrayRef<Edge>(first, last);
+  }
+
+  /// Return true if this function is a reachable closure.
+  bool isReachableClosure(SILFunction *function) const {
+    return reachableClosures.contains(function);
+  }
+
+private:
+  void recordScope(ApplySite apply,
+                   const llvm::SmallPtrSetImpl<SILFunction *> &within);
+
+  SWIFT_ASSERT_ONLY_DECL(void dump());
+};
+
+// Utility for visiting functions top-down in closure scope order.
+class ClosureFunctionOrder {
+  // All functions in top-down order (RPO) following the closure scope graph.
+  // Functions that define a closure occur before the closure.
+  SmallVector<SILFunction *, 8> topDownFunctions;
+
+public:
+  explicit ClosureFunctionOrder(ArrayRef<SILFunction *> functions);
+
+  ArrayRef<SILFunction *> getTopDownFunctions() const {
+    return topDownFunctions;
+  }
+
+  SWIFT_ASSERT_ONLY_DECL(void dump());
+};
+
+void ClosureGraph::recordScope(
+    ApplySite apply, const llvm::SmallPtrSetImpl<SILFunction *> &within) {
+  auto captureCallee = getAddressCaptureCallee(apply);
+  if (!captureCallee)
+    return;
+
+  auto scopeFunc = apply.getFunction();
+  if (!within.count(captureCallee)) {
+    // An edge to a declaration is fine to drop.
+    ASSERT(!captureCallee->isDefinition() &&
+           "function set is not closed under scope edges");
+    return;
+  }
+  // processFunction skips deserialized functions but assumes that all of a
+  // closure's scopes have been processed, so a deserialized function can only
+  // refer to deserialized closures.
+  assert(scopeFunc->wasDeserializedCanonical() ==
+             captureCallee->wasDeserializedCanonical() &&
+         "A closure cannot be serialized in a different module than its "
+         "parent context");
+
+  functionToClosures.push_back({scopeFunc, captureCallee});
+  reachableClosures.insert(captureCallee);
+}
+
+#ifndef NDEBUG
+static void dumpFunctionName(SILFunction *function) {
+  auto opts = Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
+  opts.ShowAsyncResumePartial = true;
+  llvm::dbgs() << Demangle::demangleSymbolAsString(function->getName(), opts)
+               << " '" << function->getName() << "'\n";
+}
+
+void ClosureGraph::dump() {
+  llvm::dbgs() << "\n";
+  SILFunction *currentFunc = nullptr;
+  for (auto &edge : functionToClosures) {
+    auto *scopeFunc = edge.from;
+    if (currentFunc != scopeFunc) {
+      currentFunc = scopeFunc;
+      llvm::dbgs() << "SCOPE: ";
+      dumpFunctionName(scopeFunc);
+    }
+    llvm::dbgs() << "    CLOSURE: ";
+    dumpFunctionName(edge.to);
+  }
+  // The backward edges, from closures to scope functions.
+  llvm::SmallVector<Edge, 8> closureToFunctions;
+  for (auto &edge : functionToClosures)
+    closureToFunctions.push_back({edge.to, edge.from});
+  llvm::sort(closureToFunctions);
+  currentFunc = nullptr;
+  for (auto &edge : closureToFunctions) {
+    auto *closure = edge.from;
+    if (currentFunc != closure) {
+      currentFunc = closure;
+      llvm::dbgs() << "CLOSURE: ";
+      dumpFunctionName(closure);
+    }
+    llvm::dbgs() << "    SCOPE: ";
+    dumpFunctionName(edge.to);
+  }
+}
+#endif
+
+ClosureGraph::ClosureGraph(ArrayRef<SILFunction *> functions) {
+  llvm::SmallPtrSet<SILFunction *, 16> within(functions.begin(),
+                                              functions.end());
+  for (SILFunction *F : functions)
+    for (auto &BB : *F)
+      for (auto &I : BB)
+        if (auto apply = ApplySite::isa(&I))
+          recordScope(apply, within);
+  llvm::sort(functionToClosures);
+
+  DEBUG_WITH_TYPE("closure-scope", dump());
+}
+
+/// Appends \p function and the closures reachable from it that aren't in
+/// \p visited yet to \p postorder, in postorder.
+static void closureDFS(const ClosureGraph &graph, SILFunction *function,
+                       llvm::SmallPtrSetImpl<SILFunction *> &visited,
+                       SmallVectorImpl<SILFunction *> &postorder) {
+  if (!visited.insert(function).second)
+    return; // Already ordered, or a cycle in the closure graph.
+
+  for (auto &edge : graph.getFunctionToClosureEdges(function))
+    closureDFS(graph, edge.to, visited, postorder);
+  postorder.push_back(function);
+}
+
+ClosureFunctionOrder::ClosureFunctionOrder(ArrayRef<SILFunction *> functions) {
+  ClosureGraph graph(functions);
+  topDownFunctions.reserve(functions.size());
+
+  llvm::SmallPtrSet<SILFunction *, 16> visited;
+  SmallVector<SILFunction *, 4> postorderClosures;
+  auto performDFS = [&](SILFunction *root) {
+    postorderClosures.clear();
+    closureDFS(graph, root, visited, postorderClosures);
+    // Closures are discovered in postorder, bottom-up.
+    // Reverse-append them onto the top-down function list.
+    llvm::append_range(topDownFunctions, llvm::reverse(postorderClosures));
+  };
+
+  SmallVector<SILFunction *, 4> closureWorklist;
+  for (SILFunction *function : functions) {
+    if (visited.contains(function))
+      continue;
+
+    if (graph.isReachableClosure(function)) {
+      // This is a closure, reachable from some other function, whose DFS
+      // orders it.
+      //
+      // A closure at the head of a cycle might only be reachable from other
+      // closures. So use a worklist to visit them once more as DFS roots after
+      // finishing DFS from all acyclic functions.
+      closureWorklist.push_back(function);
+      continue;
+    }
+    performDFS(function);
+  }
+  // Revisit closures in forward order. DFS will immediately return except in
+  // the unlikely event that this is an orphaned closure.
+  for (auto *closure : closureWorklist) {
+    performDFS(closure);
+  }
+  DEBUG_WITH_TYPE("closure-scope", dump());
+  assert(functions.size() == topDownFunctions.size() &&
+         "DFS missed a function");
+}
+
+#ifndef NDEBUG
+void ClosureFunctionOrder::dump() {
+  llvm::dbgs() << "\nRPO function order:\n";
+  for (auto *function : getTopDownFunctions()) {
+    llvm::dbgs() << "[" << function->getIndex() << "] ";
+    dumpFunctionName(function);
+  }
+}
+#endif
+
+} // end anonymous namespace
 
 namespace {
 // Information about an address-type closure capture.
@@ -151,7 +380,7 @@ public:
 namespace {
 class SelectEnforcement {
   // Reference back to the known dynamically enforced non-escaping closure
-  // arguments in this module. Parent scopes are processed before the closures
+  // arguments in this group. Parent scopes are processed before the closures
   // they reference.
   DynamicCaptures &dynamicCaptures;
 
@@ -599,11 +828,9 @@ struct SourceAccess {
 /// This can't be a SILFunctionTransform because DynamicCaptures need to be
 /// recorded while analyzing a closure's parent scopes before processing the
 /// closures.
-///
-/// TODO: Make this a "ClosureTransform". See the file-level comments above.
-class AccessEnforcementSelection : public SILModuleTransform {
+class AccessEnforcementSelection : public SILClosureGroupTransform {
   // Track the known dynamically enforced non-escaping closure
-  // arguments in this module. Parent scopes are processed before the closures
+  // arguments in this group. Parent scopes are processed before the closures
   // they reference.
   std::unique_ptr<DynamicCaptures> dynamicCaptures;
 
@@ -625,9 +852,7 @@ protected:
 };
 
 void AccessEnforcementSelection::run() {
-  auto *CSA = getAnalysis<ClosureScopeAnalysis>();
-  ClosureFunctionOrder closureOrder(CSA);
-  closureOrder.compute();
+  ClosureFunctionOrder closureOrder(getGroup());
 
   dynamicCaptures = std::make_unique<DynamicCaptures>();
   SWIFT_DEFER { dynamicCaptures.reset(); };
@@ -639,9 +864,6 @@ void AccessEnforcementSelection::run() {
 
 void AccessEnforcementSelection::
 processFunction(SILFunction *F) {
-  if (F->isExternalDeclaration())
-    return;
-
   LLVM_DEBUG(llvm::dbgs() << "Access Enforcement Selection in " << F->getName()
                           << "\n");
 

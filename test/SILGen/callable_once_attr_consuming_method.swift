@@ -33,7 +33,7 @@ func runAtMostOnce(_ f: @callable(once) () -> Void) {
 // CHECK: move_value [lexical] [var_decl] [[F2_THICK]] : $@callee_guaranteed (@owned Resource) -> @owned @callable(once) @callee_owned () -> ()
 // CHECK: } // end sil function '$s35callable_once_attr_consuming_method10testSimpleyyAA8ResourceVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s35callable_once_attr_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_ : $@convention(thin) (@owned Resource) -> @owned @callable(once) @callee_owned () -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s35callable_once_attr_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_ : $@convention(thin) (@owned Resource) -> @owned @callable(once) @callee_owned () -> () {
 // CHECK: [[THUNK:%.*]] = function_ref @$s35callable_once_attr_consuming_method10testSimpleyyAA8ResourceVnFyyXOoADncfu_yyXOofu0_ : $@convention(thin) (@owned Resource) -> ()
 // CHECK: [[VALUE:%.*]] = load [take] {{%.*}} : $*Resource
 // CHECK: [[CLOSURE:%.*]] = partial_apply [called_at_most_once] [[THUNK]]([[VALUE]]) : $@convention(thin) (@owned Resource) -> ()
@@ -69,7 +69,7 @@ func testCopyableViaGenericParameter(_ b: consuming Box<Int>) {
 // CHECK: store [[F2_VALUE]] to [init] {{%.*}} : $*@callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T>
 // CHECK: } // end sil function '$s35callable_once_attr_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlF'
 
-// CHECK-LABEL: sil private [ossa] @$s35callable_once_attr_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_ : $@convention(thin) <T where T : ~Copyable> (@in Box<T>) -> @owned @callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s35callable_once_attr_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_ : $@convention(thin) <T where T : ~Copyable> (@in Box<T>) -> @owned @callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T> {
 // CHECK: [[THUNK:%.*]] = function_ref @$s35callable_once_attr_consuming_method34testNonCopyableViaGenericParameter_2b2yAA3BoxVyxGn_AFntRi_zlFxyXOoAFncfu_xyXOofu0_ : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Box<τ_0_0>) -> @out τ_0_0
 // CHECK: [[CLOSURE:%.*]] = partial_apply [called_at_most_once] [[THUNK]]<T>({{%.*}}) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in Box<τ_0_0>) -> @out τ_0_0
 // CHECK: [[SUBSTITUTED:%.*]] = convert_function [[CLOSURE]] : $@callable(once) @callee_owned () -> @out T to $@callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <T>
@@ -88,7 +88,7 @@ func testNonCopyableViaGenericParameter<T: ~Copyable>(_ b1: consuming Box<T>, b2
 // CHECK: alloc_box ${ let @callable(once) @callee_owned () -> () }, let, name "f"
 // CHECK: } // end sil function '$s35callable_once_attr_consuming_method23testProtocolRequirementyyxnAA6UsableRzRi_zlF'
 
-// CHECK-LABEL: sil private [ossa] @$s35callable_once_attr_consuming_method23testProtocolRequirementyyxnAA6UsableRzRi_zlFyyXOoxncfu_yyXOofu0_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s35callable_once_attr_consuming_method23testProtocolRequirementyyxnAA6UsableRzRi_zlFyyXOoxncfu_yyXOofu0_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
 // CHECK: witness_method $T, #Usable.use : <Self where Self : Usable, Self : ~Copyable> (consuming Self) -> () -> ()
 // CHECK: } // end sil function '$s35callable_once_attr_consuming_method23testProtocolRequirementyyxnAA6UsableRzRi_zlFyyXOoxncfu_yyXOofu0_'
 func testProtocolRequirement<T: Usable & ~Copyable>(_ x: consuming T) {

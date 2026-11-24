@@ -35,7 +35,7 @@ func borrowConsumeVal(_ x: borrowing SingleElt, _ y: consuming SingleElt) {}
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure27testGlobalClosureCaptureVaryyF'
 
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure27testGlobalClosureCaptureVaryyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure27testGlobalClosureCaptureVaryyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -98,7 +98,7 @@ func testGlobalClosureCaptureVar() {
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
 // CHECK: } // end sil function '$s16moveonly_closure29testLocalLetClosureCaptureVaryyF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testLocalLetClosureCaptureVaryyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure29testLocalLetClosureCaptureVaryyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -162,7 +162,7 @@ func testLocalLetClosureCaptureVar() {
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
 // CHECK: } // end sil function '$s16moveonly_closure026testLocalVarClosureCaptureE0yyF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure026testLocalVarClosureCaptureE0yyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure026testLocalVarClosureCaptureE0yyFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -224,7 +224,7 @@ func testLocalVarClosureCaptureVar() {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCaptureF0yyyyczF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure026testInOutVarClosureCaptureF0yyyyczFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure026testInOutVarClosureCaptureF0yyyyczFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -295,7 +295,7 @@ func testInOutVarClosureCaptureVar(_ f: inout () -> ()) {
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureVaryyyycnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -360,7 +360,7 @@ func testConsumingEscapeClosureCaptureVar(_ f: consuming @escaping () -> ()) {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure27testGlobalClosureCaptureLetyyF'
 
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure27testGlobalClosureCaptureLetyyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure27testGlobalClosureCaptureLetyyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -409,7 +409,7 @@ func testGlobalClosureCaptureLet() {
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
 // CHECK: } // end sil function '$s16moveonly_closure026testLocalLetClosureCaptureE0yyF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure026testLocalLetClosureCaptureE0yyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure026testLocalLetClosureCaptureE0yyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -455,7 +455,7 @@ func testLocalLetClosureCaptureLet() {
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
 // CHECK: } // end sil function '$s16moveonly_closure29testLocalVarClosureCaptureLetyyF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testLocalVarClosureCaptureLetyyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure29testLocalVarClosureCaptureLetyyFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -504,7 +504,7 @@ func testLocalVarClosureCaptureLet() {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure29testInOutVarClosureCaptureLetyyyyczF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testInOutVarClosureCaptureLetyyyyczFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure29testInOutVarClosureCaptureLetyyyyczFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -562,7 +562,7 @@ func testInOutVarClosureCaptureLet(_ f: inout () -> ()) {
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure36testConsumingEscapeClosureCaptureLetyyyycnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -618,7 +618,7 @@ func testConsumingEscapeClosureCaptureLet(_ f: consuming @escaping () -> ()) {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzF'
 
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure29testGlobalClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
@@ -662,7 +662,7 @@ func testGlobalClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[MARKED]])
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure31testLocalLetClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
@@ -710,7 +710,7 @@ func testLocalLetClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: store [[PAI]] to [init] [[FUNC_PROJECT]]
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure31testLocalVarClosureCaptureInOutyyAA9SingleEltVzFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
@@ -759,7 +759,7 @@ func testLocalVarClosureCaptureInOut(_ x: inout SingleElt) {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure026testInOutVarClosureCapturedE0yyyycz_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
@@ -816,7 +816,7 @@ func testInOutVarClosureCaptureInOut(_ f: inout () -> (), _ x: inout SingleElt) 
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureInOutyyyycn_AA9SingleEltVztFyycfU_ : $@convention(thin) (@inout_aliasable SingleElt) -> () {
 // CHECK: bb0([[ARG:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
 //
@@ -871,7 +871,7 @@ func testConsumingEscapeClosureCaptureInOut(_ f: consuming @escaping () -> (), _
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure33testGlobalClosureCaptureConsumingyyAA9SingleEltVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure33testGlobalClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure33testGlobalClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -932,7 +932,7 @@ func testGlobalClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
 // CHECK: } // end sil function '$s16moveonly_closure35testLocalLetClosureCaptureConsumingyyAA9SingleEltVnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure35testLocalLetClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure35testLocalLetClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1007,7 +1007,7 @@ func testLocalLetClosureCaptureConsuming2(_ x: consuming SingleElt) -> (() -> ()
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
 // CHECK: } // end sil function '$s16moveonly_closure35testLocalVarClosureCaptureConsumingyyAA9SingleEltVnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure35testLocalVarClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure35testLocalVarClosureCaptureConsumingyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1077,7 +1077,7 @@ func testLocalVarClosureCaptureConsuming(_ x: consuming SingleElt) {
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure033testConsumingEscapeClosureCaptureD0yyyycn_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { var SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1139,7 +1139,7 @@ func testConsumingEscapeClosureCaptureConsuming(_ f: consuming @escaping () -> (
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure29testGlobalClosureCaptureOwnedyyAA9SingleEltVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure29testGlobalClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure29testGlobalClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] : @closureCapture
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1186,7 +1186,7 @@ func testGlobalClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK: apply [[BORROW_COPY_BORROW_PAI]]()
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalLetClosureCaptureOwnedyyAA9SingleEltVnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalLetClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure31testLocalLetClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1230,7 +1230,7 @@ func testLocalLetClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK: [[PAI:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BOX_COPY]])
 // CHECK: } // end sil function '$s16moveonly_closure31testLocalVarClosureCaptureOwnedyyAA9SingleEltVnF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testLocalVarClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure31testLocalVarClosureCaptureOwnedyyAA9SingleEltVnFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1277,7 +1277,7 @@ func testLocalVarClosureCaptureOwned(_ x: __owned SingleElt) {
 // CHECK: end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure31testInOutVarClosureCaptureOwnedyyyycz_AA9SingleEltVntF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure31testInOutVarClosureCaptureOwnedyyyycz_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure31testInOutVarClosureCaptureOwnedyyyycz_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //
@@ -1333,7 +1333,7 @@ func testInOutVarClosureCaptureOwned(_ f: inout () -> (), _ x: __owned SingleElt
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntF'
 //
-// CHECK-LABEL: sil private [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s16moveonly_closure38testConsumingEscapeClosureCaptureOwnedyyyycn_AA9SingleEltVntFyycfU_ : $@convention(thin) (@guaranteed { let SingleElt }) -> () {
 // CHECK: bb0([[BOX:%.*]] :
 // CHECK:   [[PROJECT:%.*]] = project_box [[BOX]]
 //

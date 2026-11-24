@@ -36,8 +36,8 @@ func Optionable_cases(_ x: Int) {
   _ = Optionable.mere(x)
 }
 
-// CHECK-LABEL: sil private [ossa] @$s4enum16Optionable_casesyySiFAA0B0OSicADmcfu_ : $@convention(thin) (@thin Optionable.Type) -> @owned @callee_guaranteed (Int) -> Optionable
-// CHECK-LABEL: sil private [ossa] @$s4enum16Optionable_casesyySiFAA0B0OSicADmcfu_ADSicfu0_ : $@convention(thin) (Int, @thin Optionable.Type) -> Optionable {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4enum16Optionable_casesyySiFAA0B0OSicADmcfu_ : $@convention(thin) (@thin Optionable.Type) -> @owned @callee_guaranteed (Int) -> Optionable
+// CHECK-LABEL: sil private [closure] [ossa] @$s4enum16Optionable_casesyySiFAA0B0OSicADmcfu_ADSicfu0_ : $@convention(thin) (Int, @thin Optionable.Type) -> Optionable {
 
 protocol P {}
 struct S : P {}

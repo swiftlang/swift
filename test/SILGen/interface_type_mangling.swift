@@ -195,14 +195,14 @@ struct GenericTypeContext<T>: GenericWitnessTest {
   typealias Tee = T
 
   var a: T
-  // CHECK-LABEL: sil private [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureIndF0yyqd__lF3fooL_yyx_qd__tr__lF
   func closureInGenericContext<U>(_ b: U) {
     func foo(_ x: T, _ y: U) { }
 
     foo(a, b)
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s23interface_type_mangling18GenericTypeContextV09closureInd8PropertyF0xvg3fooL_xylF
   var closureInGenericPropertyContext: T {
     func foo() -> T { }
 

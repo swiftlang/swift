@@ -198,7 +198,7 @@ public class GenericBase<T> {
 
 public class GenericDerived<T> : GenericBase<T> {
   public override func method() {
-    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [closure] [ossa] @$s5super14GenericDerivedC6methodyyFyyXEfU_ : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     {
@@ -206,7 +206,7 @@ public class GenericDerived<T> : GenericBase<T> {
     }()
     // CHECK: } // end sil function '$s5super14GenericDerivedC6methodyyFyyXEfU_'
 
-    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [closure] [ossa] @$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF : $@convention(thin) <T> (@guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     // CHECK: } // end sil function '$s5super14GenericDerivedC6methodyyF13localFunctionL_yylF'
@@ -215,7 +215,7 @@ public class GenericDerived<T> : GenericBase<T> {
     }
     localFunction()
 
-    // CHECK-LABEL: sil private [ossa] @$s5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
+    // CHECK-LABEL: sil private [closure] [ossa] @$s5super14GenericDerivedC6methodyyF15genericFunctionL_yyqd__r__lF : $@convention(thin) <T><U> (@in_guaranteed U, @guaranteed GenericDerived<T>) -> ()
     // CHECK: upcast {{.*}} : $GenericDerived<T> to $GenericBase<T>
     // CHECK: return
     func genericFunction<U>(_: U) {

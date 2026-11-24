@@ -26,14 +26,17 @@ void PrettyStackTraceSILFunctionTransform::print(llvm::raw_ostream &out) const {
   out << "While running pass #" << PassNumber
       << " SILFunctionTransform \"" << SFT->getID()
       << "\" on SILFunction ";
-  if (!SFT->getFunction()) {
-    out << " <<null>>";
-    return;
-  }
   printFunctionInfo(out);
 }
 
 void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
   out << "While running pass #" << PassNumber
       << " SILModuleTransform \"" << SMT->getID() << "\".\n";
+}
+
+void PrettyStackTraceSILClosureGroupTransform::print(
+    llvm::raw_ostream &out) const {
+  out << "While running pass #" << PassNumber << " SILClosureGroupTransform \""
+      << T->getID() << "\" on the group of SILFunction ";
+  printFunctionInfo(out);
 }

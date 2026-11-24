@@ -37,7 +37,7 @@ func test0() throws {
 // CHECK:     [[ERROR]]([[ERROR:%.*]] : $any Error):
 // CHECK-NEXT:  throw [[ERROR]]
 //   Closure.
-// CHECK-LABEL: sil private @$s8rethrows5test1yyKFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error) {
+// CHECK-LABEL: sil private [closure] @$s8rethrows5test1yyKFSiyKXEfU_ : $@convention(thin) () -> (Int, @error any Error) {
 // CHECK:       [[THROWER:%.*]] = function_ref @$s8rethrows7throwerSiyKF : $@convention(thin) () -> (Int, @error any Error)
 // CHECK:       [[T0:%.*]] = thin_to_thick_function [[THROWER]]
 // CHECK:       [[CVT:%.*]] = convert_escape_to_noescape [[T0]]

@@ -58,7 +58,7 @@ func optionalStaticMethodRefGeneric<T: P1>(t: T) {
 // CHECK:   store [[SUBST_THUNK]] to [init] [[PBOX]]
 // CHECK: } // end sil function '$s17protocol_optional0B23MethodUnboundRefGeneric1tyx_tAA2P1RzlF'
 
-// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) <T where T : P1> (@guaranteed T) -> @owned Optional<@callee_guaranteed (Int) -> ()> {
+// CHECK: sil private [closure] [ossa] @$[[THUNK_NAME]] : $@convention(thin) <T where T : P1> (@guaranteed T) -> @owned Optional<@callee_guaranteed (Int) -> ()> {
 // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
 // CHECK:   [[T_COPY:%[0-9]+]] = copy_value [[T]]
 // CHECK:   alloc_stack $Optional<@callee_guaranteed (Int) -> ()>
@@ -79,7 +79,7 @@ func optionalMethodUnboundRefGeneric<T : P1>(t: T) {
 // CHECK:   end_borrow [[BOX_LIFETIME]]
 // CHECK: } // end sil function '$s17protocol_optional0B27MethodUnboundRefExistentialyyF'
 
-// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed any P1) -> @owned Optional<@callee_guaranteed () -> @owned any P1> {
+// CHECK: sil private [closure] [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed any P1) -> @owned Optional<@callee_guaranteed () -> @owned any P1> {
 // CHECK: bb0([[EXIST:%[0-9]+]] : @guaranteed $any P1):
 // CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref [[EXIST]] : $any P1 to $[[OPENED_TY:@opened\([0-9]+, any P1\) Self]]
 // CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]

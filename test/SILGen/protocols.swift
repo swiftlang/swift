@@ -409,7 +409,7 @@ protocol SelfReturningSubscript {
 }
 
 public func testSelfReturningSubscript() {
-  // CHECK-LABEL: sil private [ossa] @$s9protocols26testSelfReturningSubscriptyyFAA0cdE0_pAaC_pXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s9protocols26testSelfReturningSubscriptyyFAA0cdE0_pAaC_pXEfU_
   // CHECK: [[OPEN:%.*]] = open_existential_addr immutable_access
   // CHECK: [[WIT_M:%.*]] = witness_method $@opened({{.*}}, any SelfReturningSubscript) Self, #SelfReturningSubscript.subscript!getter
   // CHECK: apply [[WIT_M]]<@opened({{.*}}, any SelfReturningSubscript) Self>({{%.*}}, {{%.*}}, [[OPEN]])

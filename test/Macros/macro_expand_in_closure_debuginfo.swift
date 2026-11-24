@@ -30,7 +30,7 @@ func inClosure(a: Int) {
 // CHECK: sil_scope [[CL:[0-9]+]] { loc "{{.*}}macro_expand_in_closure_debuginfo.swift":[[@LINE-5]]:14 parent @$s9MacroUser9inClosure1aySi_tFyycfU_ :
 // CHECK: sil_scope [[CL_SITE:[0-9]+]] { loc "{{.*}}macro_expand_in_closure_debuginfo.swift":[[@LINE-5]]:9 parent [[CL]] }
 // CHECK: sil_scope [[CL_MACRO:[0-9]+]] { loc "@__swiftmacro_{{.*}}9stringifyfMf_.swift":1:1 parent @$s9MacroUser{{.*}}9stringifyfMf_ : {{.*}} inlined_at [[CL_SITE]] }
-// CHECK: sil private @$s9MacroUser9inClosure1aySi_tFyycfU_ :
+// CHECK: sil private [closure] @$s9MacroUser9inClosure1aySi_tFyycfU_ :
 // CHECK: string_literal utf8 "a", loc "@__swiftmacro_{{.*}}9stringifyfMf_.swift":1:5, scope [[CL_MACRO]]
 
 // A closure that is part of the expansion is not inlined anywhere: its body
@@ -44,8 +44,8 @@ func multiStatementInClosure() {
 // CHECK: sil_scope [[MS:[0-9]+]] { loc "{{.*}}macro_expand_in_closure_debuginfo.swift":[[@LINE-5]]:14 parent @$s9MacroUser23multiStatementInClosureyyFyycfU_ :
 // CHECK: sil_scope [[MS_SITE:[0-9]+]] { loc "{{.*}}macro_expand_in_closure_debuginfo.swift":[[@LINE-5]]:9 parent [[MS]] }
 // CHECK: sil_scope [[MS_MACRO:[0-9]+]] { loc "@__swiftmacro_{{.*}}14multiStatementfMf_.swift":1:1 parent @$s9MacroUser{{.*}}14multiStatementfMf_ : {{.*}} inlined_at [[MS_SITE]] }
-// CHECK: sil private @$s9MacroUser23multiStatementInClosureyyFyycfU_ :
+// CHECK: sil private [closure] @$s9MacroUser23multiStatementInClosureyyFyycfU_ :
 // CHECK: apply {{.*}}, loc "@__swiftmacro_{{.*}}14multiStatementfMf_.swift":1:1, scope [[MS_MACRO]]
 // CHECK: sil_scope {{[0-9]+}} { loc "@__swiftmacro_{{.*}}14multiStatementfMf_.swift":1:1 parent @$s9MacroUser23multiStatementInClosureyyFyycfU_SiyXEfU_ : $@convention(thin) () -> Int }{{$}}
-// CHECK: sil private @$s9MacroUser23multiStatementInClosureyyFyycfU_SiyXEfU_ :
+// CHECK: sil private [closure] @$s9MacroUser23multiStatementInClosureyyFyycfU_SiyXEfU_ :
 // CHECK: integer_literal $Builtin.Int{{64|32}}, 10, loc "@__swiftmacro_{{.*}}14multiStatementfMf_.swift":2:14, scope {{[0-9]+}}

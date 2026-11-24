@@ -3,7 +3,7 @@
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -enable-implicit-dynamic | %FileCheck %s --check-prefix=IMPLICIT
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-previous-implementation-calls-in-dynamic-replacements | %FileCheck %s --check-prefix=NOPREVIOUS
 
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
+// IMPLICIT-LABEL: sil private [closure] [ossa] @$s23dynamically_replaceable6$deferL_yyF
 var x = 10
 defer {
   let y = x
@@ -392,9 +392,9 @@ func foobar() {
 }
 
 // IMPLICIT-LABEL: sil [dynamically_replacable] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF0geF0L_yyF
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable16testWithLocalFunyyFyycfU_
+// IMPLICIT-LABEL: sil private [closure] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF
+// IMPLICIT-LABEL: sil private [closure] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyF05localF0L_yyF0geF0L_yyF
+// IMPLICIT-LABEL: sil private [closure] [ossa] @$s23dynamically_replaceable16testWithLocalFunyyFyycfU_
 public func testWithLocalFun() {
   func localFun() {
     func localLocalFun() { print("bar") }

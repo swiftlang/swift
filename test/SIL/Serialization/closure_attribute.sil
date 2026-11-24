@@ -1,0 +1,31 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s --check-prefix=TEXT
+// RUN: %target-sil-opt %s -serialize -o %t/closures.swiftmodule -module-name closures
+// RUN: %target-sil-opt %t/closures.swiftmodule -module-name closures | %FileCheck %s --check-prefix=SERIALIZED
+
+// The [closure] function attribute survives printing, parsing, and
+// serialization.
+
+// TEXT-LABEL: sil [serialized] [closure] [ossa] @closure :
+// TEXT-LABEL: sil [serialized] [ossa] @scope :
+
+// SERIALIZED-DAG: sil [serialized] [closure] [canonical] [ossa] @closure :
+// SERIALIZED-DAG: sil [serialized] [canonical] [ossa] @scope :
+
+sil_stage raw
+
+import Builtin
+
+sil [serialized] [closure] [ossa] @closure : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [serialized] [ossa] @scope : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @closure : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}

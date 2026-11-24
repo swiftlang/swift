@@ -12,11 +12,11 @@ func packFunction<each T, each U, each V>(ts: repeat each T, us: repeat each U, 
           repeat (each T).Element == (each U).Element {
   for (t, u) in repeat (each ts, each us) {
 
-    // // CHECK-LABEL: sil private [ossa] @$s26element_archetype_captures12packFunction2ts2us2vsyxxQp_q_xQpq0_q0_QptRvzRv_Rv0_STRzSTR_7ElementQy_AFRtzr1_lF10middleFuncL_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF : $@convention(thin) <each T, each U, each V where repeat each T : Sequence, repeat each U : Sequence, repeat (each T).Element == (each U).Element><τ_1_0, τ_1_1 where τ_1_0 : Sequence, τ_1_1 : Sequence, τ_1_0.Element == τ_1_1.Element> (@in_guaranteed (repeat each V), @in_guaranteed τ_1_0, @in_guaranteed τ_1_1) -> () {
+    // // CHECK-LABEL: sil private [closure] [ossa] @$s26element_archetype_captures12packFunction2ts2us2vsyxxQp_q_xQpq0_q0_QptRvzRv_Rv0_STRzSTR_7ElementQy_AFRtzr1_lF10middleFuncL_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF : $@convention(thin) <each T, each U, each V where repeat each T : Sequence, repeat each U : Sequence, repeat (each T).Element == (each U).Element><τ_1_0, τ_1_1 where τ_1_0 : Sequence, τ_1_1 : Sequence, τ_1_0.Element == τ_1_1.Element> (@in_guaranteed (repeat each V), @in_guaranteed τ_1_0, @in_guaranteed τ_1_1) -> () {
     func middleFunc() {
       for v in repeat each vs {
 
-        // CHECK-LABEL: sil private [ossa] @$s26element_archetype_captures12packFunction2ts2us2vsyxxQp_q_xQpq0_q0_QptRvzRv_Rv0_STRzSTR_7ElementQy_AFRtzr1_lF10middleFuncL_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF05innerK0L_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF : $@convention(thin) <each T, each U, each V where repeat each T : Sequence, repeat each U : Sequence, repeat (each T).Element == (each U).Element><τ_1_0, τ_1_1 where τ_1_0 : Sequence, τ_1_1 : Sequence, τ_1_0.Element == τ_1_1.Element><τ_2_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed τ_2_0) -> () {
+        // CHECK-LABEL: sil private [closure] [ossa] @$s26element_archetype_captures12packFunction2ts2us2vsyxxQp_q_xQpq0_q0_QptRvzRv_Rv0_STRzSTR_7ElementQy_AFRtzr1_lF10middleFuncL_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF05innerK0L_yyRvzRv_Rv0_STRzSTR_AgHRSr1_lF : $@convention(thin) <each T, each U, each V where repeat each T : Sequence, repeat each U : Sequence, repeat (each T).Element == (each U).Element><τ_1_0, τ_1_1 where τ_1_0 : Sequence, τ_1_1 : Sequence, τ_1_0.Element == τ_1_1.Element><τ_2_0> (@in_guaranteed τ_1_0, @in_guaranteed τ_1_1, @in_guaranteed τ_2_0) -> () {
         func innerFunc() {
 
           // CHECK: [[FN:%.*]] = function_ref @$s26element_archetype_captures6calleeyyx_q_q0_tSTRzSTR_7ElementQy_ACRtzr1_lF : $@convention(thin) <τ_0_0, τ_0_1, τ_0_2 where τ_0_0 : Sequence, τ_0_1 : Sequence, τ_0_0.Element == τ_0_1.Element> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1, @in_guaranteed τ_0_2) -> ()
@@ -35,7 +35,7 @@ func packFunction<each T, each U, each V>(ts: repeat each T, us: repeat each U, 
 // Make sure we don't inadvertently say that `each T` is captured by
 // `localFunc()`.
 public func anotherPackFunction<each T>(_ ts: repeat each T) {
-  // CHECK-LABEL: sil private [ossa] @$s26element_archetype_captures19anotherPackFunctionyyxxQpRvzlF9localFuncL_yyRvzlF : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s26element_archetype_captures19anotherPackFunctionyyxxQpRvzlF9localFuncL_yyRvzlF : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
   func localFunc() {
     for t in repeat each ts {
       _ = t
