@@ -1,0 +1,56 @@
+// RUN: %swift -target arm64e-apple-macos15.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-block-descriptor-pointers | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-SIGNED
+// RUN: %swift -target arm64e-apple-macos15.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-UNSIGNED
+
+// REQUIRES: CODEGENERATOR=AArch64
+// REQUIRES: OS=macosx
+
+import Builtin
+
+// CHECK: [[DESCRIPTOR:@block_descriptor[.0-9]*]] = internal constant { i64, i64, ptr }
+
+// CHECK-SIGNED: [[SIGNED_DESCRIPTOR:@block_descriptor[.0-9]*.ptrauth]] = private constant { ptr, i32, i64, i64 } { ptr [[GLOBAL_DESCRIPTOR:@block_descriptor[.0-9]*]], i32 2, i64 ptrtoint (ptr getelementptr inbounds (i8, ptr [[GLOBAL_BLOCK:@block[.0-9]*]], i64 24) to i64), i64 49339 }, section "llvm.ptrauth"
+// CHECK-SIGNED: [[GLOBAL_BLOCK]] = private constant { %objc_block, %swift.function } { %objc_block { ptr {{.*}}, i32 {{.*}}, i32 0, ptr {{.*}}, ptr [[SIGNED_DESCRIPTOR]] }
+
+// CHECK-UNSIGNED-NOT: @block_descriptor{{.*}}.ptrauth
+// CHECK-UNSIGNED: [[GLOBAL_BLOCK:@block[.0-9]*]] = private constant { %objc_block, %swift.function } { %objc_block { ptr {{.*}}, i32 {{.*}}, i32 0, ptr {{.*}}, ptr {{@block_descriptor[.0-9]*}} }
+
+sil @init_header_trivial : $@convention(thin) (@inout_aliasable @block_storage Builtin.RawPointer) -> @convention(block) () -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %i = function_ref @invoke_trivial : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> ()
+  %b = init_block_storage_header %0 : $*@block_storage Builtin.RawPointer, invoke %i : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> (), type $@convention(block) () -> ()
+  return %b : $@convention(block) () -> ()
+}
+// CHECK-LABEL: define swiftcc ptr @init_header_trivial(ptr
+// CHECK:         [[HEADER:%.*]] = getelementptr inbounds{{.*}} { %objc_block, ptr }, ptr %0, i32 0, i32 0
+// CHECK:         [[SLOT:%.*]] = getelementptr inbounds{{.*}} %objc_block, ptr [[HEADER]], i32 0, i32 4
+// CHECK-SIGNED-NEXT:   [[ADDR:%.*]] = ptrtoint ptr [[SLOT]] to i64
+// CHECK-SIGNED-NEXT:   [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 49339)
+// CHECK-SIGNED-NEXT:   [[SIGNED:%.*]] = call i64 @llvm.ptrauth.sign(i64 ptrtoint (ptr [[DESCRIPTOR]] to i64), i32 2, i64 [[DISC]])
+// CHECK-SIGNED-NEXT:   [[T0:%.*]] = inttoptr i64 [[SIGNED]] to ptr
+// CHECK-SIGNED-NEXT:   store ptr [[T0]], ptr [[SLOT]]
+// CHECK-UNSIGNED-NEXT: store ptr [[DESCRIPTOR]], ptr [[SLOT]]
+
+sil @invoke_trivial : $@convention(c) (@inout_aliasable @block_storage Builtin.RawPointer) -> () {
+entry(%0 : $*@block_storage Builtin.RawPointer):
+  %c = project_block_storage %0 : $*@block_storage Builtin.RawPointer
+  return undef : $()
+}
+
+sil @global_block_callee : $@convention(thin) () -> ()
+sil @invoke_global : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+
+sil @global_block : $@convention(thin) () -> @owned @convention(block) () -> () {
+entry:
+  %f = function_ref @global_block_callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %f to $@callee_guaranteed () -> ()
+  %storage = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %capture = project_block_storage %storage
+  store %thick to %capture
+  %invoke = function_ref @invoke_global : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %block = init_block_storage_header %storage, invoke %invoke : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) () -> ()
+  %copy = copy_block %block
+  dealloc_stack %storage
+  return %copy
+}
+// CHECK-LABEL: define swiftcc ptr @global_block()
+// CHECK:         ret ptr [[GLOBAL_BLOCK]]
