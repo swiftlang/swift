@@ -1,6 +1,7 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift(-enable-experimental-feature Lifetimes)
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// REQUIRES: swift_feature_Lifetimes
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
@@ -530,6 +531,30 @@ OptionalTests.test("MutableSpan from Optional.some")
   // exclusive access through `span` ends here
 
   expectEqual(o, a)
+}
+
+OptionalTests.test("MutableSpan from Optional, returned from a function")
+.require(.minimumStdlib(.stdlib_6_5))
+.xfail(.custom(
+  { !_isDebugAssertConfiguration() },
+  reason: "https://github.com/swiftlang/swift/issues/94606"))
+.code {
+  expectEqual(writeThroughMutableSpan(), 2)
+
+  @inline(never) @_lifetime(&optional)
+  func mutableSpanOfOptional(_ optional: inout Int?) -> MutableSpan<Int> {
+    optional.mutableSpan
+  }
+
+  @inline(never)
+  func writeThroughMutableSpan() -> Int? {
+    var optional: Int? = 1
+    do {
+      var span = mutableSpanOfOptional(&optional)
+      span[0] = 2
+    }
+    return optional
+  }
 }
 
 struct TestError: Error, Equatable {}
