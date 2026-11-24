@@ -23,7 +23,7 @@
 /// load/store
 /// end_access A
 ///
-/// The second access scope does not need to be emitted.
+/// The second access scope is removed.
 ///
 /// 2) Add a new dominating accesses to loop's preheader
 ///
@@ -33,8 +33,8 @@
 /// <loop>
 /// begin_access A [dynamic] [no_nested_conflict]
 ///
-/// Adding an empty begin_access A in the preheader would allow us to
-/// turn the loop's access to [static]
+/// Adding an empty begin_access A in the preheader allows us to
+/// remove the loop's access scope.
 ///
 /// Warning: This optimization requires that all points within this function
 /// that begin an access can be identified. Failure to recognize the beginning
@@ -306,8 +306,8 @@ using DomTreeNode = llvm::DomTreeNodeBase<SILBasicBlock>;
 
 // Visit the dominator tree top down, tracking the current set of dominating
 // dynamic accesses. Dominated dynamic accesses with identical storage are
-// marked static during traversal. If a dynamic access inside a loop has no
-// dominating access, insert a new access in the preheader.
+// collected during traversal and removed afterwards. If a dynamic access inside
+// a loop has no dominating access, insert a new access in the preheader.
 class DominatedAccessRemoval {
   // Record the first access of a given storage location and the dominator node
   // in which the access occurred.
@@ -330,6 +330,11 @@ class DominatedAccessRemoval {
 
   DomTreeNode *currDomNode = nullptr;
 
+  // Dominated accesses which are redundant. Their scopes are removed after the
+  // traversal, because the traversal (and the maps above) must not see erased
+  // instructions.
+  llvm::SmallVector<BeginAccessInst *, 8> redundantAccesses;
+
   bool hasChanged = false;
 
 public:
@@ -341,6 +346,10 @@ public:
   bool optimize();
 
 protected:
+  void markRedundant(BeginAccessInst *BAI) {
+    redundantAccesses.push_back(BAI);
+    hasChanged = true;
+  }
   void visitBeginAccess(BeginAccessInst *BAI);
   bool checkDominatedAccess(BeginAccessInst *BAI,
                             DomAccessStorage currDomStorage);
@@ -365,10 +374,16 @@ bool DominatedAccessRemoval::optimize() {
         visitBeginAccess(BAI);
     }
   }
+  for (BeginAccessInst *BAI : redundantAccesses) {
+    removeBeginAccess(BAI);
+  }
   return hasChanged;
 }
 
 // Visit a BeginAccessInst once-and-only-once in domtree order.
+// Note that accesses which are marked as redundant during this traversal are
+// still in the function (they are removed after the traversal). Each access is
+// visited only once, so they are never visited again after being marked.
 // Attempt to find a dominating access with identical storage.
 // If that fails, attempt to insert a new dominating access in the preheader.
 void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
@@ -415,13 +430,13 @@ bool DominatedAccessRemoval::checkDominatedAccess(
   return optimizeDominatedAccess(BAI, currDomStorage, domAccess);
 }
 
-// If possible, optimize the current access by converting it to [static]. Return
-// true if the optimization succeeds.
+// If possible, optimize the current access by marking it as redundant, so that
+// its scope is removed. Return true if the optimization succeeds.
 //
 // This function is not allowed to add or erase instructions, only change
 // instruction flags.
 //
-// The four required conditions for converting this access to static are:
+// The four required conditions for removing this access are:
 //
 // 1. A closed dominating access has identical storage.
 //
@@ -491,18 +506,16 @@ bool DominatedAccessRemoval::optimizeDominatedAccess(
                << "Promoting to modify: " << *domAccess.beginAccess << "\n");
     domAccess.beginAccess->setAccessKind(SILAccessKind::Modify);
   }
-  LLVM_DEBUG(llvm::dbgs() << "Setting static enforcement: " << *BAI << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Removing dominated access: " << *BAI << "\n");
   LLVM_DEBUG(llvm::dbgs() << "Dominated by: " << *domAccess.beginAccess
                           << "\n");
-  BAI->setEnforcement(SILAccessEnforcement::Static);
-
-  hasChanged = true;
+  markRedundant(BAI);
   return true;
 }
 
 // Attempt to insert a new access in the loop preheader. If successful, insert
 // the new access in DominatedAccessAnalysis so it can be used to dominate other
-// accesses. Also convert the current access to static and update the current
+// accesses. Also mark the current access as redundant and update the current
 // storageToDomMap since the access may already have been recorded (when it was
 // still dynamic).
 //
@@ -562,9 +575,7 @@ void DominatedAccessRemoval::tryInsertLoopPreheaderAccess(
   LLVM_DEBUG(llvm::dbgs() << "Created loop preheader access: " << *newBegin
                           << "\n"
                           << "dominating: " << *BAI << "\n");
-  BAI->setEnforcement(SILAccessEnforcement::Static);
-
-  hasChanged = true;
+  markRedundant(BAI);
 
   // Insert the new dominating instruction in both DominatedAccessAnalysis and
   // storageToDomMap if it has uniquely identifiable storage.
@@ -579,7 +590,7 @@ void DominatedAccessRemoval::tryInsertLoopPreheaderAccess(
 
   // Track the new access as long as no other accesses from the same storage are
   // already tracked. This also necessarily replaces the current access, which
-  // was just made static.
+  // was just marked as redundant.
   DominatingAccess newDomAccess(newBegin, domInfo->getNode(preheader));
   auto iterAndInserted = storageToDomMap.try_emplace(storage, newDomAccess);
   if (!iterAndInserted.second) {
