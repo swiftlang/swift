@@ -69,3 +69,27 @@ func captureUninitialized() {
   let fn: () -> Void // expected-note {{constant defined here}}
   fn = { fn() } // expected-error {{constant 'fn' captured by a closure before being initialized}}
 }
+
+struct AutoclosureExistentialMetatype {
+  var a = 0
+  let b: any P
+
+  init(_ p: any P) {
+    _ = false || (type(of: b) == Int.self) // expected-error {{constant 'self.b' used before being initialized}}
+    b = p
+  }
+}
+
+struct AutoclosureForceUnwrapGeneric<T: Equatable> {
+  let b: T?
+
+  init(_ v: T?) {
+    _ = false || (b! == b!) // expected-error {{constant 'self.b' used before being initialized}}
+    b = v
+  }
+}
+
+func existentialMetatypeUninit() {
+  let x: any P // expected-note {{constant defined here}}
+  _ = type(of: x) // expected-error {{constant 'x' used before being initialized}}
+}

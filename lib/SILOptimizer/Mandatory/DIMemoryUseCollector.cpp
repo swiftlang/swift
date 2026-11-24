@@ -1152,6 +1152,11 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
+    if (isa<ExistentialMetatypeInst>(User)) {
+      addElementUses(BaseEltNo, PointeeType, User, DIUseKind::Load);
+      continue;
+    }
+
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
       trackDestroy(User);
