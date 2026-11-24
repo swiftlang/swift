@@ -10,3 +10,14 @@ func test() async {
     }
   }
 }
+
+struct Cont<T> {}
+
+func h<T>(_ body: (Cont<T>) -> Void) -> T { fatalError() }
+func h<T>(x: Int, _ body: (Cont<T>) -> Void) -> T { fatalError() }
+
+func g() {
+  h { c in // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    let b = c
+  }
+}
