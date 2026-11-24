@@ -4,6 +4,7 @@
 // RUN: cat %s | grep -v _expose > %t/clean.swift
 // RUN: %target-swift-frontend %t/clean.swift -module-name Decls -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/decls.h
 // RUN: %FileCheck %s < %t/decls.h
+// RUN: %FileCheck --check-prefix=CONTEXT %s < %t/decls.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/decls.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -180,3 +181,46 @@ public struct HasDoubleOptionalPointerProperty {
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT: class unsupportedGenericStruct { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedGenericStruct' can not yet be represented in C++");
+
+// Parameter packs and value generics have no requirements, but aren't supported
+// yet either.
+@available(SwiftStdlib 5.9, *)
+@_expose(Cxx) // expected-error {{generic requirements for generic struct 'unsupportedPack' can not yet be represented in C++}}
+public struct unsupportedPack<each T> {
+    public var x: Int
+}
+
+@available(SwiftStdlib 6.2, *)
+@_expose(Cxx) // expected-error {{generic requirements for generic struct 'unsupportedValueGeneric' can not yet be represented in C++}}
+public struct unsupportedValueGeneric<let N: Int> {
+    public var x: Int
+}
+
+// Requirements of the context apply to declarations without generic
+// parameters of their own.
+@_expose(Cxx)
+public struct GenericWithConstrainedMembers<T> {
+    public var x: Int
+
+    @_expose(Cxx) // expected-error {{generic requirements for instance method 'constrainedMethod()' can not yet be represented in C++}}
+    public func constrainedMethod() where T: Proto {}
+
+    @_expose(Cxx) // expected-error {{generic requirements for instance method 'sameTypeMethod()' can not yet be represented in C++}}
+    public func sameTypeMethod() where T == Int {}
+}
+
+extension GenericWithConstrainedMembers where T: Proto {
+    @_expose(Cxx) // expected-error {{generic requirements for struct 'NestedInConstrainedExtension' can not yet be represented in C++}}
+    public struct NestedInConstrainedExtension {
+        public var y: Int
+    }
+}
+
+// CONTEXT-NOT: constrainedMethod
+// CONTEXT-NOT: sameTypeMethod
+// CONTEXT-NOT: NestedInConstrainedExtension
+// CONTEXT: class unsupportedPack { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedPack' can not yet be represented in C++");
+// CONTEXT: class unsupportedValueGeneric { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedValueGeneric' can not yet be represented in C++");
+// CONTEXT-NOT: constrainedMethod
+// CONTEXT-NOT: sameTypeMethod
+// CONTEXT-NOT: NestedInConstrainedExtension
