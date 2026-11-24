@@ -2453,11 +2453,8 @@ OptionalBridgedDeclObj BridgedInstruction::RefElementAddr_getDecl() const {
   return {getAs<swift::RefElementAddrInst>()->getField()};
 }
 
-bool BridgedInstruction::DebugValue_hasVarInfo() const {
-  return getAs<swift::DebugValueInst>()->getVarInfo().has_value();
-}
 BridgedSILDebugVariable BridgedInstruction::DebugValue_getVarInfo() const {
-  return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getVarInfo().value());
+  return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getCompleteVarInfo());
 }
 BridgedType BridgedInstruction::DebugValue_getVarType() const {
   return getAs<swift::DebugValueInst>()->getVarType();

@@ -698,7 +698,7 @@ void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
 
   Operand &operandRef = getAllOperands()[operandIdx];
   SILValue operand = operandRef.get();
-  if (isa<SILUndef>(operand)) {
+  if (isa<SILUndef>(operand) && !operandType) {
     // Already undef: no operand to kill.
     return;
   }
@@ -793,35 +793,14 @@ bool DebugValueInst::isExprTypeValid() const {
       return false;
   }
 
-  // Fragments are in the opposite direction, process from right to left.
-  SILType RunningType = *varInfo.Type;
-  unsigned derefCount = 0;
+  auto RunningType = varInfo.getFragmentType(*F);
+  if (!RunningType)
+    return false;
 
+  unsigned derefCount = 0;
   for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands()) {
-    switch (Operand.getOperator()) {
-    case SILDIExprOperator::Dereference:
+    if (Operand.getOperator() == SILDIExprOperator::Dereference)
       ++derefCount;
-      break;
-    case SILDIExprOperator::Fragment: {
-      auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
-      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
-      if (!FieldParent ||
-          RunningType.getNominalDecl() != FieldParent)
-        return false;
-      RunningType = RunningType.getFieldType(Field, F);
-      break;
-    }
-    case SILDIExprOperator::TupleFragment: {
-      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
-        return false;
-      unsigned Idx = Operand.args()[1].getAsConstInt().value();
-      RunningType = RunningType.getTupleElementType(Idx);
-      break;
-    }
-    default:
-      // Invalid operator
-      return false;
-    }
   }
 
   // There must be as many op_derefs as SIL type indirection levels.
@@ -833,8 +812,39 @@ bool DebugValueInst::isExprTypeValid() const {
   if (derefCount != hasDeref())
     return false;
 
-  return RunningType.removingMoveOnlyWrapper() ==
+  return RunningType->removingMoveOnlyWrapper() ==
          valueType.getObjectType().removingMoveOnlyWrapper();
+}
+
+std::optional<SILType> SILDebugVariable::getFragmentType(SILFunction &F) const {
+  ASSERT(Type && "The fragments are narrowed from the variable type");
+  SILType RunningType = *Type;
+  for (const SILDIExprOperand &Operand : DIExpr.operands()) {
+    switch (Operand.getOperator()) {
+    case SILDIExprOperator::Dereference:
+      break;
+    case SILDIExprOperator::Fragment: {
+      auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
+      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
+      if (!FieldParent ||
+          RunningType.getNominalDecl() != FieldParent)
+        return std::nullopt;
+      RunningType = RunningType.getFieldType(Field, &F);
+      break;
+    }
+    case SILDIExprOperator::TupleFragment: {
+      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
+        return std::nullopt;
+      unsigned Idx = Operand.args()[1].getAsConstInt().value();
+      RunningType = RunningType.getTupleElementType(Idx);
+      break;
+    }
+    default:
+      // Invalid operator
+      return std::nullopt;
+    }
+  }
+  return RunningType;
 }
 
 VarDecl *DebugValueInst::getDecl() const {
