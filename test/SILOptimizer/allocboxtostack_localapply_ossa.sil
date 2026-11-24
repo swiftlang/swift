@@ -548,3 +548,56 @@ bb0:
   %retval = tuple ()
   return %retval : $()
 }
+
+// Check that cloning a closure doesn't change the pack expansion in a
+// substitution map which also contains a local archetype.
+// `Pack{repeat each T}` must not become `Pack{repeat (each T)^1}`.
+// https://github.com/swiftlang/swift/issues/94501
+
+sil @use_pack_element : $@convention(thin) <U> (@in_guaranteed U, Int) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_pack_expansion :
+// CHECK-NOT:     alloc_box
+// CHECK:         [[F:%.*]] = function_ref @$s20pack_expansion_outerTf0sn_n
+// CHECK:         apply [[F]]<Pack{repeat each T}>(
+// CHECK-LABEL: } // end sil function 'test_pack_expansion'
+sil [ossa] @test_pack_expansion : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+bb0(%0 : $*(repeat each T)):
+  %1 = alloc_box ${ var Int }, var, name "x"
+  %2 = project_box %1, 0
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = struct $Int (%3)
+  store %4 to [trivial] %2
+  %6 = function_ref @pack_expansion_outer : $@convention(thin) <each T> (@guaranteed { var Int }, @in_guaranteed (repeat each T)) -> ()
+  %7 = apply %6<Pack{repeat each T}>(%1, %0) : $@convention(thin) <each T> (@guaranteed { var Int }, @in_guaranteed (repeat each T)) -> ()
+  destroy_value %1
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20pack_expansion_outerTf0sn_n : $@convention(thin) <each T> (@inout_aliasable Int, @in_guaranteed (repeat each T)) -> () {
+// CHECK:         [[F:%.*]] = function_ref @$s20pack_expansion_innerTf0ns_n
+// CHECK:         apply [[F]]<Pack{repeat each T}, @pack_element({{[0-9]+}}) each T>(
+// CHECK-LABEL: } // end sil function '$s20pack_expansion_outerTf0sn_n'
+sil private [ossa] @pack_expansion_outer : $@convention(thin) <each T> (@guaranteed { var Int }, @in_guaranteed (repeat each T)) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Int }, %1 : $*(repeat each T)):
+  %2 = integer_literal $Builtin.Word, 0
+  %3 = dynamic_pack_index %2 of $Pack{repeat each T}
+  %4 = open_pack_element %3 of <each T> at <Pack{repeat each T}>, shape $each T, id 1
+  %5 = tuple_pack_element_addr %3 of %1 as $*@pack_element(1) each T
+  %6 = function_ref @pack_expansion_inner : $@convention(thin) <each T><U> (@in_guaranteed U, @guaranteed { var Int }) -> ()
+  %7 = apply %6<Pack{repeat each T}, @pack_element(1) each T>(%5, %0) : $@convention(thin) <each T><U> (@in_guaranteed U, @guaranteed { var Int }) -> ()
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil private [ossa] @$s20pack_expansion_innerTf0ns_n : $@convention(thin) <each T><U> (@in_guaranteed U, @inout_aliasable Int) -> () {
+sil private [ossa] @pack_expansion_inner : $@convention(thin) <each T><U> (@in_guaranteed U, @guaranteed { var Int }) -> () {
+bb0(%0 : $*U, %1 : @closureCapture @guaranteed ${ var Int }):
+  %2 = project_box %1, 0
+  %3 = load [trivial] %2
+  %4 = function_ref @use_pack_element : $@convention(thin) <U> (@in_guaranteed U, Int) -> ()
+  %5 = apply %4<U>(%0, %3) : $@convention(thin) <U> (@in_guaranteed U, Int) -> ()
+  %6 = tuple ()
+  return %6
+}
