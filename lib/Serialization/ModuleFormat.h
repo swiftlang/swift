@@ -2813,7 +2813,6 @@ namespace decls_block {
 
   using SerializableRecordFieldLayout = BCRecordLayout<
     RECORD_FIELD,
-    TypeIDField, // Swift field type, or zero if it has no Swift representation
     BCVBR<32>,  // byte offset
     BCVBR<32>,  // byte offset used during layout
     BCVBR<16>,  // LLVM struct or non-fixed element index

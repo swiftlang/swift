@@ -6008,7 +6008,6 @@ class SerializableTypeInfoReader {
     uint64_t bits;
   };
 
-  ModuleFile &MF;
   llvm::BitstreamCursor &Cursor;
   SmallVector<uint64_t, 64> Scratch;
   bool Invalid = false;
@@ -6149,23 +6148,14 @@ class SerializableTypeInfoReader {
     result.explosionSize = explosionSize;
     for (uint64_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
       SerializableRecordFieldRepresentation field;
-      swift::serialization::TypeID fieldTypeID;
       uint64_t index;
       bool isTriviallyDestroyable;
       uint64_t layoutKind;
       if (!readRecord<SerializableRecordFieldLayout>(
-              fieldTypeID, field.layout.ByteOffset,
-              field.layout.ByteOffsetForLayout, index,
+              field.layout.ByteOffset, field.layout.ByteOffsetForLayout, index,
               isTriviallyDestroyable, layoutKind,
               field.storage.Begin, field.storage.End))
         return false;
-      if (fieldTypeID) {
-        auto fieldType = MF.getTypeChecked(fieldTypeID);
-        if (fieldType)
-          field.type = *fieldType;
-        else
-          llvm::consumeError(fieldType.takeError());
-      }
       field.layout.Index = index;
       field.layout.IsTriviallyDestroyable = isTriviallyDestroyable;
       field.layout.TheKind = layoutKind;
@@ -6205,9 +6195,8 @@ class SerializableTypeInfoReader {
   }
 
 public:
-  SerializableTypeInfoReader(ModuleFile &moduleFile,
-                             llvm::BitstreamCursor &cursor)
-      : MF(moduleFile), Cursor(cursor) {}
+  explicit SerializableTypeInfoReader(llvm::BitstreamCursor &cursor)
+      : Cursor(cursor) {}
 
   std::optional<SILTypeProperties> readSILTypeProperties() {
     using namespace decls_block;
@@ -6322,7 +6311,7 @@ ModuleFile::deserializeAbstractTypeLayout(BitOffset offset) {
   if (!decodeReferenceCounting(rawReferenceCounting, referenceCounting))
     return diagnoseFatal();
 
-  SerializableTypeInfoReader reader(*this, DeclTypeCursor);
+  SerializableTypeInfoReader reader(DeclTypeCursor);
   auto typeProperties = reader.readSILTypeProperties();
   if (!typeProperties)
     return diagnoseFatal();

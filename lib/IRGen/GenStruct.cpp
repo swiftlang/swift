@@ -117,9 +117,6 @@ namespace {
                             IGM.getMaximalTypeExpansionContext());
     }
 
-    Type getInterfaceTypeForSerialization() const {
-      return Field ? Field->getInterfaceType() : Type();
-    }
   };
 
   /// A field-info implementation for fields of Clang types.
@@ -153,9 +150,6 @@ namespace {
       return {};
     }
 
-    Type getInterfaceTypeForSerialization() const {
-      return Field ? Field->getInterfaceType() : Type();
-    }
   };
 
   /// A common base class for structs.
@@ -2078,10 +2072,6 @@ namespace {
   createRecordFieldTypeInfoFromSerializableRepresentation(
       IRGenModule &IGM,
       const SerializableRecordFieldRepresentation &field) {
-    if (field.type) {
-      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
-      return IGM.getTypeInfo(loweredType);
-    }
     if (!field.typeInfo)
       llvm::report_fatal_error(
           "serialized record field has no TypeInfo representation");

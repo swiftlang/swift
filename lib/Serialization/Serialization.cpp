@@ -6833,8 +6833,8 @@ void Serializer::writeSerializableRecordTypeInfo(
   for (const auto &field : representation.fields) {
     abbrCode = DeclTypeAbbrCodes[SerializableRecordFieldLayout::Code];
     SerializableRecordFieldLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, addTypeRef(field.type),
-        field.layout.ByteOffset, field.layout.ByteOffsetForLayout,
+        Out, ScratchRecord, abbrCode, field.layout.ByteOffset,
+        field.layout.ByteOffsetForLayout,
         field.layout.Index, field.layout.IsTriviallyDestroyable,
         field.layout.TheKind, field.storage.Begin, field.storage.End);
     writeSerializableTypeInfo(*field.typeInfo);
