@@ -3211,20 +3211,12 @@ function Get-CompilersDefines([Hashtable] $Platform,
     SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
-
-    # We can't enable this on Android yet
-    # https://github.com/swiftlang/swift/issues/87445
-    SWIFT_ENABLE_RUNTIME_MODULE = $(if ($Platform.OS -eq [OS]::Windows) {
+    SWIFT_ENABLE_RUNTIME_MODULE = "YES";
+    SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -ne [OS]::Windows -or $Platform.Architecture.ShortName -ne "x86") {
         "YES"
       } else {
         "NO"
       });
-    SWIFT_ENABLE_BACKTRACING = $(if ($Platform.OS -eq [OS]::Windows -and $Platform.Architecture.ShortName -ne "x86") {
-        "YES"
-      } else {
-        "NO"
-      });
-
     SWIFT_ENABLE_SYNCHRONIZATION = "YES";
     SWIFT_ENABLE_VOLATILE = "YES";
     SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
@@ -4886,7 +4878,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
       }
     }
 
-    if ($SupplementalRuntimes -contains "Runtime" -and $Platform.OS -ne [OS]::Android) {
+    if ($SupplementalRuntimes -contains "Runtime") {
       Record-OperationTime $Platform "Build-${Variant}RuntimeModule" {
         Build-CMakeProject `
           -Src $SourceCache\swift\Runtimes\Supplemental\Runtime `

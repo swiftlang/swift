@@ -140,6 +140,11 @@ const int signalsToHandle[] = {
   SIGTRAP
 };
 
+#if defined(__ANDROID__)
+// The handlers that were installed before ours (debuggerd's).
+struct sigaction previousHandlers[lengthof(signalsToHandle)];
+#endif
+
 } // namespace
 
 namespace swift {
@@ -188,7 +193,17 @@ _swift_installCrashHandler()
     if (sigaction(signalsToHandle[n], NULL, &osa) < 0)
       return errno;
 
-    if (osa.sa_handler == SIG_DFL) {
+#if defined(__ANDROID__)
+    // Bionic installs debuggerd's handlers in every process.  Install ours
+    // over them, and pass the signal back to them after the backtrace, so
+    // that Android still writes its tombstone.
+    previousHandlers[n] = osa;
+    bool install = osa.sa_handler != SIG_IGN;
+#else
+    bool install = osa.sa_handler == SIG_DFL;
+#endif
+
+    if (install) {
       // No, so install ours
       if (sigaction(signalsToHandle[n], &sa, NULL) < 0)
         return errno;
@@ -335,6 +350,27 @@ handle_fatal_signal(int signum,
      so reset SIGSEGV and SIGBUS again */
   reset_signal(SIGSEGV, nullptr);
   reset_signal(SIGBUS, nullptr);
+
+#if defined(__ANDROID__)
+  // Give the signal back to the handlers we replaced.  A fault happens again
+  // when we return.  A signal that was sent (by abort(), for instance) has to
+  // be sent again; block it until we return, so that it is delivered on a
+  // fresh signal stack and with the context of the crash.
+  for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
+    sigaction(signalsToHandle[n], &previousHandlers[n], nullptr);
+
+  if (pinfo->si_code <= 0) {
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, signum);
+    pthread_sigmask(SIG_BLOCK, &mask, nullptr);
+    syscall(SYS_rt_tgsigqueueinfo, getpid(), self.tid, signum, pinfo);
+  }
+
+  resume_other_threads();
+  errno = old_err;
+  return;
+#endif
 
   // If we were killed by another process, kill ourselves now
   if (pinfo->si_code == SI_USER) {
@@ -835,6 +871,14 @@ memserver_entry(void *dummy __attribute__((unused))) {
   sa.sa_flags = SA_NODEFER;
   sigaction(SIGSEGV, &sa, NULL);
   sigaction(SIGBUS, &sa, NULL);
+
+  // We start with the signal mask of the crashing thread, which may block
+  // these signals (Bionic's abort() blocks everything except SIGABRT).
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGSEGV);
+  sigaddset(&mask, SIGBUS);
+  pthread_sigmask(SIG_UNBLOCK, &mask, NULL);
 
   for (;;) {
     struct memserver_req req;

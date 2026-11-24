@@ -86,6 +86,7 @@ target_link_libraries(swift-backtrace PRIVATE
   swiftRuntime
   swiftCxx
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
+  $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Linux>:swiftGlibc>
   $<$<PLATFORM_ID:Windows>:swiftCRT>
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>)

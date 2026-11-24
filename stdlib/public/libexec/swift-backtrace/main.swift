@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if (os(macOS) || os(Linux) || os(Windows)) && (arch(x86_64) || arch(arm64))
+#if (os(macOS) || os(Linux) || os(Android) || os(Windows)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Darwin)
 import Darwin
@@ -18,6 +18,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #elseif os(Windows)
 import CRT
 import WinSDK
@@ -876,14 +878,14 @@ Generate a backtrace for the parent process.
     }
   }
 
-  #if os(Linux) || os(anyAppleOS)
+  #if os(Linux) || os(Android) || os(anyAppleOS)
   static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)
 
     var newAttrs = oldAttrs
 
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
     #else
     newAttrs.c_lflag &= ~UInt(ICANON | ECHO)

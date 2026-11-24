@@ -15,12 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 #if canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 import Runtime
@@ -303,4 +305,4 @@ class Target {
   }
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

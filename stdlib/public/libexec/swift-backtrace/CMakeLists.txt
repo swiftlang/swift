@@ -4,11 +4,13 @@ set(darwin)
 set(wincrt_sdk)
 set(glibc)
 set(musl)
+set(android)
 
 if(SWIFT_BUILD_SDK_OVERLAY)
   set(wincrt_sdk CRT WinSDK)
   set(glibc Glibc)
   set(musl Musl)
+  set(android Android)
 endif()
 
 if((SWIFT_BUILD_CLANG_OVERLAYS
@@ -87,6 +89,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
   SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+  SWIFT_MODULE_DEPENDS_ANDROID      ${android}
 
   DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
@@ -96,7 +99,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
     -parse-as-library
     -g -Xlinker /debug
 
-  TARGET_SDKS OSX LINUX WINDOWS)
+  TARGET_SDKS OSX LINUX WINDOWS ANDROID)
 
 set(static_target_sdks)
 if(SWIFT_BUILD_STATIC_STDLIB)
