@@ -359,8 +359,10 @@ function Write-Summary {
 
 # Writes the timing data in the Chrome Trace Event format, which can be loaded
 # in https://ui.perfetto.dev or chrome://tracing to view the build timeline.
-function Write-TimingTrace([string] $Path) {
-  $Events = foreach ($Entry in $TimingData) {
+# With -TrackPerStep, each top-level step shows in its own track, so that the
+# steps that run at the same time do not overlap.
+function Write-TimingTrace([string] $Path, [switch] $TrackPerStep) {
+  function Get-TraceEvents([PSCustomObject] $Entry, [int] $Track) {
     [ordered]@{
       name = $Entry."Build Step"
       cat = "$($Entry.Platform) $($Entry.Arch)"
@@ -369,17 +371,30 @@ function Write-TimingTrace([string] $Path) {
       ts = [long]($Entry.Start.Ticks / 10)
       dur = [long]($Entry."Elapsed Time".Ticks / 10)
       pid = 0
-      tid = 0
+      tid = $Track
       args = [ordered]@{
         Platform = $Entry.Platform
         Arch = $Entry.Arch
         CPU = [math]::Round($Entry.CPU, 2)
       }
     }
+    foreach ($Child in $Entry.Children) {
+      Get-TraceEvents $Child $Track
+    }
+  }
+
+  $Track = 0
+  $Events = foreach ($Entry in $TimingData) {
+    if ($Entry.Parent) { continue }
+    if ($TrackPerStep) {
+      $Track += 1
+      [ordered]@{ name = "thread_name"; ph = "M"; pid = 0; tid = $Track; args = @{ name = $Entry."Build Step" } }
+    }
+    Get-TraceEvents $Entry $Track
   }
 
   $Metadata = @(
-    [ordered]@{ name = "process_name"; ph = "M"; pid = 0; args = @{ name = "build.ps1" } },
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 0; args = @{ name = "build" } },
     [ordered]@{ name = "process_name"; ph = "M"; pid = 1; args = @{ name = "lit" } }
   )
 
@@ -2101,6 +2116,38 @@ function Invoke-BuildScript([string] $Name, [string] $Script, [Hashtable] $Param
     Import-TimingData $script:CurrentOperation $ScriptTimingDataPath
     if ($ExitCode -ne 0) {
       throw "$Script exited with code $ExitCode"
+    }
+  }
+}
+
+# Removes the build trees of the given platforms, and the image of the host
+# toolchain.
+function Clear-BuildTree([Hashtable[]] $Platforms) {
+  # Fail instead of leaving a partially-cleaned tree behind.
+  function Clean-Path([string] $Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    try {
+      [System.IO.Directory]::Delete("\\?\$Path", $true)
+    } catch {
+      throw "Failed to clean '$Path': $_"
+    }
+  }
+
+  foreach ($Platform in (@($BuildPlatform, $HostPlatform) + $Platforms)) {
+    Clean-Path "$BinaryCache\$($Platform.Triple)"
+  }
+  Clean-Path "$BinaryCache\1"
+  Clean-Path "$BinaryCache\5"
+  Clean-Path (Get-InstallDir $HostPlatform)
+}
+
+# Removes the SDKs and the Windows runtimes from the image, so that the SDKs
+# that a toolchain is built against are installed from scratch.
+function Remove-InstalledSDKs([Hashtable[]] $WindowsPlatforms) {
+  Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
+  if ($HostPlatform.OS -eq [OS]::Windows) {
+    (@($HostPlatform) + @($WindowsPlatforms)) | ForEach-Object {
+      Remove-Item -Force -Recurse (Get-WindowsRuntimeInstallRoot $_) -ErrorAction Ignore
     }
   }
 }

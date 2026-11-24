@@ -7,9 +7,9 @@ Builds the installer of the Swift toolchain.
 
 .DESCRIPTION
 Patches the toolchain in the image with mimalloc, then builds the MSIs and the
-installer bundle from the image that build.ps1 populated. Optionally generates
-the Software Bill of Materials, and copies the artifacts to a staging directory
-for CI.
+installer bundle from the image that BuildToolchain.ps1 and BuildSDK.ps1
+populated. Optionally generates the Software Bill of Materials, and copies the
+artifacts to a staging directory for CI.
 
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
