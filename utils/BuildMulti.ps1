@@ -18,8 +18,9 @@ in separate processes:
 - The package tests run in the background. The test suites of the compilers
   build what they need once, then check-swift runs while the other tests run
   in the background.
+- The installer builds in the background while the tests run.
 
-The SDKs and the package tests build at a lower priority. The steps after
+The SDKs, the package tests and the installer build at a lower priority. The steps after
 SetupDependencies.ps1 log to <BinaryCache>\BuildMulti\<name>.log. This script
 prints the log of the step that it waits for as the step writes it, and the
 log of each background process in one piece once the process ended and that
@@ -600,8 +601,10 @@ if ($Test -and -not $Toolchain -and -not $IsCrossCompiling) {
   }
 }
 
+# The installer does not change the image, so it builds while the tests run.
+$InstallerJobs = @()
 if ($Package) {
-  Invoke-FollowedBuildScript "BuildInstaller" BuildInstaller.ps1 @{
+  $InstallerJobs += Start-BuildJob "BuildInstaller" BuildInstaller.ps1 -BelowNormal @{
     WindowsSDKArchitectures = $SelectedWindowsSDKArchitectures;
     AndroidSDKArchitectures = $SelectedAndroidSDKArchitectures;
   }
@@ -609,6 +612,8 @@ if ($Package) {
   Write-Warning "The SBoM is only generated with the installer, with -Package."
 }
 
+$TestJobs = @()
+$Failure = $null
 if ($Test -and -not $IsCrossCompiling) {
   $CompilerTests = @($Test | Where-Object { $_ -in "clang", "lld", "lldb", "lldb-swift", "llvm", "swift" })
   $PackageTests = @($Test | Where-Object { $_ -in "foundation", "swift-format", "sourcekit-lsp", "swiftpm", "llbuild" })
@@ -617,7 +622,6 @@ if ($Test -and -not $IsCrossCompiling) {
   $OtherTests = @($Test | Where-Object { $_ -notin $CompilerTests -and $_ -notin $PackageTests })
 
   # The package tests build in their own trees, with the toolchain of the image.
-  $TestJobs = @()
   if ($PackageTests) {
     $TestJobs += Start-BuildJob "TestToolchain-Packages" TestToolchain.ps1 -BelowNormal @{
       Test = $PackageTests;
@@ -642,7 +646,6 @@ if ($Test -and -not $IsCrossCompiling) {
   }
 
   # Run check-swift, the longest suite, here, and report all the failures.
-  $Failure = $null
   if ($CompilerTests -contains "swift") {
     try {
       Invoke-FollowedBuildScript "TestToolchain-swift" TestToolchain.ps1 @{
@@ -653,11 +656,6 @@ if ($Test -and -not $IsCrossCompiling) {
       $Failure = $_
     }
   }
-  Wait-BuildJobs $TestJobs
-  if ($Failure) {
-    throw $Failure
-  }
-
   # TODO: restore Android Swift runtime tests against the new Runtimes/* layout.
   # The previous `Test-Runtime` reconfigured the in-tree stdlib build (built by
   # the now-removed `Build-LegacySDK` -> `Build-Runtime`) with
@@ -670,6 +668,11 @@ if ($Test -and -not $IsCrossCompiling) {
   if ($Test -contains "swift" -and $Android) {
     Write-Warning "Android Swift runtime tests are not currently wired up to the new SDK layout; skipping."
   }
+}
+
+Wait-BuildJobs ($TestJobs + $InstallerJobs)
+if ($Failure) {
+  throw $Failure
 }
 
 } catch {
