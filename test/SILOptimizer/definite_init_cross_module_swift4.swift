@@ -273,6 +273,12 @@ extension Empty {
 
   init(xx: Double) {
   } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
+
+  mutating func touch() {}
+
+  init(mutateWithoutSelfInit: Void) {
+    touch() // expected-error {{'self' used before all stored properties are initialized}}
+  } // expected-warning {{initializer for struct 'Empty' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
 }
 
 extension GenericEmpty {

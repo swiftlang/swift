@@ -708,6 +708,9 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
          "Not a designated initializer");
 
+  if (TheMemory.hasDummyElement())
+    return;
+
   // Determine which members, specifically are uninitialized.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
