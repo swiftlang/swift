@@ -232,3 +232,63 @@ extension Throwing {
     self = try Self.makeOrThrow(x: x + 1)
   }
 }
+
+func takeInout<T>(_ x: inout T) {}
+
+struct GenericVarBeforeLet<T> {
+  var a = 0
+  let b: T
+
+  init(_ v: T) {
+    _ = b // expected-error {{constant 'self.b' used before being initialized}}
+    b = v
+  }
+}
+
+struct GenericLetBeforeVar<T> {
+  let a = 0
+  var b: T
+
+  init(_ v: T) {
+    _ = b // expected-error {{variable 'self.b' used before being initialized}}
+    b = v
+  }
+
+  init(inoutUse v: T) {
+    takeInout(&b) // expected-error {{variable 'self.b' passed by reference before being initialized}}
+    b = v
+  }
+}
+
+struct AutoclosureVarBeforeLet {
+  var a = false
+  let b: Bool
+
+  init() {
+    _ = false || b // expected-error {{constant 'self.b' used before being initialized}}
+    b = true
+  }
+}
+
+class ClassPropertyOrdering {
+  var a = 0
+  let b: Int
+  var pair: (Int, Int)
+
+  init(readLet: Void) {
+    pair = (1, 2)
+    _ = b // expected-error {{constant 'self.b' used before being initialized}}
+    b = 3
+  }
+}
+
+class ClassLetBeforeTupleVar {
+  let a = 0
+  let b = 0
+  var pair: (Int, Int)
+
+  init() {
+    _ = pair // expected-error {{variable 'self.pair.0' used before being initialized}}
+    pair = (1, 2)
+  }
+}

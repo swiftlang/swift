@@ -440,8 +440,12 @@ static void getPathStringToElementRec(TypeExpansionContext context,
 
 ValueDecl *
 DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
-                                           std::string &Result) const {
+                                           std::string &Result,
+                                           bool *isLet) const {
   auto &Module = MemoryInst->getModule();
+
+  if (isLet)
+    *isLet = isNonDelegatingInit() ? false : IsLet;
 
   if (isAnyInitSelf())
     Result = "self";
@@ -473,6 +477,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           getPathStringToElementRec(expansionContext,
                                     *MemoryInst->getFunction(), FieldType,
                                     Element, Result);
+          if (isLet)
+            *isLet = VD->isLet();
           return VD;
         }
         Element -= NumFieldElements;
@@ -481,8 +487,11 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
       for (auto *property : NTD->getInitAccessorProperties()) {
         auto *init = property->getAccessor(AccessorKind::Init);
         if (init->getInitializedProperties().empty()) {
-          if (Element == 0)
+          if (Element == 0) {
+            if (isLet)
+              *isLet = !property->getAccessor(AccessorKind::Set);
             return property;
+          }
           --Element;
         }
       }
