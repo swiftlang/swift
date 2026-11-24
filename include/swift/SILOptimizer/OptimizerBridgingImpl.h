@@ -132,6 +132,14 @@ BridgedLoop BridgedLoopTree::getLoop(SwiftInt index) const {
   return {li->begin()[index]};
 }
 
+bool BridgedLoopTree::isInLoop(BridgedBasicBlock block) const {
+  return li->getLoopFor(block.unbridged()) != nullptr;
+}
+
+BridgedLoop BridgedLoopTree::getInnermostLoop(BridgedBasicBlock block) const {
+  return {li->getLoopFor(block.unbridged())};
+}
+
 BridgedBasicBlock BridgedLoopTree::splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const {
   return {swift::splitEdge(bb.unbridged()->getTerminator(), edgeIndex, domTree.di, li)};
 }

@@ -23,6 +23,14 @@ struct LoopTree {
     self.bridged = bridged
     self.loops = TopLevelLoopArray(bridged)
   }
+
+  /// The innermost loop which contains `block` or nil if `block` is not in a loop.
+  func innermostLoop(of block: BasicBlock) -> Loop? {
+    if bridged.isInLoop(block.bridged) {
+      return Loop(bridged: bridged.getInnermostLoop(block.bridged))
+    }
+    return nil
+  }
 }
 
 /// Describes a loop with its children.
