@@ -56,7 +56,7 @@
 - ``Swift/withTaskCancellationShield(operation:)-2lzl8``
 - ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 
-### Cancelling Part of a Task
+### Cancellation Scopes
 
 - ``Swift/withTaskCancellationScope(_:)-9rf6d``
 - ``Swift/withTaskCancellationScope(_:)-3mlgc``

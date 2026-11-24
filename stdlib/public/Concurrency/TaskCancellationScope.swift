@@ -93,9 +93,9 @@ public struct TaskCancellationScope: ~Escapable, @unchecked Sendable {
   ///   scope's lifetime.
   @export(implementation)
   public var isCancelled: Bool {
-    let packed = unsafe _taskCancellationScopeGetIsCancelledWithReason(
-      record: _record)
-    return packed & 1 != 0
+    CancellationError.Reason(_cancellationStatus:
+      unsafe _taskCancellationScopeGetIsCancelledWithReason(record: _record)
+    ) != nil
   }
 
   /// A value indicating the reason this scope has been cancelled.
@@ -109,11 +109,8 @@ public struct TaskCancellationScope: ~Escapable, @unchecked Sendable {
   ///   returning the same reason for the scope's lifetime.
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {
-    let packed = unsafe _taskCancellationScopeGetIsCancelledWithReason(
-      record: _record)
-    guard packed & 1 != 0 else { return nil }
-    let raw = UInt8(truncatingIfNeeded: packed >> 1)
-    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
+    CancellationError.Reason(_cancellationStatus:
+      unsafe _taskCancellationScopeGetIsCancelledWithReason(record: _record))
   }
 }
 

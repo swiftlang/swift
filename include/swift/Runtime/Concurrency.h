@@ -741,6 +741,8 @@ bool swift_task_isCancelled(AsyncTask* task);
 /// - `reason` (1..3): `CancellationError.Reason.rawValue` (3 bits).
 /// - `reserved`:      All other bits are zero; reserved for future evolution.
 ///
+/// `CancellationStatus` in `MetadataValues.h` defines this layout.
+///
 /// Runtime availability: Swift 6.5. Its Swift signature is
 ///
 /// \code

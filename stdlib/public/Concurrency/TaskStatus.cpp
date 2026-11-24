@@ -1110,8 +1110,6 @@ swift_task_cancellationScopeGetIsCancelledWithReasonImpl(
   // Read the record's own atomic state directly. Safe from any thread.
   if (!record)
     return 0;
-  // The return value must encode the isCancelled and reason into one word.
-  // See Concurrency.h for more details.
   return record->getIsCancelledWithReason();
 }
 

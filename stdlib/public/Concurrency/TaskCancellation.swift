@@ -396,12 +396,8 @@ extension Task where Success == Never, Failure == Never {
       // Unlike `UnsafeCurrentTask.cancellationReason`, take cancellation shields
       // and cancellation scopes into account.
       guard let task = unsafe task else { return nil }
-      let packed = unsafe _taskGetIsCancelledWithReasonWithFlags(task._rawTask, flags: 0)
-      guard packed & 1 != 0 else { return nil }
-      let raw = UInt8(truncatingIfNeeded: packed >> 1)
-      // `CancellationError` would refer to `Task.CancellationError()` here.
-      let reason: CancellationError.Reason? = .init(_rawValue: raw)
-      return reason ?? .unspecified
+      return .init(_cancellationStatus:
+        unsafe _taskGetIsCancelledWithReasonWithFlags(task._rawTask, flags: 0))
     }
   }
 }
@@ -543,6 +539,16 @@ extension CancellationError.Reason {
     case 1: self = .deadlineExpired
     default: return nil
     }
+  }
+
+  /// Decodes the cancellation state that the runtime returns in one word, e.g.
+  /// from `swift_task_getIsCancelledWithReason`. Returns `nil` if the word
+  /// isn't cancelled.
+  @export(implementation)
+  internal init?(_cancellationStatus status: UInt) {
+    guard status & 0b1 != 0 else { return nil }
+    let raw = UInt8(truncatingIfNeeded: (status >> 1) & 0b111)
+    self = Self(_rawValue: raw) ?? .unspecified
   }
 }
 
