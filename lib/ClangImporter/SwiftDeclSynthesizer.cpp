@@ -3014,7 +3014,6 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
     const clang::CXXMethodDecl *clangMethodDecl, StringRef swiftName) {
   auto clangDC = clangMethodDecl->getParent();
-  auto &ctx = ImporterImpl.SwiftContext;
 
   assert(!clangMethodDecl->isStatic() &&
          "C++ virtual functions cannot be static");
@@ -3052,7 +3051,7 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
   }
 
   auto result = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
+      ImporterImpl.importDecl(newMethod, ImporterImpl.CurrentVersion));
   return result;
 }
 
@@ -3061,7 +3060,6 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
 FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
     const clang::CXXMethodDecl *clangMethodDecl, CArrayProjection projection) {
   auto clangDC = clangMethodDecl->getParent();
-  auto &ctx = ImporterImpl.SwiftContext;
 
   assert(clangMethodDecl->isStatic() && "Expected a static operator");
 
@@ -3077,7 +3075,7 @@ FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
         clangMethodDecl->getASTContext(), "callAsFunction"));
 
   auto result = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
+      ImporterImpl.importDecl(newMethod, ImporterImpl.CurrentVersion));
   return getDeclForCArrayProjection(result, projection);
 }
 
@@ -3769,7 +3767,6 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
 
   auto &clangCtx = ImporterImpl.getClangASTContext();
   auto &clangSema = ImporterImpl.getClangSema();
-  ASTContext &ctx = ImporterImpl.SwiftContext;
 
   clang::SourceLocation loc = derivedClass->getLocation();
   clang::DeclContext *TUDC = clangCtx.getTranslationUnitDecl();
@@ -3845,7 +3842,7 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
   ImporterImpl.registerSynthesizedClangDecl(castDecl, derivedClass);
 
   auto *importedFn = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(castDecl));
+      ImporterImpl.importDecl(castDecl, ImporterImpl.CurrentVersion));
 
   // N.B. we need to do another lookup here because the import above may have
   // invalidated the iterator from the beginning of this function.

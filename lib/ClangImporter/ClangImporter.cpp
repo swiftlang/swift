@@ -6826,7 +6826,6 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
 // Construct a Swift method that represents the synthesized C++ method
 // that invokes the base C++ method.
 static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
-                                                ASTContext &ctx,
                                                 NominalTypeDecl *derivedStruct,
                                                 NominalTypeDecl *baseStruct,
                                                 FuncDecl *baseMember) {
@@ -6840,8 +6839,8 @@ static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
           ForwardingMethodKind::Base);
   if (!newClangMethod)
     return nullptr;
-  auto *forwardingMethod = cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(newClangMethod));
+  auto *forwardingMethod =
+      cast_or_null<FuncDecl>(impl.importDeclDirectly(newClangMethod));
 
   // Switch C array projections if we got the wrong one.
   return importer::getDeclForCArrayProjectionMatching(forwardingMethod,
@@ -6865,8 +6864,8 @@ synthesizeBaseClassMethodBody(AbstractFunctionDecl *afd, void *context) {
       cast<NominalTypeDecl>(baseMember->getDeclContext()->getAsDecl());
 
   auto forwardedFunc = synthesizeBaseFunctionDeclCall(
-      *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), ctx,
-      derivedStruct, baseStruct, baseMember);
+      *static_cast<ClangImporter *>(ctx.getClangModuleLoader()), derivedStruct,
+      baseStruct, baseMember);
   if (!forwardedFunc) {
     ctx.Diags.diagnose(SourceLoc(), diag::failed_base_method_call_synthesis,
                          funcDecl, baseStruct);
@@ -7120,6 +7119,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   assert(kind == AccessorKind::Get || kind == AccessorKind::Address ||
          kind == AccessorKind::MutableAddress);
   ASTContext &ctx = afd->getASTContext();
+  auto &importer = *static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   AccessorDecl *getterDecl = cast<AccessorDecl>(afd);
   AbstractStorageDecl *baseClassVar = static_cast<AbstractStorageDecl *>(context);
@@ -7139,21 +7139,19 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
     // Subscript operator, or `.pointee` wrapper is represented through a
     // generated C++ method call that calls the base operator.
     baseGetterCxxMethod =
-        SwiftDeclSynthesizer(
-            static_cast<ClangImporter *>(ctx.getClangModuleLoader()))
-            .synthesizeCXXForwardingMethod(
-                cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
-                cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), md,
-                ForwardingMethodKind::Base,
-                getterDecl->getResultInterfaceType()->isForeignReferenceType()
-                    ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                          RemoveReferenceIfPointer
-                    : (kind != AccessorKind::Get
-                           ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                                 KeepReference
-                           : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
-                                 RemoveReference),
-                /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
+        SwiftDeclSynthesizer(&importer).synthesizeCXXForwardingMethod(
+            cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
+            cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), md,
+            ForwardingMethodKind::Base,
+            getterDecl->getResultInterfaceType()->isForeignReferenceType()
+                ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                      RemoveReferenceIfPointer
+                : (kind != AccessorKind::Get
+                       ? ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                             KeepReference
+                       : ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+                             RemoveReference),
+            /*forceConstQualifier=*/kind != AccessorKind::MutableAddress);
   } else if (auto *fd = dyn_cast_or_null<clang::FieldDecl>(baseClangDecl)) {
     const clang::FunctionDecl *retainFn = nullptr;
     // Check if this field getter is returning a retainable FRT.
@@ -7163,18 +7161,15 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
                            ->getClassDecl();
       if (auto *frtClangDecl = dyn_cast_or_null<clang::RecordDecl>(
               frtClass ? frtClass->getClangDecl() : nullptr)) {
-        retainFn = ctx.getClangModuleLoader()
-                       ->getForeignReferenceTypeOperations(frtClangDecl)
-                       .first;
+        retainFn =
+            importer.getForeignReferenceTypeOperations(frtClangDecl).first;
       }
     }
     // Field getter is represented through a generated
     // C++ method call that returns the value of the base field.
     baseGetterCxxMethod = synthesizeCxxBaseGetterAccessorMethod(
-        *static_cast<ClangImporter *>(ctx.getClangModuleLoader()),
-        cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
-        cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd,
-        retainFn,
+        importer, cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
+        cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), fd, retainFn,
         kind == AccessorKind::Get
             ? ReferenceReturnTypeBehaviorForBaseAccessorSynthesis::ReturnByValue
             : (kind == AccessorKind::Address
@@ -7191,8 +7186,8 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
                                   /*implicit=*/true);
     return {body, true};
   }
-  auto *baseGetterMethod = cast<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(baseGetterCxxMethod));
+  auto *baseGetterMethod =
+      cast<FuncDecl>(importer.importDeclDirectly(baseGetterCxxMethod));
 
   Argument selfArg = [&]() {
     auto selfDecl = getterDecl->getImplicitSelfDecl();
@@ -9060,14 +9055,11 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   // non-empty ConcreteDeclRef.
   auto failurePlaceholder = [&]() { return ConcreteDeclRef(decl); };
 
-  auto *newFn =
-      decl->getASTContext()
-          .getClangModuleLoader()
-          ->instantiateCXXFunctionTemplate(
-              decl->getASTContext(),
-              const_cast<clang::FunctionTemplateDecl *>(
-                  cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
-              subst);
+  auto *newFn = instantiateCXXFunctionTemplate(
+      decl->getASTContext(),
+      const_cast<clang::FunctionTemplateDecl *>(
+          cast<clang::FunctionTemplateDecl>(decl->getClangDecl())),
+      subst);
   if (!newFn)
     return failurePlaceholder();
 
@@ -9094,8 +9086,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
                                                         mangledNewFn));
   }
 
-  auto *newDecl = cast_or_null<ValueDecl>(
-      decl->getASTContext().getClangModuleLoader()->importDeclDirectly(newFn));
+  auto *newDecl = cast_or_null<ValueDecl>(importDeclDirectly(newFn));
   if (!newDecl)
     return failurePlaceholder();
 
