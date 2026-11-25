@@ -624,7 +624,7 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
     else
       entry.DeclsOrMacros.emplace_back(moduleMacro);
 
-     entries.push_back(entry);
+    entries.push_back(std::move(entry));
   };
 
   // If this is a global imported as a member, record is as such.
@@ -1558,11 +1558,12 @@ namespace {
 
         // Read the declarations and macros.
         unsigned numDeclsOrMacros = readNext<uint16_t>(data);
+        entry.DeclsOrMacros.reserve(numDeclsOrMacros);
         while (numDeclsOrMacros--) {
           entry.DeclsOrMacros.push_back(readNextStoredSingleEntry(data));
         }
 
-        result.push_back(entry);
+        result.push_back(std::move(entry));
       }
 
       return result;
