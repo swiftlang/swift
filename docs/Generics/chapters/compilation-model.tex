@@ -436,7 +436,7 @@ The frontend job writes out the dependency files for \texttt{a.swift} and \textt
 
 There's a bit more to the incremental build story than this; in particular, we haven't talked about the ``interface hash'' mechanism, meant to avoid rebuilding source files when changes are limited to comments, whitespace, or function bodies. We're already strayed far from the goal of describing Swift generics though, so the curious reader can refer to \cite{reqeval} and \cite{incremental} for details.
 
-\section{Module System}\label{module system}
+\section{The Module System}\label{module system}
 
 The frontend represents a module by a \IndexDefinition{module declaration}\emph{module declaration} containing one or more \IndexDefinition{file unit}\emph{file units}. The source program given to the compiler invocation forms the \index{main module}\emph{main module}. The main module is special, because its \index{abstract syntax tree}abstract syntax tree is constructed directly by parsing source code; the file units are \IndexDefinition{source file}\emph{source files}. There are three other kinds of modules:
 \begin{enumerate}
@@ -555,7 +555,7 @@ Due to expressivity limitations in C++, a bit of boilerplate is involved in the 
 \item The \texttt{InterfaceTypeRequest::evaluate()} method is defined in \SourceFile{lib/Sema/TypeCheckDecl.cpp}.
 \item \endgroup The request is separately cached, so the \texttt{InterfaceTypeRequest} class also overrides the \texttt{isCached()}, \texttt{getCachedResult()}, and \texttt{cacheResult()} methods, described below.
 \end{itemize}
-These methods are implemented in \SourceFile{lib/AST/TypeCheckRequestFunctions.cpp}.
+These methods are implemented in \SourceFile{lib/Sema/TypeCheckRequestFunctions.cpp}.
 
 \IndexSource{request evaluator}
 \apiref{Evaluator}{class}

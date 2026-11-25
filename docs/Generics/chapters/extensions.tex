@@ -587,7 +587,7 @@ We model \index{protocol inheritance}protocol inheritance by introducing an \ind
 protocol Base {...}
 protocol Derived: Base {...}
 \end{Verbatim}
-When checking a conformance to \texttt{Derived}, the \index{conformance checker}conformance checker ensures that the conforming type satisfies the $\ConfReq{Self}{Base}$ requirement. When the conformance to \texttt{Base} is unconditional, this always succeeds, because the conformance declaration on the conforming conforming type also \index{implied conformance}\emph{implies} an unconditional conformance to the base protocol:
+When checking a conformance to \texttt{Derived}, the \index{conformance checker}conformance checker ensures that the conforming type satisfies the $\ConfReq{Self}{Base}$ requirement. When the conformance to \texttt{Base} is unconditional, this always succeeds, because the conformance declaration on the conforming type also \index{implied conformance}\emph{implies} an unconditional conformance to the base protocol:
 \begin{Verbatim}
 struct Pair<T, U> {}
 extension Pair: Derived {...}
@@ -724,7 +724,7 @@ protocol Pub {
 
 struct BrewPub<T> {}
 \end{Verbatim}
-If \texttt{BrewPub} conforms to these protocols unconditionally, Swift's \index{re-declaration checking}re-declaration checking rules prevent us from declaring the two conformances with distinct type witnesses:
+If \texttt{BrewPub} conforms to these protocols unconditionally, Swift's \index{redeclaration checking}redeclaration checking rules prevent us from declaring the two conformances with distinct type witnesses:
 \begin{Verbatim}
 extension BrewPub: Bar {
   typealias Beer = String
@@ -732,11 +732,11 @@ extension BrewPub: Bar {
 }
 
 extension BrewPub: Pub {
-  typealias Beer = Float  // error: invalid re-declaration
+  typealias Beer = Float  // error: invalid redeclaration
   func pour() -> Float { return 1.0 }
 }
 \end{Verbatim}
-If the conformances are conditional on the other hand, neither type alias is visible from the other \index{constrained extension}constrained extension, so the second one is not rejected as a re-declaration:
+If the conformances are conditional on the other hand, neither type alias is visible from the other \index{constrained extension}constrained extension, so the second one is not rejected as a redeclaration:
 \begin{Verbatim}
 extension BrewPub: Bar where T: Equatable {
   typealias Beer = String
@@ -786,7 +786,7 @@ In the generic signature of \texttt{both()}, we can derive a same-type requireme
 
 There are two potential solutions to our soundness problem in the implementation conditional conformances:
 \begin{enumerate}
-\item We could tighten the rules for \index{re-declaration checking}re-declaration checking of type aliases in constrained extensions, requiring that all such type aliases have canonically equal underlying types. This would \textsl{reject the conditional conformances} above as invalid.
+\item We could tighten the rules for \index{redeclaration checking}redeclaration checking of type aliases in constrained extensions, requiring that all such type aliases have canonically equal underlying types. This would \textsl{reject the conditional conformances} above as invalid.
 \item We could extend \AlgRef{check generic arguments algorithm} to detect conformances having incompatible type witnesses in the given substitution map. This would instead \textsl{reject the call} to \texttt{both()} written above.
 \end{enumerate}
 The second approach is more desirable, and we will revisit this problem in \ChapRef{chap:minimization}.

@@ -10,11 +10,10 @@ A periodically-updated PDF is available here:
 
 ## Typesetting the PDF
 
-It's written in TeX, so to typeset the PDF yourself, you need a TeX distribution:
+It's written in TeX, so to typeset the PDF yourself, you need a TeX distribution. Either of the following should work:
 
 - [MacTeX](https://www.tug.org/mactex/mactex-download.html): macOS
 - [TeX Live](https://www.tug.org/texlive/): Linux, Windows
-- [MikTeX](https://miktex.org): another alternative for macOS, Linux, Windows
 
 ### Using `make`
 
@@ -52,12 +51,7 @@ The book makes use of internal hyperlinks so it is best to use PDF reader with s
 
 ## Current Status
 
-This is a work in progress. The following chapters are incomplete:
-
-- Part II:
-  - Existential Types
-
-The following chapters have not yet been written:
+This is a work in progress. The following chapters have not yet been written:
 
 - Part III:
   - The Property Map
