@@ -4245,9 +4245,13 @@ bb2(%error : $Error):
 sil_global private @outlined_global : $_ContiguousArrayStorage<Int>
 
 // CHECK-LABEL: sil @test_global_value
-// CHECK-NOT:   retain
-// CHECK-NOT:   release
-// CHECK-NOT:   debug_value
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   global_value @outlined_global
+// CHECK-NEXT:   debug_value
+// CHECK-NEXT:   upcast
+// CHECK-NEXT:   ref_tail_addr [immutable]
+// CHECK-NEXT:   load
+// CHECK-NEXT:   return
 // CHECK:     } // end sil function 'test_global_value'
 sil @test_global_value : $@convention(thin) () -> Int {
 bb0:

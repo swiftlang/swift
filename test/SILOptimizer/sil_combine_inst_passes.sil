@@ -18,7 +18,6 @@ sil_global private @outlined_global : $_ContiguousArrayStorage<Int>
 // CHECK-NOT:   retain
 // CHECK-NOT:   release
 // CHECK-NOT:   fix_lifetime
-// CHECK-NOT:   debug_value
 // CHECK:     } // end sil function 'remove_arc_of_global_value'
 sil @remove_arc_of_global_value : $@convention(thin) () -> Int {
 bb0:
