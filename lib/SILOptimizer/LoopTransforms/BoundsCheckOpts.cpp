@@ -25,7 +25,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/InductionVariableAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -1108,7 +1108,7 @@ public:
     SILFunction *func = getFunction();
     LI = PM->getAnalysis<SILLoopAnalysis>()->get(func);
     DT = PM->getAnalysis<DominanceAnalysis>()->get(func);
-    IVs = PM->getAnalysis<IVAnalysis>()->get(func);
+    IVs = PM->getAnalysis<InductionVariableAnalysis>()->get(func);
     RCIA = PM->getAnalysis<RCIdentityAnalysis>()->get(func);
     DestAnalysis = PM->getAnalysis<DestructorAnalysis>();
 

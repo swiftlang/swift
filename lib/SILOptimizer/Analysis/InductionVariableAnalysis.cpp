@@ -1,4 +1,4 @@
-//===--- IVAnalysis.cpp - SIL IV Analysis ---------------------------------===//
+//===--- InductionVariableAnalysis.cpp - SIL IV Analysis ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/InductionVariableAnalysis.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
