@@ -399,6 +399,13 @@ public struct Builder {
     return notifyNew(uoc.getAs(UncheckedOwnershipConversionInst.self))
   }
 
+  public func createUncheckedOwnership(
+    operand: Value, forwardingOwnership: Ownership
+  ) -> UncheckedOwnershipInst {
+    let uo = bridged.createUncheckedOwnership(operand.bridged, forwardingOwnership._bridged)
+    return notifyNew(uo.getAs(UncheckedOwnershipInst.self))
+  }
+
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
     return notifyNew(load.getAs(LoadInst.self))

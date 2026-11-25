@@ -825,6 +825,18 @@ extension Value {
     return (walker.result, baseAndScopes.innermostAccess)
   }
 
+  /// Like `accessPathWithScope`, but with a "constant" projection path (see `constantAccessPath`).
+  ///
+  /// Note that the scope is the one enclosing the access path's `base`. If the base is an
+  /// `AccessBase.index` - i.e. the walk stopped at an `index_addr` with a non-constant index -
+  /// a `begin_access` above that `index_addr` is _not_ returned.
+  public var constantAccessPathWithScope: (AccessPath, scope: BeginAccessInst?) {
+    var walker = AccessPathWalker(enforceConstantProjectionPath: true)
+    walker.walk(startAt: self)
+    let baseAndScopes = AccessBaseAndScopes(base: walker.result.base, scopes: walker.foundEnclosingScopes)
+    return (walker.result, baseAndScopes.innermostAccess)
+  }
+
   /// Computes the enclosing access scope of this address value.
   public var enclosingAccessScope: EnclosingAccessScope {
     var walker = EnclosingAccessWalker()

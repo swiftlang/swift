@@ -2009,3 +2009,15 @@ bb9:
   dealloc_stack %1
   return %r
 }
+
+// The mandatory RLE doesn't optimize loads from function arguments.
+// CHECK-LABEL: sil [ossa] @dont_optimize_inout_argument :
+// CHECK:         [[L:%.*]] = load [trivial] %0
+// CHECK-NEXT:    return [[L]]
+// CHECK-LABEL: } // end sil function 'dont_optimize_inout_argument'
+sil [ossa] @dont_optimize_inout_argument : $@convention(thin) (@inout Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  store %1 to [trivial] %0
+  %3 = load [trivial] %0
+  return %3
+}

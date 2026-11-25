@@ -774,7 +774,6 @@ private extension AnalyzedInstructions {
         newLoads.push(loadInst)
         return false
       }
-      
       splitCounter += splitLoads.count
       newLoads.append(contentsOf: splitLoads)
     }
@@ -1589,5 +1588,32 @@ private extension AccessPath {
     }
 
     return projectionPath.isConstant
+  }
+}
+
+private extension LoadInst {
+  /// Splits the load along `projectionPath` (see `LoadInst.split(alongPath:)`) and returns all
+  /// new loads, i.e. the load of the projected element and the loads of all other elements
+  /// which are split off on the way.
+  /// Returns nil if the load cannot be split along `projectionPath`.
+  func trySplit(alongPath projectionPath: SmallProjectionPath, _ context: FunctionPassContext) -> [LoadInst]? {
+    guard type.canProject(path: projectionPath, in: parentFunction) else {
+      return nil
+    }
+    let instBeforeLoad = previous
+    let instAfterLoad = next!
+    _ = split(alongPath: projectionPath, context)
+
+    // All new loads are inserted between the original neighbors of this load.
+    var newLoads = [LoadInst]()
+    for inst in ReverseInstructionList(first: instAfterLoad.previous) {
+      if inst == instBeforeLoad {
+        break
+      }
+      if let newLoad = inst as? LoadInst {
+        newLoads.append(newLoad)
+      }
+    }
+    return newLoads
   }
 }

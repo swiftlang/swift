@@ -1,5 +1,5 @@
-// {"extraArgs":["-O"],"kind":"emit-sil","signature":"swift::SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(swift::SILFunctionArgument*, llvm::ArrayRef<swift::Operand*>, llvm::ArrayRef<swift::Operand*>)","signatureNext":"SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses"}
-// RUN: not --crash %target-swift-frontend -emit-sil -O %s
+// {"extraArgs":["-O","-Xllvm","-sil-disable-pass=redundant-load-elimination"],"kind":"emit-sil","signature":"swift::SILValueOwnershipChecker::checkFunctionArgWithoutLifetimeEndingUses(swift::SILFunctionArgument*, llvm::ArrayRef<swift::Operand*>, llvm::ArrayRef<swift::Operand*>)","signatureNext":"SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses"}
+// RUN: not --crash %target-swift-frontend -emit-sil -O -Xllvm -sil-disable-pass=redundant-load-elimination %s
 public
   enum a: ~Copyable
 {

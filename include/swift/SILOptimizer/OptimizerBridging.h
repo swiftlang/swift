@@ -156,6 +156,8 @@ struct BridgedLoopTree {
   
   BRIDGED_INLINE SwiftInt getTopLevelLoopCount() const;
   BRIDGED_INLINE BridgedLoop getLoop(SwiftInt index) const;
+  BRIDGED_INLINE bool isInLoop(BridgedBasicBlock block) const;
+  BRIDGED_INLINE BridgedLoop getInnermostLoop(BridgedBasicBlock block) const;
   
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };

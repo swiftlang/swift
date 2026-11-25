@@ -146,7 +146,16 @@ private extension AllocStackInst {
     // bb1:
     //   %a = unchecked_take_enum_data_addr %enum, #Optional.some
     // ```
-    let builder = Builder(before: take, context)
+    // However, the non-destructive `unchecked_inplace_enum_data_addr` can be located before the store
+    // in the same block. In this case the new store must be placed at the original store, because the
+    // stored value is not available before it, e.g.
+    // ```
+    //   %a = unchecked_inplace_enum_data_addr %enum, #Optional.some
+    //   %e = enum $Optional<T>, #Optional.some, %x
+    //   store %e to %allocstack
+    // ```
+    let isProjectionBeforeStore = take.parentBlock == store.parentBlock && take.dominatesInBlock(store)
+    let builder = Builder(before: isProjectionBeforeStore ? store : take, context)
     let type = take.type.objectType
     let ued = builder.createUncheckedEnumData(enum: store.source, caseIndex: take.caseIndex, resultType: type)
 
