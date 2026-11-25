@@ -2508,6 +2508,16 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
                                                 bool allowArtificialSubclasses){
+  // C++ foreign reference types are imported as classes, but their instances
+  // are plain C++ objects with no isa header.
+  if (auto theClass = objectType.getClassDecl()) {
+    if (theClass->isForeignReferenceType()) {
+      assert(repr == MetatypeRepresentation::Thick &&
+             "foreign reference types have no ObjC class object");
+      return IGF.emitTypeMetadataRef(objectType.getASTType());
+    }
+  }
+
   switch (auto isaEncoding =
             getIsaEncodingForType(IGF.IGM, objectType.getASTType())) {
   case IsaEncoding::Pointer:
