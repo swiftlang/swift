@@ -34,6 +34,7 @@
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/EnterExpressionEvaluationContext.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Overload.h"
 #include "llvm/ADT/SmallVector.h"
@@ -886,6 +887,9 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeValueRefExpr};
 
   // Instantiate the templated constructor that would accept this fake variable.
+  // The expression is discarded, so don't instantiate any function bodies.
+  clang::EnterExpressionEvaluationContext unevaluated(
+      clangSema, clang::Sema::ExpressionEvaluationContext::Unevaluated);
   clang::Sema::SFINAETrap trap(clangSema);
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
@@ -1585,6 +1589,9 @@ static void conformToCxxSpan(ClangImporter::Implementation &impl,
       clangCtx.getCanonicalTagType(clangDecl));
 
   // Instantiate the templated constructor that would accept these fake values.
+  // The expression is discarded, so don't instantiate any function bodies.
+  clang::EnterExpressionEvaluationContext unevaluated(
+      clangSema, clang::Sema::ExpressionEvaluationContext::Unevaluated);
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       clangDeclTyInfo, clangDecl->getLocation(), constructExprArgs,
       clangDecl->getLocation(), /*ListInitialization*/ false);
