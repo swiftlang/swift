@@ -3742,7 +3742,7 @@ namespace {
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
-      // Make Clang define any implicit constructors it may need (copy,
+      // Make Clang declare any implicit constructors it may need (copy,
       // default). Make sure we only do this if the class has been fully defined
       // with complete fields, and we're not in a dependent context(this is
       // equivalent to the logic in CanDeclareSpecialMemberFunction in Clang's
@@ -3774,19 +3774,13 @@ namespace {
             }
           }
         }
-        if (decl->needsImplicitDefaultConstructor()) {
-          clang::CXXConstructorDecl *ctor =
-              clangSema.DeclareImplicitDefaultConstructor(
-                  const_cast<clang::CXXRecordDecl *>(decl));
-          if (!ctor->isDeleted())
-            clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
-                                                       ctor);
-        }
+        if (decl->needsImplicitDefaultConstructor())
+          clangSema.DeclareImplicitDefaultConstructor(
+              const_cast<clang::CXXRecordDecl *>(decl));
         // If the C++ struct is annotated as non-copyable, we should not try to
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
 
-        clang::CXXConstructorDecl *defaultCtor = nullptr;
         if (decl->needsImplicitCopyConstructor() && !isExplicitlyNonCopyable) {
           clangSema.DeclareImplicitCopyConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
@@ -3794,31 +3788,6 @@ namespace {
         if (decl->needsImplicitMoveConstructor()) {
           clangSema.DeclareImplicitMoveConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
-        }
-        if (decl->needsImplicitDefaultConstructor()) {
-          defaultCtor = clangSema.DeclareImplicitDefaultConstructor(
-              const_cast<clang::CXXRecordDecl *>(decl));
-        }
-        // We may have a defaulted copy/move/default constructor that needs to
-        // be defined. Try to find it.
-        for (auto methods : decl->methods()) {
-          if (auto declCtor = dyn_cast<clang::CXXConstructorDecl>(methods)) {
-            if (declCtor->isDefaulted() &&
-                declCtor->getAccess() == clang::AS_public &&
-                !declCtor->isDeleted() &&
-                // Note: we use "doesThisDeclarationHaveABody" here because
-                // that's what "DefineImplicitCopyConstructor" checks.
-                !declCtor->doesThisDeclarationHaveABody()) {
-              if (declCtor->isDefaultConstructor()) {
-                if (!defaultCtor)
-                  defaultCtor = declCtor;
-              }
-            }
-          }
-        }
-        if (defaultCtor) {
-          clangSema.DefineImplicitDefaultConstructor(clang::SourceLocation(),
-                                                     defaultCtor);
         }
 
         if (decl->needsImplicitDestructor()) {
