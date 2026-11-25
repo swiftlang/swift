@@ -19,7 +19,7 @@
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/InductionVariableAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
@@ -41,7 +41,7 @@ SILAnalysis *swift::createPostDominanceAnalysis(SILModule *) {
 }
 
 SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {
-  return new IVAnalysis(M);
+  return new InductionVariableAnalysis(M);
 }
 
 SILAnalysis *swift::createPostOrderAnalysis(SILModule *M) {

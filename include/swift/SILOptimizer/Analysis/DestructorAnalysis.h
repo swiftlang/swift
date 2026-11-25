@@ -23,11 +23,7 @@ class DestructorAnalysis : public SILAnalysis {
   llvm::DenseMap<CanType, bool> Cached;
 public:
   DestructorAnalysis(SILModule *M)
-      : SILAnalysis(SILAnalysisKind::Destructor), Mod(M) {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::Destructor;
-  }
+      : Mod(M) {}
 
   /// Returns true if destruction of T may store to memory.
   bool mayStoreToMemoryOnDestruction(SILType T);

@@ -377,12 +377,7 @@ class AccessStorageAnalysis : public BottomUpIPAnalysis {
   DestructorAnalysis *DA;
 
 public:
-  AccessStorageAnalysis()
-      : BottomUpIPAnalysis(SILAnalysisKind::AccessStorage) {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::AccessStorage;
-  }
+  AccessStorageAnalysis() {}
 
   const FunctionAccessStorage &getEffects(SILFunction *F) {
     FunctionInfo *functionInfo = getFunctionInfo(F);

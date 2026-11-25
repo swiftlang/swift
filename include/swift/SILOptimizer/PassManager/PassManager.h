@@ -23,6 +23,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/ErrorHandling.h"
+#include <array>
 #include <vector>
 #include <bitset>
 
@@ -164,8 +165,8 @@ class SILPassManager {
   /// The list of transformations to run.
   llvm::SmallVector<SILTransform *, 16> Transformations;
 
-  /// A list of registered analysis.
-  llvm::SmallVector<SILAnalysis *, 16> Analyses;
+  /// All registered analysis, indexed by their SILAnalysis::Kind.
+  std::array<SILAnalysis *, (size_t)SILAnalysis::Kind::numKinds> Analyses;
 
   /// An entry in the FunctionWorkList.
   struct WorklistEntry {
@@ -246,24 +247,17 @@ public:
 
   const SILOptions &getOptions() const;
 
-  /// Searches for an analysis of type T in the list of registered
-  /// analysis. If the analysis is not found, the program terminates.
+  /// Returns the registered analysis of type T.
   template<typename T>
   T *getAnalysis() {
-    for (SILAnalysis *A : Analyses)
-      if (auto *R = llvm::dyn_cast<T>(A))
-        return R;
-
-    llvm_unreachable("Unable to find analysis for requested type.");
+    return static_cast<T *>(Analyses[(size_t)swift::getAnalysisKind<T>()]);
   }
 
+  /// Returns the function analysis info of type T for function \p f.
   template<typename T>
   T *getAnalysis(SILFunction *f) {
-    for (SILAnalysis *A : Analyses) {
-      if (A->getKind() == T::getAnalysisKind())
-        return static_cast<FunctionAnalysisBase<T> *>(A)->get(f);
-    }
-    llvm_unreachable("Unable to find analysis for requested type.");
+    SILAnalysis *A = Analyses[(size_t)swift::getAnalysisKind<T>()];
+    return static_cast<FunctionAnalysisBase<T> *>(A)->get(f);
   }
 
   /// \returns the module that the pass manager owns.

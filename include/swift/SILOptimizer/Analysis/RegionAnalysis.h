@@ -656,18 +656,10 @@ class RegionAnalysis final
   PostOrderAnalysis *poa;
 
 public:
-  RegionAnalysis()
-      : FunctionAnalysisBase<RegionAnalysisFunctionInfo>(
-            SILAnalysisKind::Region) {}
+  RegionAnalysis() {}
 
   RegionAnalysis(const RegionAnalysis &) = delete;
   RegionAnalysis &operator=(const RegionAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() { return SILAnalysisKind::Region; }
-
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::Region;
-  }
 
   virtual void initialize(SILPassManager *PM) override;
 

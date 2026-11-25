@@ -41,8 +41,6 @@ public:
 
   ~AliasAnalysis();
 
-  static SILAnalysisKind getAnalysisKind() { return SILAnalysisKind::Alias; }
-
   /// Convenience method that returns true if V1, V2 may alias.
   bool mayAlias(SILValue V1, SILValue V2);
 

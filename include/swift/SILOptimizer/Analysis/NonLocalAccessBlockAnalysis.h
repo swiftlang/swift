@@ -60,12 +60,7 @@ public:
 class NonLocalAccessBlockAnalysis
     : public FunctionAnalysisBase<NonLocalAccessBlocks> {
 public:
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::NonLocalAccessBlock;
-  }
-  NonLocalAccessBlockAnalysis()
-      : FunctionAnalysisBase<NonLocalAccessBlocks>(
-          SILAnalysisKind::NonLocalAccessBlock) {}
+  NonLocalAccessBlockAnalysis() {}
 
   NonLocalAccessBlockAnalysis(const NonLocalAccessBlockAnalysis &) = delete;
 

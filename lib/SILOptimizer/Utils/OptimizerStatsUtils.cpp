@@ -650,6 +650,10 @@ size_t getInstructionChangeCount(SILModule &M) {
          M.getNumInstructionsScheduledForDeletion();
 }
 
+} // end anonymous namespace
+
+namespace swift {
+
 /// A helper class to represent the module stats as an analysis,
 /// so that it is preserved across multiple passes.
 class OptimizerStatsAnalysis : public SILAnalysis {
@@ -694,11 +698,7 @@ class OptimizerStatsAnalysis : public SILAnalysis {
 
 public:
   OptimizerStatsAnalysis(SILModule *M)
-      : SILAnalysis(SILAnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::OptimizerStats;
-  }
+      : M(*M), Cache(nullptr) {}
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {
@@ -761,6 +761,10 @@ public:
   /// Update module stats after running the Transform.
   void updateModuleStats(TransformationContext &Ctx);
 };
+
+} // end namespace swift
+
+namespace {
 
 class NewLineInserter {
   bool isNewline = true;
@@ -1216,6 +1220,8 @@ void processModuleStatsChanges(ModuleStat &OldStat, ModuleStat &NewStat,
   }
 }
 
+} // end anonymous namespace
+
 /// Update the stats for a module after a SIL transform has been performed.
 void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
   assert(&getModule() == &Ctx.getModule());
@@ -1306,12 +1312,16 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
   ModStat = NewModStat;
 }
 
+namespace {
+
 FunctionStat::FunctionStat(SILFunction *F) {
   InstCountVisitor V(InstCounts, VarNames, DebugVariables);
   V.visitSILFunction(F);
   BlockCount = V.getBlockCount();
   InstCount = V.getInstCount();
 }
+
+} // end anonymous namespace
 
 void OptimizerStatsAnalysis::reportSubpassStats(SILFunction *F,
                                                 TransformationContext &Ctx) {
@@ -1368,8 +1378,6 @@ void OptimizerStatsAnalysis::endSubpass(TransformationContext &Ctx) {
   reportSubpassStats(CurrentSubpass.F, Ctx);
   CurrentSubpass = {};
 }
-
-} // end anonymous namespace
 
 /// Updates SILModule stats after finishing executing the
 /// transform \p Transform.

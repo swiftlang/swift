@@ -455,7 +455,7 @@ SILPassManager::SILPassManager(SILModule *M, bool isMandatory,
       swiftPassInvocation(this),
       isMandatory(isMandatory), deserializationNotificationHandler(nullptr) {
 #define SIL_ANALYSIS(NAME) \
-  Analyses.push_back(create##NAME##Analysis(Mod));
+  Analyses[(size_t)SILAnalysis::Kind::NAME] = create##NAME##Analysis(Mod);
 #include "swift/SILOptimizer/Analysis/Analysis.def"
 
   if (!SILNumOptPassesToRun.empty()) {

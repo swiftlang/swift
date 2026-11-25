@@ -287,7 +287,7 @@ protected:
     }
   };
 
-  BottomUpIPAnalysis(SILAnalysisKind k) : SILAnalysis(k) {}
+  BottomUpIPAnalysis() {}
 
   /// Increments the CurrentUpdateID.
   /// Should be called at the beginning of a recomputation.

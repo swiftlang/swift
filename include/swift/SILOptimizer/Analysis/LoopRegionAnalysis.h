@@ -1058,9 +1058,7 @@ class LoopRegionAnalysis : public FunctionAnalysisBase<LoopRegionFunctionInfo> {
   PostOrderAnalysis *POA;
 
 public:
-  LoopRegionAnalysis(SILModule *M)
-      : FunctionAnalysisBase<LoopRegionFunctionInfo>(
-            SILAnalysisKind::LoopRegion) {}
+  LoopRegionAnalysis(SILModule *M) {}
 
   LoopRegionAnalysis(const LoopRegionAnalysis &) = delete;
   LoopRegionAnalysis &operator=(const LoopRegionAnalysis &) = delete;
@@ -1068,10 +1066,6 @@ public:
   virtual ~LoopRegionAnalysis() {}
 
   virtual void initialize(SILPassManager *PM) override;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::LoopRegion;
-  }
 
   virtual std::unique_ptr<LoopRegionFunctionInfo>
   newFunctionAnalysis(SILFunction *F) override {

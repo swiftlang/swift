@@ -20,19 +20,10 @@ namespace swift {
 
 class DeadEndBlocksAnalysis final : public FunctionAnalysisBase<DeadEndBlocks> {
 public:
-  DeadEndBlocksAnalysis()
-      : FunctionAnalysisBase<DeadEndBlocks>(SILAnalysisKind::DeadEndBlocks) {}
+  DeadEndBlocksAnalysis() {}
 
   DeadEndBlocksAnalysis(const DeadEndBlocksAnalysis &) = delete;
   DeadEndBlocksAnalysis &operator=(const DeadEndBlocksAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() {
-    return SILAnalysisKind::DeadEndBlocks;
-  }
-
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::DeadEndBlocks;
-  }
 
   std::unique_ptr<DeadEndBlocks> newFunctionAnalysis(SILFunction *f) override {
     return std::make_unique<DeadEndBlocks>(f);

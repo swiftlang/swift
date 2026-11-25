@@ -178,8 +178,7 @@ private:
   llvm::SpecificBumpPtrAllocator<FunctionInfo> Allocator;
 
 public:
-  AccessSummaryAnalysis()
-      : BottomUpIPAnalysis(SILAnalysisKind::AccessSummary) {}
+  AccessSummaryAnalysis() {}
 
   /// Returns a summary of the accesses performed by the given function.
   const FunctionSummary &getOrCreateSummary(SILFunction *Fn);
@@ -196,10 +195,6 @@ public:
     invalidate(F, InvalidationKind::Nothing);
   }
   virtual void invalidateFunctionTables() override {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::AccessSummary;
-  }
 
   /// Returns a description of the subpath suitable for use in diagnostics.
   /// The base type must be the type of the root of the path.

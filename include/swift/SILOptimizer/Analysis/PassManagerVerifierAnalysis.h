@@ -38,10 +38,6 @@ class PassManagerVerifierAnalysis : public SILAnalysis {
 public:
   PassManagerVerifierAnalysis(SILModule *mod);
 
-  static bool classof(const SILAnalysis *analysis) {
-    return analysis->getKind() == SILAnalysisKind::PassManagerVerifier;
-  }
-
   /// Validate that the analysis is able to look up all functions and that those
   /// functions are live.
   void invalidate() override final;
