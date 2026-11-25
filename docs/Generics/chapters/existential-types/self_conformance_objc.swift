@@ -1,5 +1,6 @@
 @objc protocol Woozle {
-  func stealHoney()  // but no inits or static methods
+  func stealHoney()  // note: no inits or static methods!
 }
 struct G<T: Woozle> {}
-let g = G<any Woozle>()  // okay
+let x = G<any Woozle>()             // okay
+let y = G<any Woozle & Sequence>()  // not allowed!

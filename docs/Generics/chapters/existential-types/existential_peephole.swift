@@ -3,8 +3,7 @@ protocol Shape {
 }
 
 struct Circle: Shape {
-  @_optimize(none)
-  func draw() {}
+  @_optimize(none) func draw() {}
 }
 
 func testPeephole() {

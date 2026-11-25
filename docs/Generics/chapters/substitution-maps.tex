@@ -984,12 +984,12 @@ Here is its SIL function type:
 Both parameters are passed indirectly, with the caller retaining ownership (so in fact the implementation of the function must copy these values). The SIL function type also returns two results indirectly (at the machine level, the caller provides a pair of return buffers, large enough to hold both results.)
 \end{example}
 
-\paragraph{Re-abstraction thunks.}
+\paragraph{Reabstraction thunks.}
 So, to get a SIL function type of a \index{function declaration!SIL type lowering}function declaration or \index{closure expression!SIL type lowering}closure expression, we take its \index{interface type!SIL function type}interface type, which is a formal function type. We explode tuples in the parameter list and return type, compute the category of each parameter and result, and do a few other things. Of course, some of those parameter and result types may themselves be function types, and we recursively lower those function types, too. We then form our SIL function type. This is sufficient to explain SILGen's behavior with direct calls of functions and closures, but it is not the whole story.
 
 To understand what happens when a function value is passed between generic contexts, we need to talk about \IndexDefinition{abstraction pattern}\emph{abstraction patterns}. In the compiler, the SIL type lowering operation receives not just a \index{formal type}formal type, but also an abstraction pattern.
 
-This complication arises for the following reason. When a substitution map is applied to a SIL function type, the type parameters in the SIL function type are replaced with concrete types. However, substitution does not change the directness of the SIL function type's parameters and results. So, if an original type parameter is address-only but its replacement type is loadable, the resulting SIL function type will differ from the one we get if we just lower the substituted formal type instead. Typically, a closure expression is emitted with the \IndexDefinition{natural abstraction pattern}\emph{natural} abstraction pattern, formed from its own formal type. To change the abstraction pattern of a function value, SILGen wraps the function value in a \IndexDefinition{re-abstraction thunk}\emph{re-abstraction thunk}. There are two kinds of thunk:
+This complication arises for the following reason. When a substitution map is applied to a SIL function type, the type parameters in the SIL function type are replaced with concrete types. However, substitution does not change the directness of the SIL function type's parameters and results. So, if an original type parameter is address-only but its replacement type is loadable, the resulting SIL function type will differ from the one we get if we just lower the substituted formal type instead. Typically, a closure expression is emitted with the \IndexDefinition{natural abstraction pattern}\emph{natural} abstraction pattern, formed from its own formal type. To change the abstraction pattern of a function value, SILGen wraps the function value in a \IndexDefinition{reabstraction thunk}\emph{reabstraction thunk}. There are two kinds of thunk:
 \begin{enumerate}
 \item A \IndexDefinition{substituted-to-original thunk}\textbf{substituted-to-original thunk} appears when a closure is \emph{passed in} to a generic function. It wraps a function type lowered with its natural abstraction pattern, in a function type lowered with a more general abstraction pattern.
 \item An \IndexDefinition{original-to-substituted thunk}\textbf{original-to-substituted thunk} appears when a closure is {returned} from a generic function. It wraps a function type lowered with a more general abstraction pattern, in one lowered with its natural abstraction pattern.
@@ -1035,9 +1035,9 @@ To reconcile the difference, SILGen wraps the closure with a substituted-to-orig
 %\paragraph{More about abstraction patterns.}
 For our purposes, an \index{abstraction pattern}abstraction pattern simply consists of the unsubstituted \index{formal type!abstraction pattern}formal type, to use when computing the directness of each \index{lowered parameter!abstraction pattern}parameter and \index{lowered result!abstraction pattern}result in the \index{SIL function type!abstraction pattern}SIL function type. (In reality, abstraction patterns also carry a \emph{kind} and some additional information, but we won't need that level of detail here.)
 
-A \index{re-abstraction thunk}re-abstraction thunk is implemented as a closure that wraps another closure. The body of the thunk takes each parameter and forwards it to the wrapped closure, then takes the wrapped closure's result and returns it to the caller of the thunk. In doing so, a re-abstraction thunk can change the convention of the parameters and results.
+A \index{reabstraction thunk}reabstraction thunk is implemented as a closure that wraps another closure. The body of the thunk takes each parameter and forwards it to the wrapped closure, then takes the wrapped closure's result and returns it to the caller of the thunk. In doing so, a reabstraction thunk can change the convention of the parameters and results.
 
-There is also a useful peephole optimization that we will mention now. Very often, the closure being re-abstracted is a literal \index{closure expression!re-abstraction thunk}closure expression, in which case SILGen is able to directly emit the closure with the expected abstraction pattern, instead of immediately wrapping it in a thunk. This avoids some unnecessary indirection at run time.
+There is also a useful peephole optimization that we will mention now. Very often, the closure being reabstracted is a literal \index{closure expression!reabstraction thunk}closure expression, in which case SILGen is able to directly emit the closure with the expected abstraction pattern, instead of immediately wrapping it in a thunk. This avoids some unnecessary indirection at run time.
 
 \paragraph{Opaque abstraction patterns.}
 The type lowering procedure traverses a formal type ``in parallel'' with the abstraction pattern to build the lowered type. The abstraction pattern must have the same shape as the formal type, in the sense that the formal type must be obtainable from the abstraction pattern by applying a substitution map. For example, the abstraction pattern \texttt{(Int, \rU) -> \rV} is compatible with the formal type \texttt{(Int, (Bool, String) -> Float) -> Bool}, but not with the formal type \texttt{(Bool, Int, String) -> (Float, Float)}---in the latter, the number of parameters doesn't match up, and neither does the return type.
@@ -1066,10 +1066,10 @@ let fns: [(String) -> String] = [
 apply1("hello ", "world", fns)
 apply2("hello ", "world", fns)
 \end{Verbatim}
-We don't want to re-abstract every closure in the array before we pass it to \texttt{apply1()} and \texttt{apply2()}. Instead, when storing a closure in a generic container,  we re-abstract it into its most general form, where both the parameter and result are passed indirectly. This is accomplished by wrapping each closure in a \index{substituted-to-original thunk}substituted-to-original thunk before storing it in the array, and wrapping it again in an \index{original-to-substituted thunk}original-to-substituted thunk when loading it from the array.
+We don't want to reabstract every closure in the array before we pass it to \texttt{apply1()} and \texttt{apply2()}. Instead, when storing a closure in a generic container,  we reabstract it into its most general form, where both the parameter and result are passed indirectly. This is accomplished by wrapping each closure in a \index{substituted-to-original thunk}substituted-to-original thunk before storing it in the array, and wrapping it again in an \index{original-to-substituted thunk}original-to-substituted thunk when loading it from the array.
 \end{example}
 
-An interesting \index{limitation!re-abstraction thunk}limitation of this implementation model is that re-abstraction thunks can nest, resulting in potentially unbounded memory usage. This was reported by a Swift developer on the forums~\cite{abstractleak}.
+An interesting \index{limitation!reabstraction thunk}limitation of this implementation model is that reabstraction thunks can nest, resulting in potentially unbounded memory usage. This was reported by a Swift developer on the forums~\cite{abstractleak}.
 
 \begin{example}
 Suppose we take an array of closures, repeatedly load each element from the array, and store it back without modification:
@@ -1101,10 +1101,10 @@ for _ in 0 ..< 1000 {
   }
 }
 \end{Verbatim}
-Perhaps \texttt{someFunction()} just returns its argument unchanged, but if its defined in another module, the compiler has no way to know this, because it cannot analyze its body, so we would encounter the same problem again. To solve this problem completely would require some kind of run time check when forming a re-abstraction thunk, to ``collapse'' multiple levels of nested thunks into one.
+Perhaps \texttt{someFunction()} just returns its argument unchanged, but if its defined in another module, the compiler has no way to know this, because it cannot analyze its body, so we would encounter the same problem again. To solve this problem completely would require some kind of run time check when forming a reabstraction thunk, to ``collapse'' multiple levels of nested thunks into one.
 \end{example}
 
-Our final example shows that a re-abstraction thunk may also need to explode and implode \index{tuple type!SIL type lowering}tuple types appearing in the formal function type's parameters and result.
+Our final example shows that a reabstraction thunk may also need to explode and implode \index{tuple type!SIL type lowering}tuple types appearing in the formal function type's parameters and result.
 \begin{example}
 Consider a closure with formal type \texttt{(String, (Int, Bool)) -> ()}. Lowering this type with its \index{natural abstraction pattern}natural abstraction pattern, get a SIL function type with three parameters and no results:
 \begin{quote}
@@ -1124,16 +1124,16 @@ The latter lowered type receives the two-element tuple as the second indirect pa
 \paragraph{Optional payloads.}
 Most \index{generic nominal type!SIL type lowering}generic nominal types have a uniform representation that does not depend on the abstraction pattern, and type lowering simply returns the original formal type unchanged when given such a formal type, ignoring the abstraction pattern. In particular, the generic arguments of generic nominal types are not themselves lowered.
 
-Optional types are the only exception. (Recall the declaration of \texttt{Optional} from \ExRef{ex:lowering optional}.) Optional function types are particularly common, and we don't want to pay the cost of re-abstracting to and from the \index{opaque abstraction pattern}opaque abstraction pattern every time we wrap or unwrap a value of optional function type.
+Optional types are the only exception. (Recall the declaration of \texttt{Optional} from \ExRef{ex:lowering optional}.) Optional function types are particularly common, and we don't want to pay the cost of reabstracting to and from the \index{opaque abstraction pattern}opaque abstraction pattern every time we wrap or unwrap a value of optional function type.
 
-For this reason, SIL type lowering treats \index{optional type!re-abstraction}optional types as a special case. When lowering a formal optional type with an optional type as the abstraction pattern, we lower its payload type with the abstraction pattern's formal type, and form a \IndexDefinition{lowered optional type}lowered optional type from the result.
+For this reason, SIL type lowering treats \index{optional type!reabstraction}optional types as a special case. When lowering a formal optional type with an optional type as the abstraction pattern, we lower its payload type with the abstraction pattern's formal type, and form a \IndexDefinition{lowered optional type}lowered optional type from the result.
 
 For example, consider the formal type \texttt{Optional<(String) -> String>}. Lowering this type with its \index{natural abstraction pattern}natural abstraction pattern yields the following---notice how the generic argument becomes a \index{SIL function type!optional payload}SIL function type, and this SIL function type receives its parameter and returns its result directly:
 \begin{center}
 \texttt{Optional<@convention(thick) (@guaranteed String) -> (@owned String)>}
 \end{center}
 
-Since the same formal optional type can map to one of several lowered optional types depending on the abstraction pattern, values of optional types may need to be re-abstracted. We accomplish this  by generating a conditional branch. If the active case is ``\texttt{none}'' we return the ``\texttt{none}'' case of the new optional type. If the active case is ``\texttt{some}'' we wrap the payload in a re-abstraction thunk, and then wrap this thunk in a ``\texttt{some}'' of the new type.
+Since the same formal optional type can map to one of several lowered optional types depending on the abstraction pattern, values of optional types may need to be reabstracted. We accomplish this  by generating a conditional branch. If the active case is ``\texttt{none}'' we return the ``\texttt{none}'' case of the new optional type. If the active case is ``\texttt{some}'' we wrap the payload in a reabstraction thunk, and then wrap this thunk in a ``\texttt{some}'' of the new type.
 
 We are ready to look at the type lowering algorithm.
 
@@ -1192,7 +1192,7 @@ Now, suppose we apply $\Sigma$ to \texttt{Optional<(\rT, \rU)>}. Both type param
 \end{example}
 
 \paragraph{History.}
-\IndexSwift{3.1}Swift~3.1 introduced the special type lowering support and re-abstraction for \index{optional type!SIL type lowering}optional payloads; prior to this, optional types were lowered like every other generic nominal type~\cite{optionalpayload}. The \index{opaque abstraction pattern}most general form of a \index{function type!SIL type lowering}function type changed in \IndexSwift{5.0}Swift~5, when \IndexFlag{language-mode}\verb|-swift-version 3| mode was dropped (these days, the \texttt{-swift-version} flag is named \texttt{-language-mode}, and the minimum supported language mode at the time of writing is~\texttt{4}). As we saw in \SecRef{sec:more types}, \IndexSwift{3.0}Swift~3 did not distinguish function types that receive multiple parameters from function types taking a single parameter of \index{tuple type!SIL type lowering}tuple type. Thus, in Swift~3, the most general form of a function type had to implode all parameters into a single indirect parameter of tuple type, which was somewhat inefficient. Resolving this was a strong impetus for dropping Swift~3 source compatibility~\cite{mostopaque}. Finally, \IndexSwift{5.6}Swift~5.6 introduced the peephole optimization allowing \index{SILGen}SILGen to emit a closure expression with an arbitrary abstraction pattern, rather than immediately wrapping it with a substituted-to-original thunk~\cite{emitabstract}.
+\IndexSwift{3.1}Swift~3.1 introduced the special type lowering support and reabstraction for \index{optional type!SIL type lowering}optional payloads; prior to this, optional types were lowered like every other generic nominal type~\cite{optionalpayload}. The \index{opaque abstraction pattern}most general form of a \index{function type!SIL type lowering}function type changed in \IndexSwift{5.0}Swift~5, when \IndexFlag{language-mode}\verb|-swift-version 3| mode was dropped (these days, the \texttt{-swift-version} flag is named \texttt{-language-mode}, and the minimum supported language mode at the time of writing is~\texttt{4}). As we saw in \SecRef{sec:more types}, \IndexSwift{3.0}Swift~3 did not distinguish function types that receive multiple parameters from function types taking a single parameter of \index{tuple type!SIL type lowering}tuple type. Thus, in Swift~3, the most general form of a function type had to implode all parameters into a single indirect parameter of tuple type, which was somewhat inefficient. Resolving this was a strong impetus for dropping Swift~3 source compatibility~\cite{mostopaque}. Finally, \IndexSwift{5.6}Swift~5.6 introduced the peephole optimization allowing \index{SILGen}SILGen to emit a closure expression with an arbitrary abstraction pattern, rather than immediately wrapping it with a substituted-to-original thunk~\cite{emitabstract}.
 
 \section{Source Code Reference}\label{src:substitution maps}
 
@@ -1354,7 +1354,7 @@ A singleton object responsible for \IndexSource{SIL type lowering}SIL type lower
 \item \texttt{getTypeLowering()} takes a \texttt{CanType} representing a formal type, and returns a \texttt{TypeLowering} object, which encodes the lowered type together with additional recursive properties computed by type lowering, such as whether the type is \IndexSource{trivial type}trivial.
 \end{itemize}
 
-\subsection*{Re-abstraction Thunks}
+\subsection*{Reabstraction Thunks}
 
 Key source files:
 \begin{itemize}
@@ -1363,10 +1363,10 @@ Key source files:
 \end{itemize}
 
 \apiref{SILGenFunction}{class}
-A class containing various entry points used by \IndexSource{SILGen}SILGen to emit the SIL functions. The following two entry points emit \IndexSource{re-abstraction thunk}re-abstraction thunks:
+A class containing various entry points used by \IndexSource{SILGen}SILGen to emit the SIL functions. The following two entry points emit \IndexSource{reabstraction thunk}reabstraction thunks:
 \begin{itemize}
-\item \texttt{emitOrigToSubstValue()} re-abstracts a value from a given abstraction pattern to the \IndexSource{natural abstraction pattern}natural abstraction pattern for its formal type. If the value has function type, this emits an \IndexSource{original-to-substituted thunk}original-to-substituted thunk.
-\item \texttt{emitSubstToOrigValue()} re-abstracts a value from the natural abstraction pattern for its formal type to a given abstraction pattern. If the value has function type, this emits an  \IndexSource{substituted-to-original thunk}substituted-to-original thunk.
+\item \texttt{emitOrigToSubstValue()} reabstracts a value from a given abstraction pattern to the \IndexSource{natural abstraction pattern}natural abstraction pattern for its formal type. If the value has function type, this emits an \IndexSource{original-to-substituted thunk}original-to-substituted thunk.
+\item \texttt{emitSubstToOrigValue()} reabstracts a value from the natural abstraction pattern for its formal type to a given abstraction pattern. If the value has function type, this emits an  \IndexSource{substituted-to-original thunk}substituted-to-original thunk.
 \end{itemize}
 
 \subsection*{SIL Type Substitution}

@@ -8,7 +8,7 @@
 \index{completion!z@\igobble|seealso{Knuth-Bendix algorithm}}
 \lettrine{K}{nuth-Bendix completion} is the central algorithm in the Requirement Machine. Completion attempts to construct a \index{complete presentation}\index{finite complete presentation}finite complete rewriting system from a monoid presentation by adding new rules. As we saw in \SecRef{sec:normal form algorithm}, a complete rewriting system allows us to decide if two words are equivalent, by computing and comparing their normal forms. Together with the results of \SecRef{sec:rqm correctness}, completion is how we arrive at a \emph{decision procedure} for the \index{derived requirement!decision procedure}derived requirements formalism. Recall that our encoding of explicit requirements as rewrite rules has the property that a \emph{derived} requirement then becomes a rewrite path over those rewrite rules. Thus, once we have a finite complete rewriting system, we can answer \index{generic signature query}generic signature queries and perform \index{requirement minimization}minimization.
 
-This chapter begins with a self-contained description of the Knuth-Bendix algorithm, together with some optimizations specific to the Requirement Machine. This can be supplemented by any textbook on rewriting, such as \cite{book2012string} or \cite{andallthat}. We will then look at some examples of completion with specific generic signatures. Finally, we will end the chapter by studying a generic signature that cannot be solved by the Requirement Machine, in \SecRef{sec:event horizon}. Unlike the undecidable example from \ThmRef{undecidablemonoid}, this generic signature defines a monoid with a decidable word problem, but nonetheless, one that cannot be presented by a finite complete rewriting system.
+This chapter begins with a self-contained description of the Knuth-Bendix algorithm, together with some optimizations specific to the Requirement Machine. This can be supplemented by any textbook on rewriting, such as \cite{book2012string} or \cite{andallthat}. We will then look at some examples of completion with specific generic signatures. Finally, we will end the chapter by studying a generic signature that cannot be solved by the Requirement Machine, in \SecRef{sec:event horizon}. Unlike the undecidable example from \ExRef{ex:undecidable monoid}, this generic signature defines a monoid with a decidable word problem, but nonetheless, one that cannot be presented by a finite complete rewriting system.
 
 \paragraph{The algorithm.}  The original paper by Knuth and Bendix described the algorithm for term rewriting systems~\cite{Knuth1983}; a correctness proof was later given by Huet in \cite{HUET198111}. A survey of techniques related to completion appears in \cite{BUCHBERGER19873}. In our case, the terms being rewritten are words in a free monoid; this situation was studied in \cite{narendran}. We will work through a bottom-up description of the algorithm, as a series of subroutines:
 \begin{itemize}
@@ -281,10 +281,10 @@ Given a rule and a position in its left-hand side, we can find all rules that th
 \begin{algorithm}[Overlap lookup in rule trie]\label{overlap trie lookup}
 Takes a word $t$, a position $i$ such that $0\leq i<|t|$, and a callback. For each rule $(u, v)$ where $t[i:]$ is a prefix of $u$ or $u$ is a prefix of $t[i:]$, invokes the callback with the rule $(u, v)$.
 \begin{enumerate}
-\item (Initialize) Let $N$ be the root node of the trie.
+\item (Initialize) Let $N$ be the root node of the rule trie.
 \item (End) If $i=|t|$, we've reached the end of our word. Perform a pre-order traversal of all child nodes of $N$, and for those children that have an associated rewrite rule, invoke the callback with that rule (this is the case where $t[i:]$ is a prefix of each~$u$).
-\item (Traverse) Let $s_i$ be the $i$th symbol of $t$. Look up $s_i$ in $N$. If there is no such child node, return.
-\item (Child) Otherwise, call this child node~$M$. If $M$ points at a rule $(u, v)$, invoke the callback with this rule (in this case, $u$ is a prefix of $t[i:]$).
+\item (Traverse) Let $M := \TChild{N}{s[i]}$. If $M$ is null, there are no more keys to check. Return.
+\item (Child) If $\TValue{M}$ points at a rule $(u, v)$, invoke the callback with this rule (in this case, $u$ is a prefix of $t[i:]$).
 \item (Advance) Set $N \leftarrow M$. Set $i \leftarrow i+1$. Go back to Step~2.
 \end{enumerate}
 \end{algorithm}
@@ -362,7 +362,7 @@ Thus, suppose we're constructing a requirement machine, and we have two imported
 Next, to remove case 2 from consideration, we argue that an imported rule cannot ever overlap with a local rule. If the current requirement machine is a generic signature machine, both sides of our local rule would start with a \index{generic parameter symbol}generic parameter symbol. Since the left-hand side of an imported rule cannot contain a generic parameter symbol, no such overlap can occur. On the other hand, if the current requirement machine is a protocol machine, the root protocol of the local rule would be a dependency of the root protocol of the imported rule, by the same argument as in case 1. Once again, this is impossible by construction.
 
 \paragraph{The main loop.}
-The next algorithm scans the left-hand side of each local rule with \AlgRef{overlap trie lookup} and collects the results in a list. We check the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags that were introduced in \SecRef{sec:rqm rules}. The first two will be set by a pair of algorithms in \SecRef{sec:rule simplification}, and the third one is set by the algorithm in \SecRef{subst simplification}. In a conventional implementation of Knuth-Bendix, all rules are ``local rules,'' and the \textbf{substitution-simplified} is not present.
+The next algorithm scans the left-hand side of each local rule with \AlgRef{overlap trie lookup} and collects the results in a list. We check the \textbf{left-simplified}, \textbf{right-simplified}, and \textbf{substitution-simplified} flags that were introduced in \SecRef{sec:rqm rules}. The first two will be set by a pair of algorithms in \SecRef{sec:rule simplification}, and the third one is set by the algorithm in \SecRef{sec:concrete types}. In a conventional implementation of Knuth-Bendix, all rules are ``local rules,'' and the \textbf{substitution-simplified} is not present.
 
 \begin{algorithm}[Find overlapping rules]\label{find overlapping rule algo}
 Takes the list of local rules as input, and outputs a list of overlaps to check. 
@@ -396,7 +396,7 @@ However, it is possible that the ``repeatedly'' part might not terminate, if eve
 \item Left-simplify all rules with \AlgRef{alg:simplify left}.
 \item For each overlap in the list produced by Step~1, resolve the critical pair with \AlgRef{critical pair algo}. If this algorithm reports that a rule was added, set the flag.
 \item Right-simplify all rewrite rules with \AlgRef{alg:simplify right}.
-\item Substitution-simplify all rewrite rules with \AlgRef{subst simplification algo}.
+\item Substitution-simplify all rewrite rules with \AlgRef{alg:subst simplification}.
 \item Check if the rule count, rule length, or concrete nesting limits have been exceeded; if so, report failure.
 \item If the flag is set, go back to Step~1. Otherwise, report success.
 \end{enumerate}
@@ -1504,7 +1504,7 @@ If $xyz \in \Irr(R)$, we're done, so assume that $xyz \not\in \Irr(R)$, with $xy
 
 \section{The Event Horizon}\label{sec:event horizon}
 
-In \SecRef{word problem}, we constructed a generic signature which inherently cannot be accepted by the Swift compiler because it has an undecidable theory. This section will discuss a more subtle kind of intractability, first mentioned in \SecRef{sec:normal form algorithm}. We will study a generic signature that is fully decidable, but one whose requirement machine nonetheless \index{limitation!no finite complete presentation}\index{generic signature!with no finite complete presentation}\textsl{does not admit a finite complete presentation}. The example is simple. We make two ``copies'' of \IndexProto{N}protocol \tN, and then we declare a generic parameter conforming to both:
+In \ExRef{ex:undecidable monoid}, we constructed a generic signature which inherently cannot be accepted by the Swift compiler because it has an undecidable theory. This section will discuss a more subtle kind of intractability, first mentioned in \SecRef{sec:normal form algorithm}. We will study a generic signature that is fully decidable, but one whose requirement machine nonetheless \index{limitation!no finite complete presentation}\index{generic signature!with no finite complete presentation}\textsl{does not admit a finite complete presentation}. The example is simple. We make two ``copies'' of \IndexProto{N}protocol \tN, and then we declare a generic parameter conforming to both:
 \VerbInput{completion/tpqa.swift}
 The Swift compiler quickly rejects the above with an error, pointing at struct \texttt{G}:
 \begin{quote}
@@ -1716,7 +1716,7 @@ This operation is associative with identity element $a$, so $(A,\, \oslash,\, a)
 \end{definition}
 
 \begin{definition}[Degree, rank, and tail]\label{def:deg rank tail}
-We define three monoid homomorphisms on the letters of $A$ as shown below, then extend them to all of $A^*$ in the usual way:
+We define three \index{monoid homomorphism}monoid homomorphisms on the letters of $A$ as shown below, then extend them to all of $A^*$ in the usual way:
 \begin{enumerate}
 \item The ``degree mapping'' $\Deg\colon A^* \rightarrow \NN$ counts occurrences of $t$:
 \begin{itemize}
@@ -1751,7 +1751,7 @@ We apply each mapping to both sides of each $(u, v) \in R$, and see that we get 
 \Deg(qaq) = \Deg(qa) = 0 & \Rank(qaq) = \Rank(qa) = 1 & \Tail(qaq) = \Tail(qa) = q
 \end{array}
 \]
-Furthermore, each $f \in \{\Deg,\, \Rank,\, \Tail\}$ is a monoid homomorphism, so for any rewrite step $x (u \Red v) y$ over~$R$, we have $f(xuy)=f(xvy)$. By induction on rewrite path length, we conclude that $x \Eq y$ implies $f(x) = f(y)$ for all $x$, $y \in A^*$.
+Furthermore, each $f \in \{\Deg,\, \Rank,\, \Tail\}$ is a homomorphism on $A^*$, so for any rewrite step $x (u \Red v) y$ over~$R$, we have $f(xuy)=f(xvy)$. By induction on rewrite path length, we conclude that $x \Eq y$ implies $f(x) = f(y)$ for all $x$, $y \in A^*$.
 \end{proof}
 
 \begin{lemma}[Degree mapping]\label{lemma:tpqa deg}
@@ -1905,7 +1905,7 @@ Let $\tau \in T$ and $\sigma \in C^*$ with $\Deg(\sigma)=0$. Let $s \in \PAndQ$ 
 \end{gather*}
 \end{lemma}
 \begin{proof}
-Every word visited by this path has the form described by \LemmaRef{lemma:t a decoding}, consisting of a symbol from $T$ followed by a degree-zero suffix from $C^*$. These words are all equivalent, so the $\Tail$ of every such word is~$t$. However, the $\Tail$ of their degree-zero suffixes varies. Indeed, the degree-zero suffix of the source of the first step is $\sigma \cdot \Pi(s)$, and $\Tail(\sigma \cdot \Pi(s))=s$ by definition. The degree-zero suffix of the destination of the final step is $\sigma$, and $\Tail(\sigma)\neq s$ by assumption.
+Every word visited by this path has the form described by \LemmaRef{lemma:t a decoding}, consisting of a symbol from $T$ followed by a degree-zero suffix from $C^*$. These words are all equivalent, so the $\Tail$ of every such word is~$t$. However, the $\Tail$ of their degree-zero suffixes varies. Indeed, the degree-zero suffix of the source of the first step is $\sigma \cdot \Pi(s)$, and $\Tail(\sigma \cdot \Pi(s))=s$, since $\Phi(\Pi(s))=s$. The degree-zero suffix of the destination of the final step is $\sigma$, and $\Tail(\sigma)\neq s$ by assumption.
 
 Thus, our rewrite path must contain at least one step whose source and destination, say $\tau' \sigma'$ and $\tau'' \sigma''$, have degree-zero suffixes $\sigma'$ and $\sigma'' \in C^*$ with different tails:
 \begin{enumerate}
@@ -2029,8 +2029,8 @@ Here is a picture, with the bottom row showing a regular set containing the imag
 \hline
 \multicolumn{2}{|c|}{\lambda} & \mu \\
 \hline
-\hline
 \zeta & \nu_0 & \nu_1 \\
+\hline
 \hline
 \PQA^* \cdot s \cdot a^* & a^* & a^+ \\
 \hline
@@ -2108,8 +2108,8 @@ Here is a picture:
 \hline
 \alpha & \multicolumn{2}{c|}{\beta} & \gamma \\
 \hline
-\hline
 \alpha_1 & \alpha_2 & \beta' & \gamma \\
+\hline
 \hline
 a^+ & a^* & a^* \cdot s^* & s^+ \\
 \hline
@@ -2127,6 +2127,7 @@ We find $s \in \PAndQ$ and $\lambda$, $\mu \in C^*$ with \LemmaRef{lemma:tpqa fi
 \hline
 \lambda & \mu \\
 \hline
+\hline
 \PQA^* \cdot s \cdot a^* & a^+ \\
 \hline
 \end{array}
@@ -2139,6 +2140,7 @@ Taking the same $s \in \PAndQ$, we find $\alpha$, $\beta$, and $\gamma$ with \Le
 \hline
 \alpha & \beta & \gamma \\
 \hline
+\hline
 a^+ & a^* \cdot s^* & s^+ \\
 \hline
 \end{array}
@@ -2146,7 +2148,7 @@ a^+ & a^* \cdot s^* & s^+ \\
 \end{ceqn}
 Recalling that $\Rank$ was a homomorphism by definition, we have:
 \[\Rank(\mu^{\Rank(\alpha)}) = \Rank(\alpha^{\Rank(\mu)}) = \Rank(\alpha) \cdot \Rank(\mu)\]
-But $\Phi(\alpha)$ and $\Phi(\mu)$ are elements of $a^*$, hence:
+But $\Phi(\alpha)$ and $\Phi(\mu)$ are elements of $a^+$, hence:
 \[
 \Phi(\mu^{\Rank(\alpha)}) = \Phi(\alpha^{\Rank(\mu)}) = a^{\Rank(\alpha) \cdot \Rank(\mu)}
 \]
@@ -2182,7 +2184,7 @@ Here is a picture:
 \end{ceqn}
 
 \paragraph{The end falls off.}
-Finally, consider the words $\lambda \delta \beta$ and $\lambda \delta \beta \gamma$. The first one is again irreducible, being a prefix of the second, and both are distinct, because $|\gamma| > 0$. Now, watch what happens when we apply $\Phi$ to both words. Since $\Tail(\lambda) = s$ and $|\delta| > 0$, we can repeatedly apply the identity $sa^ns \Eq sa^n$ from \LemmaRef{lemma:rinf complete} to delete all occurrences of $s$ in $\beta$ and $\gamma$:
+Finally, consider the words $\lambda \delta \beta$ and $\lambda \delta \beta \gamma$. The first one is again irreducible, being a prefix of the second, and they are distinct, because $|\gamma| > 0$. Now, watch what happens when we apply $\Phi$ to both words. Since $\Tail(\lambda) = s$ and $|\delta| > 0$, we can repeatedly apply the identity $sa^ns \Eq sa^n$ from \LemmaRef{lemma:rinf complete} to delete all occurrences of $s$ in $\beta$ and $\gamma$:
 \begin{alignat*}{2}
 & \Phi(\lambda \delta \beta) & {} \Eq \Phi(\lambda) \cdot a^{\Rank(\delta) + \Rank(\beta)} \\
 & \Phi(\lambda \delta \beta \gamma) & {} \Eq \Phi(\lambda) \cdot a^{\Rank(\delta) + \Rank(\beta)}
