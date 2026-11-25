@@ -2002,8 +2002,11 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
-  
-  if (isa<PartialApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+
+  if (isa<PartialApplyInst>(Inst) && TheMemory.isAnyInitSelf() &&
+      // Ensure the use covers the entirety of self
+      Use.FirstElement == 0 &&
+      Use.NumElements == TheMemory.getNumElements()) {
     if (!shouldEmitError(Inst)) return;
     
     diagnose(Module, Inst->getLoc(), diag::self_closure_use_uninit);
