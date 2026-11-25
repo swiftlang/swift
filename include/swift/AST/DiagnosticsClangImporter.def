@@ -238,15 +238,22 @@ NOTE(cxx_unsafe_view_projection, none,
 
 NOTE(cxx_unsafe_field, none,
      "this type has an unsafe field%select{| '%1'}0", (bool, StringRef))
+// The template argument notes name the base class whose argument it is when
+// that is not the type being explained.
 NOTE(cxx_unsafe_template_argument, none,
-     "this type has an unsafe template argument%select{| '%1'}0",
-     (bool, StringRef))
+     "%select{this type|base %1}0 has an unsafe template argument %2",
+     (bool, const clang::NamedDecl *, const clang::Type *))
 NOTE(cxx_unsafe_explicit_annotation, none,
      "%select{this type is|'%1' is}0 annotated unsafe in C++",
      (bool, StringRef))
 NOTE(cxx_unsafe_indirect_view, none,
      "this is a non-'Escapable' view whose lifetime dependency Swift cannot "
      "track", ())
+NOTE(cxx_unsafe_nonescapable_template_argument, none,
+     "%select{this type|base %1}0 is a foreign reference type with "
+     "non-'Escapable' template argument %2, but Swift classes are always "
+     "escapable",
+     (bool, const clang::NamedDecl *, const clang::Type *))
 
 NOTE(cxx_unsafe_inferred_result_dependence, none,
      "this returns a non-'Escapable' value whose lifetime Swift had to infer; "
@@ -309,6 +316,11 @@ NOTE(cxx_unknown_escapability_pointer, none,
      "this type has unknown escapability: %select{it holds|its member '%1' is}0 "
      "a pointer or reference, and Swift cannot tell whether it owns what it "
      "points to", (bool, StringRef))
+NOTE(cxx_unknown_escapability_specialization_not_annotated, none,
+     "the primary template %0 is annotated with %1, but a specialization does "
+     "not inherit the annotations of the primary template; annotate the "
+     "specialization as well",
+     (const clang::NamedDecl *, StringRef))
 
 NOTE(at_to_subscript, none, "do you want to replace it with a call "
                             "to the subscript operator?",
@@ -405,6 +417,20 @@ GROUPED_WARNING(escapable_foreign_reference_type, ForeignReferenceType, none,
       "%0 has no effect on %1; foreign reference types are imported as Swift "
       "classes, which are always escapable",
       (StringRef, const clang::NamedDecl *))
+
+GROUPED_WARNING(noncopyable_foreign_reference_type, ForeignReferenceType, none,
+      "%0 has no effect on %1; foreign reference types are imported as Swift "
+      "classes, which are always copyable",
+      (StringRef, const clang::NamedDecl *))
+
+GROUPED_WARNING(returns_independent_value_has_no_effect,
+      ClangDeclarationImport, none,
+      "SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on %0; it "
+      "%select{returns 'Escapable' type|constructs 'Escapable' type|returns a "
+      "pointer to foreign reference type|returns a reference to foreign "
+      "reference type|returns}1 %2, which cannot depend on the lifetime of "
+      "anything",
+      (const clang::NamedDecl *, unsigned, const clang::Type *))
 
 GROUPED_WARNING(unannotated_cxx_func_returning_frt, ForeignReferenceType, none,
         "cannot infer ownership of foreign reference value returned by %0",

@@ -84,6 +84,74 @@ TemplatedFloatOwner f4(int* x [[clang::lifetimebound]]) {
     return TemplatedOwner<float>{0};
 }
 
+// SWIFT_RETURNS_INDEPENDENT_VALUE has no effect when the result is Escapable or
+// a pointer or reference to a foreign reference type.
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'ri1'; it returns 'Escapable' type 'Owner', which cannot depend on the lifetime of anything}}
+Owner ri1() SWIFT_RETURNS_INDEPENDENT_VALUE;
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'ri2'; it returns 'Escapable' type 'int'}}
+int ri2() SWIFT_RETURNS_INDEPENDENT_VALUE;
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'ri3'; it returns a pointer to foreign reference type 'SharedFRT'}}
+SharedFRT *ri3() SWIFT_RETURNS_INDEPENDENT_VALUE SWIFT_RETURNS_UNRETAINED;
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'ri4'; it returns 'Escapable' type 'TemplatedIntOwner'}}
+TemplatedIntOwner ri4() SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+// It has an effect on a pointer, which may point into storage the result
+// depends on. It has none on 'void'.
+int *ri5() SWIFT_RETURNS_INDEPENDENT_VALUE;
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'ri6'; it returns 'void', which cannot depend on the lifetime of anything}}
+void ri6() SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+struct IndexIterator {
+    using iterator_category = void;
+    int index;
+};
+
+struct SWIFT_SELF_CONTAINED IndependentResults {
+    int *storage;
+
+    // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'size'; it returns 'Escapable' type 'int'}}
+    int size() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'frt'; it returns a reference to foreign reference type 'SharedFRT'}}
+    SharedFRT &frt() const SWIFT_RETURNS_INDEPENDENT_VALUE
+        SWIFT_RETURNS_UNRETAINED;
+    // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'IndependentResults'; it constructs 'Escapable' type 'IndependentResults'}}
+    IndependentResults(const Owner &o) SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+    // The annotation keeps these from being imported as unsafe projections,
+    // even 'end', which returns 'void'.
+    int *data() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    const Owner &front() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    IndexIterator iter() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    int begin() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    void end() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+};
+
+// A result type that depends on a template parameter is not diagnosed, since the
+// annotation matters for other template arguments. One that does not is
+// diagnosed once, however many instantiations are imported.
+template <typename T>
+struct IndependentTemplate {
+    T get() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    IndependentTemplate(const Owner &o) SWIFT_RETURNS_INDEPENDENT_VALUE;
+    // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'count'; it returns 'Escapable' type 'int'}}
+    int count() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+    T value;
+};
+using IndependentTemplateInt = IndependentTemplate<int>;
+using IndependentTemplateFloat = IndependentTemplate<float>;
+
+template <typename T> T independentMake(T seed) SWIFT_RETURNS_INDEPENDENT_VALUE;
+// expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'independentCount'; it returns 'Escapable' type 'int'}}
+template <typename T> int independentCount(T t) SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+// The importer synthesizes a member to call a virtual method through a derived
+// class. It is not diagnosed separately.
+struct SWIFT_IMMORTAL_REFERENCE IndependentBase {
+    // expected-warning@+1 {{SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on 'value'; it returns 'Escapable' type 'int'}}
+    virtual int value() const SWIFT_RETURNS_INDEPENDENT_VALUE;
+};
+struct IndependentDerived : IndependentBase {};
+
 // expected-warning@+2 {{the returned type 'View' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 // expected-NO-LIFETIMES-error@+1 {{a function cannot return a non-'Escapable' result}}
 View g(int* x) {
@@ -646,4 +714,36 @@ public func inferedEscapability() {
     m9()
     m10()
     m11()
+}
+
+public func independentResults(_ r: IndependentResults,
+                               _ t: IndependentTemplateInt,
+                               _ u: IndependentTemplateFloat) {
+    _ = ri1()
+    _ = ri2()
+    _ = ri3()
+    _ = ri4()
+    _ = ri5()
+    ri6()
+    _ = r.size()
+    _ = r.frt()
+    _ = IndependentResults(Owner())
+    _ = r.data()
+    _ = r.front()
+    _ = r.iter()
+    _ = r.begin()
+    r.end()
+    _ = t.get()
+    _ = t.count()
+    _ = u.count()
+    _ = IndependentTemplateInt(Owner())
+    _ = independentMake(CInt(1))
+    _ = independentMake(Owner())
+    _ = independentCount(CInt(1))
+    _ = independentCount(Owner())
+}
+
+@available(macOS 13.3, iOS 16.4, tvOS 16.4, watchOS 9.4, *)
+public func independentVirtual(_ d: IndependentDerived) {
+    _ = d.value()
 }

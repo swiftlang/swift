@@ -141,6 +141,27 @@ inline BufferOfDtorWithBufferOfView makeBufferOfDtorWithBufferOfView() {
 }
 inline BufferOfDtorWithView makeBufferOfDtorWithView() { return {}; }
 
+// A specialization does not inherit the annotations of its primary template, so
+// when its escapability is unknown, the note points at the annotation it may
+// have been meant to carry.
+// expected-note@+1 3 {{the primary template 'Box' is annotated with SWIFT_SELF_CONTAINED_IF, but a specialization does not inherit the annotations of the primary template; annotate the specialization as well}}
+template <typename T> struct SWIFT_ESCAPABLE_IF(T) Box { T t; };
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+template <> struct Box<long> { long *p; };
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+template <typename T> struct Box<T *> { T *p; };
+// An annotated specialization is not diagnosed.
+template <> struct SWIFT_ESCAPABLE Box<short> { short *p; };
+// An annotation on a declaration of the specialization that is not its
+// definition has no effect, as for any record, so this one is diagnosed.
+template <> struct SWIFT_ESCAPABLE Box<char>;
+// expected-note@+1 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+template <> struct Box<char> { char *p; };
+inline Box<long> makeBoxLong() { return {}; }
+inline Box<int *> makeBoxPointer() { return {}; }
+inline Box<short> makeBoxShort() { return {}; }
+inline Box<char> makeBoxChar() { return {}; }
+
 //--- test.swift
 import Esc
 import CxxStdlib
@@ -201,4 +222,14 @@ func nonEscapableViaConditionalArgument() {
   // expected-note@-1 {{reference to global function 'makeBufferOfDtorWithBufferOfView()' involves unsafe type}}
   _ = d // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to let 'd' involves unsafe type}}
+}
+
+func unannotatedSpecialization() {
+  _ = makeBoxLong() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBoxLong()' involves unsafe type}}
+  _ = makeBoxPointer() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBoxPointer()' involves unsafe type}}
+  _ = makeBoxShort()
+  _ = makeBoxChar() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to global function 'makeBoxChar()' involves unsafe type}}
 }

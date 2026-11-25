@@ -61,6 +61,68 @@ inline std::shared_ptr<Immortal> makeImmortal() { return nullptr; }
 inline std::unique_ptr<Derived> makeUniqueDerived() { return nullptr; }
 inline std::shared_ptr<Polymorphic> makePolymorphic() { return nullptr; }
 
+// A templated foreign reference type behaves as if it was annotated with
+// SWIFT_SELF_CONTAINED_IF over all of its template parameters, so its template
+// arguments decide its safety as they would for a value type, even when they are
+// not stored by value. A non-escapable argument would make it a view, which a
+// Swift class cannot be. An argument of unknown escapability makes it unsafe if
+// the argument is unsafe.
+struct SWIFT_NONESCAPABLE View {
+  int *p;
+};
+struct SWIFT_ESCAPABLE Owner {
+  int x;
+};
+// expected-note@+1 2 {{this type has unknown escapability: its member 'p' is a pointer or reference, and Swift cannot tell whether it owns what it points to}}
+struct HasPointer {
+  int *p;
+};
+
+// expected-note@+3 {{this type is a foreign reference type with non-'Escapable' template argument 'View', but Swift classes are always escapable}}
+// expected-note@+2 {{this type has an unsafe template argument 'int *'}}
+// expected-note@+1 {{this type has an unsafe template argument 'HasPointer'}}
+template <class T> struct SWIFT_IMMORTAL_REFERENCE Holder {
+  T *p;
+};
+using HolderView = Holder<View>;
+using HolderIntPointer = Holder<int *>;
+using HolderHasPointer = Holder<HasPointer>;
+using HolderInt = Holder<int>;
+using HolderOwner = Holder<Owner>;
+using HolderImmortal = Holder<Immortal>;
+using HolderImmortalPointer = Holder<Immortal *>;
+using HolderPolymorphic = Holder<Polymorphic>;
+
+// The unsafety is inherited by derived classes, and the note names the base.
+// expected-note@+1 {{base 'Holder<View>' is a foreign reference type with non-'Escapable' template argument 'View', but Swift classes are always escapable}}
+struct DerivedFromHolderView : Holder<View> {};
+// expected-note@+1 {{base 'Holder<int *>' has an unsafe template argument 'int *'}}
+struct DerivedFromHolderIntPointer : Holder<int *> {};
+// expected-note@+1 {{base 'Holder<HasPointer>' has an unsafe template argument 'HasPointer'}}
+struct DerivedFromHolderHasPointer : Holder<HasPointer> {};
+
+// Template arguments that refer back to the class do not loop.
+struct CRTP : Holder<CRTP> {};
+struct Node {
+  Holder<Node> *next;
+};
+using HolderNode = Holder<Node>;
+
+// Parameter packs are checked too.
+// expected-note@+1 {{this type is a foreign reference type with non-'Escapable' template argument 'View', but Swift classes are always escapable}}
+template <class... Ts> struct SWIFT_IMMORTAL_REFERENCE Variadic {
+  int x;
+};
+using VariadicView = Variadic<int, View>;
+using VariadicOwner = Variadic<int, Owner>;
+
+// SWIFT_SAFE overrides the inference, for derived classes too.
+template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_SAFE Vouched {
+  T *p;
+};
+using VouchedView = Vouched<View>;
+struct DerivedFromVouchedView : Vouched<View> {};
+
 //--- test.swift
 import Test
 import CxxStdlib
@@ -93,4 +155,36 @@ public func usePolymorphic() {
   // expected-note@-1 {{involves unsafe type}}
   _ = ptr // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{involves unsafe type}}
+}
+
+public func useUnsafeHolders(_ a: HolderView, _ b: HolderIntPointer,
+                             _ c: HolderHasPointer,
+                             _ d: DerivedFromHolderView,
+                             _ e: DerivedFromHolderIntPointer,
+                             _ f: DerivedFromHolderHasPointer,
+                             _ g: VariadicView) {
+  _ = a // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'a' involves unsafe type 'HolderView'}}
+  _ = b // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'b' involves unsafe type 'HolderIntPointer'}}
+  _ = c // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'c' involves unsafe type 'HolderHasPointer'}}
+  _ = d // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'd' involves unsafe type 'DerivedFromHolderView'}}
+  _ = e // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'e' involves unsafe type 'DerivedFromHolderIntPointer'}}
+  _ = f // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'f' involves unsafe type 'DerivedFromHolderHasPointer'}}
+  _ = g // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to parameter 'g' involves unsafe type 'VariadicView'}}
+}
+
+// Escapable arguments, foreign reference types, pointers to them, and arguments
+// of unknown escapability that are not unsafe leave the class safe.
+public func useSafeHolders(_ a: HolderInt, _ b: HolderOwner,
+                           _ c: HolderImmortal, _ d: HolderImmortalPointer,
+                           _ e: HolderPolymorphic, _ f: VariadicOwner,
+                           _ g: VouchedView, _ h: DerivedFromVouchedView,
+                           _ i: CRTP, _ j: HolderNode) {
+  _ = (a, b, c, d, e, f, g, h, i, j)
 }

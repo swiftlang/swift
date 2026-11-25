@@ -10073,6 +10073,93 @@ struct SafetyResult {
   std::optional<importer::CxxUnsafetyExplanation> unsafe;
 };
 
+/// Whether a pointer or reference to \p pointeeType is unsafe. It is, unless it
+/// points to a function or to a foreign reference type, whose lifetime is
+/// managed by reference counting.
+static bool isUnsafePointee(clang::QualType pointeeType,
+                            Evaluator &evaluator) {
+  if (pointeeType->isFunctionType())
+    return false;
+  auto *recordDecl = pointeeType->getAsRecordDecl();
+  return !(recordDecl &&
+           importer::isForeignReferenceRecord(recordDecl, evaluator));
+}
+
+/// The first non-empty result of \p fn over the type template arguments of
+/// \p spec, including those in parameter packs.
+template <typename Fn>
+static auto
+findInTypeTemplateArguments(const clang::ClassTemplateSpecializationDecl *spec,
+                            Fn fn) -> decltype(fn(clang::QualType())) {
+  for (auto &arg : spec->getTemplateArgs().asArray()) {
+    auto args = arg.getKind() == clang::TemplateArgument::Pack
+                    ? arg.getPackAsArray()
+                    : ArrayRef<clang::TemplateArgument>(arg);
+    for (auto &typeArg : args)
+      if (typeArg.getKind() == clang::TemplateArgument::Type)
+        if (auto result = fn(typeArg.getAsType()))
+          return result;
+  }
+  return {};
+}
+
+/// Why the class template specialization \p spec, imported as a class, is
+/// unsafe because of its template arguments, if it is.
+///
+/// A templated foreign reference type behaves as if it was annotated with
+/// SWIFT_SELF_CONTAINED_IF over all of its template parameters, so each type
+/// argument is judged as that annotation would judge it on a value type: an
+/// Escapable argument is fine, a non-Escapable one would make the type a view,
+/// which a Swift class cannot be, and one of unknown escapability is fine unless
+/// it is itself unsafe.
+static std::optional<importer::CxxUnsafetyExplanation>
+getClassTemplateArgumentUnsafety(
+    Evaluator &evaluator, const clang::ClassTemplateSpecializationDecl *spec) {
+  using importer::CxxUnsafetyReason;
+  return findInTypeTemplateArguments(
+      spec,
+      [&](clang::QualType type)
+          -> std::optional<importer::CxxUnsafetyExplanation> {
+        auto because = [&](CxxUnsafetyReason reason,
+                           const clang::NamedDecl *culprit) {
+          return importer::CxxUnsafetyExplanation{reason, culprit,
+                                                  type.getTypePtr()};
+        };
+        switch (evaluateOrDefault(
+            evaluator,
+            ClangTypeEscapability(
+                {type->getUnqualifiedDesugaredType(), nullptr}),
+            CxxEscapability::Unknown)) {
+        case CxxEscapability::Escapable:
+          return std::nullopt;
+        case CxxEscapability::NonEscapable:
+          return because(CxxUnsafetyReason::NonEscapableTemplateArgument,
+                         type->getAsRecordDecl());
+        case CxxEscapability::Unknown:
+          break;
+        }
+
+        // The same rules as for the template arguments of a value type. A
+        // foreign reference type is always escapable, so this is a pointer, a
+        // reference or a value type.
+        auto pointeeType = type->getPointeeType();
+        if (!pointeeType.isNull()) {
+          if (isUnsafePointee(pointeeType, evaluator))
+            return because(CxxUnsafetyReason::UnsafeTemplateArgument, nullptr);
+          return std::nullopt;
+        }
+        auto *recordDecl = type->getAsRecordDecl();
+        if (recordDecl &&
+            evaluateOrDefault(evaluator,
+                              ClangDeclExplicitSafety({recordDecl, false}),
+                              ExplicitSafety::Unspecified) ==
+                ExplicitSafety::Unsafe)
+          return because(CxxUnsafetyReason::UnsafeTemplateArgument,
+                         recordDecl);
+        return std::nullopt;
+      });
+}
+
 /// The shared implementation of ClangDeclExplicitSafety.
 ///
 /// Deriving the reason here, rather than in a parallel walk, is what keeps an
@@ -10094,7 +10181,8 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
   // base classes, and template type parameters are unsafe. Types imported as
   // classes are treated differently: the lifetime of their storage is managed
   // automatically and safely by reference counting, so their fields do not make
-  // them unsafe; only annotations on themselves and on their base classes do.
+  // them unsafe; only annotations on themselves and on their base classes, and
+  // their template arguments, do.
   // We use a stack for this recursive traversal.
   //
   // Invariant: if any Decl in the stack is unsafe, then desc.decl is unsafe.
@@ -10106,15 +10194,8 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
   // Check whether a type is unsafe. This function may also push to the stack.
   auto isUnsafe = [&](clang::QualType type) -> bool {
     auto pointeeType = type->getPointeeType();
-    if (!pointeeType.isNull()) {
-      if (pointeeType->isFunctionType())
-        return false; // Function pointers are not unsafe
-      auto *recordDecl = pointeeType->getAsRecordDecl();
-      // Pointers are ok if imported as foreign reference types,
-      // all other pointers are considered unsafe.
-      return !(recordDecl &&
-               importer::isForeignReferenceRecord(recordDecl, evaluator));
-    }
+    if (!pointeeType.isNull())
+      return isUnsafePointee(pointeeType, evaluator);
     if (auto *decl = type->getAsTagDecl()) {
       // We need to check the safety of the TagDecl corresponding to this type
       if (seen.insert(decl).second)
@@ -10153,9 +10234,20 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
 
     if (desc.isClass) {
       // Safety for class types is handled a bit differently than other types:
-      // unsafety is inherited from the base classes, but nothing else makes a
+      // unsafety is inherited from the base classes and, for a class template
+      // specialization, from the template arguments, but nothing else makes a
       // class unsafe. Note that the bases of a type imported as a class are
       // imported as classes as well.
+      if (auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+        if (auto unsafe =
+                getClassTemplateArgumentUnsafety(evaluator, spec)) {
+          // Name the specialization only when it is a base, not the class
+          // itself.
+          if (decl != desc.decl)
+            unsafe->base = spec;
+          return SafetyResult{ExplicitSafety::Unsafe, unsafe};
+        }
+      }
       auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(decl);
       if (!cxxRecordDecl || !cxxRecordDecl->hasDefinition())
         continue;
@@ -10213,27 +10305,15 @@ computeClangDeclExplicitSafety(Evaluator &evaluator,
     // Note that this does not rely on the record being defined.
     if (auto *specDecl =
             dyn_cast<clang::ClassTemplateSpecializationDecl>(recordDecl)) {
-      for (auto arg : specDecl->getTemplateArgs().asArray()) {
-        switch (arg.getKind()) {
-        case clang::TemplateArgument::Type:
-          if (isUnsafe(arg.getAsType()))
-            return unsafeBecause(
+      if (auto *argument = findInTypeTemplateArguments(
+              specDecl, [&](clang::QualType type) -> const clang::Type * {
+                return isUnsafe(type) ? type.getTypePtr() : nullptr;
+              }))
+        return SafetyResult{
+            ExplicitSafety::Unsafe,
+            importer::CxxUnsafetyExplanation{
                 importer::CxxUnsafetyReason::UnsafeTemplateArgument,
-                arg.getAsType()->getAsRecordDecl());
-          break;
-        case clang::TemplateArgument::Pack:
-          for (auto pkArg : arg.getPackAsArray()) {
-            if (pkArg.getKind() == clang::TemplateArgument::Type &&
-                isUnsafe(pkArg.getAsType()))
-              return unsafeBecause(
-                  importer::CxxUnsafetyReason::UnsafeTemplateArgument,
-                  pkArg.getAsType()->getAsRecordDecl());
-          }
-          break;
-        default:
-          continue;
-        }
-      }
+                argument->getAsRecordDecl(), argument}};
     }
 
     recordDecl = recordDecl->getDefinition();
@@ -10578,6 +10658,22 @@ importer::getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr) {
         return annotationName;
 
   return attr->getAttribute();
+}
+
+/// Whether \p attr is one of the attributes in \c ConflictingSwiftAttrs[group].
+static bool isInSwiftAttrGroup(const clang::SwiftAttrAttr *attr,
+                               unsigned group) {
+  return llvm::any_of(ConflictingSwiftAttrs[group], [&](auto attrAndName) {
+    return attr->getAttribute().starts_with(attrAndName.first);
+  });
+}
+
+bool importer::isEscapabilityAnnotation(const clang::SwiftAttrAttr *attr) {
+  return isInSwiftAttrGroup(attr, 0);
+}
+
+bool importer::isCopyabilityAnnotation(const clang::SwiftAttrAttr *attr) {
+  return isInSwiftAttrGroup(attr, 1);
 }
 
 void ClangImporter::Implementation::validateSwiftAttributes(
