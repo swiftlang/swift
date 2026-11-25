@@ -30,13 +30,9 @@ public:
   typedef llvm::DenseMap<ClassDecl *, ClassList> ClassListMap;
 
   ClassHierarchyAnalysis(SILModule *Mod)
-      : SILAnalysis(SILAnalysisKind::ClassHierarchy), M(Mod) {}
+      : M(Mod) {}
 
   ~ClassHierarchyAnalysis();
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::ClassHierarchy;
-  }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {

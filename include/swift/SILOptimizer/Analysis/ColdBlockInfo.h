@@ -96,19 +96,10 @@ class ColdBlockAnalysis : public FunctionAnalysisBase<ColdBlockInfo> {
   PostDominanceAnalysis *PDA = nullptr;
 
 public:
-  ColdBlockAnalysis(SILModule *)
-      : FunctionAnalysisBase<ColdBlockInfo>(SILAnalysisKind::ColdBlock) {}
+  ColdBlockAnalysis(SILModule *) {}
 
   ColdBlockAnalysis(const ColdBlockAnalysis &) = delete;
   ColdBlockAnalysis &operator=(const ColdBlockAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() {
-    return SILAnalysisKind::ColdBlock;
-  }
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::ColdBlock;
-  }
 
   virtual void initialize(SILPassManager *PM) override;
 

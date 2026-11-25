@@ -276,16 +276,10 @@ class EpilogueARCAnalysis : public FunctionAnalysisBase<EpilogueARCFunctionInfo>
   RCIdentityAnalysis *RC = nullptr;
   
 public:
-  EpilogueARCAnalysis(SILModule *)
-      : FunctionAnalysisBase<EpilogueARCFunctionInfo>(
-            SILAnalysisKind::EpilogueARC) {}
+  EpilogueARCAnalysis(SILModule *) {}
 
   EpilogueARCAnalysis(const EpilogueARCAnalysis &) = delete;
   EpilogueARCAnalysis &operator=(const EpilogueARCAnalysis &) = delete;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::EpilogueARC;
-  }
 
   virtual void initialize(SILPassManager *PM) override;
   

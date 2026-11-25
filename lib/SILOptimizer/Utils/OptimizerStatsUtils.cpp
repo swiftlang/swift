@@ -698,11 +698,7 @@ class OptimizerStatsAnalysis : public SILAnalysis {
 
 public:
   OptimizerStatsAnalysis(SILModule *M)
-      : SILAnalysis(SILAnalysisKind::OptimizerStats), M(*M), Cache(nullptr) {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::OptimizerStats;
-  }
+      : M(*M), Cache(nullptr) {}
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {

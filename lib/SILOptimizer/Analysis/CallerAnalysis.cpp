@@ -255,7 +255,7 @@ CallerAnalysis::unsafeGetFunctionInfo(SILFunction *f) const {
 }
 
 CallerAnalysis::CallerAnalysis(SILModule *m)
-    : SILAnalysis(SILAnalysisKind::Caller), mod(*m) {
+    : mod(*m) {
   // When we start we create a function info for each f and add all f to the
   // recompute function list.
   for (auto &f : mod) {

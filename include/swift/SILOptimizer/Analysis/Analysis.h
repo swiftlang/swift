@@ -26,20 +26,17 @@ class SILModule;
 class SILFunction;
 class SILPassManager;
 
-/// A list of the known analysis.
-struct SILAnalysisKind {
-  enum InnerTy {
-#define SIL_ANALYSIS(NAME) NAME,
-#include "Analysis.def"
-  } value;
-
-  SILAnalysisKind(InnerTy newValue) : value(newValue) {}
-  operator InnerTy() const { return value; }
-};
-
 /// The base class for all SIL-level analysis.
 class SILAnalysis {
 public:
+
+  /// A list of the known analysis.
+  enum class Kind : size_t {
+#define SIL_ANALYSIS(NAME) NAME,
+#include "Analysis.def"
+    numKinds
+  };
+
   /// This is a list of values that allow passes to communicate to analysis
   /// which traits of the code were invalidated. Based on this information
   /// the analysis can decide if it needs to be invalidated. This information
@@ -82,20 +79,14 @@ public:
   };
 
 private:
-  /// Stores the kind of derived class.
-  const SILAnalysisKind kind;
-
   /// A lock that prevents the invalidation of this analysis. When this
   /// variable is set to True then the PassManager should not invalidate
   /// this analysis.
   bool invalidationLock;
 
 public:
-  /// Returns the kind of derived class.
-  SILAnalysisKind getKind() const { return kind; }
-
   /// Constructor.
-  SILAnalysis(SILAnalysisKind k) : kind(k), invalidationLock(false) {}
+  SILAnalysis() : invalidationLock(false) {}
 
   /// Destructor.
   virtual ~SILAnalysis() {}
@@ -157,6 +148,21 @@ public:
   /// Verify that the function \p F can be used by the analysis.
   static void verifyFunction(SILFunction *F);
 };
+
+/// Returns the kind of the analysis class `T`.
+///
+/// It is specialized for all analysis classes defined in Analysis.def. Using
+/// it with any other type is a compile time error.
+template <typename T>
+SILAnalysis::Kind getAnalysisKind() = delete;
+
+#define SIL_ANALYSIS(NAME)                                                     \
+  class NAME##Analysis;                                                        \
+  template <>                                                                  \
+  inline SILAnalysis::Kind getAnalysisKind<NAME##Analysis>() {                 \
+    return SILAnalysis::Kind::NAME;                                            \
+  }
+#include "Analysis.def"
 
 /// RAII helper for locking analyses. Locks the analysis upon construction and
 /// unlocks upon destruction.
@@ -282,7 +288,6 @@ public:
     deleteAllAnalysisProviders();
   }
 
-  FunctionAnalysisBase(SILAnalysisKind k) : SILAnalysis(k), storage() {}
   FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
   FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
 

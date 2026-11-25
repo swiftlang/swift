@@ -83,16 +83,10 @@ class RCIdentityAnalysis : public FunctionAnalysisBase<RCIdentityFunctionInfo> {
 
 public:
   RCIdentityAnalysis(SILModule *)
-      : FunctionAnalysisBase<RCIdentityFunctionInfo>(
-            SILAnalysisKind::RCIdentity),
-        DA(nullptr) {}
+      : DA(nullptr) {}
 
   RCIdentityAnalysis(const RCIdentityAnalysis &) = delete;
   RCIdentityAnalysis &operator=(const RCIdentityAnalysis &) = delete;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::RCIdentity;
-  }
 
   virtual void initialize(SILPassManager *PM) override;
   

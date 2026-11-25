@@ -59,10 +59,6 @@ private:
 public:
   CallerAnalysis(SILModule *m);
 
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::Caller;
-  }
-
   /// Invalidate all information in this analysis.
   void invalidate() override;
 

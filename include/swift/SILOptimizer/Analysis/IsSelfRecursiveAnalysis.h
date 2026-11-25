@@ -46,20 +46,10 @@ public:
 class IsSelfRecursiveAnalysis final
     : public FunctionAnalysisBase<IsSelfRecursive> {
 public:
-  IsSelfRecursiveAnalysis()
-      : FunctionAnalysisBase<IsSelfRecursive>(
-            SILAnalysisKind::IsSelfRecursive) {}
+  IsSelfRecursiveAnalysis() {}
 
   IsSelfRecursiveAnalysis(const IsSelfRecursiveAnalysis &) = delete;
   IsSelfRecursiveAnalysis &operator=(const IsSelfRecursiveAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() {
-    return SILAnalysisKind::IsSelfRecursive;
-  }
-
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::IsSelfRecursive;
-  }
 
   std::unique_ptr<IsSelfRecursive> newFunctionAnalysis(SILFunction *f) override {
     return std::make_unique<IsSelfRecursive>(f);

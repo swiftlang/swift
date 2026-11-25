@@ -74,12 +74,7 @@ private:
   PostDominanceAnalysis *postDominanceAnalysis = nullptr;
 
 public:
-  explicit DifferentiableActivityAnalysis()
-      : FunctionAnalysisBase(SILAnalysisKind::DifferentiableActivity) {}
-
-  static bool classof(const SILAnalysis *s) {
-    return s->getKind() == SILAnalysisKind::DifferentiableActivity;
-  }
+  explicit DifferentiableActivityAnalysis() {}
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind k) override {
     return k & InvalidationKind::FunctionBody;

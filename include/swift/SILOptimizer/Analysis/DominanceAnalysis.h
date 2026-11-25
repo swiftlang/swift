@@ -30,19 +30,10 @@ protected:
   }
 
 public:
-  DominanceAnalysis()
-      : FunctionAnalysisBase<DominanceInfo>(SILAnalysisKind::Dominance) {}
+  DominanceAnalysis() {}
 
   DominanceAnalysis(const DominanceAnalysis &) = delete;
   DominanceAnalysis &operator=(const DominanceAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() {
-    return SILAnalysisKind::Dominance;
-  }
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::Dominance;
-  }
 
   std::unique_ptr<DominanceInfo> newFunctionAnalysis(SILFunction *F) override {
     return std::make_unique<DominanceInfo>(F);
@@ -62,20 +53,10 @@ protected:
   }
 
 public:
-  PostDominanceAnalysis()
-      : FunctionAnalysisBase<PostDominanceInfo>(
-            SILAnalysisKind::PostDominance) {}
+  PostDominanceAnalysis() {}
 
   PostDominanceAnalysis(const PostDominanceAnalysis &) = delete;
   PostDominanceAnalysis &operator=(const PostDominanceAnalysis &) = delete;
-
-  static SILAnalysisKind getAnalysisKind() {
-    return SILAnalysisKind::PostDominance;
-  }
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::PostDominance;
-  }
 
   std::unique_ptr<PostDominanceInfo>
   newFunctionAnalysis(SILFunction *F) override {

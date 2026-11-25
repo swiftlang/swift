@@ -80,15 +80,10 @@ private:
 
 class InductionVariableAnalysis final : public FunctionAnalysisBase<IVInfo> {
 public:
-  InductionVariableAnalysis(SILModule *)
-      : FunctionAnalysisBase<IVInfo>(SILAnalysisKind::InductionVariable) {}
+  InductionVariableAnalysis(SILModule *) {}
   InductionVariableAnalysis(const InductionVariableAnalysis &) = delete;
   InductionVariableAnalysis &
   operator=(const InductionVariableAnalysis &) = delete;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::InductionVariable;
-  }
 
   std::unique_ptr<IVInfo> newFunctionAnalysis(SILFunction *F) override {
     return std::make_unique<IVInfo>(*F);
