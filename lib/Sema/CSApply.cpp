@@ -154,23 +154,6 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   return subs;
 }
 
-// Lazily instantiate function definitions for class template specializations.
-// Members of a class template specialization will be instantiated here (not
-// when imported). If this method has already be instantiated, then this is a
-// no-op.
-static void maybeInstantiateCXXMethodDefinition(ValueDecl *decl) {
-  if (const auto *constMethod =
-          dyn_cast_or_null<clang::CXXMethodDecl>(decl->getClangDecl())) {
-    auto method = const_cast<clang::CXXMethodDecl *>(constMethod);
-    // Make sure that this method is part of a class template specialization.
-    if (method->getTemplateInstantiationPattern())
-      decl->getASTContext()
-          .getClangModuleLoader()
-          ->getClangSema()
-          .InstantiateFunctionDefinition(method->getLocation(), method);
-  }
-}
-
 ConcreteDeclRef
 Solution::resolveConcreteDeclRef(ValueDecl *decl,
                                  ConstraintLocator *locator) const {
@@ -180,8 +163,6 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   // Get the generic signature of the decl and compute the substitutions.
   auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
   auto subst = computeSubstitutions(decl, sig, locator);
-
-  maybeInstantiateCXXMethodDefinition(decl);
 
   // If this is a C++ function template, get it's specialization for the given
   // substitution map and update the decl accordingly.
