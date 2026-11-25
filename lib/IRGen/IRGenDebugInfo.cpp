@@ -3607,14 +3607,22 @@ void IRGenDebugInfoImpl::setInlinedTrapLocation(IRBuilder &Builder,
   // generate debug info that claimed Function A owned Block X and Block X
   // thought it was owned by Function B. Therefore, we need to find the last
   // inlined scope to point to.
-  const SILDebugScope *TheLastScope = LastScope;
-  while (TheLastScope->InlinedCallSite &&
-         TheLastScope->InlinedCallSite != TheLastScope) {
-    TheLastScope = TheLastScope->InlinedCallSite;
+  // Not LastScope, which a cond_fail with a cleanup location doesn't update.
+  const SILDebugScope *OutermostScope = Scope;
+  while (OutermostScope->InlinedCallSite &&
+         OutermostScope->InlinedCallSite != OutermostScope) {
+    OutermostScope = OutermostScope->InlinedCallSite;
   }
-  auto LastLocation = llvm::DILocation::get(
-      IGM.getLLVMContext(), LastFileAndLocation.Line,
-      LastFileAndLocation.Column, getOrCreateScope(TheLastScope));
+  // A PrologueLocation empties LastFileAndLocation but restores the builder.
+  unsigned Line = LastFileAndLocation.Line;
+  unsigned Column = LastFileAndLocation.Column;
+  if (!Line)
+    if (auto CurrentLoc = Builder.getCurrentDebugLocation()) {
+      Line = CurrentLoc.getLine();
+      Column = CurrentLoc.getCol();
+    }
+  auto LastLocation = llvm::DILocation::get(IGM.getLLVMContext(), Line, Column,
+                                            getOrCreateScope(OutermostScope));
   // FIXME: This location should point to stdlib instead of being artificial.
   auto DL = llvm::DILocation::get(IGM.getLLVMContext(), 0, 0,
                                   getOrCreateScope(Scope), LastLocation);
