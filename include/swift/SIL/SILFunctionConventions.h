@@ -289,7 +289,19 @@ public:
               silConv.getModule(), funcTy, context));
     }
 
-    return funcTy->getAllResultsSubstType(silConv.getModule(), context);
+    // FIXME: Only pack results are indirect here. Drop this once packs are
+    // opaque values.
+    if (getNumIndirectSILResults() == 0)
+      return funcTy->getAllResultsSubstType(silConv.getModule(), context);
+    if (getNumDirectSILResults() == 1)
+      return getSILType(*getDirectSILResults().begin(), context)
+          .getObjectType();
+
+    SmallVector<TupleTypeElt, 4> elts;
+    for (auto result : getDirectSILResults())
+      elts.push_back(getSILType(result, context).getASTType());
+    return SILType::getPrimitiveObjectType(
+        CanType(TupleType::get(elts, funcTy->getASTContext())));
   }
 
   /// Get the SIL type for the single result which may be direct or indirect.
