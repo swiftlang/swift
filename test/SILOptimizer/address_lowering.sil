@@ -2997,6 +2997,40 @@ bb0(%0 : @guaranteed $U):
   return %3 : $()
 }
 
+// A guaranteed address-only value is forwarded by mark_dependence without a
+// copy, so the dependence is marked on its storage.
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_guaranteed_opaque_dep :
+// CHECK:       bb0(%0 : $*T, %1 : $*U):
+// CHECK:         mark_dependence_addr [unresolved] %0 : $*T on %1 : $*U
+// CHECK:         apply {{%[^,]+}}<T>(%0)
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_guaranteed_opaque_dep'
+sil hidden [ossa] @test_mark_dependence_guaranteed_opaque_dep : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> () {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $U):
+  %2 = mark_dependence [unresolved] %0 : $T on %1 : $U
+  %3 = function_ref @takeInGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply %3<T>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_guaranteed_opaque_yield :
+// CHECK:         ([[Y:%[^,]+]], [[TOK:%[^ ]+]]) = begin_apply
+// CHECK:         mark_dependence_addr [unresolved] [[Y]] : $*T on [[TOK]] : $Builtin.SILToken
+// CHECK:         copy_addr [[Y]] to [init] {{%[^ ]+}} : $*T
+// CHECK:         end_apply [[TOK]] as $()
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_guaranteed_opaque_yield'
+sil hidden [ossa] @test_mark_dependence_guaranteed_opaque_yield : $@convention(thin) <T> (@guaranteed TestGeneric<T>) -> () {
+bb0(%0 : @guaranteed $TestGeneric<T>):
+  %1 = class_method %0 : $TestGeneric<T>, #TestGeneric.borrowedGeneric!read : <T> (TestGeneric<T>) -> @yield_once () yields (T) -> (), $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  (%2, %3) = begin_apply %1<T>(%0) : $@yield_once @convention(method) <τ_0_0> (@guaranteed TestGeneric<τ_0_0>) -> @yields @in_guaranteed τ_0_0
+  %4 = mark_dependence [unresolved] %2 : $T on %3 : $Builtin.SILToken
+  %5 = copy_value %4 : $T
+  end_apply %3 as $()
+  destroy_value %5 : $T
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base :
 // CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*U):
 // CHECK:         [[STK:%[^,]+]] = alloc_stack $T

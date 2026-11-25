@@ -1697,9 +1697,16 @@ protected:
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
     case AccessorKind::YieldingBorrow:
+      // A read wrapping an 'unsafeAddress' accessor yields an address projected
+      // out of the borrowed 'self'.
+      if (storage->getReadImpl() == ReadImplKind::Address)
+        return LifetimeDependenceKind::Scope;
+      // Other reads are synthesized as calls to the getter.
+      wrappedAccessorKind = AccessorKind::Get;
+      break;
     case AccessorKind::Modify:
     case AccessorKind::YieldingMutate:
-      // read/modify are syntesized as calls to the getter.
+      // modify is synthesized as a call to the getter.
       wrappedAccessorKind = AccessorKind::Get;
       break;
     case AccessorKind::Get:

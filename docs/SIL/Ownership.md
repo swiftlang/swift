@@ -544,7 +544,8 @@ Address-only values are potentially unmovable when borrowed. This means
 that they cannot be forwarded with guaranteed ownership unless the
 forwarded value has the same representation as in the original value and
 can reuse the same storage. Projection that does not modify the original
-value, such as `struct_extract` or `switch_enum`, is allowed.
+value, such as `struct_extract` or `switch_enum`, is allowed. So is
+`mark_dependence`, which only adds a dependence to the value.
 Aggregation, such as `struct`, is not allowed. This is an invariant for
 OSSA with opaque SIL values for these reasons:
 
