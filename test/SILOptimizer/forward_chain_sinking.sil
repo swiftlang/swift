@@ -1,0 +1,648 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -forward-chain-sinking %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {}
+
+class D {}
+
+struct S {
+  var c: C
+}
+
+struct Pair {
+  var c: C
+  var i: Builtin.Int64
+}
+
+protocol P : AnyObject {}
+
+sil @use : $@convention(thin) (@guaranteed C) -> ()
+sil @useS : $@convention(thin) (@owned S) -> ()
+sil @consume : $@convention(thin) (@owned C) -> ()
+sil @useThrows : $@convention(thin) (@guaranteed C) -> @error any Error
+sil @useP : $@convention(thin) (@guaranteed any P) -> ()
+sil @useAddr : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+sil @useSAndC : $@convention(thin) (@owned S, @guaranteed C) -> ()
+
+// The forwarding use of the copy is sunk behind the last use of the copy's source.
+// This enables copy-propagation to remove the copy.
+//
+// CHECK-LABEL: sil [ossa] @sink_simple :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         function_ref @use
+// CHECK:         apply
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[S]]
+// CHECK:       } // end sil function 'sink_simple'
+sil [ossa] @sink_simple : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %2
+}
+
+// A whole chain of forwarding instructions is sunk - across basic blocks and in the
+// right order.
+//
+// CHECK-LABEL: sil [ossa] @sink_chain_across_blocks :
+// CHECK:       bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    cond_br
+// CHECK:       bb3:
+// CHECK:         apply
+// CHECK-NEXT:    [[RC1:%.*]] = unchecked_ref_cast [[C]] to $D
+// CHECK-NEXT:    [[RC2:%.*]] = unchecked_ref_cast [[RC1]] to $C
+// CHECK-NEXT:    [[RC3:%.*]] = unchecked_ref_cast [[RC2]] to $D
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[RC3]]
+// CHECK:       } // end sil function 'sink_chain_across_blocks'
+sil [ossa] @sink_chain_across_blocks : $@convention(thin) (@owned C, Builtin.Int1) -> @owned D {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  %3 = unchecked_ref_cast %2 : $C to $D
+  %4 = unchecked_ref_cast %3 : $D to $C
+  %5 = unchecked_ref_cast %4 : $C to $D
+  cond_br %1, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %8 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %9 = apply %8(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %5
+}
+
+// A trivial operand which is defined in a block which dominates the insertion point
+// does not prevent sinking.
+//
+// CHECK-LABEL: sil [ossa] @sink_with_trivial_operand :
+// CHECK:         [[I:%.*]] = integer_literal $Builtin.Int64, 7
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK:         apply
+// CHECK-NEXT:    [[P:%.*]] = struct $Pair ([[C]], [[I]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[P]]
+// CHECK:       } // end sil function 'sink_with_trivial_operand'
+sil [ossa] @sink_with_trivial_operand : $@convention(thin) (@owned C) -> @owned Pair {
+bb0(%0 : @owned $C):
+  %1 = integer_literal $Builtin.Int64, 7
+  %2 = copy_value %0
+  %3 = struct $Pair (%2, %1)
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %3
+}
+
+// The borrow scope of the mark_dependence base ends after the insertion point.
+// Therefore the base is still available at the insertion point.
+//
+// CHECK-LABEL: sil [ossa] @sink_borrow_scope_ends_later :
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK:         apply
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on [[B]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'sink_borrow_scope_ends_later'
+sil [ossa] @sink_borrow_scope_ends_later : $@convention(thin) (@owned C, @owned D) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $D):
+  %2 = begin_borrow %1
+  %3 = copy_value %0
+  %4 = mark_dependence %3 : $C on %2 : $D
+  %5 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  end_borrow %2
+  destroy_value %1
+  return %4
+}
+
+// Control flow between the definition of the source and the copy does not prevent sinking,
+// because only the part of the source's liverange which starts at the copy is relevant.
+//
+// CHECK-LABEL: sil [ossa] @sink_copy_in_one_branch :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK:         apply
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    enum $Optional<S>, #Optional.some!enumelt, [[S]]
+// CHECK:       } // end sil function 'sink_copy_in_one_branch'
+sil [ossa] @sink_copy_in_one_branch : $@convention(thin) (@owned C, Builtin.Int1) -> @owned Optional<S> {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = copy_value %0
+  %4 = struct $S (%3)
+  %5 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %8 = enum $Optional<S>, #Optional.some!enumelt, %4
+  br bb3(%8)
+
+bb2:
+  destroy_value %0
+  %11 = enum $Optional<S>, #Optional.none!enumelt
+  br bb3(%11)
+
+bb3(%13 : @owned $Optional<S>):
+  return %13
+}
+
+// Both copies must be sunk in a single run of the pass. Sinking instructions must not
+// disturb the iteration over the function's instructions.
+//
+// CHECK-LABEL: sil [ossa] @sink_multiple_copies :
+// CHECK:         [[C1:%.*]] = copy_value %0
+// CHECK-NEXT:    [[C2:%.*]] = copy_value %1
+// CHECK:         apply {{.*}}(%0)
+// CHECK-NEXT:    [[S1:%.*]] = struct $S ([[C1]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    apply {{.*}}(%1)
+// CHECK-NEXT:    [[S2:%.*]] = struct $S ([[C2]])
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    tuple ([[S1]], [[S2]])
+// CHECK:       } // end sil function 'sink_multiple_copies'
+sil [ossa] @sink_multiple_copies : $@convention(thin) (@owned C, @owned C) -> (@owned S, @owned S) {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  %2 = copy_value %0
+  %3 = struct $S (%2)
+  %4 = copy_value %1
+  %5 = struct $S (%4)
+  %6 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %9 = apply %6(%1) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %1
+  %11 = tuple (%3, %5)
+  return %11
+}
+
+// The mark_dependence must not be sunk behind the destroy of its base operand.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_destroyed_base :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on %1
+// CHECK-NEXT:    destroy_value %1
+// CHECK:       } // end sil function 'dont_sink_destroyed_base'
+sil [ossa] @dont_sink_destroyed_base : $@convention(thin) (@owned C, @owned D) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $D):
+  %2 = copy_value %0
+  %3 = mark_dependence %2 : $C on %1 : $D
+  destroy_value %1
+  %5 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %3
+}
+
+// The mark_dependence must not be sunk out of the borrow scope of its base operand.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_out_of_borrow_scope :
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'dont_sink_out_of_borrow_scope'
+sil [ossa] @dont_sink_out_of_borrow_scope : $@convention(thin) (@owned C, @owned D) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $D):
+  %2 = begin_borrow %1
+  %3 = copy_value %0
+  %4 = mark_dependence %3 : $C on %2 : $D
+  end_borrow %2
+  destroy_value %1
+  %7 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %8 = apply %7(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %4
+}
+
+// The index_raw_pointer must not be sunk to bb3, because its index operand is
+// defined in bb1, which does not dominate bb3.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_non_dominating_operand :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[P:%.*]] = ref_to_raw_pointer
+// CHECK-NEXT:    [[I:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:    index_raw_pointer [[P]], [[I]]
+// CHECK:       } // end sil function 'dont_sink_non_dominating_operand'
+sil [ossa] @dont_sink_non_dominating_operand : $@convention(thin) (@owned C, Builtin.Int1) -> () {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  %3 = unchecked_ref_cast %2 : $C to $D
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = ref_to_raw_pointer %3 : $D to $Builtin.RawPointer
+  %6 = integer_literal $Builtin.Word, 1
+  %7 = index_raw_pointer %5 : $Builtin.RawPointer, %6 : $Builtin.Word
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %10 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %11 = apply %10(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  destroy_value %3
+  %14 = tuple ()
+  return %14
+}
+
+// Instructions with side effects are not sunk.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_side_effect_user :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK:         function_ref @useS
+// CHECK:       } // end sil function 'dont_sink_side_effect_user'
+sil [ossa] @dont_sink_side_effect_user : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = function_ref @useS : $@convention(thin) (@owned S) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned S) -> ()
+  %5 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// Nothing is sunk if the copy has more than one lifetime ending use.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_multiple_consumes :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[S:%.*]] = struct $S
+// CHECK-NEXT:    destroy_value [[S]]
+// CHECK:       } // end sil function 'dont_sink_multiple_consumes'
+sil [ossa] @dont_sink_multiple_consumes : $@convention(thin) (@owned C, Builtin.Int1) -> () {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = struct $S (%2)
+  destroy_value %4
+  br bb3
+
+bb2:
+  destroy_value %2
+  br bb3
+
+bb3:
+  %9 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %10 = apply %9(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  %12 = tuple ()
+  return %12
+}
+
+// There is no insertion point behind a terminator instruction which uses the source.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_over_terminator_use :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK:         function_ref @useThrows
+// CHECK-NEXT:    try_apply
+// CHECK:       } // end sil function 'dont_sink_over_terminator_use'
+sil [ossa] @dont_sink_over_terminator_use : $@convention(thin) (@owned C) -> (@owned S, @error any Error) {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = function_ref @useThrows : $@convention(thin) (@guaranteed C) -> @error any Error
+  try_apply %3(%0) : $@convention(thin) (@guaranteed C) -> @error any Error, normal bb1, error bb2
+
+bb1(%5 : $()):
+  destroy_value %0
+  return %2
+
+bb2(%8 : @owned $any Error):
+  destroy_value %0
+  destroy_value %2
+  throw %8
+}
+
+// Nothing is sunk if the source is consumed by a use other than a destroy_value.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_consumed_source :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK:         function_ref @consume
+// CHECK:       } // end sil function 'dont_sink_consumed_source'
+sil [ossa] @dont_sink_consumed_source : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = function_ref @consume : $@convention(thin) (@owned C) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@owned C) -> ()
+  return %2
+}
+
+// The liverange of the source has multiple end instructions, so there is no single
+// insertion point.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_multiple_liverange_ends :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK:         function_ref @use
+// CHECK-NEXT:    cond_br
+// CHECK:       } // end sil function 'dont_sink_multiple_liverange_ends'
+sil [ossa] @dont_sink_multiple_liverange_ends : $@convention(thin) (@owned C, Builtin.Int1) -> @owned S {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  %3 = struct $S (%2)
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %6 = apply %4(%0) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3
+
+bb2:
+  %8 = apply %4(%0) : $@convention(thin) (@guaranteed C) -> ()
+  br bb3
+
+bb3:
+  destroy_value %0
+  return %3
+}
+
+// The liverange of the source has an exit block, i.e. the end of the liverange does not
+// post-dominate the range.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_liverange_with_exits :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK:         function_ref @use
+// CHECK-NEXT:    br bb1
+// CHECK:       } // end sil function 'dont_sink_liverange_with_exits'
+sil [ossa] @dont_sink_liverange_with_exits : $@convention(thin) (@owned C, Builtin.Int1) -> @owned S {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = copy_value %0
+  %3 = struct $S (%2)
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  br bb1
+
+bb1:
+  %6 = apply %4(%0) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br %1, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %0
+  return %3
+}
+
+// The end of the source's liverange is the end_borrow of the mark_dependence base. Therefore the
+// base is not available at the insertion point, which is behind the end_borrow.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_behind_end_borrow_at_liverange_end :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'dont_sink_behind_end_borrow_at_liverange_end'
+sil [ossa] @dont_sink_behind_end_borrow_at_liverange_end : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = begin_borrow %0
+  %3 = mark_dependence %1 : $C on %2 : $C
+  end_borrow %2
+  destroy_value %0
+  return %3
+}
+
+// The mark_dependence base is a forwarded guaranteed value. Its borrow introducer's scope ends
+// after the insertion point.
+//
+// CHECK-LABEL: sil [ossa] @sink_forwarded_guaranteed_base :
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK-NEXT:    [[F:%.*]] = struct_extract [[B]]
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK:         apply
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on [[F]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'sink_forwarded_guaranteed_base'
+sil [ossa] @sink_forwarded_guaranteed_base : $@convention(thin) (@owned C, @owned S) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $S):
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #S.c
+  %4 = copy_value %0
+  %5 = mark_dependence %4 : $C on %3 : $C
+  %6 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  end_borrow %2
+  destroy_value %1
+  return %5
+}
+
+// The borrow scope of the forwarded guaranteed base ends before the insertion point.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_out_of_forwarded_borrow_scope :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[C]] on {{%.*}}
+// CHECK-NEXT:    end_borrow
+// CHECK:       } // end sil function 'dont_sink_out_of_forwarded_borrow_scope'
+sil [ossa] @dont_sink_out_of_forwarded_borrow_scope : $@convention(thin) (@owned C, @owned S) -> @owned C {
+bb0(%0 : @owned $C, %1 : @owned $S):
+  %2 = begin_borrow %1
+  %3 = struct_extract %2, #S.c
+  %4 = copy_value %0
+  %5 = mark_dependence %4 : $C on %3 : $C
+  end_borrow %2
+  destroy_value %1
+  %6 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %7 = apply %6(%0) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %0
+  return %5
+}
+
+// The alloc_stack is a type-dependent user of the open_existential_ref. It must not be sunk,
+// because moving it behind the other alloc_stack would violate stack discipline.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_stack_allocation :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[O:%.*]] = open_existential_ref [[C]]
+// CHECK-NEXT:    alloc_stack $@opened(1, any P) Self
+// CHECK-NEXT:    alloc_stack $Builtin.Int64
+// CHECK:       } // end sil function 'dont_sink_stack_allocation'
+sil [ossa] @dont_sink_stack_allocation : $@convention(thin) (@owned any P, Builtin.Int64) -> () {
+bb0(%0 : @owned $any P, %1 : $Builtin.Int64):
+  %2 = copy_value %0
+  %3 = open_existential_ref %2 : $any P to $@opened(1, any P) Self
+  %4 = alloc_stack $@opened(1, any P) Self
+  %5 = alloc_stack $Builtin.Int64
+  store %1 to [trivial] %5
+  %7 = function_ref @useP : $@convention(thin) (@guaranteed any P) -> ()
+  %8 = apply %7(%0) : $@convention(thin) (@guaranteed any P) -> ()
+  %9 = function_ref @useAddr : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %10 = apply %9(%5) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  dealloc_stack %5
+  dealloc_stack %4
+  destroy_value %3
+  destroy_value %0
+  %15 = tuple ()
+  return %15
+}
+
+// A borrow scope of the source which begins before the copy and ends behind it extends the
+// liverange. The struct is sunk behind the end_borrow, which enables copy-propagation.
+//
+// CHECK-LABEL: sil [ossa] @sink_behind_outer_borrow_scope :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK:         apply {{.*}}(%0)
+// CHECK-NEXT:    apply {{.*}}([[B]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[S]]
+// CHECK:       } // end sil function 'sink_behind_outer_borrow_scope'
+sil [ossa] @sink_behind_outer_borrow_scope : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  %2 = copy_value %0
+  %3 = struct $S (%2)
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %6 = apply %4(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// The outer borrow scope is the only use of the source behind the copy.
+//
+// CHECK-LABEL: sil [ossa] @sink_behind_outer_borrow_scope_only :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    struct $S ([[C]])
+// CHECK:       } // end sil function 'sink_behind_outer_borrow_scope_only'
+sil [ossa] @sink_behind_outer_borrow_scope_only : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  %2 = copy_value %0
+  %3 = struct $S (%2)
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %1
+  destroy_value %0
+  return %3
+}
+
+// The outer borrow scope also ends in a block which is not dominated by the copy.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_outer_borrow_scope_not_dominated :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    struct $S ([[C]])
+// CHECK:       } // end sil function 'dont_sink_outer_borrow_scope_not_dominated'
+sil [ossa] @dont_sink_outer_borrow_scope_not_dominated : $@convention(thin) (@owned C, Builtin.Int1) -> @owned Optional<S> {
+bb0(%0 : @owned $C, %1 : $Builtin.Int1):
+  %2 = begin_borrow %0
+  %3 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = copy_value %0
+  %6 = struct $S (%5)
+  %7 = apply %3(%0) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %2
+  destroy_value %0
+  %10 = enum $Optional<S>, #Optional.some!enumelt, %6
+  br bb3(%10)
+
+bb2:
+  %12 = apply %3(%2) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %2
+  destroy_value %0
+  %15 = enum $Optional<S>, #Optional.none!enumelt
+  br bb3(%15)
+
+bb3(%17 : @owned $Optional<S>):
+  return %17
+}
+
+// A borrow scope of the source which begins behind the copy extends the liverange until its
+// end_borrow.
+//
+// CHECK-LABEL: sil [ossa] @sink_behind_inner_borrow_scope :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow %0
+// CHECK:         apply {{.*}}([[B]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[S]]
+// CHECK:       } // end sil function 'sink_behind_inner_borrow_scope'
+sil [ossa] @sink_behind_inner_borrow_scope : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = begin_borrow %0
+  %4 = function_ref @use : $@convention(thin) (@guaranteed C) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed C) -> ()
+  end_borrow %3
+  destroy_value %0
+  return %2
+}
+
+// The end of the source's liverange is a user of the chain: the chain cannot be sunk behind it.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_chain_used_by_liverange_end :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    [[SC:%.*]] = copy_value [[S]]
+// CHECK:         apply {{%.*}}([[SC]], %0)
+// CHECK-NEXT:    return [[S]]
+// CHECK:       } // end sil function 'dont_sink_chain_used_by_liverange_end'
+sil [ossa] @dont_sink_chain_used_by_liverange_end : $@convention(thin) (@guaranteed C) -> @owned S {
+bb0(%0 : @guaranteed $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = copy_value %2
+  %4 = function_ref @useSAndC : $@convention(thin) (@owned S, @guaranteed C) -> ()
+  %5 = apply %4(%3, %0) : $@convention(thin) (@owned S, @guaranteed C) -> ()
+  return %2
+}
+
+// The end of the source's liverange is a mark_dependence on the source, whose value operand is
+// the chain.
+//
+// CHECK-LABEL: sil [ossa] @dont_sink_chain_used_by_mark_dependence_end :
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    [[S:%.*]] = struct $S ([[C]])
+// CHECK-NEXT:    [[MD:%.*]] = mark_dependence [[S]] on %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    return [[MD]]
+// CHECK:       } // end sil function 'dont_sink_chain_used_by_mark_dependence_end'
+sil [ossa] @dont_sink_chain_used_by_mark_dependence_end : $@convention(thin) (@owned C) -> @owned S {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0
+  %2 = struct $S (%1)
+  %3 = mark_dependence %2 on %0
+  destroy_value %0
+  return %3
+}
