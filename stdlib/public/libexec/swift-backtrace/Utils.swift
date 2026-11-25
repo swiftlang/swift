@@ -201,7 +201,8 @@ internal func isDir(_ path: String) -> Bool {
   guard stat(path, &st) == 0 else {
     return false
   }
-  return (st.st_mode & S_IFMT) == S_IFDIR
+  // On 32-bit Android, `st_mode` is 32 bits but `mode_t` is 16 bits.
+  return (mode_t(truncatingIfNeeded: st.st_mode) & S_IFMT) == S_IFDIR
   #endif
 }
 

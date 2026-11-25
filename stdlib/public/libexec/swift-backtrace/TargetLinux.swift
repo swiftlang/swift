@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux) || os(Android)
+#if (os(Linux) || os(Android)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Glibc)
 import Glibc
@@ -305,4 +305,4 @@ class Target {
   }
 }
 
-#endif // os(Linux) || os(Android)
+#endif // (os(Linux) || os(Android)) && (arch(x86_64) || arch(arm64))

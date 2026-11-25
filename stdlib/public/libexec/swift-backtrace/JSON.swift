@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Only built where main.swift is.
+#if (os(macOS) || os(Linux) || os(Android) || os(Windows)) && (arch(x86_64) || arch(arm64))
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
@@ -127,3 +130,5 @@ struct SwiftBacktraceWriter: BacktraceJSONWriter {
     SwiftBacktrace.writeln(string, flush: flush)
   }
 }
+
+#endif
