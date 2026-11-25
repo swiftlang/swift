@@ -1274,6 +1274,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::SpecifyTestInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::ValueToAddressInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:

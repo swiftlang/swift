@@ -1,0 +1,96 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elimination \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   -enable-experimental-feature RawLayout \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_RawLayout
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@_addressableForDependencies
+struct Addressable {
+  @_hasStorage var a: Int
+}
+
+@_rawLayout(like: Int)
+struct RawStorage : ~Copyable {}
+
+// Like `Mutex`: addressable-for-dependencies only because it contains a `@_rawLayout` type.
+struct ContainsRaw : ~Copyable {
+  @_hasStorage var a: Int
+  @_hasStorage var raw: RawStorage
+}
+
+struct NE : ~Escapable {}
+
+sil @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @borrow_contains_raw : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+
+// A value which borrows an `@in_guaranteed` address cannot write to it.
+
+// CHECK-LABEL: sil @forward_across_borrowed_capture
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'forward_across_borrowed_capture'
+sil @forward_across_borrowed_capture : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  %7 = load %2 : $*Int
+  dealloc_stack %1 : $*Addressable
+  return %7 : $Int
+}
+
+// The storage of a `@_rawLayout` type can be mutated through a borrow (via
+// `Builtin.addressOfRawLayout`). A value which borrows a type containing one is conservatively
+// assumed to write the whole value, so the load of the non-raw field `a` isn't forwarded either.
+
+// CHECK-LABEL: sil @no_forward_across_raw_layout_capture
+// CHECK:         [[L:%[0-9]+]] = load
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'no_forward_across_raw_layout_capture'
+sil @no_forward_across_raw_layout_capture : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $ContainsRaw
+  %2 = struct_element_addr %1 : $*ContainsRaw, #ContainsRaw.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @borrow_contains_raw : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  %7 = load %2 : $*Int
+  dealloc_stack %1 : $*ContainsRaw
+  return %7 : $Int
+}
+
+// A value which depends on an `@inout` address may write to it.
+
+// CHECK-LABEL: sil @no_forward_across_inout_capture
+// CHECK:         load
+// CHECK:       } // end sil function 'no_forward_across_inout_capture'
+sil @no_forward_across_inout_capture : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  %7 = load %2 : $*Int
+  dealloc_stack %1 : $*Addressable
+  return %7 : $Int
+}

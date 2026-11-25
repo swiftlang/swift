@@ -560,7 +560,7 @@ bb0(%0 : @guaranteed $Storage, %1 : $Builtin.Word):
 
 // Conflicts involving noescape closures.
 
-sil hidden [ossa] @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+sil hidden [closure] [ossa] @closureThatModifiesCaptureAndTakesInout: $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -590,7 +590,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden [ossa] @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil hidden [closure] [ossa] @closureWithArgument_1 : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note 2 {{conflicting access is here}}
   end_access %2 : $*Int
@@ -640,7 +640,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden [ossa] @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> () {
+sil hidden [closure] [ossa] @closureThatModifiesCapture_2 : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int // expected-error {{overlapping accesses, but modification requires exclusive access; consider copying to a local variable}}
   end_access %1 : $*Int
@@ -668,7 +668,7 @@ bb0(%0 : $Int):
   return %9 : $()
 }
 
-sil hidden [ossa] @closureWithConcreteReturn : $@convention(thin) (Int, @inout_aliasable Int) -> (Int) {
+sil hidden [closure] [ossa] @closureWithConcreteReturn : $@convention(thin) (Int, @inout_aliasable Int) -> (Int) {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -704,7 +704,7 @@ bb0(%0 : $Int):
 sil [reabstraction_thunk] @thunkForCalleeGuaranteed : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
 sil [reabstraction_thunk] @withoutActuallyEscapingThunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
-sil hidden [ossa] @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
+sil hidden [closure] [ossa] @closureThatModifiesCapture_1: $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %1 = begin_access [modify] [unknown] %0 : $*Int // expected-note 3{{conflicting access is here}}
   end_access %1 : $*Int
@@ -937,7 +937,7 @@ bb0(%0 : $Int):
   return %7 : $()
 }
 
-sil private [ossa] @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
+sil private [closure] [ossa] @closureForDirectPartialApplyTakingInout : $@convention(thin) (@inout Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $*Int):
   %access = begin_access [read] [unknown] %1 : $*Int // expected-note 3 {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -964,7 +964,7 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
-sil private [ossa] @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
+sil private [closure] [ossa] @closureForDirectPartialApplyChain : $@convention(thin) (@inout Int, Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Int, %1 : $Int, %2 : $*Int):
   %access = begin_access [read] [unknown] %2 : $*Int // expected-note {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -992,7 +992,7 @@ bb0(%0 : $Int):
   return %v : $()
 }
 
-sil private [ossa] @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil private [closure] [ossa] @closureForPartialApplyArgChain : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %access = begin_access [read] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -1085,7 +1085,7 @@ bb0(%0 : @guaranteed $ClassWithStoredProperty, %1 : $Int32):
 // '@noescape' function-type argument convention ('mutatingNoescapeWithThunk'
 // and 'mutatingNoescapeConflictWithThunk').
 
-sil [ossa] @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
+sil [closure] [ossa] @mutatingNoescapeHelper : $@convention(thin) (Optional<UnsafePointer<Int32>>, @inout_aliasable Int32) -> () {
 bb0(%0 : $Optional<UnsafePointer<Int32>>, %1 : $*Int32):
   %up = unchecked_enum_data %0 : $Optional<UnsafePointer<Int32>>, #Optional.some!enumelt
   %p = struct_extract %up : $UnsafePointer<Int32>, #UnsafePointer._rawValue
@@ -1245,7 +1245,7 @@ bb0(%0 : $Int):
   return %2 : $()
 }
 
-sil hidden [ossa] @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> () {
+sil hidden [closure] [ossa] @closureWithConflict : $@convention(thin) (Int, @inout_aliasable Int) -> () {
 bb0(%0 : $Int, %1 : $*Int):
   %2 = begin_access [modify] [unknown] %1 : $*Int // expected-note {{conflicting access is here}}
   end_access %2 : $*Int
@@ -1342,7 +1342,7 @@ bb3(%pa3 : @owned $@callee_guaranteed (@inout Int) -> ()):
 
 sil @takeEscapingClosure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
 
-sil private [ossa] @nestedInWithoutActuallyEscapingVerify : $@convention(thin) (@inout_aliasable Int) -> () {
+sil private [closure] [ossa] @nestedInWithoutActuallyEscapingVerify : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %a = begin_access [modify] [unknown] %0 : $*Int
   end_access %a : $*Int
@@ -1504,8 +1504,8 @@ sil [serialized] [heuristic_always_inline] @$sSD_7defaultq_x_q_yXKtciM : $@yield
 //   %access = begin_access [modify] %0
 //   begin_apply %coroutine(%access, %closure) -- where the closure captures %0
 
-// CHECK-LABEL: sil private [ossa] @closureForBeginApplyOfClosure : $@convention(thin) (@inout_aliasable Int) -> @out Int {
-sil private [ossa] @closureForBeginApplyOfClosure : $@convention(thin) (@inout_aliasable Int) -> @out Int {
+// CHECK-LABEL: sil private [closure] [ossa] @closureForBeginApplyOfClosure : $@convention(thin) (@inout_aliasable Int) -> @out Int {
+sil private [closure] [ossa] @closureForBeginApplyOfClosure : $@convention(thin) (@inout_aliasable Int) -> @out Int {
 bb0(%0 : $*Int, %1 : $*Int):
   %access = begin_access [read] [static] %1 : $*Int // expected-note {{conflicting access is here}}
   %val = load [trivial] %access : $*Int
@@ -1560,8 +1560,8 @@ bb0(%0 : $*Int, %1 : @guaranteed $@noescape @callee_guaranteed () -> Int):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil private [ossa] @closureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Dictionary<Int, Int>, Int, @inout_aliasable Int) -> () {
-sil private [ossa] @closureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Dictionary<Int, Int>, Int, @inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @closureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Dictionary<Int, Int>, Int, @inout_aliasable Int) -> () {
+sil private [closure] [ossa] @closureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Dictionary<Int, Int>, Int, @inout_aliasable Int) -> () {
 bb0(%0 : $*Dictionary<Int, Int>, %1 : $Int, %2 : $*Int):
   %6 = function_ref @implicitClosureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> Int
   %7 = partial_apply [callee_guaranteed] %6(%2) : $@convention(thin) (@inout_aliasable Int) -> Int
@@ -1587,8 +1587,8 @@ bb0(%0 : $*Dictionary<Int, Int>, %1 : $Int, %2 : $*Int):
   return %28 : $()
 }
 
-// CHECK-LABEL: sil private [transparent] [ossa] @implicitClosureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> Int {
-sil private [transparent] [ossa] @implicitClosureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> Int {
+// CHECK-LABEL: sil private [transparent] [closure] [ossa] @implicitClosureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> Int {
+sil private [transparent] [closure] [ossa] @implicitClosureForTestCoroutineWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> Int {
 bb0(%0 : $*Int):
   %2 = begin_access [read] [unknown] %0 : $*Int
   %3 = load [trivial] %2 : $*Int
@@ -1602,8 +1602,8 @@ bb0(%0 : $*Int):
 
 sil [ossa] @externalWithInout : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil private [ossa] @closureForTestExternalWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> () {
-sil private [ossa] @closureForTestExternalWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @closureForTestExternalWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> () {
+sil private [closure] [ossa] @closureForTestExternalWithClosureArg : $@convention(thin) (@inout_aliasable Int) -> () {
 bb0(%0 : $*Int):
   %f = function_ref @externalWithInout : $@convention(thin) (@inout Int) -> ()
   %call = apply %f(%0) : $@convention(thin) (@inout Int) -> () // expected-note {{conflicting access is here}}

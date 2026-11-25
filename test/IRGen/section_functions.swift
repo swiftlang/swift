@@ -121,25 +121,25 @@ class BootConfig {
 // SIL: sil hidden [section "__TEXT,boot"] @$s17section_functions7GenericV6memberyyF
 
 // SIL: sil hidden [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyF
-// SIL: sil private [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyF6helperL_yyF
-// SIL: sil private [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU_
-// SIL: sil private [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU_yyXEfU_
-// SIL: sil private @$s17section_functions22firmwareBootEntrypointyyF03notD0L_yyF
-// SIL: sil private @$s17section_functions22firmwareBootEntrypointyyFyyXEfU0_
-// SIL: sil private [section "__TEXT,boot2"] @$s17section_functions22firmwareBootEntrypointyyF9elsewhereL_yyF
-// SIL: sil private [section "__TEXT,boot2"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU1_
+// SIL: sil private [closure] [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyF6helperL_yyF
+// SIL: sil private [closure] [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU_
+// SIL: sil private [closure] [section "__TEXT,boot"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU_yyXEfU_
+// SIL: sil private [closure] @$s17section_functions22firmwareBootEntrypointyyF03notD0L_yyF
+// SIL: sil private [closure] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU0_
+// SIL: sil private [closure] [section "__TEXT,boot2"] @$s17section_functions22firmwareBootEntrypointyyF9elsewhereL_yyF
+// SIL: sil private [closure] [section "__TEXT,boot2"] @$s17section_functions22firmwareBootEntrypointyyFyyXEfU1_
 
 // SIL: sil hidden [section "__TEXT,boot"] @$s17section_functions13withLocalTypeyyF
 // SIL: sil private @$s17section_functions13withLocalTypeyyF0D0L_V6memberyyF
 // SIL: sil private @$s17section_functions13withLocalTypeyyF0D0L_V8propertySivg
-// SIL: sil private [section "__TEXT,boot"] @$s17section_functions13withLocalTypeyyF13localPropertyL_Sivg
+// SIL: sil private [closure] [section "__TEXT,boot"] @$s17section_functions13withLocalTypeyyF13localPropertyL_Sivg
 
 // SIL: sil hidden [global_init] @$s17section_functions14storedVariableSivau
-// SIL: sil private @$s17section_functions19initializedVariableSivpfiSiyXEfU_
+// SIL: sil private [closure] @$s17section_functions19initializedVariableSivpfiSiyXEfU_
 
 // Both the default argument generator and the closure written inside it.
 // SIL: sil hidden [section "__TEXT,boot"] @$s17section_functions19withDefaultArgument8callbackySiyXE_tFfA_
-// SIL: sil private [section "__TEXT,boot"] @$s17section_functions19withDefaultArgument8callbackySiyXE_tFfA_SiycfU_
+// SIL: sil private [closure] [section "__TEXT,boot"] @$s17section_functions19withDefaultArgument8callbackySiyXE_tFfA_SiycfU_
 
 // The synthesized 'get' comes from '_read', the synthesized 'set' from
 // '_modify'.

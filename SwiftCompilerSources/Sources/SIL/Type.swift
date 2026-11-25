@@ -150,6 +150,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.mayHaveCustomDeinit(function.bridged)
   }
 
+  /// True if this type may be a `@_rawLayout` type or (recursively) contain one.
+  /// Conservatively true for archetypes and types whose layout is opaque in this function
+  /// (e.g. resilient types from other modules). Currently false for opaque existentials.
+  public func isOrContainsRawLayout(in function: Function) -> Bool {
+    return bridged.isOrContainsRawLayout(function.bridged)
+  }
+
   //===--------------------------------------------------------------------===//
   //                Properties of lowered `SILFunctionType`s
   //===--------------------------------------------------------------------===//

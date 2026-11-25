@@ -13,7 +13,7 @@ class Kitty {
 
   // Access in a defer matches the context in Swift 6, so this defer should be
   // direct-to-storage.
-  // CHECK-LABEL: sil private [ossa] @$s16observers_swift65KittyC3valACSi_tcfc6$deferL_yyF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s16observers_swift65KittyC3valACSi_tcfc6$deferL_yyF
   // CHECK:         [[REF:%.+]] = ref_element_addr {{.*}} : $Kitty, #Kitty.age
   // CHECK:         [[ACCESS:%.+]] = begin_access {{.*}} [[REF]] : $*Int
   // CHECK:         assign {{.*}} to [[ACCESS]] : $*Int

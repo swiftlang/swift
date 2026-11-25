@@ -639,6 +639,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.getSerializedKind(),
       (unsigned)F.isThunk(), (unsigned)F.isWithoutActuallyEscapingThunk(),
+      (unsigned)F.isClosure(),
       (unsigned)F.getSpecialPurpose(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getPerfConstraints(),
       (unsigned)F.getClassSubclassScope(), (unsigned)F.hasCReferences(),
@@ -2510,6 +2511,10 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)operand->getType().getCategory(), addValueRef(operand));
     break;
   }
+  case SILInstructionKind::ValueToAddressInst:
+    // Only valid with opaque values, before AddressLowering, and SIL with
+    // opaque values is not serialized.
+    llvm_unreachable("not supported");
 
   case SILInstructionKind::EndAccessInst: {
     unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
@@ -3701,8 +3706,6 @@ void SILSerializer::writeDebugVariable(const SILInstruction &SI,
       DebugVarTypeCategory, attrs, ListOfValues);
 
   if (ScopeToWrite) {
-    assert(ScopeToWrite->getInlinedFunction() ==
-           SI.getDebugScope()->getInlinedFunction());
     writeDebugScopes(ScopeToWrite, SM);
     // Add a delimiter record since debug scope records are read by the
     // deserializer in a loop until the first non debug scope record is

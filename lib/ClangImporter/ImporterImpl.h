@@ -1011,9 +1011,13 @@ public:
 
   /// Like three-arg \c importBaseMemberDecl() , but clones only the indicated
   /// \p projection .
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
-                                  ClangInheritanceInfo inherit,
-                                  CArrayProjection projection);
+  /// If \p memberAccess is given, it is used in place of the access \p decl
+  /// was declared with.
+  ValueDecl *
+  importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                       ClangInheritanceInfo inherit,
+                       CArrayProjection projection,
+                       std::optional<AccessLevel> memberAccess = std::nullopt);
 
   /// Returns the operator that was synthesized from \p decl , a function
   /// imported from a C++ operator (so its name starts with `__operator`), or
@@ -1099,14 +1103,6 @@ public:
 
   /// Returns the unusable foreign type exposed by values of \p type, if any.
   UnusableForeignType exposesUnusableForeignType(Type type);
-
-  /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
-  /// libkern's OSObject hierarchy.
-  llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
-      libkernSubclasses;
-
-  /// Classify \p decl against libkern's OSObject hierarchy.
-  LibkernSubclass getLibkernSubclass(const clang::CXXRecordDecl *decl);
 
   /// Calling AbstractFunctionDecl::getLifetimeDependencies before we added
   /// the conformances we want to all the imported types is problematic because

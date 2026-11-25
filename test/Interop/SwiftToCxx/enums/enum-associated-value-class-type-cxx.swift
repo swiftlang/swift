@@ -36,6 +36,11 @@ public enum G<T> {
   case b([T])
 }
 
+public enum H {
+  case c(C?)
+  case i(Int)
+}
+
 // CHECK:      SWIFT_INLINE_THUNK E E::_impl_c::operator()(const C& val) const {
 // CHECK-NEXT:   auto result = E::_make();
 // CHECK-NEXT:   auto op = swift::_impl::_impl_RefCountedClass::copyOpaquePointer(val);
@@ -74,3 +79,15 @@ public enum G<T> {
 // CHECK-NEXT:       swift::_impl::implClassFor<swift::Array<T_0_0>>::type::initializeWithTake(result, payloadFromDestruction);
 // CHECK-NEXT:     });
 // CHECK-NEXT:   }
+
+// An optional class payload is not a class reference.
+// CHECK:      SWIFT_INLINE_THUNK H H::_impl_c::operator()(const swift::Optional<C>& val) const {
+// CHECK-NEXT:   auto result = H::_make();
+// CHECK-NEXT:   alignas(swift::Optional<C>) unsigned char buffer[sizeof(swift::Optional<C>)];
+// CHECK-NEXT:   auto *valCopy = new(buffer) swift::Optional<C>(val);
+// CHECK-NEXT:   swift::_impl::implClassFor<swift::Optional<C>>::type::initializeWithTake(::swift::_impl::ValueTypeStorage::getUninitializedStorage(result), swift::_impl::implClassFor<swift::Optional<C>>::type::getOpaquePointer(*valCopy));
+
+// CHECK:      SWIFT_INLINE_THUNK swift::Optional<C> H::getC() const {
+// CHECK:        return swift::_impl::implClassFor<swift::Optional<C>>::type::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     swift::_impl::implClassFor<swift::Optional<C>>::type::initializeWithTake(result, payloadFromDestruction);
+// CHECK-NEXT:   });

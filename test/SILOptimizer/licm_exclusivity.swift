@@ -4,12 +4,13 @@
 // REQUIRES: optimized_stdlib,asserts,swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
 
+// AccessEnforcementDom inserts a dominating access in the loop preheader and removes the
+// loop's access scope.
 // TESTSIL-LABEL: sil hidden @$s16licm_exclusivity17run_ReversedArrayyySiF : $@convention(thin) (Int) -> () {
-// TESTSIL: bb
-// TESTSIL: begin_access [modify] [dynamic] [no_nested_conflict]
-// TESTSIL: br bb{{.*}}
-// TESTSIL: bb{{.*}}:
-// TESTSIL: end_access
+// TESTSIL: [[A:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict]
+// TESTSIL-NEXT: end_access [[A]]
+// TESTSIL-NOT: begin_access
+// TESTSIL-LABEL: } // end sil function '$s16licm_exclusivity17run_ReversedArrayyySiF'
 var x = 0
 func run_ReversedArray(_ N: Int) {
   let array = Array(repeating: 1, count: 42)

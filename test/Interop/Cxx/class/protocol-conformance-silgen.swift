@@ -1,6 +1,7 @@
 // Tests that a C++ class can conform to a Swift protocol.
 
 // RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s --check-prefix=STATIC
 
 import ProtocolConformance
 
@@ -16,3 +17,14 @@ protocol HasReturn42 {
 
 // sil [clang ConformsToProtocol.return42] @[[FN_NAME]] : $@convention(c) (@inout ConformsToProtocol) -> Int32
 extension ConformsToProtocol : HasReturn42 {}
+
+protocol MakesSelf {
+  static func make() -> Self
+}
+
+// A static C++ method has no self parameter, so the witness calls it through
+// the native thunk.
+// STATIC-LABEL: sil private [transparent] [thunk] [ossa] @$sSo16HasStaticFactoryV4main9MakesSelfA2cDP4makexyFZTW :
+// STATIC: function_ref @$sSo16HasStaticFactoryV4makeAByFZTO :
+// STATIC: return
+extension HasStaticFactory : MakesSelf {}

@@ -21,7 +21,7 @@ sil_global hidden @globalInt : $Int64
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRD_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRD_RD'
 sil hidden [noinline] @testDominatingOverlapRDRD_RD : $@convention(thin) () -> () {
 bb0:
@@ -40,7 +40,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSRD_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [read] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRSRD_RD'
 sil hidden [noinline] @testDominatingOverlapRSRD_RD : $@convention(thin) () -> () {
 bb0:
@@ -59,7 +59,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDRS_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [read] [static] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDRS_RD'
 sil hidden [noinline] @testDominatingOverlapRDRS_RD : $@convention(thin) () -> () {
 bb0:
@@ -141,7 +141,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMD_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMD_RD'
 sil hidden [noinline] @testDominatingOverlapRDMD_RD : $@convention(thin) () -> () {
 bb0:
@@ -160,7 +160,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSMD_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRSMD_RD'
 sil hidden [noinline] @testDominatingOverlapRSMD_RD : $@convention(thin) () -> () {
 bb0:
@@ -179,7 +179,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMS_RD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [static] [[GA]] : $*Int64
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMS_RD'
 sil hidden [noinline] @testDominatingOverlapRDMS_RD : $@convention(thin) () -> () {
 bb0:
@@ -201,7 +201,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMD_MD : $@convention(thin) () -> () {
 // CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMD_MD'
 sil hidden [noinline] @testDominatingOverlapRDMD_MD : $@convention(thin) () -> () {
 bb0:
@@ -220,7 +220,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRSMD_MD : $@convention(thin) () -> () {
 // CHECK: begin_access [read] [static] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [dynamic] [[GA]] : $*Int64
-// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRSMD_MD'
 sil hidden [noinline] @testDominatingOverlapRSMD_MD : $@convention(thin) () -> () {
 bb0:
@@ -239,7 +239,7 @@ bb0:
 // CHECK-LABEL: sil hidden [noinline] @testDominatingOverlapRDMS_MD : $@convention(thin) () -> () {
 // CHECK: begin_access [modify] [dynamic] [[GA:%.*]] : $*Int64
 // CHECK: begin_access [modify] [static] [[GA]] : $*Int64
-// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDominatingOverlapRDMS_MD'
 sil hidden [noinline] @testDominatingOverlapRDMS_MD : $@convention(thin) () -> () {
 bb0:

@@ -324,7 +324,7 @@ To prove the same result from $G\vdash\texttt{T.V}$ instead of $G\vdash\texttt{U
 \end{proof}
 
 \begin{example}
-If~$G$ is the generic signature of \ExRef{conformance path example}, we can use our lemma to derive $G\vdash\SameReq{\rU.Iterator.Element}{\rT.SubSequence.Iterator.Element}$ from $G\vdash\SameReq{\rU}{\rT.SubSequence}$ and $G\vdash\texttt{\rU.Iterator.Element}$.
+If~$G$ is the generic signature from \ExRef{conformance path example}, we can use our lemma to derive $G\vdash\SameReq{\rU.Iterator.Element}{\rT.SubSequence.Iterator.Element}$ from $G\vdash\SameReq{\rU}{\rT.SubSequence}$ and $G\vdash\texttt{\rU.Iterator.Element}$.
 \end{example}
 
 \newcommand{\AssocConfStepDefX}{\ConfReq{U.V}{P}\tag{\textsc{AssocConf} $\AssocConfReq{Self.V}{P}{Q}$ $\ConfReq{U}{Q}$}}
@@ -443,7 +443,7 @@ p_{31}&\rightarrow\ConfReq{\rT.[Sequence]Iterator}{IteratorProtocol}\\
 p_{32}&\rightarrow\ConfReq{\rU}{Sequence}\\
 p_{41}&\rightarrow\ConfReq{\rU.[Sequence]Iterator}{IteratorProtocol}
 \end{align*}
-Our generic signature therefore has the bconformance graph below; the root abstract conformance is distinguished by a darker shade of gray. Note that $\ConfReq{\rU}{Collection}$ has a \IndexDefinition{loop}\emph{loop}---an edge with the same source and destination:
+Our generic signature therefore has the conformance graph below; the root abstract conformance is distinguished by a darker shade of gray. Note that $\ConfReq{\rU}{Collection}$ has a \IndexDefinition{loop}\emph{loop}---an edge with the same source and destination:
 
 \begin{center}
 \begin{tikzpicture}[sibling distance=6cm, level distance=1.6cm]
@@ -952,7 +952,7 @@ We showed that \AlgRef{find conformance path algorithm} for \emph{finding} a con
 
 At the present time, the compiler terminates with a stack overflow if a non-terminating type substitution is attempted. While \AlgRef{local conformance lookup algorithm} itself is a simple counted loop, the recursion is coming from Step~4. If $C$ is a \index{specialized conformance!recursive}specialized conformance, projecting an associated conformance from $C$ applies a substitution map to some other conformance; if this conformance is abstract, we recursively call into \index{local conformance lookup!recursive}local conformance lookup again. Our example happens to arrange everything just right so that we end up repeating the \emph{same} local conformance lookup.
 
-\section{The Halting Problem}\label{halting problem}
+\section{The Halting Problem}\label{sec:halting problem}
 
 In the future, the compiler should \index{termination check}detect non-terminating type substitution and diagnose the problem, instead of crashing. Two approaches spring to mind:
 \begin{enumerate}
@@ -1378,7 +1378,7 @@ Swift type substitution is Turing-complete.
 \end{theorem}
 
 \paragraph{Further discussion.}
-In \SecRef{sec:conditional conformances}, we looked at an example of a non-terminating conditional conformance check in Swift, and cited a similar example in \index{Rust}Rust. In fact, the construction in this section can be tweaked slightly to encode the tag system in terms of conditional conformances instead, so Swift conditional conformance checking is again Turing-complete, beyond simply encoding infinite loops. Looking ahead, \SecRef{word problem} will show that Swift reduced type equality is also undecidable in the general case, but we will get a termination guarantee by restricting the problem.
+In \SecRef{sec:conditional conformances}, we looked at an example of a non-terminating conditional conformance check in Swift, and cited a similar example in \index{Rust}Rust. In fact, the construction in this section can be tweaked slightly to encode the tag system in terms of conditional conformances instead, so Swift conditional conformance checking is again Turing-complete, beyond simply encoding infinite loops. Looking ahead, \SecRef{sec:word problem} will show that Swift reduced type equality is also undecidable in the general case, but we will get a termination guarantee by restricting the problem.
 
 A contributor to the Swift forums discovered another Turing machine in the Swift type system \cite{brainfuck}, by constructing an interpreter for the ``Brainfuck'' programming language in terms of the \emph{key path member lookup} feature \cite{se0252}. Countless other examples of undecidable type checking problems are described in the literature. For example, \index{Java}Java generics are known to be Turing-complete \cite{java_wildcards,java_undecidable}.
 

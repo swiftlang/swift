@@ -24,8 +24,8 @@ sil_global hidden @globalX : $X
 // CHECK: [[A:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GA:%.*]] : $*X
 // CHECK: end_access [[A]]
 // CHECK: bb3:
-// CHECK: begin_access [read] [static] [no_nested_conflict] [[GA]] : $*X
-// CHECK: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*X
+// CHECK-NEXT: begin_access [modify] [dynamic] [no_nested_conflict] [[GA]] : $*X
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomLoopRDMD'
 sil @testDomLoopRDMD : $@convention(thin) () -> () {
 bb0:
@@ -93,7 +93,7 @@ bb5:
 // CHECK: [[A:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GA:%.*]] : $*Int64
 // CHECK: end_access [[A]]
 // CHECK: bb3:
-// CHECK: begin_access [modify] [static] [no_nested_conflict] [[GA]] : $*Int64
+// CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomLoopUnidentified'
 sil @testDomLoopUnidentified : $@convention(thin) (@inout Int64) -> () {
 bb0(%0 : $*Int64):

@@ -50,12 +50,8 @@ bb0(%0 : $@thin X.Type):
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: load [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomSimpleRead'
 sil @testDomSimpleRead : $@convention(thin) () -> () {
@@ -82,12 +78,8 @@ bb0:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK: [[BEGIN:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK: store {{.*}} to [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK: store {{.*}} to [[GLOBAL]] : $*X
+// CHECK-NEXT: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomSimpleWrite'
 sil @testDomSimpleWrite : $@convention(thin) () -> () {
@@ -111,7 +103,7 @@ bb0:
 }
 
 // public func testDomAcrossBBs() {
-// Checks static-setting of scopes across basic blocks
+// Checks removal of scopes across basic blocks
 //
 // CHECK-LABEL: sil @testDomAcrossBBs : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
@@ -121,9 +113,7 @@ bb0:
 // CHECK-NEXT: br bb1
 // CHECK: br bb2
 // CHECK: bb2:
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomAcrossBBs'
 sil @testDomAcrossBBs : $@convention(thin) () -> () {
@@ -146,7 +136,7 @@ bb2:
 }
 
 // public func testDomAcrossInnerLoop() {
-// Checksstatic-setting of scopes across an inner loop
+// Checks removal of scopes across an inner loop
 //
 // CHECK-LABEL: sil @testDomAcrossInnerLoop : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
@@ -156,9 +146,7 @@ bb2:
 // CHECK-NEXT: br bb1
 // CHECK: cond_br {{.*}}, bb3, bb2
 // CHECK: bb2:
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK: load [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
+// CHECK-NEXT: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testDomAcrossInnerLoop'
 sil @testDomAcrossInnerLoop : $@convention(thin) () -> () {
@@ -193,21 +181,13 @@ bb3:
 // CHECK-NEXT: load [[BEGIN]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: br bb1
-// CHECK: [[BEGIN2:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN2]] : $*X
-// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb5, bb6
-// CHECK: [[BEGIN3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN3]] : $*X
-// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb7, bb4
-// CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN4]] : $*X
-// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb8, bb9
-// CHECK: [[BEGIN5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN5]] : $*X
-// CHECK-NEXT: end_access [[BEGIN5]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testIrreducibleGraph'
 sil @testIrreducibleGraph : $@convention(thin) () -> () {
@@ -279,13 +259,9 @@ t31:
 // CHECK-NEXT: load [[BEGIN3]] : $*X
 // CHECK-NEXT: end_access [[BEGIN3]] : $*X
 // CHECK: br bb4
-// CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN4]] : $*X
-// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb8, bb5
-// CHECK: [[BEGIN5:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN5]] : $*X
-// CHECK-NEXT: end_access [[BEGIN5]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK-NOT: begin_access
 // CHECK-LABEL: } // end sil function 'testIrreducibleGraph2'
 sil @testIrreducibleGraph2 : $@convention(thin) () -> () {
@@ -376,9 +352,7 @@ bb0:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK: bb3:
-// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN2]] : $*X
-// CHECK-NEXT: end_access [[BEGIN2]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderSimple'
 sil @testLoopDominatingAccessAdderSimple : $@convention(thin) () -> () {
@@ -455,12 +429,8 @@ bb5:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK: bb3:
-// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN2]] : $*X
-// CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: [[BEGIN3:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN3]] : $*X
-// CHECK-NEXT: end_access [[BEGIN3]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMulti'
 sil @testLoopDominatingAccessAdderMulti : $@convention(thin) () -> () {
@@ -502,15 +472,9 @@ bb5:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK: bb3:
-// CHECK: [[BEGIN2:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN2]] : $*X
-// CHECK-NEXT: end_access [[BEGIN2]] : $*X
-// CHECK: [[BEGIN3:%.*]] = begin_access [modify] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN3]] : $*X
-// CHECK-NEXT: end_access [[BEGIN3]] : $*X
-// CHECK: [[BEGIN4:%.*]] = begin_access [read] [static] [no_nested_conflict] [[GLOBAL]] : $*X
-// CHECK-NEXT: load [[BEGIN4]] : $*X
-// CHECK-NEXT: end_access [[BEGIN4]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
+// CHECK: load [[GLOBAL]] : $*X
 // CHECK: cond_br {{.*}}, bb5, bb4
 // CHECK-LABEL: } // end sil function 'testLoopDominatingAccessAdderMultiChangeKind'
 sil @testLoopDominatingAccessAdderMultiChangeKind : $@convention(thin) () -> () {
@@ -577,8 +541,8 @@ bb0:
 // FIXME: simple nested dynamic reads to identical storage could very
 // easily be removed via separate logic, but it does not fit with the
 // dominator-based algorithm. For example, during the analysis phase, we
-// could simply mark the "fully nested" read scopes, then convert them to
-// [static] right after the analysis, removing them from the result
+// could simply mark the "fully nested" read scopes, then remove them
+// right after the analysis, removing them from the result
 // map. I didn't do this because I don't know if it happens in practice.
 //
 // CHECK-LABEL: sil @testOptOnNestedDomRead : $@convention(thin) () -> () {
@@ -604,7 +568,7 @@ bb0:
 // Therefore the second access is dominated by the first access with identical storage.
 // CHECK-LABEL: sil [ossa] @testDomLoadBorrowValueHint : $@convention(thin) () -> () {
 // CHECK:         begin_access [read] [dynamic] [no_nested_conflict]
-// CHECK:         begin_access [read] [static] [no_nested_conflict]
+// CHECK-NOT:     begin_access
 // CHECK-LABEL: } // end sil function 'testDomLoadBorrowValueHint'
 sil [ossa] @testDomLoadBorrowValueHint : $@convention(thin) () -> () {
 bb0:

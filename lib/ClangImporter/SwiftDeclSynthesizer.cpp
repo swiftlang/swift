@@ -3824,14 +3824,20 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
                                               clang::VK_LValue);
   castDecl->setParams({paramDecl});
 
-  // Synthesize `return static_cast<Base *>(from);`. Using a real static_cast
-  // is required because a base subobject may live at a non-zero offset within
-  // the derived object (multiple/virtual inheritance).
-  auto castResult = clangSema.BuildCXXNamedCast(
-      loc, clang::tok::kw_static_cast,
-      clangCtx.getTrivialTypeSourceInfo(basePtrTy), paramRefExpr,
-      clang::SourceRange(), clang::SourceRange());
-  if (!castResult.isUsable())
+  // Synthesize the derived-to-base conversion `return from;` bypassing base
+  // access. The conversion accounts for base subobjects at a non-zero offset
+  // within the derived object.
+  auto from = clangSema.DefaultLvalueConversion(paramRefExpr);
+  if (!from.isUsable())
+    return nullptr;
+  clang::CastKind castKind;
+  clang::CXXCastPath castPath;
+  if (clangSema.CheckPointerConversion(from.get(), basePtrTy, castKind,
+                                       castPath, /*IgnoreBaseAccess=*/true))
+    return nullptr;
+  auto castResult = clangSema.ImpCastExprToType(from.get(), basePtrTy, castKind,
+                                                clang::VK_PRValue, &castPath);
+  if (!castResult.isUsable() || trap.hasErrorOccurred())
     return nullptr;
 
   castDecl->setBody(createClangReturnStmt(clangCtx, castResult.get()));

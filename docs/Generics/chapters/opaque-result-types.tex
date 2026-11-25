@@ -967,7 +967,7 @@ func f2() -> some Any {
 \end{Verbatim}
 \end{example}
 
-Beyond these simple examples, the technique in \SecRef{halting problem} of encoding a \index{tag system}tag system in terms of type substitution can be modified slightly to use opaque result types instead, so in fact, opaque archetype specialization is Turing-complete, and it an \index{undecidable problem!halting problem}undecidable in general if this process terminates. Thus, the only way to prevent non-terminating computation is to impose an upper bound on the total amount of work we can do, and signal an error if this limit is breached:
+Beyond these simple examples, the technique in \SecRef{sec:halting problem} of encoding a \index{tag system}tag system in terms of type substitution can be modified slightly to use opaque result types instead, so in fact, opaque archetype specialization is Turing-complete, and it an \index{undecidable problem!halting problem}undecidable in general if this process terminates. Thus, the only way to prevent non-terminating computation is to impose an upper bound on the total amount of work we can do, and signal an error if this limit is breached:
 \begin{enumerate}
 \item To catch most cases, we eagerly attempt to fully specialize every declared opaque result type from the \index{type-check primary file request}\Request{type-check primary file request}. If this happens, we emit a diagnostic, as shown with the two examples above.
 
@@ -1047,7 +1047,7 @@ See also \SecRef{src:archetypes}.
 
 Key source files:
 \begin{itemize}
-\item \SourceFile{lib/AST/SourceFile.cpp}
+\item \SourceFile{lib/AST/Module.cpp}
 \item \SourceFile{lib/Sema/TypeCheckType.cpp}
 \end{itemize}
 

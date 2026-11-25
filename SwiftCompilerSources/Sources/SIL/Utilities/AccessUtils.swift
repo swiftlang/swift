@@ -70,6 +70,9 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   case tail(RefTailAddrInst)
 
   /// An indirect function argument, like `@inout`.
+  ///
+  /// With opaque values, a guaranteed address-only argument is an object until AddressLowering. Its address is
+  /// `value_to_address` of the argument, which is also an `argument` base.
   case argument(FunctionArgument)
   
   /// An indirect result of a `begin_apply`.
@@ -109,6 +112,13 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case let mvr as MultipleValueInstructionResult:
       if mvr.parentInstruction is BeginApplyInst && baseAddress.type.isAddress {
         self = .yield(mvr)
+      } else {
+        self = .unidentified
+      }
+    case let vta as ValueToAddressInst:
+      // The address of an indirect argument that opaque values represent as an object.
+      if let arg = vta.operand.value as? FunctionArgument {
+        self = .argument(arg)
       } else {
         self = .unidentified
       }
@@ -259,7 +269,10 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case (.box(let pb1), .box(let pb2)):
       return pb1.box.referenceRoot == pb2.box.referenceRoot
     case (.class(let rea1), .class(let rea2)):
-      return rea1.fieldIndex == rea2.fieldIndex &&
+      // Comparing the field index is not sufficient: `referenceRoot` looks through casts, e.g.
+      // `unconditional_checked_cast`. Two fields of different (e.g. sibling) classes can have the same
+      // field index, but are different properties.
+      return rea1.varDecl == rea2.varDecl &&
              rea1.instance.referenceRoot == rea2.instance.referenceRoot
     case (.tail(let rta1), .tail(let rta2)):
       return rta1.instance.referenceRoot == rta2.instance.referenceRoot &&

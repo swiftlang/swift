@@ -657,7 +657,7 @@ Translating our rewrite path gives us $G\vdash\SameReq{T}{T}$ which we discard, 
 Translating our rewrite path gives us $G\vdash\TU$ which we keep, together with an empty list of derived conformance requirements which we discard.
 \end{proof}
 
-\paragraph{The decision procedure.} Recall the four basic generic signature queries that describe the equivalence class structure of a generic signature, from \SecRef{genericsigqueries}. We saw the first two are fundamental from a theoretical standpoint.
+\paragraph{The decision procedure.} Recall the four basic generic signature queries that describe the equivalence class structure of a generic signature, from \SecRef{sec:queries}. We saw the first two are fundamental from a theoretical standpoint.
 
 Taken together, \CorollaryRef{complete decidable}, \ThmRef{derivation to path swift}, and \CorollaryRef{path to derivation swift} say that if we have a well-formed generic signature~$G$ presented by a \index{complete presentation}\index{finite complete presentation}finite complete rewriting system~$\AR$, and the given type parameters are \index{valid type parameter!generic signature query}valid, then:
 \begin{enumerate}
@@ -762,7 +762,7 @@ In the next section, we will see how associated type symbols arise when we trans
 
 Why do we need associated type symbols? There are two reasons, and we will study them in great detail in \ChapRef{chap:completion}:
 \begin{enumerate}
-\item We saw a correct but inefficient implementation of the \IndexQuery{isValidTypeParameter}$\Query{isValidTypeParameter}{}$ generic signature query in \SecRef{genericsigqueries}. Associated type symbols will give us a more efficient implementation using the \index{normal form algorithm}normal form algorithm, in \AlgRef{alg:isValidTypeParameter}.
+\item We saw a correct but inefficient implementation of the \IndexQuery{isValidTypeParameter}$\Query{isValidTypeParameter}{}$ generic signature query in \SecRef{sec:queries}. Associated type symbols will give us a more efficient implementation using the \index{normal form algorithm}normal form algorithm, in \AlgRef{alg:isValidTypeParameter}.
 
 \item We also need associated type symbols to obtain a finite complete rewriting system when our generic signature has an infinite set of equivalence classes, as we will see in \SecRef{sec:recursive conformances redux}.
 \end{enumerate}
@@ -793,7 +793,7 @@ The next three symbol kinds appear when we build rewrite rules for \index{layout
 
 \paragraph{Layout symbols.} The $\layoutsym{AnyObject}$ \index{layout symbol}layout symbol represents the \texttt{AnyObject} layout constraint we introduced in \DefRef{requirement def}. It appears when we translate a layout requirement $\ConfReq{T}{AnyObject}$ into a rule $\Term(\tT)\cdot\layoutsym{AnyObject} \Eq \Term(\tT)$.
 
-We also mentioned the \verb|_NativeClass| layout constraint in \SecRef{genericsigqueries}. This constraint cannot be stated directly by the user, but it is implied by a superclass requirement to a Swift-native class. These two \index{layout symbol!reduction order}layout symbols are ordered as follows:
+We also mentioned the \verb|_NativeClass| layout constraint in \SecRef{sec:queries}. This constraint cannot be stated directly by the user, but it is implied by a superclass requirement to a Swift-native class. These two \index{layout symbol!reduction order}layout symbols are ordered as follows:
 \[\layoutsym{AnyObject} < \layoutsym{\char`_NativeClass}\]
 
 \paragraph{Superclass and concrete type symbols.}
@@ -863,7 +863,7 @@ Takes two \IndexDefinition{superclass symbol!reduction order}superclass or \Inde
 
 While superclass and concrete type symbols may contain terms, those terms cannot themselves contain superclass and concrete type symbols, because terms corresponding to type parameters only contain generic parameter, name, protocol, and associated type symbols.
 
-\paragraph{Concrete conformance symbols.} The notation for a \index{concrete conformance symbol}concrete conformance symbol looks like a concrete type symbol, but it also stores a protocol declaration. We will see in \SecRef{rqm concrete conformances} that when a type parameter \tT\ is subject to the combination of a \index{conformance requirement!concrete conformance}conformance requirement $\TP$ and a concrete \index{same-type requirement!concrete conformance}same-type requirement $\TX$, we introduce a rewrite rule containing a concrete conformance symbol:
+\paragraph{Concrete conformance symbols.} The notation for a \index{concrete conformance symbol}concrete conformance symbol looks like a concrete type symbol, but it also stores a protocol declaration. We will see in \SecRef{sec:concrete types} that when a type parameter \tT\ is subject to the combination of a \index{conformance requirement!concrete conformance}conformance requirement $\TP$ and a concrete \index{same-type requirement!concrete conformance}same-type requirement $\TX$, we introduce a rewrite rule containing a concrete conformance symbol:
 \[\Term(\tT)\cdot\concretesym{\tX\colon\texttt{P};\,\ldots} \Eq \Term(\tT)\]
 To compare two concrete conformance symbols, we first compare their protocol, then we compare their pattern type and substitution terms.
 \begin{algorithm}[Concrete conformance reduction order]\label{concrete conformance reduction order}
@@ -929,8 +929,8 @@ A \index{type parameter!in requirement machine}type parameter is a \index{linked
 
 The below is an instance of the classical algorithm for converting a linked list into an array. We traverse the list from head to tail, at each step adding a symbol at the end of the term; this leaves us with a term where the \emph{last} element is the generic parameter symbol. We then reverse the order of symbols to get the final result.
 
-\begin{algorithm}[Build term for explicit requirement]\label{build term generic}
-Takes a type parameter \tT\ as input, and outputs a (non-empty) mutable term.
+\begin{algorithm}[Build term for type in generic signature]\label{build term generic}
+Takes a type parameter~\tT\ as input, and outputs a (non-empty) mutable term.
 \begin{enumerate}
 \item (Initialize) Let $t$ be a new empty mutable term.
 \item (Base case) If \tT\ is a generic parameter type \ttgp{d}{i}:
@@ -966,8 +966,8 @@ Next, consider the ``$\TermP{P}$'' mapping, used for building terms in a \index{
 \end{tabular}
 \end{center}
 
-\begin{algorithm}[Build term for associated requirement]\label{build term protocol}
-Takes a type parameter \tT\ and a protocol declaration \tP\ as input, and outputs a (non-empty) mutable term.
+\begin{algorithm}[Build term for type in protocol]\label{build term protocol}
+Takes a type parameter~\tT\ and a protocol declaration~\tP\ as input, and outputs a (non-empty) mutable term.
 \begin{enumerate}
 \item (Initialize) Let $t$ be a new empty mutable term.
 \item (Base case) If \tT\ is the protocol \tSelf\ type (\ttgp{0}{0}), consider the term~$t$ constructed so far:
@@ -1057,7 +1057,7 @@ We now dispose of the notation $<_w$. We will denote the reduction order on term
 
 We now describe a pair of algorithms implementing the ``$\Rule$'' and ``$\RuleP{P}$'' mappings. We start with the ``$\Rule$'' mapping, which defines the local rules of a \index{query machine}\textbf{query machine} or \index{minimization machine}\textbf{minimization machine}. We can assume the input requirement is desugared already (\SecRef{requirement desugaring}), so the left-hand side is always a type parameter. We use \AlgRef{build term generic}, denoted ``$\Term$'', to translate type parameters to terms.
 
-Our core model only supported conformance requirements and same-type requirements between type parameters. We saw that we translate a conformance requirement $\ConfReq{T}{P}$ into a rewrite rule $\ConfRule{\Term(\tT)}{\pP}$. We will now think of this as a special case of a \IndexDefinition{property rule}\emph{property rule}, which is a rewrite rule of the form $\ConfRule{\Term(\tT)}{s}$ where $s$ is a symbol. In the full model, the other requirement kinds also translate to property rules, while same-type requirements between type parameters remain essentially distinct:
+Our core model only supported conformance requirements and same-type requirements between type parameters. We saw that conformance requirements $\ConfReq{T}{P}$ translate to rewrite rules $(\Term(\tT) \cdot \pP,\, \Term(\tT))$. This is a special case of a \IndexDefinition{property rule}\emph{property rule}, which is a rule of the form $(t \cdot s, t)$ where $s$ is a protocol, layout, superclass, or concrete type symbol. In the full model, the other requirement kinds also translate to property rules, while same-type requirements between type parameters remain distinct:
 \begin{center}
 \begin{tabular}{lll}
 \toprule
@@ -1077,7 +1077,7 @@ $\Rule\, \TU$ & $\Term(\tT)\Eq\Term(\tU)$&\\
 
 \smallskip
 
-\begin{algorithm}[Build rule from explicit requirement]\label{build rule}
+\begin{algorithm}[Build rule for explicit requirement]\label{build rule}
 Takes a desugared requirement as input, and outputs a pair of terms.
 \begin{enumerate}
 \item For a \index{conformance requirement!in requirement machine}\textbf{conformance requirement} $\TP$, return the pair $(\Term(\tT)\cdot s,\,\Term(\tT))$ where~$s$ is the \index{protocol symbol}protocol symbol $\pP$.
@@ -1109,7 +1109,7 @@ $\RuleP{P}\, \AssocSameReq{Self.U}{Self.V}{P}$ & \multicolumn{2}{l}{$\TermP{P}(\
 
 \smallskip
 
-\begin{algorithm}[Build rule from associated requirement]\label{build rule protocol}
+\begin{algorithm}[Build rule for associated requirement]\label{build rule protocol}
 Takes a desugared requirement and a protocol declaration~\tP\ as input, and outputs a pair of terms.
 \begin{enumerate}
 \item For an \index{conformance requirement!in requirement machine}\textbf{associated conformance requirement} $\AssocConfReq{Self.U}{Q}{P}$, return the pair $(\TermP{P}(\SelfU)\cdot s,\,\TermP{P}(\SelfU))$ where $s$ is the protocol symbol $\pP$.
@@ -1455,10 +1455,6 @@ In this section, we revisit the \index{normal form algorithm}normal form algorit
 \end{enumerate}
 Regarding the first issue, we know that completion gives us a \index{confluent reduction relation}confluent reduction relation, where the normal form of a term does not depend on any choice of rewrite steps. As a practical matter though, we still something deterministic. We do this by always choosing the rewrite step with the shortest \index{left whisker}left \index{whiskering}whisker; in other words, we scan the original term from left to right and rewrite the \emph{left-most} matching factor, if there is one, and repeat. To resolve the second issue, we must \emph{find} these matching factors efficiently. We do this with the aid of an auxiliary data structure.
 
-\newcommand{\TKey}[1]{\texttt{KEY}(#1)}
-\newcommand{\TChild}[2]{\texttt{CHILD}(#1,#2)}
-\newcommand{\TValue}[1]{\texttt{VALUE}(#1)}
-
 \paragraph{The rule trie.} A \IndexDefinition{trie}\emph{trie} represents a mapping from keys to values, where the keys are strings (so, elements of a free monoid). The lookup operation finds the shortest \emph{prefix} of an input string that is equal to some key, in \index{asymptotic complexity}linear time proportional to the length of the key. Each requirement machine has its own \IndexDefinition{rule trie}trie where the keys are the left-hand sides of rewrite rules, and the values are the indices of those rules in the array.
 
 Concretely, a trie is a collection of \emph{nodes}, organized as a \index{tree}tree. Each node represents a unique string that is a prefix of one or more keys stored in the trie.  We denote this for a node~$n$ by $\TKey{n}$. If $\TKey{n}$ is the \emph{entire} key, then $n$ stores the value associated with this key, denoted $\TValue{n}$. Otherwise, $\TValue{n}$ is null.
@@ -1509,11 +1505,11 @@ To implement the trie lookup operation, we start from the root and follow the se
 \begin{algorithm}[Lookup in rule trie]\label{trie lookup algo}
 Takes a word $t$ and an offset $i$ such that $0\leq i<|t|$. If there exists a word $x$ with $|x|=i$ and a rewrite rule $(u,v)$ such that $t=xuy$, returns the index of this rule $(u,v)$ in the \index{rule array}array of rules. Otherwise, returns null.
 \begin{enumerate}
-\item (Initialize) Let $n$ be the root node.
+\item (Initialize) Let $N$ be the root node of the rule trie. Let $i := 0$.
 \item (End) If $i=|t|$, we've reached the end of our word. Return null.
-\item (Child) Let $m := \TChild{n}{s_i}$ where $s_i$ is the $i$th symbol of $t$. If $m$ is null, there are no more keys left to check. Return null.
-\item (Value) Otherwise, if $\TValue{m}$ is not null, return $\TValue{m}$.
-\item (Advance) Otherwise, set $n \leftarrow m$ and $i \leftarrow i+1$. Go back to Step~2.
+\item (Child) Let $M := \TChild{n}{t[i]}$, where $t[i]$ is the $i$th symbol in $t$. If $M$ is null, there are no more keys left to check. Return null.
+\item (Value) Otherwise, if $\TValue{M}$ is set, return $\TValue{M}$.
+\item (Advance) Otherwise, set $N \leftarrow M$ and $i \leftarrow i+1$. Go back to Step~2.
 \end{enumerate}
 \end{algorithm}
 
@@ -1535,10 +1531,10 @@ After adding a new rewrite rule to the \index{rule array}array of rules, we must
 \begin{algorithm}[Insert rule in rule trie]\label{trie insert algo}
 Takes the index of a rewrite rule $(u,v)$ as input. Has side effects.
 \begin{enumerate}
-\item (Initialize) Let $n$ be the root node of the trie. Let $i:=0$.
-\item (End) If $i=|u|$, update $\TValue{n}$ with the index of $(u,v)$, and return.
-\item (Child) Let $s_i$ be the $i$th symbol of $u$. Let $m:=\TChild{n}{s_i}$. If $m$ is null, allocate a new node $m$ and set $\TChild{n}{s_i}\leftarrow m$.
-\item (Next) Set $n \leftarrow m$. Set $i \leftarrow i+1$. Go back to Step~2.
+\item (Initialize) Let $N$ be the root node of the rule trie. Let $i:=0$.
+\item (End) If $i=|u|$, set $\TValue{N}$ to the index of $(u,v)$, and return.
+\item (Child) Let $M:=\TChild{N}{u[i]}$. If $M$ is null, allocate a new node $M$ and set $\TChild{N}{u[i]}\leftarrow M$.
+\item (Next) Set $N \leftarrow M$. Set $i \leftarrow i+1$. Go back to Step~2.
 \end{enumerate}
 \end{algorithm}
 
@@ -1812,14 +1808,14 @@ The above share some common logic:
 \end{itemize}
 
 \apiref{rewriting::Trie}{template class}
-A template class implementing the \IndexSource{trie}trie data structure. Used by the \texttt{RewriteSystem} and \texttt{PropertyMap}. The keys are terms, while the value type is a template parameter. Another template parameter selects between a shortest or longest match lookup strategy. We use shortest match for the normal form algorithm. See also \SecRef{src:completion} and \SecRef{property map sourceref}.
+A template class implementing the \IndexSource{trie}trie data structure. Used by the \texttt{RewriteSystem} and \texttt{PropertyMap}. The keys are terms, while the value type is a template parameter. Another template parameter selects between a shortest or longest match lookup strategy. We use shortest match for the normal form algorithm. See also \SecRef{src:completion} and \SecRef{src:property map}.
 \begin{itemize}
 \item \texttt{find()} finds an existing entry with \AlgRef{trie lookup algo}.
 \item \texttt{insert()} inserts a new entry with \AlgRef{trie insert algo}.
 \end{itemize}
 
 \apiref{rewriting::RewriteStep::Kind}{enum}
-The \texttt{RewriteStep::Kind::Rule} kind represents the application of a rewrite rule to a term. Other rewrite step kinds appear in \SecRef{property map sourceref}.
+The \texttt{RewriteStep::Kind::Rule} kind represents the application of a rewrite rule to a term. Other rewrite step kinds appear in \SecRef{src:property map}.
 
 \apiref{rewriting::RewriteStep}{struct}
 A compact encoding of a \IndexSource{rewrite step!in requirement machine}rewrite step.

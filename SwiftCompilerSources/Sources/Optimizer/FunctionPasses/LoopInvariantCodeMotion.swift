@@ -65,6 +65,7 @@ private struct MovableInstructions {
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var scopedInsts: [ScopedInstruction] = []
+  var stackAllocations: [AllocStackInst] = []
 }
 
 /// Analyzed instructions inside the currently processed loop.
@@ -76,6 +77,8 @@ private struct AnalyzedInstructions {
   var loads: Stack<LoadInst>
   var loadBorrows: Stack<LoadBorrowInst>
   var stores: Stack<StoreInst>
+  /// Stack allocations which, or a projection of which, are copied into a stack allocation in the loop.
+  var copiedStackAllocations: InstructionSet
 
   // loop blocks that dominate all exiting and latch blocks
   var dominatingBlocks: BasicBlockSet
@@ -92,6 +95,7 @@ private struct AnalyzedInstructions {
     self.loads = Stack<LoadInst>(context)
     self.loadBorrows = Stack<LoadBorrowInst>(context)
     self.stores = Stack<StoreInst>(context)
+    self.copiedStackAllocations = InstructionSet(context)
     self.dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
   }
   
@@ -101,6 +105,7 @@ private struct AnalyzedInstructions {
     loads.deinitialize()
     loadBorrows.deinitialize()
     stores.deinitialize()
+    copiedStackAllocations.deinitialize()
     dominatingBlocks.deinitialize()
   }
 }
@@ -144,7 +149,12 @@ private func analyzeInstructions(
         analyzedInstructions.loadBorrows.append(loadBorrowInst)
         continue // Don't set `hasOtherMemReadingInsts`
       case let storeInst as StoreInst:
+        if let load = storeInst.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == storeInst.parentBlock {
+          analyzedInstructions.recordCopiedStackAllocation(of: storeInst, in: loop)
+        }
         analyzedInstructions.stores.append(storeInst)
+      case let copyAddrInst as CopyAddrInst:
+        analyzedInstructions.recordCopiedStackAllocation(of: copyAddrInst, in: loop)
       default:
         break
       }
@@ -445,6 +455,14 @@ private func collectMovableInstructions(
         if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
+      case let allocStackInst as AllocStackInst:
+        // An allocation in a loop never carries a value into the next iteration. Hoisting it only pays off by keeping
+        // it alive over the uses of a copy's destination, which lets TempRValueElimination remove the copy.
+        if analyzedInstructions.copiedStackAllocations.contains(allocStackInst) {
+          movableInstructions.stackAllocations.append(allocStackInst)
+        } else {
+          log("Not hoisting stack allocation \(allocStackInst)")
+        }
       case let fullApplySite as FullApplySite:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
@@ -480,6 +498,7 @@ private func collectMovableInstructions(
 /// - hoist of instructions that are guaranteed to be executed
 /// - sink
 /// - hoist with sink of scoped instructions
+/// - hoist of stack allocations, if nothing else moved
 private func optimizeLoop(
   loop: Loop,
   movableInstructions: inout MovableInstructions,
@@ -492,6 +511,12 @@ private func optimizeLoop(
   changed = movableInstructions.hoistAndSinkLoadsAndStores(outOf: loop, context)      || changed
   changed = movableInstructions.hoistInstructions(outOf: loop, context)               || changed
   changed = movableInstructions.hoistWithSinkScopedInstructions(outOf: loop, context) || changed
+
+  // Speculative store hoisting in `speculativelyHoistInstructions` can only hoist a conditional store to an `alloc_stack` that is still inside the loop.
+  // That's why we can hoist the remaining stack allocations only after the previous steps have converged.
+  if !changed {
+    changed = movableInstructions.hoistStackAllocations(outOf: loop, context)
+  }
 
   return changed
 }
@@ -756,6 +781,16 @@ private extension AnalyzedInstructions {
 
     return true
   }
+
+  mutating func recordCopiedStackAllocation(of copy: CopyLikeInstruction, in loop: Loop) {
+    if copy.isInitializationOfDestination,
+       let destination = copy.destinationAddress as? AllocStackInst,
+       loop.contains(block: destination.parentBlock),
+       case .stack(let source) = copy.sourceAddress.accessBase
+    {
+      copiedStackAllocations.insert(source)
+    }
+  }
 }
 
 private extension MovableInstructions {
@@ -806,8 +841,12 @@ private extension MovableInstructions {
     var changed = false
 
     for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
+      if let storeBorrowInst = scopedInst as? StoreBorrowInst,
+         loop.contains(block: storeBorrowInst.allocStack.parentBlock) 
+      {
+        guard storeBorrowInst.allocStack.hoist(outOf: loop, context) else {
+          continue
+        }
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -825,6 +864,17 @@ private extension MovableInstructions {
       }
       
       changed = true
+    }
+
+    return changed
+  }
+
+  /// Hoist stack allocations and sink their deallocations.
+  mutating func hoistStackAllocations(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
+    var changed = false
+
+    for allocStackInst in stackAllocations {
+      changed = allocStackInst.hoist(outOf: loop, context) || changed
     }
 
     return changed
@@ -1112,21 +1162,34 @@ private extension MovableInstructions {
 
 private func hoistAllocAndDealloc(
   allocStackInst: AllocStackInst, outOf loop: Loop, _ context: FunctionPassContext
-) {
+) -> Bool {
+  guard loop.contains(block: allocStackInst.parentBlock), !loop.hasNoExitBlocks else {
+    return false
+  }
+
+  var liveRange = BasicBlockRange(begin: allocStackInst.parentBlock, context)
+  defer { liveRange.deinitialize() }
+  liveRange.insert(contentsOf: allocStackInst.deallocations.map { $0.parentBlock })
+
+  let deallocationsInLoop = allocStackInst.deallocations.filter { loop.contains(block: $0.parentBlock) }
+
+  log("Hoisting \(allocStackInst)")
   allocStackInst.move(before: loop.preheader!.terminator, context)
 
-  var sankFirst = false
-  for deallocStack in allocStackInst.deallocations {
-    if sankFirst {
-      context.erase(instruction: deallocStack)
-    } else {
-      sankFirst = deallocStack.sink(outOf: loop, context)
-    }
+  for deallocStack in deallocationsInLoop {
+    context.erase(instruction: deallocStack)
+  }
+
+  for exitBlock in loop.exitBlocks where !liveRange.contains(exitBlock.singlePredecessor!) {
+    let builder = Builder(before: exitBlock.instructions.first!, context)
+    builder.createDeallocStack(allocStackInst)
   }
 
   context.notifyInvalidatedStackNesting()
+
+  return true
 }
-  
+
 private extension Instruction {
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
@@ -1159,8 +1222,7 @@ private extension Instruction {
         hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
         return true
       } else if let allocStackInst = self as? AllocStackInst {
-        hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
-        return true
+        return hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
       } else {
         move(before: terminator, context)
       }

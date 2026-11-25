@@ -7009,8 +7009,10 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
 
     clang::CastKind Kind;
     clang::CXXCastPath Path;
+    // Swift access control already allowed this access, so bypass C++ base
+    // access, e.g., for fields inherited via private inheritance.
     clangSema.CheckPointerConversion(thisExpr, baseClassPtr, Kind, Path,
-                                     /*IgnoreBaseAccess=*/false,
+                                     /*IgnoreBaseAccess=*/true,
                                      /*Diagnose=*/true);
     auto conv = clangSema.ImpCastExprToType(thisExpr, baseClassPtr, Kind,
                                             clang::VK_PRValue, &Path);
@@ -7047,7 +7049,36 @@ static clang::CXXMethodDecl *synthesizeCxxBaseGetterAccessorMethod(
         clang::SourceLocation(), {fieldExpr}, clang::SourceLocation());
     if (!retainCall.isUsable())
       return nullptr;
-    body.push_back(retainCall.get());
+    clang::Stmt *retainStmt = retainCall.get();
+    // A pointer field may be null; only retain the object it points to,
+    // unless the field is non-null or the retain function accepts null.
+    auto hasNullability = [](clang::QualType ty, clang::NullabilityKind kind) {
+      auto nullability = ty->getNullability();
+      return nullability && *nullability == kind;
+    };
+    // Clang propagates parameter nullability to later redeclarations, so the
+    // most recent one has it even if the declaration we found doesn't.
+    auto *retainDecl = retainFn->getMostRecentDecl();
+    bool retainAcceptsNull =
+        retainDecl->getNumParams() == 1 &&
+        hasNullability(retainDecl->getParamDecl(0)->getType(),
+                       clang::NullabilityKind::Nullable);
+    if (field->getType()->isPointerType() &&
+        !hasNullability(field->getType(), clang::NullabilityKind::NonNull) &&
+        !retainAcceptsNull) {
+      auto nullCheckField = createFieldAccess();
+      if (!nullCheckField)
+        return nullptr;
+      auto cond = clangSema.CheckBooleanCondition(clang::SourceLocation(),
+                                                  nullCheckField);
+      if (!cond.isUsable())
+        return nullptr;
+      retainStmt = clang::IfStmt::Create(
+          clangCtx, clang::SourceLocation(), clang::IfStatementKind::Ordinary,
+          /*Init=*/nullptr, /*Var=*/nullptr, cond.get(),
+          clang::SourceLocation(), clang::SourceLocation(), retainStmt);
+    }
+    body.push_back(retainStmt);
   }
 
   // Construct the method's body.
@@ -7473,8 +7504,11 @@ static void handleAmbiguousOverrides(ClangImporter::Implementation &Impl,
 
 static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
                                       ValueDecl *decl, DeclContext *newContext,
-                                      ClangInheritanceInfo inheritance) {
-  AccessLevel access = inheritance.accessForBaseDecl(decl);
+                                      ClangInheritanceInfo inheritance,
+                                      std::optional<AccessLevel> memberAccess) {
+  AccessLevel access = memberAccess
+                           ? inheritance.accessForBaseMember(*memberAccess)
+                           : inheritance.accessForBaseDecl(decl);
   ASTContext &context = decl->getASTContext();
 
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
@@ -7518,6 +7552,7 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
         fn->getGenericParams(), ParameterList::create(context, params),
         fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
+    out->setImplicitlyUnwrappedOptional(fn->isImplicitlyUnwrappedOptional());
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     auto markedUnavailable = inheritance.setUnavailableIfNecessary(decl, out);
@@ -7534,6 +7569,9 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         subscript->getStaticSpelling(), subscript->getSubscriptLoc(),
         subscript->getIndices(), subscript->getNameLoc(), subscript->getElementInterfaceType(),
         newContext, subscript->getGenericParams());
+    out->setImplicitlyUnwrappedOptional(
+        subscript->isImplicitlyUnwrappedOptional());
+    cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
     auto accessors = makeBaseClassMemberAccessors(newContext, out, subscript);
@@ -7557,8 +7595,10 @@ static ValueDecl *cloneBaseMemberDecl(ClangImporter::Implementation &Impl,
         new (rawMemory) VarDecl(var->isStatic(), var->getIntroducer(),
                                 var->getLoc(), var->getName(), newContext);
     out->setInterfaceType(var->getInterfaceType());
+    out->setImplicitlyUnwrappedOptional(var->isImplicitlyUnwrappedOptional());
     out->setIsObjC(var->isObjC());
     out->setIsDynamic(var->isDynamic());
+    cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
     out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
@@ -9284,7 +9324,7 @@ Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit,
-    CArrayProjection projection) {
+    CArrayProjection projection, std::optional<AccessLevel> memberAccess) {
   decl = getDeclForCArrayProjection(decl, projection);
   if (!decl)
     return nullptr;
@@ -9294,7 +9334,8 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
   auto known = clonedBaseMembers.find(key);
   if (known == clonedBaseMembers.end()) {
-    ValueDecl *cloned = cloneBaseMemberDecl(*this, decl, newContext, inherit);
+    ValueDecl *cloned =
+        cloneBaseMemberDecl(*this, decl, newContext, inherit, memberAccess);
     known = clonedBaseMembers.try_emplace(key, cloned).first;
     clonedMembers.try_emplace(cloned, decl);
   }
@@ -9304,6 +9345,15 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
     ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit) {
+  // If decl is itself a clone (e.g., of a base member redeclared by a
+  // using-declaration in an intermediate class), clone its original instead,
+  // keeping the access of the clone.
+  std::optional<AccessLevel> memberAccess;
+  if (auto *original = getOriginalForClonedMember(decl)) {
+    memberAccess = decl->getFormalAccess();
+    decl = original;
+  }
+
   // We don't need to clone a hidden storage projection because the modern
   // projection will forward to its base decl, not its counterpart. Fortunately,
   // this overload of `forEachCArrayProjection()` only asks for legacy
@@ -9311,7 +9361,8 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   auto *modernClone = forEachCArrayProjection(
       decl->getAttrs().hasAttribute<CArrayProjectionAttr>(),
       [&](CArrayProjection projection) {
-        return importBaseMemberDecl(decl, newContext, inherit, projection);
+        return importBaseMemberDecl(decl, newContext, inherit, projection,
+                                    memberAccess);
       },
       /*addAlternate=*/false);
 
@@ -9466,13 +9517,6 @@ std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
 ClangImporter::getForeignReferenceTypeOperations(
     const clang::RecordDecl *decl) {
   return Impl.getForeignReferenceTypeOperations(decl);
-}
-
-LibkernSubclass
-ClangImporter::getLibkernSubclass(const clang::RecordDecl *decl) {
-  if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl))
-    return Impl.getLibkernSubclass(cxxRecord);
-  return LibkernSubclass::None;
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
@@ -10385,12 +10429,19 @@ AccessLevel
 ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
   if (!isInheriting())
     return AccessLevel::Public;
+  return accessForBaseMember(baseDecl->getFormalAccess());
+}
+
+AccessLevel
+ClangInheritanceInfo::accessForBaseMember(AccessLevel memberAccess) const {
+  if (!isInheriting())
+    return memberAccess;
 
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
   auto inherited =
       access ? importer::convertClangAccess(*access) : AccessLevel::Private;
-  return std::min(baseDecl->getFormalAccess(), inherited);
+  return std::min(memberAccess, inherited);
 }
 
 bool ClangInheritanceInfo::setUnavailableIfNecessary(

@@ -137,7 +137,7 @@ func captureImmutableOwned_callee(_ cl: () -> ()) {}
 // CHECK:         destroy_value [[CONTEXT]]
 // CHECK-NOT:     destroy_value [[COPY]]
 // CHECK-LABEL: } // end sil function '$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyF'
-// CHECK-LABEL: sil private [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_ : {{.*}} {
 // CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $MOAny):
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]
 // CHECK:         mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
@@ -152,7 +152,7 @@ func captureImmutableOwnedNoncopyable() {
 
 // CaptureKind::Immutable, settable: an autoclosure reads a `let` initialized
 // after its declaration as an lvalue, an owned read that copies the capture.
-// CHECK-LABEL: sil private [transparent] [ossa] [opaque] @$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_ : {{.*}} {
+// CHECK-LABEL: sil private [transparent] [closure] [ossa] [opaque] @$s22opaque_values_closures36captureImmutableInitializedAfterDeclySbx_xSbtSLRzlFSbyKXEfu_ : {{.*}} {
 // CHECK:       bb0([[CAPTURE:%[^,]+]] : @closureCapture @guaranteed $T,
 // CHECK-NOT:     alloc_stack
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[CAPTURE]]

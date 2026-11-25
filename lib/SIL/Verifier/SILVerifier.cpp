@@ -1863,17 +1863,19 @@ public:
 
     SILType DebugVarTy = *varInfo->Type;
 
-    auto *debugScope = inst->getDebugScope();
+    auto *varScope = varInfo->Scope;
+    require(varScope->getParentFunction() == inst->getFunction(),
+            "debug variable scope belongs to a different function");
     if (varInfo->ArgNo)
       require(!varInfo->Name.empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
-    // slot if our debug scope is not an inlined call site.
+    // slot if the variable's scope is not an inlined call site.
     //
     // This catches SIL transformations that accidentally remove inline
     // information (stored in the SILDebugScope) from debug-variable-carrying
     // instructions.
-    if (debugScope && !debugScope->InlinedCallSite)
+    if (!varScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
@@ -1899,12 +1901,6 @@ public:
         DebugVars[argNum] = {varInfo->Name, DebugVarTy};
       }
 
-    // Check the (auxiliary) debug variable scope
-    if (const SILDebugScope *VarDS = varInfo->Scope)
-      require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
-              "Scope of the debug variable should have the same parent function"
-              " as that of instruction.");
-
     // Check that every var info with the same name, scope and location, refer
     // to a variable of the same type
     llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
@@ -1912,8 +1908,7 @@ public:
       varInfo->Loc = inst->getLoc();
     if (!varInfo->Loc)
       varInfo->Loc = SILLocation::invalid();
-    VarID Key(varInfo->Scope ? varInfo->Scope : debugScope,
-              UniqueName, *varInfo->Loc);
+    VarID Key(varScope, UniqueName, *varInfo->Loc);
     auto CachedVar = DebugVarTypes.insert({Key, DebugVarTy});
     if (!CachedVar.second) {
       auto lhs = CachedVar.first->second.removingMoveOnlyWrapper();
@@ -2153,9 +2148,6 @@ public:
             "result of alloc_stack must be an address type");
 
     verifyLocalArchetype(AI, AI->getElementType().getASTType());
-
-    require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
-            "AllocStack Var Info should be None if invalidated");
 
     checkAddressWalkerCanVisitAllTransitiveUses(AI);
 
@@ -5849,6 +5841,53 @@ public:
     requireSameType(RI->getType(),
                     SILType::getBuiltinWordType(F.getASTContext()),
                     "bridge_object_to_word must produce a Word");
+  }
+
+  void checkValueToAddressInst(ValueToAddressInst *VAI) {
+    require(!F.hasLoweredAddresses(),
+            "value_to_address is only valid in opaque values");
+
+    auto isVariable = [](SILValue value) {
+      if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+        return arg->getArgumentConvention().isIndirectConvention();
+      if (auto *borrow = dyn_cast<BeginBorrowInst>(value))
+        return bool(borrow->isFromVarDecl());
+      if (auto *move = dyn_cast<MoveValueInst>(value))
+        return bool(move->isFromVarDecl());
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        // Before AddressLowering, the conventions don't report a
+        // @guaranteed_address result as an address, so look at the callee type.
+        auto results = apply->getSubstCalleeType()->getResults();
+        return results.size() == 1 && results[0].getConvention() ==
+                                          ResultConvention::GuaranteedAddress;
+      }
+      if (isa_and_nonnull<BeginApplyInst>(value->getDefiningInstruction()))
+        return value->getOwnershipKind() == OwnershipKind::Guaranteed;
+      return false;
+    };
+    SILValue root = VAI->getOperand();
+    // The operand may be behind a nested borrow. A temporary has no
+    // stable address.
+    while (!isVariable(root)) {
+      auto *borrow = dyn_cast<BeginBorrowInst>(root);
+      if (!borrow)
+        break;
+      root = borrow->getOperand();
+    }
+    require(isVariable(root),
+            "value_to_address operand must be an indirect argument, a "
+            "[var_decl] move_value or begin_borrow, a borrow accessor result, "
+            "or a guaranteed coroutine yield");
+
+    // AddressLowering resolves the address of a loadable value only for a
+    // guaranteed indirect argument, whose address is the argument itself.
+    if (!VAI->getOperand()->getType().isAddressOnly(F)) {
+      auto *arg = dyn_cast<SILFunctionArgument>(VAI->getOperand());
+      require(arg && arg->getArgumentConvention() ==
+                         SILArgumentConvention::Indirect_In_Guaranteed,
+              "value_to_address of a loadable value must be a guaranteed "
+              "indirect argument");
+    }
   }
 
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {

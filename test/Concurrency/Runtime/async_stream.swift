@@ -21,7 +21,7 @@ struct SomeError: Error, Equatable {
 
 class NotSendable {}
 
-final class Expectation: @unchecked Sendable {
+final class UncheckedExpectation: @unchecked Sendable {
   var fulfilled = false
 }
 
@@ -461,9 +461,9 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
           }
@@ -475,9 +475,9 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("termination behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
             continuation.finish()
@@ -490,9 +490,9 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
@@ -510,9 +510,9 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited throwing") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncThrowingStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
@@ -1008,7 +1008,7 @@ final class Expectation: @unchecked Sendable {
       // we first need to explicitly cast to `(any Actor)?` before retrieving
       // the `SerialExecutor`.
       tests.test("unfolding closure executes on the caller's actor") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let stream = AsyncStream<Void>(unfolding: {
           let currentActor = #isolation as (any Actor)?
           let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
@@ -1028,7 +1028,7 @@ final class Expectation: @unchecked Sendable {
       // we first need to explicitly cast to `(any Actor)?` before retrieving
       // the `SerialExecutor`.
       tests.test("unfolding closure executes on the caller's actor throwing") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let stream = AsyncThrowingStream<Void, Never>(unfolding: {
           let currentActor = #isolation as (any Actor)?
           let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
@@ -1072,7 +1072,7 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("unfolding init onCancel called on task cancel") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
         var counter = 0
         let stream = AsyncStream<Int>(unfolding: { @MainActor in
@@ -1103,7 +1103,7 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("unfolding init onCancel called on task cancel throwing") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
         var counter = 0
         let stream = AsyncThrowingStream<Int, Never>(unfolding: { @MainActor in
@@ -1134,7 +1134,7 @@ final class Expectation: @unchecked Sendable {
       }
 
       tests.test("unfolding init onCancel called on cancelled task throwing") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
         let stream = AsyncThrowingStream<Int, Never>(unfolding: { @MainActor in
           return nil
@@ -1187,7 +1187,7 @@ final class Expectation: @unchecked Sendable {
       // MARK: - onTermination
 
       tests.test("onTermination finished reason") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let _ = AsyncStream<String> {
           $0.onTermination = { @Sendable reason in
             if case .finished = reason {
@@ -1201,7 +1201,7 @@ final class Expectation: @unchecked Sendable {
 
       tests.test("onTermination finished reason throwing") {
         // Case A: finish() with no error -> .finished(nil)
-        let nilExpectation = Expectation()
+        let nilExpectation = UncheckedExpectation()
         let _ = AsyncThrowingStream<String, Error> {
           $0.onTermination = { @Sendable reason in
             if case .finished(let e) = reason, e == nil {
@@ -1213,7 +1213,7 @@ final class Expectation: @unchecked Sendable {
         expectTrue(nilExpectation.fulfilled)
 
         // Case B: finish(throwing:) -> .finished(error)
-        let errExpectation = Expectation()
+        let errExpectation = UncheckedExpectation()
         let thrownError = SomeError()
         let _ = AsyncThrowingStream<String, Error> {
           $0.onTermination = { @Sendable reason in
@@ -1333,7 +1333,7 @@ final class Expectation: @unchecked Sendable {
       // cause has yet to be determined.
       /*
       tests.test("task cancellation terminates stream") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let (stream, continuation) = AsyncStream<Int>.makeStream()
         continuation.onTermination = { @Sendable reason in
           if case .cancelled = reason { expectation.fulfilled = true }

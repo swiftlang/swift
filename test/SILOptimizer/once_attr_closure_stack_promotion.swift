@@ -241,7 +241,7 @@ func sink(_ k: consuming Klass) {}
 // CHECK:   strong_release [[K]]
 // CHECK: } // end sil function '$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyF'
 
-// CHECK-LABEL: sil private @$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil private [closure] @$s33once_attr_closure_stack_promotion27testConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[CAPTURE:%.*]] : @closureCapture $Klass):
 // CHECK:   strong_retain [[CAPTURE]]
 // CHECK:   [[SINK:%.*]] = function_ref @$s33once_attr_closure_stack_promotion4sinkyyAA5KlassCnF
@@ -263,7 +263,7 @@ func testConsumedCopyableCapture() {
 // CHECK:   strong_release [[K]]
 // CHECK: } // end sil function '$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyF'
 
-// CHECK-LABEL: sil private @$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil private [closure] @$s33once_attr_closure_stack_promotion37testExplicitlyConsumedCopyableCaptureyyFyyXEfU_ : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: bb0([[CAPTURE:%.*]] : @closureCapture $Klass):
 // CHECK:   strong_retain [[CAPTURE]]
 // CHECK:   [[SINK:%.*]] = function_ref @$s33once_attr_closure_stack_promotion4sinkyyAA5KlassCnF

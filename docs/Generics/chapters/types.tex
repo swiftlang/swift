@@ -228,7 +228,7 @@ Consider the four types \texttt{Key?}, \texttt{Optional<Key>}, \texttt{Value?}, 
 \item When we consider the generic signature of the extension, we're left with just one reduced type, because both canonical types reduce to \texttt{Optional<\ttgp{0}{0}>} via the same-type requirement. Thus, all four of the original types are equal under reduced type equality.
 \end{itemize}
 
-Reduced type equality means ``equivalent as a consequence of one or more same-type requirements.'' We will define this equivalence of type parameters in \SecRef{valid type params} using the derived requirements formalism, and then generalize to all interface types in \SecRef{genericsigqueries}. Presenting a decision procedure for reduced type equality is one of the main results in this book; key developments take place in \SecRef{sec:normal form algorithm} and \ChapRef{chap:symbols terms rules}.
+Reduced type equality means ``equivalent as a consequence of one or more same-type requirements.'' We will define this equivalence of type parameters in \SecRef{valid type params} using the derived requirements formalism, and then generalize to all interface types in \SecRef{sec:queries}. Presenting a decision procedure for reduced type equality is one of the main results in this book; key developments take place in \SecRef{sec:normal form algorithm} and \ChapRef{chap:symbols terms rules}.
 
 \section{Fundamental Types}\label{fundamental types}
 
@@ -361,7 +361,7 @@ If \tT\ is the base type, \texttt{P} is a protocol, and \texttt{A} is an associa
 A \IndexDefinition{type parameter}\emph{type parameter} is a generic parameter type or dependent member type (whose base is then another type parameter). An \index{interface type}\emph{interface type} is a \index{type!containing type parameters}type that might contain type parameters, but is not necessarily a type parameter itself. A significant portion of this book is devoted to understanding type parameters. Key topics include:
 \begin{itemize}
 \item Semantic validity of type parameters (\SecRef{derived req}, \SecRef{valid type params}).
-\item Generic signature queries (\SecRef{genericsigqueries}).
+\item Generic signature queries (\SecRef{sec:queries}).
 \item Dependent member type substitution (\SecRef{abstract conformances}, \ChapRef{chap:conformance paths}).
 \item Type resolution with bound and unbound type parameters (\ChapRef{chap:type resolution}).
 \end{itemize}
@@ -660,9 +660,9 @@ Note that the identifier ``\tSelf'' only has this interpretation inside a class.
 \ListingRef{dynamic self example} demonstrates some of the behaviors of the dynamic \tSelf\ type. Two invalid cases are shown; \texttt{invalid1()} is rejected because the type checker cannot prove that the return type is always an instance of the dynamic type of \texttt{self}, and \texttt{invalid2()} is rejected because \tSelf\ appears in contravariant position.  This feature comes from \index{Objective-C}Objective-C, where it is called \texttt{instancetype}.
 
 \paragraph{Type variable types.}
-A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression. The \IndexDefinition{expression type checker}expression type checker builds a \emph{constraint system} by walking an expression recursively, assigning new type variables to each sub-expression and then recording constraints to relate these type variables. The constraint solver then searches for a \emph{solution} that assigns a concrete type to each type variable in a way that satisfies the constraints. Solving the constraint system can have three possible outcomes:
+A \IndexDefinition{type variable type}type variable represents the future inferred type of an \index{expression}expression. The \IndexDefinition{expression type checker}expression type checker builds a \emph{constraint system} by walking an expression recursively, assigning new type variables to each subexpression and then recording constraints to relate these type variables. The constraint solver then searches for a \emph{solution} that assigns a concrete type to each type variable in a way that satisfies the constraints. Solving the constraint system can have three possible outcomes:
 \begin{itemize}
-\item \textbf{One solution}---the expression and all of its sub-expressions are well-typed.
+\item \textbf{One solution}---the expression and all of its subexpressions are well-typed.
 \item \textbf{No solutions}---the constraints cannot be satisfied, so the expression is invalid.
 \item \textbf{Multiple solutions}---the expression is ambiguous, because there is more than one possible assignment of concrete types that satisfies the constraints.
 \end{itemize}

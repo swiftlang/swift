@@ -8310,10 +8310,6 @@ bool ArgumentMismatchFailure::diagnoseAttemptedRegexBuilder() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseInOutToPointerInSubscript() const {
-  if (!getASTContext().LangOpts.hasFeature(
-          Feature::SubscriptParametersWithOwnership))
-    return false;
-
   // Only for `&x` passed where a pointer is expected.
   auto *argExpr = getAsExpr(getAnchor());
   if (!argExpr || !argExpr->isSemanticallyInOutExpr())

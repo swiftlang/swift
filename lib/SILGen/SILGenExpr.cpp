@@ -4689,8 +4689,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
-    SmallString<64> nameBuf;
-    
     auto name = Mangle::ASTMangler(SGM.getASTContext())
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);

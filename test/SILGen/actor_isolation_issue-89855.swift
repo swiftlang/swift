@@ -5,7 +5,7 @@
 
 // Regression test for https://github.com/swiftlang/swift/issues/89855
 
-// CHECK-LABEL: sil private [isolation "@concurrent"] [ossa] @$s4main1CC1fyyScA_pYiYaFyycfU_yyYacfU_ : $@convention(thin) @async (@guaranteed C) -> () {
+// CHECK-LABEL: sil private [closure] [isolation "@concurrent"] [ossa] @$s4main1CC1fyyScA_pYiYaFyycfU_yyYacfU_ : $@convention(thin) @async (@guaranteed C) -> () {
 final class C {
   func f(_ other: isolated any Actor) async {
     let _ = {
@@ -18,7 +18,7 @@ final class C {
   }
 }
 
-// CHECK-LABEL: sil private [isolation "actor_instance"] [ossa] @$s4main1AC1fyyScA_pYiFyycfU_yycfU_ : $@convention(thin) (@guaranteed A, @sil_isolated @guaranteed any Actor) -> () {
+// CHECK-LABEL: sil private [closure] [isolation "actor_instance"] [ossa] @$s4main1AC1fyyScA_pYiFyycfU_yycfU_ : $@convention(thin) (@guaranteed A, @sil_isolated @guaranteed any Actor) -> () {
 actor A {
     func f(_ other: isolated any Actor) {
         let otherIso = {

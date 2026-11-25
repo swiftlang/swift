@@ -2298,6 +2298,8 @@ private:
   std::string ModuleCachePath;
   bool DisableFailOnError;
   std::vector<std::string> ClangImporterArgs;
+  bool EnableCXXInterop = false;
+  std::optional<version::Version> FormalCxxInteropMode;
 
 public:
   SwiftAPIDigesterInvocation(const std::string &ExecPath)
@@ -2402,6 +2404,21 @@ public:
     ResourceDir = ParsedArgs.getLastArgValue(OPT_resource_dir).str();
     ModuleCachePath = ParsedArgs.getLastArgValue(OPT_module_cache_path).str();
     ClangImporterArgs = ParsedArgs.getAllArgValues(OPT_Xcc);
+
+    // Parse C++ interoperability options the same way the frontend does.
+    {
+      SourceManager SM;
+      PrintingDiagnosticConsumer PDC;
+      DiagnosticEngine Diags(SM);
+      Diags.addConsumer(PDC);
+      LangOptions CxxInteropOpts;
+      CxxInteropOpts.setCxxInteropFromArgs(ParsedArgs, Diags,
+                                           InitInvoke.getFrontendOptions());
+      if (Diags.hadAnyError())
+        return 1;
+      EnableCXXInterop = CxxInteropOpts.EnableCXXInterop;
+      FormalCxxInteropMode = CxxInteropOpts.FormalCxxInteropMode;
+    }
     DebugMapping = ParsedArgs.hasArg(OPT_debug_mapping);
     DisableFailOnError = ParsedArgs.hasArg(OPT_disable_fail_on_error);
 
@@ -2483,6 +2500,8 @@ public:
     // Ensure the tool works on linux properly
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
+    InitInvoke.getLangOptions().EnableCXXInterop = EnableCXXInterop;
+    InitInvoke.getLangOptions().FormalCxxInteropMode = FormalCxxInteropMode;
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
 
     // Pass -Xcc arguments to the Clang importer
@@ -2523,6 +2542,7 @@ public:
     for (auto M : PreferInterfaceForModules) {
       InitInvoke.getFrontendOptions().PreferInterfaceForModules.push_back(M);
     }
+    InitInvoke.computeCXXStdlibOptions();
     if (Modules.empty()) {
       llvm::errs() << "Need to specify -include-all or -module <name>\n";
       exit(1);

@@ -772,6 +772,7 @@ struct DeclSILOptional {
     EffectsKind *MRK = nullptr;
     ActorIsolation *actorIsolation = nullptr;
     std::optional<SILStage> *functionStage = nullptr;
+    bool *isClosure = nullptr;
 };
 } // end anonymous namespace
 
@@ -840,6 +841,8 @@ static bool parseDeclSILOptional(
     else if (options.isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *options.isWithoutActuallyEscapingThunk = true;
+    else if (options.isClosure && SP.P.Tok.getText() == "closure")
+      *options.isClosure = true;
     else if (options.specialPurpose && SP.P.Tok.getText() == "global_init")
       *options.specialPurpose = SILFunction::Purpose::GlobalInit;
     else if (options.specialPurpose && SP.P.Tok.getText() == "lazy_getter")
@@ -4224,6 +4227,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createUncheckedOwnership(InstLoc, Val, forwardingOwnership);
+    break;
+  }
+
+  case SILInstructionKind::ValueToAddressInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!Val->getType().isObject()) {
+      P.diagnose(InstLoc.getSourceLoc(), diag::sil_operand_not_object,
+                 "operand", OpcodeName);
+      return true;
+    }
+
+    ResultVal = B.createValueToAddress(InstLoc, Val);
     break;
   }
 
@@ -7903,6 +7922,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool needStackProtection = false;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
+  bool isClosure = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
@@ -7933,7 +7953,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk,
           &hasOwnershipForTrivial, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage},
+          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage,
+          &isClosure},
           FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7989,6 +8010,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
+    FunctionState.F->setIsClosure(isClosure);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);

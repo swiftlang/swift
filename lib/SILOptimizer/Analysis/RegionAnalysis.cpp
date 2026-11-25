@@ -4301,6 +4301,12 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 // This should be removed by DI which runs before us in the pass pipeline.
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
 
+// This should be removed by AddressLowering which runs before us in the pass
+// pipeline.
+// TODO: replace this entry with real semantics when moving AddressLowering
+// later.
+CONSTANT_TRANSLATION(ValueToAddressInst, Asserting)
+
 // We should never hit this since it can only appear as a final instruction in a
 // global variable static initializer list.
 CONSTANT_TRANSLATION(VectorInst, Asserting)

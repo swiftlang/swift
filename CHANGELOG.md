@@ -34,10 +34,23 @@
   )
   ```
 
-  Priority escalation handlers, including the handler of
-  `withTaskPriorityEscalationHandler`, are now called once with the task's
-  current priority as both arguments when they are installed. Thus, an
-  escalation that happens before the handler is installed is not missed.
+* [SE-0462][], [SE-0564][]:
+  Swift 6.5 changes the behavior of task priority escalation handlers: a
+  handler is now called once with the task's current priority as soon as it is
+  installed, so an escalation that happens between reading
+  `Task.currentPriority` and installing the handler is no longer lost:
+
+  ```swift
+  let priority = Task.currentPriority
+  let job = queue.enqueue(request, priority: priority)
+  return try await withTaskPriorityEscalationHandler {
+    try await job.value
+  } onPriorityEscalated: { _, newPriority in
+    // Also called on install; only react to an actual escalation.
+    guard newPriority > priority else { return }
+    queue.escalate(job, to: newPriority)
+  }
+  ```
 
 * [#88082][]:
 

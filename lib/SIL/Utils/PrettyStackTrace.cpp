@@ -75,15 +75,14 @@ void PrettyStackTraceSILLocation::print(llvm::raw_ostream &out) const {
 
 void PrettyStackTraceSILFunction::print(llvm::raw_ostream &out) const {
   out << "While " << action << " SIL function ";
-  if (!func) {
-    out << " <<null>>";
-    return;
-  }
-
   printFunctionInfo(out);
 }
 
 void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) const {  
+  if (!func) {
+    out << " <<null>>";
+    return;
+  }
   out << "\"";
   func->printName(out);
   out << "\".\n";

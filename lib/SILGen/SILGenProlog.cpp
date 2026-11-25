@@ -1013,6 +1013,14 @@ private:
     // argument if we're responsible for it.
     SILDebugVariable varinfo(pd->isImmutableInFunctionBody(), ArgNo);
     if (!argrv.getType().isAddress()) {
+      // Under opaque values, an argument that the caller passes by address is a
+      // guaranteed object. The binding below can be a copy of it, so remember
+      // the argument itself: its address is the one the caller passed.
+      if (auto *arg = dyn_cast<SILFunctionArgument>(argrv.getValue());
+          arg && arg->getArgumentConvention() ==
+                     SILArgumentConvention::Indirect_In_Guaranteed) {
+        SGF.GuaranteedIndirectArguments[pd] = arg;
+      }
       // NOTE: We setup SGF.VarLocs[pd] in updateArgumentValueForBinding.
       updateArgumentValueForBinding(argrv, loc, pd, varinfo);
       SGF.enterFormalScopeCleanup(loc, argrv.getValue());

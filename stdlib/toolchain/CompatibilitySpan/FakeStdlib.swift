@@ -26,6 +26,20 @@ internal func _precondition(
 }
 
 @export(implementation) @_transparent
+internal func _debugPrecondition(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+}
+
+@export(implementation) @_transparent
+internal func _internalInvariant(
+  _ condition: @autoclosure () -> Bool, _ message: StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) {
+}
+
+@export(implementation) @_transparent
 internal func _internalInvariantFailure(
   _ message: StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line

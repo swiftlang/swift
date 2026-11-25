@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface \
 // RUN:   -enable-library-evolution -swift-version 5 -module-name Lib \
-// RUN:   -enable-experimental-feature SubscriptParametersWithOwnership \
 // RUN:   %s -DLIB
 // RUN: %FileCheck %s < %t/Lib.swiftinterface
 
@@ -15,10 +14,7 @@
 // ...and a client must be able to use it through that module.
 // RUN: %empty-directory(%t/mods)
 // RUN: cp %t/LibFromInterface.swiftmodule %t/mods/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck -I %t/mods %s -DCLIENT \
-// RUN:   -enable-experimental-feature SubscriptParametersWithOwnership
-
-// REQUIRES: swift_feature_SubscriptParametersWithOwnership
+// RUN: %target-swift-frontend -typecheck -I %t/mods %s -DCLIENT
 
 #if LIB
 

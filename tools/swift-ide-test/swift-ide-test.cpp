@@ -1446,7 +1446,6 @@ static void printCodeCompletionResultsImpl(
         case CodeCompletionDiagnosticSeverity::None:
           llvm_unreachable("none");
         }
-        SmallString<256> Scratch;
         OS << ":" << DiagSeverityAndMessage.second;
       }
     }

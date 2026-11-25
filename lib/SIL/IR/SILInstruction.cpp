@@ -19,6 +19,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -50,6 +51,21 @@ void SILInstruction::setDebugScope(const SILDebugScope *DS) {
          "scope belongs to different function");
 
   debugScope = DS;
+}
+
+bool SILInstruction::canSetDebugLocation() const {
+  // A variable-carrying instruction cannot change its scope, since that would
+  // change the scope of the variable. AllocBoxInst always uses the
+  // instruction's scope for the variable's scope, and AllocStackInst and
+  // DebugValueInst only store a separate scope if they don't match when the
+  // instruction is created.
+  // To change the instruction scope without losing the variable, use a
+  // SILCloner to recreate the instruction, or move the variable into a
+  // debug_value instruction.
+  if (auto dvci = DebugVarCarryingInst(const_cast<SILInstruction *>(this)))
+    return !dvci.getVarInfo();
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//

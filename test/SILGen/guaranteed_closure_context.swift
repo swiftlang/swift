@@ -70,4 +70,4 @@ func guaranteed_captures() {
   escape(captureEverything)
 }
 
-// CHECK: sil private [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var any P }, S, @guaranteed C, @in_guaranteed any P)
+// CHECK: sil private [closure] [ossa] [[FN_NAME]] : $@convention(thin) (@guaranteed { var S }, @guaranteed { var C }, @guaranteed { var any P }, S, @guaranteed C, @in_guaranteed any P)

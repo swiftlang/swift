@@ -16,7 +16,7 @@ public func run(_ x: borrowing any P & ~Copyable,
   matches(x)
 }
 
-// CHECK-LABEL: sil private @{{.*}}check{{.*}}
+// CHECK-LABEL: sil private [closure] @{{.*}}check{{.*}}
 // CHECK-NOT:     @error_type
 // CHECK:         checked_cast_addr_br test_only any P & ~Copyable in {{%.*}} to Box<E>,
 // CHECK-NOT:     @error_type
@@ -24,7 +24,7 @@ public func check<E>(_ x: borrowing any P & ~Copyable, _ t: E.Type) -> Bool {
   run(x, { $0 is Box<E> })
 }
 
-// CHECK-LABEL: sil private @{{.*}}checkArray{{.*}}
+// CHECK-LABEL: sil private [closure] @{{.*}}checkArray{{.*}}
 // CHECK-NOT:     @error_type
 // CHECK:         checked_cast_addr_br test_only any P & ~Copyable in {{%.*}} to Array<E>,
 // CHECK-NOT:     @error_type

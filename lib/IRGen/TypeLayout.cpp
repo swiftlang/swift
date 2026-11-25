@@ -2432,12 +2432,12 @@ bool EnumTypeLayoutEntry::buildSinglePayloadRefCountString(
         std::min(numEmptyCases, payloadTI.getFixedExtraInhabitantCount(IGM));
 
     if (xiTagValues) {
-      unsigned bitWidth = payloadTI.getFixedSize().getValueInBits();
-      auto lowValue = payloadTI.getFixedExtraInhabitantValue(IGM, bitWidth, 0);
-      auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
-
-      auto tzCount = mask.countTrailingZeros();
-      auto shiftedMask = mask.lshr(tzCount);
+      // unsigned bitWidth = payloadTI.getFixedSize().getValueInBits();
+      // auto lowValue = payloadTI.getFixedExtraInhabitantValue(IGM, bitWidth, 0);
+      // auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
+      //
+      // auto tzCount = mask.countTrailingZeros();
+      // auto shiftedMask = mask.lshr(tzCount);
       // auto toCount = shiftedMask.countTrailingOnes();
       // if (mask.popcount() > 64 || toCount != mask.popcount() ||
       //     (tzCount % toCount != 0)) {
