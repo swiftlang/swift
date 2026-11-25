@@ -593,7 +593,7 @@ public:
   llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
     
   AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
-  
+
   /// Establish the scope for the addressable buffer that might be allocated
   /// for a local variable binding.
   ///
@@ -604,9 +604,21 @@ public:
   /// cleanup is tracked to determine whether the variable is initialized on
   /// every exit path out of the scope. Otherwise, the variable is assumed to
   /// be active on every exit.
-  void enterLocalVariableAddressableBufferScope(VarDecl *decl,
-                    CleanupHandle destroyVarCleanup = CleanupHandle::invalid());
-  
+  ///
+  /// If \c endsWithFormalAccess is true, the binding's own scope ends with a
+  /// formal access, as for a borrow binding. Formal accesses end before the
+  /// enclosing scope's cleanups are emitted, so the buffer has to end with a
+  /// formal access too, pushed after the binding's, to end before the binding
+  /// does. \c destroyVarCleanup must not be provided in that case.
+  void enterLocalVariableAddressableBufferScope(
+      VarDecl *decl, CleanupHandle destroyVarCleanup = CleanupHandle::invalid(),
+      bool endsWithFormalAccess = false);
+
+  /// Tear down the addressable buffer of \c decl if it has been formed, and
+  /// otherwise remember where to, in case it is formed later.
+  void emitLocalVariableAddressableBufferCleanup(
+      CleanupLocation loc, ValueDecl *decl, CleanupHandle destroyVarCleanup);
+
   /// Get a stable address which is suitable for forming dependent pointers
   /// if possible.
   SILValue getVariableAddressableBuffer(VarDecl *decl,

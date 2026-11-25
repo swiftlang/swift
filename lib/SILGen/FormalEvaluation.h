@@ -19,6 +19,9 @@
 #include <optional>
 
 namespace swift {
+
+class ValueDecl;
+
 namespace Lowering {
 
 class SILGenFunction;
@@ -27,7 +30,7 @@ class FormalEvaluationScope;
 
 class FormalAccess {
 public:
-  enum Kind { Shared, Exclusive, Owned, Unenforced };
+  enum Kind { Shared, Exclusive, Owned, Unenforced, AddressableBuffer };
 
 private:
   unsigned allocatedSize;
@@ -102,6 +105,26 @@ public:
         value(value) {}
 
   SILValue getValue() const { return value; }
+
+private:
+  void finishImpl(SILGenFunction &SGF) override;
+};
+
+/// Ends the addressable buffer of a variable whose own scope ends with a formal
+/// access. See SILGenFunction::enterLocalVariableAddressableBufferScope.
+///
+/// The cleanup handle is the buffer's ordinary cleanup, which covers early
+/// exits. It is deactivated, and popped if it is on top of the stack, before
+/// this access is finished, so finishing must not refer to it.
+class AddressableBufferFormalAccess : public FormalAccess {
+  ValueDecl *decl;
+
+public:
+  AddressableBufferFormalAccess(SILLocation loc, CleanupHandle cleanup,
+                                ValueDecl *decl)
+      : FormalAccess(sizeof(*this), FormalAccess::AddressableBuffer, loc,
+                     cleanup),
+        decl(decl) {}
 
 private:
   void finishImpl(SILGenFunction &SGF) override;

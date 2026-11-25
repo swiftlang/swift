@@ -722,26 +722,7 @@ public:
 
   void emit(SILGenFunction &SGF, CleanupLocation l,
             ForUnwind_t forUnwind) override {
-    auto addressableBuffer = SGF.getAddressableBufferInfo(vd);
-    if (!addressableBuffer) {
-      return;
-    }
-    
-    // Reflect the state of the variable's original cleanup.
-    CleanupState cleanupState = CleanupState::Active;
-    if (destroyVarHandle.isValid()) {
-      cleanupState = SGF.Cleanups.getCleanup(destroyVarHandle).getState();
-    }
-
-    if (auto *state = addressableBuffer->getState()) {
-      // The addressable buffer was already forced, so clean up now.
-      deallocateAddressable(SGF, l, *state, cleanupState);
-    } else {
-      // Remember this insert location in case we need to force the addressable
-      // buffer later.
-      SILInstruction *marker = SGF.B.createTuple(l, {});
-      addressableBuffer->cleanupPoints.push_back({marker, cleanupState});
-    }
+    SGF.emitLocalVariableAddressableBufferCleanup(l, vd, destroyVarHandle);
   }
 
   void dump(SILGenFunction &SGF) const override {
@@ -1791,7 +1772,10 @@ public:
       SavedInsertionPointRAII savedIP(SGF.B);
       if (auto *def = bindValue.getValue()->getDefiningInstruction())
         SGF.B.setInsertionPoint(def);
-      SGF.enterLocalVariableAddressableBufferScope(var);
+      // The borrow ends with a formal access (see emitBorrowInto), so the
+      // buffer's scope has to as well.
+      SGF.enterLocalVariableAddressableBufferScope(
+          var, CleanupHandle::invalid(), /*endsWithFormalAccess=*/true);
     }
 
     // Emit debug info for the borrowed noncopyable binding.
@@ -2715,12 +2699,42 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
   llvm_unreachable("unhandled case");
 }
 
-void
-SILGenFunction::enterLocalVariableAddressableBufferScope(VarDecl *decl,
-                                                         CleanupHandle destroyCleanup) {
+void SILGenFunction::enterLocalVariableAddressableBufferScope(
+    VarDecl *decl, CleanupHandle destroyCleanup, bool endsWithFormalAccess) {
   auto marker = B.createTuple(decl, {});
   AddressableBuffers[decl].insertPoint = marker;
   Cleanups.pushCleanup<DeallocateLocalVariableAddressableBuffer>(decl, destroyCleanup);
+  if (endsWithFormalAccess) {
+    assert(isInFormalEvaluationScope() && "Must be in formal evaluation scope");
+    assert(!destroyCleanup.isValid() &&
+           "the formal access can't track the state of another cleanup");
+    FormalEvalContext.push<AddressableBufferFormalAccess>(
+        SILLocation(decl), Cleanups.getTopCleanup(), decl);
+  }
+}
+
+void SILGenFunction::emitLocalVariableAddressableBufferCleanup(
+    CleanupLocation l, ValueDecl *vd, CleanupHandle destroyVarHandle) {
+  auto addressableBuffer = getAddressableBufferInfo(vd);
+  if (!addressableBuffer) {
+    return;
+  }
+
+  // Reflect the state of the variable's original cleanup.
+  CleanupState cleanupState = CleanupState::Active;
+  if (destroyVarHandle.isValid()) {
+    cleanupState = Cleanups.getCleanup(destroyVarHandle).getState();
+  }
+
+  if (auto *state = addressableBuffer->getState()) {
+    // The addressable buffer was already forced, so clean up now.
+    deallocateAddressable(*this, l, *state, cleanupState);
+  } else {
+    // Remember this insert location in case we need to force the addressable
+    // buffer later.
+    SILInstruction *marker = B.createTuple(l, {});
+    addressableBuffer->cleanupPoints.push_back({marker, cleanupState});
+  }
 }
 
 static bool isFullyAbstractedLowering(SILGenFunction &SGF,
