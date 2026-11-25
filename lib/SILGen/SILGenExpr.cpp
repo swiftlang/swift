@@ -7001,7 +7001,13 @@ public:
     // and abort or we continue and destroy the ultimate reference.
     auto isEscaping = SGF.B.createDestroyNotEscapedClosure(
         l, v, DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
-    SGF.B.createCondFail(l, isEscaping, "non-escaping closure has escaped");
+    // A trap needs its own line entry, which IRGen doesn't emit for a cleanup
+    // location. Keep pointing at the end of the scope, like the cleanup does.
+    RegularLocation trapLoc(l);
+    if (l.isASTNode())
+      trapLoc.pointToEnd();
+    SGF.B.createCondFail(trapLoc, isEscaping,
+                         "non-escaping closure has escaped");
   }
 
   void dump(SILGenFunction &) const override {
