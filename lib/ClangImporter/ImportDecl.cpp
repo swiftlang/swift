@@ -12150,6 +12150,12 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     }
   }
 
+  // Index the members of swiftDecl by name so that checking whether a base
+  // member is already present doesn't need a scan over all members. Built on
+  // first use, since getMembers() loads all members of swiftDecl.
+  llvm::DenseMap<DeclName, TinyPtrVector<const ValueDecl *>> membersByName;
+  bool indexedMembers = false;
+
   // Add the members here.
   for (auto member : members) {
     if (inheritance) {
@@ -12162,27 +12168,31 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       if (Impl.isMemberSynthesizedPerType(baseMember))
         continue;
 
+      if (!indexedMembers) {
+        for (auto *currentMember : swiftDecl->getMembers())
+          if (auto *vd = dyn_cast<ValueDecl>(currentMember))
+            membersByName[vd->getName()].push_back(vd);
+        indexedMembers = true;
+      }
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity for the same C array projection.
       auto memberArity = getImportedBaseMemberDeclArity(baseMember);
-      bool shouldAddBaseMember = true;
-      for (const auto *currentMember : swiftDecl->getMembers()) {
-        auto vd = dyn_cast<ValueDecl>(currentMember);
-        if (vd->getName() == baseMember->getName() &&
-            memberArity == getImportedBaseMemberDeclArity(vd) &&
-            !isCloneOfCArrayCounterpart(Impl, baseMember, vd)) {
-          shouldAddBaseMember = false;
-          break;
-        }
-      }
-      if (!shouldAddBaseMember)
+      auto it = membersByName.find(baseMember->getName());
+      if (it != membersByName.end() &&
+          llvm::any_of(it->second, [&](const ValueDecl *vd) {
+            return memberArity == getImportedBaseMemberDeclArity(vd) &&
+                   !isCloneOfCArrayCounterpart(Impl, baseMember, vd);
+          }))
         continue;
 
       // So we need to clone the member into the derived class.
       if (auto cloned =
-              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance)) {
         swiftDecl->addMember(cloned);
+        membersByName[cloned->getName()].push_back(cloned);
+      }
 
       continue;
     }
