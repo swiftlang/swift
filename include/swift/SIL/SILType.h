@@ -999,6 +999,12 @@ public:
 
   bool mayHaveCustomAssign(const SILFunction &function) const;
 
+  /// True if this type may be a `@_rawLayout` type or (recursively) contain
+  /// one. Conservatively true for archetypes and types whose layout is opaque
+  /// in this function (e.g. resilient types from other modules). Currently
+  /// false for opaque existentials.
+  bool isOrContainsRawLayout(const SILFunction &function) const;
+
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
   /// actors and actors, use isAnyActor().

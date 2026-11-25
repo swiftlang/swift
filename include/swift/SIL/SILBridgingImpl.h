@@ -444,6 +444,10 @@ bool BridgedType::mayHaveCustomDeinit(BridgedFunction f) const {
   return unbridged().mayHaveCustomDeinit(*f.getFunction());
 }
 
+bool BridgedType::isOrContainsRawLayout(BridgedFunction f) const {
+  return unbridged().isOrContainsRawLayout(*f.getFunction());
+}
+
 SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }

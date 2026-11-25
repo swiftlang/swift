@@ -1,0 +1,183 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   -enable-experimental-feature RawLayout \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
+// REQUIRES: swift_feature_RawLayout
+
+// Memory effects of applies on an address which is captured by a value with a scoped borrow
+// dependence on it (`@lifetime(borrow address_for_deps N)`).
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@_addressableForDependencies
+struct Addressable {
+  @_hasStorage var a: Int
+}
+
+@_rawLayout(like: Int)
+struct RawStorage : ~Copyable {}
+
+// Like `Mutex`: addressable-for-dependencies only because it contains a `@_rawLayout` type.
+struct ContainsRaw : ~Copyable {
+  @_hasStorage var a: Int
+  @_hasStorage var raw: RawStorage
+}
+
+struct NE : ~Escapable {}
+
+sil @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @borrow_raw : $@convention(thin) (@in_guaranteed RawStorage) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @borrow_contains_raw : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @borrow_generic : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+sil [readnone] @readnone_fn : $@convention(thin) () -> ()
+
+// Both applies may read %1 (the second one only through %4), but not write it.
+// An apply which doesn't read memory at all doesn't get a read effect.
+
+// CHECK-LABEL: @read_through_borrowed_capture
+// CHECK:        %5 = apply %4(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=0
+// CHECK:        %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=0
+// CHECK:        %9 = apply %8() : $@convention(thin) () -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=0,w=0
+sil @read_through_borrowed_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "memory_effects"
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  %7 = function_ref @readnone_fn : $@convention(thin) () -> ()
+  %8 = apply %7() : $@convention(thin) () -> ()
+  dealloc_stack %1 : $*Addressable
+  %r = tuple ()
+  return %r : $()
+}
+
+// A value which depends on an `@inout` argument (like a `MutableSpan`) may write to it.
+
+// CHECK-LABEL: @write_through_inout_capture
+// CHECK:        %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=1
+sil @write_through_inout_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "memory_effects"
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %1 : $*Addressable
+  %r = tuple ()
+  return %r : $()
+}
+
+// The storage of a `@_rawLayout` type can be mutated through a borrow (via
+// `Builtin.addressOfRawLayout`), so a value which borrows it may write to it.
+
+// CHECK-LABEL: @write_through_raw_layout_capture
+// CHECK:        %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed RawStorage) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %0 = alloc_stack $RawStorage{{.*}}
+// CHECK-NEXT:  r=1,w=1
+// CHECK:        %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %0 = alloc_stack $RawStorage{{.*}}
+// CHECK-NEXT:  r=1,w=1
+sil @write_through_raw_layout_capture : $@convention(thin) () -> () {
+bb0:
+  specify_test "memory_effects"
+  %0 = alloc_stack $RawStorage
+  %1 = function_ref @borrow_raw : $@convention(thin) (@in_guaranteed RawStorage) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed RawStorage) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %3 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %0 : $*RawStorage
+  %r = tuple ()
+  return %r : $()
+}
+
+// Same for a type which contains a `@_rawLayout` type. The whole value is treated as writable.
+
+// CHECK-LABEL: @write_through_contains_raw_layout_capture
+// CHECK:        %5 = apply %4(%1) : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %1 = alloc_stack $ContainsRaw{{.*}}
+// CHECK-NEXT:  r=1,w=1
+// CHECK:        %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $ContainsRaw{{.*}}
+// CHECK-NEXT:  r=1,w=1
+sil @write_through_contains_raw_layout_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "memory_effects"
+  %1 = alloc_stack $ContainsRaw
+  %2 = struct_element_addr %1 : $*ContainsRaw, #ContainsRaw.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @borrow_contains_raw : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed ContainsRaw) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %1 : $*ContainsRaw
+  %r = tuple ()
+  return %r : $()
+}
+
+// A non-copyable generic type may be a `@_rawLayout` type.
+
+// CHECK-LABEL: @write_through_noncopyable_generic_capture
+// CHECK:        %2 = apply %1<T>(%0) : {{.*}} @owned NE
+// CHECK-NEXT:   %0 = alloc_stack $T{{.*}}
+// CHECK-NEXT:  r=1,w=1
+// CHECK:        %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %0 = alloc_stack $T{{.*}}
+// CHECK-NEXT:  r=1,w=1
+sil @write_through_noncopyable_generic_capture : $@convention(thin) <T where T : ~Copyable> () -> () {
+bb0:
+  specify_test "memory_effects"
+  %0 = alloc_stack $T
+  %1 = function_ref @borrow_generic : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %3 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %0 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// `@_rawLayout` types are always non-copyable, so a copyable generic type cannot be or contain one.
+
+// CHECK-LABEL: @read_through_copyable_generic_capture
+// CHECK:        %2 = apply %1<T>(%0) : {{.*}} @owned NE
+// CHECK-NEXT:   %0 = alloc_stack $T{{.*}}
+// CHECK-NEXT:  r=1,w=0
+// CHECK:        %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %0 = alloc_stack $T{{.*}}
+// CHECK-NEXT:  r=1,w=0
+sil @read_through_copyable_generic_capture : $@convention(thin) <T> () -> () {
+bb0:
+  specify_test "memory_effects"
+  %0 = alloc_stack $T
+  %1 = function_ref @borrow_generic : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %2 = apply %1<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %3 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %0 : $*T
+  %r = tuple ()
+  return %r : $()
+}
