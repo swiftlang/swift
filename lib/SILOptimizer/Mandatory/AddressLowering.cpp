@@ -296,6 +296,32 @@ static bool isPseudoReturnValue(SILValue value) {
   return false;
 }
 
+/// Return the lowered indirect result argument that receives the function's
+/// \p directResultIdx'th direct result before address lowering. Pack results
+/// are indirect both before and after address lowering.
+///
+/// FIXME: Drop the pack case once packs are opaque values.
+///
+/// Precondition: indirect function arguments have already been rewritten
+///               (see insertIndirectReturnArgs()).
+static SILValue getIndirectResultArgForDirectResult(SILFunction *function,
+                                                    unsigned directResultIdx) {
+  auto loweredFnConv = getLoweredFnConv(function);
+  unsigned argIdx = 0;
+  for (SILResultInfo result : loweredFnConv.getResults()) {
+    if (!result.isPack() &&
+        directResultIdx-- == 0) {
+      assert(loweredFnConv.isSILIndirect(result));
+      // Cannot call function->getIndirectSILResults here because that API
+      // uses the function conventions before address lowering.
+      return function->getArguments()[argIdx];
+    }
+    if (loweredFnConv.isSILIndirect(result))
+      ++argIdx;
+  }
+  llvm_unreachable("direct result index out of range");
+}
+
 /// Return the value representing storage of an address-only or indirectly
 /// returned tuple element. For real tuples, return the tuple value itself. If
 /// the tuple is a pseudo-return value, return the indirect function argument
@@ -317,20 +343,11 @@ static SILValue getTupleStorageValue(Operand *operand) {
   if (!isPseudoReturnValue(tuple))
     return tuple;
 
-  unsigned resultIdx = tuple->getElementIndex(operand);
-
   auto *function = tuple->getFunction();
-  auto loweredFnConv = getLoweredFnConv(function);
-  assert(loweredFnConv.getResults().size() == tuple->getElements().size());
-
-  unsigned indirectResultIdx = 0;
-  for (SILResultInfo result : loweredFnConv.getResults().slice(0, resultIdx)) {
-    if (loweredFnConv.isSILIndirect(result))
-      ++indirectResultIdx;
-  }
-  // Cannot call function->getIndirectSILResults here because that API uses the
-  // function conventions before address lowering.
-  return function->getArguments()[indirectResultIdx];
+  assert(function->getConventions().getNumDirectSILResults() ==
+         tuple->getElements().size());
+  return getIndirectResultArgForDirectResult(function,
+                                             tuple->getElementIndex(operand));
 }
 
 /// Return the value representing storage for a single return value.
@@ -343,11 +360,8 @@ static SILValue getSingleReturnAddress(Operand *operand) {
   assert(!isPseudoReturnValue(operand->get()));
 
   auto *function = operand->getParentFunction();
-  assert(getLoweredFnConv(function).getNumIndirectSILResults() == 1);
-
-  // Cannot call getIndirectSILResults here because that API uses the
-  // function conventions before address lowering.
-  return function->getArguments()[0];
+  assert(function->getConventions().getNumDirectSILResults() == 1);
+  return getIndirectResultArgForDirectResult(function, 0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -856,8 +870,7 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
     }
     ++argIdx;
   }
-  assert(argIdx ==
-         fnConv.getSILArgIndexOfFirstParam() + fnConv.getNumSILArguments());
+  assert(argIdx == fnConv.getNumSILArguments());
 }
 
 /// Before populating the ValueStorageMap, insert function arguments for any
@@ -896,8 +909,14 @@ static unsigned insertIndirectReturnOrErrorArgs(AddressLoweringState &pass) {
   };
 
   unsigned argIdx = 0;
-  for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx))
-    createIndirectResult(resultTy, "$return_value", argIdx++);
+  for (SILResultInfo result : pass.loweredFnConv.getIndirectSILResults()) {
+    // FIXME: Drop the pack case once packs are opaque values.
+    if (!result.isPack()) {
+      createIndirectResult(pass.loweredFnConv.getSILType(result, typeCtx),
+                           "$return_value", argIdx);
+    }
+    ++argIdx;
+  }
 
   assert(argIdx == pass.loweredFnConv.getNumIndirectSILResults());
 
@@ -2269,11 +2288,8 @@ AddressMaterialization::materializeProjectionIntoUseImpl(Operand *operand,
   case SILInstructionKind::TupleInst: {
     auto *tupleInst = cast<TupleInst>(user);
     if (isPseudoReturnValue(tupleInst)) {
-      unsigned resultIdx = tupleInst->getElementIndex(operand);
-      assert(resultIdx < pass.loweredFnConv.getNumIndirectSILResults());
-      // Cannot call getIndirectSILResults here because that API uses the
-      // original function type.
-      return pass.function->getArguments()[resultIdx];
+      return getIndirectResultArgForDirectResult(
+          pass.function, tupleInst->getElementIndex(operand));
     }
     SILValue tupleAddr = materializeComposingUser(tupleInst, intoPhiOperand);
     return projectionBuilder.createTupleElementAddr(
@@ -2521,7 +2537,7 @@ bool CallArgRewriter::rewriteArguments() {
   bool changed = false;
 
   auto origConv = apply.getSubstCalleeConv();
-  assert((apply.getNumArguments() == origConv.getNumParameters() &&
+  assert((apply.getNumArguments() == origConv.getNumSILArguments() &&
           apply.asFullApplySite()) ||
          (apply.getNumArguments() <= origConv.getNumParameters() &&
           !apply.asFullApplySite()) &&
@@ -3002,20 +3018,39 @@ void ApplyRewriter::makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs) {
   unsigned newResultArgIdx =
       loweredCalleeConv.getSILArgIndexOfFirstIndirectResult();
 
+  // The address for each direct call result that becomes indirect, in the
+  // order of direct results.
+  SmallVector<SILValue, 4> directResultAddrs;
   auto visitCallResult = [&](SILValue result, SILResultInfo resultInfo) {
     assert(!opaqueCalleeConv.isSILIndirect(resultInfo) &&
            "canonical call results are always direct");
 
+    SILValue indirectResultAddr;
     if (loweredCalleeConv.isSILIndirect(resultInfo)) {
-      SILValue indirectResultAddr = materializeIndirectOutputAddress(
+      indirectResultAddr = materializeIndirectOutputAddress(
           ApplyOutput::Result,
           result, loweredCalleeConv.getSILType(resultInfo, typeCtx));
-      // Record the new indirect call argument.
-      newCallArgs[newResultArgIdx++] = indirectResultAddr;
     }
+    directResultAddrs.push_back(indirectResultAddr);
     return true;
   };
   visitCallResults(apply, visitCallResult);
+
+  // Record the new indirect result call arguments, keeping the existing ones.
+  // FIXME: Only pack results are indirect before address lowering. Drop this
+  // once packs are opaque values.
+  unsigned oldResultArgIdx =
+      opaqueCalleeConv.getSILArgIndexOfFirstIndirectResult();
+  auto directResultAddrIter = directResultAddrs.begin();
+  for (SILResultInfo resultInfo : apply.getSubstCalleeType()->getResults()) {
+    if (resultInfo.isPack()) {
+      newCallArgs[newResultArgIdx++] = apply.getArgument(oldResultArgIdx++);
+      continue;
+    }
+    assert(directResultAddrIter != directResultAddrs.end());
+    if (SILValue indirectResultAddr = *directResultAddrIter++)
+      newCallArgs[newResultArgIdx++] = indirectResultAddr;
+  }
 
   // Handle a try_apply for @error_indirect, who in the opaque convention has
   // a direct error result, but needs an indirect error result when lowered.
@@ -3753,6 +3788,10 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
 
   // Gather direct function results.
   unsigned numOldResults = opaqueFnConv.getNumDirectSILResults();
+  // Every result is already indirect.
+  // FIXME: Drop this, and the pack case below, once packs are opaque values.
+  if (numOldResults == 0)
+    return;
   SmallVector<SILValue, 8> oldResults;
   TupleInst *pseudoReturnVal = nullptr;
   if (numOldResults == 1)
@@ -3769,26 +3808,30 @@ void ReturnRewriter::rewriteReturn(ReturnInst *returnInst) {
       pass.loweredFnConv.getSILArgIndexOfFirstIndirectResult();
 
   // Initialize the indirect result arguments and populate newDirectResults.
-  for_each(pass.function->getLoweredFunctionType()->getResults(), oldResults,
-           [&](SILResultInfo resultInfo, SILValue oldResult) {
-             // Assume that all original results are direct in SIL.
-             assert(!opaqueFnConv.isSILIndirect(resultInfo));
-             if (!pass.loweredFnConv.isSILIndirect(resultInfo)) {
-               // A @guaranteed_address's lowering directly returns an address.
-               if (pass.loweredFnConv.isAddressResult(resultInfo) &&
-                   oldResult->getType().isObject()) {
-                 newDirectResults.push_back(
-                     getGuaranteedAddressResultAddress(oldResult, pass));
-                 return;
-               }
-               newDirectResults.push_back(oldResult);
-               return;
-             }
-             SILArgument *newResultArg =
-                 pass.function->getArgument(newResultArgIdx);
-             rewriteElement(oldResult, newResultArg, returnBuilder);
-             ++newResultArgIdx;
-           });
+  auto oldResultIter = oldResults.begin();
+  for (SILResultInfo resultInfo :
+       pass.function->getLoweredFunctionType()->getResults()) {
+    if (resultInfo.isPack()) {
+      ++newResultArgIdx;
+      continue;
+    }
+    SILValue oldResult = *oldResultIter++;
+    if (!pass.loweredFnConv.isSILIndirect(resultInfo)) {
+      // A @guaranteed_address's lowering directly returns an address.
+      if (pass.loweredFnConv.isAddressResult(resultInfo) &&
+          oldResult->getType().isObject()) {
+        newDirectResults.push_back(
+            getGuaranteedAddressResultAddress(oldResult, pass));
+        continue;
+      }
+      newDirectResults.push_back(oldResult);
+      continue;
+    }
+    SILArgument *newResultArg = pass.function->getArgument(newResultArgIdx);
+    rewriteElement(oldResult, newResultArg, returnBuilder);
+    ++newResultArgIdx;
+  }
+  assert(oldResultIter == oldResults.end());
 
   assert(newDirectResults.size() ==
          pass.loweredFnConv.getNumDirectSILResults());
