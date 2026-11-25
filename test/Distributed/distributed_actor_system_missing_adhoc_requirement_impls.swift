@@ -807,6 +807,42 @@ struct FakeInvocationEncoder_recordErrorType_wrongType: DistributedTargetInvocat
   mutating func doneRecording() throws {}
 }
 
+// The ad-hoc requirements may constrain their generic parameter by exactly the
+// SerializationRequirement and nothing else, since any additional constraint
+// would be assumed to hold when called through the protocol (rdar://188871676)
+protocol ClassBound: AnyObject {}
+protocol DecodableClassBound: Decodable, AnyObject {}
+
+struct FakeInvocationEncoder_recordArgument_extraConstraint: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{type 'FakeInvocationEncoder_recordArgument_extraConstraint' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_recordArgument_extraConstraint' is missing witness for protocol requirement 'recordArgument'}}
+  //expected-note@-4{{add stubs for conformance}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<Value> (RemoteCallArgument<Value>) throws -> ()'}}
+  mutating func recordArgument<Value: Encodable & ClassBound>(_ argument: RemoteCallArgument<Value>) throws {} // BAD: ClassBound instead of Decodable
+  mutating func recordReturnType<R: SerializationRequirement>(_ type: R.Type) throws {}
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
+struct FakeInvocationEncoder_recordReturnType_refinedConstraint: DistributedTargetInvocationEncoder {
+  //expected-error@-1{{type 'FakeInvocationEncoder_recordReturnType_refinedConstraint' does not conform to protocol 'DistributedTargetInvocationEncoder'}}
+  //expected-note@-2{{add stubs for conformance}}
+  //expected-error@-3{{struct 'FakeInvocationEncoder_recordReturnType_refinedConstraint' is missing witness for protocol requirement 'recordReturnType'}}
+  //expected-note@-4{{add stubs for conformance}}
+  typealias SerializationRequirement = Codable
+
+  mutating func recordGenericSubstitution<T>(_ type: T.Type) throws {}
+  mutating func recordArgument<Value: SerializationRequirement>(_ argument: RemoteCallArgument<Value>) throws {}
+  // expected-note@+1 {{candidate has non-matching type '<R> (R.Type) throws -> ()'}}
+  mutating func recordReturnType<R: Encodable & DecodableClassBound>(_ type: R.Type) throws {} // BAD: refines Decodable
+  mutating func recordErrorType<E: Error>(_ type: E.Type) throws {}
+  mutating func doneRecording() throws {}
+}
+
 class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
   typealias SerializationRequirement = Codable
 
@@ -869,6 +905,20 @@ final class PublicFakeInvocationDecoder_badBadProtoRequirement: DistributedTarge
   func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
   // expected-note@+1 {{candidate has non-matching type '<Argument> () throws -> Argument'}}
   func decodeNextArgument<Argument: SomeProtocol>() throws -> Argument { fatalError() }
+  func decodeReturnType() throws -> Any.Type? { nil }
+  func decodeErrorType() throws -> Any.Type? { nil }
+}
+
+final class FakeInvocationDecoder_decodeNextArgument_extraConstraint: DistributedTargetInvocationDecoder {
+  // expected-error@-1{{type 'FakeInvocationDecoder_decodeNextArgument_extraConstraint' does not conform to protocol 'DistributedTargetInvocationDecoder'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{class 'FakeInvocationDecoder_decodeNextArgument_extraConstraint' is missing witness for protocol requirement 'decodeNextArgument'}}
+  // expected-note@-4{{add stubs for conformance}}
+  typealias SerializationRequirement = Codable
+
+  func decodeGenericSubstitutions() throws -> [Any.Type] { [] }
+  // expected-note@+1 {{candidate has non-matching type '<Argument> () throws -> Argument'}}
+  func decodeNextArgument<Argument: SerializationRequirement & ClassBound>() throws -> Argument { fatalError() } // BAD: extra ClassBound
   func decodeReturnType() throws -> Any.Type? { nil }
   func decodeErrorType() throws -> Any.Type? { nil }
 }
@@ -945,6 +995,19 @@ struct BadResultHandler_mutatingButShouldNotBe: DistributedTargetInvocationResul
 
   // expected-note@+1 {{candidate is marked 'mutating' but protocol does not allow it}}
   mutating func onReturn<Success: Codable>(value: Success) async throws {} // WRONG: can't be mutating
+  func onReturnVoid() async throws {}
+  func onThrow<Err: Error>(error: Err) async throws {}
+}
+
+struct BadResultHandler_extraConstraint: DistributedTargetInvocationResultHandler {
+  // expected-error@-1 {{type 'BadResultHandler_extraConstraint' does not conform to protocol 'DistributedTargetInvocationResultHandler'}}
+  // expected-note@-2{{add stubs for conformance}}
+  // expected-error@-3{{struct 'BadResultHandler_extraConstraint' is missing witness for protocol requirement 'onReturn'}}
+  // expected-note@-4{{add stubs for conformance}}
+  typealias SerializationRequirement = Codable
+
+  // expected-note@+1 {{candidate has non-matching type '<Success> (value: Success) async throws -> ()'}}
+  func onReturn<Success: Codable & ClassBound>(value: Success) async throws {} // BAD: extra ClassBound
   func onReturnVoid() async throws {}
   func onThrow<Err: Error>(error: Err) async throws {}
 }
