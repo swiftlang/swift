@@ -34,6 +34,22 @@ final class E {
   let ld: D = D()
 }
 
+struct Holder {
+  var c: C
+  var span: Thing {
+    @_lifetime(borrow self) get { _overrideLifetime(Thing(), borrowing: self) }
+  }
+  var throwingSpan: Thing {
+    @_lifetime(borrow self) get throws { _overrideLifetime(Thing(), borrowing: self) }
+  }
+}
+
+// Unwrapping `h` or `iuo` consumes the loaded copy with a switch_enum. The dependence is on its payload.
+final class G {
+  var h: Holder? = nil
+  var iuo: Holder! = nil
+}
+
 func use(_ t: borrowing Thing) {}
 func f(_ s: Optional<Thing>) {}
 func makeD() -> D { D() }
@@ -72,6 +88,19 @@ func localVarThenVar(_ d: D) {
   use(x.c.span)
 }
 
+func optionalVarForce(_ g: G) {
+  use(g.h!.span)
+}
+
+func iuoVarLocal(_ g: G) {
+  let t = g.iuo.span
+  use(t)
+}
+
+func iuoVarThrows(_ g: G) throws {
+  use(try g.iuo.throwingSpan)
+}
+
 // --- Rejected: the copy cannot be extended past the merge of the optional chain. ---
 
 func optionalThenVar(_ d: D?) {
@@ -89,5 +118,11 @@ func optionalChain(_ x: C?) {
 func classPropChain(_ h: C) {
   f(h.next?.next?.span) // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on this scoped access to variable 'next'}}
+  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func optionalVarChain(_ g: G) {
+  f(g.h?.span) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{it depends on this scoped access to variable 'h'}}
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }

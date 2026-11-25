@@ -409,6 +409,8 @@ private struct ExtendableScope {
   let scope: LifetimeDependence.Scope
   let introducer: Introducer
 
+  /// The instruction that begins this scope's range. For a block argument, including a terminator result, this is the
+  /// block's first instruction, not the terminator, whose other successors are outside the value's lifetime.
   var firstInstruction: Instruction {
     switch introducer {
     case let .scoped(scopedInst):
@@ -416,7 +418,7 @@ private struct ExtendableScope {
     case let .stackTemporary(initializingStore):
       return initializingStore
     case let .owned(value):
-      if let definingInst = value.definingInstructionOrTerminator {
+      if let definingInst = value.definingInstruction {
         return definingInst
       }
       return value.parentBlock.instructions.first!
