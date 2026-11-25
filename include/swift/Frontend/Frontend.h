@@ -163,6 +163,47 @@ public:
                  StringRef mainExecutablePath = {},
                  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
+  /// Initializes the compiler invocation and diagnostic engine from an
+  /// already-parsed frontend \p ParsedArgs list.
+  ///
+  /// Unlike the \c ArrayRef<const char *> overload, this always runs
+  /// environment initialization (such as setting the main executable path and
+  /// computing default runtime/prebuilt module search paths) even when
+  /// \p ParsedArgs contains no arguments.
+  ///
+  /// \returns true if there was an error, false on success.
+  bool parseArgs(llvm::opt::ArgList &ParsedArgs, DiagnosticEngine &Diags,
+                 SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+                     *ConfigurationFileBuffers = nullptr,
+                 StringRef workingDirectory = {},
+                 StringRef mainExecutablePath = {},
+                 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
+
+  /// Parses command-line arguments for a standalone driver tool using \p Table
+  /// with \p ToolFlagsToInclude | \c options::FrontendOption and diagnoses
+  /// missing argument values or unknown options.
+  ///
+  /// \returns true if there was an error, false on success.
+  static bool parseDriverToolArgs(llvm::opt::OptTable &Table,
+                                  ArrayRef<const char *> Args,
+                                  llvm::opt::InputArgList &ParsedArgs,
+                                  unsigned ToolFlagsToInclude,
+                                  DiagnosticEngine &Diags);
+
+  /// Filters out tool-only options and \p ExcludedOptions (such as
+  /// `-module-name`, `-o`, or `-help`) from \p ParsedArgs, appends any
+  /// `-Xfrontend` argument values after the direct frontend arguments
+  /// (matching `swift-driver`), configures the invocation via \c parseArgs,
+  /// and verifies that no source inputs or frontend action flags were selected.
+  ///
+  /// \returns true if there was an error, false on success.
+  bool parseDriverToolFrontendArgs(
+      const llvm::opt::InputArgList &ParsedArgs,
+      ArrayRef<llvm::opt::OptSpecifier> ExcludedOptions,
+      DiagnosticEngine &Diags, StringRef workingDirectory = {},
+      StringRef mainExecutablePath = {},
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
+
   /// Sets specific options based on the given serialized Swift binary data.
   ///
   /// This is additive, i.e. options are not reset to their default values given
