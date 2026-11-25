@@ -30,12 +30,7 @@ namespace swift {
 class SILLoopAnalysis : public FunctionAnalysisBase<SILLoopInfo> {
   DominanceAnalysis *DA;
 public:
-  SILLoopAnalysis(SILModule *)
-      : FunctionAnalysisBase(SILAnalysisKind::Loop), DA(nullptr) {}
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::Loop;
-  }
+  SILLoopAnalysis(SILModule *) : DA(nullptr) {}
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return K & InvalidationKind::Branches;

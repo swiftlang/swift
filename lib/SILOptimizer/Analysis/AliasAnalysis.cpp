@@ -57,7 +57,7 @@ class AliasAnalysisContainer : public FunctionAnalysisBase<AliasAnalysis> {
   SILPassManager *PM = nullptr;
 
 public:
-  AliasAnalysisContainer() : FunctionAnalysisBase(SILAnalysisKind::Alias) {}
+  AliasAnalysisContainer() {}
 
   virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
     return K & InvalidationKind::Instructions;

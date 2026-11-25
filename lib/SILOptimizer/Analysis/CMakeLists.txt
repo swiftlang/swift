@@ -14,7 +14,7 @@ target_sources(swiftSILOptimizer PRIVATE
   DifferentiableActivityAnalysis.cpp
   EpilogueARCAnalysis.cpp
   FunctionOrder.cpp
-  IVAnalysis.cpp
+  InductionVariableAnalysis.cpp
   IsSelfRecursiveAnalysis.cpp
   LoopAnalysis.cpp
   LoopRegionAnalysis.cpp

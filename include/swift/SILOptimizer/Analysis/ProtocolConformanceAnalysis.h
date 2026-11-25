@@ -37,13 +37,9 @@ public:
       SoleConformingTypeMap;
 
   ProtocolConformanceAnalysis(SILModule *Mod)
-      : SILAnalysis(SILAnalysisKind::ProtocolConformance), M(Mod) {}
+      : M(Mod) {}
 
   ~ProtocolConformanceAnalysis();
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::ProtocolConformance;
-  }
 
   /// Invalidate all information in this analysis.
   virtual void invalidate() override {}

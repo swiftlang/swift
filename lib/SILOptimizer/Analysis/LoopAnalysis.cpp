@@ -29,6 +29,6 @@ void SILLoopAnalysis::initialize(SILPassManager *PM) {
   DA = PM->getAnalysis<DominanceAnalysis>();
 }
 
-SILAnalysis *swift::createLoopAnalysis(SILModule *M) {
+SILAnalysis *swift::createSILLoopAnalysis(SILModule *M) {
   return new SILLoopAnalysis(M);
 }

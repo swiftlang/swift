@@ -1,4 +1,4 @@
-//===--- IVAnalysis.h - SIL IV Analysis -------------------------*- C++ -*-===//
+//===--- InductionVariableAnalysis.h - SIL IV Analysis ----------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_IVANALYSIS_H
-#define SWIFT_SILOPTIMIZER_ANALYSIS_IVANALYSIS_H
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_INDUCTIONVARIABLEANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_INDUCTIONVARIABLEANALYSIS_H
 
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SIL/SILArgument.h"
@@ -78,16 +78,12 @@ private:
   void visit(SCCType &SCC);
 };
 
-class IVAnalysis final : public FunctionAnalysisBase<IVInfo> {
+class InductionVariableAnalysis final : public FunctionAnalysisBase<IVInfo> {
 public:
-  IVAnalysis(SILModule *)
-      : FunctionAnalysisBase<IVInfo>(SILAnalysisKind::InductionVariable) {}
-  IVAnalysis(const IVAnalysis &) = delete;
-  IVAnalysis &operator=(const IVAnalysis &) = delete;
-
-  static bool classof(const SILAnalysis *S) {
-    return S->getKind() == SILAnalysisKind::InductionVariable;
-  }
+  InductionVariableAnalysis(SILModule *) {}
+  InductionVariableAnalysis(const InductionVariableAnalysis &) = delete;
+  InductionVariableAnalysis &
+  operator=(const InductionVariableAnalysis &) = delete;
 
   std::unique_ptr<IVInfo> newFunctionAnalysis(SILFunction *F) override {
     return std::make_unique<IVInfo>(*F);

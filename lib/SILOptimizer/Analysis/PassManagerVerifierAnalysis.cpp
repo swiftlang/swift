@@ -24,7 +24,7 @@ static llvm::cl::opt<bool>
 using namespace swift;
 
 PassManagerVerifierAnalysis::PassManagerVerifierAnalysis(SILModule *mod)
-    : SILAnalysis(SILAnalysisKind::PassManagerVerifier), mod(*mod) {
+    : mod(*mod) {
 #ifndef NDEBUG
   if (!EnableVerifier)
     return;

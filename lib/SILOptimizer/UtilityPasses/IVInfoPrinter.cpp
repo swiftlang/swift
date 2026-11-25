@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/SILOptimizer/Analysis/IVAnalysis.h"
+#include "swift/SILOptimizer/Analysis/InductionVariableAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -35,7 +35,7 @@ class IVInfoPrinter : public SILModuleTransform {
 
   /// The entry point to the transformation.
   void run() override {
-    auto *IV = PM->getAnalysis<IVAnalysis>();
+    auto *IV = PM->getAnalysis<InductionVariableAnalysis>();
 
     for (auto &F : *getModule()) {
       if (F.isExternalDeclaration()) continue;
