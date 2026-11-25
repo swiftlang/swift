@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-inline-generics=true | %FileCheck %s
+
+// Check that a function which must not be specialized in Osize mode is not inlined into
+// a generic context. Otherwise an Osize client could specialize the inlined code.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+sil [_semantics "optimize.sil.specialize.generic.size.never"] [ossa] @size_never_callee : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil [ossa] @normal_callee : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_inline_size_never_into_generic_caller :
+// CHECK:         [[F:%.*]] = function_ref @size_never_callee
+// CHECK:         apply [[F]]<T>(%0)
+// CHECK:       } // end sil function 'dont_inline_size_never_into_generic_caller'
+sil [ossa] @dont_inline_size_never_into_generic_caller : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = function_ref @size_never_callee : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @inline_normal_into_generic_caller :
+// CHECK-NOT:     function_ref @normal_callee
+// CHECK:         [[F:%.*]] = function_ref @use
+// CHECK:         apply [[F]]<T>(%0)
+// CHECK:       } // end sil function 'inline_normal_into_generic_caller'
+sil [ossa] @inline_normal_into_generic_caller : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = function_ref @normal_callee : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %2 = apply %1<T>(%0) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
