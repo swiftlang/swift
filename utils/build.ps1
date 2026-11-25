@@ -5584,6 +5584,9 @@ function Build-SourceKitLSP([Hashtable] $Platform,
                             [Hashtable] $Compilers,
                             [string]    $SwiftSDK,
                             [string]    $SwiftSyntax_DIR) {
+  # TODO: Re-enable debug info once https://github.com/swiftlang/swift/issues/94615 is fixed.
+  $DebugInfo = $false
+
   Build-CMakeProject `
     -Src $SourceCache\sourcekit-lsp `
     -Bin (Get-ProjectBinaryCache $Platform SourceKitLSP) `
