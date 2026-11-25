@@ -42,6 +42,8 @@ struct NC: ~Copyable {
   var x: AnyObject
 }
 
+struct EmptyGen<T> {}
+
 sil @use_guaranteed : $@convention(thin) (@guaranteed AnyObject) -> ()
 sil @use_owned : $@convention(thin) (@owned AnyObject) -> ()
 sil @use_S : $@convention(thin) (@guaranteed S) -> ()
@@ -144,9 +146,11 @@ bb0(%0 : @guaranteed $AnyObject):
   return %3
 }
 
+// The debug_value of an exploded argument is killed.
 // CHECK-LABEL: sil shared [ossa] @$s16partial_dead_argTf4x_nTf4nd_n : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK:       bb0(%0 : @guaranteed $AnyObject):
-// CHECK:         fix_lifetime %0
+// CHECK-NEXT:    debug_value undef : $S, let, name "s", argno 1
+// CHECK-NEXT:    fix_lifetime %0
 // CHECK-NEXT:    tuple
 // CHECK:       } // end sil function '$s16partial_dead_argTf4x_nTf4nd_n'
 
@@ -166,6 +170,7 @@ bb0(%0 : @guaranteed $AnyObject):
 // CHECK:       } // end sil function 'partial_dead_arg'
 sil [ossa] @partial_dead_arg : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
+  debug_value %0, let, name "s", argno 1
   %1 = struct_extract %0, #S.x
   fix_lifetime %1
   %r = tuple ()
@@ -298,7 +303,10 @@ bb0(%0 : $Int):
 }
 
 // A `debug_value undef` of a generic type doesn't make the specialized function generic.
+// It is replaced by a `debug_value undef : $()`.
 // CHECK-LABEL: sil shared [ossa] @$s15undef_debug_valTf4d_n : $@convention(thin) () -> Int64 {
+// CHECK:       bb0:
+// CHECK-NEXT:    debug_value undef : $(), let, name "x"
 // CHECK-NOT:     debug_value
 // CHECK:       } // end sil function '$s15undef_debug_valTf4d_n'
 sil [ossa] @undef_debug_val : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64 {
@@ -318,6 +326,52 @@ bb0(%0 : @guaranteed $GenS<Int>):
   %1 = function_ref @undef_debug_val : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64
   %2 = apply %1<Int>(%0) : $@convention(thin) <T> (@guaranteed GenS<T>) -> Int64
   return %2
+}
+
+// A `debug_value` of a removed dead generic argument is replaced by a `debug_value undef : $()`.
+// CHECK-LABEL: sil shared [ossa] @$s22dead_generic_debug_valTf4dn_n : $@convention(thin) (Int) -> Int {
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    debug_value undef : $(), let, name "x", argno 1
+// CHECK-NEXT:    debug_value %0, let, name "y", argno 2
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function '$s22dead_generic_debug_valTf4dn_n'
+sil [ossa] @dead_generic_debug_val : $@convention(thin) <T> (@in_guaranteed T, Int) -> Int {
+bb0(%0 : $*T, %1 : $Int):
+  debug_value %0, let, name "x", argno 1, expr op_deref
+  debug_value %1, let, name "y", argno 2
+  return %1
+}
+
+sil [ossa] @call_dead_generic_debug_val : $@convention(thin) (@in_guaranteed GenS<Int>, Int) -> Int {
+bb0(%0 : $*GenS<Int>, %1 : $Int):
+  %2 = function_ref @dead_generic_debug_val : $@convention(thin) <T> (@in_guaranteed T, Int) -> Int
+  %3 = apply %2<GenS<Int>>(%0, %1) : $@convention(thin) <T> (@in_guaranteed T, Int) -> Int
+  return %3
+}
+
+// A generic variable type from a debug reconstruction block doesn't make the specialized function
+// generic. The `debug_value` is replaced by a `debug_value undef : $()`.
+// CHECK-LABEL: sil shared [ossa] @$s21generic_debug_bb_typeTf4dn_n : $@convention(thin) (Int) -> Int {
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    debug_value undef : $(), let, name "self", argno 1
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function '$s21generic_debug_bb_typeTf4dn_n'
+sil [ossa] @generic_debug_bb_type : $@convention(thin) <T> (EmptyGen<T>, Int) -> Int {
+bb0(%0 : $EmptyGen<T>, %1 : $Int):
+  debug_value (), let, name "self", argno 1, transform {
+  bb0:
+    %2 = struct $EmptyGen<T> ()
+    return %2 : $EmptyGen<T>
+  }
+  return %1
+}
+
+sil [ossa] @call_generic_debug_bb_type : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = struct $EmptyGen<Int> ()
+  %2 = function_ref @generic_debug_bb_type : $@convention(thin) <T> (EmptyGen<T>, Int) -> Int
+  %3 = apply %2<Int>(%1, %0) : $@convention(thin) <T> (EmptyGen<T>, Int) -> Int
+  return %3
 }
 
 sil [ossa] @implicitly_generic_undef : $@convention(thin) <T> (Int) -> () {
@@ -464,8 +518,10 @@ bb2(%6 : @owned $any Error):
 }
 
 // A dead thin metatype argument is not removed, because it has no runtime representation.
-// A dead argument which only has debug uses is removed.
+// A dead argument which only has debug uses is removed. Its debug uses are killed.
 // CHECK-LABEL: sil shared [ossa] @$s18dead_thin_metatypeTf4nd_n : $@convention(thin) (@thin Int.Type) -> () {
+// CHECK:       bb0(%0 : $@thin Int.Type):
+// CHECK-NEXT:    debug_value undef : $AnyObject, let, name "x"
 // CHECK-NOT:     debug_value
 // CHECK:       } // end sil function '$s18dead_thin_metatypeTf4nd_n'
 sil [ossa] @dead_thin_metatype : $@convention(thin) (@thin Int.Type, @guaranteed AnyObject) -> () {
@@ -807,13 +863,12 @@ bb0(%0 : @guaranteed $AnyObject):
   return %3
 }
 
-// A `debug_value` of the argument after the former copy is moved to the function entry, because
-// the argument is consumed now.
+// A `debug_value` of the argument after the former copy is not moved, although the argument is
+// consumed now. A debug_value outside the lifetime is okay in OSSA.
 // CHECK-LABEL: sil shared [ossa] @$s31guaranteed_arg_with_debug_valueTf4o_n : $@convention(thin) (@owned AnyObject) -> () {
 // CHECK:       bb0(%0 : @owned $AnyObject):
-// CHECK-NEXT:    debug_value %0, let, name "x"
 // CHECK:         apply {{%.*}}(%0)
-// CHECK-NOT:     debug_value
+// CHECK-NEXT:    debug_value %0, let, name "x"
 // CHECK:       } // end sil function '$s31guaranteed_arg_with_debug_valueTf4o_n'
 sil [ossa] @guaranteed_arg_with_debug_value : $@convention(thin) (@guaranteed AnyObject) -> () {
 bb0(%0 : @guaranteed $AnyObject):
