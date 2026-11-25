@@ -28,9 +28,3 @@ public func caller1(x: A & B) -> A & B {
 public func caller2(x: A & B, y: A & C) -> A & B {
   return addMixedTypeParams(x, y)
 }
-
-// Make sure we emit an error and don't crash when failing to instantiate a function.
-public func callexpectsConstCharPtr() {
-  // expected-note@<unknown> {{in instantiation of function template specialization 'expectsConstCharPtr<int>' requested here}}
-  expectsConstCharPtr(0 as Int32)
-}

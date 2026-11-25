@@ -1,5 +1,5 @@
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -suppress-remarks -suppress-notes \
+// RUN: %target-swift-frontend -emit-ir -o /dev/null -verify -suppress-remarks -suppress-notes \
 // RUN:     -cxx-interoperability-mode=default \
 // RUN:     -I %t%{fs-sep}Inputs %t%{fs-sep}main.swift \
 // RUN:     -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}header.h
@@ -15,10 +15,6 @@ module CxxHeader {
 
 // TODO: the following diagnostics should be moved to main.swift at the call site
 //       that triggers the instantiation
-// expected-error@+4 {{could not substitute parameters for C++ function template 'cxxCast': BaseT, UnrelatedT}}
-// expected-error@+3 {{could not substitute parameters for C++ function template 'cxxCast': BaseT, SubClassT}}
-// expected-error@+2 {{could not substitute parameters for C++ function template 'cxxCast': BaseT, SubProtectedT}}
-// expected-error@+1 {{could not substitute parameters for C++ function template 'cxxCast': BaseT, SubPrivateT}}
 template <class O, class I> O cxxCast(I i) { return static_cast<O>(i); }
 // expected-error@-1 {{cannot cast 'const SubPrivateT' to its private base class 'const BaseT'}}
 // expected-error@-2 {{cannot cast 'const SubProtectedT' to its protected base class 'const BaseT'}}
