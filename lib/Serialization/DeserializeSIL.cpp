@@ -2073,10 +2073,13 @@ llvm::Error SILDeserializer::readSILInstruction(
                                       ListOfValues.drop_front(I));
     if (!DebugVar)
       return DebugVar.takeError();
-    // The location override is the instruction's own serialized location.
+    // createDebugValue ignores the location override for the variable.
+    // The location override contains the correct deserialized location here,
+    // so pass it through.
     ResultInst = Builder.createDebugValue(
-        Loc, Operands, DebugVar.get().value_or(SILDebugVariable()),
-        UsesMoveableValDebugInfo, HasTrace, /*overrideLoc=*/ false);
+        Builder.getCurrentDebugLocOverride().value_or(Loc), Operands,
+        DebugVar.get().value_or(SILDebugVariable()), UsesMoveableValDebugInfo,
+        HasTrace);
 
     // If the serialized debug_value has a reconstruction block, add it to
     // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records
@@ -2101,8 +2104,12 @@ llvm::Error SILDeserializer::readSILInstruction(
         return MaybeVar.takeError();
       DebugVar = MaybeVar.get();
     }
+    // createAllocBox ignores the location override for the variable.
+    // The location override contains the correct deserialized location here,
+    // so pass it through.
     ResultInst = Builder.createAllocBox(
-        Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
+        Builder.getCurrentDebugLocOverride().value_or(Loc),
+        cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
         DebugVar, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
         /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);

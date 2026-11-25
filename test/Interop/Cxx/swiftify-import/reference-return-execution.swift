@@ -4,9 +4,6 @@
 
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
-// The SIL verifier rejects the store_borrow scope around Ref<Cell<T>> under opaque values.
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 // RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells)
 
