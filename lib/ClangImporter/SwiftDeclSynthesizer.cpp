@@ -44,6 +44,7 @@
 #include "clang/Basic/Specifiers.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 #include "clang/Sema/DynamicAllocationArgumentsCXX.h"
+#include "clang/Sema/EnterExpressionEvaluationContext.h"
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
@@ -3405,7 +3406,10 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperExpr};
 
   // Instantiate the templated constructor that would accept the fake
-  // __SwiftFunctionWrapper<...> value.
+  // __SwiftFunctionWrapper<...> value. The expression is discarded, so don't
+  // instantiate any function bodies.
+  clang::EnterExpressionEvaluationContext unevaluated(
+      clangSema, clang::Sema::ExpressionEvaluationContext::Unevaluated);
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       functionTypeClangInfo, functionTypeClangDecl->getLocation(),
       constructExprArgs, functionTypeClangDecl->getLocation(),
