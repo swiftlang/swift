@@ -110,6 +110,45 @@ public struct SSAUpdater<Context: MutatingContext> {
     return computedValuesAtBeginOfBlocks[block]!
   }
 
+  /// Like `getValue(atBeginOf:)`, but returns nil instead of inserting a phi argument.
+  ///
+  /// Must be called after all available values are added.
+  public func getExistingValue(atBeginOf block: BasicBlock) -> Value? {
+    if let value = computedValuesAtBeginOfBlocks[block] {
+      return value
+    }
+    var uniqueValue: Value? = nil
+    func merge(_ value: Value) -> Bool {
+      // If branches disagree, there is no usable existing value.
+      if let uniqueValue, uniqueValue != value {
+        return false
+      }
+      uniqueValue = value
+      return true
+    }
+
+    var worklist = BasicBlockWorklist(context)
+    defer { worklist.deinitialize() }
+    worklist.pushIfNotVisited(block)
+    while let current = worklist.pop() {
+      // At the entry block, if there is no available value, use undef.
+      if current.predecessors.isEmpty, !merge(Undef.get(type: type, context)) {
+        return nil
+      }
+      // Merge values from the end of each predecessor.
+      for pred in current.predecessors {
+        if let value = getComputedValue(atEndOf: pred) {
+          if !merge(value) {
+            return nil
+          }
+        } else {
+          worklist.pushIfNotVisited(pred)
+        }
+      }
+    }
+    return uniqueValue
+  }
+
   /// Collects all blocks which need a computed value in order to determine the value at
   /// `startBlock`, by walking backwards from `startBlock` along predecessors, stopping at blocks
   /// which already have an available or computed value.
@@ -407,6 +446,17 @@ public struct InstructionBasedSSAUpdater<Context: MutatingContext> {
   /// _before_ the first instruction of `block`.
   public mutating func getValue(atBeginOf block: BasicBlock) -> Value {
     return ssaUpdater.getValue(atBeginOf: block)
+  }
+
+  /// Like `getValue(before:)`, but returns nil instead of inserting a phi argument.
+  ///
+  /// Must be called after all available values are added.
+  public mutating func getExistingValue(before instruction: Instruction) -> Value? {
+    // getAvailableValue will sort the values on first access, making this function mutating.
+    if let value = availableValues[instruction.parentBlock]?.getAvailableValue(before: instruction) {
+      return value
+    }
+    return ssaUpdater.getExistingValue(atBeginOf: instruction.parentBlock)
   }
 
   /// The phi arguments which were inserted so far by `getValue`, in the order they were created.
