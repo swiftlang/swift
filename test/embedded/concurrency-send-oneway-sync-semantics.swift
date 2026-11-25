@@ -30,7 +30,7 @@ import _Concurrency
 
 // Polls until 'done' returns true, and fails instead of hanging forever if the
 // fire-and-forget calls never run
-func waitUntil(_ done: () async throws -> Bool) async rethrows {
+func waitUntil(_ done: @Sendable () async throws -> Bool) async rethrows {
   for _ in 0 ..< 1_000_000 {
     if try await done() {
       return

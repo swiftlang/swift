@@ -53,7 +53,7 @@ func test(_ g: Greeter) throws {
 
 // The operation closure receives the evaluated receiver as a 'sending'
 // capture and makes the call
-// CHECK-LABEL: sil private [ossa] @$s4main4testyyAA7GreeterCKFyyYaKXOfU_ : $@convention(thin) @async (@sil_sending @guaranteed Greeter) -> @error any Error {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4main4testyyAA7GreeterCKFyyYaKXOfU_ : $@convention(thin) @async (@sil_sending @guaranteed Greeter) -> @error any Error {
 // CHECK: bb0([[CAPTURED:%.*]] : @closureCapture @guaranteed $Greeter):
 // CHECK: class_method [[CAPTURED]] : $Greeter, #Greeter.greet
 
