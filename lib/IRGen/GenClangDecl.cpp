@@ -191,6 +191,13 @@ public:
   bool shouldVisitImplicitCode() const { return true; }
 };
 
+// Defaulted default constructors don't have a body until Sema defines them.
+bool isUndefinedDefaultedDefaultConstructor(const clang::FunctionDecl *fd) {
+  auto *ctor = dyn_cast<clang::CXXConstructorDecl>(fd);
+  return ctor && ctor->isDefaultConstructor() && ctor->isDefaulted() &&
+         !ctor->isDeleted() && !ctor->doesThisDeclarationHaveABody();
+}
+
 // If any (re)declaration of `decl` contains executable code, returns that
 // redeclaration; otherwise, returns nullptr.
 // In the case of a function, executable code is contained in the function
@@ -214,6 +221,10 @@ clang::Decl *getDeclWithExecutableCode(clang::Sema &clangSema,
     if (fd->isDefaulted() && !fd->isDeleted() &&
         fd->getDefaultedComparisonKind() !=
             clang::DefaultedComparisonKind::None)
+      return fd;
+
+    // Likewise for a defaulted default constructor.
+    if (isUndefinedDefaultedDefaultConstructor(fd))
       return fd;
   } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
@@ -304,6 +315,10 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
         if (DCK != clang::DefaultedComparisonKind::None)
           clangSema.DefineDefaultedComparison(fn->getLocation(), fn, DCK);
       }
+
+      if (isUndefinedDefaultedDefaultConstructor(fn))
+        clangSema.DefineImplicitDefaultConstructor(
+            fn->getLocation(), cast<clang::CXXConstructorDecl>(fn));
     }
 
     if (clang::Decl *executableDecl =
