@@ -784,6 +784,28 @@ StdSpanTestSuite.test("Convert empty Swift span with nil base address")
   }
 }
 
+StdSpanTestSuite.test("Span(_unsafeCxxSpan:) rejects an oversized count")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = initConstSpanWithOversizedCount()
+  expectEqual(s.size(), -1)
+
+  expectCrashLater()
+  _ = Span(_unsafeCxxSpan: s)
+}
+
+StdSpanTestSuite.test("MutableSpan(_unsafeCxxSpan:) rejects an oversized count")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = initSpanWithOversizedCount()
+  expectEqual(s.size(), -1)
+
+  expectCrashLater()
+  _ = MutableSpan(_unsafeCxxSpan: s)
+}
+
 StdSpanTestSuite.test("CxxSpan conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
