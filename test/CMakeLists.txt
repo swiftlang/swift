@@ -523,6 +523,13 @@ foreach(SDK ${SWIFT_SDKS})
               "to which Swift build products will be deployed.")
         endif()
 
+        # Build products like libswiftCore.so.
+        set(android_build_products "${SWIFTLIB_DIR}/android")
+        if(SWIFT_ENABLE_BACKTRACING)
+          # The runtime finds swift-backtrace next to libswiftCore.so.
+          list(APPEND android_build_products "${SWIFTLIBEXEC_DIR}/android/swift-backtrace")
+        endif()
+
         # Warning: This step will fail if you do not have an Android device
         #          connected via USB. See docs/Android.md for details on
         #          how to run the test suite for Android.
@@ -537,8 +544,7 @@ foreach(SDK ${SWIFT_SDKS})
                 --ndk "${SWIFT_ANDROID_NDK_PATH}"
                 --destination "${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}"
                 --destination-arch "${ARCH}"
-                # Build products like libswiftCore.so.
-                "${SWIFTLIB_DIR}/android")
+                ${android_build_products})
       endif()
       add_custom_target("upload-stdlib${VARIANT_SUFFIX}"
           ${command_upload_stdlib}

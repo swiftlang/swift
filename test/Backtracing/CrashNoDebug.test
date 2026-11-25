@@ -15,7 +15,7 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || (OS=linux-android && (CPU=aarch64 || CPU=x86_64))
 
 
 // NODEBUG: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0*}}4 ***

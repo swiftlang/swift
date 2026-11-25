@@ -34,7 +34,7 @@ def shell(args):
     Note that this only occurs if communication with the connected device
     fails, not if the command run on the device fails.
     """
-    return subprocess.check_output(['adb', 'shell'] + args)
+    return subprocess.check_output(['adb', 'shell'] + args, text=True)
 
 
 def rmdir(path):
@@ -52,12 +52,12 @@ def push(local_paths, device_path):
         # improves the effective transfer speed.
         return subprocess.check_output(
             ['adb', 'push', '--sync'] + local_paths + [device_path],
-            stderr=subprocess.STDOUT).strip()
+            stderr=subprocess.STDOUT, text=True).strip()
     except subprocess.CalledProcessError as e:
         if "unrecognized option '--sync'" in e.output:
             return subprocess.check_output(
                 ['adb', 'push'] + local_paths + [device_path],
-                stderr=subprocess.STDOUT).strip()
+                stderr=subprocess.STDOUT, text=True).strip()
         else:
             raise e
 

@@ -9,7 +9,7 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || (OS=linux-android && (CPU=aarch64 || CPU=x86_64))
 
 // CHECK: *** Program crashed: {{(Bad pointer dereference|Access violation)}} at 0x{{0+}}4 ***
 

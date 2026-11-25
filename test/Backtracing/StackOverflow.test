@@ -11,7 +11,7 @@
 // UNSUPPORTED: asan
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || (OS=linux-android && (CPU=aarch64 || CPU=x86_64))
 
 // FIXME: We have to allow all the line numbers below to be off-by-one because
 // of a CoreSymbolication bug.  This also means we have to skip checking the
