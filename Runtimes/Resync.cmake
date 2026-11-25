@@ -277,6 +277,10 @@ copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
 if(IS_DIRECTORY "${PlatformExecutors_ROOT_DIR}/swift-platform-executors/Sources/_PlatformExecutorsCore")
   copy_library_sources("" "Sources/_PlatformExecutorsCore" "Supplemental/_PlatformExecutorsCore"
     ROOT "${PlatformExecutors_ROOT_DIR}/swift-platform-executors")
+  copy_library_sources(PlatformExecutors "Sources" "Supplemental/PlatformExecutors"
+    ROOT "${PlatformExecutors_ROOT_DIR}/swift-platform-executors")
+  copy_library_sources(CPlatformExecutors "Sources" "Supplemental/PlatformExecutors"
+    ROOT "${PlatformExecutors_ROOT_DIR}/swift-platform-executors")
 endif()
 
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")

@@ -149,3 +149,34 @@ if(SwiftRuntime_ENABLE_platformexecutorscore)
     CMAKE_ARGS
       ${COMMON_OPTIONS})
 endif()
+
+# PlatformExecutors
+if(SwiftRuntime_ENABLE_platformexecutors)
+  # It uses `Synchronization` and `_PlatformExecutorsCore`, from the trees of
+  # their builds.
+  if(NOT SwiftRuntime_ENABLE_synchronization OR NOT SwiftRuntime_ENABLE_platformexecutorscore)
+    message(FATAL_ERROR "PlatformExecutors requires Synchronization and PlatformExecutorsCore")
+  endif()
+  ExternalProject_Get_Property(Synchronization BINARY_DIR)
+  set(_synchronization_binary_dir "${BINARY_DIR}")
+  ExternalProject_Get_Property(PlatformExecutorsCore BINARY_DIR)
+  set(_platform_executors_core_binary_dir "${BINARY_DIR}")
+  set(_platform_executors_options)
+  if(DEFINED SwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR)
+    list(APPEND _platform_executors_options
+      -DSwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR=${SwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR})
+  endif()
+  ExternalProject_Add(PlatformExecutors
+    PREFIX "PlatformExecutors"
+    SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/PlatformExecutors"
+    DEPENDS Synchronization PlatformExecutorsCore
+    INSTALL_DIR "${CMAKE_INSTALL_PREFIX}"
+    INSTALL_COMMAND ""
+    # To ensure incremental builds work as expected
+    BUILD_ALWAYS 1
+    CMAKE_ARGS
+      ${COMMON_OPTIONS}
+      -DSwiftSynchronization_DIR=${_synchronization_binary_dir}/cmake/SwiftSynchronization
+      -DSwiftPlatformExecutorsCore_DIR=${_platform_executors_core_binary_dir}/cmake/SwiftPlatformExecutorsCore
+      ${_platform_executors_options})
+endif()

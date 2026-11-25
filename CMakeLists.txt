@@ -1947,8 +1947,16 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
 
       set(runtimes_to_enable StringProcessing|Synchronization|Distributed|Observation)
+      set(platform_executors_options)
       if(SWIFT_ENABLE_PLATFORM_EXECUTORS)
         string(APPEND runtimes_to_enable |PlatformExecutorsCore)
+        set(_platform_executors_sdks ANDROID LINUX LINUX_STATIC FREEBSD WINDOWS)
+        if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS AND
+           sdk IN_LIST _platform_executors_sdks)
+          string(APPEND runtimes_to_enable |PlatformExecutors)
+          set(platform_executors_options
+            -DSwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR:PATH=${SWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE})
+        endif()
       endif()
       if(sdk STREQUAL "OSX")
         string(APPEND runtimes_to_enable |Runtime)
@@ -1963,6 +1971,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         BUILD_ALWAYS 1
         CMAKE_ARGS
           -DSwift_ENABLE_RUNTIMES=${runtimes_to_enable}
+          ${platform_executors_options}
           -DBUILD_SHARED_LIBS=YES
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
