@@ -826,6 +826,13 @@ public:
     return scopeCloner.getOrCreateClonedScope(DS);
   }
 
+  const SILDebugScope *remapVariableScope(const SILDebugScope *DS) {
+    // Never remap a variable to a fixed location.
+    if (hasFixedLocation)
+      return DS;
+    return remapScope(DS);
+  }
+
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
     result = Cloned;
     SILCloner<BridgedClonerImpl>::postProcess(Orig, Cloned);
