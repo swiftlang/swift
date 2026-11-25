@@ -113,7 +113,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
       ThreadLocal.swift
 
       SWIFT_COMPILE_FLAGS ${_embedded_observation_swift_flags}
-      DEPENDS embedded-concurrency-${mod}
+      DEPENDS embedded-concurrency-${mod} copy_embedded_swift_platform_header
       INSTALL_IN_COMPONENT stdlib
     )
   endforeach()
