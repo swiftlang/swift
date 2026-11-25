@@ -51,8 +51,7 @@ class Cat : FakeNSObject {
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2
 
   // CHECK: bb1:
-    // CHECK-NEXT: [[LD:%.*]] = load {{.*}} : $*Cat
-    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[LD]] : $Cat, #Cat.x
+    // CHECK-NEXT: [[FIELD_ADDR:%.*]] = ref_element_addr [[ARG2]] : $Cat, #Cat.x
     // CHECK-NEXT: [[FIELD_ADDR_ACCESS:%.*]] = begin_access [deinit] [static] [[FIELD_ADDR]]
     // CHECK-NEXT: destroy_addr [[FIELD_ADDR_ACCESS]] : $*LifetimeTracked
     // CHECK-NEXT: end_access [[FIELD_ADDR_ACCESS]]

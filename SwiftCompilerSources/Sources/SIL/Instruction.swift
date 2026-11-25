@@ -2212,6 +2212,16 @@ final public class BeginAccessInst : SingleValueInstruction, UnaryInstruction {
     context.notifyInstructionChanged(self)
   }
 
+  /// True if the access scope forbids mutating the memory.
+  public var isReadOnly: Bool {
+    switch accessKind {
+    case .modify, .deinit:
+      return false
+    case .read, .`init`:
+      return true
+    }
+  }
+
   // The raw values must match SILAccessEnforcement.
   public enum Enforcement: Int {
     /// The access's enforcement has not yet been determined.

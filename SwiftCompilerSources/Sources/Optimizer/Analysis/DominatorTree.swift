@@ -89,6 +89,18 @@ extension Instruction {
   }
 }
 
+extension Value {
+  func strictlyDominates(instruction: Instruction, _ domTree: DominatorTree) -> Bool {
+    if let inst = definingInstruction {
+      return inst.strictlyDominates(instruction, domTree)
+    }
+    if let arg = self as? Argument {
+      return arg.parentBlock.dominates(instruction.parentBlock, domTree)
+    }
+    return false
+  }
+}
+
 //===--------------------------------------------------------------------===//
 //                              Tests
 //===--------------------------------------------------------------------===//

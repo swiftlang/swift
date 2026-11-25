@@ -38,6 +38,25 @@ bb0(%0 : @owned $StructWithDeinit, %1 : $S1):
   return %5
 }
 
+// A `struct` instruction of a struct with a deinit cannot be bypassed when splitting the store.
+// The struct must be destructured with a `drop_deinit` instead.
+// CHECK-LABEL: sil [ossa] @take_field_of_stored_struct_with_deinit :
+// CHECK:         [[S:%.*]] = struct $StructWithDeinit
+// CHECK-NEXT:    [[D:%.*]] = drop_deinit [[S]]
+// CHECK-NEXT:    ([[F1:%.*]], {{%.*}}) = destructure_struct [[D]]
+// CHECK:         return [[F1]]
+// CHECK-LABEL: } // end sil function 'take_field_of_stored_struct_with_deinit'
+sil [ossa] @take_field_of_stored_struct_with_deinit : $@convention(thin) (@owned C1, S1) -> @owned C1 {
+bb0(%0 : @owned $C1, %1 : $S1):
+  %2 = alloc_stack $StructWithDeinit
+  %3 = struct $StructWithDeinit (%0, %1)
+  store %3 to [init] %2
+  %5 = struct_element_addr %2, #StructWithDeinit.f1
+  %6 = load [take] %5
+  dealloc_stack %2
+  return %6
+}
+
 sil @s1_deinit : $@convention(method) (@owned StructWithDeinit) -> ()
 sil_moveonlydeinit StructWithDeinit { @s1_deinit }
 

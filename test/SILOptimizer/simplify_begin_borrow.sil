@@ -567,3 +567,25 @@ bb0(%0 : @owned $C, %1 : @owned $S1):
   %r = tuple ()
   return %r
 }
+
+// An `unchecked_ownership` with "none" forwarding ownership (a value hint) is not part of the
+// forwarding chain. It must not be converted to an owned forwarding instruction.
+// CHECK-LABEL: sil [ossa] @convert_to_owned_with_none_unchecked_ownership :
+// OPT:           [[U:%.*]] = unchecked_ownership %0 : $C, forwarding: @none
+// OPT-NOT:       begin_borrow
+// OPT:           br bb1([[U]] : $C)
+// CHECK-LABEL: } // end sil function 'convert_to_owned_with_none_unchecked_ownership'
+sil [ossa] @convert_to_owned_with_none_unchecked_ownership : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0
+  %2 = unchecked_ownership %1, forwarding: @none
+  fix_lifetime %1
+  end_borrow %1
+  br bb1(%2)
+
+bb1(%3 : $C):
+  fix_lifetime %3
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}

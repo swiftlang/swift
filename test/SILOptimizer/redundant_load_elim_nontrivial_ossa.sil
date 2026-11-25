@@ -97,7 +97,10 @@ sil_global @total_nontrivialstruct : $NonTrivialStruct
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
 sil @use_Klass : $@convention(thin) (@owned Klass) -> ()
+sil @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+sil @borrow_and_produce_klass : $@convention(thin) (@guaranteed Klass) -> @owned Klass
 sil @use_nontrivialstruct : $@convention(thin) (@owned NonTrivialStruct) -> ()
+sil @modify_nontrivialstruct : $@convention(thin) (@inout NonTrivialStruct) -> ()
 sil @use_a : $@convention(thin) (@owned A) -> ()
 sil @use_twofield : $@convention(thin) (@owned TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
@@ -251,12 +254,13 @@ bb0(%0 : @owned $Klass):
   return %7 : $()
 }
 
+// The stored `struct` is not destructured, but its operand is used directly.
 // CHECK-LABEL: promote_partial_load :
-// CHECK:         [[S:%.*]] = struct $NonTrivialStruct
+// CHECK-NOT:     struct $
 // CHECK-NOT:     store
-// CHECK:         [[D:%.*]] = destructure_struct [[S]]
+// CHECK-NOT:     destructure_struct
 // CHECK-NOT:     load
-// CHECK:         return [[D]]
+// CHECK:         return %0
 // CHECK-LABEL: } // end sil function 'promote_partial_load'
 sil [ossa] @promote_partial_load : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
@@ -377,10 +381,11 @@ bb6:
 // Forward store %1 and store %2 such that load %3 becomes an identity trivial cast.
 // Both loads from %0 will be eliminated.
 // CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : 
-// CHECK: bb1
-// CHECK: = load
-// CHECK-NOT: = load
-// CHECK: bb2
+// CHECK:         destroy_addr %0
+// CHECK:       bb1({{.*}}):
+// CHECK-NOT:     load
+// CHECK:       bb3:
+// CHECK:         store {{.*}} to [init] %0
 // CHECK-LABEL: } // end sil function 'test_read_dependence_allows_forwarding_multi_bb_2'
 sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, @owned A, @owned A) -> () {
 bb0(%0 : $*A, %1 : @owned $A, %2 : @owned $A):
@@ -410,11 +415,9 @@ bb2:
 }
 
 // CHECK-LABEL: sil [ossa] @load_to_load_loop :
-// CHECK:       bb1:
-// CHECK-NEXT:    load
+// CHECK:       bb1({{.*}}):
 // CHECK-NOT:     load
 // CHECK:       bb3:
-// CHECK-NEXT:    load
 // CHECK-NOT:     load
 // CHECK-LABEL: } // end sil function 'load_to_load_loop'
 sil [ossa] @load_to_load_loop : $@convention(thin) (@owned Klass) -> () {
@@ -519,10 +522,12 @@ bb2:
   return %23 : $()
 }
 
-// Make sure we form a single SILArgument.
+// Both paths store the same values. Therefore no SILArgument is needed.
 //
 // CHECK-LABEL: silargument_agg_in_one_block :
-// CHECK: bb3([[ARG1:%.*]] : @owned $Klass, [[ARG2:%.*]] : @owned $Klass):
+// CHECK: bb3:
+// CHECK-NOT: = load
+// CHECK: struct $TwoField (%0 : $Klass, %1 : $Klass)
 // CHECK-NOT: = load
 // CHECK-LABEL: } // end sil function 'silargument_agg_in_one_block'
 sil hidden [ossa] @silargument_agg_in_one_block : $@convention(thin) (@owned Klass, @owned Klass) -> () {
@@ -851,7 +856,10 @@ bb8:
 // CHECK-LABEL: @ignore_unreachable_simple :
 // This is not optimized, yet
 // CHECK:         load [copy]
-// CHECK:         load [copy]
+// CHECK:       bb1:
+// CHECK-NOT:     load
+// CHECK:       bb2:
+// CHECK:         destroy_value [dead_end]
 // CHECK: } // end sil function 'ignore_unreachable_simple'
 sil [ossa] @ignore_unreachable_simple : $@convention(thin) (@in_guaranteed NonTrivialStruct) -> () {
 bb0(%0 : $*NonTrivialStruct):
@@ -1044,10 +1052,7 @@ bb14:
 }
 
 // CHECK-LABEL: @test_available_value3 :
-// CHECK:       bb9:
-// CHECK-NEXT:    load
-// CHECK:       bb13:
-// CHECK-NEXT:    load
+// CHECK-NOT:    load
 // CHECK: } // end sil function 'test_available_value3'
 sil [ossa] @test_available_value3 : $@convention(method) (@owned NonTrivialStruct) -> () {
 bb0(%0 : @owned $NonTrivialStruct):
@@ -1240,13 +1245,13 @@ bb0(%0 : $*(Agg3, Klass), %1 : @owned $Klass, %2 : $Int, %3 : @owned $Klass):
 }
 
 // CHECK-LABEL: @load_take_from_store_assign :
+// CHECK:         destroy_addr %1
 // CHECK:         [[DS:%.*]] = destructure_struct %0
 // CHECK:         [[TADDR:%.*]] =  struct_element_addr %1 : $*Agg2, #Agg2.t
 // CHECK:         ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[DS]]
 // CHECK:         [[TA0:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 0
-// CHECK:         destroy_addr [[TA0]]
 // CHECK:         [[TA1:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 1
-// CHECK:         store [[T1]] to [assign] [[TA1]]
+// CHECK:         store [[T1]] to [init] [[TA1]]
 // CHECK:         return [[T0]]
 // CHECK:       } // end sil function 'load_take_from_store_assign'
 sil [ossa] @load_take_from_store_assign : $@convention(thin) (@owned Agg2, @inout Agg2, @owned Klass) -> @owned Klass {
@@ -1260,11 +1265,11 @@ bb0(%0 : @owned $Agg2, %1 : $*Agg2, %2 : @owned $Klass):
 }
 
 // CHECK-LABEL: @copyaddr_take_from_store_assign :
+// CHECK:         destroy_addr %2
 // CHECK:         [[DS:%.*]] = destructure_struct %1
 // CHECK:         [[TADDR:%.*]] =  struct_element_addr %2 : $*Agg2, #Agg2.t
 // CHECK:         ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[DS]]
 // CHECK:         [[TA0:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 0
-// CHECK:         destroy_addr [[TA0]]
 // CHECK:         [[TA1:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 1
 // CHECK:         store [[T0]] to [init] %0
 // CHECK:       } // end sil function 'copyaddr_take_from_store_assign'
@@ -1321,3 +1326,958 @@ bb0(%0 : $*Agg2, %1 : @owned $Klass):
   return %8 : $Klass
 }
 
+// CHECK-LABEL: sil [ossa] @load_take_from_store_of_nested_aggregate :
+// CHECK-NOT:     struct $
+// CHECK-NOT:     tuple (
+// CHECK-NOT:     destructure_struct
+// CHECK-NOT:     destructure_tuple
+// CHECK-NOT:     load
+// CHECK:         destroy_value %1
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_from_store_of_nested_aggregate'
+sil [ossa] @load_take_from_store_of_nested_aggregate : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %2 = alloc_stack $Agg2
+  %3 = tuple (%0 : $Klass, %1 : $Klass)
+  %4 = struct $Agg2 (%3 : $(Klass, Klass))
+  store %4 to [init] %2 : $*Agg2
+  %5 = struct_element_addr %2 : $*Agg2, #Agg2.t
+  %6 = tuple_element_addr %5 : $*(Klass, Klass), 0
+  %7 = load [take] %6 : $*Klass
+  %8 = tuple_element_addr %5 : $*(Klass, Klass), 1
+  %9 = load [take] %8 : $*Klass
+  destroy_value %9 : $Klass
+  dealloc_stack %2 : $*Agg2
+  return %7 : $Klass
+}
+
+// The `struct` has another use. Therefore it must be destructured.
+// CHECK-LABEL: sil [ossa] @load_take_from_store_of_multi_use_struct :
+// CHECK:         [[S:%.*]] = struct $NonTrivialStruct (%0 : $Klass)
+// CHECK:         [[F:%.*]] = destructure_struct [[S]]
+// CHECK-NOT:     load
+// CHECK:         return [[F]]
+// CHECK:       } // end sil function 'load_take_from_store_of_multi_use_struct'
+sil [ossa] @load_take_from_store_of_multi_use_struct : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $NonTrivialStruct
+  %2 = struct $NonTrivialStruct (%0 : $Klass)
+  %3 = copy_value %2 : $NonTrivialStruct
+  store %2 to [init] %1 : $*NonTrivialStruct
+  %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %5 = load [take] %4 : $*Klass
+  destroy_value %3 : $NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $Klass
+}
+
+
+// A `load_borrow` of a sub-field, contained in the liverange of the `load [take]`.
+// The `load_borrow` is replaced by a `begin_borrow` of the available value plus a projection.
+// The scope ending `end_borrow` must end the `begin_borrow` and not the projected value,
+// because a projection is not a borrow introducer.
+// CHECK-LABEL: @load_take_with_contained_load_borrow :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    [[F:%.*]] = struct_extract [[B]] : $NonTrivialStruct, #NonTrivialStruct.val
+// CHECK-NEXT:    unchecked_ref_cast [[F]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:       } // end sil function 'load_take_with_contained_load_borrow'
+sil [ossa] @load_take_with_contained_load_borrow : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %1 : $*NonTrivialStruct
+  %2 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %3 = load_borrow %2 : $*Klass
+  %4 = unchecked_ref_cast %3 : $Klass to $Builtin.NativeObject
+  end_borrow %3 : $Klass
+  %5 = load [take] %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $NonTrivialStruct
+}
+
+// A `load [take]` with a liverange exit (bb2) which is not a dead-end block: the value must be
+// stored back to memory in the exit block. The address of the load does not dominate the exit
+// block, therefore it must be re-created from the base of the access.
+// CHECK-LABEL: @load_take_exit_block_projected_address :
+// CHECK:         [[F:%.*]] = destructure_struct %0
+// CHECK:       bb2:
+// CHECK-NEXT:    [[SEA:%.*]] = struct_element_addr %{{[0-9]+}} : $*NonTrivialStruct, #NonTrivialStruct.val
+// CHECK-NEXT:    store [[F]] to [init] [[SEA]]
+// CHECK:       } // end sil function 'load_take_exit_block_projected_address'
+sil [ossa] @load_take_exit_block_projected_address : $@convention(thin) (@owned NonTrivialStruct, Builtin.Int1) -> () {
+bb0(%0 : @owned $NonTrivialStruct, %1 : $Builtin.Int1):
+  %2 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = struct_element_addr %2 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %4 = load [take] %3 : $*Klass
+  destroy_value %4 : $Klass
+  dealloc_stack %2 : $*NonTrivialStruct
+  br bb3
+
+bb2:
+  %5 = function_ref @modify_nontrivialstruct : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  destroy_addr %2 : $*NonTrivialStruct
+  dealloc_stack %2 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The lifetime border (after the apply) is in a loop which doesn't contain the load and the
+// removed `load_borrow`. Don't insert a `load [take]` and a `store` into the loop.
+// CHECK-LABEL: @load_take_dont_store_back_in_loop :
+// CHECK:       bb2:
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    br bb1
+// CHECK:       bb3:
+// CHECK-NEXT:    load_borrow %2
+// CHECK:         load [take] %2
+// CHECK:       } // end sil function 'load_take_dont_store_back_in_loop'
+sil [ossa] @load_take_dont_store_back_in_loop : $@convention(thin) (@owned NonTrivialStruct, Builtin.Int1) -> () {
+bb0(%0 : @owned $NonTrivialStruct, %1 : $Builtin.Int1):
+  %2 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %2 : $*NonTrivialStruct
+  %4 = function_ref @modify_nontrivialstruct : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  br bb1
+
+bb1:
+  cond_br %1, bb2, bb3
+
+bb2:
+  %6 = apply %4(%2) : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  br bb1
+
+bb3:
+  %8 = load_borrow %2 : $*NonTrivialStruct
+  %9 = struct_extract %8 : $NonTrivialStruct, #NonTrivialStruct.val
+  %10 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %11 = apply %10(%9) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %8 : $NonTrivialStruct
+  %13 = load [take] %2 : $*NonTrivialStruct
+  destroy_value %13 : $NonTrivialStruct
+  dealloc_stack %2 : $*NonTrivialStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// Like `load_take_exit_block_projected_address`, but the load is within an access scope.
+// The address must be re-created from the `begin_access` and not from the access base.
+// Otherwise the inserted store would bypass the access scope, which breaks optimizations which
+// rely on the fact that all accesses within an access scope go through the `begin_access`.
+// CHECK-LABEL: @load_take_exit_block_address_in_access_scope :
+// CHECK:         [[BA:%.*]] = begin_access [modify] [dynamic] %{{[0-9]+}} : $*NonTrivialStruct
+// CHECK:         [[F:%.*]] = destructure_struct %1
+// CHECK:       bb2:
+// CHECK-NEXT:    [[SEA:%.*]] = struct_element_addr [[BA]] : $*NonTrivialStruct, #NonTrivialStruct.val
+// CHECK-NEXT:    store [[F]] to [init] [[SEA]]
+// CHECK:       } // end sil function 'load_take_exit_block_address_in_access_scope'
+sil [ossa] @load_take_exit_block_address_in_access_scope : $@convention(thin) (@owned NonTrivialStruct, @owned NonTrivialStruct, Builtin.Int1) -> () {
+bb0(%0 : @owned $NonTrivialStruct, %1 : @owned $NonTrivialStruct, %2 : $Builtin.Int1):
+  %3 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %3 : $*NonTrivialStruct
+  %4 = begin_access [modify] [dynamic] %3 : $*NonTrivialStruct
+  store %1 to [assign] %4 : $*NonTrivialStruct
+  cond_br %2, bb1, bb2
+
+bb1:
+  %5 = struct_element_addr %4 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %6 = load [take] %5 : $*Klass
+  destroy_value %6 : $Klass
+  br bb3
+
+bb2:
+  %7 = function_ref @modify_nontrivialstruct : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  %8 = apply %7(%4) : $@convention(thin) (@inout NonTrivialStruct) -> ()
+  destroy_addr %4 : $*NonTrivialStruct
+  br bb3
+
+bb3:
+  end_access %4 : $*NonTrivialStruct
+  dealloc_stack %3 : $*NonTrivialStruct
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// A contained `load_borrow` in a loop header. The available value of the `load_borrow`'s block is
+// located _after_ the `load_borrow`. Therefore the `load_borrow` must borrow the value which comes
+// into the block - and not the available value of its own block, which would create a cycle.
+// CHECK-LABEL: @load_borrow_with_available_value_after_it :
+// CHECK:       bb1([[PHI:%.*]] : @owned $Klass):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[PHI]]
+// CHECK:         [[NEW:%.*]] = apply %{{[0-9]+}}([[B]])
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[PHI]]
+// CHECK-NOT:     load_borrow
+// CHECK:       } // end sil function 'load_borrow_with_available_value_after_it'
+sil [ossa] @load_borrow_with_available_value_after_it : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  br bb1
+
+bb1:
+  %2 = load_borrow %1 : $*Klass
+  %3 = function_ref @borrow_and_produce_klass : $@convention(thin) (@guaranteed Klass) -> @owned Klass
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Klass) -> @owned Klass
+  end_borrow %2 : $Klass
+  destroy_addr %1 : $*Klass
+  fix_lifetime %4 : $Klass
+  store %4 to [init] %1 : $*Klass
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %5 = function_ref @test_rle_in_guaranteed_callee : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  destroy_addr %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// A `load_borrow` of the whole location, contained in the liverange of the `load [take]`.
+// CHECK-LABEL: @load_take_with_contained_load_borrow_of_whole_location :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK-NEXT:    unchecked_ref_cast [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_with_contained_load_borrow_of_whole_location'
+sil [ossa] @load_take_with_contained_load_borrow_of_whole_location : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = unchecked_ref_cast %2 : $Klass to $Builtin.NativeObject
+  end_borrow %2 : $Klass
+  %4 = load [take] %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %4 : $Klass
+}
+
+// The borrow scope of the contained `load_borrow` has multiple `end_borrow`s, all of them
+// within the liverange.
+// CHECK-LABEL: @load_take_with_contained_load_borrow_multiple_end_borrows :
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb3:
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_with_contained_load_borrow_multiple_end_borrows'
+sil [ossa] @load_take_with_contained_load_borrow_multiple_end_borrows : $@convention(thin) (@owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = load_borrow %2 : $*Klass
+  cond_br %1, bb1, bb2
+
+bb1:
+  end_borrow %3 : $Klass
+  br bb3
+
+bb2:
+  end_borrow %3 : $Klass
+  br bb3
+
+bb3:
+  %4 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %4 : $Klass
+}
+
+// With multiple available values the contained `load_borrow` borrows the phi which the
+// SSA updater creates for the available values.
+// CHECK-LABEL: @load_take_with_contained_load_borrow_multiple_available_values :
+// CHECK:       bb3([[P:%.*]] : @owned $Klass):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[P]]
+// CHECK-NEXT:    unchecked_ref_cast [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         return [[P]]
+// CHECK:       } // end sil function 'load_take_with_contained_load_borrow_multiple_available_values'
+sil [ossa] @load_take_with_contained_load_borrow_multiple_available_values : $@convention(thin) (@guaranteed Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @guaranteed $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  cond_br %1, bb1, bb2
+
+bb1:
+  %3 = copy_value %0 : $Klass
+  store %3 to [init] %2 : $*Klass
+  br bb3
+
+bb2:
+  %4 = copy_value %0 : $Klass
+  store %4 to [init] %2 : $*Klass
+  br bb3
+
+bb3:
+  %5 = load_borrow %2 : $*Klass
+  %6 = unchecked_ref_cast %5 : $Klass to $Builtin.NativeObject
+  end_borrow %5 : $Klass
+  %7 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %7 : $Klass
+}
+
+// Two `load_borrow`s in the liverange: one of the whole location and one of a sub-field.
+// CHECK-LABEL: @load_take_with_two_contained_load_borrows :
+// CHECK:         [[B1:%.*]] = begin_borrow %0
+// CHECK-NEXT:    end_borrow [[B1]]
+// CHECK:         [[B2:%.*]] = begin_borrow %0
+// CHECK-NEXT:    struct_extract [[B2]] : $NonTrivialStruct, #NonTrivialStruct.val
+// CHECK-NEXT:    end_borrow [[B2]]
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_with_two_contained_load_borrows'
+sil [ossa] @load_take_with_two_contained_load_borrows : $@convention(thin) (@owned NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %1 : $*NonTrivialStruct
+  %2 = load_borrow %1 : $*NonTrivialStruct
+  end_borrow %2 : $NonTrivialStruct
+  %3 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %4 = load_borrow %3 : $*Klass
+  end_borrow %4 : $Klass
+  %5 = load [take] %1 : $*NonTrivialStruct
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $NonTrivialStruct
+}
+
+// A contained `load_borrow` is also replaced if the load is a `load [copy]`. In this case the
+// `load_borrow` borrows the inserted copy of the available value.
+// CHECK-LABEL: @load_copy_with_contained_load_borrow :
+// CHECK:         [[C:%.*]] = copy_value %1
+// CHECK-NEXT:    store %1 to [assign] %0
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[C]]
+// CHECK-NEXT:    struct_extract [[B]] : $NonTrivialStruct, #NonTrivialStruct.val
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     load
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'load_copy_with_contained_load_borrow'
+sil [ossa] @load_copy_with_contained_load_borrow : $@convention(thin) (@inout NonTrivialStruct, @owned NonTrivialStruct) -> @owned NonTrivialStruct {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $NonTrivialStruct):
+  store %1 to [assign] %0 : $*NonTrivialStruct
+  %2 = load_borrow %0 : $*NonTrivialStruct
+  %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  end_borrow %2 : $NonTrivialStruct
+  %4 = load [copy] %0 : $*NonTrivialStruct
+  return %4 : $NonTrivialStruct
+}
+
+// A `load_borrow` of an unrelated location does not prevent the optimization and is not touched.
+// CHECK-LABEL: @load_take_with_load_borrow_of_unrelated_location :
+// CHECK-NOT:     load [take]
+// CHECK:         load_borrow %1
+// CHECK-NOT:     load [take]
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_with_load_borrow_of_unrelated_location'
+sil [ossa] @load_take_with_load_borrow_of_unrelated_location : $@convention(thin) (@owned Klass, @inout Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : $*Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = load_borrow %1 : $*Klass
+  %4 = unchecked_ref_cast %3 : $Klass to $Builtin.NativeObject
+  end_borrow %3 : $Klass
+  %5 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %5 : $Klass
+}
+
+// An `end_borrow` of a borrow scope which is not a `load_borrow` of the load's location does not
+// prevent the optimization.
+// CHECK-LABEL: @load_take_with_unrelated_borrow_scope :
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_take_with_unrelated_borrow_scope'
+sil [ossa] @load_take_with_unrelated_borrow_scope : $@convention(thin) (@owned Klass, @guaranteed Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : @guaranteed $Klass):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = begin_borrow %1 : $Klass
+  %4 = unchecked_ref_cast %3 : $Klass to $Builtin.NativeObject
+  end_borrow %3 : $Klass
+  %5 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %5 : $Klass
+}
+
+// Bail out: the `load_borrow` borrows a larger location than the one which is loaded.
+// Such a `load_borrow` cannot be replaced by a projection of the available value.
+// CHECK-LABEL: @load_take_with_load_borrow_of_larger_location :
+// CHECK:         load_borrow %1
+// CHECK:         load [take]
+// CHECK:       } // end sil function 'load_take_with_load_borrow_of_larger_location'
+sil [ossa] @load_take_with_load_borrow_of_larger_location : $@convention(thin) (@owned NonTrivialStruct) -> @owned Klass {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = alloc_stack $NonTrivialStruct
+  store %0 to [init] %1 : $*NonTrivialStruct
+  %2 = load_borrow %1 : $*NonTrivialStruct
+  %3 = struct_extract %2 : $NonTrivialStruct, #NonTrivialStruct.val
+  end_borrow %2 : $NonTrivialStruct
+  %4 = struct_element_addr %1 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %5 = load [take] %4 : $*Klass
+  dealloc_stack %1 : $*NonTrivialStruct
+  return %5 : $Klass
+}
+
+// Bail out: the borrow scope is not fully contained in the liverange, because the `end_borrow`
+// in bb2 is not reachable backward from the load.
+// CHECK-LABEL: @load_take_with_load_borrow_scope_not_contained :
+// CHECK:       bb1:
+// CHECK:         load [take] %2
+// CHECK:       bb2:
+// CHECK:         destroy_addr %2
+// CHECK:       } // end sil function 'load_take_with_load_borrow_scope_not_contained'
+sil [ossa] @load_take_with_load_borrow_scope_not_contained : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = load_borrow %2 : $*Klass
+  cond_br %1, bb1, bb2
+
+bb1:
+  end_borrow %3 : $Klass
+  %4 = load [take] %2 : $*Klass
+  destroy_value %4 : $Klass
+  dealloc_stack %2 : $*Klass
+  br bb3
+
+bb2:
+  end_borrow %3 : $Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  br bb3
+
+bb3:
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// Bail out: the borrow scope is ended by a reborrow (in bb2) and not by an `end_borrow`.
+// CHECK-LABEL: @load_take_with_reborrowed_load_borrow :
+// CHECK:         load_borrow %2
+// CHECK:         load [take] %2
+// CHECK:       } // end sil function 'load_take_with_reborrowed_load_borrow'
+sil [ossa] @load_take_with_reborrowed_load_borrow : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = load_borrow %2 : $*Klass
+  cond_br %1, bb1, bb2
+
+bb1:
+  end_borrow %3 : $Klass
+  %4 = load [take] %2 : $*Klass
+  destroy_value %4 : $Klass
+  dealloc_stack %2 : $*Klass
+  br bb4
+
+bb2:
+  br bb3(%3 : $Klass)
+
+bb3(%5 : @reborrow $Klass):
+  %6 = borrowed %5 : $Klass from ()
+  end_borrow %6 : $Klass
+  destroy_addr %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  br bb4
+
+bb4:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// Bail out: the `load_borrow` is not in the liverange, because the available value (the
+// `load [copy]`) is located between the `load_borrow` and the load.
+// CHECK-LABEL: @load_take_with_load_borrow_before_available_value :
+// CHECK:         load_borrow %1
+// CHECK:         load [take] %1
+// CHECK:       } // end sil function 'load_take_with_load_borrow_before_available_value'
+sil [ossa] @load_take_with_load_borrow_before_available_value : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1 : $*Klass
+  %2 = load_borrow %1 : $*Klass
+  %3 = load [copy] %1 : $*Klass
+  end_borrow %2 : $Klass
+  destroy_value %3 : $Klass
+  %4 = load [take] %1 : $*Klass
+  dealloc_stack %1 : $*Klass
+  return %4 : $Klass
+}
+
+// Bail out: one of the two available values (the `load [copy]` in bb1) is located inside the
+// borrow scope of the `load_borrow`.
+// CHECK-LABEL: @load_take_with_available_value_in_load_borrow_scope :
+// CHECK:         load_borrow %2
+// CHECK:       bb3:
+// CHECK:         load [take] %2
+// CHECK:       } // end sil function 'load_take_with_available_value_in_load_borrow_scope'
+sil [ossa] @load_take_with_available_value_in_load_borrow_scope : $@convention(thin) (@owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2 : $*Klass
+  %3 = load_borrow %2 : $*Klass
+  cond_br %1, bb1, bb2
+
+bb1:
+  %4 = load [copy] %2 : $*Klass
+  end_borrow %3 : $Klass
+  destroy_value %4 : $Klass
+  br bb3
+
+bb2:
+  end_borrow %3 : $Klass
+  br bb3
+
+bb3:
+  %5 = load [take] %2 : $*Klass
+  dealloc_stack %2 : $*Klass
+  return %5 : $Klass
+}
+
+// A `destroy_addr` is split into `destroy_addr`s of the fields, if the value is only available via
+// stores to the fields.
+// CHECK-LABEL: sil [ossa] @destroy_addr_with_available_field_values :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C1:%.*]] = copy_value %1
+// CHECK-NEXT:    br bb3([[C1]] : $Klass)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C2:%.*]] = copy_value %1
+// CHECK-NEXT:    br bb3([[C2]] : $Klass)
+// CHECK:       bb3([[A:%.*]] : @owned $Klass):
+// CHECK:         apply
+// CHECK-NOT:     destroy_addr
+// CHECK:         destroy_value [[A]]
+// CHECK:       } // end sil function 'destroy_addr_with_available_field_values'
+sil [ossa] @destroy_addr_with_available_field_values : $@convention(thin) (@inout NonTrivialStruct, @owned Klass) -> () {
+bb0(%0 : $*NonTrivialStruct, %1 : @owned $Klass):
+  %2 = struct_element_addr %0 : $*NonTrivialStruct, #NonTrivialStruct.val
+  %3 = load [take] %2 : $*Klass
+  destroy_value %3 : $Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = copy_value %1 : $Klass
+  store %5 to [init] %2 : $*Klass
+  br bb3
+
+bb2:
+  %8 = copy_value %1 : $Klass
+  store %8 to [init] %2 : $*Klass
+  br bb3
+
+bb3:
+  %11 = function_ref @use_Klass : $@convention(thin) (@owned Klass) -> ()
+  %12 = apply %11(%1) : $@convention(thin) (@owned Klass) -> ()
+  destroy_addr %0 : $*NonTrivialStruct
+  %14 = function_ref @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+  %15 = apply %14() : $@convention(thin) () -> @owned NonTrivialStruct
+  store %15 to [init] %0 : $*NonTrivialStruct
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// Trivial fields don't need a split `destroy_addr`.
+// CHECK-LABEL: sil [ossa] @destroy_addr_with_trivial_field :
+// CHECK:         [[K:%.*]] = apply
+// CHECK-NOT:     destroy_addr
+// CHECK:         destroy_value [[K]]
+// CHECK-NOT:     destroy_addr
+// CHECK:       } // end sil function 'destroy_addr_with_trivial_field'
+sil [ossa] @destroy_addr_with_trivial_field : $@convention(thin) (@guaranteed Klass, Int) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : $Int):
+  %2 = alloc_stack $Agg3
+  %c = copy_value %0 : $Klass
+  %3 = struct $Agg3 (%c : $Klass, %1 : $Int)
+  store %3 to [init] %2 : $*Agg3
+  %5 = struct_element_addr %2 : $*Agg3, #Agg3.k
+  %6 = load [take] %5 : $*Klass
+  destroy_value %6 : $Klass
+  %7 = function_ref @borrow_and_produce_klass : $@convention(thin) (@guaranteed Klass) -> @owned Klass
+  %8 = apply %7(%0) : $@convention(thin) (@guaranteed Klass) -> @owned Klass
+  store %8 to [init] %5 : $*Klass
+  destroy_addr %2 : $*Agg3
+  dealloc_stack %2 : $*Agg3
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// Don't split a `destroy_addr` if the fields are not available.
+// CHECK-LABEL: sil [ossa] @dont_split_destroy_addr :
+// CHECK:         destroy_addr %0 : $*TwoField
+// CHECK:       } // end sil function 'dont_split_destroy_addr'
+sil [ossa] @dont_split_destroy_addr : $@convention(thin) (@inout TwoField) -> () {
+bb0(%0 : $*TwoField):
+  destroy_addr %0 : $*TwoField
+  %2 = function_ref @init_twofield : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+  %3 = metatype $@thin TwoField.Type
+  %4 = apply %2(%3) : $@convention(thin) (@thin TwoField.Type) -> @owned TwoField
+  store %4 to [init] %0 : $*TwoField
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// The memory lifetime must not be shrunk into the reborrowed scope of a `load_borrow`.
+// CHECK-LABEL: sil [ossa] @dont_take_in_reborrowed_load_borrow_scope :
+// CHECK:       bb3([[R:%.*]] : @reborrow $Klass):
+// CHECK-NEXT:    [[B:%.*]] = borrowed [[R]] : $Klass from ()
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    load [take] %0
+// CHECK:       } // end sil function 'dont_take_in_reborrowed_load_borrow_scope'
+sil [ossa] @dont_take_in_reborrowed_load_borrow_scope : $@convention(thin) (@inout Klass, @owned Klass) -> () {
+bb0(%0 : $*Klass, %1 : @owned $Klass):
+  %2 = load_borrow %0 : $*Klass
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%2 : $Klass)
+
+bb2:
+  end_borrow %2 : $Klass
+  destroy_value %1 : $Klass
+  br bb4
+
+bb3(%7 : @reborrow $Klass):
+  %8 = borrowed %7 : $Klass from ()
+  end_borrow %8 : $Klass
+  %10 = load_borrow %0 : $*Klass
+  end_borrow %10 : $Klass
+  destroy_addr %0 : $*Klass
+  store %1 to [init] %0 : $*Klass
+  br bb4
+
+bb4:
+  %15 = tuple ()
+  return %15 : $()
+}
+
+sil @get_klass : $@convention(thin) () -> @owned Klass
+sil @use_klass_no_effects : $@convention(thin) (@guaranteed Klass) -> () {
+  [global: ]
+}
+sil @modify_klass : $@convention(thin) (@inout Klass) -> ()
+
+// A `load [take]` can shrink the memory lifetime up to a `load [copy]` in a `modify` access scope.
+// CHECK-LABEL: sil [ossa] @load_take_after_load_copy_in_modify_access :
+// CHECK:         [[A:%.*]] = begin_access [modify] [static] %0
+// CHECK-NEXT:    [[L:%.*]] = load [take] [[A]]
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[L]]
+// CHECK:         tuple ([[L]] : $Klass, [[C]] : $Klass)
+// CHECK-LABEL: } // end sil function 'load_take_after_load_copy_in_modify_access'
+sil [ossa] @load_take_after_load_copy_in_modify_access : $@convention(thin) (@inout Klass) -> (@owned Klass, @owned Klass) {
+bb0(%0 : $*Klass):
+  %1 = begin_access [modify] [static] %0
+  %2 = load [copy] %1
+  %3 = load [take] %1
+  %4 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %5 = apply %4() : $@convention(thin) () -> @owned Klass
+  store %5 to [init] %1
+  end_access %1
+  %8 = tuple (%2, %3)
+  return %8
+}
+
+// The dead-end block reads the memory. Therefore the value must be stored back instead of
+// destroying it with a `destroy_value [dead_end]`.
+// CHECK-LABEL: sil [ossa] @load_take_with_reading_dead_end_block :
+// CHECK:       bb1:
+// CHECK-NEXT:    dealloc_stack
+// CHECK-NEXT:    return %0
+// CHECK:       bb2:
+// CHECK-NEXT:    store %0 to [init] %2
+// CHECK-NEXT:    load_borrow %2
+// CHECK-LABEL: } // end sil function 'load_take_with_reading_dead_end_block'
+sil [ossa] @load_take_with_reading_dead_end_block : $@convention(thin) (@owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2
+  cond_br %1, bb1, bb2
+bb1:
+  %4 = load [take] %2
+  dealloc_stack %2
+  return %4
+bb2:
+  %6 = load_borrow %2
+  %7 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %6
+  unreachable
+}
+
+// The address of a global cannot be re-created in the exit block (bb2) to store back the value.
+// CHECK-LABEL: sil [ossa] @load_take_exit_block_global_address :
+// CHECK:         store %0 to [assign] %2
+// CHECK:       bb1:
+// CHECK-NEXT:    load [take] %2
+// CHECK-LABEL: } // end sil function 'load_take_exit_block_global_address'
+sil [ossa] @load_take_exit_block_global_address : $@convention(thin) (@owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = global_addr @total_klass : $*Klass
+  store %0 to [assign] %2
+  cond_br %1, bb1, bb2
+bb1:
+  %5 = load [take] %2
+  %6 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %7 = apply %6() : $@convention(thin) () -> @owned Klass
+  store %7 to [init] %2
+  br bb3(%5)
+bb2:
+  %10 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %11 = apply %10() : $@convention(thin) () -> @owned Klass
+  br bb3(%11)
+bb3(%13 : @owned $Klass):
+  return %13
+}
+
+// The base address of the load (%5) doesn't dominate the exit block (bb2). Therefore the
+// address cannot be re-created in the exit block to store back the value.
+// CHECK-LABEL: sil [ossa] @load_take_exit_block_not_dominated_by_base :
+// CHECK:         store %1 to [assign] %3
+// CHECK:       bb1:
+// CHECK-NEXT:    [[A:%.*]] = ref_element_addr %0
+// CHECK-NEXT:    load [take] [[A]]
+// CHECK-LABEL: } // end sil function 'load_take_exit_block_not_dominated_by_base'
+sil [ossa] @load_take_exit_block_not_dominated_by_base : $@convention(thin) (@guaranteed AB, @owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @guaranteed $AB, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = ref_element_addr %0, #AB.value
+  store %1 to [assign] %3
+  cond_br %2, bb1, bb2
+bb1:
+  %5 = ref_element_addr %0, #AB.value
+  %6 = load [take] %5
+  %7 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %8 = apply %7() : $@convention(thin) () -> @owned Klass
+  store %8 to [init] %5
+  br bb3(%6)
+bb2:
+  %11 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %12 = apply %11() : $@convention(thin) () -> @owned Klass
+  br bb3(%12)
+bb3(%14 : @owned $Klass):
+  return %14
+}
+
+// The exit block (bb2) is outside the borrow scope of the class reference. Therefore the
+// address cannot be re-created in the exit block to store back the value.
+// CHECK-LABEL: sil [ossa] @load_take_exit_block_outside_borrow_scope :
+// CHECK:         store %1 to [assign] %4
+// CHECK:       bb1:
+// CHECK-NEXT:    load [take] %4
+// CHECK-LABEL: } // end sil function 'load_take_exit_block_outside_borrow_scope'
+sil [ossa] @load_take_exit_block_outside_borrow_scope : $@convention(thin) (@owned AB, @owned Klass, Builtin.Int1) -> @owned Klass {
+bb0(%0 : @owned $AB, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = begin_borrow %0
+  %4 = ref_element_addr %3, #AB.value
+  store %1 to [assign] %4
+  cond_br %2, bb1, bb2
+bb1:
+  %6 = load [take] %4
+  %7 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %8 = apply %7() : $@convention(thin) () -> @owned Klass
+  store %8 to [init] %4
+  end_borrow %3
+  destroy_value %0
+  br bb3(%6)
+bb2:
+  end_borrow %3
+  destroy_value %0
+  %14 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %15 = apply %14() : $@convention(thin) () -> @owned Klass
+  br bb3(%15)
+bb3(%17 : @owned $Klass):
+  return %17
+}
+
+// The lifetime border after the `apply` in bb2 is outside the access scope of the load.
+// Therefore the address cannot be re-created there to insert a new load.
+// CHECK-LABEL: sil [ossa] @lifetime_border_outside_access_scope :
+// CHECK:       bb1:
+// CHECK:         load_borrow
+// CHECK:         load [copy]
+// CHECK:       bb2:
+// CHECK:         = function_ref @modify_klass
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    br bb1
+// CHECK-LABEL: } // end sil function 'lifetime_border_outside_access_scope'
+sil [ossa] @lifetime_border_outside_access_scope : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Klass
+  store %0 to [init] %2
+  br bb1
+bb1:
+  %4 = begin_access [modify] [static] %2
+  %5 = load_borrow %4
+  %6 = function_ref @use_klass_no_effects : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5
+  %9 = load [copy] %4
+  %10 = apply %6(%9) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %9
+  end_access %4
+  cond_br %1, bb2, bb3
+bb2:
+  %14 = function_ref @modify_klass : $@convention(thin) (@inout Klass) -> ()
+  %15 = apply %14(%2) : $@convention(thin) (@inout Klass) -> ()
+  br bb1
+bb3:
+  %17 = function_ref @modify_klass : $@convention(thin) (@inout Klass) -> ()
+  %18 = apply %17(%2) : $@convention(thin) (@inout Klass) -> ()
+  destroy_addr %2
+  dealloc_stack %2
+  %21 = tuple ()
+  return %21
+}
+
+// A `destroy_addr` of a tuple is split to make it redundant with a store to a tuple element.
+// CHECK-LABEL: sil [ossa] @split_destroy_addr_of_tuple :
+// CHECK:         [[E0:%.*]] = tuple_element_addr %0 : $*(Klass, Klass), 0
+// CHECK-NEXT:    destroy_addr [[E0]]
+// CHECK-NOT:     store
+// CHECK:         destroy_value %1
+// CHECK:         [[E1:%.*]] = tuple_element_addr %0 : $*(Klass, Klass), 1
+// CHECK-NEXT:    destroy_addr [[E1]]
+// CHECK-LABEL: } // end sil function 'split_destroy_addr_of_tuple'
+sil [ossa] @split_destroy_addr_of_tuple : $@convention(thin) (@in (Klass, Klass), @owned Klass) -> () {
+bb0(%0 : $*(Klass, Klass), %1 : @owned $Klass):
+  %2 = tuple_element_addr %0, 0
+  store %1 to [assign] %2
+  destroy_addr %0
+  %5 = tuple ()
+  return %5
+}
+
+sil @use_twofield_no_effects : $@convention(thin) (@guaranteed TwoField) -> () {
+  [global: ]
+}
+sil @get_twofield : $@convention(thin) () -> @owned TwoField
+sil @use_twofield_addr : $@convention(thin) (@in_guaranteed TwoField) -> ()
+
+// The lifetime border is inside a read-only access scope.
+// CHECK-LABEL: sil [ossa] @load_take_lifetime_border_in_read_access :
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] %1
+// CHECK-NEXT:    struct_element_addr [[A]]
+// CHECK-NEXT:    end_access [[A]]
+// CHECK:         load [take] %1
+// CHECK-LABEL: } // end sil function 'load_take_lifetime_border_in_read_access'
+sil [ossa] @load_take_lifetime_border_in_read_access : $@convention(thin) (@owned TwoField) -> (@owned Klass, @owned TwoField) {
+bb0(%0 : @owned $TwoField):
+  %1 = alloc_stack $TwoField
+  store %0 to [init] %1
+  %3 = begin_access [read] [dynamic] %1
+  %4 = struct_element_addr %3, #TwoField.a
+  %5 = load [copy] %4
+  end_access %3
+  %7 = load_borrow %1
+  %8 = function_ref @use_twofield_no_effects : $@convention(thin) (@guaranteed TwoField) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed TwoField) -> ()
+  end_borrow %7
+  %11 = load [take] %1
+  dealloc_stack %1
+  %13 = tuple (%5, %11)
+  return %13
+}
+
+// The available load is inside a read-only access scope, but its address is not derived from the scope.
+// CHECK-LABEL: sil [ossa] @load_take_available_load_in_read_access :
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] %0
+// CHECK-NEXT:    load [copy] %0
+// CHECK-NEXT:    end_access [[A]]
+// CHECK-NEXT:    load [take] %0
+// CHECK-LABEL: } // end sil function 'load_take_available_load_in_read_access'
+sil [ossa] @load_take_available_load_in_read_access : $@convention(thin) (@in TwoField) -> (@owned TwoField, @owned TwoField) {
+bb0(%0 : $*TwoField):
+  %1 = begin_access [read] [dynamic] %0
+  %2 = load [copy] %0
+  end_access %1
+  %4 = load [take] %0
+  %5 = tuple (%2, %4)
+  return %5
+}
+
+// The store-back in the exit block (bb1) would be inside a read-only access scope.
+// CHECK-LABEL: sil [ossa] @load_take_exit_block_in_read_access :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_access
+// CHECK:       bb2:
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    load [take] %2
+// CHECK-LABEL: } // end sil function 'load_take_exit_block_in_read_access'
+sil [ossa] @load_take_exit_block_in_read_access : $@convention(thin) (@owned TwoField, Builtin.Int1) -> @owned TwoField {
+bb0(%0 : @owned $TwoField, %1 : $Builtin.Int1):
+  %2 = alloc_stack $TwoField
+  store %0 to [init] %2
+  %4 = begin_access [read] [dynamic] %2
+  cond_br %1, bb1, bb2
+bb1:
+  end_access %4
+  %7 = function_ref @use_twofield_addr : $@convention(thin) (@in_guaranteed TwoField) -> ()
+  %8 = apply %7(%2) : $@convention(thin) (@in_guaranteed TwoField) -> ()
+  destroy_addr %2
+  %10 = function_ref @get_twofield : $@convention(thin) () -> @owned TwoField
+  %11 = apply %10() : $@convention(thin) () -> @owned TwoField
+  br bb3(%11)
+bb2:
+  end_access %4
+  %14 = load [take] %2
+  br bb3(%14)
+bb3(%16 : @owned $TwoField):
+  dealloc_stack %2
+  return %16
+}
+
+sil [ossa] @closure_reading_klass : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load_borrow %0
+  %2 = function_ref @use_klass_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1
+  %5 = tuple ()
+  return %5
+}
+
+sil [ossa] @call_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> ()):
+  %1 = apply %0() : $@noescape @callee_guaranteed () -> ()
+  %2 = tuple ()
+  return %2
+}
+
+// The on-stack closure captures the address and reads from it when it's called. Therefore
+// the `destroy_addr` must not be combined with the `load [copy]` to a `load [take]`.
+//
+// CHECK-LABEL: sil [ossa] @dont_take_memory_captured_by_on_stack_closure :
+// CHECK-NOT:     load [take]
+// CHECK:         [[C:%.*]] = mark_dependence [nonescaping]
+// CHECK-NOT:     load [take]
+// CHECK:         apply {{%.*}}([[C]])
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-LABEL: } // end sil function 'dont_take_memory_captured_by_on_stack_closure'
+sil [ossa] @dont_take_memory_captured_by_on_stack_closure : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1
+  %3 = function_ref @closure_reading_klass : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %5 = mark_dependence [nonescaping] %4 on %1
+  %6 = load [copy] %1
+  %7 = function_ref @call_noescape_closure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %5
+  destroy_addr %1
+  dealloc_stack %1
+  return %6
+}

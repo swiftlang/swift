@@ -1116,14 +1116,9 @@ bb6:
   br bb3
 }
 
-// Make sure the first load in bb1 is not eliminated as we have
-// this unreachable block which will have a liveout of nil.
-// we make this in the context of a loop, because we want to run an
-// optimistic data flow.
-//
 // CHECK-LABEL: sil @load_to_load_loop_with_unreachable_block
 // CHECK: bb1:
-// CHECK: = load
+// CHECK-NOT: load
 // CHECK: cond_br
 sil @load_to_load_loop_with_unreachable_block : $@convention(thin) () -> () {
 bb0:
@@ -1541,4 +1536,32 @@ bb0(%0 : $CastBase):
   %6 = load %5
   %7 = tuple (%3, %6)
   return %7
+}
+
+// `destroy_addr` is only handled in OSSA.
+// CHECK-LABEL: sil @dont_handle_destroy_addr_after_store_in_non_ossa :
+// CHECK:         store %0 to %1
+// CHECK-NEXT:    destroy_addr %1
+// CHECK-LABEL: } // end sil function 'dont_handle_destroy_addr_after_store_in_non_ossa'
+sil @dont_handle_destroy_addr_after_store_in_non_ossa : $@convention(thin) (@owned B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_stack $B
+  store %0 to %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @dont_handle_destroy_addr_after_load_in_non_ossa :
+// CHECK:         load %0
+// CHECK:         destroy_addr %0
+// CHECK-LABEL: } // end sil function 'dont_handle_destroy_addr_after_load_in_non_ossa'
+sil @dont_handle_destroy_addr_after_load_in_non_ossa : $@convention(thin) (@in B) -> () {
+bb0(%0 : $*B):
+  %1 = load %0
+  fix_lifetime %1
+  destroy_addr %0
+  %r = tuple ()
+  return %r
 }

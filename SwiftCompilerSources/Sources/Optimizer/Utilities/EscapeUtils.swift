@@ -1096,8 +1096,10 @@ private extension PartialApplyInst {
     }
     switch conv {
     case .indirectIn, .indirectInGuaranteed:
-      // A partial_apply copies the values from indirect-in arguments, but does not capture the address.
-      return false
+      // An escaping partial_apply copies the values from indirect-in arguments, but does not capture the
+      // address. In contrast, the context of an on-stack partial_apply does not own its captured values.
+      // It just captures the address and the closure reads from the address when it is called.
+      return isOnStack
     case .indirectInout, .indirectInoutAliasable, .packInout:
       return true
     case .directOwned, .directUnowned, .directGuaranteed, .packOwned, .packGuaranteed:
