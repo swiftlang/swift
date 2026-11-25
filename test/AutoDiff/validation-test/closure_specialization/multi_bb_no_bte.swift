@@ -2,20 +2,15 @@
 
 // REQUIRES: executable_test
 
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/none.out -Onone
-// RUN: %target-build-swift %s -o %t/opt.out  -O
-// RUN: %target-codesign %t/none.out
-// RUN: %target-codesign %t/opt.out
-// RUN: %target-run %t/none.out
-// RUN: %target-run %t/opt.out
+// RUN: %target-run-simple-swift(-Onone)
+// RUN: %target-run-simple-swift(-O)
 
 // RUN: %target-swift-frontend -emit-sil %s -O -o %t/out.sil
 
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK1
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK2
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK3
-// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
+// RUN: %FileCheck %s < %t/out.sil --check-prefix=CHECK1
+// RUN: %FileCheck %s < %t/out.sil --check-prefix=CHECK2
+// RUN: %FileCheck %s < %t/out.sil --check-prefix=CHECK3
+// RUN: %FileCheck %s < %t/out.sil --check-prefix=CHECK4
 
 import DifferentiationUnittest
 import StdlibUnittest
@@ -25,18 +20,19 @@ var AutoDiffClosureSpecMultiBBNoBTETests = TestSuite("AutoDiffClosureSpecMultiBB
 typealias FloatArrayTan = Array<Float>.TangentVector
 
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
-  // CHECK1-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating1 #1 (_:_:)
-  // CHECK1-NEXT: {{^}}// Isolation: nonisolated
-  // CHECK1-NEXT:  sil private @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
-  // CHECK1:         %[[#E52:]] = function_ref @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr094$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbN8TRSf_TG5SfSa16_DifferentiationAE0J0RzlE0jQ0VySf_GIegno_ADSfAIIegno_07$sSf16_Z65E7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ADSfAIIegno_AJTf1nnEEcEc_n07$sSa16_z4AA14j33RzlE13_vjpSubscript5indexx5value_l7A2aBRzlo2B4q4Vy13g45VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Y0ACSiAkCSiAkCSiTf1nnEEE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK1:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK1:         %[[#E55:]] = tuple (%[[#]], %[[#E53]])
-  // CHECK1:         return %[[#E55]]
-  // CHECK1:       } // end sil function '$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr'
+  // CHECK1-LABEL:    {{^}}// reverse-mode derivative of sumFirstThreeConcatenating1 #1 (_:_:)
+  // CHECK1-NEXT:     {{^}}// Isolation: nonisolated
+  // CHECK1-NEXT:     sil private @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
+  // CHECK1:            // function_ref specialized pullback of sumFirstThreeConcatenating1 #1 (_:_:) in closure #1 in
+  // CHECK1-NEXT:       %[[#E52:]] = function_ref @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr094$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbN8TRSf_TG5SfSa16_DifferentiationAE0J0RzlE0jQ0VySf_GIegno_ADSfAIIegno_07$sSf16_Z65E7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ADSfAIIegno_AJTf1nnEEcEc_n07$sSa16_z4AA14j33RzlE13_vjpSubscript5indexx5value_l7A2aBRzlo2B4q4Vy13g45VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Y0ACSiAkCSiAkCSiTf1nnEEE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK1:            %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK1:            %[[#E55:]] = tuple (%[[#]], %[[#E53]])
+  // CHECK1:            return %[[#E55]]
+  // CHECK1:          } // end sil function '$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr'
 
-  // CHECK1-NONE:  {{^}}// pullback of sumFirstThreeConcatenating1
-  // CHECK1:       {{^}}// specialized pullback of sumFirstThreeConcatenating1
-  // CHECK1:       sil private {{.*}}@$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr094$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbN8TRSf_TG5SfSa16_DifferentiationAE0J0RzlE0jQ0VySf_GIegno_ADSfAIIegno_07$sSf16_Z65E7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ADSfAIIegno_AJTf1nnEEcEc_n07$sSa16_z4AA14j33RzlE13_vjpSubscript5indexx5value_l7A2aBRzlo2B4q4Vy13g45VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Y0ACSiAkCSiAkCSiTf1nnEEE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
+  // CHECK1-NONE:     {{^}}// pullback of sumFirstThreeConcatenating1
+  // CHECK1:          {{^}}// specialized pullback of sumFirstThreeConcatenating1
+  // CHECK1:          sil private {{.*}}@$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr094$s13TangentVector16_Differentiation14DifferentiablePQzSaA2bCRzlE0D4ViewVyAE_GIegno_AeHIegno_AbN8TRSf_TG5SfSa16_DifferentiationAE0J0RzlE0jQ0VySf_GIegno_ADSfAIIegno_07$sSf16_Z65E7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ADSfAIIegno_AJTf1nnEEcEc_n07$sSa16_z4AA14j33RzlE13_vjpSubscript5indexx5value_l7A2aBRzlo2B4q4Vy13g45VectorQz_GAIc8pullbacktSi_tFAKL_yAjiaBRzlFSf_Y0ACSiAkCSiAkCSiTf1nnEEE_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
   func sumFirstThreeConcatenating1(_ a: [Float], _ b: [Float]) -> Float {
     let c = a + b
     return c[0] + c[1] + c[2]
@@ -54,18 +50,19 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
 }
 
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test2") {
-  // CHECK2-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating2 #1 (_:_:)
-  // CHECK2-NEXT: {{^}}// Isolation: nonisolated
-  // CHECK2-NEXT:  sil private @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
-  // CHECK2:         %[[#E52:]] = function_ref @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si04$s13v26Vector16_Differentiation14j3PQzo7A2bCRzlr2D4T35VyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5SfSa01_H0AF0J0RzlE0jT0VySf_GIegno_AESfAJIegno_0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AESfAJIegno_AKTf1nEEEcEc_n0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAlCSiAlCSiTf1nnEEE_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK2:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
-  // CHECK2:         %[[#E55:]] = tuple (%[[#]], %[[#E53]])
-  // CHECK2:         return %[[#E55]]
-  // CHECK2:       } // end sil function '$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr'
+  // CHECK2-LABEL:    {{^}}// reverse-mode derivative of sumFirstThreeConcatenating2 #1 (_:_:)
+  // CHECK2-NEXT:     {{^}}// Isolation: nonisolated
+  // CHECK2-NEXT:     sil private @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
+  // CHECK2:            // function_ref specialized pullback of sumFirstThreeConcatenating2 #1 (_:_:) in closure #2 in
+  // CHECK2-NEXT:       %[[#E52:]] = function_ref @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si04$s13v26Vector16_Differentiation14j3PQzo7A2bCRzlr2D4T35VyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5SfSa01_H0AF0J0RzlE0jT0VySf_GIegno_AESfAJIegno_0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AESfAJIegno_AKTf1nEEEcEc_n0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAlCSiAlCSiTf1nnEEE_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK2:            %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
+  // CHECK2:            %[[#E55:]] = tuple (%[[#]], %[[#E53]])
+  // CHECK2:            return %[[#E55]]
+  // CHECK2:          } // end sil function '$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr'
 
-  // CHECK2-NONE:  {{^}}// pullback of sumFirstThreeConcatenating2
-  // CHECK2:       {{^}}// specialized pullback of sumFirstThreeConcatenating2
-  // CHECK2:       sil private {{.*}}@$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si04$s13v26Vector16_Differentiation14j3PQzo7A2bCRzlr2D4T35VyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5SfSa01_H0AF0J0RzlE0jT0VySf_GIegno_AESfAJIegno_0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AESfAJIegno_AKTf1nEEEcEc_n0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAlCSiAlCSiTf1nnEEE_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
+  // CHECK2-NONE:     {{^}}// pullback of sumFirstThreeConcatenating2
+  // CHECK2:          {{^}}// specialized pullback of sumFirstThreeConcatenating2
+  // CHECK2:          sil private {{.*}}@$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si04$s13v26Vector16_Differentiation14j3PQzo7A2bCRzlr2D4T35VyAE_GIegno_AeHIegno_AbCRzlTRSf_TG5SfSa01_H0AF0J0RzlE0jT0VySf_GIegno_AESfAJIegno_0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AESfAJIegno_AKTf1nEEEcEc_n0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAlCSiAlCSiTf1nnEEE_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView) {
 
   func sumFirstThreeConcatenating2(_ a: [Float], _ b: [Float]) -> Float {
     var c = a
@@ -114,18 +111,19 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test3") {
     var y: Float = 4
   }
 
-  // CHECK3:       {{^}}// reverse-mode derivative of multiply #1 (_:)
-  // CHECK3-NEXT: {{^}}// Isolation: nonisolated
-  // CHECK3-NEXT:  sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr : $@convention(thin) (RealPropertyWrappers) -> (Float, @owned @callee_guaranteed (Float) -> RealPropertyWrappers.TangentVector) {
-  // CHECK3:         %[[#A22:]] = function_ref @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
-  // CHECK3:         %[[#A23:]] = partial_apply [callee_guaranteed] %[[#A22]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
-  // CHECK3:         %[[#A24:]] = tuple (%[[#]], %[[#A23]])
-  // CHECK3:         return %[[#A24]]
-  // CHECK3:       } // end sil function '$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr'
+  // CHECK3:          {{^}}// reverse-mode derivative of multiply #1 (_:)
+  // CHECK3-NEXT:     {{^}}// Isolation: nonisolated
+  // CHECK3-NEXT:     sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr : $@convention(thin) (RealPropertyWrappers) -> (Float, @owned @callee_guaranteed (Float) -> RealPropertyWrappers.TangentVector) {
+  // CHECK3:            // function_ref specialized pullback of multiply #1 (_:) in closure #3 in
+  // CHECK3-NEXT:       %[[#A22:]] = function_ref @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
+  // CHECK3:            %[[#A23:]] = partial_apply [callee_guaranteed] %[[#A22]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
+  // CHECK3:            %[[#A24:]] = tuple (%[[#]], %[[#A23]])
+  // CHECK3:            return %[[#A24]]
+  // CHECK3:          } // end sil function '$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr'
 
-  // CHECK3-NONE:  {{^}}// pullback of multiply
-  // CHECK3:       {{^}}// specialized pullback of multiply
-  // CHECK3:       sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector {
+  // CHECK3-NONE:     {{^}}// pullback of multiply
+  // CHECK3:          {{^}}// specialized pullback of multiply
+  // CHECK3:          sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktt1_u5FZSf_U6SfcfU_S2fTf1ncE_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector {
 
   @differentiable(reverse)
   func multiply(_ s: RealPropertyWrappers) -> Float {
@@ -162,14 +160,15 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test4") {
     }
   }
 
-  // CHECK4-LABEL: {{^}}// reverse-mode derivative of methodWrapper #1 (_:)
-  // CHECK4-NEXT: {{^}}// Isolation: nonisolated
-  // CHECK4-NEXT:  sil private @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
-  // CHECK4:         %[[#C39:]] = function_ref @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJpSpSr014$s3outyycfU2_5D21L_V6methodSfyFTJpSpSrAA05_AD__ef2_5d2L_gH24F_bb3__Pred__src_0_wrt_033_E588B908471A5F020CF23EC392ADD7D3LLOTf1nE_n : $@convention(thin) (Float, @owned _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector 
-  // CHECK4:         %[[#C40:]] = partial_apply [callee_guaranteed] %[[#C39]](%[[#]]) : $@convention(thin) (Float, @owned _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector
-  // CHECK4:         %[[#C42:]] = tuple (%[[#]], %[[#C40]])
-  // CHECK4:         return %[[#C42]]
-  // CHECK4:       } // end sil function '$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJrSpSr'
+  // CHECK4-LABEL:    {{^}}// reverse-mode derivative of methodWrapper #1 (_:)
+  // CHECK4-NEXT:     {{^}}// Isolation: nonisolated
+  // CHECK4-NEXT:     sil private @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
+  // CHECK4:            // function_ref specialized pullback of methodWrapper #1 (_:) in closure #4 in
+  // CHECK4-NEXT:       %[[#C39:]] = function_ref @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJpSpSr014$s3outyycfU2_5d29L_V6methodSfyFTJpSpSr00176_40ef2_5d2L_gh4FTJrj16Sr$s3out111_AD__ef2_5d2L_gH95F_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2ec29a16599e181dbf335cf4de139116OD_hvCFFefufzeTf1nb_nAA01_n2__ef2_5d2L_gh2F_o2__p2__q3_0_r3_0_s1_t3_1_u4_1_2V0OTf1nE_n : $@convention(thin) (Float, _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2ec29a16599e181dbf335cf4de139116) -> Class.TangentVector
+  // CHECK4:            %[[#C40:]] = partial_apply [callee_guaranteed] %[[#C39]](%[[#]]) : $@convention(thin) (Float, _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2ec29a16599e181dbf335cf4de139116) -> Class.TangentVector
+  // CHECK4:            %[[#C42:]] = tuple (%[[#]], %[[#C40]])
+  // CHECK4:            return %[[#C42]]
+  // CHECK4:          } // end sil function '$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJrSpSr'
 
   /// TODO: even though branch tracing enum is not passed to top-level pullback
   /// directly, it is captured by one of the closures which was specialized.
@@ -177,9 +176,9 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test4") {
   /// pullback. Specializing closures passed as payload tuple elements of the enum
   /// is currently not supported.
 
-  // CHECK4-NONE:  {{^}}// pullback of methodWrapper
-  // CHECK4:       {{^}}// specialized pullback of methodWrapper
-  // CHECK4:       sil private @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJpSpSr014$s3outyycfU2_5D21L_V6methodSfyFTJpSpSrAA05_AD__ef2_5d2L_gH24F_bb3__Pred__src_0_wrt_033_E588B908471A5F020CF23EC392ADD7D3LLOTf1nE_n : $@convention(thin) (Float, @owned _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector {
+  // CHECK4-NONE:     {{^}}// pullback of methodWrapper
+  // CHECK4:          {{^}}// specialized pullback of methodWrapper
+  // CHECK4:          sil private @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJpSpSr014$s3outyycfU2_5d29L_V6methodSfyFTJpSpSr00176_40ef2_5d2L_gh4FTJrj16Sr$s3out111_AD__ef2_5d2L_gH95F_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2ec29a16599e181dbf335cf4de139116OD_hvCFFefufzeTf1nb_nAA01_n2__ef2_5d2L_gh2F_o2__p2__q3_0_r3_0_s1_t3_1_u4_1_2V0OTf1nE_n : $@convention(thin) (Float, _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2ec29a16599e181dbf335cf4de139116) -> Class.TangentVector {
 
   @differentiable(reverse)
   func methodWrapper(_ x: Class) -> Float {

@@ -1,0 +1,172 @@
+// Derived from test/AutoDiff/validation-test/closure_specialization/pullback_captures_pipeline.swift.
+
+// Retain the boxed callback while specializing the other branch's captures.
+
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization -dce %s -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+@differentiable(reverse, wrt: x)
+@inline(never) public func boxedSquare(_ x: Float) -> Float
+
+@derivative(of: boxedSquare, wrt: x)
+@inline(__always) public func boxedSquareVJP(_ x: Float) -> (value: Float, pullback: (Float) -> Float)
+
+@differentiable(reverse, wrt: x)
+public func branch(_ x: Float, _ flag: Bool) -> Float
+
+@usableFromInline
+@frozen enum _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@usableFromInline
+@frozen enum _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+// CHECK-LABEL:     {{^}}enum _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_dac56b2102ece0fca8f80fd3e9542c57 {
+// CHECK-NEXT:        case bb2((predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, (Float, Float), (Float, Float)))
+// CHECK:             case bb1((predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, {{(@callee_guaranteed )?}}(Float) -> Float))
+// CHECK-LABEL:     {{^}}}
+@usableFromInline
+@frozen enum _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, (Float) -> (Float, Float), (Float) -> (Float, Float)))
+  case bb1((predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, (Float) -> Float))
+}
+
+// closure #1 in boxedSquareVJP(_:)
+sil [heuristic_always_inline] @$s16PullbackCaptures14boxedSquareVJPySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, @guaranteed { var Float }, Float) -> Float {
+} // end sil function '$s16PullbackCaptures14boxedSquareVJPySf5value_S2fc8pullbacktSfFS2fcfU_'
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of branch(_:_:)
+// CHECK-NOT:       {{^sil }}
+// CHECK:           {{^}}sil [ossa] @$s16PullbackCaptures6branchyS2f_SbtFTJrSUpSr :
+// CHECK:             %[[#BOX:]] = alloc_box ${ var Float }
+// CHECK:             // function_ref closure #1 in boxedSquareVJP(_:)
+// CHECK-NEXT:        %[[#ROOT:]] = function_ref @$s16PullbackCaptures14boxedSquareVJPySf5value_S2fc8pullbacktSfFS2fcfU_ :
+// CHECK-NEXT:        %[[#COPY:]] = copy_value %[[#BOX]]
+// CHECK-NEXT:        %[[#CALLBACK:]] = partial_apply [callee_guaranteed] %[[#ROOT]](%[[#COPY]],
+// CHECK:             tuple {{.*}}%[[#CALLBACK]])
+// CHECK:           bb2:
+// CHECK-NOT:         partial_apply
+// CHECK:             enum $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_dac56b2102ece0fca8f80fd3e9542c57, #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_dac56b2102ece0fca8f80fd3e9542c57.bb2!enumelt,
+// CHECK:             // function_ref specialized pullback of branch(_:_:)
+// CHECK-NEXT:        %[[#]] = function_ref @$s16PullbackCaptures6branchyS2f_SbtFTJpSUpSr00180_44$s16PullbackCaptures6branchyS2f_SbtFTJrSUpSr$s4main110_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_dac56b2102ece0fca8f80fd3e9542c57OD_AGCDHeryfDeTf1nb_n :
+// CHECK:             return
+// reverse-mode derivative of branch(_:_:)
+sil [ossa] @$s16PullbackCaptures6branchyS2f_SbtFTJrSUpSr : $@convention(thin) (Float, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $Bool):
+  %4 = struct_extract %1, #Bool._value
+  %5 = tuple ()
+  cond_br %4, bb1, bb2
+
+bb1:
+  %7 = enum $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %5
+  %9 = alloc_box ${ var Float }, var, name "factor"
+  %10 = project_box %9, 0
+  %11 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
+  %12 = struct_extract %0, #Float._value
+  %13 = builtin "fmul_FPIEEE32"(%11, %12) : $Builtin.FPIEEE32
+  %14 = struct $Float (%13)
+  store %14 to [trivial] %10
+  %16 = builtin "fmul_FPIEEE32"(%12, %12) : $Builtin.FPIEEE32
+  %17 = struct $Float (%16)
+  // function_ref closure #1 in boxedSquareVJP(_:)
+  %18 = function_ref @$s16PullbackCaptures14boxedSquareVJPySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, @guaranteed { var Float }, Float) -> Float
+  %19 = copy_value %9
+  %20 = partial_apply [callee_guaranteed] %18(%19, %0) : $@convention(thin) (Float, @guaranteed { var Float }, Float) -> Float
+  destroy_value %9
+  %22 = tuple $(predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float) (%7, %20)
+  %23 = enum $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %22
+  br bb3(%17, %23)
+
+bb2:
+  %25 = enum $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %5
+  %26 = struct_extract %0, #Float._value
+  %27 = builtin "fmul_FPIEEE32"(%26, %26) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %29 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %30 = partial_apply [callee_guaranteed] %29(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %31 = builtin "fmul_FPIEEE32"(%27, %26) : $Builtin.FPIEEE32
+  %32 = struct $Float (%31)
+  %33 = partial_apply [callee_guaranteed] %29(%0, %28) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %34 = tuple $(predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)) (%25, %30, %33)
+  %35 = enum $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %34
+  br bb3(%32, %35)
+
+bb3(%37 : $Float, %38 : @owned $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  // function_ref pullback of branch(_:_:)
+  %39 = function_ref @$s16PullbackCaptures6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %40 = partial_apply [callee_guaranteed] %39(%38) : $@convention(thin) (Float, @owned _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %41 = tuple (%37, %40)
+  return %41
+} // end sil function '$s16PullbackCaptures6branchyS2f_SbtFTJrSUpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of branch(_:_:)
+// CHECK:           sil private [ossa] @$s16PullbackCaptures6branchyS2f_SbtFTJpSUpSr00180_44$s16PullbackCaptures6branchyS2f_SbtFTJrSUpSr$s4main110_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_dac56b2102ece0fca8f80fd3e9542c57OD_AGCDHeryfDeTf1nb_n :
+// CHECK:             // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+// CHECK-NEXT:        %[[#MULTIPLY1:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ :
+// CHECK-NEXT:        %[[#]] = apply %[[#MULTIPLY1]](
+// CHECK:             // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+// CHECK-NEXT:        %[[#MULTIPLY2:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ :
+// CHECK-NEXT:        %[[#]] = apply %[[#MULTIPLY2]](
+// CHECK:             (%[[#]], %[[#SAVED_CALLBACK:]]) = destructure_tuple
+// CHECK-NEXT:        %[[#]] = apply %[[#SAVED_CALLBACK]](%[[#]]) : $@callee_guaranteed (Float) -> Float
+// CHECK-NEXT:        destroy_value %[[#SAVED_CALLBACK]]
+// CHECK:           } // end sil function
+// pullback of branch(_:_:)
+sil private [ossa] @$s16PullbackCaptures6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float {
+bb0(%0 : $Float, %1 : @owned $_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  switch_enum %1, case #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s16PullbackCaptures6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%5 : @owned $(predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  (%6, %7, %8) = destructure_tuple %5
+  %9 = apply %8(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %8
+  %11 = tuple_extract %9, 0
+  %12 = tuple_extract %9, 1
+  %13 = struct_extract %11, #Float._value
+  %14 = builtin "fadd_FPIEEE32"(%13, %2) : $Builtin.FPIEEE32
+  %15 = struct $Float (%14)
+  %16 = struct_extract %12, #Float._value
+  %17 = builtin "fadd_FPIEEE32"(%16, %2) : $Builtin.FPIEEE32
+  %18 = apply %7(%15) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %7
+  %20 = tuple_extract %18, 0
+  %21 = tuple_extract %18, 1
+  %22 = struct_extract %20, #Float._value
+  %23 = builtin "fadd_FPIEEE32"(%22, %17) : $Builtin.FPIEEE32
+  %24 = struct_extract %21, #Float._value
+  %25 = builtin "fadd_FPIEEE32"(%24, %23) : $Builtin.FPIEEE32
+  %26 = struct $Float (%25)
+  br bb3(%26)
+
+bb2(%29 : @owned $(predecessor: _AD__$s16PullbackCaptures6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float)):
+  (%30, %31) = destructure_tuple %29
+  %32 = apply %31(%0) : $@callee_guaranteed (Float) -> Float
+  destroy_value %31
+  %34 = struct_extract %32, #Float._value
+  %35 = builtin "fadd_FPIEEE32"(%34, %2) : $Builtin.FPIEEE32
+  %36 = struct $Float (%35)
+  br bb3(%36)
+
+bb3(%39 : $Float):
+  return %39
+} // end sil function '$s16PullbackCaptures6branchyS2f_SbtFTJpSUpSr'
+
+// closure #1 in static Float._vjpMultiply(lhs:rhs:)
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float) {
+} // end sil function '$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'

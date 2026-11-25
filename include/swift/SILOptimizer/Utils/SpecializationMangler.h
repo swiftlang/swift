@@ -67,6 +67,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
     InOutToOut = 5,
     ClosurePropPreviousArg = 6, // the same closure as a previous `ClosureProp` argument
     DifferentiableFunctionProp = 7,
+    AutoDiffBranchTracingEnum = 8,
 
     First_Option = 0,
     Last_Option = 31,
@@ -96,6 +97,7 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
       SILInstruction *inst;
       unsigned otherArgIdx; // only for `ClosurePropPreviousArg`
       unsigned differentiableFunctionIdx; // only for `DifferentiableFunctionProp`
+      Identifier autoDiffBranchTracingEnumIdentity;
     };
 
     ArgInfo(ArgumentModifier kind) : kind(kind), inst(nullptr) {}
@@ -128,6 +130,7 @@ public:
       unsigned OrigArgIdx, SILInstruction *DifferentiableFunction,
       SILInstruction *OriginalRoot, SILInstruction *JVPRoot,
       SILInstruction *VJPRoot);
+  void setArgumentAutoDiffBranchTracingEnum(unsigned OrigArgIdx, Identifier identity);
   void setArgumentDead(unsigned OrigArgIdx);
   void setArgumentOwnedToGuaranteed(unsigned OrigArgIdx);
   void setArgumentGuaranteedToOwned(unsigned OrigArgIdx);

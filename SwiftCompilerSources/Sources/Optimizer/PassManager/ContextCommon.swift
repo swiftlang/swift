@@ -114,11 +114,15 @@ extension Context {
   }
 
   func buildSpecializedFunction<T>(specializedFunction: Function, buildFn: (Function, FunctionPassContext) -> T) -> T {
-    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(specializedFunction.bridged)
+    withNestedFunctionContext(for: specializedFunction) { buildFn(specializedFunction, $0) }
+  }
+
+  func withNestedFunctionContext<T>(for function: Function, _ body: (FunctionPassContext) -> T) -> T {
+    let nestedBridgedContext = bridgedPassContext.initializeNestedPassContext(function.bridged)
     let nestedContext = FunctionPassContext(_bridged: nestedBridgedContext)
     defer { bridgedPassContext.deinitializedNestedPassContext() }
 
-    return buildFn(specializedFunction, nestedContext)
+    return body(nestedContext)
   }
 
   func notifyNewFunction(function: Function, derivedFrom: Function) {
