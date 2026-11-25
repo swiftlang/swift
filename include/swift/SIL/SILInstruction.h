@@ -448,8 +448,11 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   bool hasIdenticalState(const SILInstruction *RHS) const;
 
   /// Update this instruction's SILDebugScope. This function should
-  /// never be called directly. Use SILBuilder, SILBuilderWithScope or
+  /// **never** be called directly. Use SILBuilder, SILBuilderWithScope or
   /// SILClonerWithScope instead.
+  /// This private function may only be called by SILBasicBlock when an
+  /// instruction is moved to a new function, using the ScopeCloner, and
+  /// updating the variable scope with the same cloner.
   void setDebugScope(const SILDebugScope *DS);
 
   /// Total number of created and deleted SILInstructions.
@@ -488,6 +491,15 @@ protected:
 
   ~SILInstruction() {
     NumDeletedInstructions++;
+  }
+
+  /// Private function to initialize the debug location.
+  /// Called from the constructors and `setDebugLocation`.
+  void setDebugLocationUnchecked(SILDebugLocation debugLoc) {
+    debugScope = debugLoc.getScope();
+    SILLocation loc = debugLoc.getLocation();
+    asSILNode()->locationKindAndFlags = loc.kindAndFlags.packedKindAndFlags;
+    locationStorage = loc.storage;
   }
 
 public:
@@ -534,14 +546,17 @@ public:
     return SILDebugLocation(getLoc(), debugScope);
   }
 
+  bool canSetDebugLocation() const;
+
   /// Sets the debug location.
   /// Note: Usually it should not be needed to use this function as the location
   /// is already set in when creating an instruction.
+  /// Calling this function on a variable-carrying instruction will assert,
+  /// as changing the scope of a variable is not allowed.
   void setDebugLocation(SILDebugLocation debugLoc) {
-    debugScope = debugLoc.getScope();
-    SILLocation loc = debugLoc.getLocation();
-    asSILNode()->locationKindAndFlags = loc.kindAndFlags.packedKindAndFlags;
-    locationStorage = loc.storage;
+    ASSERT(canSetDebugLocation() &&
+           "Cannot change scope of variable-carrying instruction");
+    setDebugLocationUnchecked(debugLoc);
   }
 
   /// Return the previous instruction, or nullptr if this is the first
@@ -1007,7 +1022,7 @@ class NonSingleValueInstruction : public SILInstruction, public SILNode {
 public:
   NonSingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
       : SILInstruction(), SILNode((SILNodeKind)kind) {
-    setDebugLocation(loc);
+    setDebugLocationUnchecked(loc);
   }
 
   using SILInstruction::operator new;
@@ -1223,7 +1238,7 @@ public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
                          SILType type)
         : SILInstruction(), ValueBase(ValueKind(kind), type) {
-    setDebugLocation(loc);
+    setDebugLocationUnchecked(loc);
   }
 
   using SILInstruction::operator new;
@@ -1953,6 +1968,9 @@ public:
   TailAllocatedDebugVariable(int_type RawValue) { Bits.RawValue = RawValue; }
   int_type getRawValue() const { return Bits.RawValue; }
 
+  /// Drop the debug variable. The tail-allocated storage stays in place.
+  void invalidate() { Bits.Data.HasValue = false; }
+
   unsigned getArgNo() const { return Bits.Data.ArgNo; }
   void setArgNo(unsigned N) { Bits.Data.ArgNo = N; }
   /// Returns the name of the source variable, if it is stored in the
@@ -2198,12 +2216,6 @@ public:
   /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
   /// have location and scope and sometimes not.
   std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
-    // If we used to have debug info attached but our debug info is now
-    // invalidated, just bail.
-    if (sharedUInt8().AllocStackInst.hasInvalidatedVarInfo) {
-      return std::nullopt;
-    }
-
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
@@ -2232,30 +2244,11 @@ public:
                        VarDeclLoc, VarDeclScope, VarDIExpr);
   }
 
-  /// True if this AllocStack has var info that a pass purposely invalidated.
-  ///
-  /// NOTE:
-  ///
-  /// 1. We don't print this state. It is just a way to invalidate the debug
-  /// info. When we parse back in whatever we printed, we will parse it without
-  /// debug var info since none will be printed.
-  ///
-  /// 2. Since we do not serialize debug info today, we do not need to serialize
-  /// this state.
-  ///
-  /// TODO: If we begin serializing debug info, we will need to begin
-  /// serializing this!
-  bool isVarInfoInvalidated() const {
-    return sharedUInt8().AllocStackInst.hasInvalidatedVarInfo;
-  }
-
   /// Invalidate the debug info in an alloc_stack. This is useful in cases where
   /// we one is merging alloc_stack and wants to split the debug info on an
   /// alloc_stack into a separate debug_value instruction from the merged
   /// alloc_stack.
-  void invalidateVarInfo() {
-    sharedUInt8().AllocStackInst.hasInvalidatedVarInfo = true;
-  }
+  void invalidateVarInfo() { VarInfo.invalidate(); }
 
   bool isLet() const {
     if (auto varInfo = getVarInfo())
@@ -2641,6 +2634,9 @@ public:
                          getDebugScope());
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), {}, {}, nullptr);
   };
+
+  /// Drop the debug variable from this alloc_box.
+  void invalidateVarInfo() { VarInfo.invalidate(); }
 
   void setUsesMoveableValueDebugInfo() {
     sharedUInt8().AllocBoxInst.usesMoveableValueDebugInfo =
@@ -3426,6 +3422,42 @@ public:
     return getSubstCalleeConv().hasAddressResult();
   }
 
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// address-typed self, return the self operand. Otherwise return nullptr.
+  Operand *getSelfAddressOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// object-typed self, return the self operand.
+  Operand *getSelfObjectOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isObject()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
+  /// If the result of a borrow or mutate accessor depends on an object-typed
+  /// self, return the self operand: a non-trivial @guaranteed result borrows
+  /// self, and an address result is an interior pointer of self.
+  Operand *getSelfObjectOfBorrowMutateAccessorResult() {
+    if (auto *selfOperand = getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+      return selfOperand;
+    }
+    return getSelfObjectOfAddressBorrowMutateAccessorResult();
+  }
+
   bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
 };
 
@@ -3491,6 +3523,16 @@ public:
   /// Returns true if the resulting closure can't be copied. See
   /// `SILFunctionType::isNoncopyable()`.
   bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
+
+  /// Returns true if this closure's on-stack context borrows the value
+  /// argument \p argOp instead of owning it.
+  ///
+  /// An on-stack context borrows each value argument, except that the context
+  /// of a noncopyable closure owns the values that the closure consumes.
+  /// Always false for an escaping closure, whose context owns its value
+  /// arguments, and for an address argument, whose ownership follows from its
+  /// convention.
+  bool contextBorrowsArgument(const Operand &argOp) const;
 
   /// Returns true if calling the resulting closure consumes it. See
   /// `SILFunctionType::isCallConsuming()`.
@@ -8236,6 +8278,19 @@ public:
   }
 };
 
+// Derive the address of an addressable object.
+class ValueToAddressInst
+    : public UnaryInstructionBase<SILInstructionKind::ValueToAddressInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  ValueToAddressInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand,
+                             Operand->getType().getAddressType()) {
+    assert(Operand->getType().isObject() && "Expected an object operand");
+  }
+};
+
 /// RefElementAddrInst - Derive the address of a named element in a reference
 /// type instance.
 class RefElementAddrInst
@@ -10009,6 +10064,7 @@ public:
     case CheckKind::InitableButNotConsumable:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   IsStrict_t isStrict() const {
@@ -10413,13 +10469,60 @@ public:
 ///
 /// It is undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
-class DeallocRefInst :
-  public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
-                              DeallocationInst> {
+///
+/// Optionally, it names the tail-allocated arrays the instance was allocated
+/// with, as in `alloc_ref`, so that the deallocation can pass the allocation's
+/// size (and, with typed allocation, its type ID). The instance is operand 0,
+/// followed by the tail element counts.
+class DeallocRefInst final : public InstructionBaseWithTrailingOperands<
+                                 SILInstructionKind::DeallocRefInst,
+                                 DeallocRefInst, DeallocationInst, SILType> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) { }
+  DeallocRefInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> AllOperands,
+                 ArrayRef<SILType> ElementTypes)
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc) {
+    sharedUInt8().DeallocRefInst.numTailTypes = ElementTypes.size();
+    assert(sharedUInt8().DeallocRefInst.numTailTypes == ElementTypes.size() &&
+           "Truncation");
+    assert(AllOperands.size() > ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
+  }
+
+  static DeallocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                                SILValue Operand,
+                                ArrayRef<SILType> ElementTypes,
+                                ArrayRef<SILValue> ElementCountOperands);
+
+public:
+  /// The instance to deallocate.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  unsigned getNumTailTypes() const {
+    return sharedUInt8().DeallocRefInst.numTailTypes;
+  }
+
+  ArrayRef<SILType> getTailAllocatedTypes() const {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  MutableArrayRef<SILType> getTailAllocatedTypes() {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  ArrayRef<Operand> getTailAllocatedCounts() const {
+    return getAllOperands().slice(1, getNumTailTypes());
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

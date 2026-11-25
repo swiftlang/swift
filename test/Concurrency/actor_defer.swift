@@ -30,7 +30,7 @@ func testNonDefer_negative() {
   doSomething()
 }
 // Don't include a data race check at the start of the defer
-// CHECK-LABEL: sil private @$s11actor_defer24testGlobalActor_positiveyyF6$deferL_yyF
+// CHECK-LABEL: sil private [closure] @$s11actor_defer24testGlobalActor_positiveyyF6$deferL_yyF
 // CHECK-NEXT:  bb0:
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    function_ref

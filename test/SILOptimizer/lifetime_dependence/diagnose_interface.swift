@@ -3,6 +3,11 @@
 // RUN:   -I %S/Inputs \
 // RUN:   -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil \
+// RUN:   -o /dev/null \
+// RUN:   -I %S/Inputs \
+// RUN:   -verify \
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_feature_LifetimeDependence
 

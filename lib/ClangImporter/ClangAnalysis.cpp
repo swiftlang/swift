@@ -7,6 +7,7 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -379,9 +380,12 @@ public:
                                                   /*primarySuperclass=*/nullptr,
                                                   /*isValid=*/rrInfo.isValid());
       else
-        return ForeignReferenceTypeInfo::Shared(checkedDecl,
-                                                /*primarySuperclass=*/nullptr,
-                                                /*isValid=*/rrInfo.isValid());
+        return ForeignReferenceTypeInfo::Shared(
+            checkedDecl, /*primarySuperclass=*/nullptr,
+            /*isLibkernObject=*/
+            importer::hasSwiftAttributeOnAnyRedecl(
+                checkedDecl, {"libkern_ownership_convention"}),
+            /*isValid=*/rrInfo.isValid());
     }
 
     const clang::CXXRecordDecl *uniqueDirectFRTBase = visitBases(checkedDecl);
@@ -436,6 +440,7 @@ public:
       // type, albeit an invalid one (due to ambiguity).
       //
       // return ForeignReferenceTypeInfo::Shared(FRTBase, nullptr,
+      //                                         isLibkernObject(FRTBase),
       //                                         /*isValid=*/false);
       //
       // However, to honor the existing behavior, (for now) we will report
@@ -446,7 +451,10 @@ public:
     if (seenImmortal)
       return ForeignReferenceTypeInfo::Immortal(FRTBase, primarySuperclass);
 
-    return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
+    return ForeignReferenceTypeInfo::Shared(
+        FRTBase, primarySuperclass,
+        importer::hasSwiftAttributeOnAnyRedecl(
+            FRTBase, {"libkern_ownership_convention"}));
   }
 };
 } // namespace
@@ -498,6 +506,7 @@ importer::getUncachedForeignReferenceTypeInfo(const clang::RecordDecl *decl) {
     else
       return ForeignReferenceTypeInfo::Shared(decl,
                                               /*primarySuperclass=*/nullptr,
+                                              /*isLibkernObject=*/false,
                                               /*isValid=*/rrInfo.isValid());
   }
 
@@ -606,7 +615,7 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
           info.getDecl(), {{"returned_as_unretained_by_default", true}}))
     return;
 
-  // If this returns OSObject or one of its subclasses, rely on libkern's
+  // If this returns OSMetaClassBase or one of its subclasses, rely on libkern's
   // ownership rules.
   if (importer::getLibkernOwnershipOfReturnedFRT(clangFunc, ctx))
     return;
@@ -625,43 +634,6 @@ static void diagnoseMissingReturnsRetained(ClangImporter::Implementation &Impl,
 void ClangImporter::checkCalledClangFunction(const ValueDecl *func,
                                              SourceLoc callSiteLoc) {
   diagnoseMissingReturnsRetained(Impl, func, callSiteLoc);
-}
-
-/// Whether \p record is the top-level libkern class named \p name.
-static bool isLibkernClass(const clang::CXXRecordDecl *record, StringRef name) {
-  return record && record->getIdentifier() && record->getName() == name &&
-         record->getDeclContext()->getRedeclContext()->isTranslationUnit();
-}
-
-LibkernSubclass ClangImporter::Implementation::getLibkernSubclass(
-    const clang::CXXRecordDecl *record) {
-  if (!record || !record->hasDefinition())
-    return LibkernSubclass::None;
-
-  record = record->getDefinition();
-  auto it = libkernSubclasses.find(record);
-  if (it != libkernSubclasses.end())
-    return it->second;
-
-  // OSIterator is the strongest answer there is, so no base can change it.
-  if (isLibkernClass(record, "OSIterator")) {
-    libkernSubclasses[record] = LibkernSubclass::OSIterator;
-    return LibkernSubclass::OSIterator;
-  }
-
-  auto result = isLibkernClass(record, "OSObject") ? LibkernSubclass::OSObject
-                                                   : LibkernSubclass::None;
-
-  for (const auto &base : record->bases()) {
-    auto baseSubclass =
-        getLibkernSubclass(base.getType()->getAsCXXRecordDecl());
-    result = std::max(result, baseSubclass);
-    if (result == LibkernSubclass::OSIterator)
-      break;
-  }
-
-  libkernSubclasses[record] = result;
-  return result;
 }
 
 std::optional<ResultConvention>
@@ -708,9 +680,6 @@ swift::importer::getOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
 std::optional<ResultConvention>
 swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
                                                   ASTContext &ctx) {
-  if (!ctx.LangOpts.hasFeature(Feature::LibkernOwnershipConventions))
-    return std::nullopt;
-
   auto *func = dyn_cast<clang::FunctionDecl>(decl);
   if (!func)
     return std::nullopt;
@@ -719,9 +688,13 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
   if (!recordDecl)
     return std::nullopt;
 
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-  auto libkernSubclass = importer->getLibkernSubclass(recordDecl);
-  if (libkernSubclass == LibkernSubclass::None)
+  recordDecl = recordDecl->getDefinition();
+  if (!recordDecl)
+    return std::nullopt;
+
+  auto info = evaluateOrDefault(
+      ctx.evaluator, ForeignReferenceTypeInfoRequest({recordDecl}), {});
+  if (!info.isLibkernObject())
     return std::nullopt;
 
   if (!func->getIdentifier())
@@ -754,8 +727,7 @@ swift::importer::getLibkernOwnershipOfReturnedFRT(const clang::NamedDecl *decl,
   if (funcName.ends_with("Matching"))
     return std::nullopt;
 
-  if ((!funcName.starts_with("get") && !funcName.starts_with("Get")) ||
-      libkernSubclass == LibkernSubclass::OSIterator)
+  if (!funcName.starts_with("get") && !funcName.starts_with("Get"))
     return ResultConvention::Owned;
 
   return ResultConvention::Unowned;
@@ -1079,9 +1051,13 @@ void importer::checkRetainReleaseFunctions(
   // (A directly-annotated FRT may be forward-declared.)
   if (baseCxxRecordDecl &&
       (!isReachable(cxxRecordDecl) || !isReachable(baseCxxRecordDecl))) {
-    Impl.diagnose(HeaderLoc(recordDecl->getLocation()),
-                  diag::foreign_reference_type_unreachable,
-                  classDecl->getNameStr());
+    Impl.markUnavailable(classDecl,
+                         "foreign reference type '" +
+                             classDecl->getNameStr().str() +
+                             "' has unreachable definition");
+    Impl.UnusableForeignTypes[classDecl] = UnusableForeignType(
+        classDecl,
+        UnusableForeignType::Reason::UnreachableForeignReferenceType);
     return;
   }
 
@@ -1198,6 +1174,220 @@ bool importer::isOverrideOfRetainReleaseMethod(
   }
 
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Unusable foreign types
+//===----------------------------------------------------------------------===//
+
+/// Whether Swift copies and destroys the imported C++ record \p structDecl only
+/// through its C++ copy constructor and destructor, rather than field-wise.
+/// Uses the same rules as \c AddressOnlyCXXClangRecordTypeInfo in IRGen.
+static bool isCopiedAndDestroyedByCxx(const StructDecl *structDecl) {
+  auto *cxxRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  return cxxRecord && structDecl->isCxxNonTrivial() &&
+         importer::findCopyConstructor(cxxRecord) &&
+         importer::findNonTrivialDestructor(cxxRecord);
+}
+
+/// Whether \p nominal is an unsafe pointer type.
+static bool isUnsafePointer(const NominalTypeDecl *nominal) {
+  auto &ctx = nominal->getASTContext();
+  return nominal == ctx.getUnsafePointerDecl() ||
+         nominal == ctx.getUnsafeMutablePointerDecl() ||
+         nominal == ctx.getUnsafeBufferPointerDecl() ||
+         nominal == ctx.getUnsafeMutableBufferPointerDecl();
+}
+
+/// Calls \p fn on each nominal type that values of \p type hold by value, i.e.,
+/// each nominal type in \p type except pointees of unsafe pointers, and
+/// parameter and result types of C function pointers. Stops when \p fn returns
+/// true.
+static void
+forEachNominalHeldByValue(Type type,
+                          llvm::function_ref<bool(NominalTypeDecl *)> fn) {
+  class Walker : public TypeWalker {
+    llvm::function_ref<bool(NominalTypeDecl *)> Fn;
+  public:
+    explicit Walker(llvm::function_ref<bool(NominalTypeDecl *)> fn) : Fn(fn) {}
+    Action walkToTypePre(Type ty) override {
+      // Copying a C function pointer doesn't copy any values of its parameter
+      // or result types.
+      if (auto *fnTy = ty->getAs<AnyFunctionType>())
+        if (fnTy->getRepresentation() ==
+            FunctionTypeRepresentation::CFunctionPointer)
+          return Action::SkipNode;
+
+      auto *nominal = ty->getAnyNominal();
+      if (!nominal)
+        return Action::Continue;
+      if (Fn(nominal))
+        return Action::Stop;
+      return isUnsafePointer(nominal) ? Action::SkipNode : Action::Continue;
+    }
+  };
+
+  type->getCanonicalType().walk(Walker(fn));
+}
+
+bool importer::hasExposedStorage(const NominalTypeDecl *nominal) {
+  // Copying a class reference doesn't copy the object, and the storage of a
+  // resilient type is not visible to clients.
+  if (!isa<StructDecl, EnumDecl>(nominal) || nominal->isResilient())
+    return false;
+  auto *structDecl = dyn_cast<StructDecl>(nominal);
+  return !structDecl || !isCopiedAndDestroyedByCxx(structDecl);
+}
+
+namespace {
+/// Finds the unusable foreign types exposed by nominal types, caching results.
+///
+/// Storage can be recursive (e.g. `struct S { var kids: [S] }`), so this uses
+/// Tarjan's strongly connected components algorithm where every type in
+/// a component exposes every other.
+class UnusableForeignTypeFinder {
+  ClangImporter::Implementation &Impl;
+
+  struct Node {
+    unsigned Index;
+    unsigned LowLink;
+    UnusableForeignType Found;
+  };
+
+  /// The types on \c Stack, i.e., types whose component is not complete yet.
+  llvm::DenseMap<NominalTypeDecl *, Node> Nodes;
+  SmallVector<NominalTypeDecl *, 8> Stack;
+  unsigned NextIndex = 0;
+
+public:
+  explicit UnusableForeignTypeFinder(ClangImporter::Implementation &impl)
+      : Impl(impl) {}
+
+  UnusableForeignType find(NominalTypeDecl *nominal) {
+    unsigned lowLink = 0;
+    UnusableForeignType found;
+    visitHeldType(nominal, lowLink, found);
+    ASSERT(Nodes.empty() && Stack.empty());
+    return found;
+  }
+
+private:
+  /// Visits a type \p held that the type being visited holds by value.
+  ///
+  /// Lowers \p lowLink if \p held is in a component that isn't complete yet,
+  /// and sets \p found if \p held exposes an unusable type.
+  void visitHeldType(NominalTypeDecl *held, unsigned &lowLink,
+                     UnusableForeignType &found) {
+    if (held->hasNoExposedUnusableForeignTypes())
+      return;
+
+    auto cached = Impl.UnusableForeignTypes.find(held);
+    if (cached != Impl.UnusableForeignTypes.end()) {
+      if (!found)
+        found = cached->second;
+      return;
+    }
+
+    if (!hasExposedStorage(held)) {
+      held->setNoExposedUnusableForeignTypes();
+      return;
+    }
+
+    if (!Nodes.count(held))
+      visitStorage(held);
+
+    // If the type is still on the stack, it's in the same component as a type
+    // being visited. Its result is combined when that component is complete.
+    auto node = Nodes.find(held);
+    if (node != Nodes.end()) {
+      lowLink = std::min(lowLink, node->second.LowLink);
+      return;
+    }
+
+    if (held->hasNoExposedUnusableForeignTypes())
+      return;
+    if (!found)
+      found = Impl.UnusableForeignTypes.lookup(held);
+  }
+
+  void visitStorage(NominalTypeDecl *nominal) {
+    unsigned index = NextIndex++;
+    Nodes[nominal] = {index, index, UnusableForeignType()};
+    Stack.push_back(nominal);
+
+    unsigned lowLink = index;
+    UnusableForeignType found;
+    auto visitType = [&](Type type) {
+      forEachNominalHeldByValue(type, [&](NominalTypeDecl *held) {
+        visitHeldType(held, lowLink, found);
+        return false;
+      });
+    };
+
+    if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+      for (auto *field : structDecl->getStoredProperties())
+        visitType(field->getInterfaceType());
+
+      // Fields of C++ base classes count as fields of the derived record.
+      auto *cxxRecord =
+          dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+      if (cxxRecord && cxxRecord->hasDefinition()) {
+        for (auto &base : cxxRecord->bases()) {
+          auto *baseRecord = base.getType()->getAsCXXRecordDecl();
+          if (!baseRecord)
+            continue;
+          if (auto *baseDecl = dyn_cast_or_null<NominalTypeDecl>(
+                  Impl.importDecl(baseRecord, Impl.CurrentVersion)))
+            visitHeldType(baseDecl, lowLink, found);
+        }
+      }
+    } else {
+      for (auto *element : cast<EnumDecl>(nominal)->getAllElements())
+        if (element->hasAssociatedValues())
+          visitType(element->getPayloadInterfaceType());
+    }
+
+    auto &node = Nodes[nominal];
+    node.LowLink = lowLink;
+    node.Found = found;
+    if (lowLink != index)
+      return;
+
+    // This type is the root of a complete component, which consists of the
+    // types above it on the stack.
+    auto members = ArrayRef<NominalTypeDecl *>(Stack).drop_front(
+        llvm::find(Stack, nominal) - Stack.begin());
+    for (auto *member : members)
+      if (!found)
+        found = Nodes[member].Found;
+    for (auto *member : members) {
+      Nodes.erase(member);
+      if (found)
+        Impl.UnusableForeignTypes[member] = found;
+      else
+        member->setNoExposedUnusableForeignTypes();
+    }
+    Stack.truncate(Stack.size() - members.size());
+  }
+};
+} // end anonymous namespace
+
+UnusableForeignType
+ClangImporter::Implementation::exposesUnusableForeignType(Type type) {
+  if (UnusableForeignTypes.empty() || !type || type->hasError())
+    return UnusableForeignType();
+
+  UnusableForeignType found;
+  forEachNominalHeldByValue(type, [&](NominalTypeDecl *nominal) {
+    found = UnusableForeignTypeFinder(*this).find(nominal);
+    return bool(found);
+  });
+  return found;
+}
+
+UnusableForeignType ClangImporter::exposesUnusableForeignType(Type type) {
+  return Impl.exposesUnusableForeignType(type);
 }
 
 //===----------------------------------------------------------------------===//

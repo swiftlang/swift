@@ -103,8 +103,7 @@ bb0(%0 : @owned $(String, String)):
 // CHECK-O-NEXT:    fix_lifetime [[B]]
 // CHECK-O-NEXT:    fix_lifetime %1
 // CHECK-O-NEXT:    end_borrow [[B]]
-// CHECK-O-NEXT:    [[T:%.*]] = tuple (%0, %1)
-// CHECK-O-NEXT:    destroy_value [[T]]
+// CHECK-O-NEXT:    destroy_value %0
 // CHECK-ONONE:     tuple_extract
 // CHECK-ONONE:     tuple_extract
 // CHECK:       } // end sil function 'split_borrowed_tuple'
@@ -132,8 +131,8 @@ bb0(%0 : @owned $String, %1 : $Int):
 // CHECK-O-NEXT:    fix_lifetime [[B2]]
 // CHECK-O-NEXT:    end_borrow [[B2]]
 // CHECK-O:       bb3:
-// CHECK-O-NEXT:    [[T:%.*]] = tuple (%0, %1)
-// CHECK-O-NEXT:    destroy_value [[T]]
+// CHECK-O-NEXT:    destroy_value %0
+// CHECK-O-NEXT:    destroy_value %1
 // CHECK:       } // end sil function 'split_borrowed_tuple_multi_borrows'
 sil [ossa] @split_borrowed_tuple_multi_borrows : $@convention(thin) (@owned String, @owned String) -> () {
 bb0(%0 : @owned $String, %1 : @owned $String):
@@ -162,8 +161,7 @@ bb3:
 // CHECK-O-NEXT:    [[C:%.*]] = copy_value %0
 // CHECK-O-NEXT:    fix_lifetime %1
 // CHECK-O-NEXT:    destroy_value [[C]]
-// CHECK-O-NEXT:    [[T:%.*]] = tuple (%0, %1)
-// CHECK-O-NEXT:    destroy_value [[T]]
+// CHECK-O-NEXT:    destroy_value %0
 // CHECK:       } // end sil function 'split_destructure_of_copied_tuple'
 sil [ossa] @split_destructure_of_copied_tuple : $@convention(thin) (@owned String, Int) -> () {
 bb0(%0 : @owned $String, %1 : $Int):

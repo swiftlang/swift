@@ -235,7 +235,6 @@ protected:
                  lexical : 1,
                  fromVarDecl : 1,
                  usesMoveableValueDebugInfo : 1,
-                 hasInvalidatedVarInfo : 1,
                  isNested : 1);
 
     SHARED_FIELD(AllocBoxInst, uint8_t
@@ -254,6 +253,9 @@ protected:
 
     SHARED_FIELD(AllocPackMetadataInst, uint8_t
       isNested : 1);
+
+    SHARED_FIELD(DeallocRefInst, uint8_t
+      numTailTypes: NumAllocRefTailTypesBits);
 
     SHARED_FIELD(PartialApplyInst, uint8_t
                  isNested : 1);

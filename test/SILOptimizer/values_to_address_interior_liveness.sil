@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -sil-print-types -test-runner -enable-sil-opaque-values -module-name Swift \
+// RUN: -enable-experimental-feature Lifetimes %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+// The address that value_to_address produces is an interior pointer into its
+// operand. Interior liveness has to follow the uses of that address, rather
+// than treat the instruction as a pointer escape.
+
+import Builtin
+
+sil_stage raw
+
+// A guaranteed operand.
+//
+// CHECK-LABEL: testGuaranteed: interior_liveness_swift with: %0
+// CHECK:       Interior liveness: %0
+// CHECK-NOT:   Pointer escape
+// CHECK-NOT:   last user:{{.*}}value_to_address
+// CHECK:       end running test 1 of 1 on testGuaranteed: interior_liveness_swift with: %0
+sil [ossa] @testGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  specify_test "interior_liveness_swift %0"
+  %1 = value_to_address %0 : $T
+  %2 = load_borrow %1 : $*T
+  end_borrow %2 : $T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// An owned operand.
+//
+// CHECK-LABEL: testOwned: interior_liveness_swift with: %0
+// CHECK:       Interior liveness: %0
+// CHECK-NOT:   Pointer escape
+// CHECK-NOT:   last user:{{.*}}value_to_address
+// CHECK:       end running test 1 of 1 on testOwned: interior_liveness_swift with: %0
+sil [ossa] @testOwned : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  specify_test "interior_liveness_swift %0"
+  %1 = value_to_address %0 : $T
+  %2 = load_borrow %1 : $*T
+  end_borrow %2 : $T
+  destroy_value %0 : $T
+  %3 = tuple ()
+  return %3 : $()
+}

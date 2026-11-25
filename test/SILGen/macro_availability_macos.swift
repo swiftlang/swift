@@ -56,7 +56,7 @@ macro BodyThatCallsCode(_ codeString: String) =
 macro MemberAttributeThatAddsPeer(_ codeString: String) =
   #externalMacro(module: "MacroDefinition", type: "MemberAttributeThatAddsPeerMacro")
 
-// EXPRESSION-LABEL: sil private [ossa] @$s4main19testExpressionMacroSiyFSiyXEfU_ :
+// EXPRESSION-LABEL: sil private [closure] [ossa] @$s4main19testExpressionMacroSiyFSiyXEfU_ :
 // EXPRESSION: [[MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // EXPRESSION: [[MINOR:%.*]] = integer_literal $Builtin.Word, 51
 // EXPRESSION: [[PATCH:%.*]] = integer_literal $Builtin.Word, 0

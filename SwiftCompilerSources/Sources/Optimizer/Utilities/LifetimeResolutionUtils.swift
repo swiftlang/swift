@@ -201,9 +201,10 @@ struct ResolvableRoot {
 
   /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
   enum ExtraLivenessUse {
-    /// The function exits, at which point an `inout` parameter must be initialized.
+    /// The function exits, at which point an `inout` parameter or the contents of a borrowed box must be initialized.
     case functionExit(TermInst)
-    /// The lifetime of the `alloc_box` ends.
+    /// The destroys of an initialized `alloc_box` that are treated as artificial liveness uses to ensure we don't
+    /// take a contents out of the box without reinitializing it.
     case boxLifetimeEnd(Instruction)
 
     var instruction: Instruction {
@@ -282,9 +283,9 @@ struct ResolvableRoot {
     }
   }
 
-  /// Build from a storage allocation (`alloc_box` / `alloc_stack`), an address argument, or the `self` argument of a
-  /// root class initializer. Callers holding only an address must first walk up to the allocation, e.g. with
-  /// `allocation(backing:)`.
+  /// Build from a storage allocation (`alloc_box` / `alloc_stack`), an address or borrowed box argument, or the `self`
+  /// argument of a root class initializer. Callers holding only an address must first walk up to the allocation, e.g.
+  /// with `allocation(backing:)`.
   init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache) {
     let function = val.parentFunction
     var extraUses: [ExtraLivenessUse] = []
@@ -301,9 +302,10 @@ struct ResolvableRoot {
 
         let indices = indexCache.fieldIndices(for: storage.type.objectType)
 
-        // If this is the 'self' for an empty type in its initializer, we don't have any fields to initialize.
-        // So, treat the storage as being born initialized
-        startsInitialized = mu.kind == .rootSelf && !indices.hasFields
+        // If this is the 'self' for an empty Copyable type in its initializer, we don't have any fields to initialize.
+        // We just treat the storage as being born initialized.
+        // TODO: have SILGen emit an initializing store?
+        startsInitialized = mu.kind == .rootSelf && !indices.hasFields && !storage.type.isMoveOnly
 
         if mu.kind == .derivedSelf {
           initialStore = Self.findInitialStoreOfDerivedSelf(mu)
@@ -332,8 +334,27 @@ struct ResolvableRoot {
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
       let box: Value = markUninitialized ?? storage
-      box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
+      // A `dealloc_box` frees a box whose contents are uninitialized, so it demands nothing.
+      for end in box.uses.endingLifetime where !(end.instruction is DeallocBoxInst) {
+        extraUses.append(.boxLifetimeEnd(end.instruction))
+      }
       // TODO: add copies of the box too
+
+    case let arg as FunctionArgument where arg.type.isBox && arg.ownership == .guaranteed:
+      // A box captured by a closure, whose contents may be consumed only if reinitialized before the function exits.
+      guard let (projectBox, _) = Self.findProjectBox(of: arg) else {
+        return nil
+      }
+      storage = arg
+      address = projectBox
+      markUninitialized = nil
+      varDecl = arg.findVarDecl()
+      isLexical = arg.isLexical
+      startsInitialized = true
+      mode = .storage
+
+      // TODO: the contents must also be initialized where a dead-end block is reached, i.e., before an `unreachable`.
+      function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
     case let arg as FunctionArgument where arg.type.isAddress:
       storage = arg
@@ -348,10 +369,10 @@ struct ResolvableRoot {
         startsInitialized = true
       case .indirectOut:
         startsInitialized = false
-      case .indirectInout:
+      case .indirectInout, .indirectInoutAliasable:
         startsInitialized = true
 
-        // For an inout parameter, all function exit terminators are considered uses.
+        // For an inout parameter or a non-escaping closure capture, all function exit terminators are considered uses.
         function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
       default:
@@ -640,7 +661,7 @@ private func findSuperInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplyS
 //                                  Markers
 //===----------------------------------------------------------------------===//
 
-/// A marker that LifetimeResolution leaves where it corrected a misuse, which LifetimeResolutionDiagnose turns into
+/// A marker that LifetimeResolution leaves where it corrected a misuse, which DiagnoseResolvedLifetimes turns into
 /// a user-facing diagnostic.
 enum LifetimeResolutionMarker {
   /// `assign undef to [init] %leaf`, after the root's `markerInsertionPoint`: the leaf is read before being

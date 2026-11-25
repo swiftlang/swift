@@ -341,7 +341,6 @@ swift::cxx_translation::getDeclRepresentation(
     return {Unsupported, UnrepresentableIsolatedInActor};
   if (isa<MacroDecl>(VD))
     return {Unsupported, UnrepresentableMacro};
-  GenericSignature genericSignature;
   // Don't expose decls with definitions that are emitted into the client.
   if (VD->isAlwaysEmittedIntoClient())
     return {Unsupported, UnrepresentableRequiresClientEmission};
@@ -352,8 +351,6 @@ swift::cxx_translation::getDeclRepresentation(
         !AFD->getASTContext().LangOpts.hasFeature(
             Feature::GenerateBindingsForThrowingFunctionsInCXX))
       return {Unsupported, UnrepresentableThrows};
-    if (AFD->hasGenericParamList())
-      genericSignature = AFD->getGenericSignature();
   }
   if (const auto *typeDecl = dyn_cast<NominalTypeDecl>(VD)) {
     if (isa<ProtocolDecl>(typeDecl)) {
@@ -370,8 +367,6 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableObjC};
     if (isa<ClassDecl>(VD) && typeDecl->isGenericContext())
       return {Unsupported, UnrepresentableGeneric};
-    if (typeDecl->hasGenericParamList())
-      genericSignature = typeDecl->getGenericSignature();
     // The C++ class for a Swift class derives from the C++ class of its
     // superclass, which can't be emitted if the superclass is generic.
     if (const auto classDecl = dyn_cast<ClassDecl>(typeDecl)) {
@@ -420,8 +415,11 @@ swift::cxx_translation::getDeclRepresentation(
     }
   }
 
-  // Generic requirements are not yet supported in C++.
-  if (!isExposableToCxx(genericSignature)) {
+  // Generic requirements are not yet supported in C++. This includes the
+  // requirements of the context, e.g. a contextual `where` clause or a
+  // constrained extension, not just those of the decl's own parameters.
+  if (!isExposableToCxx(
+          VD->getInnermostDeclContext()->getGenericSignatureOfContext())) {
     return {Unsupported, UnrepresentableGenericRequirements};
   }
 
@@ -450,10 +448,57 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
   return false;
 }
 
+swift::cxx_translation::CxxExposure
+swift::cxx_translation::getCxxExposure(const ValueDecl *VD) {
+  auto exposure = CxxExposure::Unannotated;
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>()) {
+      switch (attr->getExposureKind()) {
+      case ExposureKind::Cxx:
+        exposure = CxxExposure::Exposed;
+        break;
+      case ExposureKind::NotCxx:
+        return CxxExposure::NotExposed;
+      case ExposureKind::Wasm:
+        break;
+      }
+    }
+  }
+  return exposure;
+}
+
+bool swift::cxx_translation::mayBePrintedInCxxHeader(
+    const ValueDecl *VD, AccessLevel minRequiredAccess,
+    bool requiresExposeAttr) {
+  // Accessors are printed together with their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(VD))
+    VD = accessor->getStorage();
+
+  auto exposure = getCxxExposure(VD);
+  if (exposure == CxxExposure::NotExposed)
+    return false;
+  if (requiresExposeAttr && exposure != CxxExposure::Exposed)
+    return false;
+
+  // A member is only printed as part of its enclosing type.
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    if (!isVisibleToCxx(VD, minRequiredAccess) ||
+        !isExposableToCxx(VD, /*layoutQueries=*/nullptr))
+      return false;
+  }
+  return true;
+}
+
 bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   // If there's no generic signature, it's fine.
   if (!genericSig)
     return true;
+
+  // Parameter packs and value generic parameters have no requirements, but
+  // are not supported yet either.
+  for (auto *param : genericSig.getGenericParams())
+    if (param->isParameterPack() || param->isValue())
+      return false;
 
   // FIXME: This should use getRequirements() and actually
   // support arbitrary requirements. We don't really want
@@ -533,4 +578,5 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
   case UnrepresentableZeroSizedValueType:
     return Diagnostic(diag::expose_zero_size_to_cxx, vd);
   }
+  llvm_unreachable("covered switch");
 }

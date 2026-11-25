@@ -38,6 +38,7 @@ static bool shouldSuggestConcreteTypeFixit(
 
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Emit diagnostics for the given \c RequirementErrors.

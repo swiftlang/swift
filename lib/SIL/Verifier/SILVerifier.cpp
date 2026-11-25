@@ -1863,17 +1863,19 @@ public:
 
     SILType DebugVarTy = *varInfo->Type;
 
-    auto *debugScope = inst->getDebugScope();
+    auto *varScope = varInfo->Scope;
+    require(varScope->getParentFunction() == inst->getFunction(),
+            "debug variable scope belongs to a different function");
     if (varInfo->ArgNo)
       require(!varInfo->Name.empty(), "function argument without a name");
 
     // Check that there is at most one debug variable defined for each argument
-    // slot if our debug scope is not an inlined call site.
+    // slot if the variable's scope is not an inlined call site.
     //
     // This catches SIL transformations that accidentally remove inline
     // information (stored in the SILDebugScope) from debug-variable-carrying
     // instructions.
-    if (debugScope && !debugScope->InlinedCallSite)
+    if (!varScope->InlinedCallSite)
       if (unsigned argNum = varInfo->ArgNo) {
         // It is a function argument.
         if (argNum < DebugVars.size() && !DebugVars[argNum].first.empty()) {
@@ -1899,12 +1901,6 @@ public:
         DebugVars[argNum] = {varInfo->Name, DebugVarTy};
       }
 
-    // Check the (auxiliary) debug variable scope
-    if (const SILDebugScope *VarDS = varInfo->Scope)
-      require(VarDS->getInlinedFunction() == debugScope->getInlinedFunction(),
-              "Scope of the debug variable should have the same parent function"
-              " as that of instruction.");
-
     // Check that every var info with the same name, scope and location, refer
     // to a variable of the same type
     llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
@@ -1912,8 +1908,7 @@ public:
       varInfo->Loc = inst->getLoc();
     if (!varInfo->Loc)
       varInfo->Loc = SILLocation::invalid();
-    VarID Key(varInfo->Scope ? varInfo->Scope : debugScope,
-              UniqueName, *varInfo->Loc);
+    VarID Key(varScope, UniqueName, *varInfo->Loc);
     auto CachedVar = DebugVarTypes.insert({Key, DebugVarTy});
     if (!CachedVar.second) {
       auto lhs = CachedVar.first->second.removingMoveOnlyWrapper();
@@ -2154,9 +2149,6 @@ public:
 
     verifyLocalArchetype(AI, AI->getElementType().getASTType());
 
-    require(!AI->isVarInfoInvalidated() || !bool(AI->getVarInfo()),
-            "AllocStack Var Info should be None if invalidated");
-
     checkAddressWalkerCanVisitAllTransitiveUses(AI);
 
     // There used to be a check if all uses of ASI are inside the alloc-dealloc
@@ -2186,6 +2178,36 @@ public:
       verifyLocalArchetype(ARI, Types[Idx].getASTType());
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
+    }
+    checkTailAllocatedAttr(ARI->getType(), ARI->getTailAllocatedTypes());
+  }
+
+  /// Both the allocation and the deallocation of a class with
+  /// @_tailAllocated must use the attribute's element types, so that they
+  /// pass the same size and type ID.
+  void checkTailAllocatedAttr(SILType classType, ArrayRef<SILType> Types) {
+    auto *classDecl = classType.getClassDecl();
+    if (Types.empty() || !classDecl)
+      return;
+    auto [attr, owner] = classDecl->getTailAllocatedAttr();
+    if (!attr)
+      return;
+    auto attrTypes = attr->getResolvedTypes(owner);
+    if (llvm::any_of(attrTypes, [](Type type) { return type->hasError(); }))
+      return;
+    require(Types.size() == attrTypes.size(),
+            "tail elements must be the @_tailAllocated element types");
+    auto ownerType = classType.getASTType()->getSuperclassForDecl(owner);
+    auto subs = ownerType->getContextSubstitutionMap();
+    // Lowered with the owner's generic abstraction, like a stored property
+    // (SILGen lowers them so for both the allocation and the deallocation).
+    auto sig = owner->getGenericSignature().getCanonicalSignature();
+    for (unsigned Idx = 0, End = Types.size(); Idx != End; ++Idx) {
+      auto expected = F.getLoweredType(
+          Lowering::AbstractionPattern(sig, attrTypes[Idx]->getCanonicalType()),
+          attrTypes[Idx].subst(subs));
+      require(Types[Idx].getASTType() == expected.getASTType(),
+              "tail elements must be the @_tailAllocated element types");
     }
   }
 
@@ -4310,6 +4332,16 @@ public:
 
     require(!checkResilience(cd, F),
             "cannot directly deallocate resilient class");
+
+    for (auto &Count : DI->getTailAllocatedCounts())
+      require(Count.get()->getType().is<BuiltinIntegerType>(),
+              "count needs integer type");
+    if (cd->getTailAllocatedAttr().first)
+      require(DI->getNumTailTypes() != 0,
+              "dealloc_ref of a class with @_tailAllocated must name its tail "
+              "elements");
+    checkTailAllocatedAttr(DI->getOperand()->getType(),
+                           DI->getTailAllocatedTypes());
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),
@@ -5811,6 +5843,53 @@ public:
                     "bridge_object_to_word must produce a Word");
   }
 
+  void checkValueToAddressInst(ValueToAddressInst *VAI) {
+    require(!F.hasLoweredAddresses(),
+            "value_to_address is only valid in opaque values");
+
+    auto isVariable = [](SILValue value) {
+      if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+        return arg->getArgumentConvention().isIndirectConvention();
+      if (auto *borrow = dyn_cast<BeginBorrowInst>(value))
+        return bool(borrow->isFromVarDecl());
+      if (auto *move = dyn_cast<MoveValueInst>(value))
+        return bool(move->isFromVarDecl());
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        // Before AddressLowering, the conventions don't report a
+        // @guaranteed_address result as an address, so look at the callee type.
+        auto results = apply->getSubstCalleeType()->getResults();
+        return results.size() == 1 && results[0].getConvention() ==
+                                          ResultConvention::GuaranteedAddress;
+      }
+      if (isa_and_nonnull<BeginApplyInst>(value->getDefiningInstruction()))
+        return value->getOwnershipKind() == OwnershipKind::Guaranteed;
+      return false;
+    };
+    SILValue root = VAI->getOperand();
+    // The operand may be behind a nested borrow. A temporary has no
+    // stable address.
+    while (!isVariable(root)) {
+      auto *borrow = dyn_cast<BeginBorrowInst>(root);
+      if (!borrow)
+        break;
+      root = borrow->getOperand();
+    }
+    require(isVariable(root),
+            "value_to_address operand must be an indirect argument, a "
+            "[var_decl] move_value or begin_borrow, a borrow accessor result, "
+            "or a guaranteed coroutine yield");
+
+    // AddressLowering resolves the address of a loadable value only for a
+    // guaranteed indirect argument, whose address is the argument itself.
+    if (!VAI->getOperand()->getType().isAddressOnly(F)) {
+      auto *arg = dyn_cast<SILFunctionArgument>(VAI->getOperand());
+      require(arg && arg->getArgumentConvention() ==
+                         SILArgumentConvention::Indirect_In_Guaranteed,
+              "value_to_address of a loadable value must be a guaranteed "
+              "indirect argument");
+    }
+  }
+
   void checkConvertFunctionInst(ConvertFunctionInst *ICI) {
     auto opTI = requireObjectType(SILFunctionType, ICI->getOperand(),
                                   "convert_function operand");
@@ -5834,6 +5913,9 @@ public:
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),
             "convert_function cannot drop execution semantics");
+    require(!resTI->isNoncopyable() || opTI->isNoncopyable(),
+            "convert_function cannot form a noncopyable value; a thunk must "
+            "form it");
     require(!resTI->isNondeinitable() || opTI->isNondeinitable(),
             "convert_function cannot form a nondeinitable value; a thunk "
             "must form it");
@@ -5863,6 +5945,8 @@ public:
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI",
         *ICI->getFunction());
+    require(opTI->getExecutionSemantics() == resTI->getExecutionSemantics(),
+            "convert_escape_to_noescape cannot change execution semantics");
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.
@@ -5907,10 +5991,24 @@ public:
     // function argument or Builtin.Borrow.
     if (F.getFunctionStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
-      auto base = AccessBase::compute(RI->getOperand());
-      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
-                                            : base.getBaseAddress()
-                       : SILValue();
+      SILValue root;
+      SILValue address = RI->getOperand();
+      while (true) {
+        auto base = AccessBase::compute(address);
+        root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                         : base.getBaseAddress()
+                    : SILValue();
+        // The address result of an accessor with an address self is derived
+        // from self.
+        auto *apply = dyn_cast_or_null<ApplyInst>(root);
+        auto *selfOp = apply
+            ? apply->getSelfAddressOfAddressBorrowMutateAccessorResult()
+            : nullptr;
+        if (!selfOp) {
+          break;
+        }
+        address = selfOp->get();
+      }
       require(!root || !root->getType().isAddress() ||
                   isa<SILFunctionArgument>(root) ||
                   (isa<ApplyInst>(root) &&
@@ -6689,18 +6787,44 @@ public:
   }
   
   void checkAwaitAsyncContinuationInst(AwaitAsyncContinuationInst *AACI) {
-    // The operand must be a GetAsyncContinuation* instruction.
+    // The operand may either be a GetAsyncContinuation* or a
+    // `getSplitContinuationAddr` builtin, which binds a continuation created
+    // elsewhere to this function. The latter form always delivers the value into a
+    // resume buffer, so it behaves as the address form, and its throwing-ness
+    // is carried by the presence of an error successor rather than by the
+    // instruction.
+    auto *splitGet = dyn_cast<BuiltinInst>(AACI->getOperand());
+    if (splitGet &&
+        splitGet->getBuiltinInfo().ID !=
+            BuiltinValueKind::GetSplitContinuationAddr)
+      splitGet = nullptr;
     auto cont = dyn_cast<GetAsyncContinuationInstBase>(AACI->getOperand());
-    require(cont, "can only await the result of a get_async_continuation instruction");
-    bool isAddressForm = isa<GetAsyncContinuationAddrInst>(cont);
+    require(cont || splitGet,
+            "can only await the result of a get_async_continuation instruction "
+            "or of a getSplitContinuationAddr builtin");
+    bool isAddressForm = splitGet || isa<GetAsyncContinuationAddrInst>(cont);
 
-    auto &C = cont->getType().getASTContext();
-    
+    auto &C = AACI->getFunction()->getASTContext();
+
+    if (splitGet) {
+      require(splitGet->getArguments().size() == 2,
+              "getSplitContinuationAddr takes two operands");
+      require(splitGet->getArguments()[0]->getType()
+                  .is<BuiltinRawUnsafeContinuationType>(),
+              "getSplitContinuationAddr's first operand must be a "
+              "Builtin.RawUnsafeContinuation");
+      require(splitGet->getArguments()[1]->getType().isAddress(),
+              "getSplitContinuationAddr's resume buffer must be an address");
+    }
+
     // The shape of the successors depends on the continuation instruction being
     // awaited.
-    require((bool)AACI->getErrorBB() == cont->throws(),
-            "must have an error successor if and only if the continuation is throwing");
-    if (cont->throws()) {
+    if (cont) {
+      require((bool)AACI->getErrorBB() == cont->throws(),
+              "must have an error successor if and only if the continuation is throwing");
+    }
+    bool throws = splitGet ? (bool)AACI->getErrorBB() : cont->throws();
+    if (throws) {
       require(AACI->getErrorBB()->getNumArguments() == 1,
               "error successor must take one argument");
       auto arg = AACI->getErrorBB()->getArgument(0);
@@ -6716,7 +6840,7 @@ public:
     }
     if (isAddressForm) {
       require(AACI->getResumeBB()->getNumArguments() == 0,
-              "resume successor must take no arguments for get_async_continuation_addr");
+              "resume successor must take no arguments for the address form");
     } else {
       require(AACI->getResumeBB()->getNumArguments() == 1,
               "resume successor must take one argument for get_async_continuation");
@@ -7192,6 +7316,7 @@ public:
                          case ParameterConvention::Pack_Inout:
                            return true;
                          }
+                         llvm_unreachable("covered switch");
                        }),
             "entry point address argument must have an indirect calling "
             "convention");
@@ -7746,6 +7871,15 @@ public:
         }
       }
 
+      if (F->hasUnresolvedLifetimes()) {
+        require(F->isDefinition(),
+                "only a function definition can have unresolved lifetimes");
+        require(F->hasOwnership(),
+                "a function with unresolved lifetimes must be in OSSA");
+        require(F->getFunctionStage() == SILStage::Raw,
+                "a function with unresolved lifetimes must be in raw SIL");
+      }
+
       if (F->isExternalDeclaration()) {
         if (F->hasForeignBody())
           return;
@@ -7788,7 +7922,7 @@ public:
     visitSILBasicBlocks(F);
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
-        !mod.getASTContext().hadError()) {
+        !F->hasUnresolvedLifetimes() && !mod.getASTContext().hadError()) {
       F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
 

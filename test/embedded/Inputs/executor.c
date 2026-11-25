@@ -1,7 +1,7 @@
 /* A custom executor to test that we can build an external executor
    and use it with libswift_Concurrency.a. */
 
-#include <swift/EmbeddedPlatform+Concurrency.h>
+#include <SwiftPlatform/Concurrency.h>
 #include <swift/ExecutorImpl.h>
 
 #include <assert.h>

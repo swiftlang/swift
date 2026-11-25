@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -module-name test -verify %s \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -module-name test -verify %s \
 // RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering -o /dev/null 2>&1 | %FileCheck %s
 
 // For extra coverage, compile without opaque values, but skip FileCheck.
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -disable-sil-opaque-values -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -disable-sil-opaque-values -verify %s -o /dev/null
 
 // The stored properties of `self` in a root class initializer are initialized by their first
 // assignment, and reassigned afterwards. When the initializer fails before all of them are
@@ -21,7 +21,6 @@ func mayThrow() throws {}
 // CHECK-NEXT:    store {{.*}} to [trivial] [[COUNT_ACCESS]]
 // CHECK:         [[PI:%.*]] = ref_element_addr {{.*}} #Fields.pi
 // CHECK-NEXT:    store {{.*}} to [trivial] [[PI]]
-// CHECK:         [[SELF:%.*]] = end_init_let_ref
 // CHECK:         [[LINK1:%.*]] = ref_element_addr {{.*}} #Fields.link
 // CHECK-NEXT:    [[LINK1_ACCESS:%.*]] = begin_access [modify] [dynamic] [[LINK1]]
 // CHECK-NEXT:    [[ARG:%.*]] = copy_value %0
@@ -29,8 +28,9 @@ func mayThrow() throws {}
 // CHECK:         [[LINK2:%.*]] = ref_element_addr {{.*}} #Fields.link
 // CHECK-NEXT:    [[LINK2_ACCESS:%.*]] = begin_access [modify] [dynamic] [[LINK2]]
 // CHECK-NEXT:    store {{.*}} to [assign] [[LINK2_ACCESS]]
-// CHECK:         [[COPY:%.*]] = copy_value [[SELF]]
-// CHECK-NEXT:    init_existential_ref [[COPY]]
+// CHECK:         [[SELF:%.*]] = end_init_let_ref
+// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[SELF]]
+// CHECK-NEXT:    init_existential_ref [[BORROW]]
 // CHECK:         return [[SELF]]
 // CHECK:       } // end sil function '$s4test6FieldsC4linkAcA4LinkC_tcfc'
 class Fields {
@@ -56,11 +56,11 @@ class Fields {
 // CHECK:         [[U:%.*]] = ref_element_addr {{.*}} #Generic.u
 // CHECK-NEXT:    [[ARG2:%.*]] = copy_value %0
 // CHECK-NEXT:    store [[ARG2]] to [init] [[U]]
-// CHECK:         end_init_let_ref
 // CHECK:         [[T2:%.*]] = ref_element_addr {{.*}} #Generic.t
 // CHECK-NEXT:    [[T2_ACCESS:%.*]] = begin_access [modify] [dynamic] [[T2]]
 // CHECK-NEXT:    [[ARG3:%.*]] = copy_value %0
 // CHECK-NEXT:    store [[ARG3]] to [assign] [[T2_ACCESS]]
+// CHECK:         end_init_let_ref
 // CHECK:       } // end sil function '$s4test7GenericC1tACyxGx_tcfc'
 class Generic<T> {
   var t: T

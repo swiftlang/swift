@@ -140,6 +140,28 @@ func testMixedConsumingAndBorrowingCaptures() {
 // CHECK-NEXT: Tracker(mixed) deinit
 testMixedConsumingAndBorrowingCaptures()
 
+// A closure's context borrows a `borrowing` parameter that it captures, so
+// neither a call nor a drop of the closure destroys the parameter.
+@inline(never)
+func testBorrowingParameterCapture(_ t: borrowing Tracker, call: Bool) {
+  if call {
+    consume({ _ in print("Tracker(\(t.tag)) captured") }, Payload(tag: ""))
+  } else {
+    dontConsume { _ in print("Tracker(\(t.tag)) captured") }
+  }
+  print("Tracker(\(t.tag)) still alive")
+}
+
+// CHECK-NEXT: Tracker(borrowing) captured
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) still alive
+// CHECK-NEXT: Tracker(borrowing) deinit
+do {
+  let t = Tracker("borrowing")
+  testBorrowingParameterCapture(t, call: true)
+  testBorrowingParameterCapture(t, call: false)
+}
+
 // A zero-sized `~Copyable` consuming capture must still be destroyed
 // (regression test: an empty capture must not be dropped from the
 // context's layout, since it would then never be destroyed at all).
@@ -718,3 +740,58 @@ do {
 // An at-most-once function has the layout of an ordinary function.
 // CHECK-NEXT: layout: true
 print("layout: \(MemoryLayout<@callable(once) () -> Void>.size == MemoryLayout<() -> Void>.size && MemoryLayout<@callable(once) () -> Void>.alignment == MemoryLayout<() -> Void>.alignment)")
+
+// An at-most-once closure with a consumed noncopyable capture, which is
+// forwarded to a generic function through a heap-allocated re-abstraction
+// thunk.
+
+@inline(never)
+func runGeneric<R>(_ fn: @callable(once) () -> R) -> R { fn() }
+
+@inline(__always)
+func forwardToGeneric(_ fn: @callable(once) () -> Int) -> Int { runGeneric(fn) }
+
+@inline(never)
+func consumeResource(_ r: consuming Resource) -> Int { r.tag.count }
+
+@inline(never)
+func testForwardConsumedCapture(_ tag: String) -> Int {
+  let r = Resource(tag)
+  return forwardToGeneric { consumeResource(r) }
+}
+
+// CHECK-NEXT: Resource(forwarded) deinit
+// CHECK-NEXT: forwarded consumed capture: 9
+print("forwarded consumed capture: \(testForwardConsumedCapture("forwarded"))")
+
+// An inlined at-most-once closure that consumes a noncopyable capture and is
+// called on either of two paths.
+
+@inline(never)
+func useResource(_ r: consuming Resource) { r.use() }
+
+@inline(__always)
+func callOnEitherPath(_ first: Bool, _ body: @callable(once) () -> Void) {
+  if first {
+    print("first path")
+    body()
+  } else {
+    print("second path")
+    body()
+  }
+}
+
+@inline(never)
+func testCalledOnEitherPath(_ first: Bool, _ tag: String) {
+  let r = Resource(tag)
+  callOnEitherPath(first) { useResource(r) }
+}
+
+// CHECK-NEXT: first path
+// CHECK-NEXT: Resource(either first) used
+// CHECK-NEXT: Resource(either first) deinit
+testCalledOnEitherPath(true, "either first")
+// CHECK-NEXT: second path
+// CHECK-NEXT: Resource(either second) used
+// CHECK-NEXT: Resource(either second) deinit
+testCalledOnEitherPath(false, "either second")

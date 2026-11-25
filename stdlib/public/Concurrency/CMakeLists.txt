@@ -10,9 +10,10 @@
 #
 #===----------------------------------------------------------------------===#
 
-# ExecutorImpl.h includes ExecutorTypes.h from the EmbeddedPlatform headers.
+# ExecutorImpl.h includes SwiftPlatform/ExecutorTypes.h from the
+# EmbeddedPlatform headers.
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
-  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift)
+  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
 
 set(swift_concurrency_private_link_libraries)
@@ -104,6 +105,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   Error.cpp
   ExecutorBridge.cpp
   ExecutorChecks.cpp
+  SplitContinuation.cpp
   Task.cpp
   TaskAlloc.cpp
   TaskStatus.cpp
@@ -287,6 +289,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+    -Xfrontend -enable-sil-opaque-values
   ${swift_concurrency_options}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
@@ -378,6 +381,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
+    if(NOT "${triple}" MATCHES "-none-")
+      list(APPEND extra_c_compile_flags
+        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
+    endif()
+
     if("${arch}" MATCHES "wasm32")
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
         ExecutorImpl.swift
@@ -423,6 +431,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       SWIFT_COMPILE_FLAGS
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+        -Xfrontend -enable-sil-opaque-values
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
         -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
@@ -468,6 +477,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         DEPENDS
           "embedded-concurrency-${mod}"
 
+        SWIFT_COMPILE_FLAGS
+          -Xfrontend -enable-sil-opaque-values
         C_COMPILE_FLAGS
           ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
           -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
@@ -497,8 +508,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   swift_install_in_component(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
-    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift/ExecutorTypes.h"
     DESTINATION "include/swift"
+    COMPONENT compiler)
+
+  swift_install_in_component(FILES
+    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include/SwiftPlatform/ExecutorTypes.h"
+    DESTINATION "include/SwiftPlatform"
     COMPONENT compiler)
 
   add_dependencies(embedded-concurrency "copy_executor_impl_header")

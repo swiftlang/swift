@@ -13,7 +13,7 @@ struct NC: ~Copyable {
   consuming func eat() {}
   borrowing func look() {}
 }
-func takeNC(_ x: consuming NC) {} // expected-note 8 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
+func takeNC(_ x: consuming NC) {} // expected-note 12 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
 func useNC(_ x: borrowing NC) {}
 func takeAndUse(_ a: consuming NC, _ b: borrowing NC) {} // expected-note {{consider making this parameter 'borrowing' if 'takeAndUse' does not need ownership of it}} {{22-31=borrowing}}
 func takeGeneric<T: ~Copyable>(_ t: consuming T) {} // expected-note {{consider making this parameter 'borrowing' if 'takeGeneric' does not need ownership of it}}
@@ -23,6 +23,32 @@ func usedAfterConsume() {
   let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x) // expected-error {{'x' used after consume}}
+}
+
+func usedAfterConsumeLets() {
+  let x = NC(c: C())     // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  let y = x              // expected-note {{consumed here}}
+  useNC(x)                    // expected-error {{'x' used after consume}}
+  _ = y
+}
+
+func multiAssignConsume(_ x: inout NC) {  // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  var y = NC(c: C())
+  y = x            // expected-note {{consumed here}}
+  y = x            // expected-error {{'x' consumed more than once}}
+  _ = y
+}
+
+func inoutOwnedArgConsumedTwice(_ x: inout NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
+  x = NC(c: C())
+}
+
+func inoutReturned(_ x: inout NC) -> NC {
+  let y = x
+  x = NC(c: C())
+  return y
 }
 
 func consumedTwice() {
@@ -320,4 +346,162 @@ func severalErrors(_ b: Bool) {
   takeNC(x) // expected-error {{'x' consumed more than once}}
             // expected-note@-1 {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x) // expected-error {{'x' used after consume}}
+}
+
+// --- closure captures must be reinitialized before the closure returns ---
+
+func callNonEscaping(_ f: () -> ()) { f() }
+var escapedClosure: () -> () = {}
+func callEscaping(_ f: @escaping () -> ()) { escapedClosure = f }
+
+func captureNotReinitialized() {
+  var x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  callNonEscaping {
+    takeNC(x) // expected-error {{missing reinitialization of closure capture 'x' after consume}}
+  }
+  x = NC(c: C())
+  useNC(x)
+}
+
+func captureReinitialized() {
+  var x = NC(c: C())
+  callNonEscaping {
+    takeNC(x)
+    x = NC(c: C())
+  }
+  useNC(x)
+}
+
+func captureConsumedBeforeTrap() {
+  var x = NC(c: C())
+  callNonEscaping {
+    takeNC(x)
+    fatalError()
+  }
+  x = NC(c: C())
+  useNC(x)
+}
+
+func consumingCaptureNotReinitialized(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  callNonEscaping {
+    takeNC(x) // expected-error {{missing reinitialization of closure capture 'x' after consume}}
+  }
+}
+
+func consumingCaptureBorrowed(_ x: consuming NC) {
+  callNonEscaping { useNC(x) }
+}
+
+func copyableCaptureConsumeOperator() {
+  var c = C()
+  callNonEscaping {
+    _ = consume c // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+  c = C()
+  use(c)
+}
+
+func copyableCaptureConsumeOperatorReinitialized() {
+  var c = C()
+  callNonEscaping {
+    _ = consume c
+    c = C()
+  }
+  use(c)
+}
+
+func consumingCopyableCapture(_ c: consuming C) {
+  callNonEscaping {
+    take(c) // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+}
+
+func consumingCopyableCaptureExplicitCopy(_ c: consuming C) {
+  callNonEscaping { take(copy c) }
+}
+
+func escapingCaptureNotReinitialized(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  callEscaping {
+    takeNC(x) // expected-error {{missing reinitialization of closure capture 'x' after consume}}
+  }
+}
+
+func escapingCaptureReinitialized(_ x: consuming NC) {
+  callEscaping {
+    takeNC(x)
+    x = NC(c: C())
+  }
+}
+
+func escapingCaptureBorrowed(_ x: consuming NC) {
+  callEscaping { useNC(x) }
+}
+
+func escapingCopyableCapture(_ c: consuming C) {
+  callEscaping {
+    take(c) // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+}
+
+func escapingCopyableCaptureExplicitCopy(_ c: consuming C) {
+  callEscaping { take(copy c) }
+}
+
+func escapingCaptureConsumeOperator() {
+  var c = C()
+  callEscaping {
+    _ = consume c // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+  c = C()
+  use(c)
+}
+
+func escapingCaptureConsumeOperatorReinitialized() {
+  var c = C()
+  callEscaping {
+    _ = consume c
+    c = C()
+  }
+  use(c)
+}
+
+// --- existentials ---
+
+protocol P: ~Copyable {
+  consuming func con()
+  mutating func mut()
+}
+struct PBox: ~Copyable { var e: any P & ~Copyable }
+func takeP(_ x: consuming any P & ~Copyable) {} // expected-note 2 {{consider making this parameter 'borrowing' if 'takeP' does not need ownership of it}}
+
+extension PBox {
+  mutating func consumeWithoutReinit() {
+    e.con() // expected-error {{missing reinitialization of inout parameter 'self.e' after consume}}
+  }
+}
+
+func existentialMutatedAfterConsume(_ x: consuming any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  takeP(x) // expected-note {{consumed here; 'takeP' takes ownership of this argument}}
+  x.mut() // expected-error {{'x' used after consume}}
+}
+
+func existentialConsumedInLoop(_ x: consuming any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  for _ in 0..<3 {
+    x.con() // expected-error {{'x' consumed in a loop}}
+  }
+}
+
+func existentialBorrowedConsumed(_ x: borrowing any P & ~Copyable) { // expected-note {{make 'x' a 'consuming' parameter to take ownership of it}}
+  takeP(x) // expected-error {{'x' is borrowed and cannot be consumed}}
+}
+
+func existentialInoutNotReinitialized(_ x: inout any P & ~Copyable) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  x.con() // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
+}
+
+func existentialInoutReinitializedOnOneBranch(_ x: inout any P & ~Copyable, _ y: consuming any P & ~Copyable, _ b: Bool) { // expected-note {{'x' declared here with noncopyable type 'any P & ~Copyable'}}
+  x.con() // expected-error {{missing reinitialization of inout parameter 'x' after consume}}
+  if b {
+    x = y
+  }
 }

@@ -213,92 +213,149 @@ public:
   enum class Kind : uint8_t {
     /// There was an error resolving this scope.
     Error,
+
     /// The global scope, which outlives every other scope. Lives "sufficiently
     /// long". Escapable types have immortal scope.
     Immortal,
-    /// A scope parameter of an enclosing type.
+
+    /// A scope parameter of an enclosing function or type.
     Param,
+
     /// The scope for the body of a call to a given function. Represents the
     /// access scope of a parameter which isn't bound or referred to. Only known
     /// to live for the body of the call.
     Body,
 
-    Last_Kind = Body
+    /// A local access scope in the current function *other* than a parameter.
+    /// Note that lifetime analysis can sometimes unify one of these local
+    /// scopes with a parameter scope or even the immortal scope; other
+    /// code should not assume that they cannot outlast such scopes.
+    Local,
+
+    /// A scope variable introduced within a constraint system.
+    /// Should be eliminated after solving.
+    UnresolvedVariable,
   };
 
 private:
-  static bool hasDepth(Kind kind) {
-    switch (kind) {
-    case Kind::Error:
-    case Kind::Immortal:
-      return false;
-    case Kind::Param:
-    case Kind::Body:
-      return true;
-    }
-    llvm_unreachable("bad kind");
-  }
+  using BitsType = uint32_t;
+  static constexpr unsigned NumBits = 32;
 
-  static bool hasIndex(Kind kind) {
-    switch (kind) {
-    case Kind::Error:
-    case Kind::Immortal:
-    case Kind::Body:
-      return false;
-    case Kind::Param:
-      return true;
-    }
-    llvm_unreachable("bad kind");
-  }
+  enum class StorageKind : BitsType {
+    Singleton,
+    Param,
+    Local,
+    UnresolvedVariable,
+    Last_Kind = Param
+  };
 
-  static constexpr unsigned NumKindBits = 2;
-  static constexpr unsigned NumDataBits = 32 - NumKindBits;
-  static constexpr unsigned NumIndexBits = 15;
-  static constexpr unsigned NumDepthBits = NumDataBits - NumIndexBits;
-  static constexpr uint32_t IndexMask =
-      llvm::maskTrailingOnes<uint32_t>(NumIndexBits);
-  static constexpr unsigned DepthShift = NumIndexBits;
-  static_assert(llvm::isUInt<NumKindBits>(unsigned(Kind::Last_Kind)),
+  static constexpr unsigned NumStorageKindBits = 2;
+  static constexpr BitsType StorageKindMask =
+    ((BitsType(1) << NumStorageKindBits) - 1) << 0;
+  static_assert(llvm::isUInt<NumStorageKindBits>(BitsType(StorageKind::Last_Kind)),
                 "unable to fit a ScopeRef::Kind in the given number of bits");
 
-  uint32_t TheKind : NumKindBits;
-  /// Interpreted according to the kind:
-  /// - all zero for `Error` and `Immortal`,
-  /// - `NumDepthBits` then `NumIndexBits` for `Param`
-  /// - `NumDepthBits` followed by `NumIndexBits` of 0 for `Body`
-  uint32_t Data : NumDataBits;
+  static constexpr unsigned DataShift = NumStorageKindBits;
+  static constexpr unsigned NumDataBits = NumBits - DataShift;
+  static constexpr BitsType DataMask =
+    ((BitsType(1) << NumDataBits) - 1) << DataShift;
 
-  ScopeRef(Kind kind, uint32_t data) : TheKind(unsigned(kind)), Data(data) {
+  static constexpr unsigned IndexShift = DataShift;
+  static constexpr unsigned NumIndexBits = 15;
+  static constexpr BitsType IndexMask =
+    ((BitsType(1) << NumIndexBits) - 1) << IndexShift;
+
+  static constexpr unsigned DepthShift = DataShift + NumIndexBits;
+  static constexpr unsigned NumDepthBits = NumDataBits - NumIndexBits;
+  static constexpr BitsType DepthMask =
+    ((BitsType(1) << NumDepthBits) - 1) << DepthShift;
+  static_assert(DepthShift + NumDepthBits == NumBits, "used all bits");
+
+  /// StorageKind (0...1) | Data (2...31)
+  /// --------------------+---------------------
+  /// Singleton           | one of the singleton Kinds (2...31)
+  /// Param               | Index (2...17)          | Depth (18...31)
+  ///                     |   (index 0 is Body)     |
+  /// Local               | Data (2...31)
+  /// Variable            | Data (2...31)
+  BitsType Bits;
+
+  StorageKind getStorageKind() const {
+    return StorageKind(Bits & StorageKindMask);
+  }
+  BitsType getRawData() const {
+    return (Bits >> DataShift);
+  }
+  BitsType getRawIndex() const {
+    return (Bits & IndexMask) >> IndexShift;
+  }
+  BitsType getRawDepth() const {
+    return (Bits & DepthMask) >> DepthShift;
+  }
+  static BitsType getRawParamData(unsigned rawIndex, unsigned rawDepth) {
+    ASSERT(llvm::isUInt<NumDepthBits>(rawDepth) &&
+           llvm::isUInt<NumIndexBits>(rawIndex) &&
+           "scope reference overflow");
+    return BitsType(rawIndex | (rawDepth << NumIndexBits));
+  }
+
+  ScopeRef(StorageKind kind, BitsType data)
+      : Bits(BitsType(kind) | (data << DataShift)) {
     ASSERT(llvm::isUInt<NumDataBits>(data) && "scope reference overflow");
   }
 
 public:
-  static ScopeRef forError() { return {Kind::Error, 0}; }
+  static ScopeRef forError() {
+    return {StorageKind::Singleton, BitsType(Kind::Error)};
+  }
 
-  static ScopeRef forImmortal() { return {Kind::Immortal, 0}; }
+  static ScopeRef forImmortal() {
+    return {StorageKind::Singleton, BitsType(Kind::Immortal)};
+  }
 
   static ScopeRef forParam(ScopeDepth depth, unsigned index) {
-    ASSERT(llvm::isUInt<NumDepthBits>(depth.Value) &&
-           llvm::isUInt<NumIndexBits>(index) &&
-           "scope reference overflow");
-    return {Kind::Param, (depth.Value << DepthShift) | index};
+    return {StorageKind::Param, getRawParamData(index + 1, depth.Value)};
   }
 
   static ScopeRef forBody(ScopeDepth depth) {
-    ASSERT(llvm::isUInt<NumDepthBits>(depth.Value) &&
-           "scope reference overflow");
-    return {Kind::Body, depth.Value << DepthShift};
+    return {StorageKind::Param, getRawParamData(0, depth.Value)};
   }
 
   /// Create a Body scope at depth 0, to use as the default access scope of a
   /// parameter.
   static ScopeRef forCallBody() { return forBody(ScopeDepth::zero()); }
 
-  Kind getKind() const { return Kind(TheKind); }
+  static ScopeRef forLocal(unsigned index) {
+    return {StorageKind::Local, index};
+  }
+
+  static ScopeRef forUnresolvedVariable(unsigned index) {
+    return {StorageKind::UnresolvedVariable, index};
+  }
+
+  Kind getKind() const {
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+      // We directly store the singleton Kind value as Data.
+      return Kind(getRawData());
+
+    case StorageKind::Param:
+      return getRawIndex() == 0 ? Kind::Body : Kind::Param;
+
+    case StorageKind::Local:
+      return Kind::Local;
+
+    case StorageKind::UnresolvedVariable:
+      return Kind::UnresolvedVariable;
+    }
+    llvm_unreachable("bad kind");
+  }
 
   /// Is this the placeholder error scope, used when there was an error
   /// resolving a scope specifier?
-  bool isError() const { return getKind() == Kind::Error; }
+  bool isError() const {
+    return *this == forError();
+  }
 
   /// The number of function types between this reference and its binder.
   ///
@@ -309,8 +366,8 @@ public:
   /// Here `&a` has depth 1, since the type of `body` is between it and the
   /// type of `with`.
   ScopeDepth getDepth() const {
-    ASSERT(hasDepth(getKind()));
-    return ScopeDepth(Data >> DepthShift);
+    ASSERT(getStorageKind() == StorageKind::Param);
+    return ScopeDepth(getRawDepth());
   }
 
   /// The index of the scope parameter in its binder.
@@ -325,22 +382,34 @@ public:
   /// `&b`, the access scope of `b`, has index 2, since the result refers to it.
   /// The accesses of `a`, `x`, and `y` are body scopes and don't have an index.
   unsigned getIndex() const {
-    ASSERT(hasIndex(getKind()));
-    return Data & IndexMask;
+    ASSERT(getKind() == Kind::Param);
+    return getRawIndex() - 1;
+  }
+
+  unsigned getLocalIndex() const {
+    ASSERT(getKind() == Kind::Local);
+    return getRawData();
+  }
+
+  unsigned getUnresolvedVariableIndex() const {
+    ASSERT(getKind() == Kind::UnresolvedVariable);
+    return getRawData();
   }
 
   /// Reference the same scope from \p by more function types in.
   ///
-  /// Immortal scopes are not shifted, since they are global.
+  /// Singleton scopes are not shifted, since they are global.
+  /// Local scopes might need to deal with this?
+  /// Unresolved scope variables in the constraint system never should.
   ScopeRef shifted(ScopeDepth by) const {
-    switch (getKind()) {
-    case Kind::Error:
-    case Kind::Immortal:
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+    case StorageKind::Local:
+    case StorageKind::UnresolvedVariable:
       return *this;
-    case Kind::Param:
-      return forParam(ScopeDepth(getDepth().Value + by.Value), getIndex());
-    case Kind::Body:
-      return forBody(ScopeDepth(getDepth().Value + by.Value));
+    case StorageKind::Param:
+      return {StorageKind::Param,
+              getRawParamData(getRawIndex(), getRawDepth() + by.Value)};
     }
     llvm_unreachable("unhandled kind");
   }
@@ -348,18 +417,28 @@ public:
   /// Return the recursive properties that would apply to a type
   /// with this scope reference as a component.
   RecursiveTypeProperties getRecursiveProperties() const {
-    if (isError()) return RecursiveTypeProperties::HasError;
-    return {};
+    switch (getStorageKind()) {
+    case StorageKind::Singleton:
+      if (isError()) return RecursiveTypeProperties::HasError;
+      return {};
+    case StorageKind::Local:
+    case StorageKind::Param:
+      return {};
+    case StorageKind::UnresolvedVariable:
+      return (RecursiveTypeProperties::HasTypeVariable |
+              RecursiveTypeProperties::SolverAllocated);
+    }
+    llvm_unreachable("unhandled kind");
   }
 
   /// Prints `^depth.index`, `^depth.body`, or `immortal`.
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
 
-  uint32_t getOpaqueValue() const { return llvm::bit_cast<uint32_t>(*this); }
+  BitsType getOpaqueValue() const { return Bits; }
 
   friend bool operator==(ScopeRef lhs, ScopeRef rhs) {
-    return lhs.getOpaqueValue() == rhs.getOpaqueValue();
+    return lhs.Bits == rhs.Bits;
   }
   friend bool operator!=(ScopeRef lhs, ScopeRef rhs) { return !(lhs == rhs); }
 };

@@ -292,6 +292,7 @@ LANGUAGE_FEATURE(BuiltinGepProjection, 0, "gepProjection Builtin")
 LANGUAGE_FEATURE(BuiltinDereferenceable, 0, "Builtin.dereferenceable")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 LANGUAGE_FEATURE(BuiltinContinuationNonCopyableSuccess, 0, "Builtin.{resume,withUnsafe}*Continuation* relaxed to allow Success: ~Copyable")
+LANGUAGE_FEATURE(BuiltinSplitContinuations, 564, "Split continuation builtins")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 /// Allow the kind of an OS version query function in the
 /// `availability.osversion` semantics attribute.
@@ -302,6 +303,13 @@ LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @
 LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
 LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
+LANGUAGE_FEATURE(SubscriptParametersWithOwnership, 562, "Ownership of subscript parameters")
+
+// The stdlib's CChar32 is a typealias for UInt32 rather than Unicode.Scalar.
+// Compilers without this feature ship a CxxStdlib overlay that requires
+// CChar32 == Unicode.Scalar, so the stdlib interface prints the old typealias
+// for them.
+SUPPRESSIBLE_LANGUAGE_FEATURE(CChar32IsUInt32, 0, "CChar32 is UInt32")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -620,7 +628,7 @@ LANGUAGE_FEATURE(BorrowingForLoop, 0, "borrowing for-in loops")
 SUPPRESSIBLE_LANGUAGE_FEATURE(InlineAlways, 496, "@inline(always) attribute")
 
 /// Allow use of the @unsafe(always) attribute
-SUPPRESSIBLE_LANGUAGE_FEATURE(AlwaysUnsafeAttribute, 0, "@unsafe(always) attribute")
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AlwaysUnsafeAttribute, false)
 
 /// The Deinitable invertible protocol, which Copyable inherits
 SUPPRESSIBLE_LANGUAGE_FEATURE(DeinitableProtocol, 0, "Deinitable protocol")
@@ -634,10 +642,6 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
-
-/// Enable subscript parameters that have ownership (inout, borrowing,
-/// consuming).
-EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
 
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
@@ -690,16 +694,16 @@ LANGUAGE_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe, 0,
 /// Handle lookup for llvm intrinsics like aarch64.neon.smull and .sqxtn
 LANGUAGE_FEATURE(BuiltinExtendVectorLanes, 0, "Support for accessing LLVM Builtins that widen or narrow vector lanes")
 
-/// Infer the return ownership of C++ methods that return libkern's OSObject or
-/// one of its subclasses from the method's name, following libkern's
-/// conventions.
-EXPERIMENTAL_FEATURE(LibkernOwnershipConventions, true)
-
 /// Emit `resignRemoteID` calls in remote distributed actor deinits.
 LANGUAGE_FEATURE(DistributedActorResignRemoteID, 548, "resignRemoteID for remote distributed actor references")
 
 /// Enable @_target, a per-function target-features/CPU override.
 EXPERIMENTAL_FEATURE(TargetAttribute, true)
+
+/// Enable @_tailAllocated, which describes the tail-allocated elements of a
+/// class so that typed deallocation in Embedded Swift can pass the size and
+/// type ID of the allocation.
+EXPERIMENTAL_FEATURE(TailAllocatedAttribute, true)
 
 /// Enable type-based scope restrictions on ~Escapable types.
 EXPERIMENTAL_FEATURE(ScopeRestrictions, false)

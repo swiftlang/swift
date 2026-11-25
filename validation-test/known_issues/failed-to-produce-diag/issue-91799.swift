@@ -23,6 +23,15 @@ public struct ProperPassthroughMacro: BodyMacro {
   }
 }
 
+public struct CallMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) -> ExprSyntax {
+    return "perform(closure: \(node.arguments.last!.expression))"
+  }
+}
+
 //--- main.swift
 @attached(body)
 macro ProperPassthrough() = #externalMacro(module: "MacroDefinition", type: "ProperPassthroughMacro")
@@ -59,3 +68,16 @@ extension Subject {
     self.run { _ in self.value += 1 }
   }
 }
+
+@freestanding(expression)
+macro call(block: () -> Void) = #externalMacro(module: "MacroDefinition", type: "CallMacro")
+
+func perform(closure: () -> Void) {}
+let count = 42
+
+#call(block: { [count] in // expected-note {{in expansion of macro 'call' here}}
+  print(count)
+})
+// expected-expansion@-3:1 {{
+//   expected-error@1:1 {{failed to produce diagnostic for expression; please submit a bug report}}
+// }}

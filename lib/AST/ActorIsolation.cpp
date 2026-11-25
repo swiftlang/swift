@@ -210,4 +210,5 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
   case GlobalActor:
     return areTypesEqual(lhs.globalActor, rhs.globalActor);
   }
+  llvm_unreachable("covered switch");
 }

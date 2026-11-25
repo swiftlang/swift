@@ -657,6 +657,7 @@ public:
     case MacroWalking::None:
       return std::make_pair(false, false);
     }
+    llvm_unreachable("covered switch");
   }
 
   /// This method configures whether the walker should visit the body of a

@@ -331,7 +331,9 @@ namespace {
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
                           bool useStructLayouts) const override {
-      if (!useStructLayouts) {
+      // A scalar entry would release the context instead of destroying it.
+      if (!useStructLayouts ||
+          isClosureContextDestroyedDirectly(IGM, FormalType)) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       } else if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -378,6 +380,8 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        assert(!isClosureContextDestroyedDirectly(IGF.IGM, FormalType) &&
+               "retaining a context that is destroyed without a release");
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
@@ -386,16 +390,27 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        // In Embedded Swift, a noncopyable closure owns its context, so drop
+        // it without the runtime, which isn't available with -no-allocations.
+        if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+          emitDestroyEmbeddedNoncopyableClosureContext(IGF, data);
+          return;
+        }
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
-      if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
+      if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         IGF.Builder.CreateStore(context, dataAddr);
-      else
+      } else if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+        llvm::Value *oldContext = IGF.Builder.CreateLoad(dataAddr);
+        IGF.Builder.CreateStore(context, dataAddr);
+        emitDestroyEmbeddedNoncopyableClosureContext(IGF, oldContext);
+      } else {
         IGF.emitNativeStrongAssign(context, dataAddr);
+      }
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -1879,19 +1894,13 @@ getPartialApplicationForwarderEmission(
 }
 
 /// Returns the fields of a stack-promoted closure context that the context
-/// doesn't own. A borrowed `~Copyable` capture is a bitwise copy of a value
-/// that the enclosing function still owns, so nothing in the context may
-/// destroy it.
-llvm::BitVector
-getUnownedContextFields(HeapLayout const &layout,
-                        ArrayRef<ParameterConvention> conventions) {
+/// doesn't own.
+static llvm::BitVector
+getUnownedContextFields(ArrayRef<ParameterConvention> conventions,
+                        ArrayRef<unsigned> borrowedFields) {
   llvm::BitVector unownedFields(conventions.size());
-  for (unsigned i : indices(conventions)) {
-    auto fieldTy = layout.getElementTypes()[i];
-    if (fieldTy && conventions[i] == ParameterConvention::Direct_Guaranteed &&
-        fieldTy.isMoveOnly())
-      unownedFields.set(i);
-  }
+  for (unsigned i : borrowedFields)
+    unownedFields.set(i);
   return unownedFields;
 }
 
@@ -1991,7 +2000,8 @@ static llvm::Value *emitPartialApplicationForwarder(
     bool calleeHasContext, const Signature &origSig,
     CanSILFunctionType origType, CanSILFunctionType substType,
     CanSILFunctionType outType, SubstitutionMap subs, HeapLayout const *layout,
-    ArrayRef<ParameterConvention> conventions) {
+    ArrayRef<ParameterConvention> conventions,
+    ArrayRef<unsigned> borrowedFields) {
   auto outSig = IGM.getSignature(outType);
   llvm::AttributeList outAttrs = outSig.getAttributes();
   llvm::FunctionType *fwdTy = outSig.getType();
@@ -2173,7 +2183,7 @@ static llvm::Value *emitPartialApplicationForwarder(
   llvm::BitVector consumedFields(layout ? layout->getElements().size() : 0);
   llvm::BitVector unownedFields;
   if (layout && outType->isNoEscape())
-    unownedFields = getUnownedContextFields(*layout, conventions);
+    unownedFields = getUnownedContextFields(conventions, borrowedFields);
 
   // If there's a data pointer required, but it's a swift-retainable
   // value being passed as the context, just forward it down.
@@ -2578,6 +2588,8 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   SmallVector<const TypeInfo *, 4> argTypeInfos;
   SmallVector<SILType, 4> argValTypes;
   SmallVector<ParameterConvention, 4> argConventions;
+  // The fields of a stack-promoted context that hold the values it borrows.
+  SmallVector<unsigned, 2> borrowedFields;
 
   // A context's HeapLayout stores all of the partially applied args.
   // A HeapLayout is "fixed" if all of its fields have a fixed layout.
@@ -2624,6 +2636,19 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     if (schema.empty() && !param.isFormalIndirect() &&
         ti.isTriviallyDestroyable(ResilienceExpansion::Maximal))
       return;
+
+    // A stack-promoted context borrows each value that the closure doesn't
+    // consume. The context of a noncopyable closure, whose call consumes it,
+    // can't be such a value itself.
+    bool isBorrowed =
+        outType->isNoEscape() &&
+        (param.getConvention() == ParameterConvention::Direct_Guaranteed ||
+         param.getConvention() == ParameterConvention::Direct_Unowned);
+    if (isBorrowed) {
+      borrowedFields.push_back(argConventions.size());
+      if (outType->isNoncopyable())
+        hasSingleSwiftRefcountedContext = No;
+    }
 
     argValTypes.push_back(argType);
     argConventions.push_back(param.getConvention());
@@ -2741,8 +2766,11 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // A nondeinitable closure always gets a context of its own so that its
   // destructor can trap when the closure is dropped. That means it can't take
-  // advantage of the single ref-counted object optimization.
-  if (outType->isNondeinitable())
+  // advantage of the single ref-counted object optimization. Neither can a
+  // noncopyable closure in Embedded Swift, which is dropped by calling the
+  // destructor of its context directly.
+  if (outType->isNondeinitable() ||
+      isClosureContextDestroyedDirectly(IGF.IGM, outType))
     hasSingleSwiftRefcountedContext = No;
 
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
@@ -2797,10 +2825,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
     auto origSig = IGF.IGM.getSignature(origType);
 
-    llvm::Value *forwarder =
-      emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
-                                      origSig, origType, substType,
-                                      outType, subs, nullptr, argConventions);
+    llvm::Value *forwarder = emitPartialApplicationForwarder(
+        IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
+        outType, subs, nullptr, argConventions, borrowedFields);
     forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
     forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
     out.add(forwarder);
@@ -2872,7 +2899,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
         // and so they cannot be destroyed.
         llvm::BitVector unownedFields =
-            getUnownedContextFields(layout, argConventions);
+            getUnownedContextFields(argConventions, borrowedFields);
 
         auto descriptor = IGF.IGM.getAddrOfCaptureDescriptor(SILFn, origType,
                                                        substType, subs,
@@ -2973,7 +3000,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   llvm::Value *forwarder = emitPartialApplicationForwarder(
       IGF.IGM, staticFn, fnContext != nullptr, origSig, origType, substType,
-      outType, subs, &layout, argConventions);
+      outType, subs, &layout, argConventions, borrowedFields);
   forwarder = emitPointerAuthSign(IGF, forwarder, outAuthInfo);
   forwarder = IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
   out.add(forwarder);
@@ -3182,7 +3209,9 @@ llvm::Constant *irgen::emitGlobalBlock(IRGenModule &IGM,
       llvm::ConstantExpr::getBitCast(invokeFunction, IGM.FunctionPtrTy),
       IGM.getOptions().PointerAuth.BlockInvocationFunctionPointers,
       invokeTy);
-  header.add(descriptor);
+  header.addSignedPointer(descriptor,
+                          IGM.getOptions().PointerAuth.BlockDescriptorPointers,
+                          PointerAuthEntity());
   header.finishAndAddTo(blockFields);
 
   blockFields.addAlignmentPadding(storageTL.getFixedAlignment());
@@ -3223,8 +3252,8 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   llvm::Value *invokeVal = llvm::ConstantExpr::getBitCast(invokeFunction,
                                                       IGF.IGM.FunctionPtrTy);
 
-  auto descriptorVal = llvm::ConstantExpr::getBitCast(descriptor,
-                                                      IGF.IGM.Int8PtrTy);
+  llvm::Value *descriptorVal =
+      llvm::ConstantExpr::getBitCast(descriptor, IGF.IGM.Int8PtrTy);
 
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
@@ -3245,8 +3274,13 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
   }
   IGF.Builder.CreateStore(invokeVal, invokeAddr);
 
-  IGF.Builder.CreateStore(descriptorVal,
-                          IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
+  auto descriptorAddr = IGF.Builder.CreateStructGEP(headerAddr, 4, layout);
+  if (auto &schema = IGF.getOptions().PointerAuth.BlockDescriptorPointers) {
+    auto descriptorAuthInfo = PointerAuthInfo::emit(
+        IGF, schema, descriptorAddr.getAddress(), PointerAuthEntity());
+    descriptorVal = emitPointerAuthSign(IGF, descriptorVal, descriptorAuthInfo);
+  }
+  IGF.Builder.CreateStore(descriptorVal, descriptorAddr);
 }
 
 llvm::Value *IRGenFunction::popAsyncContext(llvm::Value *calleeContext) {

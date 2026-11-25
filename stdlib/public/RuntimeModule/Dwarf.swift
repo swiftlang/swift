@@ -622,6 +622,10 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     let abbrevOffset: Address
     let dieBounds: Bounds
 
+    /// True for a unit that we made up from a `.debug_line` program header
+    /// because there is no `.debug_info`; it has no DIEs.
+    let isLineOnly: Bool
+
     enum State {
       case unresolved
       case resolved
@@ -655,7 +659,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
          unitType: Dwarf_UnitType,
          addressSize: Int,
          abbrevOffset: Address,
-         dieBounds: Bounds) {
+         dieBounds: Bounds,
+         isLineOnly: Bool = false) {
       self.baseOffset = baseOffset
       self.version = version
       self.isDwarf64 = isDwarf64
@@ -663,6 +668,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       self.addressSize = addressSize
       self.abbrevOffset = abbrevOffset
       self.dieBounds = dieBounds
+      self.isLineOnly = isLineOnly
     }
 
     var name: String {
@@ -697,20 +703,30 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   @_specialize(kind: full, where S == Elf32Image)
   @_specialize(kind: full, where S == Elf64Image)
   init(source: Source, shouldSwap: Bool = false) throws {
-    // ###TODO: This should be optional, because we can have just line number
-    //          information.  We should test that, too.
-    guard let abbrevSection = source.getDwarfSection(.debugAbbrev),
-          let infoSection = source.getDwarfSection(.debugInfo) else {
-      throw DwarfError.noDebugInformation
+    // We can get by with just a line number program, so .debug_info and
+    // .debug_abbrev are optional as long as there's a .debug_line.
+    let debugInfo = source.getDwarfSection(.debugInfo)
+    let debugAbbrev = source.getDwarfSection(.debugAbbrev)
+    let debugLine = source.getDwarfSection(.debugLine)
+
+    if debugInfo == nil || debugAbbrev == nil {
+      guard debugLine != nil else {
+        throw DwarfError.noDebugInformation
+      }
+      isLineOnly = true
     }
 
-    self.infoSection = infoSection
-    self.abbrevSection = abbrevSection
+    self.infoSection = debugInfo ?? ImageSource(
+      unowned: UnsafeRawBufferPointer(start: nil, count: 0),
+      isMappedImage: false)
+    self.abbrevSection = debugAbbrev ?? ImageSource(
+      unowned: UnsafeRawBufferPointer(start: nil, count: 0),
+      isMappedImage: false)
 
     addrSection = source.getDwarfSection(.debugAddr)
     arangesSection = source.getDwarfSection(.debugARanges)
     strSection = source.getDwarfSection(.debugStr)
-    lineSection = source.getDwarfSection(.debugLine)
+    lineSection = debugLine
     lineStrSection = source.getDwarfSection(.debugLineStr)
     strOffsetsSection = source.getDwarfSection(.debugStrOffsets)
     rangesSection = source.getDwarfSection(.debugRanges)
@@ -720,8 +736,16 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     self.shouldSwap = shouldSwap
 
     // We only read the unit headers here; everything else is done lazily.
-    self.units = try readUnitHeaders()
+    if isLineOnly {
+      self.units = try readLineOnlyUnits()
+    } else {
+      self.units = try readUnitHeaders()
+    }
   }
+
+  /// True if there is no `.debug_info`, in which case all we have is the
+  /// line number programs and our units are made up from those.
+  private(set) var isLineOnly = false
 
   private func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
     if shouldSwap {
@@ -827,6 +851,45 @@ class DwarfReader<S: DwarfSource & AnyObject> {
                         addressSize: Int(addressSize),
                         abbrevOffset: abbrevOffset,
                         dieBounds: dieBounds))
+
+      cursor.pos = next
+    }
+
+    return units
+  }
+
+  /// Make a unit for each line number program in `.debug_line`, for when we
+  /// don't have any DIEs.
+  private func readLineOnlyUnits() throws -> [Unit] {
+    guard let lineSection else {
+      return []
+    }
+
+    let end = lineSection.bytes.count
+    var units: [Unit] = []
+    var cursor = ImageSourceCursor(source: lineSection)
+
+    while cursor.pos < end {
+      let base = cursor.pos
+      let (length, dwarf64) = try cursor.readDwarfLength()
+      let (next, ov) = cursor.pos.addingReportingOverflow(length)
+      guard !ov && next <= end else {
+        throw DwarfError.badLineProgramLength
+      }
+
+      // We don't know the real address size; line number programs find out
+      // for themselves from DW_LNE_set_address.
+      let unit = Unit(baseOffset: base,
+                      version: 0,
+                      isDwarf64: dwarf64,
+                      unitType: .DW_UT_compile,
+                      addressSize: 0,
+                      abbrevOffset: 0,
+                      dieBounds: Bounds(base: 0, size: 0),
+                      isLineOnly: true)
+      unit.lineBase = base
+      unit.state = .resolved
+      units.append(unit)
 
       cursor.pos = next
     }
@@ -2322,12 +2385,39 @@ class DwarfReader<S: DwarfSource & AnyObject> {
         size: nil,
         md5sum: nil
       )
-      info.addressSize = unit.addressSize
+      if !unit.isLineOnly {
+        info.addressSize = unit.addressSize
+      }
       result = info
     }
 
     lineNumberInfoCache[lineBase] = .some(result)
     return result
+  }
+
+  /// Get the line number info for `unit`, with its sequences indexed.
+  ///
+  /// We index the sequences the first time that we need to look something
+  /// up; scanning a unit doesn't need the line number program itself.
+  private func indexedLineNumberInfo(
+    for unit: Unit
+  ) -> DwarfLineNumberInfo? {
+    guard var info = lineNumberInfo(for: unit) else {
+      return nil
+    }
+
+    if info.sequences == nil {
+      do {
+        try info.buildSequenceIndex()
+      } catch {
+        info.sequences = RangeIndex(sortedElements: [])
+      }
+      if let lineBase = unit.lineBase {
+        lineNumberInfoCache[lineBase] = .some(info)
+      }
+    }
+
+    return info
   }
 
   typealias SourceLocation = SymbolicatedBacktrace.SourceLocation
@@ -2336,21 +2426,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     for address: Address
   ) throws -> SourceLocation? {
     for unit in unitsContaining(address) {
-      guard var info = lineNumberInfo(for: unit) else {
+      guard var info = indexedLineNumberInfo(for: unit) else {
         continue
-      }
-
-      // Index the sequences the first time that we need to look something
-      // up; scanning a unit doesn't need the line number program itself.
-      if info.sequences == nil {
-        do {
-          try info.buildSequenceIndex()
-        } catch {
-          info.sequences = RangeIndex(sortedElements: [])
-        }
-        if let lineBase = unit.lineBase {
-          lineNumberInfoCache[lineBase] = .some(info)
-        }
       }
 
       // Only run the sequences that cover the address, in program order
@@ -2405,7 +2482,8 @@ class DwarfReader<S: DwarfSource & AnyObject> {
 
   /// Units that we couldn't get any address ranges for, because their root
   /// DIE doesn't have `DW_AT_low_pc`/`DW_AT_high_pc` or `DW_AT_ranges` (and
-  /// they aren't in `.debug_aranges`).  They might still contain functions.
+  /// they aren't in `.debug_aranges`).  They might still contain functions,
+  /// or have a line number program that tells us where their code is.
   private var unmappedUnits: [Int] = []
 
   /// Maps addresses to the `unmappedUnits` that contain functions or inlined
@@ -2413,6 +2491,38 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   /// we do that the first time that we need it.
   private lazy var unmappedUnitMap: RangeIndex<UnitRange> =
     buildUnmappedUnitMap()
+
+  /// Sort `ranges` by `lowPC`, merging the ranges that overlap or touch and
+  /// belong to the same unit.
+  ///
+  /// A unit only says that it *might* cover an address, so merging its own
+  /// ranges doesn't change what we find, and leaves fewer ranges that
+  /// overlap each other.  We don't merge ranges from different units, since
+  /// we need all of the units that might cover an address.
+  private func sortAndCoalesce(_ ranges: inout [UnitRange]) {
+    ranges.sort { $0.lowPC < $1.lowPC }
+
+    // The merged range for a unit starts where its first range does, so as
+    // we go in `lowPC` order we only ever need to extend the last range that
+    // we kept for the unit, and the result stays sorted.
+    var lastKept = [Int](repeating: -1, count: units.count)
+    var kept = 0
+
+    for ndx in ranges.indices {
+      let range = ranges[ndx]
+      let last = lastKept[range.unitIndex]
+
+      if last >= 0 && range.lowPC <= ranges[last].highPC {
+        ranges[last].highPC = Swift.max(ranges[last].highPC, range.highPC)
+      } else {
+        ranges[kept] = range
+        lastKept[range.unitIndex] = kept
+        kept += 1
+      }
+    }
+
+    ranges.removeSubrange(kept...)
+  }
 
   private func buildUnmappedUnitMap() -> RangeIndex<UnitRange> {
     // Make sure that we've found the unmapped units
@@ -2433,9 +2543,21 @@ class DwarfReader<S: DwarfSource & AnyObject> {
                                 highPC: callSite.highPC,
                                 unitIndex: ndx))
       }
+
+      // A unit with only line number information (for instance because it
+      // was built with -gline-tables-only) has no function DIEs, so the
+      // only addresses that we know it covers are the ones that its line
+      // number program does.
+      if let sequences = indexedLineNumberInfo(for: unit)?.sequences {
+        for sequence in sequences.elements {
+          ranges.append(UnitRange(lowPC: sequence.lowPC,
+                                  highPC: sequence.highPC,
+                                  unitIndex: ndx))
+        }
+      }
     }
 
-    ranges.sort { $0.lowPC < $1.lowPC }
+    sortAndCoalesce(&ranges)
     return RangeIndex(sortedElements: ranges)
   }
 
@@ -2444,7 +2566,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     var covered = [Bool](repeating: false, count: units.count)
 
     // Prefer .debug_aranges, which lets us avoid looking at the units at all.
-    if let arangesSection {
+    if let arangesSection, !isLineOnly {
       do {
         try readARanges(arangesSection, into: &ranges, covered: &covered)
       } catch {
@@ -2490,7 +2612,7 @@ class DwarfReader<S: DwarfSource & AnyObject> {
       }
     }
 
-    ranges.sort { $0.lowPC < $1.lowPC }
+    sortAndCoalesce(&ranges)
     return RangeIndex(sortedElements: ranges)
   }
 
@@ -2622,6 +2744,12 @@ class DwarfReader<S: DwarfSource & AnyObject> {
   /// that it contains.  This only happens once for each unit.
   private func scan(_ unit: Unit) {
     if unit.callSites != nil && unit.functions != nil {
+      return
+    }
+
+    if unit.isLineOnly {
+      unit.callSites = RangeIndex(sortedElements: [])
+      unit.functions = RangeIndex(sortedElements: [])
       return
     }
 
@@ -3077,7 +3205,9 @@ struct DwarfLineNumberInfo {
             state = initialState
           case .DW_LNE_set_address:
             let address: UInt64
-            guard let addressSize = addressSize else {
+            // If we don't know the address size, it's the rest of the opcode
+            guard let addressSize = addressSize
+                    ?? (length > 1 ? Int(length - 1) : nil) else {
               throw DwarfError.unspecifiedAddressSize
             }
             switch addressSize {

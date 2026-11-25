@@ -741,6 +741,10 @@ public:
   void getSeparatelyImportedOverlays(
       ModuleDecl *declaring, SmallVectorImpl<ModuleDecl *> &overlays) const;
 
+  /// Assign local discriminators for the context. Must only be called after
+  /// type-checking.
+  void assignLocalDiscriminators();
+
   /// Retrieve the syntactic depth of this declaration context, i.e.,
   /// the number of non-module-scoped contexts.
   ///

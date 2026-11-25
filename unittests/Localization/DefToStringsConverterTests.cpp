@@ -51,7 +51,7 @@ TEST_F(LocalizationTest, MissingLocalizationFiles) {
 }
 
 TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesSequentially) {
-  StringsLocalizationProducer strings(DiagsPath);
+  StringsLocalizationProducer strings(getDiagsBuffer());
   strings.forEachAvailable([](swift::DiagID id, llvm::StringRef translation) {
     llvm::StringRef msg = diagnosticMessages[static_cast<uint32_t>(id)];
     ASSERT_EQ(msg, translation);
@@ -59,7 +59,7 @@ TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesSequentially) {
 }
 
 TEST_F(LocalizationTest, ConverterTestMatchDiagnosticMessagesRandomly) {
-  StringsLocalizationProducer strings(DiagsPath);
+  StringsLocalizationProducer strings(getDiagsBuffer());
 
   std::random_device rd;
   std::mt19937 gen(rd());

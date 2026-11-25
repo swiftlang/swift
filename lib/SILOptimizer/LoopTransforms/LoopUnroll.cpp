@@ -85,8 +85,11 @@ public:
 protected:
   // SILCloner CRTP override.
   SILValue getMappedValue(SILValue V) {
+    // Values defined outside the cloned region are used directly. The
+    // exception is the arguments of the blocks the cloner creates when it
+    // splits exit edges, which are mapped to the cloned block's arguments.
     if (auto *BB = V->getParentBlock()) {
-      if (!Loop->contains(BB))
+      if (!Loop->contains(BB) && !ValueMap.count(V))
         return V;
     }
     return SILCloner<LoopCloner>::getMappedValue(V);
@@ -386,10 +389,10 @@ struct UnrollablePackLoopInfo {
 /// expansions. These are the headers of candidate loops for Pack Loop
 /// Unrolling.
 ///
-/// Ignore `open_pack_element` instructions where the opened Pack types are
-/// homogeneous (all elements the same) and contain more than one element.
-/// PackTypeElimination can eliminate these without unrolling the loop, so doing
-/// so would just increase code size unnecessarily.
+/// TODO: Avoid unrolling loops over homogeneous packs when possible. We must
+/// unroll even loops over homogeneous packs in some cases; for example,
+/// unrolling is necessary to eliminate `tuple_pack_element_addr` instructions
+/// that use the dynamic pack index.
 ///
 /// Returns an array containing each loop header and its depth.
 static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
@@ -420,26 +423,19 @@ static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
         if (!indexArg || !LoopInfo->isLoopHeader(indexArg->getParent()))
           continue;
 
-        // Check if every opened Pack type contains a list of distinct non-pack
-        // expansion (scalar) types.
-        bool heterogeneousScalar = true;
+        // Check if every opened Pack type contains a list of non-pack expansion
+        // (scalar) types.
+        bool allScalar = true;
         ope->getOpenedGenericEnvironment()->forEachPackElementBinding(
             [&](ElementArchetypeType *elementArchetype, PackType *pack) {
-              if (!heterogeneousScalar)
+              if (!allScalar)
                 return;
 
-              const auto numElements = pack->getNumElements();
-              if (numElements == 0 || pack->containsPackExpansionType() ||
-                  (numElements > 1 &&
-                   llvm::all_equal(llvm::map_range(
-                       pack->getElementTypes(), [](const auto &type) {
-                         return type->getCanonicalType();
-                       })))) {
-                heterogeneousScalar = false;
-              }
+              if (pack->getNumElements() == 0 || pack->containsPackExpansionType())
+                allScalar = false;
             });
 
-        if (heterogeneousScalar &&
+        if (allScalar &&
             !collectedBlocks.contains(indexArg->getParent())) {
           collectedBlocks.insert(indexArg->getParent());
           packLoopHeaders.push_back(
@@ -634,14 +630,6 @@ static bool unrollLoop(SILLoop *Loop, SILBasicBlock *Preheader,
                        SILBasicBlock *Header, SILBasicBlock *Latch,
                        const CountedLoopExit &CountedExit) {
   uint64_t MaxTripCount = CountedExit.TripCount;
-
-  // TODO: We need to split edges from non-condbr exits for the SSA updater. For
-  // now just don't handle loops containing such exits.
-  SmallVector<SILBasicBlock *, 16> ExitingBlocks;
-  Loop->getExitingBlocks(ExitingBlocks);
-  for (auto &Exit : ExitingBlocks)
-    if (!isa<CondBranchInst>(Exit->getTerminator()))
-      return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
                           << Header->getParent()->getName()

@@ -90,7 +90,9 @@ extension std.u32string {
   public init(_ string: String) {
     self.init()
     for char in string.unicodeScalars {
-      self.push_back(char)
+      // The element type is CChar32, which is UInt32 in newer SDKs but
+      // Unicode.Scalar in older SDKs; '.init' works with either.
+      self.push_back(.init(char))
     }
   }
 }
@@ -170,8 +172,9 @@ extension std.string: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.string, rhs: std.string) {
+  public static func +=(lhs: inout std.string, rhs: @_addressable std.string) {
     lhs.append(rhs)
   }
 
@@ -257,8 +260,11 @@ extension std.wstring: Equatable, Comparable {
     return lhs.compare(rhs) < 0
   }
 
+  // `@_addressable` matches the imported `operator+=`, so this shadows it.
   @export(implementation)
-  public static func +=(lhs: inout std.wstring, rhs: std.wstring) {
+  public static func +=(
+    lhs: inout std.wstring, rhs: @_addressable std.wstring
+  ) {
     lhs.append(rhs)
   }
 
@@ -419,7 +425,9 @@ extension String {
   ///   string.
   @export(implementation)
   public init(_ cxxU32String: std.u32string) {
-    let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
+    // The element type is CChar32, which is UInt32 in newer SDKs but
+    // Unicode.Scalar in older SDKs; rebinding to UInt32 works with either.
+    let buffer = unsafe UnsafeBufferPointer(
       start: cxxU32String.data(),
       count: cxxU32String.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {
@@ -510,7 +518,8 @@ extension String {
   ///   string view.
   @export(implementation)
   public init(_ cxxU32StringView: std.u32string_view) {
-    let buffer = unsafe UnsafeBufferPointer<Unicode.Scalar>(
+    // See init(_: std.u32string).
+    let buffer = unsafe UnsafeBufferPointer(
       start: cxxU32StringView.data(),
       count: cxxU32StringView.size())
     self = unsafe buffer.withMemoryRebound(to: UInt32.self) {

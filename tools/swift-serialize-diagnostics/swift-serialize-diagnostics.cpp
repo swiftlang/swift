@@ -21,6 +21,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/raw_ostream.h"
@@ -67,7 +68,13 @@ int main(int argc, char *argv[]) {
   {
     assert(llvm::sys::path::extension(options::InputFilePath) == ".strings");
 
-    StringsLocalizationProducer strings(options::InputFilePath);
+    auto buffer = llvm::MemoryBuffer::getFile(options::InputFilePath);
+    if (!buffer) {
+      llvm::errs() << "Cannot read diagnostic file " << options::InputFilePath
+                   << '\n';
+      return EXIT_FAILURE;
+    }
+    StringsLocalizationProducer strings(std::move(*buffer));
 
     strings.forEachAvailable(
         [&Serializer](swift::DiagID id, llvm::StringRef translation) {

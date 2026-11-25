@@ -27,7 +27,20 @@ public func NotExposedfunction() {}
 public class UnavailableClass {
 }
 
+@_expose(!Cxx)
+public final class HiddenClass {
+    public init() {}
+}
+
+// APIs that use a hidden class are not exposed either.
+public struct HoldsHidden {
+    public var c: HiddenClass
+}
+
+public func takesHidden(_ c: HiddenClass) {}
+
 // CHECK-NOT: NotExposed
 // CHECK-NOT: notExposed
 // CHECK: Exposed
 // CHECK-NOT: UnavailableClass
+// CHECK: // Unavailable in C++: Swift global function 'takesHidden(_:)'. Parameter 'c' of type 'HiddenClass' is not representable in C++.

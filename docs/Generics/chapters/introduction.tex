@@ -110,7 +110,7 @@ The \index{calling convention}calling conventions of these functions differ sign
 
 The default ownership rules for a Swift function are that the caller retains ownership over the parameter values passed into the callee, while the callee transfers ownership of the return value to the caller. Thus the generic implementation of \verb|identity()| must create a logical copy of \texttt{x} and then move this copy back to the caller, and do this in a manner that abstracts over all possible concrete types.
 
-The calling convention for a generic function passes \IndexDefinition{runtime type metadata}\emph{runtime type metadata} for each generic parameter in the function's generic signature. Runtime type metadata describes the \index{size}size and \index{alignment}alignment of a concrete type, and provides implementations of the \emph{move}, \emph{copy} and \emph{destroy} operations.
+The calling convention for a generic function passes \IndexDefinition{runtime type metadata}\emph{runtime type metadata} for each generic parameter in the function's generic signature. Runtime type metadata describes the \index{size of value}size and \index{alignment of value}alignment of a concrete type, and provides implementations of the \emph{move}, \emph{copy} and \emph{destroy} operations.
 
 For a trivial type, the move and copy operations simply copy the bytes of the value, while destroy does nothing. For a reference type, the value is a \index{reference count}reference-counted pointer, so copy and destroy operations update the \index{reference counting}reference count, while a move leaves the reference count unchanged. The value operations for structs and enums are defined recursively from their members. Finally, \index{weak reference type}weak references and existential types also have special value operations.
 
@@ -366,7 +366,7 @@ To get the return type of our call, we evaluate $\texttt{Pair<I.Element>}\otimes
 Once we have the above, we can conclude that the return type of our call to \verb|readTwo()| is $\texttt{Pair<I.Element>}\otimes\Sigma=\texttt{Pair<Int>}$.
 
 \begin{MoreDetails}
-\item Dependent member type substitution: \SecRef{abstract conformances}, \ChapRef{conformance paths}
+\item Dependent member type substitution: \SecRef{abstract conformances}, \ChapRef{chap:conformance paths}
 \end{MoreDetails}
 
 \paragraph{Type parameters.} Generic parameter types and dependent member types are the two kinds of \index{type parameter}\emph{type parameters}. The generic signature of \verb|readTwo()| defines two type parameters, \texttt{I} and \texttt{I.Element}.
@@ -551,7 +551,7 @@ Swift's ``value semantics'' are an evolution of a certain philosophy that origin
 
 Rust's \emph{traits} are similar to Swift's protocols; traits can declare associated types and associated conformance requirements. Rust generics also allow some kinds of abstraction not supported by Swift, such as lifetime variables, generic associated types \cite{rust_gat}, and const generics \cite{rust_const}. On the flip side, Rust does not allow same-type requirements to be stated in full generality~\cite{rust_same}. Instead, trait bounds can constrain associated types with a syntactic form resembling Swift's \index{parameterized protocol type}parameterized protocol types (\SecRef{protocols}), but we will show in \ExRef{proto assoc rule} that Swift's same-type requirements are more general.
 
-Rust's ``\texttt{where} clause elaboration'' is more limited than Swift's derived requirements formalism, and associated requirements sometimes need to be re-stated in the \texttt{where} clause of a generic declaration \cite{rust_bug}. An early attempt at formalizing Rust traits appears in a PhD dissertation from 2015 \cite{Milewski_2015}. A more recent effort is ``Chalk,'' an implementation of a \index{Prolog}Prolog-like solver based on Horn clauses~\cite{rust_chalk}.
+Rust's ``\texttt{where} clause elaboration'' is more limited than Swift's derived requirements formalism, and associated requirements sometimes need to be restated in the \texttt{where} clause of a generic declaration \cite{rust_bug}. An early attempt at formalizing Rust traits appears in a PhD dissertation from 2015 \cite{Milewski_2015}. A more recent effort is ``Chalk,'' an implementation of a \index{Prolog}Prolog-like solver based on Horn clauses~\cite{rust_chalk}.
 
 \paragraph{Java.}
 Traditional \index{Java}Java generics are implemented by erasing generic argument types at compile time, so that values of generic parameter type are always represented by object pointers, and primitive value types must be \index{boxing}boxed first. This avoids the complexity of dependent layout, at the cost of more runtime checks and heap allocations. Java generics also support \index{variance}\emph{variance}, a form of subtyping between different instantiations of the same generic type, defined in terms of the \index{subtype relation}subtype relation on their corresponding generic arguments~\cite{java_faq}. An effort to extend the Java virtual machine with support for user-defined value types and reified generics is currently underway~\cite{valhalla}.

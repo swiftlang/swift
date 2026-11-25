@@ -19,6 +19,29 @@ sil-function-attribute ::= '[ossa]'
 
 The function is in OSSA (ownership SSA) form.
 
+### Unresolved lifetimes
+
+```
+sil-function-attribute ::= '[unresolved]'
+```
+
+The OSSA function's lifetimes are unresolved. This means the initialization, 
+destruction, and copies of values and storage may be missing or invalid.
+For example,
+
+- A value may be consumed more than once, or not at all. 
+- Memory locations may be taken more than once or destroyed multiple times.
+- Assigns and stores may not have the correct `[init]` or `[assign]` qualifier.
+- Conditionally initialized storage may be destroyed unconditionally.
+- Partially initialized memory may be completely destroyed.
+
+The SILVerifier's ownership checking is relaxed when this attribute is present
+on a function, checking only for correct operand ownership.
+
+LifetimeResolution turns an unresolved function into one that is resolved through
+dataflow analysis that _legalizes_ the SIL. It is not legal for this attribute to
+appear on a function outside of Raw SIL.
+
 ### Transparent functions
 
 ```
@@ -45,6 +68,26 @@ sil-function-attribute ::= '[without_actually_escaping]'
 ```
 
 The function is a thunk for closures which are not actually escaping.
+
+### Closures
+
+```
+sil-function-attribute ::= '[closure]'
+```
+
+The function is a closure: SILGen created it for a closure expression or an
+autoclosure, or for a declaration in a local context, such as a local function,
+a local accessor, a `defer` body, or a local wrapped variable's initializers. A
+script's top-level function that captures a local of the top-level code is a
+closure too. The functions that reference a closure are its scopes, and a
+closure group keeps a closure with its scopes. A pass that clones a function to
+replace it, such as a specialization, keeps the attribute.
+
+A function that an apply or `partial_apply` passes a box or an
+`@inout_aliasable` address must be a closure that the applying function
+references, and must not be a thunk. The passes that run per closure group
+read such a callee's body and assert that it is in their group. Hand-written
+SIL must mark these functions `[closure]`.
 
 ### Dynamically replaceable functions
 

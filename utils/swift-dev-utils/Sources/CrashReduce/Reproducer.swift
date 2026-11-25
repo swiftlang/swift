@@ -112,6 +112,7 @@ public struct Reproducer: Sendable {
       case noAsan = "no_asan"
       case objcInterop = "objc_interop"
       case swiftParser = "swift_swift_parser"
+      case autoDiff = "differentiable_programming"
     }
     var requirements: Set<TestCaseRequirement> = []
     if options.useGuardMalloc {
@@ -125,6 +126,9 @@ public struct Reproducer: Sendable {
     }
     if signatures.sigs.contains(where: { $0.symbol?.hasPrefix("$s") ?? false }) {
       requirements.insert(.swiftParser)
+    }
+    if isForAutoDiff {
+      requirements.insert(.autoDiff)
     }
     var result = requirements.map(\.rawValue).sorted().map {
       "// REQUIRES: \($0)"
@@ -193,6 +197,16 @@ public struct Reproducer: Sendable {
     } else {
       buffers[0].code.text
     }
+  }
+
+  var isForCxxInterop: Bool {
+    options.extraArgs.contains(where: {
+      $0.value?.starts(with: "-cxx-interoperability-mode") ?? false
+    })
+  }
+
+  var isForAutoDiff: Bool {
+    buffers.contains(where: \.code.hasAutoDiffImport)
   }
 
   var splits: [Int] {

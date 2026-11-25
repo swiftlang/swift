@@ -286,7 +286,7 @@ func testAddressOnlyBorrowingNonEscapingClosure<T : P>(_ x: borrowing GenericNon
 // CHECK:   apply [[FN]]<T>([[UNWRAPPED]])
 // CHECK: } // end sil function '$s35noimplicitcopy_borrowing_parameters37testAddressOnlyBorrowingLocalFunctionyyAA23GenericNonTrivialStructVyxGAA1PRzlF'
 //
-// CHECK-LABEL: sil private [ossa] @$s35noimplicitcopy_borrowing_parameters37testAddressOnlyBorrowingLocalFunctionyyAA23GenericNonTrivialStructVyxGAA1PRzlF5localL_yyAaFRzlF :
+// CHECK-LABEL: sil private [closure] [ossa] @$s35noimplicitcopy_borrowing_parameters37testAddressOnlyBorrowingLocalFunctionyyAA23GenericNonTrivialStructVyxGAA1PRzlF5localL_yyAaFRzlF :
 // CHECK: bb0([[ARG:%.*]] : @closureCapture $*GenericNonTrivialStruct<T>):
 // CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr [[ARG]]
 // CHECK:   mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]]
@@ -308,7 +308,7 @@ func testAddressOnlyBorrowingLocalFunction<T : P>(_ x: borrowing GenericNonTrivi
 // CHECK:   apply [[FN]]<T>([[UNWRAPPED]])
 // CHECK: } // end sil function '$s35noimplicitcopy_borrowing_parameters29testAddressOnlyBorrowingDeferyyAA23GenericNonTrivialStructVyxGAA1PRzlF'
 //
-// CHECK-LABEL: sil private [ossa] @$s35noimplicitcopy_borrowing_parameters29testAddressOnlyBorrowingDeferyyAA23GenericNonTrivialStructVyxGAA1PRzlF6$deferL_yyAaFRzlF :
+// CHECK-LABEL: sil private [closure] [ossa] @$s35noimplicitcopy_borrowing_parameters29testAddressOnlyBorrowingDeferyyAA23GenericNonTrivialStructVyxGAA1PRzlF6$deferL_yyAaFRzlF :
 // CHECK: bb0([[ARG:%.*]] : @closureCapture $*GenericNonTrivialStruct<T>):
 // CHECK:   [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr [[ARG]]
 // CHECK:   mark_unresolved_non_copyable_value [no_consume_or_assign] [[WRAPPED]]

@@ -5,7 +5,7 @@
 
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=linux-android || OS=linux-androideabi
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

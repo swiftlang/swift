@@ -476,6 +476,7 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
     fn->addSemanticsAttr(attr);
   // The cloned closure goes into the same section as the original closure.
   fn->setSection(orig->section());
+  fn->setIsClosure(orig->isClosure());
   return fn;
 }
 
@@ -589,8 +590,7 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
   if (SILValue value = getProjectBoxMappedVal(inst->getSingleOperand())) {
     getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
     auto varInfo = *inst->getVarInfo();
-    if (varInfo.Scope)
-      varInfo.Scope = getOpScope(inst->getDebugScope());
+    varInfo.Scope = getOpScope(varInfo.Scope);
     // The operand is promoted from a project_box (address), to an object
     // type: strip the leading op_deref.
     ASSERT(!inst->getDebugReconstructionBlock() &&

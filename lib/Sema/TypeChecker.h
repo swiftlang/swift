@@ -523,6 +523,7 @@ void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
 
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
+void checkTailAllocatedCounts(ClassDecl *classDecl);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
@@ -1194,6 +1195,12 @@ FuncDecl *getForEachIteratorNextFunction(
 VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                UnresolvedDotExpr *UDE);
 
+/// If an initializer of a C++ foreign reference type called with `super.init`
+/// from a Swift subclass cannot construct the base subobject of the subclass,
+/// diagnose it.
+bool diagnoseForeignReferenceSuperInit(ConstructorDecl *ctor, SourceLoc loc,
+                                       bool implicitlyGenerated);
+
 /// Diagnose assigning variable to itself.
 bool diagnoseSelfAssignment(const Expr *E);
 
@@ -1488,25 +1495,6 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
 
-/// Look for closure discriminators within an AST.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
-  unsigned NextDiscriminator = 0;
-
-public:
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
-
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator();
-
-  unsigned getFirstDiscriminator() const {
-    return FirstDiscriminator;
-  }
-};
 
 using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;

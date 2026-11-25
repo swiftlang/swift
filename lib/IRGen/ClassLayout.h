@@ -224,8 +224,9 @@ public:
     return Options.contains(ClassMetadataFlags::ClassHasObjCImplementation);
   }
 
-  std::optional<uint64_t>
-  computeTypedMallocTypeDescriptor(IRGenModule &IGM, SILType selfType) const;
+  std::optional<uint64_t> computeTypedMallocTypeDescriptor(
+      IRGenModule &IGM, SILType selfType,
+      ArrayRef<SILType> tailElementTypes = {}) const;
 
 private:
   static void collectAllStoredPropertyTypes(

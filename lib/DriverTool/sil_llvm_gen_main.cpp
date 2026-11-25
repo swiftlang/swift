@@ -59,6 +59,7 @@ convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
   case SILOptStrictConcurrency::Minimal:
     return StrictConcurrency::Minimal;
   }
+  llvm_unreachable("covered switch");
 }
 
 struct SILLLVMGenOptions {

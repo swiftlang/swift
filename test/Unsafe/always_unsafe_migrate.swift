@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -verify -swift-version 6 -strict-memory-safety:migrate %s
+// RUN: %target-swift-frontend -typecheck -verify -swift-version 6 -strict-memory-safety:migrate -enable-experimental-feature AlwaysUnsafeAttribute %s
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // An always-unsafe use is an error even in migration mode: unlike a merely
 // unsafe one, it is not something a migration pass gets to rewrite silently.

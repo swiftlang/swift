@@ -37,7 +37,7 @@ struct UnreliableRandomGenerator {
 ### Convert the Throwing Expression to a Result
 
 You preserve the return value or thrown error from a throwing expression using the
-``Swift/Result`` enumeration’s ``Swift/Result/init(catching:)`` initializer. Invoke
+``Swift/Result`` enumeration’s ``Swift/Result/init(catching:)-(()->Success)`` initializer. Invoke
 the throwing expression inside the closure you pass to the initializer:
 
 ```swift
@@ -50,7 +50,7 @@ statistical average of both a range of numbers returned from a random number gen
 as well as the failure rate of calling the API. In these cases, you need to store
 the whole result rather than just the success value or that the API call failed.
 
-The following example uses the ``Swift/Result/init(catching:)`` initializer in the
+The following example uses the ``Swift/Result/init(catching:)-(()->Success)`` initializer in the
 broader context of saving a series of calls for later statistical analysis:
 
 ```swift

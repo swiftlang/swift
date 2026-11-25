@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -primary-file %s %S/Inputs/noncopyable_private_other.swift -emit-ir -o - | %FileCheck %s
+// RUN: %target-swift-frontend -O -primary-file %s %S/Inputs/noncopyable_private_other.swift -emit-ir -o - | %FileCheck %s --check-prefix=OPT --implicit-check-not='$s19noncopyable_private11PrivateType'
 
 public struct SomeStruct : ~Copyable {
   // PublicType is a struct without a deinit but a non-copyable field with a
@@ -40,3 +41,20 @@ public struct SomeStructWithMPE : ~Copyable {
 // CHECK:  call void %Destroy(ptr {{.*}}, ptr @"$s19noncopyable_private22PublicMultiPayloadEnumON"
 // CHECK:  ret void
 // CHECK: }
+
+// The optimizer must not destroy PublicType's private field directly either.
+
+public final class PublicTypeHolder {
+  var p = PublicType()
+}
+
+@inline(never)
+public func consumePublicType(_ p: consuming PublicType) {}
+
+// OPT-LABEL: define {{.*}} @"$s19noncopyable_private16PublicTypeHolderCfD"(
+// OPT:   call void %Destroy(ptr {{.*}}, ptr {{.*}}@"$s19noncopyable_private10PublicTypeVN")
+// OPT:   ret void
+
+// OPT-LABEL: define {{.*}} @"$s19noncopyable_private17consumePublicTypeyyAA0dE0VnF"(
+// OPT:   call void %Destroy(ptr {{.*}}, ptr {{.*}}@"$s19noncopyable_private10PublicTypeVN")
+// OPT:   ret void

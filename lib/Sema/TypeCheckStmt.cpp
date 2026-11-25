@@ -271,6 +271,12 @@ namespace {
       return MacroWalking::Arguments;
     }
 
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // Lazy initializers get discriminators assigned after
+      // re-contextualization, so we should only walk the accessor.
+      return LazyInitializerWalking::InAccessor;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -294,18 +300,19 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if(CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator)
-          CE->setDiscriminator(NextClosureDiscriminator++);
-
-        // We need to walk into closure bodies with a new sequence.
-        SetLocalDiscriminators innerVisitor;
-        if (auto params = CE->getParameters()) {
-          for (auto *param : *params) {
-            innerVisitor.setLocalDiscriminator(param);
+        if (CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator) {
+          // We have a debug mode where we give every closure the same
+          // discriminator to ensure SILGen catches them.
+          auto &ctx = CE->getASTContext();
+          if (ctx.LangOpts.DebugDuplicateClosureDiscriminators) {
+            CE->setDiscriminator(0);
+          } else {
+            CE->setDiscriminator(NextClosureDiscriminator++);
           }
         }
-        CE->getBody()->walk(innerVisitor);
 
+        // Walk the parameter and body in a new sequence.
+        CE->assignLocalDiscriminators();
         return Action::SkipNode(E);
       }
 
@@ -408,15 +415,37 @@ namespace {
   };
 }
 
-unsigned LocalDiscriminatorsRequest::evaluate(
-    Evaluator &evaluator, DeclContext *dc
-) const {
+evaluator::SideEffect
+BodyDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
+  ASTNode body;
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(dc)) {
+    if (!func->isBodySkipped())
+      body = func->getBody();
+  } else if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
+    body = tld->getBody();
+  }
+  if (!body)
+    return {};
+
+  auto &ctx = dc->getASTContext();
+  SetLocalDiscriminators visitor(ctx.getNextDiscriminator(dc));
+  body.walk(visitor);
+  ctx.setMaxAssignedDiscriminator(dc, visitor.maxAssignedDiscriminator());
+  return {};
+}
+
+evaluator::SideEffect
+LocalDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
   ASTContext &ctx = dc->getASTContext();
+
+  // Note that we've handled the body as part of this request.
+  if (isa<AbstractFunctionDecl, TopLevelCodeDecl>(dc))
+    eval.cacheOutput(BodyDiscriminatorsRequest{dc}, {});
 
   // Autoclosures aren't their own contexts; look to the parent instead.
   if (isa<AutoClosureExpr>(dc)) {
-    return evaluateOrDefault(evaluator,
-                             LocalDiscriminatorsRequest{dc->getParent()}, 0);
+    dc->getParent()->assignLocalDiscriminators();
+    return {};
   }
 
   ASTNode node;
@@ -428,19 +457,6 @@ unsigned LocalDiscriminatorsRequest::evaluate(
       node = func->getBody();
     selfParam = func->getImplicitSelfDecl();
     params = func->getParameters();
-
-    // Accessors for lazy properties should be walked as part of the property's
-    // pattern.
-    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-      if (accessor->isImplicit() &&
-          accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
-          if (auto binding = var->getParentPatternBinding()) {
-            node = binding;
-          }
-        }
-      }
-    }
   } else if (auto closure = dyn_cast<ClosureExpr>(dc)) {
     node = closure->getBody();
     params = closure->getParameters();
@@ -455,7 +471,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
         cast<ValueDecl>(dc->getParent()->getAsDecl()),
         defaultArgInit->getIndex());
     if (!param)
-      return 0;
+      return {};
 
     node = param->getTypeCheckedDefaultExpr();
   } else if (auto propertyWrapperInit =
@@ -480,11 +496,10 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     params = getParameterList(dc);
   }
 
-  auto startDiscriminator = ctx.getNextDiscriminator(dc);
   if (!node && !args && !params && !selfParam)
-    return startDiscriminator;
+    return {};
 
-  SetLocalDiscriminators visitor(startDiscriminator);
+  SetLocalDiscriminators visitor(ctx.getNextDiscriminator(dc));
 
   // Set local discriminator for the 'self' parameter.
   if (selfParam)
@@ -503,11 +518,8 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   if (args)
     args->walk(visitor);
 
-  unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
-  ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
-
-  // Return the next discriminator.
-  return nextDiscriminator;
+  ctx.setMaxAssignedDiscriminator(dc, visitor.maxAssignedDiscriminator());
+  return {};
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a
@@ -1110,6 +1122,7 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   case StmtConditionElement::CK_PatternBinding:
     return typeCheckPatternBindingStmtConditionElement(elt, isFalsable, dc);
   }
+  llvm_unreachable("covered switch");
 }
 
 /// If \p elt is a `#available` or `#unavailable` condition element whose
@@ -2284,23 +2297,35 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   return r;
 }
 
+bool TypeChecker::diagnoseForeignReferenceSuperInit(ConstructorDecl *ctor,
+                                                    SourceLoc loc,
+                                                    bool implicitlyGenerated) {
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+
+  auto &ctx = ctor->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing))
+    return false;
+
+  // Only a C++ constructor can construct the base subobject of this object. We
+  // don't currently support global-functions-as-initializers for the purpose
+  // of constructing a base subobject.
+  if (ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(ctor))
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::chain_foreign_reference_non_constructor_init,
+                     implicitlyGenerated, ctor,
+                     classDecl->getDeclaredInterfaceType());
+  ctor->diagnose(diag::decl_declared_here, ctor);
+  return true;
+}
+
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
 static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
-  // The chained initializer call may have been found before the body was
-  // type-checked, as the call of the initializer rather than its application
-  // to `super`. Look through it for a C++ foreign reference type.
-  if (auto selfApply = dyn_cast<SelfApplyExpr>(apply->getSemanticFn())) {
-    if (auto ref = dyn_cast<OtherConstructorDeclRefExpr>(
-            selfApply->getSemanticFn())) {
-      auto classDecl = ref->getDecl()->getDeclContext()->getSelfClassDecl();
-      if (classDecl && classDecl->isForeignReferenceType())
-        apply = selfApply;
-    }
-  }
-
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getSemanticFn());
@@ -2315,20 +2340,10 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       auto &ctx = fromCtor->getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
           classDecl->isForeignReferenceType()) {
-        // Only a C++ constructor can construct the base subobject of this
-        // object.
-        if (ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
-                ctor))
+        if (!implicitlyGenerated)
           return false;
-
-        auto loc = implicitlyGenerated ? fromCtor->getLoc()
-                                       : apply->getArgs()->getLoc();
-        ctx.Diags.diagnose(loc,
-                           diag::chain_foreign_reference_non_constructor_init,
-                           implicitlyGenerated, ctor,
-                           classDecl->getDeclaredInterfaceType());
-        ctor->diagnose(diag::decl_declared_here, ctor);
-        return true;
+        return TypeChecker::diagnoseForeignReferenceSuperInit(
+            ctor, fromCtor->getLoc(), /*implicitlyGenerated=*/true);
       }
     }
     if (!implicitlyGenerated) {

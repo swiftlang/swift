@@ -215,6 +215,7 @@ public:
     case Kind::Erased:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   Kind getKind() const { return value.getInt(); }
@@ -246,6 +247,7 @@ public:
     case FunctionTypeIsolation::Kind::Parameter:
       return forUnknown();
     }
+    llvm_unreachable("covered switch");
   }
 };
 

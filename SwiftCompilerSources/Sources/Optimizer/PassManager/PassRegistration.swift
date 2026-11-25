@@ -71,6 +71,7 @@ private func registerSwiftPasses() {
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
   registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
+  registerPass(functionSignatureOptimization, { functionSignatureOptimization.run($0) })
 
   // Function passes
   registerPass(allocBoxToStack, { allocBoxToStack.run($0) })
@@ -120,7 +121,7 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
   registerPass(removeSILGenLifetimesPass, { removeSILGenLifetimesPass.run($0) })
   registerPass(lifetimeResolutionPass, { lifetimeResolutionPass.run($0) })
-  registerPass(lifetimeResolutionDiagnosePass, { lifetimeResolutionDiagnosePass.run($0) })
+  registerPass(diagnoseResolvedLifetimesPass, { diagnoseResolvedLifetimesPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
   registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
   registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })

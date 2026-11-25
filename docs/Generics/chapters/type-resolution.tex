@@ -342,7 +342,7 @@ Next, we look at this function \texttt{g()}, which references our previously-see
 func g<T: Sequence>(_: T)
     where T.Element: Subscriber, T.Element.Content: Equatable {...}
 \end{Verbatim}
-Here, we form the requirement $\ConfReq{T.Element.Content}{Equatable}$ whose subject type is the unbound dependent member type \texttt{T.Element.Content}. Indeed, this is not a type alias type at all. As we will learn in \SecRef{protocol type aliases}, protocol type aliases introduce rewrite rules, and the computation of reduced types replaces the unbound dependent member type with the underlying type of the \index{protocol type alias}protocol type alias. In this case, we get a generic signature with a requirement having quite the long subject type,
+Here, we form the requirement $\ConfReq{T.Element.Content}{Equatable}$ whose subject type is the unbound dependent member type \texttt{T.Element.Content}. Indeed, this is not a type alias type at all. As we will learn in \SecRef{sec:protocol type aliases}, protocol type aliases introduce rewrite rules, and the computation of reduced types replaces the unbound dependent member type with the underlying type of the \index{protocol type alias}protocol type alias. In this case, we get a generic signature with a requirement having quite the long subject type,
 \begin{center}
 $\ConfReq{T.[Sequence]Element.[Subscriber]Parent.[Provider]Entity}{Equatable}$.
 \end{center}

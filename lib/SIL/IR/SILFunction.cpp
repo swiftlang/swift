@@ -299,6 +299,7 @@ void SILFunction::init(
   // lowered by the stage term in hasLoweredAddresses() and needs no flag.
   this->HasLoweredAddresses = false;
   this->HasOwnershipForTrivialValues = false;
+  this->HasUnresolvedLifetimes = false;
 
   // A function is born at the stage floor. Content created after the module
   // commits to a stage is built to that stage's rules.
@@ -309,6 +310,7 @@ void SILFunction::init(
   this->HasOwnership = true,
   this->WasDeserializedCanonical = false;
   this->IsWithoutActuallyEscapingThunk = false;
+  this->IsClosure = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
   this->perfConstraints = PerformanceConstraints::None;
   this->EffectsKindAttr = unsigned(E);
@@ -340,6 +342,7 @@ void SILFunction::setFunctionStage(SILStage stage) {
 
 void SILFunction::inheritDerivedFrom(const SILFunction *from) {
   setHasLoweredAddresses(from->hasLoweredAddresses());
+  setHasUnresolvedLifetimes(from->hasUnresolvedLifetimes());
   // Only ever move forward. The clone was born at the module's stage floor,
   // which can already be ahead of a source that predates a commit, such as a
   // snapshot.
@@ -446,9 +449,11 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->CodeGenModel = CodeGenModel;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
+  newSnapshot->IsClosure = IsClosure;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
   newSnapshot->HasLoweredAddresses = HasLoweredAddresses;
+  newSnapshot->HasUnresolvedLifetimes = HasUnresolvedLifetimes;
 
   SILFunctionCloner cloner(newSnapshot);
   cloner.cloneFunction(this);
@@ -1378,7 +1383,11 @@ SILFunction::isPossiblyUsedExternally() const {
       isSwiftRuntimeFunction())
     return true;
 
-  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+  if (swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule()))
+    return true;
+
+  // The generated C++ header may call this function.
+  return getDeclRef().mayBeCalledFromCxxHeader(getModule());
 }
 
 bool SILFunction::shouldBePreservedForDebugger() const {

@@ -48,10 +48,16 @@ struct Main {
         handler: handler)
       print("UNEXPECTED: cross-system returned")
     } catch let e as ExecuteDistributedTargetError {
-      print("crossSystem threw errorCode=\(e.errorCode)")
+      // Depending on availability, the error can be more precise, so we accept both:
+      // We're not too picky about which we get in this test, that's fine.
+      var ok = e.errorCode == .typeDeserializationFailure
+      if #available(SwiftStdlib 6.5, *) {
+        ok = ok || e.errorCode == .incompatibleInvocationDecoder
+      }
+      print("crossSystem threw expected errorCode=\(ok)")
     } catch {
       print("crossSystem threw: \(error)")
     }
-    // CHECK: crossSystem threw errorCode=incompatibleInvocationDecoder
+    // CHECK: crossSystem threw expected errorCode=true
   }
 }

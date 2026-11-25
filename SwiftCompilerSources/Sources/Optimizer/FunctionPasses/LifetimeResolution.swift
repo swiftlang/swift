@@ -43,6 +43,8 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
       resolver.run(on: argument, &indexCache)
     }
   }
+
+  function.set(hasUnresolvedLifetimes: false, context)
 }
 
 private struct Resolver {
@@ -61,10 +63,13 @@ private struct Resolver {
         return
       }
 
-      // TODO: resolve `.guaranteed` values too. It should amount to having all consuming uses
-      //   require a copy, including those on the boundary, and inserting end_access/end_borrow.
-      if value.ownership == .owned {
+      switch value.ownership {
+      case .owned:
         resolveSingleDef(value, context)
+      case .guaranteed:
+        resolveGuaranteed(value, context)
+      default:
+        break
       }
       return
     }
@@ -210,7 +215,7 @@ private struct MultiDefResolver {
   // Legalization
   //===--------------------------------------------------------------------===//
 
-  // Legalize the SIL from the solved demand, leaving markers behind for LifetimeResolutionDiagnose
+  // Legalize the SIL from the solved demand, leaving markers behind for DiagnoseResolvedLifetimes
   // to turn into user-facing diagnostics for any misuses that were corrected by this phase.
   mutating func legalizeDemand() {
     for block in function.blocks {
@@ -451,8 +456,16 @@ private struct MultiDefResolver {
     }
   }
 
+  // TODO: the memory is uninitialized from the take until its reinitialization, or a Never-returning call for an
+  //   `inout`, so the access must be extended to cover that point. For a borrowed box, which can be reentrantly
+  //   accessed, that extended access must be a dynamically enforced modify.
   func adjustAccessForTake(_ addr: Value) {
     assert(addr.type.isAddress)
+
+    // A take out of an open_existential_addr requires it to be mutable.
+    if let openExt = addr.definingInstruction as? OpenExistentialAddrInst, openExt.isImmutable {
+      openExt.set(isImmutable: false, context: context)
+    }
 
     guard case let .access(beginAccess) = addr.enclosingAccessScope else {
       return
@@ -694,6 +707,8 @@ private struct MultiDefResolver {
     case let tupleAddrConstructor as TupleAddrConstructorInst:
       tupleAddrConstructor.set(isInitializationOfDestination: initialization, context)
     case is FullApplySite:
+      return initialization
+    case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
       return initialization
     default:
       // TODO: handle assign_or_init, store_weak, store_unowned, etc.
@@ -969,16 +984,24 @@ private struct MultiDefResolver {
         addLiveness(operand)
         return .continueWalk
       }
-      // If the loaded SSA value is consumed by some non-destroying instruction, its demand is "own".
-      func hasConsumingUser(_ op: Operand) -> Bool {
-        return op.ownership == .forwardingConsume || op.instruction is MoveValueInst
+      // If the loaded SSA value is consumed by anything other than a plain clean-up, its demand is "own".
+      // This includes forwarding consumes and destroying consumes such as stores, move_value, and owned call arguments.
+      func hasConsumingLoadUser(_ op: Operand) -> Bool {
+        switch op.ownership {
+        case .forwardingConsume:
+          return true
+        case .destroyingConsume:
+          return !(op.instruction is DestroyValueInst || op.instruction is EndLifetimeInst)
+        default:
+          return false
+        }
       }
       let range = self.range(of: operand)
       switch load.loadOwnership {
       case .take:
           addUse(.take(operand, .own), range)   // TODO: what about a take where all non-destroy users borrow?
       case .unqualified, .copy:
-        if load.uses.filter(hasConsumingUser).isEmpty {
+        if load.uses.filter(hasConsumingLoadUser).isEmpty {
           addUse(.use(operand, .borrow), range)
         } else {
           addUse(.use(operand, .own), range)
@@ -1005,6 +1028,8 @@ private struct MultiDefResolver {
         addUse(.def(operand), range(of: operand))
       case let srcDestInst as SourceDestAddrInstruction where srcDestInst.destinationOperand == operand:
         addUse(.def(operand), range(of: operand))
+      case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
+        addUse(.def(operand), range(of: operand))
       case is DestroyAddrInst:
         addUse(.end(operand), range(of: operand))
       case is DeallocStackInst:
@@ -1022,7 +1047,11 @@ private struct MultiDefResolver {
       case .indirectIn:
         addUse(.take(operand, .own), range(of: operand))
       default:
-        addLiveness(operand)
+        // A coroutine may access the memory until its scope ends.
+        let range = self.range(of: operand)
+        for end in apply.endInstructions {
+          addUse(.liveness(end), range)
+        }
       }
       return .continueWalk
     }
@@ -1255,7 +1284,7 @@ private struct MultiDefResolver {
       var demandKill: Demand {
         switch self {
         case .def, .superInit: .all
-        case .root(_, initialized: true): .all // A root that starts initialized is a def.
+        case .root: .all  // Nothing can be demanded of the storage before it exists.
         default: .nothing
         }
       }
@@ -1498,4 +1527,8 @@ let lifetimeResolutionResolveTest = FunctionTest("lifetime_resolution_resolve") 
   var indexCache = FieldIndexTrieCache(for: function)
   let root = arguments.takeValue()
   resolver.run(on: root, &indexCache)
+
+  // Assume the whole function has been resolved otherwise.
+  // This ensures we get extra verification for unit tests.
+  function.set(hasUnresolvedLifetimes: false, context)
 }

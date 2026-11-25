@@ -1009,6 +1009,27 @@ static bool isDeadOnStackClosureUser(SILInstruction *user) {
          isa<StrongReleaseInst>(user);
 }
 
+bool swift::isCaptureOwnedByOnStackClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
+    return false;
+  ApplySite site(pai);
+  if (!site.isArgumentOperand(argOp))
+    return false;
+  if (site.hasContextOwnedAddressArgument(argOp))
+    return true;
+  SILValue arg = argOp.get();
+  SILFunction *function = pai->getFunction();
+  if (function->hasOwnership())
+    return argOp.isConsuming();
+
+  // Without ownership, follow IRGen: the context owns each nontrivial value
+  // that it captures, unless it borrows the value.
+  if (arg->getType().isAddress() || arg->getType().isTrivial(*function))
+    return false;
+  return !pai->contextBorrowsArgument(argOp);
+}
+
 static bool
 deadMarkDependenceUser(Operand *use,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
@@ -1217,8 +1238,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     if (pa->isNoncopyable()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
-        if (!argOp.isConsuming() &&
-            !ApplySite(pa).hasContextOwnedAddressArgument(argOp))
+        // A capture that was transferred to a combined apply is undef.
+        if (!isCaptureOwnedByOnStackClosure(argOp) ||
+            isa<SILUndef>(argOp.get()))
           continue;
 
         SILBuilderWithScope builder(pa, builderCtxt);
@@ -2243,10 +2265,7 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (srcDVI && srcDVI->getAllOperands().size() > 1)
     return;
 
-  // Note: The instruction should logically be in the SI's scope.
-  // However, LLVM does not support variables and stores in different scopes,
-  // so we use the variable's scope.
-  auto *newDVI = SILBuilder(SI, DefiningInst->getDebugScope())
+  auto *newDVI = SILBuilderWithScope(SI)
       .createDebugValue(SI->getLoc(), original, *VarInfo);
 
   if (srcDVI)
@@ -2322,8 +2341,8 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
           tupleType, SPII->getComponentIndex());
       VarInfo.DIExpr.append(FragDIExpr);
     }
-    SILBuilder(PESI, DbgInst->getDebugScope())
-        .createDebugValue(DbgInst->getLoc(), PESI->getValue(), VarInfo);
+    SILBuilderWithScope(PESI)
+        .createDebugValue(PESI->getLoc(), PESI->getValue(), VarInfo);
   }
 }
 

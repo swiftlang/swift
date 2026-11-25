@@ -145,15 +145,15 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
 // Import-as-member properties, with the getter or the setter imported first.
 typedef struct { int value; } ImportedAccessors;
 
-NSInteger getGetterFirst(const ImportedAccessors *s)
+NSInteger getGetterFirst(const ImportedAccessors *_Nonnull s)
     __attribute__((swift_name("getter:ImportedAccessors.getterFirst(self:)")));
-void setGetterFirst(ImportedAccessors *s, NSInteger v)
+void setGetterFirst(ImportedAccessors *_Nonnull s, NSInteger v)
     __attribute__((swift_name("setter:ImportedAccessors.getterFirst(self:_:)")))
     __attribute__((unavailable));
 
-void setSetterFirst(ImportedAccessors *s, NSInteger v)
+void setSetterFirst(ImportedAccessors *_Nonnull s, NSInteger v)
     __attribute__((swift_name("setter:ImportedAccessors.setterFirst(self:_:)")));
-NSInteger getSetterFirst(const ImportedAccessors *s)
+NSInteger getSetterFirst(const ImportedAccessors *_Nonnull s)
     __attribute__((swift_name("getter:ImportedAccessors.setterFirst(self:)")))
     __attribute__((unavailable));
 

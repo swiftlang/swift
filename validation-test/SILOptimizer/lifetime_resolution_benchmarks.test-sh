@@ -32,12 +32,9 @@ import sys
 # Files that are expected to fail to compile or run. Listing a file that
 # passes is an error.
 EXCEPTIONAL_FILES = [
-    # Compiler crash in LifetimeResolution
-    pathlib.Path("benchmark/single-source/ToddCoxeter.swift"),
     # Spurious use-before-init / use-after-consume errors
     pathlib.Path("benchmark/single-source/DictionaryKeysContains.swift"),
-    # Spurious 'copy of noncopyable typed value' errors
-    pathlib.Path("benchmark/single-source/Concurrency/TaskIsCancelledCancellationScopes.swift"),
+    # Spurious 'LifetimeResolution missed diagnosing a copy' errors
     pathlib.Path("benchmark/single-source/SpanTests.swift"),
     # async let support
     pathlib.Path("benchmark/single-source/Concurrency/ChildTaskCreation.swift"),

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Ownership.h"
+#include "swift/Basic/Unreachable.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 
@@ -25,8 +26,7 @@ llvm::StringRef swift::keywordOf(ReferenceOwnership ownership) {
   case ReferenceOwnership::Unmanaged: return "unowned(unsafe)";
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
-  assert(false && "impossible");
-  LLVM_BUILTIN_TRAP;
+  swift_unreachable("impossible");
 }
 
 llvm::StringRef swift::manglingOf(ReferenceOwnership ownership) {
@@ -38,6 +38,5 @@ llvm::StringRef swift::manglingOf(ReferenceOwnership ownership) {
   case ReferenceOwnership::Unmanaged: return "Xu";
   }
   // We cannot use llvm_unreachable() because this is used by the stdlib.
-  assert(false && "impossible");
-  LLVM_BUILTIN_TRAP;
+  swift_unreachable("impossible");
 }

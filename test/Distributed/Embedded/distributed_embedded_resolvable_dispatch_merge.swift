@@ -33,5 +33,5 @@ distributed actor Greeter: Greeting {
 // CHECK: } // end sil function '$e4main7GreeterC25_executeDistributedTarget6target17invocationDecoder13resultHandlery0D0010RemoteCallE0V_AA022EmbeddedFakeInvocationH0VzAA0mn6ResultJ0VtYaKF'
 
 // The second name is matched in the autoclosure on the right of '||'.
-// CHECK-LABEL: sil private [transparent] [ossa] @$e4main7GreeterC25_executeDistributedTarget{{.*}}fu_ :
+// CHECK-LABEL: sil private [transparent] [closure] [ossa] @$e4main7GreeterC25_executeDistributedTarget{{.*}}fu_ :
 // CHECK: string_literal utf8 "$e4main9$GreetingC5hello4nameS2S_tYaKFTE"

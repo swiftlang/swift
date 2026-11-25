@@ -111,7 +111,7 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
   {
     // The `end_borrow`s of `baseBorrow` are not considered to be writes here, because that borrow scope is
     // extended beyond the load's liverange below. If it cannot be extended, this function bails out.
-    if mayWrite(toAddressOf: load, within: collectedUses, ignoreEndBorrowsOf: baseBorrow, context) {
+    if mayWriteOrEndAccess(toAddressOf: load, within: collectedUses, ignoreEndBorrowsOf: baseBorrow, context) {
       return false
     }
 
@@ -126,7 +126,7 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
     load.replaceWithLoadBorrow(collectedUses: collectedUses, enclosingBorrow: baseBorrow.value)
   } else {
     // The address is not derived from a borrowed reference.
-    if mayWrite(toAddressOf: load, within: collectedUses, context) {
+    if mayWriteOrEndAccess(toAddressOf: load, within: collectedUses, context) {
       return false
     }
     load.replaceWithLoadBorrow(collectedUses: collectedUses)
@@ -151,7 +151,7 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bo
   collectedUses.insertNonDestroyingEnds(into: &liverange)
 
   if copy.fromValue.ownership == .owned {
-    if !liverange.isFullyContainedIn(scopeOf: copy.fromValue) {
+    if !liverange.isFullyContainedIn(scopeOf: copy.fromValue, context) {
       return false
     }
   } else {
@@ -406,6 +406,9 @@ private struct AllocStackUsesWalker : AddressDefUseWalker {
         if let pa = apply as? PartialApplyInst, !pa.isOnStack {
           return .abortWalk
         }
+        if let applyInst = apply as? ApplyInst, applyInst.functionConvention.hasAddressResult {
+          return .abortWalk
+        }
         return .continueWalk
       default:
         return .abortWalk
@@ -424,7 +427,9 @@ private struct AllocStackUsesWalker : AddressDefUseWalker {
   }
 }
 
-private func mayWrite(
+/// Returns true if the loaded memory may be written, or its access scope ends, within the lifetime of the load.
+/// Either way, the `load_borrow` couldn't replace it.
+private func mayWriteOrEndAccess(
   toAddressOf load: LoadInst,
   within collectedUses: Uses,
   ignoreEndBorrowsOf borrowToIgnore: BeginBorrowValue? = nil,
@@ -450,6 +455,9 @@ private func mayWrite(
     if inst.mayWrite(toAddress: load.address, aliasAnalysis),
        !inst.isEndBorrow(ofScope: borrowToIgnore)
     {
+      return true
+    }
+    if inst.endsAccessScope(of: load) {
       return true
     }
     worklist.pushPredecessors(of: inst, ignoring: load)
@@ -555,7 +563,7 @@ private extension ForwardingInstruction {
     if !preservesReferenceCounts {
       return false
     }
-    if !canForwardGuaranteedValues {
+    if !canForwardGuaranteedValues || !canForwardGuaranteedAddressOnlyValues {
       return false
     }
     // For simplicity only support a single owned operand. Otherwise we would have to check if the other

@@ -654,3 +654,119 @@ bb0:
   return %r
 }
 
+
+// Block arguments without uses are added as available values before the first instruction of
+// their block.
+
+// CHECK-LABEL: sil @ib_block_arg_loop :
+// CHECK:       bb1([[A:%[0-9]+]] : $Builtin.Int64):
+// CHECK-NEXT:    apply {{%[0-9]+}}([[A]])
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    fix_lifetime [[L2]]
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK:       bb2:
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK-NEXT:    br bb1([[L2]])
+// CHECK:       bb3:
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK:       } // end sil function 'ib_block_arg_loop'
+sil @ib_block_arg_loop : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1(%1 : $Builtin.Int64)
+
+bb1(%a : $Builtin.Int64):
+  %u0 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %2 = integer_literal $Builtin.Int64, 2
+  fix_lifetime %2
+  %u1 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  %u2 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb1(undef : $Builtin.Int64)
+
+bb3:
+  %u3 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// Same as above, but the block argument is added before the instruction based available values.
+
+// CHECK-LABEL: sil @ib_block_arg_loop_added_first :
+// CHECK:       bb1([[A:%[0-9]+]] : $Builtin.Int64):
+// CHECK-NEXT:    apply {{%[0-9]+}}([[A]])
+// CHECK-NEXT:    [[L2:%.*]] = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    fix_lifetime [[L2]]
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK:       bb2:
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK-NEXT:    br bb1([[L2]])
+// CHECK:       bb3:
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L2]])
+// CHECK:       } // end sil function 'ib_block_arg_loop_added_first'
+sil @ib_block_arg_loop_added_first : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater true"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  br bb1(%1 : $Builtin.Int64)
+
+bb1(%a : $Builtin.Int64):
+  %u0 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %2 = integer_literal $Builtin.Int64, 2
+  fix_lifetime %2
+  %u1 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  cond_br undef, bb2, bb3
+
+bb2:
+  %u2 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb1(undef : $Builtin.Int64)
+
+bb3:
+  %u3 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}
+
+// The block argument is the only available value in its block and is merged with another value
+// in a successor block.
+
+// CHECK-LABEL: sil @ib_block_arg_merge :
+// CHECK:         [[L1:%.*]] = integer_literal $Builtin.Int64, 1
+// CHECK:       bb1:
+// CHECK-NEXT:    apply {{%[0-9]+}}([[L1]])
+// CHECK-NEXT:    br bb4([[L1]])
+// CHECK:       bb3([[A:%[0-9]+]] : $Builtin.Int64):
+// CHECK-NEXT:    apply {{%[0-9]+}}([[A]])
+// CHECK-NEXT:    br bb4([[A]])
+// CHECK:       bb4([[P:%[0-9]+]] : $Builtin.Int64):
+// CHECK-NEXT:    apply {{%[0-9]+}}([[P]])
+// CHECK:       } // end sil function 'ib_block_arg_merge'
+sil @ib_block_arg_merge : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_based_ssa_updater"
+  %f = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %1 = integer_literal $Builtin.Int64, 1
+  fix_lifetime %1
+  cond_br undef, bb1, bb4
+
+bb1:
+  %u0 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb3
+
+bb4:
+  br bb2(%1 : $Builtin.Int64)
+
+bb2(%a : $Builtin.Int64):
+  %u1 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb3
+
+bb3:
+  %u2 = apply %f(undef) : $@convention(thin) (Builtin.Int64) -> ()
+  %r = tuple ()
+  return %r
+}

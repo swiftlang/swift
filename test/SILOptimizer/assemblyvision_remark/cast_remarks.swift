@@ -120,7 +120,7 @@ public func forcedCast3<NS: AnyObject, T: AnyObject>(_ ns: NS) -> T {
   var x = ns // expected-warning {{variable 'x' was never mutated}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
                   // expected-note @-7:56 {{of 'ns'}}
-                  // expected-remark @-2 {{retain of type 'NS'}}
+                  // expected-remark @-2:12 {{retain of type 'NS'}}
 }
 
 // Interestingly today, with AnyObject codegen, we do not lose the assignment to
@@ -131,7 +131,7 @@ public func forcedCast4<NS: AnyObject, T: AnyObject>(_ ns: NS, _ ns2: NS) -> T {
   x = ns2
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
                   // expected-note @-5:66 {{of 'ns2'}}
-                  // expected-remark @-2 {{retain of type 'NS'}}
+                  // expected-remark @-2:12 {{retain of type 'NS'}}
 }
 
 public func condCast<NS: AnyObject, T: AnyObject>(_ ns: NS) -> T? {
@@ -160,7 +160,7 @@ public func condCast3<NS: AnyObject, T: AnyObject>(_ ns: NS) -> T? {
   var x = ns // expected-warning {{variable 'x' was never mutated}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
                   // expected-note @-7:54 {{of 'ns'}}
-                  // expected-remark @-2 {{retain of type 'NS'}}
+                  // expected-remark @-2:12 {{retain of type 'NS'}}
 }
 
 public func condCast4<NS: AnyObject, T: AnyObject>(_ ns: NS, _ ns2: NS) -> T? {
@@ -169,7 +169,7 @@ public func condCast4<NS: AnyObject, T: AnyObject>(_ ns: NS, _ ns2: NS) -> T? {
   x = ns2
   return x as? T // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
                  // expected-note @-5:64 {{of 'ns2'}}
-                 // expected-remark @-2 {{retain of type 'NS'}}
+                 // expected-remark @-2:12 {{retain of type 'NS'}}
 }
 
 public func condCast5<NS: AnyObject, T: AnyObject>(_ ns: NS) -> T? {

@@ -11,13 +11,13 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements the algorithm for computing a minimal set of rules from
-// a confluent rewrite system. A minimal set of rules is:
+// a complete rewrite system. A minimal set of rules is:
 //
-// 1) Large enough that computing the confluent completion produces the original
+// 1) Large enough that completion can recover the original complete
 //    rewrite system;
 //
 // 2) Small enough that no further rules can be deleted without changing the
-//    resulting confluent rewrite system.
+//    resulting complete rewrite system.
 //
 // The main entry point here is RewriteSystem::minimizeRewriteSystem().
 //

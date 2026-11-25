@@ -273,6 +273,7 @@ private:
         case Kind::Environment:
           return getEnvironment().Requirements.size();
         }
+        llvm_unreachable("covered switch");
       }
     };
 

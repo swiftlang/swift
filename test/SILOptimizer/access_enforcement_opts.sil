@@ -1779,3 +1779,43 @@ bb0(%0 : $TestClass, %1: $MayHaveDeinit):
 // CHECK-LABEL: sil @testSummarizeFunction
 // CHECK-NOT: begin_access {{.*}}no_nested_conflict
 // CHECK: } // end sil function 'testSummarizeFunction'
+
+class CastBase {}
+
+final class CastSibling1 : CastBase {
+  @_hasStorage var x: Int
+}
+
+final class CastSibling2 : CastBase {
+  @_hasStorage var z: Int64
+}
+
+// Access scopes to properties of sibling classes with the same field index must not be merged,
+// even if the class references are derived from the same root value.
+// CHECK-LABEL: sil @dont_merge_sibling_class_property_accesses :
+// CHECK:         [[C1:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling1
+// CHECK:         [[X:%.*]] = ref_element_addr [[C1]] : $CastSibling1, #CastSibling1.x
+// CHECK:         [[A1:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[X]]
+// CHECK:         load [[A1]]
+// CHECK:         end_access [[A1]]
+// CHECK:         [[C2:%.*]] = unconditional_checked_cast %0 : $CastBase to CastSibling2
+// CHECK:         [[Z:%.*]] = ref_element_addr [[C2]] : $CastSibling2, #CastSibling2.z
+// CHECK:         [[A2:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[Z]]
+// CHECK:         load [[A2]]
+// CHECK:         end_access [[A2]]
+// CHECK-LABEL: } // end sil function 'dont_merge_sibling_class_property_accesses'
+sil @dont_merge_sibling_class_property_accesses : $@convention(thin) (@guaranteed CastBase) -> (Int, Int64) {
+bb0(%0 : $CastBase):
+  %1 = unconditional_checked_cast %0 to CastSibling1
+  %2 = ref_element_addr %1, #CastSibling1.x
+  %3 = begin_access [read] [dynamic] %2
+  %4 = load %3
+  end_access %3
+  %6 = unconditional_checked_cast %0 to CastSibling2
+  %7 = ref_element_addr %6, #CastSibling2.z
+  %8 = begin_access [read] [dynamic] %7
+  %9 = load %8
+  end_access %8
+  %11 = tuple (%4, %9)
+  return %11
+}

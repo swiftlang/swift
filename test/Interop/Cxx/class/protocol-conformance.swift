@@ -33,6 +33,16 @@ extension Trivial : DefaultInitializable { }
 extension Trivial : CanReturn42 { }
 extension ConformsToProtocol : CanReturn42 { }
 
+protocol MakesSelf {
+  static func make() -> Self
+}
+
+extension HasStaticFactory : MakesSelf { }
+
+@inline(never)
+@_optimize(none)
+func makeViaProtocol<T : MakesSelf>(_ _: T.Type) -> T { T.make() }
+
 @inline(never)
 @_optimize(none)
 func tryReturn42(_ _p: CanReturn42) -> Int32 {
@@ -75,6 +85,10 @@ ExtendedTypes.test("(Don't) Use default impl") {
 
   let hasMethod = ConformsToProtocol()
   expectEqual(42, tryReturn42(hasMethod))
+}
+
+ExtendedTypes.test("Static method witness") {
+  expectEqual(42, makeViaProtocol(HasStaticFactory.self).value)
 }
 
 ExtendedTypes.test("Constrained generic") {

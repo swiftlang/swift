@@ -707,10 +707,7 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      if (auto *cctor = importer::findCopyConstructor(cxxRecordDecl);
-          cctor && cctor->getAccess() == clang::AS_public)
-        return cctor;
-      return nullptr;
+      return importer::findCopyConstructor(cxxRecordDecl);
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -862,6 +859,51 @@ namespace {
       IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
+    const clang::CXXMethodDecl *lookupAssignmentOperator(IRGenModule &IGM,
+                                                         bool isMove) const {
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      if (!cxxRecordDecl)
+        return nullptr;
+
+      auto *importer =
+          static_cast<ClangImporter *>(IGM.Context.getClangModuleLoader());
+      auto *assignOp = const_cast<clang::CXXMethodDecl *>(
+          importer->lookupCXXAssignmentOperator(cxxRecordDecl, isMove));
+      if (!assignOp)
+        return nullptr;
+
+      if (!assignOp->getNonObjectParameter(0)->getType()->isReferenceType())
+        return nullptr;
+
+      if (assignOp->isTrivial())
+        return nullptr;
+
+      if (!importer->tryDefineCXXAssignmentOperatorBody(assignOp))
+        return nullptr;
+
+      return assignOp;
+    }
+
+    void emitAssignmentOperatorCall(IRGenFunction &IGF,
+                                    const clang::CXXMethodDecl *assignOp,
+                                    Address dest, Address src) const {
+      auto *assignFn = cast<llvm::Function>(IGF.IGM.getAddrOfClangGlobalDecl(
+          clang::GlobalDecl(assignOp), NotForDefinition));
+      llvm::Value *args[] = {dest.getAddress(), src.getAddress()};
+
+      if (IGF.IGM.isForeignExceptionHandlingEnabled() &&
+          !IGF.IGM.isCxxNoThrow(const_cast<clang::CXXMethodDecl *>(assignOp))) {
+        IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                         llvm::BasicBlock *invokeUnwindDest) {
+          IGF.Builder.createInvoke(assignFn->getFunctionType(), assignFn, args,
+                                   invokeNormalDest, invokeUnwindDest);
+        });
+        return;
+      }
+
+      IGF.Builder.CreateCall(assignFn->getFunctionType(), assignFn, args);
+    }
+
   public:
     AddressOnlyCXXClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                       llvm::Type *storageType, Size size,
@@ -895,10 +937,11 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
-      auto *destructor = getCXXDestructor(T);
-      // If the destructor is trivial, clang will assert when we call
-      // `emitCXXDestructorCall` so, just let Swift handle this destructor.
-      if (!destructor || destructor->isTrivial()) {
+      auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      auto *destructor = cxxRecordDecl
+                             ? importer::findNonTrivialDestructor(cxxRecordDecl)
+                             : nullptr;
+      if (!destructor) {
         // If we didn't find a destructor to call, bail out to the parent
         // implementation.
         StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
@@ -1000,6 +1043,11 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                         SILType T, bool isOutlined) const override {
+      if (auto copyAssign =
+              lookupAssignmentOperator(IGF.IGM, /*isMove=*/false)) {
+        emitAssignmentOperatorCall(IGF, copyAssign, destAddr, srcAddr);
+        return;
+      }
       if (auto copyConstructor = findCopyConstructor()) {
         destroy(IGF, destAddr, T, isOutlined);
         emitCopyWithCopyOrMoveConstructor(IGF, T, copyConstructor,
@@ -1036,6 +1084,13 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
+      if (auto moveOrCopyAssign =
+              lookupAssignmentOperator(IGF.IGM, /*isMove=*/true)) {
+        emitAssignmentOperatorCall(IGF, moveOrCopyAssign, dest, src);
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
       if (auto moveConstructor = findMoveConstructor()) {
         destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyOrMoveConstructor(IGF, T, moveConstructor,
@@ -1735,14 +1790,17 @@ private:
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    auto objectSize =
+        isBaseSubobject ? layout.getNonVirtualSize() : layout.getSize();
     Size objectTotalStride = Size(objectSize.getQuantity());
     // Unless this is a base subobject of a C++ type, we do not take advantage
     // of tail padding, because that would prevent us from passing the address
     // of the object off to C, which is a pretty likely scenario for imported C
     // types.
     // In C++, fields of a derived class might get placed into tail padding of a
-    // base class, in which case we should not add extra padding here.
+    // base class, in which case we should not add extra padding here. A base
+    // subobject also does not contain its virtual bases, so only pad to its
+    // non-virtual size.
     assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
     assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
                                    objectTotalStride.getValueInBits());
@@ -1803,7 +1861,7 @@ private:
 
     // Round up to an even number of bytes.
     assert(bitBegin % 8 == 0);
-    Size offset = Size(bitBegin / 8);
+    Size offset = SubobjectAdjustment + Size(bitBegin / 8);
     Size byteLength = Size((bitEnd - bitBegin + 7) / 8);
 
     addOpaqueField(offset, byteLength);

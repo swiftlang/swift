@@ -380,9 +380,8 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
 
     SILTypeCategoryField, /// debug var type category
-    BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
-                          /// trace, hasDebugVar, isLet,
-                          /// isDenseMapSingleton(two bits), hasType,
+    BCFixed<9>,           /// hasReconstructionBlock, movableValueDebuginfo,
+                          /// trace, hasDebugVar, isLet, hasType,
                           /// hasScope, hasLoc, hasExpr
     BCArray<ValueIDField> /// operand info: operand, type, debug var info:
                           /// name, argno, optional stuff: typeid
@@ -420,6 +419,7 @@ namespace sil_block {
                      BCFixed<2>,  // serializedKind
                      BCFixed<3>,  // thunk kind
                      BCFixed<1>,  // without_actually_escaping
+                     BCFixed<1>,  // closure
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode
@@ -586,9 +586,9 @@ namespace sil_block {
     BCArray<ValueIDField> // a list of arguments
   >;
 
-  // SIL instructions with one type. (alloc_stack)
+  // SIL instructions with one type. (alloc_stack, alloc_box)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<5>, // Optional attributes
+                                          BCFixed<6>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)

@@ -137,6 +137,7 @@ KnownProtocolKind swift::getKnownProtocolKind(InvertibleProtocolKind ip) {
     case InvertibleProtocolKind::Id: return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -164,6 +165,7 @@ KnownProtocolKind swift::getKnownProtocolKind(RepressibleProtocolKind ip) {
     return KnownProtocolKind::Id;
 #include "swift/AST/KnownProtocols.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
@@ -2667,22 +2669,27 @@ unsigned ASTContext::getNextMacroDiscriminator(
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
+static const DeclContext *getContextForDiscriminator(const DeclContext *dc) {
+  // Autoclosures don't start a new sequence.
+  while (auto *ACE = dyn_cast<AutoClosureExpr>(dc))
+    dc = ACE->getParent();
+
+  // Top-level code declarations don't have their own discriminators.
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(dc))
+    dc = TLCD->getParentModule();
+
+  return dc;
+}
+
 /// Get the next discriminator within the given declaration context.
 unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
-  // Top-level code declarations don't have their own discriminators.
-  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParent();
-
-  return getImpl().NextDiscriminator[dc];
+  return getImpl().NextDiscriminator[getContextForDiscriminator(dc)];
 }
 
 /// Set the maximum assigned discriminator within the given declaration context.
 void ASTContext::setMaxAssignedDiscriminator(
     const DeclContext *dc, unsigned discriminator) {
-  // Top-level code declarations don't have their own discriminators.
-  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParent();
-
+  dc = getContextForDiscriminator(dc);
   assert(discriminator >= getImpl().NextDiscriminator[dc]);
   getImpl().NextDiscriminator[dc] = discriminator;
 }
@@ -3006,6 +3013,7 @@ static bool isClangModuleVersion(const ModuleLoader::ModuleVersionInfo &info) {
   case ModuleLoader::ModuleVersionSourceKind::SwiftInterface:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ASTContext::addSucceededCanImportModule(
@@ -6996,6 +7004,20 @@ ASTContext::getForeignRepresentationInfo(NominalTypeDecl *nominal,
       // or UInt to a C type.
       addTrivial(getIdentifier("Int"), stdlib);
       addTrivial(getIdentifier("UInt"), stdlib);
+
+      // Register Unicode.Scalar as foreign-representable on all platforms.
+      if (auto *unicodeEnum =
+              dyn_cast_or_null<EnumDecl>(findUnderlyingTypeInModule(
+                  *this, getIdentifier("Unicode"), stdlib))) {
+        for (auto *result :
+             unicodeEnum->lookupDirect(getIdentifier("Scalar"))) {
+          if (auto *scalarDecl = dyn_cast<StructDecl>(result)) {
+            getImpl().ForeignRepresentableCache.insert(
+                {scalarDecl, ForeignRepresentationInfo::forTrivial()});
+            break;
+          }
+        }
+      }
     }
 
     if (auto darwin = getLoadedModule(Id_Darwin)) {

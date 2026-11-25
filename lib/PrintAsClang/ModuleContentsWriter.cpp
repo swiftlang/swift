@@ -1114,18 +1114,21 @@ public:
     // ambiguities because of the arithmetic types that conflict with types we
     // already have in `swift::` namespace. Also skip `Error` protocol from
     // stdlib, we have experimental support for it. Also skip explicitly exluded
-    // declarations.
+    // declarations. Also skip special names: a top-level `init` or `subscript`
+    // only exists in invalid code, and has no C++ name.
     removedVDList.erase(
         llvm::remove_if(
             removedVDList,
             [&](const ValueDecl *vd) {
               return !printer.isVisible(vd) || vd->isObjC() ||
-                     (vd->isStdlibDecl() && !vd->getName().isSpecial() &&
+                     vd->getName().isSpecial() ||
+                     (vd->isStdlibDecl() &&
                       vd->getBaseIdentifier().hasUnderscoredNaming()) ||
                      (vd->isStdlibDecl() && isa<StructDecl>(vd)) ||
                      (vd->isStdlibDecl() &&
                       vd->getASTContext().getErrorDecl() == vd) ||
-                     swift::hasExposeNotCxxAttr(vd);
+                     cxx_translation::getCxxExposure(vd) ==
+                         cxx_translation::CxxExposure::NotExposed;
             }),
         removedVDList.end());
     // Sort the unavaiable decls by their name and kind.

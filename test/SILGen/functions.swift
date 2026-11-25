@@ -360,10 +360,10 @@ func calls(_ i:Int, j:Int, k:Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @inout_aliasable SomeStruct) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @inout_aliasable SomeStruct) -> () {
 // CHECK: function_ref @$s9functions10SomeStructV6methodyyBi64_F : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> ()
 
-// CHECK-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_yBi64_cfu2_ : $@convention(thin) (Builtin.Int64, @guaranteed SomeClass) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_yBi64_cfu2_ : $@convention(thin) (Builtin.Int64, @guaranteed SomeClass) -> ()
 // CHECK: class_method %1 : $SomeClass, #SomeClass.method : (SomeClass) -> (Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> ()
 
 func return_func() -> (_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {
@@ -465,7 +465,7 @@ final class r17828355Class {
 }
 
 // The curry thunk for the method should not include a class_method instruction.
-// CHECK-LABEL: sil private [ossa] @$s9functions14r17828355ClassC6methodyyBi64_FyBi64_cACcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @guaranteed r17828355Class) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s9functions14r17828355ClassC6methodyyBi64_FyBi64_cACcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @guaranteed r17828355Class) -> () {
 // CHECK: function_ref @$s9functions14r17828355ClassC6methodyyBi64_F : $@convention(method) (Builtin.Int64, @guaranteed r17828355Class) -> ()
 // CHECK: }
 
@@ -494,7 +494,7 @@ func testNoescape() {
 // be passed to the capturing closure.closure
 // CHECK: closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: Isolation: nonisolated
-// CHECK-NEXT: sil private [ossa] @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private [closure] [ossa] @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 
 
@@ -515,8 +515,8 @@ func testNoescape2() {
 
 // CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: Isolation: nonisolated
-// CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private [closure] [ossa] @$s9functions13testNoescape2yyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
 // CHECK-NEXT: Isolation: nonisolated
-// CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
+// CHECK-NEXT: sil private [closure] [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {

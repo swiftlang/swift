@@ -14,7 +14,7 @@
 ///
 /// It defines the Dispatch-specific functions for the runtime and, in
 /// Embedded builds, the executor entrypoints declared in
-/// EmbeddedPlatform+Concurrency.h and ExecutorImpl.h.
+/// SwiftPlatform/Concurrency.h and ExecutorImpl.h.
 ///
 ///===------------------------------------------------------------------===///
 
@@ -53,7 +53,7 @@ extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
 #include "TaskPrivate.h"
 
 #if SWIFT_CONCURRENCY_EMBEDDED
-#include "swift/EmbeddedPlatform+Concurrency.h"
+#include "SwiftPlatform/Concurrency.h"
 #endif
 
 #ifndef NSEC_PER_SEC

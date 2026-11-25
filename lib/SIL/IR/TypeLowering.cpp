@@ -32,6 +32,7 @@
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/LLVMExtras.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -1860,9 +1861,20 @@ namespace {
     void
     emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue aggValue,
                             TypeExpansionKind loweringStyle) const override {
+      if (loweringStyle == TypeExpansionKind::None)
+        return emitDestroyValue(B, loc, aggValue);
       // A value type with a deinit cannot be memberwise destroyed.
       if (auto *nominal = getLoweredType().getNominalDecl()) {
         if (nominal->hasValueTypeDestructor()) {
+          emitDestroyValue(B, loc, aggValue);
+          return;
+        }
+      }
+      for (auto *field :
+           getLoweredType().getStructDecl()->getStoredProperties()) {
+        auto fieldTy = getLoweredType().getFieldType(
+            field, B.getModule(), B.getFunction().getTypeExpansionContext());
+        if (!B.getFunction().isTypeABIAccessible(fieldTy)) {
           emitDestroyValue(B, loc, aggValue);
           return;
         }
@@ -2973,6 +2985,10 @@ namespace {
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+        auto *importer =
+            static_cast<ClangImporter *>(TC.Context.getClangModuleLoader());
+        if (importer->hasNonTrivialAssignmentOperator(D))
+          properties.setCustomAssign();
       }
 
       if (auto *clangDecl = D->getClangDecl()) {
@@ -5582,12 +5598,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
     return ABIDifference::NeedsThunk;
 
-  // A nondeinitable value needs a context of its own, so forming one from any
-  // other thick function value needs a thunk, even from a noncopyable value
-  // with the same ABI. A thin function has no context, so thin-to-thick can
-  // form the value directly.
-  if (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable() &&
-      fnTy1->getExtInfo().hasContext())
+  // A noncopyable value needs a context of its own, which only it refers to,
+  // so forming one from a copyable thick function value needs a thunk. So
+  // does forming a nondeinitable value from any other thick function value,
+  // even from a noncopyable value with the same ABI. A thin function has no
+  // context, so thin-to-thick can form the value directly.
+  if (fnTy1->getExtInfo().hasContext() &&
+      ((fnTy2->isNoncopyable() && !fnTy1->isNoncopyable()) ||
+       (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable())))
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())

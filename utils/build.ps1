@@ -296,13 +296,13 @@ if ($UseHostToolchain -is [string]) {
 
 $DefaultPinned = @{
   AMD64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10.exe";
-    PinnedSHA256 = "C287DD533A65A73D657B1B9F2305BE50552F89B46199A0F6162A287DEE547149";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10.exe";
+    PinnedSHA256 = "23FC57903FADFF78F6AC89BACFB1EBD79A48274B0DBAD4D705A4A700CD825E52";
     PinnedVersion = "6.4.0";
   };
   ARM64 = @{
-    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-08-01-a-windows10-arm64.exe"
-    PinnedSHA256 = "8C9F35E37DA08CC598E0CBC7821880D2282E4D02633DD78ECBB248370A5C9985";
+    PinnedBuild = "https://download.swift.org/swift-6.4.x-branch/windows10-arm64/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a/swift-6.4.x-DEVELOPMENT-SNAPSHOT-2026-11-09-a-windows10-arm64.exe"
+    PinnedSHA256 = "B3A93EA91AE9FB46F31435B92BF394EE4534161F76EA8E9FE1AB9F21784D1F05";
     PinnedVersion = "6.4.0";
   };
 }
@@ -727,10 +727,14 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 ## Helpers for logging and timing build steps.
 
-$TimingData = New-Object System.Collections.Generic.List[System.Object]
+# Avoid New-Object: enumerating its [psobject]-wrapped List[object] throws
+# "Argument types do not match", see https://github.com/PowerShell/PowerShell/issues/27558
+$TimingData = [System.Collections.Generic.List[System.Object]]::new()
 $CurrentOperation = $null
 $BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
 $RecordTimings = $Summary -or $Trace
+$BuildStartTime = [DateTime]::UtcNow
+$ExternalTraceEvents = [System.Collections.Generic.List[System.Object]]::new()
 
 if ($RecordTimings) {
   Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
@@ -925,10 +929,68 @@ function Write-TimingTrace([string] $Path) {
     }
   }
 
+  $Metadata = @(
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 0; args = @{ name = "build.ps1" } },
+    [ordered]@{ name = "process_name"; ph = "M"; pid = 1; args = @{ name = "lit" } }
+  )
+
   New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
-  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
+  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = $Metadata + @($Events) + @($ExternalTraceEvents) })
   [IO.File]::WriteAllText($Path, $Json)
   Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
+}
+
+# lit makes the timestamps relative to the first test, so align each trace to end
+# when its file was written.
+function Import-LitTimeTraces([string] $Directory, [TimeSpan] $MinDuration = [TimeSpan]::FromSeconds(1)) {
+  $MinDurationUs = [long]($MinDuration.Ticks / 10)
+  foreach ($File in Get-ChildItem -Path $Directory -Filter "*.json" -File -ErrorAction Ignore) {
+    try {
+      $Events = @((Get-Content -Raw $File.FullName | ConvertFrom-Json).traceEvents)
+    } catch {
+      Write-Warning "Ignoring unreadable lit trace '$($File.FullName)': $_"
+      continue
+    }
+    if ($Events.Count -eq 0) { continue }
+
+    $TraceEnd = [long] 0
+    foreach ($TraceEvent in $Events) { $TraceEnd = [math]::Max($TraceEnd, $TraceEvent.ts + $TraceEvent.dur) }
+    $Offset = [long](($File.LastWriteTimeUtc - $BuildStartTime).Ticks / 10) - $TraceEnd
+
+    foreach ($TraceEvent in $Events) {
+      if ($TraceEvent.dur -lt $MinDurationUs) { continue }
+      $ExternalTraceEvents.Add([ordered]@{
+        name = $TraceEvent.name
+        cat = "lit"
+        ph = "X"
+        ts = $TraceEvent.ts + $Offset
+        dur = $TraceEvent.dur
+        pid = 1
+        tid = $TraceEvent.pid
+      })
+    }
+  }
+}
+
+function Invoke-WithLitTimeTraces([string] $Directory, [ScriptBlock] $ScriptBlock) {
+  # lit's --time-trace-output fails on the unset start time of excluded tests.
+  if (-not $Trace -or $env:LIT_FILTER) {
+    & $ScriptBlock
+    return
+  }
+
+  Remove-Item -Recurse -Force $Directory -ErrorAction Ignore
+  New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+  try {
+    Invoke-IsolatingEnvVars {
+      # lit parses LIT_OPTS with shlex, quote the path to preserve backslashes.
+      # Several lit invocations can run concurrently, have each write its own file.
+      $env:LIT_OPTS = "$env:LIT_OPTS --time-trace-output='$Directory\lit.json' --use-unique-output-file-name".Trim()
+      & $ScriptBlock
+    }
+  } finally {
+    Import-LitTimeTraces $Directory
+  }
 }
 
 function Get-AndroidNDK {
@@ -1834,7 +1896,7 @@ function Get-Dependencies {
 
         Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem "$BundleRoot\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
+        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
@@ -3523,6 +3585,30 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
+function Get-LLVMVersion([string] $LLVMBinaryCache) {
+  # Read the version from the configured LLVMConfig.cmake. These are the values
+  # that name the LLVM DLL, LLVM-<Major><Suffix>.dll.
+  $LLVMConfig = "$LLVMBinaryCache\lib\cmake\llvm\LLVMConfig.cmake"
+  $Content = Get-Content -Raw $LLVMConfig -ErrorAction Stop
+  if (-not ($Content -match '(?m)^set\(LLVM_VERSION_MAJOR (\d+)\)')) {
+    throw "LLVM_VERSION_MAJOR not found in '$LLVMConfig'"
+  }
+  $Major = $Matches.1
+  if (-not ($Content -match '(?m)^set\(LLVM_VERSION_SUFFIX ?([^)\s]*)\)')) {
+    throw "LLVM_VERSION_SUFFIX not found in '$LLVMConfig'"
+  }
+  return @{ Major = $Major; Suffix = $Matches.1 }
+}
+
+function Get-LLVMVersionMajor([string] $LLVMBinaryCache) {
+  return (Get-LLVMVersion $LLVMBinaryCache).Major
+}
+
+function Get-LLVMDylibVersion([string] $LLVMBinaryCache) {
+  $Version = Get-LLVMVersion $LLVMBinaryCache
+  return "$($Version.Major)$($Version.Suffix)"
+}
+
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [switch] $PrepareSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
@@ -3566,6 +3652,8 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       }
       $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
       $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+      # In the LLVM DLL build, liblldb.dll (and so _lldb.pyd) imports LLVM-<version>.dll.
+      $LLDBRuntimeDLLs += Get-Item "$CompilerCache\bin\LLVM-$(Get-LLVMDylibVersion $CompilerCache).dll"
       foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
         Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
       }
@@ -3696,11 +3784,13 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     }
 
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
-    if ($Targets) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
-    }
-    if ($TestSwift) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+    Invoke-WithLitTimeTraces "$($BuildCMakeArgs.Bin)\lit-time-traces" {
+      if ($Targets) {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+      }
+      if ($TestSwift) {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+      }
     }
 
     if ($LLDBTargets) {
@@ -3827,11 +3917,7 @@ function Build-CompilerRuntime([Hashtable] $Platform,
                                [Hashtable] $Compilers) {
   $LLVMBinaryCache = $(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)
 
-  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMBinaryCache\bin\llvm-lit.py" --version)
-  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
-    throw "Unexpected version string '$LITVersionStr' output from llvm-lit.py"
-  }
-  $LLVMVersionMajor = $Matches.1
+  $LLVMVersionMajor = Get-LLVMVersionMajor $LLVMBinaryCache
 
   $InstallRoot = "$($HostPlatform.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
 
@@ -5756,6 +5842,9 @@ function Build-SymbolKit([Hashtable] $Platform,
 function Build-DocC([Hashtable] $Platform,
                     [Hashtable] $Compilers,
                     [string]    $SwiftSDK) {
+  # TODO: Re-enable debug info once https://github.com/swiftlang/swift/issues/88563 is fixed.
+  $DebugInfo = $false
+
   Build-CMakeProject `
     -Src $SourceCache\swift-docc `
     -Bin (Get-ProjectBinaryCache $Platform DocC) `
@@ -6018,7 +6107,10 @@ function Build-Installer([Hashtable] $Platform) {
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$(Get-ProjectBinaryCache $HostPlatform DocC)\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
-    PythonVersion = $PythonVersion
+    PythonVersion = $PythonVersion;
+    # The toolchain ships LLVM-<version>.dll (LLVM_BUILD_LLVM_DYLIB in the Windows caches).
+    IncludeLLVMDLL = "True";
+    LLVMVersion = Get-LLVMDylibVersion (Get-ProjectBinaryCache $HostPlatform Stage2Compilers)
   }
 
   Invoke-IsolatingEnvVars {

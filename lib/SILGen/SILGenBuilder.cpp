@@ -298,6 +298,7 @@ ManagedValue SILGenBuilder::createPhi(SILType type,
   case OwnershipKind::Unowned:
     return ManagedValue::forUnownedObjectValue(arg);
   }
+  llvm_unreachable("covered switch");
 }
 
 ManagedValue SILGenBuilder::createAllocRef(

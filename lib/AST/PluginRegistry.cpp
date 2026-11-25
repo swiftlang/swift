@@ -20,6 +20,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "llvm/Support/Endian.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Config/config.h"
 
@@ -127,11 +128,11 @@ PluginRegistry::getInProcessPlugins(llvm::StringRef serverPath) {
 }
 
 llvm::Expected<CompilerPlugin *>
-PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
-  llvm::sys::fs::file_status stat;
-  if (auto err = llvm::sys::fs::status(path, stat)) {
-    return llvm::errorCodeToError(err);
-  }
+PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox,
+                                     llvm::vfs::FileSystem &fs) {
+  auto stat = fs.status(path);
+  if (!stat)
+    return llvm::errorCodeToError(stat.getError());
 
   std::lock_guard<std::mutex> lock(mtx);
 
@@ -139,25 +140,26 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   auto &storage = LoadedPluginExecutables[path];
   if (storage) {
     // See if the loaded one is still usable.
-    if (storage->getLastModificationTime() == stat.getLastModificationTime())
+    if (storage->getLastModificationTime() == stat->getLastModificationTime())
       return storage.get();
 
     // The plugin is updated. Close the previously opened plugin.
     storage = nullptr;
   }
 
-  if (!llvm::sys::fs::exists(stat)) {
+  if (!stat->exists()) {
     return llvm::createStringError(std::errc::no_such_file_or_directory,
                                    "not found");
   }
 
-  if (!llvm::sys::fs::can_execute(path)) {
+  if ((stat->getPermissions() & llvm::sys::fs::all_exe) ==
+      llvm::sys::fs::no_perms) {
     return llvm::createStringError(std::errc::permission_denied,
                                    "not executable");
   }
 
   auto plugin = std::make_unique<LoadedExecutablePlugin>(
-      path, stat.getLastModificationTime(), disableSandbox);
+      path, stat->getLastModificationTime(), disableSandbox);
 
   plugin->setDumpMessaging(dumpMessaging);
 

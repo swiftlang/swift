@@ -93,6 +93,7 @@ convertSILOptToRawStrictConcurrencyLevel(SILOptStrictConcurrency level) {
   case SILOptStrictConcurrency::Minimal:
     return StrictConcurrency::Minimal;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace llvm {
@@ -555,6 +556,16 @@ struct SILOptOptions {
       "debug-diagnostic-names",
       llvm::cl::desc("Include diagnostic names when printing"));
 
+  llvm::cl::opt<bool> AssertOnDiagnosticError = llvm::cl::opt<bool>(
+      "assert-on-diagnostic-error",
+      llvm::cl::desc("Trap when an error diagnostic is emitted. For compiler "
+                     "developers only."));
+
+  llvm::cl::opt<bool> AssertOnDiagnosticWarning = llvm::cl::opt<bool>(
+      "assert-on-diagnostic-warning",
+      llvm::cl::desc("Trap when a warning diagnostic is emitted. For compiler "
+                     "developers only."));
+
   llvm::cl::opt<swift::UnavailableDeclOptimization>
       UnavailableDeclOptimization =
           llvm::cl::opt<swift::UnavailableDeclOptimization>(
@@ -749,6 +760,10 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     Invocation.getDiagnosticOptions().PrintDiagnosticNames =
         PrintDiagnosticNamesMode::Identifier;
   }
+  Invocation.getDiagnosticOptions().AssertOnError |=
+      options.AssertOnDiagnosticError;
+  Invocation.getDiagnosticOptions().AssertOnWarning |=
+      options.AssertOnDiagnosticWarning;
 
   for (auto &featureName : options.UpcomingFeatures) {
     auto feature = Feature::getUpcomingFeature(featureName);

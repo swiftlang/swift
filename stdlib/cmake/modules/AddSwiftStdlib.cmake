@@ -184,8 +184,10 @@ function(_add_target_variant_c_compile_link_flags)
                        "-fcoverage-mapping")
   endif()
 
-  # Use frame pointers on Linux
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR
+     "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC" OR
+     "${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result "-fno-omit-frame-pointer")
   endif()
 
@@ -366,8 +368,10 @@ function(_add_target_variant_c_compile_flags)
                        "-fcoverage-mapping")
   endif()
 
-  # Use frame pointers on Linux
-  if("${CFLAGS_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if("${CFLAGS_SDK}" STREQUAL "LINUX" OR
+     "${CFLAGS_SDK}" STREQUAL "LINUX_STATIC" OR
+     "${CFLAGS_SDK}" STREQUAL "ANDROID")
     list(APPEND result "-fno-omit-frame-pointer")
   endif()
 
@@ -464,7 +468,7 @@ function(_add_target_variant_c_compile_flags)
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
   if(CFLAGS_SDK STREQUAL "embedded" AND _threading_package STREQUAL "EMBEDDED")
-    list(APPEND result "-I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform")
+    list(APPEND result "-I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include")
   endif()
 
   if(SWIFT_STDLIB_OS_VERSIONING)
@@ -1108,7 +1112,7 @@ function(add_swift_target_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
       # Flags required to build embedded libraries
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded;-enable-experimental-feature;TailAllocatedAttribute)
 
       # Two orthogonal per-triple opt-ins gate the departures from the
       # default embedded stdlib build:
@@ -1272,8 +1276,10 @@ function(add_swift_target_library_single target name)
     set(install_in_component "${SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT}")
   endif()
 
-  # Use frame pointers on Linux
-  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX")
+  # Use frame pointers on Linux and Android
+  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX" OR
+      "${SWIFTLIB_SINGLE_SDK}" STREQUAL "LINUX_STATIC" OR
+      "${SWIFTLIB_SINGLE_SDK}" STREQUAL "ANDROID")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 
@@ -3212,7 +3218,9 @@ function(_add_swift_target_executable_single name)
       -Xfrontend;-strict-implicit-module-context)
   endif()
 
-  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")
+  if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX" OR
+      "${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX_STATIC" OR
+      "${SWIFTEXE_SINGLE_SDK}" STREQUAL "ANDROID")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS "-Xcc" "-fno-omit-frame-pointer")
   endif()
 

@@ -65,6 +65,7 @@ private struct MovableInstructions {
   var loadsAndStores: [Instruction] = []
   var hoistUp: [Instruction] = []
   var scopedInsts: [ScopedInstruction] = []
+  var stackAllocations: [AllocStackInst] = []
 }
 
 /// Analyzed instructions inside the currently processed loop.
@@ -72,23 +73,29 @@ private struct AnalyzedInstructions {
   /// Side effects of the loop.
   var loopSideEffects: StackWithCount<Instruction>
   /// Non-load instructions that have no side effects but may read from memory.
-  var loopReadOnlyEffects: StackWithCount<Instruction>
+  var loopReadOnlyEffects: Stack<Instruction>
   var loads: Stack<LoadInst>
+  var loadBorrows: Stack<LoadBorrowInst>
   var stores: Stack<StoreInst>
+  /// Stack allocations which, or a projection of which, are copied into a stack allocation in the loop.
+  var copiedStackAllocations: InstructionSet
 
   // loop blocks that dominate all exiting and latch blocks
   var dominatingBlocks: BasicBlockSet
 
-  /// `true` if the loop has instructions which (may) read from memory, which are not in `Loads` and not in `sideEffects`.
+  /// `true` if the loop has instructions which (may) read from memory, which are not in `loads`,
+  /// `loadBorrows` and not in `sideEffects`.
   var hasOtherMemReadingInsts: Bool {
     !loopReadOnlyEffects.isEmpty
   }
   
   init (in loop: Loop, _ context: FunctionPassContext) {
     self.loopSideEffects = StackWithCount<Instruction>(context)
-    self.loopReadOnlyEffects = StackWithCount<Instruction>(context)
+    self.loopReadOnlyEffects = Stack<Instruction>(context)
     self.loads = Stack<LoadInst>(context)
+    self.loadBorrows = Stack<LoadBorrowInst>(context)
     self.stores = Stack<StoreInst>(context)
+    self.copiedStackAllocations = InstructionSet(context)
     self.dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
   }
   
@@ -96,7 +103,9 @@ private struct AnalyzedInstructions {
     loopSideEffects.deinitialize()
     loopReadOnlyEffects.deinitialize()
     loads.deinitialize()
+    loadBorrows.deinitialize()
     stores.deinitialize()
+    copiedStackAllocations.deinitialize()
     dominatingBlocks.deinitialize()
   }
 }
@@ -136,8 +145,16 @@ private func analyzeInstructions(
       case let loadInst as LoadInst:
         analyzedInstructions.loads.append(loadInst)
         continue // Don't set `hasOtherMemReadingInsts`
+      case let loadBorrowInst as LoadBorrowInst:
+        analyzedInstructions.loadBorrows.append(loadBorrowInst)
+        continue // Don't set `hasOtherMemReadingInsts`
       case let storeInst as StoreInst:
+        if let load = storeInst.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == storeInst.parentBlock {
+          analyzedInstructions.recordCopiedStackAllocation(of: storeInst, in: loop)
+        }
         analyzedInstructions.stores.append(storeInst)
+      case let copyAddrInst as CopyAddrInst:
+        analyzedInstructions.recordCopiedStackAllocation(of: copyAddrInst, in: loop)
       default:
         break
       }
@@ -165,6 +182,7 @@ private func collectProjectableAccessPathsAndSplitLoads(
          analyzedInstructions.isOnlyLoadedAndStored(
            accessPath: accessPath,
            storeAddr: storeInst.destination,
+           in: loop,
            context.aliasAnalysis
          ),
          !movableInstructions.loadAndStoreAccessPaths.contains(accessPath),
@@ -193,7 +211,7 @@ private func collectSpeculativelyMovableInstructions(in loop: Loop,
   for bb in loop.loopBlocks {
     for inst in bb.instructions {
       switch inst {
-      case is LoadInst:
+      case is LoadInst, is LoadBorrowInst:
         movableInstructions.loadsAndStores.append(inst)
       case let storeInst as StoreInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
@@ -368,7 +386,7 @@ private func storesUniqueReadableValue(
     return false
   }
 
-  // loopSideEffects, loopReadOnlyEffects and loads partition the set of
+  // loopSideEffects, loopReadOnlyEffects, loads and loadBorrows partition the set of
   // instructions with memory effects in the loop.
   if analyzedInstructions.loopSideEffects.contains(where: hasConflictingEffect) {
     return false
@@ -377,6 +395,9 @@ private func storesUniqueReadableValue(
     return false
   }
   if analyzedInstructions.loads.contains(where: hasConflictingEffect) {
+    return false
+  }
+  if analyzedInstructions.loadBorrows.contains(where: hasConflictingEffect) {
     return false
   }
 
@@ -434,6 +455,14 @@ private func collectMovableInstructions(
         if !beginBorrowInst.isLexical && beginBorrowInst.canScopedInstructionBeHoisted(outOf: loop, analyzedInstructions: analyzedInstructions, context) {
           movableInstructions.scopedInsts.append(beginBorrowInst)
         }
+      case let allocStackInst as AllocStackInst:
+        // An allocation in a loop never carries a value into the next iteration. Hoisting it only pays off by keeping
+        // it alive over the uses of a copy's destination, which lets TempRValueElimination remove the copy.
+        if analyzedInstructions.copiedStackAllocations.contains(allocStackInst) {
+          movableInstructions.stackAllocations.append(allocStackInst)
+        } else {
+          log("Not hoisting stack allocation \(allocStackInst)")
+        }
       case let fullApplySite as FullApplySite:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if readOnlyApplyCounter * analyzedInstructions.loopSideEffects.count < 8000,
@@ -469,6 +498,7 @@ private func collectMovableInstructions(
 /// - hoist of instructions that are guaranteed to be executed
 /// - sink
 /// - hoist with sink of scoped instructions
+/// - hoist of stack allocations, if nothing else moved
 private func optimizeLoop(
   loop: Loop,
   movableInstructions: inout MovableInstructions,
@@ -481,6 +511,12 @@ private func optimizeLoop(
   changed = movableInstructions.hoistAndSinkLoadsAndStores(outOf: loop, context)      || changed
   changed = movableInstructions.hoistInstructions(outOf: loop, context)               || changed
   changed = movableInstructions.hoistWithSinkScopedInstructions(outOf: loop, context) || changed
+
+  // Speculative store hoisting in `speculativelyHoistInstructions` can only hoist a conditional store to an `alloc_stack` that is still inside the loop.
+  // That's why we can hoist the remaining stack allocations only after the previous steps have converged.
+  if !changed {
+    changed = movableInstructions.hoistStackAllocations(outOf: loop, context)
+  }
 
   return changed
 }
@@ -502,9 +538,18 @@ private extension AnalyzedInstructions {
   func isOnlyLoadedAndStored(
     accessPath: AccessPath,
     storeAddr: Value,
+    in loop: Loop,
     _ aliasAnalysis: AliasAnalysis
   ) -> Bool {
     if loopSideEffects.contains(where: { sideEffect in
+      // Alias analysis reports an `end_borrow` of a `load_borrow` as writing the loaded memory location
+      // (to prevent the memory from being modified during the borrow scope). Ignore it if its `load_borrow`
+      // is replaced by a borrow of the stored value in `hoistAndSinkLoadAndStore`, because then the
+      // `end_borrow` doesn't refer to the memory location anymore.
+      // An `end_borrow` of a non-replaceable `load_borrow` is a conflict, which is checked below.
+      if sideEffect.isPartOfReplaceableLoadBorrow(of: accessPath, in: loop) {
+        return false
+      }
       switch sideEffect {
       case let storeInst as StoreInst:
         if storeInst.storesTo(accessPath) {
@@ -528,6 +573,18 @@ private extension AnalyzedInstructions {
 
     if loads.contains(where: { loadInst in
       loadInst.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadInst.overlaps(accessPath: accessPath)
+    }) {
+      return false
+    }
+
+    // A `load_borrow` which may read from the memory location must be replaced by a borrow of the
+    // stored value in `hoistAndSinkLoadAndStore`, because after the transformation the memory location
+    // doesn't contain a valid value inside the loop.
+    // In contrast to a `load`, which is split if it's wider than `accessPath` (see `splitLoads`), a
+    // `load_borrow` can only be replaced if it loads from `accessPath` or a projection of it, and if its
+    // borrow scope ends within the loop (see `isReplaceable`).
+    if loadBorrows.contains(where: { loadBorrow in
+      loadBorrow.mayRead(fromAddress: storeAddr, aliasAnalysis) && !loadBorrow.isReplaceable(by: accessPath, in: loop)
     }) {
       return false
     }
@@ -628,13 +685,32 @@ private extension AnalyzedInstructions {
       }
   }
 
+  /// Returns true if `loopSideEffects` contains any memory writes outside of `scope` which may alias
+  /// with `address`.
+  ///
+  /// Alias analysis reports an `end_borrow` of a `load_borrow` as writing the loaded memory location.
+  /// But it doesn't really write to memory. It only prevents that the memory location is changed during
+  /// the borrow scope. When `scope` is hoisted out of the loop and its end is sunk out of the loop, all
+  /// `load_borrow` scopes in the loop are completely inside the extended scope (see `isEndBorrowOfLoadBorrow`).
+  /// Therefore it's correct to ignore all `end_borrow`s of `load_borrow`s.
+  ///
+  /// However, `ignoreEndBorrowsOfOtherLoadBorrows` is only true if this is also beneficial:
+  /// * true: for hoisting a `begin_access [read]`. Extending a read access scope over other borrow scopes
+  ///   has no negative effect.
+  /// * false: for hoisting a `load_borrow`. Then only `end_borrow`s of `load_borrow`s which are inside `scope`
+  ///   (i.e. the `end_borrow` of the hoisted `load_borrow` itself) are ignored. Hoisting a `load_borrow`
+  ///   over the borrow scopes of other `load_borrow`s of the same memory location would create a borrow
+  ///   scope which spans the whole loop. Such a scope prevents other optimizations.
   func sideEffectsMayWrite(to address: Value,
                            outsideOf scope: InstructionRange,
+                           ignoreEndBorrowsOfOtherLoadBorrows: Bool,
                            _ context: FunctionPassContext
   ) -> Bool {
     for sideEffectInst in loopSideEffects {
       if sideEffectInst.mayWrite(toAddress: address, context.aliasAnalysis),
-         !scope.inclusiveRangeContains(sideEffectInst)
+         !scope.inclusiveRangeContains(sideEffectInst),
+         !(ignoreEndBorrowsOfOtherLoadBorrows ? sideEffectInst.isEndBorrowOfLoadBorrow
+                                              : scope.containsBorrowScopeBegin(of: sideEffectInst))
       {
         return true
       }
@@ -648,7 +724,8 @@ private extension AnalyzedInstructions {
   ) -> Bool {
     for sideEffectInst in loopSideEffects {
       if sideEffectInst.mayReadOrWrite(address: address, context.aliasAnalysis),
-         !scope.inclusiveRangeContains(sideEffectInst)
+         !scope.inclusiveRangeContains(sideEffectInst),
+         !sideEffectInst.isEndBorrowOfLoadBorrow
       {
         return true
       }
@@ -704,6 +781,16 @@ private extension AnalyzedInstructions {
 
     return true
   }
+
+  mutating func recordCopiedStackAllocation(of copy: CopyLikeInstruction, in loop: Loop) {
+    if copy.isInitializationOfDestination,
+       let destination = copy.destinationAddress as? AllocStackInst,
+       loop.contains(block: destination.parentBlock),
+       case .stack(let source) = copy.sourceAddress.accessBase
+    {
+      copiedStackAllocations.insert(source)
+    }
+  }
 }
 
 private extension MovableInstructions {
@@ -754,8 +841,12 @@ private extension MovableInstructions {
     var changed = false
 
     for scopedInst in scopedInsts {
-      if let storeBorrowInst = scopedInst as? StoreBorrowInst {
-        _ = storeBorrowInst.allocStack.hoist(outOf: loop, context)
+      if let storeBorrowInst = scopedInst as? StoreBorrowInst,
+         loop.contains(block: storeBorrowInst.allocStack.parentBlock) 
+      {
+        guard storeBorrowInst.allocStack.hoist(outOf: loop, context) else {
+          continue
+        }
       }
 
       guard scopedInst.hoist(outOf: loop, context) else {
@@ -773,6 +864,17 @@ private extension MovableInstructions {
       }
       
       changed = true
+    }
+
+    return changed
+  }
+
+  /// Hoist stack allocations and sink their deallocations.
+  mutating func hoistStackAllocations(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
+    var changed = false
+
+    for allocStackInst in stackAllocations {
+      changed = allocStackInst.hoist(outOf: loop, context) || changed
     }
 
     return changed
@@ -818,18 +920,16 @@ private extension MovableInstructions {
       return false
     }
 
-    // We currently don't support split `load [take]`.
-    for case let load as LoadInst in loadsAndStores {
-      if load.loadOwnership == .take, load.address.accessPath != accessPath {
-        return false
-      }
+    let function = firstStore.parentFunction
+
+    guard allSplitLoadTakesAreOfSameField(of: accessPath) else {
+      return false
     }
 
-    let function = firstStore.parentFunction
     let phiOwnership: Ownership =
       function.hasOwnership && !firstStore.source.type.isTrivial(in: function) ? .owned : .none
 
-    var ssaUpdater = SSAUpdater(
+    var ssaUpdater = InstructionBasedSSAUpdater(
       type: firstStore.destination.type.objectType,
       ownership: phiOwnership,
       context
@@ -838,9 +938,9 @@ private extension MovableInstructions {
 
     // Set all stored values as available values in the ssaUpdater.
     for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
-      ssaUpdater.addAvailableValue(storeInst.source, in: storeInst.parentBlock)
+      ssaUpdater.addAvailableValue(storeInst.source, after: storeInst)
     }
-    
+
     var cloner = Cloner(cloneBefore: loop.preheader!.terminator, context)
     defer { cloner.deinitialize() }
     
@@ -873,26 +973,32 @@ private extension MovableInstructions {
     }
 
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
-    ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
+    ssaUpdater.addAvailableValue(initialLoad, after: initialLoad)
+
+    // A `load [take]` is replaced by destructuring the current value and re-constructing it with
+    // an `undef` for the taken field. The re-constructed value is available after the `load [take]`.
+    // For a `load [take]` of the whole value, the re-constructed value is just `undef`.
+    // As it is created later, use a placeholder for now.
+    var loadTakePlaceholders = Dictionary<LoadInst, MarkDependenceInst>()
+    for case let load as LoadInst in loadsAndStores where load.loadOwnership == .take && load.loadsFrom(accessPath) {
+      let builder = Builder(after: load, context)
+      let undef = Undef.get(type: firstStore.destination.type.objectType, context)
+      let placeholder = builder.createMarkDependence(value: undef, base: undef, ownership: phiOwnership,
+                                                     kind: .Unresolved)
+      loadTakePlaceholders[load] = placeholder
+      ssaUpdater.addAvailableValue(placeholder, after: placeholder)
+    }
     
     var changed = false
-    var currentBlock: BasicBlock?
-    var currentVal: Value?
     
-    // Remove all stores and replace the loads with the current value.
-    //
-    // This loop depends on loadsAndStores being in order the instructions appear in blocks.
+    // Replace the loads with the current value.
     for inst in loadsAndStores {
-      let block = inst.parentBlock
-      
-      if block != currentBlock {
-        currentBlock = block
-        currentVal = nil
-      }
-      
-      if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
-        currentVal = storeInst.source
-        context.erase(instruction: storeInst)
+      // All `load_borrow`s which load from `accessPath` are replaceable, which is checked in `isOnlyLoadedAndStored`.
+      if let loadBorrow = inst as? LoadBorrowInst,
+         let projectionPath = accessPath.getProjection(to: loadBorrow.address.accessPath)
+      {
+        let rootVal = ssaUpdater.getValue(before: loadBorrow)
+        loadBorrow.replace(withBorrowOf: rootVal, projectedAlong: projectionPath, context)
         changed = true
         continue
       }
@@ -902,8 +1008,19 @@ private extension MovableInstructions {
         continue
       }
       
-      // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
-      let rootVal = currentVal ?? ssaUpdater.getValue(atBeginOf: block)
+      let rootVal = ssaUpdater.getValue(before: loadInst)
+
+      if let placeholder = loadTakePlaceholders[loadInst] {
+        let projectionPath = accessPath.getProjection(to: loadInst.address.accessPath)!
+        let builder = Builder(before: loadInst, context)
+        let undef = Undef.get(type: loadInst.type, context)
+        let (projected, updated) = rootVal.createProjectionAndReplace(with: undef, path: projectionPath,
+                                                                      builder: builder)
+        placeholder.valueOperand.set(to: updated, context)
+        loadInst.replace(with: projected, context)
+        changed = true
+        continue
+      }
 
       if loadInst.address.accessPath == accessPath {
         if loadInst.loadOwnership == .copy {
@@ -931,6 +1048,24 @@ private extension MovableInstructions {
       
       changed = true
     }
+
+    for case let load as LoadInst in loadsAndStores {
+      if let placeholder = loadTakePlaceholders[load] {
+        placeholder.replace(with: placeholder.value, context)
+      }
+    }
+
+    // The re-constructed value of a `load [take]` has no ownership, because the only non-trivial field
+    // is `undef` (or the whole value is `undef`). But inserted phis are created with "owned" ownership.
+    // Such phis would never be consumed, because the value is not stored back.
+    canonicalizeOwnershipToNone(of: ssaUpdater.insertedPhis, context)
+
+    // The stores are only removed at the end, because they are needed as insertion points for available
+    // values in the ssaUpdater.
+    for case let storeInst as StoreInst in loadsAndStores where storeInst.storesTo(accessPath) {
+      context.erase(instruction: storeInst)
+      changed = true
+    }
     
     loadsAndStores.removeAll(where: { $0.isDeleted })
     
@@ -954,6 +1089,40 @@ private extension MovableInstructions {
     }
     
     return changed
+  }
+
+  /// Returns true if all split `load [take]`s of `accessPath` (i.e. `load [take]`s of a projected address)
+  /// take the same field.
+  ///
+  /// For simplicity, only support splitting `load [take]`s of the same field.
+  /// With this restriction, a `load [take]` can never destructure a value which contains an `undef` field,
+  /// because in valid OSSA the taken field must be re-initialized by a store before it can be taken again.
+  ///
+  /// This restriction also guarantees that a split `load [take]` is never inside the borrow scope of a
+  /// `load_borrow` of another field. This would result in a lifetime end of the borrowed value inside
+  /// the borrow scope:
+  /// ```
+  ///   %b = load_borrow %fieldB                      %bb = begin_borrow %value
+  ///                                         ->      %b = struct_extract %bb, #fieldB
+  ///   %a = load [take] %fieldA                      (%a, ...) = destructure_struct %value  // lifetime end of %value!
+  ///   end_borrow %b                                 end_borrow %bb
+  /// ```
+  /// In valid OSSA, the non-trivial field B must be de-initialized before the next store of the whole value.
+  /// This can only be done by a `load [take]` of B, which is a split `load [take]` of a different field,
+  /// or by an instruction which writes to B, e.g. `destroy_addr`, which bails in `isOnlyLoadedAndStored`.
+  func allSplitLoadTakesAreOfSameField(of accessPath: AccessPath) -> Bool {
+    var firstSplitLoadTakePath: AccessPath? = nil
+    for case let load as LoadInst in loadsAndStores where load.isSplitLoadTake(of: accessPath) {
+      let path = load.address.accessPath
+      if let firstSplitLoadTakePath {
+        if path != firstSplitLoadTakePath {
+          return false
+        }
+      } else {
+        firstSplitLoadTakePath = path
+      }
+    }
+    return true
   }
 
   func memoryIsInitializedAtAllExits(of loop: Loop, accessPath: AccessPath, _ context: FunctionPassContext) -> Bool {
@@ -993,21 +1162,34 @@ private extension MovableInstructions {
 
 private func hoistAllocAndDealloc(
   allocStackInst: AllocStackInst, outOf loop: Loop, _ context: FunctionPassContext
-) {
+) -> Bool {
+  guard loop.contains(block: allocStackInst.parentBlock), !loop.hasNoExitBlocks else {
+    return false
+  }
+
+  var liveRange = BasicBlockRange(begin: allocStackInst.parentBlock, context)
+  defer { liveRange.deinitialize() }
+  liveRange.insert(contentsOf: allocStackInst.deallocations.map { $0.parentBlock })
+
+  let deallocationsInLoop = allocStackInst.deallocations.filter { loop.contains(block: $0.parentBlock) }
+
+  log("Hoisting \(allocStackInst)")
   allocStackInst.move(before: loop.preheader!.terminator, context)
 
-  var sankFirst = false
-  for deallocStack in allocStackInst.deallocations {
-    if sankFirst {
-      context.erase(instruction: deallocStack)
-    } else {
-      sankFirst = deallocStack.sink(outOf: loop, context)
-    }
+  for deallocStack in deallocationsInLoop {
+    context.erase(instruction: deallocStack)
+  }
+
+  for exitBlock in loop.exitBlocks where !liveRange.contains(exitBlock.singlePredecessor!) {
+    let builder = Builder(before: exitBlock.instructions.first!, context)
+    builder.createDeallocStack(allocStackInst)
   }
 
   context.notifyInvalidatedStackNesting()
+
+  return true
 }
-  
+
 private extension Instruction {
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
@@ -1040,8 +1222,7 @@ private extension Instruction {
         hoist(loadCopyInst: loadCopyInst, outOf: loop, context)
         return true
       } else if let allocStackInst = self as? AllocStackInst {
-        hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
-        return true
+        return hoistAllocAndDealloc(allocStackInst: allocStackInst, outOf: loop, context)
       } else {
         move(before: terminator, context)
       }
@@ -1131,6 +1312,11 @@ private extension StoreInst {
 }
 
 private extension LoadInst {
+  /// Returns `true` if this is a `load [take]` from a projected address of `accessPath`.
+  func isSplitLoadTake(of accessPath: AccessPath) -> Bool {
+    loadOwnership == .take && address.accessPath != accessPath && loadsFrom(accessPath)
+  }
+
   /// Returns `true` if this load instruction loads from `accessPath` or a
   /// projected address from `accessPath`.
   func loadsFrom(_ accessPath: AccessPath) -> Bool {
@@ -1152,6 +1338,73 @@ private extension LoadInst {
     }
     
     return false
+  }
+}
+
+/// Changes the ownership of phis to `.none` if none of the incoming values has ownership.
+private func canonicalizeOwnershipToNone(of phis: [Phi], _ context: FunctionPassContext) {
+  var changed = true
+  while changed {
+    changed = false
+    for phi in phis where phi.value.ownership == .owned {
+      if phi.incomingValues.allSatisfy({ $0.ownership == .none }) {
+        phi.value.set(ownership: .none, context)
+        changed = true
+      }
+    }
+  }
+}
+
+private extension LoadBorrowInst {
+
+  /// Returns `true` if this `load_borrow` loads from `accessPath` or a projected address from `accessPath`
+  /// and can be replaced by a borrow of the stored value in `hoistAndSinkLoadAndStore`.
+  func isReplaceable(by accessPath: AccessPath, in loop: Loop) -> Bool {
+    guard let projectionPath = accessPath.getProjection(to: address.accessPath),
+          projectionPath.isMaterializable
+    else {
+      return false
+    }
+    // The borrow scope must end within the loop, because the stored value is consumed by the
+    // `store` which is inserted at the begin of the loop exit blocks.
+    // Reborrows are not supported.
+    return scopeEndingOperands.allSatisfy { $0.instruction is EndBorrowInst && loop.contains(block: $0.instruction.parentBlock) }
+  }
+
+  /// Replaces this `load_borrow` with a borrow of `value`, projected along `path`.
+  func replace(withBorrowOf value: Value, projectedAlong path: SmallProjectionPath, _ context: FunctionPassContext) {
+    let builder = Builder(before: self, context)
+    let endBorrowOperands = Array(scopeEndingOperands)
+    if value.ownership == .owned {
+      let borrow = builder.createBeginBorrow(of: value)
+      for endBorrowOp in endBorrowOperands {
+        endBorrowOp.set(to: borrow, context)
+      }
+      replace(with: borrow.createProjection(path: path, builder: builder), context)
+    } else {
+      for endBorrowOp in endBorrowOperands {
+        context.erase(instruction: endBorrowOp.instruction)
+      }
+      replace(with: value.createProjection(path: path, builder: builder), context)
+    }
+  }
+}
+
+private extension Instruction {
+  /// Returns `true` if this is a `load_borrow` or its `end_borrow` and the `load_borrow` can be
+  /// replaced by the stored value in `hoistAndSinkLoadAndStore`.
+  func isPartOfReplaceableLoadBorrow(of accessPath: AccessPath, in loop: Loop) -> Bool {
+    switch self {
+    case let loadBorrow as LoadBorrowInst:
+      return loadBorrow.isReplaceable(by: accessPath, in: loop)
+    case let endBorrow as EndBorrowInst:
+      if let loadBorrow = endBorrow.borrow as? LoadBorrowInst {
+        return loadBorrow.isReplaceable(by: accessPath, in: loop)
+      }
+      return false
+    default:
+      return false
+    }
   }
 }
 
@@ -1221,6 +1474,50 @@ private extension FullApplySite {
   }
 }
 
+private extension InstructionRange {
+  /// Returns true if `inst` is an `end_borrow` whose `load_borrow` is inside this range.
+  func containsBorrowScopeBegin(of inst: Instruction) -> Bool {
+    if let endBorrow = inst as? EndBorrowInst,
+       let loadBorrow = endBorrow.borrow as? LoadBorrowInst
+    {
+      return inclusiveRangeContains(loadBorrow)
+    }
+    return false
+  }
+}
+
+private extension Instruction {
+  /// Returns true if this is an `end_borrow` of a `load_borrow`.
+  ///
+  /// Alias analysis reports an `end_borrow` of a `load_borrow` as writing the loaded memory location,
+  /// so that the memory location cannot be changed during the borrow scope. If a scope is hoisted out of
+  /// the loop (and its end is sunk out of the loop), it's fine to also include such an `end_borrow`
+  /// because the whole borrow scope is then inside the extended scope: in valid OSSA, an `end_borrow`
+  /// inside a loop cannot end a borrow scope which begins outside the loop. Otherwise there would be
+  /// a path which ends the borrow scope twice.
+  /// For example, a `load_borrow` within a `begin_access` scope whose `end_borrow` is after the `end_access`:
+  /// ```
+  ///   %1 = begin_access [read] %0
+  ///   %2 = load_borrow %1
+  ///   end_access %1
+  ///   end_borrow %2
+  /// ```
+  /// Or a `load_borrow` within a static access scope which precedes a hoisted `modify` access:
+  /// ```
+  ///   %1 = begin_access [read] [static] %0
+  ///   %2 = load_borrow %1
+  ///   end_borrow %2
+  ///   end_access %1
+  ///   %3 = begin_access [modify] [dynamic] %0   // hoisted out of the loop
+  /// ```
+  var isEndBorrowOfLoadBorrow: Bool {
+    if let endBorrow = self as? EndBorrowInst {
+      return endBorrow.borrow is LoadBorrowInst
+    }
+    return false
+  }
+}
+
 private extension ScopedInstruction {
   /// Returns `true` if this begin access is safe to hoist.
   func canScopedInstructionBeHoisted(
@@ -1240,14 +1537,20 @@ private extension ScopedInstruction {
     case is BeginApplyInst:
       return true // Has already been checked with other full applies.
     case let loadBorrowInst as LoadBorrowInst:
-      return !analyzedInstructions.sideEffectsMayWrite(to: loadBorrowInst.address, outsideOf: scope, context)
+      // Don't hoist a `load_borrow` over `end_borrow`s of other `load_borrow`s of the same memory location.
+      // This would be correct, but it creates a borrow scope which spans the whole loop. Such a scope
+      // prevents RedundantLoadElimination from eliminating the memory location, e.g. an `alloc_stack`
+      // of a sequence iterator which is only borrowed in the loop.
+      return !analyzedInstructions.sideEffectsMayWrite(to: loadBorrowInst.address, outsideOf: scope,
+                                                       ignoreEndBorrowsOfOtherLoadBorrows: false, context)
 
     case let beginAccess as BeginAccessInst:
       if beginAccess.accessKind == .read {
         // Check that we don't generate nested accesses when extending the access scope. Also, we must not
         // extend a "read" access scope over a memory write (to the same address) even if the write is _not_
         // in an access scope, because this would confuse alias analysis.
-        return !analyzedInstructions.sideEffectsMayWrite(to: beginAccess.address, outsideOf: scope, context)
+        return !analyzedInstructions.sideEffectsMayWrite(to: beginAccess.address, outsideOf: scope,
+                                                         ignoreEndBorrowsOfOtherLoadBorrows: true, context)
       } else {
         // This does not include memory-reading instructions which are not in `loopSideEffects`, like a
         // plain `load`. This is fine because we can extend a "modify" access scope over memory reads
@@ -1270,7 +1573,7 @@ private extension AccessPath {
     case .box(let inst as Instruction), .class(let inst as Instruction),
       .index(let inst as Instruction),
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
-      .storeBorrow(let inst as Instruction),
+      .storeBorrow(let inst as Instruction), .borrowMutateAccessor(let inst as Instruction),
       .tail(let inst as Instruction):
       if loop.contains(block: inst.parentBlock) {
         return false

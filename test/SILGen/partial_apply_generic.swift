@@ -19,7 +19,7 @@ func getStaticFunc1<T: Foo>(t: T.Type) -> () -> () {
   return t.staticFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic14getStaticFunc11tyycxm_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
 // CHECK: witness_method $T, #Foo.staticFunc :
 
 
@@ -29,7 +29,7 @@ func getStaticFunc2<T: Foo>(t: T) -> () -> () {
   return T.staticFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic14getStaticFunc21tyycx_tAA3FooRzlFyycfu_ : $@convention(thin) <T where T : Foo> (@thick T.Type) -> ()
 // CHECK: witness_method $T, #Foo.staticFunc :
 
 
@@ -39,7 +39,7 @@ func getInstanceFunc1<T: Foo>(t: T) -> () -> () {
   return t.instanceFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic16getInstanceFunc11tyycx_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic16getInstanceFunc11tyycx_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> () {
 // CHECK: witness_method $T, #Foo.instanceFunc : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 
 
@@ -49,7 +49,7 @@ func getInstanceFunc2<T: Foo>(t: T) -> (T) -> () -> () {
   return T.instanceFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic16getInstanceFunc21tyycxcx_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic16getInstanceFunc21tyycxcx_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> ()
 // CHECK: witness_method $T, #Foo.instanceFunc : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 
 
@@ -59,7 +59,7 @@ func getInstanceFunc3<T: Foo>(t: T.Type) -> (T) -> () -> () {
   return t.instanceFunc
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic16getInstanceFunc31tyycxcxm_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic16getInstanceFunc31tyycxcxm_tAA3FooRzlFyycxcfu_yycfu0_ : $@convention(thin) <T where T : Foo> (@in_guaranteed T) -> ()
 // CHECK: witness_method $T, #Foo.instanceFunc : <Self where Self : Foo> (Self) -> () -> () : $@convention(witness_method: Foo) <τ_0_0 where τ_0_0 : Foo> (@in_guaranteed τ_0_0) -> ()
 
 
@@ -69,5 +69,5 @@ func getNonCanonicalSelfFunc<T, U : Panda>(t: T.Type) -> (T) -> (U) -> () where 
   return t.makesSelfNonCanonical
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lFyq_cxcfu_yq_cfu0_ : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@in_guaranteed U, @in_guaranteed T) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s21partial_apply_generic23getNonCanonicalSelfFunc1tyq_cxcxm_t7CuddlesQy_RszAA5PandaR_r0_lFyq_cxcfu_yq_cfu0_ : $@convention(thin) <T, U where T == U.Cuddles, U : Panda> (@in_guaranteed U, @in_guaranteed T) -> () {
 // CHECK: witness_method $T, #Foo.makesSelfNonCanonical : <Self><T where Self == T.Cuddles, T : Panda> (Self) -> (T) -> () : $@convention(witness_method: Foo) <τ_0_0><τ_1_0 where τ_0_0 == τ_1_0.Cuddles, τ_1_0 : Panda> (@in_guaranteed τ_1_0, @in_guaranteed τ_0_0) -> ()

@@ -1590,6 +1590,11 @@ public:
         getSILDebugLocation(loc), src));
   }
 
+  ValueToAddressInst *createValueToAddress(SILLocation loc, SILValue src) {
+    return insert(new (getModule())
+                      ValueToAddressInst(getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
@@ -2617,9 +2622,13 @@ public:
     return insert(new (getModule())
                     DeallocStackRefInst(getSILDebugLocation(Loc), operand));
   }
-  DeallocRefInst *createDeallocRef(SILLocation Loc, SILValue operand) {
-    return insert(new (getModule()) DeallocRefInst(
-        getSILDebugLocation(Loc), operand));
+  DeallocRefInst *
+  createDeallocRef(SILLocation Loc, SILValue operand,
+                   ArrayRef<SILType> ElementTypes = {},
+                   ArrayRef<SILValue> ElementCountOperands = {}) {
+    return insert(DeallocRefInst::create(getSILDebugLocation(Loc),
+                                         getFunction(), operand, ElementTypes,
+                                         ElementCountOperands));
   }
   DeallocPartialRefInst *createDeallocPartialRef(SILLocation Loc,
                                                  SILValue operand,

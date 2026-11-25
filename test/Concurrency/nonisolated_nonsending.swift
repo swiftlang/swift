@@ -20,7 +20,7 @@ protocol P: Sendable {
 func testPartialApplication(p: [any P]) async {
   _ = p.map { $0.f }
 }
-// CHECK-LABEL: sil private @$s22nonisolated_nonsending22testPartialApplication1pySayAA1P_pG_tYaFyyYaYbYCcAaD_pXEfU_ :
+// CHECK-LABEL: sil private [closure] @$s22nonisolated_nonsending22testPartialApplication1pySayAA1P_pG_tYaFyyYaYbYCcAaD_pXEfU_ :
 // CHECK: function_ref @$sBAIeNghHgIL_BAytIeNghHgILr_TR :
 
 //   Reabstraction thunk from caller-isolated () -> () to caller-isolated () -> T

@@ -110,6 +110,7 @@ static bool isFullyAppliedFunctionRef(const Solution &S,
     // All argument lists have been applied.
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 void PostfixCompletionCallback::sawSolutionImpl(

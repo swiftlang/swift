@@ -2811,6 +2811,27 @@ void PrintAST::printSelfAccessKindModifiersIfNeeded(const FuncDecl *FD) {
   }
 }
 
+/// When printing an inlineable `yielding borrow`/`yielding mutate` accessor,
+/// we emit two blocks depending on whether CoroutineAccessors is enabled.
+/// For older compilers, we emit the feature-disabled block using the
+/// legacy `_read`/`_modify` keyword so it can be correctly inlined.
+static bool printsWithLegacyCoroutineKeyword(const AccessorDecl *accessor,
+                                             const PrintOptions &options) {
+  return requiresFeatureCoroutineAccessors(accessor->getAccessorKind()) &&
+         options.SuppressCoroutineAccessors;
+}
+
+static AccessorKind getLegacyCoroutineAccessorKind(AccessorKind kind) {
+  switch (kind) {
+  case AccessorKind::YieldingBorrow:
+    return AccessorKind::Read;
+  case AccessorKind::YieldingMutate:
+    return AccessorKind::Modify;
+  default:
+    return kind;
+  }
+}
+
 void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
                               bool printedInitializer) {
   if (isa<VarDecl>(ASD) && !Options.PrintPropertyAccessors)
@@ -2892,6 +2913,27 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
     }
 
     Printer << " {";
+
+    // A lifetime dependence is part of an accessor's signature, so print it
+    // even when the accessor is printed abstractly.
+    auto printLifetimeAttrs = [&](AccessorKind kind) {
+      auto *accessor = ASD->getAccessor(kind);
+      if (!accessor)
+        return;
+      // Print the attribute inline: by default a long attribute such as
+      // '@lifetime' would get its own line.
+      PrintOptions inlineOptions;
+      inlineOptions.SuppressLifetimes = Options.SuppressLifetimes;
+      for (auto *attr : accessor->getAttrs().getAttributes<LifetimeAttr>()) {
+        SmallString<64> buffer;
+        llvm::raw_svector_ostream os(buffer);
+        StreamPrinter attrPrinter(os);
+        attr->print(attrPrinter, inlineOptions, accessor);
+        Printer << " " << buffer.str().rtrim();
+      }
+    };
+
+    printLifetimeAttrs(AccessorKind::Get);
     if (mutatingGetter) printWithSpace("mutating");
 
     if (Options.PrintSelfAccessKindKeyword) {
@@ -2917,6 +2959,7 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
     }
 
     if (settable) {
+      printLifetimeAttrs(AccessorKind::Set);
       if (nonmutatingSetter) printWithSpace("nonmutating");
 
       if (ASD->getParsedAccessor(AccessorKind::Mutate)) {
@@ -2982,12 +3025,19 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
   // Collect the accessor declarations that we should print.
   SmallVector<AccessorDecl *, 4> accessorsToPrint;
   auto AddAccessorToPrint = [&](AccessorKind kind) {
-    if (Options.SuppressCoroutineAccessors &&
-        requiresFeatureCoroutineAccessors(kind))
-      return;
     auto *Accessor = ASD->getAccessor(kind);
     if (!Accessor)
       return;
+    // A `yielding` accessor printed with the legacy keyword stands in for the
+    // legacy accessor; don't print both.
+    if (kind == AccessorKind::Read || kind == AccessorKind::Modify) {
+      auto yieldingKind = kind == AccessorKind::Read
+                              ? AccessorKind::YieldingBorrow
+                              : AccessorKind::YieldingMutate;
+      if (auto *yielding = ASD->getAccessor(yieldingKind))
+        if (printsWithLegacyCoroutineKeyword(yielding, Options))
+          return;
+    }
     if (shouldPrint(Accessor))
       accessorsToPrint.push_back(Accessor);
   };
@@ -3779,6 +3829,13 @@ suppressingFeatureAvailabilityOSVersionQueryKind(
   action();
 }
 
+static void
+suppressingFeatureCChar32IsUInt32(PrintOptions &options,
+                                  llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressCChar32IsUInt32, true);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(const PrintOptions &_options, Feature feature,
                                llvm::function_ref<void()> action) {
@@ -4167,7 +4224,14 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
 
   if (ShouldPrint) {
     Printer << " = ";
-    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
+    if (Options.SuppressCChar32IsUInt32 && usesFeatureCChar32IsUInt32(decl)) {
+      // Compilers without $CChar32IsUInt32 expect the old definition.
+      // Unqualified lookup is fine: this is only printed in the stdlib's own
+      // interface, where 'Unicode' always refers to Swift.Unicode.
+      Printer << "Unicode.Scalar";
+    } else {
+      printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
+    }
     printDeclGenericRequirements(decl);
   }
 }
@@ -4777,10 +4841,6 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
 }
 
 void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
-  if (Options.SuppressCoroutineAccessors &&
-      requiresFeatureCoroutineAccessors(decl->getAccessorKind())) {
-    return;
-  }
   printDocumentationComment(decl);
   printAttributes(decl);
   // Explicitly print 'mutating' and 'nonmutating' if needed.
@@ -4799,7 +4859,10 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   case AccessorKind::Borrow:
     recordDeclLoc(decl,
       [&]{
-        Printer << getAccessorLabel(decl->getAccessorKind());
+        auto kind = decl->getAccessorKind();
+        if (printsWithLegacyCoroutineKeyword(decl, Options))
+          kind = getLegacyCoroutineAccessorKind(kind);
+        Printer << getAccessorLabel(kind);
       });
     break;
   case AccessorKind::Set:
@@ -4885,7 +4948,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       SWIFT_DEFER {
         Printer.printStructurePost(PrintStructureKind::CoroutineYieldsTypes);
       };
-      Printer << " " << tok::kw_yield << " (";
+      Printer << " yields (";
 
       for (auto [idx, yield] : llvm::enumerate(yields)) {
         if (idx > 0)
@@ -4905,6 +4968,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
 
         printTypeLoc(TheTypeLoc, getNonRecursiveOptions(decl));
       }
+      Printer << ")";
     }
 
     Type ResultTy = decl->getResultInterfaceType();
@@ -7422,7 +7486,6 @@ public:
       Printer.printSimpleAttr("@yield_once") << " ";
     }
 
-    SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
       return;
@@ -7519,7 +7582,6 @@ public:
       }
     }
 
-    SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
       break;

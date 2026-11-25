@@ -21,6 +21,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
@@ -277,8 +278,8 @@ bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
 }
 
 bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
-     StringRef path, SourceFileDepGraph &g) {
-  auto buffer = llvm::MemoryBuffer::getFile(path);
+    StringRef path, SourceFileDepGraph &g, llvm::vfs::FileSystem &fs) {
+  auto buffer = fs.getBufferForFile(path);
   if (!buffer)
     return false;
 

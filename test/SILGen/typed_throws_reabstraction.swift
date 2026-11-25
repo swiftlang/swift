@@ -43,7 +43,7 @@ func test1() throws { // OK
 
 // rdar://169150387
 func test3<E: Error>(e: E) {
-  // CHECK-LABEL: sil private [ossa] @$s{{.+}}5test31eyx_ts5ErrorRzlFyyxYKcfU_ : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error any Error {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s{{.+}}5test31eyx_ts5ErrorRzlFyyxYKcfU_ : $@convention(thin) <E where E : Error> (@in_guaranteed E) -> @error any Error {
   // CHECK:      bb0([[V1:%.+]] : @closureCapture $*E):
   // CHECK:        [[V2:%.+]] = alloc_stack $E
   // CHECK-NEXT:   copy_addr [[V1]] to [init] [[V2]]

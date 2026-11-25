@@ -96,9 +96,9 @@ class RewriteSystem final {
   /// Whether we've initialized the rewrite system with a call to initialize().
   unsigned Initialized : 1;
 
-  /// Whether we've computed the confluent completion at least once.
+  /// Whether we've performed Knuth-Bendix completion at least once.
   ///
-  /// It might be computed multiple times if the property map's concrete type
+  /// It might be performed multiple times if the property map's concrete type
   /// unification procedure adds new rewrite rules.
   unsigned Complete : 1;
 
@@ -206,7 +206,7 @@ public:
       std::vector<std::pair<MutableTerm, MutableTerm>> &&permanentRules,
       std::vector<std::pair<MutableTerm, MutableTerm>> &&requirementRules);
 
-  bool simplify(MutableTerm &term, RewritePath *path=nullptr) const;
+  bool reduce(MutableTerm &term, RewritePath *path=nullptr) const;
 
   std::optional<unsigned> simplifySubstitutions(Term baseTerm, Symbol symbol,
                                                 const PropertyMap *map,

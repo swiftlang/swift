@@ -55,6 +55,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 
 option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)

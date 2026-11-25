@@ -30,3 +30,40 @@ bb0(%0 : $*GenWrapper<T>):
   return %2
 }
 
+
+public struct GenWrapper2<T> {
+  @_hasStorage var _inner: GenWrapper<T> { get set }
+}
+
+sil [ossa] @borrow_inner : $@convention(method) <T> (@in_guaranteed GenWrapper2<T>) -> @guaranteed_address GenWrapper<T> {
+bb0(%0 : $*GenWrapper2<T>):
+  %1 = struct_element_addr %0, #GenWrapper2._inner
+  return %1
+}
+
+// CHECK: Begin Error in function test_nested_address_of_temp
+// CHECK: SIL verification failed: unidentified address return:
+// CHECK: ->   return %{{[0-9]+}} : $*T
+// CHECK: End Error in function test_nested_address_of_temp
+sil [ossa] @test_nested_address_of_temp : $@convention(thin) <T> (@in_guaranteed GenWrapper2<T>) -> @guaranteed_address T {
+bb0(%0 : $*GenWrapper2<T>):
+  %stk = alloc_stack $GenWrapper2<T>
+  copy_addr %0 to [init] %stk
+  %1 = function_ref @borrow_inner : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper2<τ_0_0>) -> @guaranteed_address GenWrapper<τ_0_0>
+  %2 = apply %1<T>(%stk) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper2<τ_0_0>) -> @guaranteed_address GenWrapper<τ_0_0>
+  %3 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %4 = apply %3<T>(%2) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  destroy_addr %stk
+  dealloc_stack %stk
+  return %4
+}
+
+// CHECK-NOT: Begin Error in function test_nested_address_of_argument
+sil [ossa] @test_nested_address_of_argument : $@convention(thin) <T> (@in_guaranteed GenWrapper2<T>) -> @guaranteed_address T {
+bb0(%0 : $*GenWrapper2<T>):
+  %1 = function_ref @borrow_inner : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper2<τ_0_0>) -> @guaranteed_address GenWrapper<τ_0_0>
+  %2 = apply %1<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper2<τ_0_0>) -> @guaranteed_address GenWrapper<τ_0_0>
+  %3 = function_ref @borrow_addressonly_prop : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  %4 = apply %3<T>(%2) : $@convention(method) <τ_0_0> (@in_guaranteed GenWrapper<τ_0_0>) -> @guaranteed_address τ_0_0
+  return %4
+}

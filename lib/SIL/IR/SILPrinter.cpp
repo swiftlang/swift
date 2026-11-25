@@ -33,6 +33,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILCoverageMap.h"
@@ -1332,6 +1333,14 @@ public:
     }
   }
 
+  /// Print the scopes referenced by \p I, including its debug variable's scope.
+  void printDebugScopes(const SILInstruction &I, const SourceManager &SM) {
+    printDebugScope(I.getDebugScope(), SM);
+    if (auto DVI = DebugVarCarryingInst(const_cast<SILInstruction *>(&I)))
+      if (auto Var = DVI.getVarInfo(/* complete = */ false))
+        printDebugScope(Var->Scope, SM);
+  }
+
   void printDebugScopeRef(const SILDebugScope *DS, const SourceManager &SM,
                           bool PrintComma = true) {
     if (DS) {
@@ -1713,8 +1722,10 @@ public:
       *this << "[stack] ";
     if (!ARI->isStackAllocationNested())
       *this << "[non_nested] ";
-    auto Types = ARI->getTailAllocatedTypes();
-    auto Counts = ARI->getTailAllocatedCounts();
+    printTailElems(ARI->getTailAllocatedTypes(), ARI->getTailAllocatedCounts());
+  }
+
+  void printTailElems(ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
     for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
       *this << "[tail_elems " << Types[Idx] << " * "
             << getIDAndType(Counts[Idx].get()) << "] ";
@@ -2595,6 +2606,10 @@ public:
     printForwardingOwnershipKind(I);
   }
 
+  void visitValueToAddressInst(ValueToAddressInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }
@@ -3084,6 +3099,7 @@ public:
     *this << getIDAndType(ESRL->getOperand());
   }
   void visitDeallocRefInst(DeallocRefInst *DI) {
+    printTailElems(DI->getTailAllocatedTypes(), DI->getTailAllocatedCounts());
     *this << getIDAndType(DI->getOperand());
   }
   void visitDeallocPartialRefInst(DeallocPartialRefInst *DPI) {
@@ -3717,7 +3733,7 @@ void SILBasicBlock::print(SILPrintContext &Ctx) const {
   auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
     SILPrinter P(Ctx);
-    P.printDebugScope(I.getDebugScope(), SM);
+    P.printDebugScopes(I, SM);
   }
 
   SILPrinter(Ctx).print(this);
@@ -3830,7 +3846,7 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     for (auto &BB : *this)
       for (auto &I : BB) {
         SILPrinter P(PrintCtx);
-        P.printDebugScope(I.getDebugScope(), SM);
+        P.printDebugScopes(I, SM);
       }
     OS << "\n";
   }
@@ -3878,6 +3894,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case IsDistributedThunk: OS << "[distributed_thunk] "; break;
   case IsDistributedProxyAdapterThunk: OS << "[distributed_proxy_adapter_thunk] "; break;
   }
+  if (isClosure())
+    OS << "[closure] ";
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
   }
@@ -4053,6 +4071,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   // indicate this with [opaque].
   if (!hasLoweredAddresses())
     OS << "[opaque] ";
+
+  if (hasUnresolvedLifetimes())
+    OS << "[unresolved] ";
 
   if (needsStackProtection())
     OS << "[stack_protection] ";

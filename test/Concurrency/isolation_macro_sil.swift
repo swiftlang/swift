@@ -26,7 +26,7 @@ func takeDefaulted(iso: isolated (any Actor)? = #isolation) {}
 //   Check that we emit #isolation correctly in closures.
 // CHECK-LABEL: // closure #1 in containsClosure()
 // CHECK-NEXT:  // Isolation: nonisolated(nonsending)
-// CHECK-LABEL: sil private @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-LABEL: sil private [closure] @$s4test15containsClosureyyFyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK:       [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
 // CHECK-NEXT:    // function_ref take(iso:)
@@ -53,7 +53,7 @@ func deferWithIsolatedParam(_ iso: isolated (any Actor)) {
 // CHECK-NEXT:    apply [[DEFER]](%0)
 // CHECK: } // end sil function '$s4test22deferWithIsolatedParamyyScA_pYiF'
 
-// CHECK-LABEL: sil private @$s4test22deferWithIsolatedParamyyScA_pYiF6$deferL_yyF :
+// CHECK-LABEL: sil private [closure] @$s4test22deferWithIsolatedParamyyScA_pYiF6$deferL_yyF :
 // CHECK:       bb0(%0 : @closureCapture $any Actor):
 // CHECK:         [[T0:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, %0
 // CHECK:         [[FN:%.*]] = function_ref @$s4test4take3isoyScA_pSg_tF :
@@ -75,7 +75,7 @@ func deferWithIsolatedParam_defaultedUse(_ iso: isolated (any Actor)) {
 // CHECK-NEXT:    apply [[DEFER]](%0)
 // CHECK: } // end sil function '$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF'
 
-// CHECK-LABEL: sil private @$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF6$deferL_yyF :
+// CHECK-LABEL: sil private [closure] @$s4test35deferWithIsolatedParam_defaultedUseyyScA_pYiF6$deferL_yyF :
 // CHECK:       bb0(%0 : @closureCapture $any Actor):
 // CHECK:         [[T0:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, %0
 // CHECK:         [[FN:%.*]] = function_ref @$s4test13takeDefaulted3isoyScA_pSgYi_tF :
@@ -138,7 +138,7 @@ func hasNestedDefer() async {
 
 // CHECK-LABEL: // $defer #1 () in $defer #1 () in hasNestedDefer()
 // CHECK-NEXT:  // Isolation: nonisolated(nonsending)
-// CHECK-NEXT: sil private @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) @caller_isolated (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: sil private [closure] @$s4test14hasNestedDeferyyYaF6$deferL_yyFACL_yyF : $@convention(thin) @caller_isolated (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor):
 // CHECK-NEXT:    [[ACTOR:%.*]] = implicitactor_to_opaqueisolation_cast %0
 // CHECK-NEXT:    // function_ref take(iso:)

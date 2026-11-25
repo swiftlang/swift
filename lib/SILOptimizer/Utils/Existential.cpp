@@ -216,6 +216,11 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     // through them so that the underlying init_existential_ref can be found by
     // ConcreteExistentialInfo.
     ExistentialValue = lookThroughOwnershipInsts(Open->getOperand());
+    for (SILValue v = Open->getOperand(); v != ExistentialValue;
+         v = cast<SingleValueInstruction>(v)->getOperand(0)) {
+      if (isa<CopyValueInst>(v))
+        isExistentialValueCopied = true;
+    }
 
     // A `load_borrow` which RLE could not eliminate records the loaded value in
     // its value hint, e.g.

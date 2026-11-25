@@ -424,6 +424,7 @@ private:
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
     }
+    llvm_unreachable("covered switch");
   #undef ENTRY
   }
 };

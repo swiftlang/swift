@@ -1,0 +1,149 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-selection %s -o /dev/null
+
+// REQUIRES: asserts
+
+// Edges of the closure group schedule (ClosureGroupSchedule.h) that
+// closure_group_schedule.sil doesn't cover. Each member is printed with its
+// group's leader, its first member, in brackets. The destructor and builtin
+// "once" cases test call edges by order.
+
+sil_stage raw
+
+import Builtin
+
+class DtorC {}
+
+// CHECK-LABEL: begin running test 1 of 1 on indirect_apply: closure_group_schedule
+
+// An apply of a function value with an @inout_aliasable parameter has no
+// direct callee: it links nothing, and neither the scan nor
+// ClosureFunctionOrder (the second RUN line) asserts on it.
+// CHECK-NEXT: group 0
+// CHECK-NEXT:   [indirect_apply] indirect_apply
+
+// A function that isn't a closure, referenced but not applied: no link.
+// CHECK-NEXT: group 1
+// CHECK-NEXT:   [box_unapplied] box_unapplied
+// CHECK-NEXT: group 2
+// CHECK-NEXT:   [box_unapplied_user] box_unapplied_user
+
+// A release calls the deallocating deinit, so its group runs before
+// dtor_user's, although dtor_closure leads that group in bottom-up order.
+// CHECK-NEXT: group 3
+// CHECK-NEXT:   [DtorC_dealloc] DtorC_dealloc
+// CHECK-NEXT: group 4
+// CHECK-NEXT:   [dtor_closure] dtor_closure
+// CHECK-NEXT:   [dtor_closure] dtor_user
+
+// builtin "once" calls its initializer, so its group runs before once_user's,
+// although once_closure leads that group in bottom-up order.
+// CHECK-NEXT: group 5
+// CHECK-NEXT:   [once_init] once_init
+// CHECK-NEXT: group 6
+// CHECK-NEXT:   [once_closure] once_closure
+// CHECK-NEXT:   [once_closure] once_user
+// CHECK-NEXT: end running test 1 of 1 on indirect_apply: closure_group_schedule
+
+//===----------------------------------------------------------------------===//
+// An indirect apply of a non-escaping closure type
+//===----------------------------------------------------------------------===//
+
+sil @indirect_apply : $@convention(thin) (@convention(thin) (@inout_aliasable Builtin.Int64) -> ()) -> () {
+bb0(%0 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()):
+  specify_test "closure_group_schedule"
+  %s = alloc_stack $Builtin.Int64
+  %a = apply %0(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A function with a box parameter that is referenced but never applied. It
+// isn't a closure, and the reference passes no capture, so the two functions
+// stay in separate groups.
+//===----------------------------------------------------------------------===//
+
+sil @box_unapplied : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @box_unapplied_user : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> () {
+bb0:
+  %f = function_ref @box_unapplied : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %t = thin_to_thick_function %f : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () to $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+  return %t : $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+}
+
+//===----------------------------------------------------------------------===//
+// A destructor edge. dtor_closure comes first in bottom-up order and joins
+// dtor_user's group by a closure link. dtor_user reaches DtorC_dealloc only
+// through the release, so without that edge dtor_user's group would run first.
+//===----------------------------------------------------------------------===//
+
+sil [closure] @dtor_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @DtorC_dealloc : $@convention(method) (@owned DtorC) -> () {
+bb0(%0 : $DtorC):
+  dealloc_ref %0 : $DtorC
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @dtor_user : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @dtor_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %c = alloc_ref $DtorC
+  strong_release %c : $DtorC
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_vtable DtorC {
+  #DtorC.deinit!deallocator: @DtorC_dealloc
+}
+
+//===----------------------------------------------------------------------===//
+// A builtin "once" edge, set up like the destructor edge: once_user calls
+// once_init only through the builtin.
+//===----------------------------------------------------------------------===//
+
+sil_global private @once_token : $Builtin.Word
+
+sil [closure] @once_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @once_init : $@convention(c) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @once_user : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %g = function_ref @once_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %g(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %t = global_addr @once_token : $*Builtin.Word
+  %p = address_to_pointer %t : $*Builtin.Word to $Builtin.RawPointer
+  %f = function_ref @once_init : $@convention(c) () -> ()
+  %o = builtin "once"(%p : $Builtin.RawPointer, %f : $@convention(c) () -> ()) : $()
+  %r = tuple ()
+  return %r : $()
+}

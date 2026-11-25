@@ -81,6 +81,7 @@ LLVM_ATTRIBUTE_USED StringRef swift::getDeclAttrKindID(DeclAttrKind kind) {
     return #CLASS;
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
@@ -518,6 +519,7 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   case DeclAttrKind::CLASS: return static_cast<const CLASS##Attr *>(this)->clone(ctx);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 bool DeclAttribute::canClone() const {
@@ -529,6 +531,7 @@ bool DeclAttribute::canClone() const {
     return static_cast<const CLASS##Attr *>(this)->canClone();
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Ensure that every DeclAttribute subclass implements its own isEquivalent().
@@ -550,6 +553,7 @@ bool DeclAttribute::isEquivalent(const DeclAttribute *other, Decl *attachedTo) c
                 static_cast<const CLASS##Attr *>(other), attachedTo);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 const BackDeployedAttr *
@@ -1522,6 +1526,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::TailAllocated: {
+    auto *attr = cast<TailAllocatedAttr>(this);
+    Printer.printAttrName("@_tailAllocated");
+    Printer << "(counts: " << attr->getCountsName();
+    auto types = attr->getTypes();
+    auto reprs = attr->getTypeReprs();
+    for (unsigned i = 0, e = types.size(); i != e; ++i) {
+      Printer << (i == 0 ? ", types: " : ", ");
+      if (types[i])
+        types[i].print(Printer, Options);
+      else
+        reprs[i]->print(Printer, Options);
+    }
+    Printer << ")";
+    break;
+  }
+
   case DeclAttrKind::Target: {
     Printer.printAttrName("@_target");
     Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
@@ -2353,6 +2374,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "callable(once)";
   case DeclAttrKind::Target:
     return "_target";
+  case DeclAttrKind::TailAllocated:
+    return "_tailAllocated";
   case DeclAttrKind::ScopeParams:
     return "_scopeParams";
   }
@@ -2637,6 +2660,52 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                               const_cast<RawLayoutAttr *>(this),
                               /*isLikeType*/ false},
                            ErrorType::get(ctx));
+}
+
+TailAllocatedAttr *TailAllocatedAttr::createParsed(
+    ASTContext &ctx, SourceLoc atLoc, SourceRange range, Identifier countsName,
+    SourceLoc countsNameLoc, ArrayRef<TypeRepr *> typeReprs) {
+  return new (ctx) TailAllocatedAttr(
+      countsName, countsNameLoc, ctx.AllocateCopy(typeReprs),
+      ctx.Allocate<Type>(typeReprs.size()), atLoc, range, /*implicit=*/false);
+}
+
+TailAllocatedAttr *TailAllocatedAttr::create(
+    ASTContext &ctx, Identifier countsName, ArrayRef<Type> types, bool implicit,
+    LazyMemberLoader *resolver, uint64_t resolverContextData) {
+  auto *attr = new (ctx) TailAllocatedAttr(
+      countsName, SourceLoc(), /*typeReprs=*/{}, ctx.AllocateCopy(types),
+      SourceLoc(), SourceRange(), implicit);
+  attr->Resolver = resolver;
+  attr->ResolverContextData = resolverContextData;
+  return attr;
+}
+
+ArrayRef<Type> TailAllocatedAttr::getResolvedTypes(ClassDecl *owner) const {
+  return evaluateOrDefault(owner->getASTContext().evaluator,
+                           ResolveTailAllocatedTypesRequest{
+                               owner, const_cast<TailAllocatedAttr *>(this)},
+                           {});
+}
+
+VarDecl *TailAllocatedAttr::getCountsDecl(ClassDecl *owner) const {
+  return evaluateOrDefault(owner->getASTContext().evaluator,
+                           TailAllocatedCountsDeclRequest{
+                               owner, const_cast<TailAllocatedAttr *>(this)},
+                           nullptr);
+}
+
+bool TailAllocatedAttr::isEquivalent(const TailAllocatedAttr *other,
+                                     Decl *attachedTo) const {
+  if (getCountsName() != other->getCountsName())
+    return false;
+
+  auto CD = dyn_cast<ClassDecl>(attachedTo);
+  if (!CD)
+    return true;
+
+  return llvm::equal(getResolvedTypes(CD), other->getResolvedTypes(CD),
+                     eqTypes);
 }
 
 bool RawLayoutAttr::isEquivalent(const RawLayoutAttr *other,

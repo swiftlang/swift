@@ -746,3 +746,298 @@ bb6:
   return %res : $()
 }
 
+sil @consumeAny_no_barrier : $@convention(thin) (@in Any) -> () {
+ [global:]
+}
+
+sil @use_int : $@convention(thin) (Int) -> () {
+ [global:]
+}
+
+// CHECK-LABEL: sil [ossa] @dealloc_after_merge :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    [[E:%.*]] = init_enum_data_addr %0
+// CHECK-NEXT:    copy_addr [take] %1 to [init] [[E]]
+// CHECK-NEXT:    inject_enum_addr %0
+// CHECK-NEXT:    br bb3
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'dealloc_after_merge'
+sil [ossa] @dealloc_after_merge : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack $Optional<Any>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %4
+  inject_enum_addr %2, #Optional.some!enumelt
+  copy_addr [take] %2 to %0
+  br bb3
+
+bb2:
+  destroy_addr %1
+  br bb3
+
+bb3:
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dealloc_in_successors :
+// CHECK:       bb0(%0 : $*Int, %1 : $Int):
+// CHECK-NEXT:    store %1 to [trivial] %0
+// CHECK-NEXT:    cond_br
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'dealloc_in_successors'
+sil [ossa] @dealloc_in_successors : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  copy_addr [take] %2 to %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %2
+  br bb3
+
+bb2:
+  dealloc_stack %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// On the path through bb2 the destination keeps its value.
+//
+// CHECK-LABEL: sil [ossa] @dealloc_on_path_without_copy :
+// CHECK:         [[A:%.*]] = alloc_stack $Int
+// CHECK-NEXT:    store %1 to [trivial] [[A]]
+// CHECK-LABEL: } // end sil function 'dealloc_on_path_without_copy'
+sil [ossa] @dealloc_on_path_without_copy : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  cond_br undef, bb1, bb2
+
+bb1:
+  copy_addr [take] %2 to %0
+  dealloc_stack %2
+  br bb3
+
+bb2:
+  dealloc_stack %2
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @alloc_stack_outside_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb1:
+// CHECK-NEXT:    apply %{{[0-9]+}}(%0)
+// CHECK-NEXT:    cond_br
+// CHECK-LABEL: } // end sil function 'alloc_stack_outside_loop'
+sil [ossa] @alloc_stack_outside_loop : $@convention(thin) (@inout Child) -> () {
+bb0(%0 : $*Child):
+  %1 = alloc_stack $Child
+  %2 = function_ref @gen_child : $@convention(thin) () -> @out Child
+  destroy_addr %0
+  br bb1
+
+bb1:
+  %5 = apply %2(%1) : $@convention(thin) () -> @out Child
+  copy_addr [take] %1 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_addr %0
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The destination's old value is destroyed in each iteration.
+//
+// CHECK-LABEL: sil [ossa] @alloc_stack_outside_loop_with_assign :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    apply %{{[0-9]+}}(%0)
+// CHECK-NEXT:    cond_br
+// CHECK-LABEL: } // end sil function 'alloc_stack_outside_loop_with_assign'
+sil [ossa] @alloc_stack_outside_loop_with_assign : $@convention(thin) (@inout Any) -> () {
+bb0(%0 : $*Any):
+  %1 = alloc_stack $Any
+  %2 = function_ref @createAny_no_barrier : $@convention(thin) () -> @out Any
+  br bb1
+
+bb1:
+  %4 = apply %2(%1) : $@convention(thin) () -> @out Any
+  copy_addr [take] %1 to %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The next iteration reads the value which the copy left in the alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @liverange_reentered_after_copy :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'liverange_reentered_after_copy'
+sil [ossa] @liverange_reentered_after_copy : $@convention(thin) (@inout Int, Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int, %2 : $Int):
+  %3 = alloc_stack $Int
+  %4 = function_ref @use_int : $@convention(thin) (Int) -> ()
+  store %1 to [trivial] %3
+  br bb1
+
+bb1:
+  %7 = load [trivial] %3
+  %8 = apply %4(%7) : $@convention(thin) (Int) -> ()
+  copy_addr %3 to %0
+  store %2 to [trivial] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @read_after_copy_in_successor :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'read_after_copy_in_successor'
+sil [ossa] @read_after_copy_in_successor : $@convention(thin) (@inout Int, Int) -> Int {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  copy_addr %2 to %0
+  br bb1
+
+bb1:
+  %5 = load [trivial] %2
+  dealloc_stack %2
+  return %5
+}
+
+// The loop returns to the first use without passing the copy.
+//
+// CHECK-LABEL: sil [ossa] @first_use_reentered_before_copy :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'first_use_reentered_before_copy'
+sil [ossa] @first_use_reentered_before_copy : $@convention(thin) (@inout Any) -> () {
+bb0(%0 : $*Any):
+  %1 = alloc_stack $Any
+  %2 = function_ref @createAny_no_barrier : $@convention(thin) () -> @out Any
+  %3 = function_ref @consumeAny_no_barrier : $@convention(thin) (@in Any) -> ()
+  br bb1
+
+bb1:
+  %5 = apply %2(%1) : $@convention(thin) () -> @out Any
+  cond_br undef, bb2, bb3
+
+bb2:
+  %7 = apply %3(%1) : $@convention(thin) (@in Any) -> ()
+  br bb1
+
+bb3:
+  copy_addr [take] %1 to %0
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The payload would be written in the loop although the enum case is only injected after it.
+//
+// CHECK-LABEL: sil [ossa] @enum_payload_written_in_loop :
+// CHECK:         alloc_stack $Any
+// CHECK:       bb3:
+// CHECK-NEXT:    [[E:%[0-9]+]] = init_enum_data_addr %0
+// CHECK-NEXT:    copy_addr [take] {{%[0-9]+}} to [init] [[E]]
+// CHECK-LABEL: } // end sil function 'enum_payload_written_in_loop'
+sil [ossa] @enum_payload_written_in_loop : $@convention(thin) (@in_guaranteed Any) -> @out Optional<Any> {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack $Any
+  copy_addr %1 to [init] %2
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  destroy_addr %2
+  copy_addr %1 to [init] %2
+  br bb1
+
+bb3:
+  %4 = init_enum_data_addr %0, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %4
+  inject_enum_addr %0, #Optional.some!enumelt
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// Same, with the alloc_stack also deallocated on an early exit.
+//
+// CHECK-LABEL: sil [ossa] @enum_payload_written_in_loop_with_early_exit :
+// CHECK:         alloc_stack $Any
+// CHECK:       bb5:
+// CHECK-NEXT:    [[E:%[0-9]+]] = init_enum_data_addr %0
+// CHECK-NEXT:    copy_addr [take] {{%[0-9]+}} to [init] [[E]]
+// CHECK-LABEL: } // end sil function 'enum_payload_written_in_loop_with_early_exit'
+sil [ossa] @enum_payload_written_in_loop_with_early_exit : $@convention(thin) (@in_guaranteed Any) -> @out Optional<Any> {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack $Any
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %2
+  inject_enum_addr %0, #Optional.none!enumelt
+  br bb6
+
+bb2:
+  copy_addr %1 to [init] %2
+  br bb3
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  destroy_addr %2
+  copy_addr %1 to [init] %2
+  br bb3
+
+bb5:
+  %4 = init_enum_data_addr %0, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %4
+  inject_enum_addr %0, #Optional.some!enumelt
+  dealloc_stack %2
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r
+}

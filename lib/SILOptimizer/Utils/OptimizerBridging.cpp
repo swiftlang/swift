@@ -151,14 +151,14 @@ OptionalBridgedValue BridgedPassContext::simplifyInstruction(BridgedInstruction 
   return {::simplifyInstruction(inst.unbridged())};
 }
 
-void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
+bool BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
   SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
   InstructionDeleter deleter;
-  SILInliner::inlineFullApply(FullApplySite(apply.unbridged()),
-                              mandatoryInline
-                                  ? SILInliner::InlineKind::MandatoryInline
-                                  : SILInliner::InlineKind::PerformanceInline,
-                              funcBuilder, deleter);
+  return SILInliner::inlineFullApply(
+             FullApplySite(apply.unbridged()),
+             mandatoryInline ? SILInliner::InlineKind::MandatoryInline
+                             : SILInliner::InlineKind::PerformanceInline,
+             funcBuilder, deleter) != nullptr;
 }
 
 void BridgedPassContext::eraseFunction(BridgedFunction function) const {
@@ -408,14 +408,34 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   return BridgedOwnedString(Mangler.mangle());
 }
 
-BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices,
-                                                          BridgedFunction function) const {
+BridgedOwnedString BridgedPassContext::mangleWithSignatureSpecializedArgs(BridgedArrayRef bridgedArgSpecializations,
+                                                                          bool resultOwnedToGuaranteed,
+                                                                          BridgedFunction function) const {
   SILFunction *f = function.getFunction();
   Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
-  for (SwiftInt idx : bridgedDeadArgIndices.unbridged<SwiftInt>()) {
-    Mangler.setArgumentDead((unsigned)idx);
+  for (auto argMangling : bridgedArgSpecializations.unbridged<SignatureSpecializedArgMangling>()) {
+    unsigned argIdx = (unsigned)argMangling.argIdx;
+    switch (argMangling.kind) {
+      case SignatureSpecializedArgMangling::Kind::ownedToGuaranteed:
+        Mangler.setArgumentOwnedToGuaranteed(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::guaranteedToOwned:
+        Mangler.setArgumentGuaranteedToOwned(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::dead:
+        Mangler.setArgumentDead(argIdx);
+        break;
+      case SignatureSpecializedArgMangling::Kind::explode:
+        Mangler.setArgumentSROA(argIdx);
+        break;
+    }
+  }
+  if (resultOwnedToGuaranteed) {
+    // The mangling for a direct result which is not returned at +1. It demangles
+    // to "Return = Owned To Guaranteed".
+    Mangler.setReturnValueOwnedToUnowned();
   }
   return BridgedOwnedString(Mangler.mangle());
 }
@@ -641,6 +661,10 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // A specialization of a function goes into the same section as the original
   // function.
   specializedApplySiteCallee->setSection(original->section());
+
+  // It replaces the original at the references it is specialized for, so a
+  // specialization of a closure is a closure.
+  specializedApplySiteCallee->setIsClosure(original->isClosure());
 
   specializedApplySiteCallee->inheritDerivedFrom(original);
 

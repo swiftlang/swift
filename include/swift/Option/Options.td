@@ -962,7 +962,7 @@ def enable_experimental_cxx_interop :
 def cxx_interoperability_mode :
   Joined<["-"], "cxx-interoperability-mode=">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftSynthesizeInterfaceOption, SwiftAPIDigesterOption]>,
   HelpText<"Enables C++ interoperability; pass 'default' to enable or 'off' to disable">;
 
 def experimental_c_foreign_reference_types :

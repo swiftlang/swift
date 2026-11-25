@@ -156,7 +156,7 @@ extension NSObject {
 }
 
 let fn = ErrorProne.fail
-// CHECK-LABEL: sil private [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcfu_ : $@convention(thin) () -> @error any Error
+// CHECK-LABEL: sil private [closure] [ossa] @$s14foreign_errors2fnyyKcvpfiyyKcfu_ : $@convention(thin) () -> @error any Error
 
 func testArgs() throws {
   try ErrorProne.consume(nil)

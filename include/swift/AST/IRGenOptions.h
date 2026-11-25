@@ -140,6 +140,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Swift heap metadata destructors.
   PointerAuthSchema HeapDestructors;
 
+  /// The metadata pointer in the header of an Embedded Swift heap object.
+  PointerAuthSchema EmbeddedHeapObjectMetadata;
+
   /// Non-constant function pointers captured in a partial-apply context.
   PointerAuthSchema PartialApplyCapture;
 
@@ -290,8 +293,12 @@ public:
   /// The compilation directory for the debug info.
   std::string DebugCompilationDir;
 
-  /// The DWARF version of debug info.
-  uint8_t DWARFVersion = 4;
+  /// The compilation directory for the coverage mapping.
+  std::string CoverageCompilationDir;
+
+  /// The DWARF version of debug info. The driver always passes the target's
+  /// default explicitly via -dwarf-version.
+  uint8_t DWARFVersion = 5;
 
   /// The command line string that is to be stored in the debug info.
   std::string DebugFlags;

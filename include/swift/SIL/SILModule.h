@@ -42,6 +42,7 @@
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -406,6 +407,13 @@ private:
   /// functions.
   using LocalArchetypeKey = std::pair<GenericEnvironment *, SILFunction *>;
   llvm::DenseMap<LocalArchetypeKey, SILValue> RootLocalArchetypeDefs;
+
+  /// The keys of RootLocalArchetypeDefs whose value is a PlaceholderValue.
+  /// This lets reclaimUnresolvedLocalArchetypeDefinitions() visit only the
+  /// placeholders instead of the whole map: it is called once per function by
+  /// some clients (e.g. CrossModuleOptimization), so scanning the module-wide
+  /// map there is quadratic in the number of local archetypes in the module.
+  llvm::DenseSet<LocalArchetypeKey> UnresolvedLocalArchetypeKeys;
 
   /// The number of PlaceholderValues in RootLocalArchetypeDefs.
   int numUnresolvedLocalArchetypes = 0;
@@ -1313,6 +1321,7 @@ inline bool SILOptions::supportsLexicalLifetimes(const SILModule &mod) const {
     // stripped as part of lowering from raw to canonical SIL.)
     return LexicalLifetimes == LexicalLifetimesOption::On;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Print a simple description of a SILModule for the request evaluator.

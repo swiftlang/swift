@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O -enable-experimental-feature Lifetimes %s
+// RUN: %target-swift-frontend -enable-lifetime-resolution -emit-sil -O -enable-experimental-feature Lifetimes %s
 
 // REQUIRES: swift_feature_Lifetimes
 

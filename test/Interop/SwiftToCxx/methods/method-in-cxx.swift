@@ -220,13 +220,13 @@ public func createPassStructInClassMethod() -> PassStructInClassMethod {
 // CHECK-NEXT: _impl::$s7Methods09ClassWithA0C4dumpyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK ClassWithMethods ClassWithMethods::sameRet() noexcept {
-// CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(Methods::_impl::$s7Methods09ClassWithA0C7sameRetACyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT: return Methods::_impl::_impl_ClassWithMethods::makeRetained(Methods::_impl::$s7Methods09ClassWithA0C7sameRetACyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK void ClassWithMethods::mutate() noexcept {
 // CHECK-NEXT: _impl::$s7Methods09ClassWithA0C6mutateyyF(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK ClassWithMethods ClassWithMethods::deepCopy(swift::Int x) noexcept {
-// CHECK-NEXT: return _impl::_impl_ClassWithMethods::makeRetained(Methods::_impl::$s7Methods09ClassWithA0C8deepCopyyACSiF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT: return Methods::_impl::_impl_ClassWithMethods::makeRetained(Methods::_impl::$s7Methods09ClassWithA0C8deepCopyyACSiF(x, ::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct ClassWithMethods::staticFinalClassMethod(swift::Int x) noexcept {
 // CHECK-NEXT: return Methods::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {

@@ -27,9 +27,9 @@ address of the allocated memory.
 `alloc_stack` always allocates memory on the stack even for
 runtime-sized type.
 
-`alloc_stack` is a stack allocation instruction. See the section above
-on stack discipline. The corresponding stack deallocation instruction is
-`dealloc_stack`.
+`alloc_stack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_stack`.
 
 The `dynamic_lifetime` attribute specifies that the initialization and
 destruction of the stored value cannot be verified at compile time. This
@@ -68,9 +68,9 @@ Allocates uninitialized memory on the stack for a value pack of the
 given type, which must be a pack type. The result of the instruction is
 the address of the allocated memory.
 
-`alloc_pack` is a stack allocation instruction. See the section above on
-stack discipline. The corresponding stack deallocation instruction is
-`dealloc_pack`.
+`alloc_pack` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack`.
 
 ### alloc_pack_metadata
 
@@ -81,9 +81,9 @@ sil-instruction ::= 'alloc_pack_metadata' $()
 Inserted as the last SIL lowering pass of IRGen, indicates that the next
 instruction may have on-stack pack metadata allocated on its behalf.
 
-Notionally, `alloc_pack_metadata` is a stack allocation instruction. See
-the section above on stack discipline. The corresponding stack
-deallocation instruction is `dealloc_pack_metadata`.
+Notionally, `alloc_pack_metadata` is a stack allocation instruction. See [Stack
+Discipline](SIL.md#stack-discipline). The corresponding stack deallocation
+instruction is `dealloc_pack_metadata`.
 
 Only valid in Lowered SIL.
 
@@ -507,10 +507,15 @@ Marks the deallocation of the stack space for an `alloc_ref [stack]`.
 ### dealloc_ref
 
 ```
-sil-instruction ::= 'dealloc_ref' sil-operand
+sil-instruction ::= 'dealloc_ref'
+                      ('[' 'tail_elems' sil-type '*' sil-operand ']')*
+                      sil-operand
 
 dealloc_ref %0 : $T
+dealloc_ref [tail_elems $E * %1 : $Builtin.Int64] %0 : $T
 // $T must be a class type
+// $E is the type of the tail-allocated elements
+// %1 must be of a builtin integer type
 ```
 
 Deallocates an uninitialized class type instance, bypassing the
@@ -518,6 +523,13 @@ reference counting mechanism.
 
 The type of the operand must match the allocated type exactly, or else
 undefined behavior results.
+
+The optional `tail_elems` attributes specify the element types and element
+counts of the tail-allocated arrays, which must be the ones the instance was
+allocated with, in the same order, so that the deallocation can pass the
+allocation's size (and, with typed allocation, its type ID). The
+count-operand must be of a builtin integer type. The `tail_elems` attributes
+are required for a class with `@_tailAllocated` in Embedded Swift.
 
 The instance must have a retain count of one.
 
@@ -2911,7 +2923,9 @@ signature). Instead:
     that are passed directly and the noncopyable address-only values that
     are passed as `@in` arguments. The `partial_apply` consumes such an 
     `@in` argument, which leaves its memory uninitialized, and the caller
-    has nothing left to destroy.
+    has nothing left to destroy. Like any other on-stack context, it
+    borrows the values that the closure doesn't consume, whether or not
+    they are Copyable.
 2.  If the `partial_apply` has an escaping function type (not
     `[on_stack]`) then the closure context will be heap allocated with a
     retain count of 1. Any closed over parameters (except for `@inout`
@@ -4362,9 +4376,10 @@ These instructions are collectively called the *pack indexing
 instructions*. Each of them produces a single value of type
 `Builtin.PackIndex`. Instructions that consume pack indices generally
 provide a projected element type which is required to be structurally
-well-typed for the given pack index and the actual pack type they index
-into. This rule depends on the exact pack indexing instruction used and
-is described in a section above.
+well-typed for the given pack index and the actual pack type they
+index into. This rule depends on the exact pack indexing instruction
+used and is described in [Structural type matching for pack
+indices](SIL.md#structural-type-matching-for-pack-indices).
 
 All pack indexing instructions carry an **indexed pack type**, which is
 a formal type that must be a pack type. Pack indexing instructions can
@@ -4635,6 +4650,37 @@ produces the same value.
 The `alignment` integer value specifies the byte alignment of the
 address. `alignment=0` is the default, indicating the natural alignment
 of `T`.
+
+### value_to_address
+
+```
+sil-instruction ::= 'value_to_address' sil-operand
+
+%1 = value_to_address %0 : $T
+// %0 must be an object of address-only type $T, or a guaranteed indirect
+// function argument of loadable type $T
+// %1 will be of type $*T
+```
+
+Produces the address of the storage of an opaque value.
+
+With opaque values, an address-only value is an SSA object. It has no
+address in SIL until AddressLowering assigns it storage. Some operations
+need the address of a particular value, such as a lifetime dependence on
+the address of an addressable argument or variable.
+
+This instruction does not allocate. Its result is the address of the
+operand's own storage, which is an [alloc_stack](#alloc_stack) or an indirect
+function argument that AddressLowering assigned, or a projection of one.
+AddressLowering guarantees that `value_to_address` of the same operand
+always resolves to the same address, and asserts that the storage is one of
+those.
+
+The operand may have any ownership. The result is an interior pointer into
+the operand: every use of the address must be within the lifetime of the
+operand. The operand's root must be a variable, not a temporary.
+
+Only valid in opaque values mode, before AddressLowering.
 
 ### unchecked_ref_cast
 
@@ -5230,7 +5276,8 @@ sil-terminator ::= 'return_borrow' sil-operand 'from_scopes' '(' (sil-operand ('
 
 return_borrow %0 : $T from_scopes (%1, %2 ...)
 // %0 must be a @guaranteed value
-// %1, %2, ... must be borrow introducers for %0, like `load_borrow`
+// %1, %2, ... must be borrow introducers for %0, like `load_borrow`,
+//   ordered from inner to outer
 // $T must be the return type of the current function
 ```
 

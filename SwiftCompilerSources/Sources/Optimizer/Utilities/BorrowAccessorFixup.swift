@@ -30,9 +30,25 @@ import OptimizerBridging
 /// ```
 /// A trivial result has no enclosing scope, so only the `unchecked_ownership` instructions are removed.
 ///
+/// A `@guaranteed_address` or `@inout` address result that is derived from local borrow scopes are
+/// handled the same way:
+/// ```
+///   %ld = load_borrow %self
+///   %fwd = unchecked_ownership %ld
+///   %addr = apply %borrowAccessor(%fwd)
+///   end_borrow %ld
+///   return %addr
+/// ```
+/// ->
+/// ```
+///   %ld = load_borrow %self
+///   %addr = apply %borrowAccessor(%ld)
+///   return_borrow %addr from_scopes (%ld)
+/// ```
+///
 /// Returns true if the function changed.
 func fixupBorrowAccessors(in function: Function, _ context: FunctionPassContext) -> Bool {
-  guard function.convention.hasGuaranteedResult else {
+  guard function.convention.hasGuaranteedResult || function.convention.hasAddressResult else {
     return false
   }
 
@@ -62,15 +78,18 @@ func fixupBorrowAccessors(in function: Function, _ context: FunctionPassContext)
     }
   }
 
-  // The scopes are ordered from outer to inner.
+  // The scopes are ordered from inner to outer.
   let builder = Builder(before: returnInst, context)
   builder.createReturnBorrow(of: returnInst.returnedValue, fromScopes: enclosingScopes.map { $0.value })
   context.erase(instruction: returnInst)
   return true
 }
 
-/// Returns the local borrow scopes that enclose `value`, ordered from outer to inner.
+/// Returns the local borrow scopes that enclose `value`, ordered from inner to outer.
 private func getEnclosingLocalScopes(of value: Value, _ context: FunctionPassContext) -> [BeginBorrowValue] {
+  if value.type.isAddress {
+    return enclosingObjects(of: value).flatMap { getEnclosingLocalScopes(of: $0, context) }
+  }
   var scopes = [BeginBorrowValue]()
   var worklist = ValueWorklist(context)
   defer { worklist.deinitialize() }
@@ -84,7 +103,40 @@ private func getEnclosingLocalScopes(of value: Value, _ context: FunctionPassCon
     worklist.pushIfNotVisited(contentsOf: current.getEnclosingValues(context))
   }
   // Walking up visits inner scopes before outer scopes.
-  return scopes.reversed()
+  return scopes
+}
+
+/// The objects which `address` is only valid within, ordered from inner to outer.
+private func enclosingObjects(of address: Value) -> [Value] {
+  let accessBaseAndScopes = address.accessBaseWithScopes
+  var objects = [Value]()
+  // The scopes are ordered from inner to outer.
+  for case let .dependence(markDep) in accessBaseAndScopes.scopes {
+    if markDep.base.type.isAddress {
+      objects.append(contentsOf: enclosingObjects(of: markDep.base))
+    } else {
+      objects.append(markDep.base)
+    }
+  }
+  switch accessBaseAndScopes.base {
+  case let .borrowMutateAccessor(apply):
+    if let selfArgument = apply.selfArgument {
+      if selfArgument.type.isAddress {
+        objects.append(contentsOf: enclosingObjects(of: selfArgument))
+      } else {
+        objects.append(selfArgument)
+      }
+    }
+  case let .box(projectBox):
+    objects.append(projectBox.box)
+  case let .class(refElementAddr):
+    objects.append(refElementAddr.instance)
+  case let .tail(refTailAddr):
+    objects.append(refTailAddr.instance)
+  case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
+    break
+  }
+  return objects
 }
 
 func registerBorrowAccessorFixup() {

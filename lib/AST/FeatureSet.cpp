@@ -183,6 +183,17 @@ UNINTERESTING_FEATURE(BuiltinTypedAllocationID)
 UNINTERESTING_FEATURE(MutateAndConsumeInDeinit)
 UNINTERESTING_FEATURE(Cells)
 
+bool swift::usesFeatureCChar32IsUInt32(const Decl *decl) {
+  auto *TAD = dyn_cast<TypeAliasDecl>(decl);
+  if (!TAD || !TAD->getName().is("CChar32"))
+    return false;
+  if (!TAD->getDeclContext()->isModuleScopeContext() ||
+      !TAD->getModuleContext()->isStdlibModule())
+    return false;
+  auto underlying = TAD->getUnderlyingType();
+  return underlying && !underlying->isUnicodeScalar();
+}
+
 static bool usesFeatureSubscriptParametersWithOwnership(Decl *decl) {
   auto *SD = dyn_cast<SubscriptDecl>(decl);
   if (!SD)
@@ -230,6 +241,10 @@ static bool usesFeatureTargetAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
+static bool usesFeatureTailAllocatedAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TailAllocatedAttr>();
+}
+
 static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
   for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
     // Exported functions and types, and non-exported types.
@@ -252,14 +267,11 @@ static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
     return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
-  switch (decl->getKind()) {
-  case DeclKind::Var: {
-    auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
-  }
-  default:
-    return hasLifetimeAttr(decl);
-  }
+  // A property or subscript may carry the attribute on its accessors.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+    return hasLifetimeAttr(storage) ||
+           llvm::any_of(storage->getAllAccessors(), hasLifetimeAttr);
+  return hasLifetimeAttr(decl);
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {
@@ -502,6 +514,7 @@ UNINTERESTING_FEATURE(BuiltinCancellationHandlerWithReason)
 UNINTERESTING_FEATURE(BuiltinCreateSynchronousDiscardingTask)
 UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
+UNINTERESTING_FEATURE(BuiltinSplitContinuations)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
@@ -512,7 +525,6 @@ UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(ImportNonPublicCxxMembers)
 UNINTERESTING_FEATURE(ImportCxxMembersLazily)
 UNINTERESTING_FEATURE(ImportUnsafeCxxMethodsAsAlwaysUnsafe)
-UNINTERESTING_FEATURE(LibkernOwnershipConventions)
 UNINTERESTING_FEATURE(ForeignReferenceTypeInheritance)
 UNINTERESTING_FEATURE(ForeignReferenceTypeSubclassing)
 UNINTERESTING_FEATURE(CxxImplementation)

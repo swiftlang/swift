@@ -382,6 +382,21 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                           ElementTypes, AllOperands);
 }
 
+DeallocRefInst *
+DeallocRefInst::create(SILDebugLocation DebugLoc, SILFunction &F,
+                       SILValue Operand, ArrayRef<SILType> ElementTypes,
+                       ArrayRef<SILValue> ElementCountOperands) {
+  assert(ElementTypes.size() == ElementCountOperands.size());
+  SmallVector<SILValue, 8> AllOperands;
+  AllOperands.push_back(Operand);
+  AllOperands.append(ElementCountOperands.begin(), ElementCountOperands.end());
+  collectTypeDependentOperands(AllOperands, F, ElementTypes);
+  auto Size = totalSizeToAlloc<swift::Operand, SILType>(AllOperands.size(),
+                                                        ElementTypes.size());
+  auto Buffer = F.getModule().allocateInst(Size, alignof(DeallocRefInst));
+  return ::new (Buffer) DeallocRefInst(DebugLoc, AllOperands, ElementTypes);
+}
+
 bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
   auto baseType = this->getType();
   auto classType = baseType.getASTType();
@@ -1115,6 +1130,16 @@ PartialApplyInst::PartialApplyInst(
                       TypeDependentOperands, ArgLocs, SpecializationInfo,
                       ClosureType) {
   sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
+}
+
+bool PartialApplyInst::contextBorrowsArgument(const Operand &argOp) const {
+  if (!isOnStack() || argOp.get()->getType().isAddress())
+    return false;
+  if (!isNoncopyable())
+    return true;
+  return !ApplySite(const_cast<PartialApplyInst *>(this))
+              .getArgumentConvention(argOp)
+              .isOwnedConventionInCaller();
 }
 
 PartialApplyInst *PartialApplyInst::create(
@@ -4112,7 +4137,8 @@ ReturnBorrowInst *ReturnBorrowInst::create(SILDebugLocation DebugLoc,
 ReturnBorrowInst::ReturnBorrowInst(SILDebugLocation DebugLoc,
                                    ArrayRef<SILValue> operands)
     : InstructionBaseWithTrailingOperands(operands, DebugLoc) {
-  assert(operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
+  assert(operands[0]->getType().isAddress() ||
+         operands[0]->getOwnershipKind() == OwnershipKind::Guaranteed);
 }
 
 // This may be called in an invalid SIL state. SILCombine creates new

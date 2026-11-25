@@ -625,7 +625,7 @@ static void computeSwiftModuleTraceInfo(
 
       // FIXME: Better error handling
       StringRef realDepPath =
-          fs::real_path(depPath, buffer, /*expand_tile*/ true)
+          ctx.SourceMgr.getFileSystem()->getRealPath(depPath, buffer)
               ? StringRef(depPath) // Couldn't find the canonical path, assume
                                    // this is good enough.
               : buffer.str();
@@ -683,7 +683,7 @@ static void computeSwiftModuleTraceInfo(
 
     // FIXME: The behavior of fs::exists for relative paths is undocumented.
     // Use something else instead?
-    if (fs::exists(moduleAdjacentInterfacePath)) {
+    if (ctx.SourceMgr.getFileSystem()->exists(moduleAdjacentInterfacePath)) {
       // This should be an error but it is not because of funkiness around
       // compatible modules such as us having both armv7s.swiftinterface
       // and armv7.swiftinterface in the dependency tracker.

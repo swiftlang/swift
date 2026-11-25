@@ -10,6 +10,7 @@ In addition to using an array literal, you can also create an array using these 
 - ``Swift/Array/init(_:)-1ip9h``
 - ``Swift/Array/init(_:)-236cl``
 - ``Swift/Array/init(repeating:count:)-5zvh4``
+- ``Swift/Array/init(capacity:initializingWith:)``
 - ``Swift/Array/init(unsafeUninitializedCapacity:initializingWith:)``
 
 ### Inspecting an Array
@@ -38,6 +39,7 @@ In addition to using an array literal, you can also create an array using these 
 - ``Swift/Array/replaceSubrange(_:with:)-6a2ai``
 - ``Swift/Array/replaceSubrange(_:with:)-7293p``
 - ``Swift/Array/reserveCapacity(_:)``
+- ``Swift/Array/append(addingCapacity:initializingWith:)``
 
 ### Combining Arrays
 
@@ -151,6 +153,7 @@ In addition to using an array literal, you can also create an array using these 
 - ``Swift/Array/starts(with:by:)``
 - ``Swift/Array/lexicographicallyPrecedes(_:)``
 - ``Swift/Array/lexicographicallyPrecedes(_:by:)``
+- ``Swift/Array/isTriviallyIdentical(to:)``
 
 ### Manipulating Indices
 
@@ -171,7 +174,6 @@ In addition to using an array literal, you can also create an array using these 
 - ``Swift/Array/withUnsafeBufferPointer(_:)``
 - ``Swift/Array/withUnsafeMutableBufferPointer(_:)``
 - ``Swift/Array/withUnsafeBytes(_:)``
-- ``Swift/Array/withUnsafeBytes(of:)``
 - ``Swift/Array/withUnsafeMutableBytes(_:)``
 - ``Swift/Array/withContiguousStorageIfAvailable(_:)-1wj7c``
 - ``Swift/Array/withContiguousMutableStorageIfAvailable(_:)-77ste``

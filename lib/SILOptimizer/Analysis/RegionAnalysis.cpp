@@ -676,6 +676,7 @@ static PartialApplyInst *getUnderlyingPartialApply(SILValue closure) {
     case ClosureUseKind::Unsupported:
       return SILValue();
     }
+    llvm_unreachable("covered switch");
   };
 
   while (SILValue unwrapped = tryLookthroughClosureUse(closure))
@@ -3125,6 +3126,14 @@ public:
       return translateSILBuiltin(bi);
     }
 
+    if (auto *eai = dyn_cast<EndApplyInst>(inst)) {
+      // FIXME: This might not be not entirely correct.
+      auto *bai = eai->getBeginApply();
+      return translateSILMultiAssign(
+          eai->getResults(), ArrayRef<Operand *>(),
+          makeOperandRefRange(bai->getAllOperands()), {});
+    }
+
     auto fas = FullApplySite::isa(inst);
     assert(bool(fas) && "Builtins should be handled above");
 
@@ -3728,6 +3737,7 @@ public:
     return visit##ID(cast<ID>(inst));
 #include "swift/SIL/SILNodes.def"
       }
+      llvm_unreachable("covered switch");
     };
 
     auto kind = computeOpKind();
@@ -4144,7 +4154,6 @@ CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
 CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
-CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
 CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
@@ -4266,6 +4275,7 @@ CONSTANT_TRANSLATION(ApplyInst, Apply)
 CONSTANT_TRANSLATION(BeginApplyInst, Apply)
 CONSTANT_TRANSLATION(BuiltinInst, Apply)
 CONSTANT_TRANSLATION(TryApplyInst, Apply)
+CONSTANT_TRANSLATION(EndApplyInst, Apply)
 
 //===---
 // Asserting
@@ -4290,6 +4300,12 @@ CONSTANT_TRANSLATION(DeallocPackMetadataInst, Asserting)
 
 // This should be removed by DI which runs before us in the pass pipeline.
 CONSTANT_TRANSLATION(AssignOrInitInst, Asserting)
+
+// This should be removed by AddressLowering which runs before us in the pass
+// pipeline.
+// TODO: replace this entry with real semantics when moving AddressLowering
+// later.
+CONSTANT_TRANSLATION(ValueToAddressInst, Asserting)
 
 // We should never hit this since it can only appear as a final instruction in a
 // global variable static initializer list.

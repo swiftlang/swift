@@ -331,6 +331,9 @@ public:
     // FIXME: how to support `()` parameters.
     if (typeUseKind != FunctionSignatureTypeUse::ReturnType)
       return ClangRepresentation::unsupported;
+    // FIXME: `()?` would need a C++ optional of void.
+    if (optionalKind && *optionalKind != OTK_None)
+      return ClangRepresentation::unsupported;
     os << "void";
     return ClangRepresentation::representable;
   }
@@ -392,6 +395,8 @@ public:
         os << " * _Nonnull";
       return ClangRepresentation::representable;
     }
+    if (!declPrinter.shouldInclude(cd))
+      return ClangRepresentation::unsupported;
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
@@ -430,6 +435,9 @@ public:
     // noncopyable.
     for (Type arg : genericArgs) {
       if (cxx_translation::isNoncopyableValueTypeExposableToCxx(arg))
+        return ClangRepresentation::unsupported;
+      // Only OpaquePointer has the C++ type traits a generic argument needs.
+      if (arg->getAnyPointerElementType())
         return ClangRepresentation::unsupported;
     }
     os << '<';

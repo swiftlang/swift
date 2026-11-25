@@ -200,7 +200,7 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
     return true;
 
   // So are C++ constructors that initialize a foreign reference type.
-  if (constant.isForeignReferenceInitializer())
+  if (constant.isCXXForeignReferenceInitializer())
     return true;
 
   // Extension methods currently must be statically dispatched, unless they're
@@ -679,7 +679,7 @@ public:
     // A C++ constructor that initializes a foreign reference type is imported
     // as a static factory, but its initializing entry point takes `self` as
     // the trailing `this` argument, like a C++ instance method.
-    if (constant->isForeignReferenceInitializer())
+    if (constant->isCXXForeignReferenceInitializer())
       result.foreign.self = ImportAsMemberStatus();
 
     return result;
@@ -1361,7 +1361,15 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
+    if (SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e))) {
+      // If we couldn't emit the closure, emit an undef.
+      auto substType = cast<FunctionType>(e->getType()->getCanonicalType());
+      auto origType = getIndirectApplyAbstractionPattern(
+          SGF, AbstractionPattern(substType), substType);
+      ManagedValue fn = SGF.emitUndef(SGF.getLoweredType(substType));
+      setCallee(Callee::forIndirect(fn, origType, substType, e));
+      return;
+    }
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
@@ -3943,7 +3951,8 @@ public:
   // origFormalType is a function type.
   void emitPreparedArgs(PreparedArguments &&args,
                         AbstractionPattern origFormalType,
-                        ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) {
+                        ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+                        unsigned lifetimeDependenciesBaseIndex) {
     assert(args.isValid());
     auto params = args.getParams();
     auto argSources = std::move(args).getSources();
@@ -3975,7 +3984,7 @@ public:
               continue;
             }
             
-            if (scoped->contains(i)) {
+            if (scoped->contains(lifetimeDependenciesBaseIndex + i)) {
               addressable = SGF.getTypeProperties(origFormalParamType,
                                                   origFormalParamType.getType())
                 .isAddressableForDependencies();
@@ -5411,6 +5420,7 @@ public:
   void emit(SILGenFunction &SGF, AbstractionPattern origFormalType,
             CanSILFunctionType substFnType,
             ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+            unsigned lifetimeDependenciesBaseIndex,
             ParamLowering &lowering,
             SmallVectorImpl<ManagedValue> &args,
             SmallVectorImpl<DelayedArgument> &delayedArgs,
@@ -5423,7 +5433,8 @@ public:
     ArgEmitter emitter(SGF, Loc, lowering.Rep, options, params, args,
                        delayedArgs, foreign);
     emitter.emitPreparedArgs(std::move(Args), origFormalType,
-                             lifetimeDependencies);
+                             lifetimeDependencies,
+                             lifetimeDependenciesBaseIndex);
   }
 
   /// Take the arguments for special processing, in place of the above.
@@ -5642,6 +5653,7 @@ public:
     if (forUnwind && CanUnwind) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
+      // TODO: This is not correct when coroutine has a normal result
       SGF.B.createEndApply(l, ApplyToken,
                            SILType::getEmptyTupleType(SGF.getASTContext()));
     }
@@ -6252,13 +6264,17 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       
       // Claim the foreign "self" with the self param.
       auto siteForeign = ForeignInfo{foreign.self, {}, {}};
+      auto origMethodType = origFormalType.getFunctionResultType();
+      // The lifetimeDependencies structure refers to `self` by the final
+      // index after the formal method arguments.
       std::move(*selfArg).emit(SGF, origFormalType, substFnType,
                                lifetimeDependencies,
+                               origMethodType.getNumFunctionParams(),
                                paramLowering,
                                args.back(), delayedArgs,
                                siteForeign);
 
-      origFormalType = origFormalType.getFunctionResultType();
+      origFormalType = origMethodType;
     }
 
     args.push_back({});
@@ -6268,7 +6284,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     auto siteForeignError = ForeignInfo{{}, foreign.error, foreign.async};
     // Claim the method formal params.
     std::move(*callSite).emit(SGF, origFormalType, substFnType,
-                              lifetimeDependencies, paramLowering,
+                              lifetimeDependencies, 0, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
   }
 
@@ -6954,17 +6970,17 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
   return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(
+SILValue SILGenFunction::emitEndApplyWithRethrow(
     SILLocation loc, MultipleValueInstructionResult *token,
-    SILValue allocation) {
+    SILValue allocation, SILType resultType) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
-  B.createEndApply(loc, token,
-                   SILType::getEmptyTupleType(getASTContext()));
+  SILValue result = B.createEndApply(loc, token, resultType);
   if (allocation) {
     B.createDeallocStack(loc, allocation);
   }
+  return result;
 }
 
 void SILGenFunction::emitYield(SILLocation loc,
@@ -8092,7 +8108,7 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
                      ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType,
-                           origFnType.getLifetimeDependencies());
+                           origFnType.getLifetimeDependencies(), 0);
 
   // TODO: do something to preserve LValues in the delayed arguments?
   if (!delayedArgs.empty())
@@ -8936,7 +8952,7 @@ SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
   auto prepared = prepareIndices(loc, substFnType,
                                  // Strategy doesn't matter
                                  AccessStrategy::getStorage(), argList);
-  emitter.emitPreparedArgs(std::move(prepared), origFnType, {});
+  emitter.emitPreparedArgs(std::move(prepared), origFnType, {}, 0);
 
   if (!delayedArgs.empty())
     emitDelayedArguments(*this, delayedArgs, argValues);

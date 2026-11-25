@@ -1063,6 +1063,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// A formal SIL reference to a value, suitable for use as a stored

@@ -1124,7 +1124,6 @@ void CompletionBuilder::setPrefix(CodeCompletionString *prefix) {
 
 Completion *CompletionBuilder::finish() {
   const SwiftResult *newBase = &this->base;
-  llvm::SmallString<64> nameStorage;
   if (modified) {
     // We've modified the original result, so build a new one.
     auto opKind = CodeCompletionOperatorKind::None;

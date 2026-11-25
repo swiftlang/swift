@@ -150,7 +150,6 @@ APInt swift::constantFoldCast(APInt val, const BuiltinInfo &BI) {
   uint32_t DestBitWidth =
   DestTy->castTo<BuiltinIntegerType>()->getGreatestWidth();
 
-  APInt CastResV;
   if (SrcBitWidth == DestBitWidth) {
     return val;
   } else switch (BI.ID) {

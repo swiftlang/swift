@@ -269,7 +269,7 @@ func iterateContinueBreak<each Element>(over element: repeat each Element) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14pack_iteration14iterateClosure4overyxxQp_tRvzlF : $@convention(thin) <each Element> (@pack_guaranteed Pack{repeat each Element}) -> () {
 //
-// CHECK-LABEL: sil private [ossa] @$s14pack_iteration14iterateClosure4overyxxQp_tRvzlFyycfU_ : $@convention(thin) <each Element> (@in_guaranteed (repeat each Element)) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s14pack_iteration14iterateClosure4overyxxQp_tRvzlFyycfU_ : $@convention(thin) <each Element> (@in_guaranteed (repeat each Element)) -> () {
 //
 // CHECK: bb0([[PACK:%.*]] :  @closureCapture $*(repeat each Element)):
 // CHECK: [[ALLOC_PACK:%.*]] = alloc_pack $Pack{repeat each Element}

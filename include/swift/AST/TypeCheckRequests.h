@@ -145,6 +145,7 @@ public:
     case Default:
       return Type();
     }
+    llvm_unreachable("covered switch");
   }
   Type getInheritedType() { return payload.get<Inherited_>().ty; }
   std::pair<Type, InverseTypeRepr *> getSuppressed() {
@@ -4041,6 +4042,48 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Resolves the element types of a `@_tailAllocated` attribute in the context
+/// of the class it is attached to.
+class ResolveTailAllocatedTypesRequest
+    : public SimpleRequest<ResolveTailAllocatedTypesRequest,
+                           ArrayRef<Type>(ClassDecl *, TailAllocatedAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Type> evaluate(Evaluator &evaluator, ClassDecl *owner,
+                          TailAllocatedAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ArrayRef<Type>> getCachedResult() const;
+  void cacheResult(ArrayRef<Type> value) const;
+};
+
+/// Finds the counts property named by a `@_tailAllocated` attribute.
+class TailAllocatedCountsDeclRequest
+    : public SimpleRequest<TailAllocatedCountsDeclRequest,
+                           VarDecl *(ClassDecl *, TailAllocatedAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *owner,
+                    TailAllocatedAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Determines whether this is a "simple" didSet i.e one that either does not
 /// use the implicit oldValue parameter in the body or does not take an explicit
 /// parameter (ex: 'didSet(oldValue)').
@@ -5073,11 +5116,14 @@ public:
 
 /// Compute the local discriminators for the given declaration context.
 ///
-/// This is a state-changing operation for closures within the context, which
-/// produces the discriminator value that any subsequent requests should use.
+/// This is a state-changing operation for closures within the context.
+///
+/// NOTE: Do not call into this request directly: Use
+/// `DeclContext::assignLocalDiscriminators` instead since that handles function
+/// bodies.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
-                           unsigned(DeclContext *),
+                           evaluator::SideEffect(DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5085,10 +5131,33 @@ public:
 private:
   friend SimpleRequest;
 
-  unsigned evaluate(Evaluator &evaluator, DeclContext *dc) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }
+};
+
+/// The function/top-level body equivalent to LocalDiscriminatorsRequest.
+///
+/// This is necessary since we support replacing function/top-level bodies for
+/// code completion, so need to be able to re-assign discriminators without also
+/// re-assigning for function parameters.
+class BodyDiscriminatorsRequest
+    : public SimpleRequest<BodyDiscriminatorsRequest,
+                           evaluator::SideEffect(DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &eval, DeclContext *) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 /// Retrieve the raw documentation comment of a declaration.

@@ -30,6 +30,7 @@ swift_compiler_sources(Optimizer
   DeinitDevirtualizer.swift
   DestroyHoisting.swift
   DiagnoseInfiniteRecursion.swift
+  DiagnoseResolvedLifetimes.swift
   EmbeddedWitnessCallSpecialization.swift
   ImplicitDestroyChecker.swift
   InitializeStaticGlobals.swift
@@ -39,7 +40,6 @@ swift_compiler_sources(Optimizer
   LifetimeDependenceInsertion.swift
   LifetimeDependenceScopeFixup.swift
   LifetimeResolution.swift
-  LifetimeResolutionDiagnose.swift
   LifetimeResolutionSingleDef.swift
   LoopInvariantCodeMotion.swift
   LowerAddressInstructions.swift

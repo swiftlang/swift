@@ -738,6 +738,7 @@ struct DeclSILOptional {
     bool *isCanonical = nullptr;
     bool *hasOwnershipSSA = nullptr;
     bool *hasLoweredAddresses = nullptr;
+    bool *hasUnresolvedLifetimes = nullptr;
     IsThunk_t *isThunk = nullptr;
     IsDynamicallyReplaceable_t *isDynamic = nullptr;
     IsDistributed_t *isDistributed = nullptr;
@@ -771,6 +772,7 @@ struct DeclSILOptional {
     EffectsKind *MRK = nullptr;
     ActorIsolation *actorIsolation = nullptr;
     std::optional<SILStage> *functionStage = nullptr;
+    bool *isClosure = nullptr;
 };
 } // end anonymous namespace
 
@@ -818,6 +820,8 @@ static bool parseDeclSILOptional(
       *options.hasOwnershipForTrivial = true;
     else if (options.hasLoweredAddresses && SP.P.Tok.getText() == "opaque")
       *options.hasLoweredAddresses = false;
+    else if (options.hasUnresolvedLifetimes && SP.P.Tok.getText() == "unresolved")
+      *options.hasUnresolvedLifetimes = true;
     else if (options.needStackProtection && SP.P.Tok.getText() == "stack_protection")
       *options.needStackProtection = true;
     else if (options.isSpecialized && SP.P.Tok.getText() == "specialized")
@@ -837,6 +841,8 @@ static bool parseDeclSILOptional(
     else if (options.isWithoutActuallyEscapingThunk
              && SP.P.Tok.getText() == "without_actually_escaping")
       *options.isWithoutActuallyEscapingThunk = true;
+    else if (options.isClosure && SP.P.Tok.getText() == "closure")
+      *options.isClosure = true;
     else if (options.specialPurpose && SP.P.Tok.getText() == "global_init")
       *options.specialPurpose = SILFunction::Purpose::GlobalInit;
     else if (options.specialPurpose && SP.P.Tok.getText() == "lazy_getter")
@@ -2288,6 +2294,23 @@ bool SILParser::parseForwardingOwnershipKind(
     return P.parseToken(tok::colon, diag::expected_tok_in_sil_instr, ":")
            || parseSILOwnership(forwardingKind);
   }
+  return false;
+}
+
+bool SILParser::parseTailElems(SmallVectorImpl<SILType> &ElementTypes,
+                               SmallVectorImpl<SILValue> &ElementCounts,
+                               SILBuilder &B) {
+  SILType ElemTy;
+  if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() || P.Tok.getText() != "*")
+    return true;
+  P.consumeToken();
+
+  SILValue ElemCount;
+  if (parseTypedValueRef(ElemCount, B))
+    return true;
+
+  ElementTypes.push_back(ElemTy);
+  ElementCounts.push_back(ElemCount);
   return false;
 }
 
@@ -4207,6 +4230,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
   }
 
+  case SILInstructionKind::ValueToAddressInst: {
+    if (parseTypedValueRef(Val, B))
+      return true;
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    if (!Val->getType().isObject()) {
+      P.diagnose(InstLoc.getSourceLoc(), diag::sil_operand_not_object,
+                 "operand", OpcodeName);
+      return true;
+    }
+
+    ResultVal = B.createValueToAddress(InstLoc, Val);
+    break;
+  }
+
   case SILInstructionKind::LoadInst: {
     std::optional<LoadOwnershipQualifier> Qualifier;
     SourceLoc AddrLoc;
@@ -5475,18 +5514,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       } else if (Optional == "non_nested") {
         isNested = StackAllocationIsNotNested;
       } else if (Optional == "tail_elems") {
-        SILType ElemTy;
-        if (parseSILType(ElemTy) || !P.Tok.isAnyOperator() ||
-            P.Tok.getText() != "*")
+        if (parseTailElems(ElementTypes, ElementCounts, B))
           return true;
-        P.consumeToken();
-
-        SILValue ElemCount;
-        if (parseTypedValueRef(ElemCount, B))
-          return true;
-
-        ElementTypes.push_back(ElemTy);
-        ElementCounts.push_back(ElemCount);
       } else {
         return true;
       }
@@ -5547,9 +5576,23 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createDeallocPackMetadata(InstLoc, Val);
     break;
   case SILInstructionKind::DeallocRefInst: {
+    SmallVector<SILType, 2> ElementTypes;
+    SmallVector<SILValue, 2> ElementCounts;
+    while (P.consumeIf(tok::l_square)) {
+      Identifier Id;
+      parseSILIdentifier(Id, diag::expected_in_attribute_list);
+      StringRef Optional = Id.str();
+      if (Optional == "tail_elems") {
+        if (parseTailElems(ElementTypes, ElementCounts, B))
+          return true;
+      } else {
+        return true;
+      }
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+    }
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createDeallocRef(InstLoc, Val);
+    ResultVal = B.createDeallocRef(InstLoc, Val, ElementTypes, ElementCounts);
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {
@@ -7871,6 +7914,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   bool hasLoweredAddresses = false;
+  bool hasUnresolvedLifetimes = false;
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
@@ -7878,6 +7922,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   bool needStackProtection = false;
   AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
+  bool isClosure = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
@@ -7898,8 +7943,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional({
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &hasLoweredAddresses, &isThunk, &isDynamic, &isDistributed,
-          &isRuntimeAccessible, &forceEnableLexicalLifetimes,
+          &hasLoweredAddresses, &hasUnresolvedLifetimes, &isThunk, &isDynamic,
+          &isDistributed, &isRuntimeAccessible, &forceEnableLexicalLifetimes,
           &useStackForPackMetadata, &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
@@ -7908,7 +7953,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk,
           &hasOwnershipForTrivial, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage},
+          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage,
+          &isClosure},
           FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7940,6 +7986,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setHasLoweredAddresses(hasLoweredAddresses);
+    FunctionState.F->setHasUnresolvedLifetimes(hasUnresolvedLifetimes);
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
     FunctionState.F->setIsDistributed(isDistributed);
@@ -7963,6 +8010,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
+    FunctionState.F->setIsClosure(isClosure);
     FunctionState.F->setInlineStrategy(inlineStrategy);
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);

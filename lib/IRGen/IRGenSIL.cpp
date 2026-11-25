@@ -1070,6 +1070,9 @@ public:
                          bool IsAnonymous, bool WasMoved,
                          SILDebugInfoExpression *ExprToExtend = nullptr,
                          std::optional<Alignment> Align = std::nullopt) {
+    // Mark the shadow copy code as compiler-generated.
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
+
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1143,6 +1146,8 @@ public:
                               bool WasMoved,
                               llvm::SmallVectorImpl<llvm::Value *> &copy,
                               SILDebugInfoExpression *ExprToExtend = nullptr) {
+    // Mark the shadow copy code as compiler-generated.
+    ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
@@ -1196,7 +1201,6 @@ public:
       Alloca =
         LTI.allocateStack(*this, Type, VarInfo.Name + ".debug").getAddress();
       zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
-      ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
       LTI.initialize(*this, e, Alloca, false /* isOutlined */);
       auto shadow = Alloca.getAddress();
       // Async functions use the value of the artificial address.
@@ -1249,21 +1253,20 @@ public:
   template <typename StorageType>
   void emitDebugVariableDeclaration(
       StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
-      const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      bool InCoroContext = false,
+      SILDebugVariable VarInfo, bool InCoroContext = false,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+          Builder, Storage, Ty, VarInfo, InCoroContext,
           ArtificialKind::RealValue, DbgInstrKind);
       return;
     }
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+        Builder, Storage, Ty, VarInfo, InCoroContext,
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
@@ -1382,6 +1385,9 @@ public:
   }
   void visitUncheckedOwnershipInst(UncheckedOwnershipInst *i) {
     llvm_unreachable("unimplemented");
+  }
+  void visitValueToAddressInst(ValueToAddressInst *i) {
+    llvm_unreachable("value_to_address is removed by AddressLowering");
   }
   void visitMergeIsolationRegionInst(MergeIsolationRegionInst *i) {
     llvm_unreachable("Valid only when ownership is enabled");
@@ -6343,8 +6349,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
                                    IGM.getMaximalTypeExpansionContext()),IGM);
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
-                                         getDebugScope(), {}, *Var,
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy, *Var,
                                          /*InCoroContext=*/false, ArtificialValue);
 }
 
@@ -6352,8 +6357,8 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
 /// async function and thus may get allocated in the coroutine context. These
 /// variables need to be marked with the Coro flag, so LLVM's CoroSplit pass can
 /// recognize them.
-static bool InCoroContext(SILFunction &f, SILInstruction &i) {
-  return f.isAsync() && !i.getDebugScope()->InlinedCallSite;
+static bool InCoroContext(SILFunction &f, const SILDebugScope *varScope) {
+  return f.isAsync() && !varScope->InlinedCallSite;
 }
 
 /// Salvage an LLVM instruction emitted within a debug reconstruction block.
@@ -6393,14 +6398,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // If there is a debug reconstruction block, the debug_value operand isn't
   // the value of the variable.
   SILValue SILVal = DebugBB ? SILValue() : i->getSingleOperand();
-  if (i->getDebugScope()->getInlinedFunction()->isTransparent())
+  auto VarInfo = i->getCompleteVarInfo();
+  if (VarInfo.Scope->getInlinedFunction()->isTransparent())
     return;
 
-  auto VarInfo = i->getCompleteVarInfo();
   if (SILVal && isa<SILUndef>(SILVal) && VarInfo.isErrorVariable()) {
     // We cannot track the location of inlined error arguments because it has no
     // representation in SIL.
-    if (!SILVal->getType().isAddress() && !i->getDebugScope()->InlinedCallSite) {
+    if (!SILVal->getType().isAddress() && !VarInfo.Scope->InlinedCallSite) {
       auto funcTy = CurSILFn->getLoweredFunctionType();
       emitErrorResultVar(funcTy, funcTy->getErrorResult(), i);
     }
@@ -6410,7 +6415,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     if (!i->usesMoveableValueDebugInfo())
       return;
   }
-  bool IsInCoro = InCoroContext(*CurSILFn, *i);
+  bool IsInCoro = InCoroContext(*CurSILFn, VarInfo.Scope);
 
   bool IsAnonymous = false;
   VarInfo.Name = getVarName(i, IsAnonymous);
@@ -6505,7 +6510,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     Copy.emplace_back(emitShadowCopyIfNeeded(
         Storage, TI.getStorageType(),
-        i->getDebugScope(), VarInfo, IsAnonymous,
+        VarInfo.Scope, VarInfo, IsAnonymous,
         i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
   } else if (SILVal->getType().isAddress()) {
     auto &TI = getTypeInfo(SILVal->getType());
@@ -6514,10 +6519,10 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     Copy.emplace_back(emitShadowCopyIfNeeded(
         Storage, TI.getStorageType(),
-        i->getDebugScope(), VarInfo, IsAnonymous,
+        VarInfo.Scope, VarInfo, IsAnonymous,
         i->usesMoveableValueDebugInfo(), &VarInfo.DIExpr));
   } else {
-    emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), VarInfo, IsAnonymous,
+    emitShadowCopyIfNeeded(SILVal, VarInfo.Scope, VarInfo, IsAnonymous,
                            i->usesMoveableValueDebugInfo(), Copy,
                            &VarInfo.DIExpr);
   }
@@ -6527,8 +6532,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(
-      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), VarInfo,
-      IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+      Copy, DbgTy, SILTy, VarInfo, IsInCoro,
+      AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 
   // Erase any LLVM instructions emitted by the debug BB. They were only needed
   // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
@@ -6962,8 +6967,8 @@ void IRGenSILFunction::emitDebugInfoBeforeAllocStack(AllocStackInst *i,
                                                      DebugTypeInfo &DbgTy) {
   auto VarInfo = i->getVarInfo();
   if (!VarInfo ||
-      !i->getDebugScope() ||
-      i->getDebugScope()->getInlinedFunction()->isTransparent())
+      !VarInfo->Scope ||
+      VarInfo->Scope->getInlinedFunction()->isTransparent())
     return;
 
   VarDecl *Decl = i->getDecl();
@@ -6996,12 +7001,12 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
                                                     llvm::Value *addr) {
   auto VarInfo = i->getVarInfo();
   if (!VarInfo ||
-      !i->getDebugScope() ||
-      i->getDebugScope()->getInlinedFunction()->isTransparent())
+      !VarInfo->Scope ||
+      VarInfo->Scope->getInlinedFunction()->isTransparent())
     return;
 
   VarDecl *Decl = i->getDecl();
-  auto *DS = i->getDebugScope();
+  auto *DS = VarInfo->Scope;
 
   // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
@@ -7028,7 +7033,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
          isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr) ||
          isCallToMalloc(addr));
 
-  bool IsInCoro = InCoroContext(*CurSILFn, *i);
+  bool IsInCoro = InCoroContext(*CurSILFn, DS);
 
   // For task alloc (swift_task_alloc), the address is itself behind a pointer,
   // so prepend an extra op_deref.
@@ -7068,7 +7073,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
     }
 
     emitDebugVariableDeclaration(
-        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, IsInCoro,
+        addr, DbgTy, SILTy, *VarInfo, IsInCoro,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
@@ -7123,9 +7128,7 @@ void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
-                AllocRefInstBase *ARI) {
-  auto Types = ARI->getTailAllocatedTypes();
-  auto Counts = ARI->getTailAllocatedCounts();
+                ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
   for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
     Explosion ElemCount = IGF.getLoweredExplosion(Counts[Idx].get());
     TailArrays.push_back({Types[Idx], ElemCount.claimNext()});
@@ -7145,7 +7148,8 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
@@ -7175,7 +7179,8 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   }
 
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   Explosion metadata = getLoweredExplosion(i->getMetatypeOperand());
   auto metadataValue = metadata.claimNext();
@@ -7275,7 +7280,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     return;
   }
   auto classType = i->getOperand()->getType();
-  emitClassDeallocation(*this, classType, selfValue);
+  SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
+  emitClassDeallocation(*this, classType, selfValue, TailArrays);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {
@@ -7352,7 +7360,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   auto &ti = getTypeInfo(SILTy);
   auto Storage =
       emitShadowCopyIfNeeded(boxWithAddr.getAddressPointer(), ti.getStorageType(),
-                             i->getDebugScope(),
+                             VarInfo->Scope,
                              *VarInfo, IsAnonymous, false /*was moved*/,
                              &VarInfo->DIExpr);
 
@@ -7364,8 +7372,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
   IGM.DebugInfo->emitVariableDeclaration(
-      Builder, Storage, DbgTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      InCoroContext(*CurSILFn, *i));
+      Builder, Storage, DbgTy, *VarInfo, InCoroContext(*CurSILFn, VarInfo->Scope));
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
@@ -9459,6 +9466,31 @@ void IRGenSILFunction::visitGetAsyncContinuationAddrInst(
 
 void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     AwaitAsyncContinuationInst *i) {
+  // getSplitContinuationAddr binds a continuation created in another frame
+  // to this one, so the suspension is set up from its operands rather than from
+  // a get_async_continuation in this frame.
+  auto *splitGet = dyn_cast<BuiltinInst>(i->getOperand());
+  if (splitGet && splitGet->getBuiltinInfo().ID ==
+                      BuiltinValueKind::GetSplitContinuationAddr) {
+    llvm::Value *continuation =
+        getLoweredSingletonExplosion(splitGet->getArguments()[0]);
+    Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
+    SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
+
+    auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
+    bool hasError = i->getErrorBB() != nullptr;
+    auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
+    auto *errorPhi = hasError ? getLoweredBB(i->getErrorBB()).phis[0] : nullptr;
+    assert(!hasError || getLoweredBB(i->getErrorBB()).phis.size() == 1 &&
+                            "error basic block should only expect one value");
+
+    // The value is delivered into the resume buffer, so the resume successor
+    // takes no arguments and there is nothing to add to its PHI nodes.
+    emitAwaitSplitContinuation(continuation, resumeBuffer, resumeTy,
+                                  normalDestBB, errorPhi, errorDestBB);
+    return;
+  }
+
   Explosion resumeResult;
 
   bool isIndirect = i->getResumeBB()->args_empty();

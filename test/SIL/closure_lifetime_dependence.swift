@@ -26,16 +26,16 @@ func callTakePicker(cond: Bool, ne: NE) {
 
 // Closures in callTakePicker
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU_'
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU0_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, Bool) -> @lifetime(copy 0, copy 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU0_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, Bool) -> @lifetime(copy 0, copy 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU0_'
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU1_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU1_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU1_'
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU2_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, Bool, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU2_ : $@convention(thin) (@guaranteed NE, @guaranteed NE, Bool, @guaranteed NE) -> @lifetime(copy 0, copy 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence14callTakePicker4cond2neySb_AA2NEVtFA2F_AFtXEfU2_'
 
 func takeOnePicker(picker: @_lifetime(copy ne0) (_ ne0: NE, NE) -> NE) {
@@ -57,10 +57,10 @@ func callTakeOnePicker() {
 
 // Closures in callTakeOnePicker
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU_'
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU0_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU0_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence17callTakeOnePickeryyFAA2NEVAD_ADtXEfU0_'
 
 // Closure Context Dependencies
@@ -95,11 +95,11 @@ func callContextAndArgDependentPicker() {
   contextAndArgDependentPicker { neArg in neArg } // OK
 }
 
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, borrow 1) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU_ : $@convention(thin) (@guaranteed NE, @guaranteed NE) -> @lifetime(copy 0, borrow 1) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU_'
 
 // The captures dependence here is technically unnecessary, but causes no harm, since the closure is only called in one place.
-// CHECK-LABEL: sil private @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_ : $@convention(thin) (@guaranteed NE) -> @lifetime(captures, copy 0) @owned NE {
+// CHECK-LABEL: sil private [closure] @$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_ : $@convention(thin) (@guaranteed NE) -> @lifetime(captures, copy 0) @owned NE {
 // CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence32callContextAndArgDependentPickeryyFAA2NEVADXEfU0_'
 
 

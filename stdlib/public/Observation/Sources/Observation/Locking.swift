@@ -20,6 +20,8 @@
 // mirrors what Synchronization's Mutex does in
 // stdlib/public/Synchronization/Mutex/EmbeddedImpl.swift.
 #if $Embedded
+internal import SwiftPlatform
+
 @_extern(c, "_swift_mutex_init")
 internal func _swift_mutex_init(
   _ mutex: UnsafeMutableRawPointer,

@@ -101,3 +101,11 @@ func testDynamicMemberLookupKeyPaths(
   _ = \ChainedIUOLens.n
   _ = intLens.x
 }
+
+func testChainingWithMissingMember(_ o: S) {
+  final class S {
+    static func iuo() -> S! { S() }
+  }
+
+  _ = o.missing(S.iuo())  // expected-error {{value of type 'S' has no member 'missing'}}
+}

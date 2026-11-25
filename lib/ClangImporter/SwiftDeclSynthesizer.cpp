@@ -1218,14 +1218,28 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   clang::ASTContext &Ctx = ImporterImpl.getClangASTContext();
 
   // Getter: static inline FieldType get(RecordType self);
+  // C++ records that are move-only or can't be passed in registers are taken
+  // by const reference instead, so that reading the field neither consumes nor
+  // copies the record.
   auto recordType = Ctx.getCanonicalTagType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
+  bool getterSelfByRef = false;
+  if (isa<clang::CXXRecordDecl>(structDecl)) {
+    auto *def = structDecl->getDefinitionOrSelf();
+    getterSelfByRef =
+        !def->canPassInRegisters() ||
+        getCxxValueSemanticsKind(recordType.getTypePtr(), ImporterImpl) ==
+            CxxValueSemanticsKind::MoveOnly;
+  }
+  auto getterSelfType = getterSelfByRef
+                            ? Ctx.getLValueReferenceType(recordType.withConst())
+                            : recordType;
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
   auto cGetterType =
-      Ctx.getFunctionType(fieldDecl->getType(), {recordType},
+      Ctx.getFunctionType(fieldDecl->getType(), {getterSelfType},
                           clang::FunctionProtoType::ExtProtoInfo());
   auto cGetterDecl = createClangFunctionDecl(Ctx, structDecl->getDeclContext(),
                                          cGetterName, cGetterType);
@@ -1253,14 +1267,16 @@ std::pair<FuncDecl *, FuncDecl *> SwiftDeclSynthesizer::makeBitFieldAccessors(
   // Synthesize the getter body
   {
     auto cGetterSelf =
-        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, recordType);
+        createClangParmVarDecl(Ctx, cGetterDecl, nullptr, getterSelfType);
     cGetterDecl->setParams(cGetterSelf);
 
-    auto cGetterSelfExpr =
-        createClangDeclRefExpr(Ctx, cGetterSelf, recordType, clang::VK_LValue);
+    auto cGetterSelfExpr = createClangDeclRefExpr(
+        Ctx, cGetterSelf, getterSelfType.getNonReferenceType(),
+        clang::VK_LValue);
     auto cGetterMemberExpr = clang::MemberExpr::CreateImplicit(
         Ctx, cGetterSelfExpr,
-        /*isarrow=*/false, fieldDecl, fieldType, clang::VK_LValue,
+        /*isarrow=*/false, fieldDecl,
+        getterSelfByRef ? fieldType.withConst() : fieldType, clang::VK_LValue,
         clang::OK_BitField);
     auto cGetterExpr = clang::ImplicitCastExpr::Create(
         Ctx, fieldType, clang::CK_LValueToRValue, cGetterMemberExpr,
@@ -2275,8 +2291,13 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
+  // A getter for a non-Escapable element returned indirectly would have to go
+  // through 'UnsafePointer.pointee', which requires an Escapable pointee. The
+  // element type may refer to the generic parameters of a templated operator.
+  bool elementIsNonEscapable =
+      !getterImpl->mapTypeIntoEnvironment(elementTy)->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (elementIsNoncopyable || elementIsNonEscapable);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
@@ -2381,12 +2402,17 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
-  // Use 'address' or 'mutableAddress' accessors for non-copyable
-  // types that are returned indirectly.
-  bool isNoncopyable = dc->mapTypeIntoEnvironment(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+  // Use 'address' or 'mutableAddress' accessors for values returned indirectly
+  // when they are non-copyable, when they are non-Escapable (a getter would
+  // have to go through 'UnsafePointer.pointee', which requires an Escapable
+  // pointee), or when they depend on 'self'. Such accessors, and getters of
+  // non-copyable or 'self'-dependent values, are not implicit.
+  auto elementTyInContext = dc->mapTypeIntoEnvironment(elementTy);
+  bool isNoncopyable = elementTyInContext->isNoncopyable();
+  bool isNonEscapable = !elementTyInContext->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (isNoncopyable || isNonEscapable || resultDependsOnSelf);
+  bool isImplicit = !(isNoncopyable || resultDependsOnSelf || useAddress);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
@@ -3368,23 +3394,18 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto wrapperClangType =
       clangCtx.getCanonicalTagType(wrapperClangDecl).withConst();
 
-  // Create a fake variable with the __SwiftFunctionWrapper<...> type.
-  auto fakeWrapperVarDecl = clang::VarDecl::Create(
-      clangCtx, /*DC*/ clangCtx.getTranslationUnitDecl(),
-      clang::SourceLocation(), clang::SourceLocation(), /*Id*/ nullptr,
-      wrapperClangType, clangCtx.getTrivialTypeSourceInfo(wrapperClangType),
-      clang::StorageClass::SC_None);
-  auto fakeWrapperRefExpr = createClangDeclRefExpr(
-      clangCtx, fakeWrapperVarDecl, wrapperClangType, clang::VK_LValue);
+  // A stand-in for a value of the __SwiftFunctionWrapper<...> type.
+  auto *fakeWrapperExpr = new (clangCtx) clang::OpaqueValueExpr(
+      functionTypeClangDecl->getLocation(), wrapperClangType, clang::VK_LValue);
 
   auto functionTypeClangType =
       clangCtx.getCanonicalTagType(functionTypeClangDecl);
   auto functionTypeClangInfo =
       clangCtx.getTrivialTypeSourceInfo(functionTypeClangType);
-  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperRefExpr};
+  SmallVector<clang::Expr *, 1> constructExprArgs = {fakeWrapperExpr};
 
   // Instantiate the templated constructor that would accept the fake
-  // __SwiftFunctionWrapper<...> variable.
+  // __SwiftFunctionWrapper<...> value.
   auto constructExprResult = clangSema.BuildCXXTypeConstructExpr(
       functionTypeClangInfo, functionTypeClangDecl->getLocation(),
       constructExprArgs, functionTypeClangDecl->getLocation(),
@@ -3803,14 +3824,20 @@ FuncDecl *SwiftDeclSynthesizer::makeBaseClassPointerCastFunction(
                                               clang::VK_LValue);
   castDecl->setParams({paramDecl});
 
-  // Synthesize `return static_cast<Base *>(from);`. Using a real static_cast
-  // is required because a base subobject may live at a non-zero offset within
-  // the derived object (multiple/virtual inheritance).
-  auto castResult = clangSema.BuildCXXNamedCast(
-      loc, clang::tok::kw_static_cast,
-      clangCtx.getTrivialTypeSourceInfo(basePtrTy), paramRefExpr,
-      clang::SourceRange(), clang::SourceRange());
-  if (!castResult.isUsable())
+  // Synthesize the derived-to-base conversion `return from;` bypassing base
+  // access. The conversion accounts for base subobjects at a non-zero offset
+  // within the derived object.
+  auto from = clangSema.DefaultLvalueConversion(paramRefExpr);
+  if (!from.isUsable())
+    return nullptr;
+  clang::CastKind castKind;
+  clang::CXXCastPath castPath;
+  if (clangSema.CheckPointerConversion(from.get(), basePtrTy, castKind,
+                                       castPath, /*IgnoreBaseAccess=*/true))
+    return nullptr;
+  auto castResult = clangSema.ImpCastExprToType(from.get(), basePtrTy, castKind,
+                                                clang::VK_PRValue, &castPath);
+  if (!castResult.isUsable() || trap.hasErrorOccurred())
     return nullptr;
 
   castDecl->setBody(createClangReturnStmt(clangCtx, castResult.get()));
@@ -4059,6 +4086,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
   case CxxRecordSemanticsKind::SwiftClassType:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Function body synthesizer for a deinit of a noncopyable type, which

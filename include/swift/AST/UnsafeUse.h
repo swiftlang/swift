@@ -316,6 +316,7 @@ public:
     case PreconcurrencyImport:
       return storage.importDecl->getLoc();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Replace the location, if possible.
@@ -377,6 +378,7 @@ public:
     case PreconcurrencyImport:
       return storage.importDecl;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Get the associated type declaration for a type witness.
@@ -416,6 +418,7 @@ public:
     case TemporarilyEscaping:
       return nullptr;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Get the type of the reference, if there is one.
@@ -447,6 +450,7 @@ public:
     case TemporarilyEscaping:
       return storage.temporarilyEscaping->getOpaqueValue()->getType();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Get the protocol conformance, if there is one.
@@ -475,6 +479,7 @@ public:
     case PreconcurrencyImport:
       return ProtocolConformanceRef::forInvalid();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Get information about the call argument.

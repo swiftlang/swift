@@ -151,6 +151,7 @@ public:
     case Kind::ActorAsyncAllocatingInit:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool operator!=(const ActorInstance &other) const {

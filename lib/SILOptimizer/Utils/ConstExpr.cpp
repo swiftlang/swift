@@ -97,6 +97,7 @@ static bool isReadOnlyFunction(WellKnownFunction function) {
   case WellKnownFunction::DebugPrint:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Helper function for creating UnknownReason without a payload.

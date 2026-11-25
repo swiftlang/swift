@@ -1466,10 +1466,7 @@ public:
         
         // A subscript only accepts `&` on an argument when its parameters may
         // be declared `inout`.
-        bool inoutSubscriptArg =
-            isa<SubscriptExpr>(parent) &&
-            Ctx.LangOpts.hasFeature(
-                Feature::SubscriptParametersWithOwnership);
+        bool inoutSubscriptArg = isa<SubscriptExpr>(parent);
 
         if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
             isa<MacroExpansionExpr>(parent) || inoutSubscriptArg) {

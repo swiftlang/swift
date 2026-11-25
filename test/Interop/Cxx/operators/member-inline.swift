@@ -166,10 +166,12 @@ OperatorsTestSuite.test("DerivedFromAddressOnlyIntWrapper.call (inline, base cla
   let resultNoArgs = wrapper()
   let resultOneArg = wrapper(23)
   let resultTwoArgs = wrapper(3, 5)
+  let resultConstRefArg = wrapper(AddressOnlyIntWrapper(8))
 
   expectEqual(42, resultNoArgs)
   expectEqual(65, resultOneArg)
   expectEqual(57, resultTwoArgs)
+  expectEqual(50, resultConstRefArg)
 }
 
 OperatorsTestSuite.test("ReadWriteIntArray.subscript (inline)") {
@@ -483,6 +485,11 @@ OperatorsTestSuite.test("HasStaticOperatorCallDerived.call") {
   let h = HasStaticOperatorCallDerived()
   let res = h(0)
   expectEqual(42, res)
+}
+
+OperatorsTestSuite.test("DerivedFromHasOperatorCallConstRefParam.call") {
+  let d = DerivedFromHasOperatorCallConstRefParam()
+  expectEqual(43, d(AddressOnlyIntWrapper(42)))
 }
 
 OperatorsTestSuite.test("HasStaticOperatorCallWithConstOperator.call") {

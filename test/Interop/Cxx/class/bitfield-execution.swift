@@ -37,4 +37,45 @@ BitFieldsTestSuite.test("adjacent fields are independent") {
   expectEqual(0, s.c)
 }
 
+func readA(_ s: borrowing NonCopyableBitFields) -> CUnsignedInt {
+  return s.a
+}
+
+BitFieldsTestSuite.test("reading a noncopyable record's field does not consume it") {
+  var s = NonCopyableBitFields()
+  expectEqual(1, s.a)
+  s.b = 7
+  expectEqual(7, s.b)
+  expectEqual(1, readA(s))
+}
+
+func readA(_ s: borrowing CopyCountingBitFields) -> CUnsignedInt {
+  return s.a
+}
+
+BitFieldsTestSuite.test("reading a field does not copy the record") {
+  let s = CopyCountingBitFields()
+  let copies = copyCountingBitFieldsCopies
+  expectEqual(3, s.a)
+  expectEqual(3, readA(s))
+  expectEqual(copies, copyCountingBitFieldsCopies)
+}
+
+BitFieldsTestSuite.test("bit-field in a base class at a nonzero offset") {
+  var s = BitFieldInSecondBase()
+  s.x = 10
+  s.b = 5
+  let copy = s
+  expectEqual(10, copy.x)
+  expectEqual(5, copy.b)
+}
+
+BitFieldsTestSuite.test("bit-field in a base class after the vtable pointer") {
+  var s = BitFieldBehindVTable()
+  s.b = 3
+  let copy = s
+  expectEqual(3, copy.b)
+  expectEqual(42, copy.virt())
+}
+
 runAllTests()

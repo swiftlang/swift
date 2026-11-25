@@ -464,15 +464,11 @@ protected:
     /// Whether 'static' or 'class' was used.
     StaticSpelling : 2,
 
-    : NumPadBits,
-
     /// The number of pattern binding declarations.
     NumPatternEntries : 16
   );
   
   SWIFT_INLINE_BITFIELD_FULL(EnumCaseDecl, Decl, 32,
-    : NumPadBits,
-
     /// The number of tail-allocated element pointers.
     NumElements : 32
   );
@@ -637,15 +633,16 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(TypeDecl, ValueDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(GenericTypeParamDecl, TypeDecl, 16+16+3+1,
-    Depth : 16,
-    Index : 16,
     ParamKind : 3,
 
     /// Whether this generic parameter represents an opaque type.
-    IsOpaqueType : 1
+    IsOpaqueType : 1,
+
+    Depth : 16,
+    Index : 16
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AssociatedTypeDecl, TypeDecl, 1,
+  SWIFT_INLINE_BITFIELD(AssociatedTypeDecl, TypeDecl, 1,
     /// Whether we have computed the default type.
     IsDefaultDefinitionTypeComputed : 1
   );
@@ -659,7 +656,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -674,7 +671,10 @@ protected:
     HasDestructorComputed : 1,
 
     /// Whether we have a user-defined deinit.
-    HasDestructor : 1
+    HasDestructor : 1,
+
+    /// Whether this type exposes a foreign type that Swift code must not use.
+    NoExposedUnusableForeignTypes : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -724,8 +724,6 @@ protected:
 
     /// Whether we've computed the protocol requirements list yet.
     ProtocolRequirementsValid : 1,
-
-    : NumPadBits,
 
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
@@ -896,6 +894,11 @@ protected:
   SWIFT_INLINE_BITFIELD(MissingMemberDecl, Decl, 1+2,
     NumberOfFieldOffsetVectorEntries : 1,
     NumberOfVTableEntries : 2
+  );
+
+  SWIFT_INLINE_BITFIELD(TopLevelCodeDecl, Decl, 1,
+    /// Whether we've assigned discriminators for the body.
+    HasBodyDiscriminators : 1
   );
 
   } Bits;
@@ -3010,14 +3013,29 @@ class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return Bits.TopLevelCodeDecl.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = value;
+  }
+
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
-      Decl(DeclKind::TopLevelCode, Parent),
-      Body(Body) {}
+      : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+        Decl(DeclKind::TopLevelCode, Parent), Body(Body) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = false;
+  }
 
   BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
+  void setBody(BraceStmt *b, bool resetDiscriminators = false) {
+    Body = b;
+    if (resetDiscriminators)
+      setBodyHasDiscriminators(false);
+  }
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -4720,6 +4738,7 @@ protected:
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
     Bits.NominalTypeDecl.HasDestructorComputed = false;
     Bits.NominalTypeDecl.HasDestructor = false;
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = false;
     ExtensionGeneration = 0;
   }
 
@@ -4809,6 +4828,15 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Whether this type is known not to expose an unusable foreign type.
+  bool hasNoExposedUnusableForeignTypes() const {
+    return Bits.NominalTypeDecl.NoExposedUnusableForeignTypes;
+  }
+
+  void setNoExposedUnusableForeignTypes() {
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
@@ -5553,6 +5581,10 @@ public:
   /// Retrieve the ClassDecl for the superclass of this class, or null if there
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
+
+  /// The `@_tailAllocated` attribute of this class or of its nearest superclass
+  /// that has one, and the class it is attached to; {nullptr, nullptr} if none.
+  std::pair<TailAllocatedAttr *, ClassDecl *> getTailAllocatedAttr() const;
 
   /// Check if this class is a superclass or equal to the given class.
   bool isSuperclassOf(const ClassDecl *other) const;
@@ -6515,6 +6547,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine the mutability of this storage declaration when
@@ -6548,6 +6581,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Does this storage declaration have explicitly-defined accessors
@@ -6883,6 +6917,7 @@ public:
     case VarDecl::Introducer::Borrowing:
       return "_borrowing";
     }
+    llvm_unreachable("covered switch");
   }
 
 protected:
@@ -8325,7 +8360,21 @@ protected:
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
     unsigned NoLifetimeDependenceInfo : 1;
+
+    /// Whether we've assigned discriminators for a function body.
+    /// NOTE: This should really be a bit on AbstractFunctionDecl, but that
+    /// bitfield is full.
+    unsigned HasBodyDiscriminators : 1;
   } LazySemanticInfo = { };
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return LazySemanticInfo.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    LazySemanticInfo.HasBodyDiscriminators = value;
+  }
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,

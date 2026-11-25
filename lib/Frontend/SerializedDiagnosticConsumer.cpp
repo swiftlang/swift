@@ -32,6 +32,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/VirtualFileSystem.h"
 
 using namespace swift;
 using namespace clang::serialized_diags;
@@ -137,7 +138,8 @@ public:
                                       llvm::sys::fs::OF_None));
     if (EC) {
       // Create a temporary diagnostics engine to print the error to stderr.
-      SourceManager dummyMgr;
+      SourceManager dummyMgr(
+          llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>());
       DiagnosticEngine DE(dummyMgr);
       PrintingDiagnosticConsumer PDC;
       DE.addConsumer(PDC);

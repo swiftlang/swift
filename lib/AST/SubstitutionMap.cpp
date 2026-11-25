@@ -258,6 +258,16 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
   // from these requirements.
   if (!genericSig->requiresProtocol(type, proto)) {
     Type substType = type.subst(*this);
+
+    // A missing conformance might be satisfied by the replacement type.
+    if (ProtocolConformanceRef::canBeMissing(proto) &&
+        !substType->isTypeParameter() &&
+        !substType->isTypeVariableOrMember()) {
+      if (auto found = swift::lookupConformance(substType, proto,
+                                                /*allowMissing=*/true))
+        return found;
+    }
+
     return ProtocolConformanceRef::forMissingOrInvalid(substType, proto);
   }
 

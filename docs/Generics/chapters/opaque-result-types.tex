@@ -119,7 +119,7 @@ func twoSequences(_ b: Bool) -> some Sequence {
 }
 \end{Verbatim}
 \end{example}
-There is one exception to this rule. We allow the underlying type of an opaque result type to depend on \index{availability}\emph{availability}. We will not discuss availability checking in the this book, except to say that the outcome of an availability check, which is written with the special ``\verb|if #available(...)|'' syntax, does not change during program execution. Thus, we allow a function with an opaque result type to contain \texttt{return} statements with mismatched types, as long as they're in different branches of an availability check.
+There is one exception to this rule. We allow the underlying type of an opaque result type to depend on \index{availability}\emph{availability}. We will not discuss availability checking in this book, except to say that the outcome of an availability check, which is written with the special ``\verb|if #available(...)|'' syntax, does not change during program execution. Thus, we allow a function with an opaque result type to contain \texttt{return} statements with mismatched types, as long as they're in different branches of an availability check.
 \begin{example}
 On a \index{macOS}macOS host, the \texttt{bestWidget()} function will return one of two underlying types, depending on the operating system version:
 \begin{Verbatim}
@@ -859,7 +859,7 @@ print(pick(someSequence2(123)))
 
 The entry point for \texttt{someSequence2()} takes three parameters: a buffer to hold the return value of type $\Oy$, the type metadata for \rT\ which here is \texttt{Int}, and a pointer to a value of type \rT.
 
-To determine the \index{size}size of the return value buffer, we generate a call to the appropriate Swift runtime entry point, handing it the opaque type descriptor for \texttt{someSequence2()}, and the type metadata for \rT. At run time, this outputs type metadata for the underlying type, which is \texttt{Array<Int>}. We recover the type's size from its metadata, and generate a dynamic stack allocation with the result.
+To determine the \index{size of value}size of the return value buffer, we generate a call to the appropriate Swift runtime entry point, handing it the opaque type descriptor for \texttt{someSequence2()}, and the type metadata for \rT. At run time, this outputs type metadata for the underlying type, which is \texttt{Array<Int>}. We recover the type's size from its metadata, and generate a dynamic stack allocation with the result.
 
 We then hand the result of \texttt{someSequence2()} to \texttt{pick()}. The entry point for \texttt{pick()} takes four parameters: a buffer for the return value of type \texttt{\rT.Element}, the type metadata for \rT, and a witness table for $\ConfReq{\rT}{Sequence}$. For the latter, we must pass in the witness table for $\ConfReq{$\Oy \otimes \Sigma$}{Sequence}$. To obtain this witness table, we generate a call to the other Swift runtime entry point, again handing it the opaque type descriptor, and the type metadata for \texttt{Int}. This runtime entry point outputs the witness table for the underlying conformance, $\ConfReq{Array<Int>}{Sequence}$.
 

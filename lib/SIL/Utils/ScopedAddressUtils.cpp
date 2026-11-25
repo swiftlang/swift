@@ -57,6 +57,7 @@ bool ScopedAddressValue::isScopeEndingUse(Operand *op) const {
     return false;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ScopedAddressValue::visitScopeEndingUses(
@@ -83,6 +84,7 @@ bool ScopedAddressValue::visitScopeEndingUses(
     return true;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 // Note: This is used to fixup an incomplete address scope, so cannot assume the
@@ -161,6 +163,7 @@ ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
   case ScopedAddressValueKind::Invalid:
     llvm_unreachable("Using invalid case?!");
   }
+  llvm_unreachable("covered switch");
 }
 
 void ScopedAddressValue::endScopeAtLivenessBoundary(

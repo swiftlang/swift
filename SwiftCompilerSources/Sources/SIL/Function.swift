@@ -67,10 +67,17 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
   
   public var hasOwnershipForTrivialValues: Bool {
-    bridged.hasOwnership()
+    bridged.hasOwnershipForTrivialValues()
   }
   public func set(hasOwnershipForTrivialValues: Bool, _ context: some MutatingContext) {
     bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
+  }
+
+  /// True between RemoveSILGenLifetimes and LifetimeResolution, while a value may be consumed
+  /// more than once or not at all.
+  public var hasUnresolvedLifetimes: Bool { bridged.hasUnresolvedLifetimes() }
+  public func set(hasUnresolvedLifetimes: Bool, _ context: some MutatingContext) {
+    bridged.setHasUnresolvedLifetimes(hasUnresolvedLifetimes)
   }
 
   /// The module which defines this function, or nil if it's not known.

@@ -58,10 +58,16 @@ protected:
   TaggedUnionBase(Kind theKind) : TheKind(theKind) {}
 
 public:
+  template <Kind K>
+  using typeForKind = typename StorageType::template typeForKind<K>;
+
+  template <class T>
+  using enable_if_constructible_t =
+    std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()>;
+
   /// Construct the union with a value of the given type, which must
   /// (ignoring references) be one of the declared members of the union.
-  template <class T,
-            typename = std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()> >
+  template <class T, typename = enable_if_constructible_t<T>>
   TaggedUnionBase(T &&value) {
     using TargetType = TaggedUnionImpl::simplify_member_type<T>;
     TheKind = StorageType::template kindForMember<TargetType>();
@@ -286,6 +292,55 @@ class TaggedUnion :
                          ExternalUnionMembers<Members...>>;
 public:
   using super::super;
+};
+
+namespace TaggedUnionImpl {
+
+template <class K, class Index,
+          Index (&getIndexForKind)(K kind),
+          K (&getDefaultKindForIndex)(Index index)>
+struct ExplicitKindHelper {
+  using Kind = K;
+
+  template <class IndexType>
+  static constexpr IndexType coerceKindToIndex(Kind kind) {
+    return IndexType(getIndexForKind(kind));
+  }
+
+  template <class IndexType>
+  static constexpr Kind coerceIndexToKind(IndexType index) {
+    return getDefaultKindForIndex(Index(index));
+  }
+};
+
+} // end namespace TaggedUnionImpl
+
+/// A tagged union that uses a specific enum for its kind type.
+///
+/// The enum doesn't have to be 1-1 with its members, but it will use
+/// getDefaultKindForIndex to decide which member to construct if you
+/// construct it with a specific member type.
+template <class Kind, class Members,
+          typename Members::Index (&getIndexForKind)(Kind),
+          Kind (&getDefaultKindForIndex)(typename Members::Index)>
+class ExplicitTaggedUnion
+  : public TaggedUnionBase<TaggedUnionImpl::ExplicitKindHelper<
+                             Kind,
+                             typename Members::Index,
+                             getIndexForKind,
+                             getDefaultKindForIndex>,
+                           Members> {
+  using super =
+           TaggedUnionBase<TaggedUnionImpl::ExplicitKindHelper<
+                             Kind,
+                             typename Members::Index,
+                             getIndexForKind,
+                             getDefaultKindForIndex>,
+                           Members>;
+public:
+  using super::super;
+
+  Kind getKind() const { return this->TheKind; }
 };
 
 } // end namespace swift

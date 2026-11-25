@@ -256,7 +256,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
        &swiftOverlayDependenciesIDs](ModuleDependencyInfo &moduleDep) {
         moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
         moduleDep.setCrossImportOverlayDependencies(
-            crossImportOverlayDependenciesIDs);
+            ArrayRef(crossImportOverlayDependenciesIDs));
         moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
       };
 
@@ -285,7 +285,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
             getStringArray(bridgingModuleDependenciesArrayID);
         if (!bridgingModuleDeps)
           llvm::report_fatal_error("Bad bridging module dependencies");
-        llvm::StringSet<> alreadyAdded;
         std::vector<ModuleDependencyID> bridgingModuleDepIDs;
         for (const auto &mod : *bridgingModuleDeps)
           bridgingModuleDepIDs.push_back(
@@ -764,7 +763,6 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       if (!headerModuleDependencies)
         llvm::report_fatal_error("Bad binary direct dependencies: no header "
                                  "import module dependencies");
-      llvm::StringSet<> alreadyAdded;
 
       std::vector<ModuleDependencyID> clangHeaderDependencyIDs;
       for (const auto &headerDepName : *headerModuleDependencies)
@@ -1055,12 +1053,13 @@ bool swift::dependencies::module_dependency_cache_serialization::
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
-    readInterModuleDependenciesCache(StringRef path,
-                                     ModuleDependenciesCache &cache,
-                                     llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
+    readInterModuleDependenciesCache(
+        StringRef path, ModuleDependenciesCache &cache,
+        llvm::sys::TimePoint<> &serializedCacheTimeStamp,
+        llvm::vfs::FileSystem &FS) {
   PrettyStackTraceStringAction stackTrace(
       "loading inter-module dependency graph", path);
-  auto buffer = llvm::MemoryBuffer::getFile(path);
+  auto buffer = FS.getBufferForFile(path);
   if (!buffer)
     return true;
 

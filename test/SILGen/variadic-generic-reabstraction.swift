@@ -160,3 +160,37 @@ func testResultReabstractedEmission_vanishing() {
     (a: Int, b: Bool) -> Bool in b
   }
 }
+
+// Test mapping an outer pack to a single inner parameter in a reabstraction
+// thunk. This would cause a crash if the inner parameter was Optional (#81157).
+func takeOptNoArgsClosure(arg: (() -> Void)?) -> Int { 0 }
+func testOptionalSingleInnerParamReabstraction() {
+  takesVariadicFunction(function: takeOptNoArgsClosure)
+}
+
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIeg_SgSiIggd_xRi_zRi1_zRi0_zlyytIsegr_Sg_QSiSiIegpd_TR :
+// CHECK-SAME: $@convention(thin) (@pack_guaranteed Pack{Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>}, @guaranteed @noescape @callee_guaranteed (@guaranteed Optional<@callee_guaranteed () -> ()>) -> Int) -> Int {
+// CHECK:       bb0(%0 : $*Pack{Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>}, %1 : @guaranteed $@noescape @callee_guaranteed (@guaranteed Optional<@callee_guaranteed () -> ()>) -> Int):
+// CHECK-NEXT:    [[ARG_INDEX:%.*]] = scalar_pack_index 0 of $Pack{Optional<() -> ()>}
+// CHECK-NEXT:    [[ARG_ADDR:%.*]] = pack_element_get [[ARG_INDEX]] of %0 : $*Pack{Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>} as $*Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
+// CHECK-NEXT:    [[OPT_CLOSURE:%.*]] = load_borrow [[ARG_ADDR]] : $*Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
+// CHECK-NEXT:    [[OPT_COPY:%.*]] = copy_value [[OPT_CLOSURE]] : $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
+// CHECK-NEXT:    switch_enum [[OPT_COPY]] : $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+// CHECK:       bb1([[CLOSURE:%.*]] : @owned $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>):
+// CHECK-NEXT:    [[CONV_CLOS:%.*]] = convert_function [[CLOSURE]] : $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()> to $@callee_guaranteed () -> @out ()
+// CHECK-NEXT:    // function_ref thunk for @escaping @callee_guaranteed () -> (@out ())
+// CHECK-NEXT:    [[THUNK:%.*]] = function_ref @$sytIegr_Ieg_TR : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
+// CHECK-NEXT:    [[THUNKED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[CONV_CLOS]]) : $@convention(thin) (@guaranteed @callee_guaranteed () -> @out ()) -> ()
+// CHECK-NEXT:    [[SOME_THUNKED:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, [[THUNKED]] : $@callee_guaranteed () -> ()
+// CHECK-NEXT:    br bb3([[SOME_THUNKED]] : $Optional<@callee_guaranteed () -> ()>)
+// CHECK:       bb2:
+// CHECK-NEXT:    [[NONE:%.*]] = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+// CHECK-NEXT:    br bb3([[NONE]] : $Optional<@callee_guaranteed () -> ()>)
+// CHECK:       bb3([[OPT_THUNKED:%.*]] : @owned $Optional<@callee_guaranteed () -> ()>):
+// CHECK-NEXT:    [[BORROWED_THUNKED:%.*]] = begin_borrow [[OPT_THUNKED]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK-NEXT:    [[RESULT:%.*]] = apply %1([[BORROWED_THUNKED]]) : $@noescape @callee_guaranteed (@guaranteed Optional<@callee_guaranteed () -> ()>) -> Int
+// CHECK-NEXT:    end_borrow [[BORROWED_THUNKED]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK-NEXT:    destroy_value [[OPT_THUNKED]] : $Optional<@callee_guaranteed () -> ()>
+// CHECK-NEXT:    end_borrow [[OPT_CLOSURE]] : $Optional<@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>>
+// CHECK-NEXT:    return [[RESULT]] : $Int
+// CHECK-LABEL: } // end sil function '$sIeg_SgSiIggd_xRi_zRi1_zRi0_zlyytIsegr_Sg_QSiSiIegpd_TR'

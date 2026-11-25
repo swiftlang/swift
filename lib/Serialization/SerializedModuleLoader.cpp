@@ -1460,10 +1460,11 @@ bool swift::extractCompilerFlagsFromInterface(
 }
 
 llvm::VersionTuple
-swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
+swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath,
+                                             llvm::vfs::FileSystem &FS) {
   llvm::VersionTuple result;
   // Read the interface file and extract its compiler arguments line
-  if (auto file = llvm::MemoryBuffer::getFile(moduleInterfacePath)) {
+  if (auto file = FS.getBufferForFile(moduleInterfacePath)) {
     llvm::BumpPtrAllocator alloc;
     llvm::StringSaver argSaver(alloc);
     SmallVector<const char*, 8> args;
@@ -1531,8 +1532,8 @@ bool SerializedModuleLoaderBase::canImportModule(
     if (!versionInfo)
       return true;
 
-    auto moduleVersion =
-        extractUserModuleVersionFromInterface(moduleInterfaceSourcePath);
+    auto moduleVersion = extractUserModuleVersionFromInterface(
+        moduleInterfaceSourcePath, *Ctx.SourceMgr.getFileSystem());
 
     // If version is requested and found in interface, return the version.
     // Otherwise fallback to binary module handling.

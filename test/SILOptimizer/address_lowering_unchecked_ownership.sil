@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -module-name Swift -sil-verify-all %s | %FileCheck %s
+
+import Builtin
+
+sil_stage raw
+
+sil @takeGuaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         apply %{{.*}}<T>(%0)
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_guaranteed'
+sil [ossa] @unchecked_ownership_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = unchecked_ownership %0 : $T
+  %2 = function_ref @takeGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_owned : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK:       bb0(%0 : $*T, %1 : $*T):
+// CHECK:         [[A:%.*]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[A]] : $*T
+// CHECK:         copy_addr [take] [[A]] to [init] %0 : $*T
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_owned'
+sil [ossa] @unchecked_ownership_owned : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = unchecked_ownership %1 : $T
+  return %2 : $T
+}
+
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_conversion : $@convention(thin) <T> (@in T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         apply %{{.*}}<T>(%0)
+// CHECK-NEXT:    destroy_addr %0 : $*T
+// CHECK-LABEL: } // end sil function 'unchecked_ownership_conversion'
+sil [ossa] @unchecked_ownership_conversion : $@convention(thin) <T> (@in T) -> () {
+bb0(%0 : @owned $T):
+  %1 = unchecked_ownership_conversion %0 : $T, @owned to @guaranteed
+  %2 = function_ref @takeGuaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  end_borrow %1 : $T
+  destroy_value %0 : $T
+  %r = tuple ()
+  return %r : $()
+}

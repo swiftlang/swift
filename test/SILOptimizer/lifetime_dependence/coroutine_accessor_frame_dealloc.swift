@@ -3,6 +3,11 @@
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-callee-allocated-coro-abi \
 // RUN:   | %FileCheck %s
+// RUN: %target-swift-frontend -enable-lifetime-resolution -emit-sil -Onone -sil-verify-all %s \
+// RUN:   -enable-experimental-feature CoroutineAccessors \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-callee-allocated-coro-abi \
+// RUN:   | %FileCheck %s
 
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_Lifetimes

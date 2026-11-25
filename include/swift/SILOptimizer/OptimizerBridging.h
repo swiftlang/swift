@@ -255,6 +255,18 @@ struct BridgedPassContext {
   };
 
   BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
+
+  struct SignatureSpecializedArgMangling {
+    SwiftInt argIdx;
+
+    enum class Kind {
+      ownedToGuaranteed, guaranteedToOwned, dead, explode
+    } kind;
+  };
+
+  BridgedOwnedString mangleWithSignatureSpecializedArgs(BridgedArrayRef bridgedArgSpecializations,
+                                                        bool resultOwnedToGuaranteed,
+                                                        BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedArrayRef closureArgManglings, BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithConstCaptureArgs(BridgedArrayRef bridgedConstArgs,
                                                 BridgedFunction applySiteCallee) const;
@@ -267,7 +279,7 @@ struct BridgedPassContext {
       BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
-  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
+  bool inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;

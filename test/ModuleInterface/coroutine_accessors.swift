@@ -3,7 +3,7 @@
 // RUN:     %s \
 // RUN:     -enable-experimental-feature CoroutineAccessors \
 // RUN:     -module-name Rock
-// RUN: %FileCheck %s --check-prefixes=CHECK,CHECK-%target-abi-stability < %t.swiftinterface
+// RUN: %FileCheck %s < %t.swiftinterface
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name Rock
 
 // REQUIRES: swift_feature_CoroutineAccessors
@@ -31,19 +31,15 @@ public var i: Int {
 // CHECK-NEXT: }
 // CHECK-NEXT: #else
 
-// Old consumers will get the legacy form, which in this case
-// implies the legacy ABI.
+// Old consumers get the same accessors under the legacy keywords.  (On
+// non-ABI-stable platforms the legacy-ABI entry points aren't emitted, so old
+// consumers can parse this but can't link against it; that's expected, since
+// such platforms have no cross-compiler binary compatibility.)
 
-// CHECK-stable-NEXT: public var i: Swift::Int {
-// CHECK-stable-NEXT:   _read
-// CHECK-stable-NEXT:   _modify
-// CHECK-stable-NEXT: }
-
-// On non-ABI-stable platforms, we've stopped emitting the legacy ABI,
-// so this property has no ABI on such platforms.
-
-// CHECK-unstable-NEXT: public var i: Swift::Int {
-// CHECK-unstable-NEXT: }
+// CHECK-NEXT: public var i: Swift::Int {
+// CHECK-NEXT:   _read
+// CHECK-NEXT:   _modify
+// CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
 
@@ -85,8 +81,7 @@ public struct S {
     }
 }
 
-// The property mirrors `var i` above: same guard, same stable/unstable
-// split for the legacy branch.
+// The property mirrors `var i` above.
 
 // CHECK:      public struct S {
 // CHECK:        #if compiler(>=5.3) && $CoroutineAccessors
@@ -95,16 +90,13 @@ public struct S {
 // CHECK-NEXT:     yielding mutate
 // CHECK-NEXT:   }
 // CHECK-NEXT:   #else
-// CHECK-stable-NEXT: public var value: Swift::Int {
-// CHECK-stable-NEXT:   _read
-// CHECK-stable-NEXT:   _modify
-// CHECK-stable-NEXT: }
-// CHECK-unstable-NEXT: public var value: Swift::Int {
-// CHECK-unstable-NEXT: }
+// CHECK-NEXT:   public var value: Swift::Int {
+// CHECK-NEXT:     _read
+// CHECK-NEXT:     _modify
+// CHECK-NEXT:   }
 // CHECK-NEXT:   #endif
 
-// The subscript now mirrors the property: same guard, same stable/unstable
-// split for the legacy branch.
+// The subscript mirrors the property.
 
 // CHECK-NEXT:   #if compiler(>=5.3) && $CoroutineAccessors
 // CHECK-NEXT:   public subscript(i: Swift::Int) -> Swift::Int {
@@ -112,12 +104,52 @@ public struct S {
 // CHECK-NEXT:     yielding mutate
 // CHECK-NEXT:   }
 // CHECK-NEXT:   #else
-// CHECK-stable-NEXT: public subscript(i: Swift::Int) -> Swift::Int {
-// CHECK-stable-NEXT:   _read
-// CHECK-stable-NEXT:   _modify
-// CHECK-stable-NEXT: }
-// CHECK-unstable-NEXT: public subscript(i: Swift::Int) -> Swift::Int {
-// CHECK-unstable-NEXT: }
+// CHECK-NEXT:   public subscript(i: Swift::Int) -> Swift::Int {
+// CHECK-NEXT:     _read
+// CHECK-NEXT:     _modify
+// CHECK-NEXT:   }
 // CHECK-NEXT:   #endif
 // CHECK:      }
 
+
+
+// === Inlinable coroutine accessors ===
+
+public struct Inlinable {
+  @usableFromInline var x = 0
+  public init() {}
+  @inlinable public var value: Int {
+    get { x }
+    yielding mutate { yield &x; x += 1 }
+  }
+  @inlinable public var view: Int {
+    yielding borrow { yield x }
+  }
+}
+
+// Old consumers must get the accessor bodies too: the legacy branch prints the
+// `yielding` accessors under the legacy keywords, not the synthesized legacy
+// accessors that forward to them (which have no body to print).
+
+// CHECK:      public struct Inlinable {
+// CHECK:        #if compiler(>=5.3) && $CoroutineAccessors
+// CHECK-NEXT:   @inlinable public var value: Swift::Int {
+// CHECK-NEXT:     get { x }
+// CHECK-NEXT:     yielding mutate { yield &x; x += 1 }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   @inlinable public var value: Swift::Int {
+// CHECK-NEXT:     get { x }
+// CHECK-NEXT:     _modify { yield &x; x += 1 }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   #if compiler(>=5.3) && $CoroutineAccessors
+// CHECK-NEXT:   @inlinable public var view: Swift::Int {
+// CHECK-NEXT:     yielding borrow { yield x }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   @inlinable public var view: Swift::Int {
+// CHECK-NEXT:     _read { yield x }
+// CHECK-NEXT:   }
+// CHECK-NEXT:   #endif
+// CHECK:      }

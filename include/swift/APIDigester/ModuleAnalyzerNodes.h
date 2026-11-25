@@ -184,7 +184,8 @@ public:
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
 #include "swift/AST/KnownIdentifiers.def"
 
-  SDKContext(CheckerOptions Options);
+  SDKContext(CheckerOptions Options,
+             llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS = nullptr);
 
   llvm::BumpPtrAllocator &allocator() {
     return Allocator;

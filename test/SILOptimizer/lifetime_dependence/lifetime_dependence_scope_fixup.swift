@@ -119,7 +119,7 @@ func test1(_ a: Array<Int>) {
   }
 }
 
-// CHECK-LABEL: sil private @$s31lifetime_dependence_scope_fixup5test2yySaySiGFySWXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeRawBufferPointer, @guaranteed Array<Int>) -> (@out τ_0_0, @error any Error) for <()> {
+// CHECK-LABEL: sil private [closure] @$s31lifetime_dependence_scope_fixup5test2yySaySiGFySWXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeRawBufferPointer, @guaranteed Array<Int>) -> (@out τ_0_0, @error any Error) for <()> {
 // CHECK:   [[CONT:%.*]] = alloc_stack [lexical] [var_decl] $NCContainer, var, name "x"
 // CHECK:   [[BA:%.*]] = begin_access [read] [static] [[CONT]] : $*NCContainer
 // CHECK:   [[LD:%.*]] = load [[BA]] : $*NCContainer

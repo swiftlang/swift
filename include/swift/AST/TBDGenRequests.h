@@ -253,6 +253,7 @@ public:
     case Kind::Unknown:
       return llvm::hash_value(Kind);
     }
+    llvm_unreachable("covered switch");
   }
 
   friend bool operator==(const SymbolSource &LHS, const SymbolSource &RHS) {
@@ -269,6 +270,7 @@ public:
     case Kind::Unknown:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   friend bool operator!=(const SymbolSource &LHS, const SymbolSource &RHS) {
@@ -288,6 +290,7 @@ public:
     case Kind::Unknown:
       llvm_unreachable("Unsupported: Symbol flags for unknown source");
     }
+    llvm_unreachable("covered switch");
   }
 };
 

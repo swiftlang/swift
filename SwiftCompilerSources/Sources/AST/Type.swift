@@ -294,6 +294,7 @@ extension TypeProperties {
   public var hasOpaqueArchetype: Bool { rawType.bridged.hasOpaqueArchetype() }
   /// True if this type mentions an existential (opened existential) archetype.
   public var hasExistentialArchetype: Bool { rawType.bridged.hasExistentialArchetype() }
+  public var hasPrimaryArchetype: Bool { rawType.bridged.hasPrimaryArchetype() }
   public var hasDynamicSelf: Bool { rawType.bridged.hasDynamicSelf() }
   public var isEscapable: Bool { rawType.bridged.isEscapable() }
   public var isNoEscape: Bool { rawType.bridged.isNoEscape() }
@@ -367,6 +368,10 @@ extension TypeProperties {
 
   public var isSILPackElementAddress: Bool {
     return rawType.bridged.isSILPackElementAddress()
+  }
+
+  public func getTypeOf(member: VarDecl) -> Type {
+    Type(bridged: rawType.bridged.getTypeOfMember(member.bridged))
   }
 }
 

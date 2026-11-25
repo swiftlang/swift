@@ -162,15 +162,15 @@ static void buildRewritePathForInducedRule(Term key,
       differenceID, substitutionIndex, /*inverse=*/true));
 }
 
-/// Given that LHS and RHS are known to simplify to the same term, build a
+/// Given that LHS and RHS are known to reduce to the same term, build a
 /// rewrite path from RHS to LHS.
 void RewriteSystem::buildRewritePathForJoiningTerms(MutableTerm lhsTerm,
                                                     MutableTerm rhsTerm,
                                                     RewritePath *path) const {
-  (void) simplify(rhsTerm, path);
+  (void) reduce(rhsTerm, path);
 
   RewritePath lhsPath;
-  (void) simplify(lhsTerm, &lhsPath);
+  (void) reduce(lhsTerm, &lhsPath);
   lhsPath.invert();
 
   path->append(lhsPath);
@@ -319,15 +319,15 @@ std::optional<unsigned> RewriteSystem::simplifySubstitutions(
     auto term = symbol.getSubstitutions()[index];
     MutableTerm mutTerm(term);
 
-    // Note that it's of course possible that the term both requires
-    // simplification, and the simplified term has a concrete type.
+    // Note that it's of course possible that the term is both
+    // reducible, and the reduced term has a concrete type.
     //
     // This isn't handled with our current representation of
     // TypeDifference, but that should be fine since the caller
     // has to iterate until fixed point anyway.
     //
     // This should be rare in practice.
-    if (simplify(mutTerm, path)) {
+    if (reduce(mutTerm, path)) {
       // Record a mapping from this substitution to the simplified term.
       sameTypes.emplace_back(index, Term::get(mutTerm, Context));
 

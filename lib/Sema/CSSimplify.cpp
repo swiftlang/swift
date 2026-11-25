@@ -2051,6 +2051,7 @@ public:
     case MatchKind::Conversion:
       return matchConversion();
     }
+    llvm_unreachable("covered switch");
   }
 
 private:
@@ -2908,6 +2909,7 @@ matchFunctionThrowing(ConstraintSystem &cs,
     return ConstraintSystem::SolutionKind::Solved;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Determines the types that \p kind of \p func1 and \p func2 depend on, with
@@ -6966,6 +6968,9 @@ bool ConstraintSystem::repairFailures(
   }
 
   case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice: {
+    if (lhs->is<HoleType>() || rhs->is<HoleType>())
+      return true;
+
     // If this is an attempt to use readonly IUO as a destination
     // of an assignment e.g.
     //
@@ -8373,13 +8378,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // UnsafeMutablePointer can be converted from an inout reference to a
         // scalar or array.
         if (auto inoutType1 = dyn_cast<InOutType>(desugar1)) {
-          // With SubscriptParametersWithOwnership, a subscript index declared
-          // `inout` takes the exclusive access itself, and these implicit
-          // pointer conversions do not apply in that position.
-          bool inoutSubscriptArg =
-              getASTContext().LangOpts.hasFeature(
-                  Feature::SubscriptParametersWithOwnership) &&
-              isArgumentOfSubscript(locator);
+          // A subscript index declared `inout` takes the exclusive access
+          // itself, and these implicit pointer conversions do not apply in
+          // that position.
+          bool inoutSubscriptArg = isArgumentOfSubscript(locator);
           if (!isAutoClosureArgument && !inoutSubscriptArg) {
             auto inoutBaseType = getFixedTypeRecursive(
                 inoutType1->getInOutObjectType(), /*wantRValue=*/true);
@@ -9682,6 +9684,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
       case PTK_AutoreleasingUnsafeMutablePointer:
         llvm_unreachable("no implicit conversion");
       }
+      llvm_unreachable("covered switch");
     };
 
     // String -> UnsafePointer<Void>
@@ -10848,6 +10851,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       case ExistentialMemberAccessLimitation::None:
         return false;
       }
+      llvm_unreachable("covered switch");
     };
 
     // Metatype extension members are only accessible on the protocol

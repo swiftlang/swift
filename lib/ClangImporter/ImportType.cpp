@@ -1149,7 +1149,7 @@ namespace {
 
         // Import the underlying integer type.
         auto result = Visit(clangDecl->getIntegerType());
-        // Unicode.Scalar (from char32_t or wchar_t) doesn't conform to
+        // Unicode.Scalar (from wchar_t) doesn't conform to
         // _ExpressibleByBuiltinIntegerLiteral, which is required for enum
         // constant values. Use UInt32 instead.
         if (result.AbstractType && result.AbstractType->isUnicodeScalar())
@@ -1791,7 +1791,7 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
-  // When Unicode.Scalar (from char32_t or wchar_t) is used as an enum's
+  // When Unicode.Scalar (from wchar_t) is used as an enum's
   // underlying type, import as UInt32 instead. Unicode.Scalar doesn't conform
   // to _ExpressibleByBuiltinIntegerLiteral, which is required for enum cases.
   if (importKind == ImportTypeKind::Enum && importedType->isUnicodeScalar())
@@ -2406,23 +2406,32 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   // A reference to a non-Escapable type cannot be imported (see
   // VisitReferenceType). Some operators that return one are still useful.
   const auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
-  if (method && method->getNumExplicitParams() == 0 &&
-      clangDecl->getReturnType()->isReferenceType() &&
+  if (method && clangDecl->getReturnType()->isReferenceType() &&
       isNonEscapable(SwiftContext.evaluator,
                      clangDecl->getReturnType()->getPointeeType().getTypePtr(),
                      nullptr)) {
+    bool takesNoArguments = method->getNumExplicitParams() == 0;
+
+    // A method synthesized to forward to an inherited operator is not an
+    // operator itself, but backs the same synthesized members.
+    auto effectiveOp = op;
+    for (const auto *forwarded = getForwardedCXXMethod(method); forwarded;
+         forwarded = getForwardedCXXMethod(forwarded))
+      effectiveOp = forwarded->getOverloadedOperator();
+
     // A prefix ++ or -- returns a reference to self, and is only called for its
     // side effect, e.g. by the synthesized 'successor()'. Drop its result.
-    if (op == clang::OO_PlusPlus || op == clang::OO_MinusMinus)
+    if ((effectiveOp == clang::OO_PlusPlus ||
+         effectiveOp == clang::OO_MinusMinus) &&
+        takesNoArguments)
       return voidResult();
 
-    // A dereference operator whose result depends on 'self' backs a 'pointee'
-    // property with an 'unsafeAddress' accessor, which never dereferences the
-    // 'Unsafe(Mutable)Pointer'. Import the reference as one.
-    if (op == clang::OO_Star &&
-        (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
-             clangDecl) ||
-         isSmartPointerDereference(method))) {
+    // A dereference or subscript operator only backs the synthesized 'pointee'
+    // property or subscript. For a non-Escapable element those use address
+    // accessors, which never dereference the 'Unsafe(Mutable)Pointer'. Import
+    // the reference as one.
+    if ((effectiveOp == clang::OO_Star && takesNoArguments) ||
+        effectiveOp == clang::OO_Subscript) {
       auto pointeeQualType = clangDecl->getReturnType()->getPointeeType();
       Type pointeeType = importTypeIgnoreIUO(
           pointeeQualType, ImportTypeKind::Value,
@@ -2995,8 +3004,6 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
       classifyCxxReferenceParameter(param->getType()) &&
       !swiftParamTy->isForeignReferenceType() &&
-      !(isa<clang::FunctionDecl>(paramContext) &&
-        cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
       !isa<clang::ObjCMethodDecl, clang::ObjCContainerDecl>(paramContext)) {
     paramInfo->setAddressable();
   }

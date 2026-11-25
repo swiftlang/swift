@@ -3,6 +3,11 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -Xllvm -sil-print-types -emit-sil \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name test \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_Lifetimes
 

@@ -48,15 +48,18 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
 #include "clang/Basic/TargetInfo.h"
+#include "clang/Driver/CommonArgs.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
+#include "llvm/Analysis/ObjCARCUtil.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -76,6 +79,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
@@ -169,6 +173,12 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx,
   TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
 
   TargetOpts.MCOptions.AsmVerbose = Opts.VerboseAsm;
+
+  // Follow Clang's policy so that Swift and C objects linked together agree on
+  // whether cross-section DWARF references are relocated.
+  TargetOpts.MCOptions.MachORelocatableDwarf =
+      clang::driver::tools::useMachORelocatableDwarf(Ctx.LangOpts.Target,
+                                                     Opts.DWARFVersion);
 
 #if LLVM_VERSION_MAJOR < 24
   // WebAssembly doesn't support atomics yet, see
@@ -576,8 +586,22 @@ void swift::performLLVMOptimizations(
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
-      !Opts.DisableLLVMOptzns)
+  //
+  // Even at -Onone, we still need to run ObjCARCContract for code Clang
+  // generated at -O1 or above (e.g. for imported inline functions with
+  // -Xcc -O2): to remove clang.arc.use / clang.arc.noop.use, and to insert
+  // the assembly markers Clang leaves to it (recorded in a module flag that
+  // Swift itself sets only when optimizing). Run it only if any of these
+  // actually appear and LTO isn't used (LTO runs ObjCARCContract).
+  if (!DisableObjCARCContract &&
+      (Opts.shouldOptimize()
+           ? !Opts.DisableLLVMOptzns
+           : !isThinLTO && !isFullLTO &&
+                 (Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_use) ||
+                  Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_noop_use) ||
+                  Module->getModuleFlag(objcarc::getRVMarkerModuleFlagStr()))))
     MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
 
   if (Opts.Verify) {
@@ -690,7 +714,12 @@ static bool needsRecompile(StringRef OutputFilename, ArrayRef<uint8_t> HashData,
   if (OutputFilename.empty())
     return true;
 
-  auto BinaryOwner = object::createBinary(OutputFilename);
+  // The existing output file is not an input of the compilation, so it is not
+  // in the virtual file system.
+  auto BinaryOwner = [&] {
+    auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
+    return object::createBinary(OutputFilename);
+  }();
   if (!BinaryOwner) {
     consumeError(BinaryOwner.takeError());
     return true;
@@ -1052,6 +1081,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
   opts.HeapDestructors =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.EmbeddedHeapObjectMetadata =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ObjCISA);
 
   // Partial-apply captures are not ABI and can use a more aggressive key.
   opts.PartialApplyCapture =

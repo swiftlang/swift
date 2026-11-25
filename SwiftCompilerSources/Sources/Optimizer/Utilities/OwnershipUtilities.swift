@@ -13,27 +13,45 @@
 import SIL
 
 extension InstructionRange {
-  /// Returns true if this instruction range is fully contained in the liverange of `value`.
-  public func isFullyContainedIn(scopeOf value: Value) -> Bool {
+  /// Returns true if this instruction range is fully contained in the liverange of `value`, i.e. if
+  /// `value` is alive at all instructions of the range.
+  ///
+  /// For an owned value this is the case if its lifetime doesn't end within the range. For a guaranteed
+  /// value - including forwarded guaranteed values - none of the borrow scopes of its borrow introducers
+  /// must end within the range.
+  ///
+  /// The begin of the range must be located within the liverange of `value`, e.g. it's an instruction
+  /// which uses `value`.
+  /// The end instructions are not part of the range: the lifetime of `value` may end at an end
+  /// instruction. To check if `value` is still alive _behind_ an instruction, the range must end at the
+  /// instruction which follows it.
+  public func isFullyContainedIn(scopeOf value: Value, _ context: some Context) -> Bool {
     switch value.ownership {
     case .owned:
-      return value.uses.endingLifetime.allSatisfy {
-        !self.contains($0.instruction)
-      }
+      return !value.uses.endingLifetime.contains { self.contains($0.instruction) }
     case .guaranteed:
-      guard let beginBorrow = BeginBorrowValue(value.lookThroughForwardingInstructions) else {
-        return false
+      // Introducers without a local scope, e.g. guaranteed function arguments, are alive in the whole
+      // function.
+      for introducer in value.getBorrowIntroducers(context) where introducer.hasLocalScope {
+        if introducer.scopeEndingOperands.contains(where: { self.contains($0.instruction) }) {
+          return false
+        }
       }
-      if case .functionArgument = beginBorrow {
-        // The lifetime of a guaranteed function argument spans over the whole function.
-        return true
-      }
-      return beginBorrow.scopeEndingOperands.allSatisfy {
-        !self.contains($0.instruction)
-      }
+      return true
     case .none, .unowned:
       return false
     }
+  }
+}
+
+extension Instruction {
+  /// Returns true if this is an `end_access` of the innermost access scope that `load` reads from, which is found
+  /// through any `mark_dependence` of the access.
+  func endsAccessScope(of load: LoadInst) -> Bool {
+    guard let endAccess = self as? EndAccessInst else {
+      return false
+    }
+    return endAccess.beginAccess == load.address.accessBaseWithScopes.innermostAccess
   }
 }
 
@@ -181,6 +199,16 @@ private func getInsertionPoints(for loadBorrow: LoadBorrowInst,
 }
 
 extension Value {
+  /// If this address is a projection of a borrowed reference, the `begin_borrow`/`load_borrow` which
+  /// introduces that reference's borrow scope. That scope must enclose the lifetime of anything
+  /// loaded from this address.
+  var beginBorrowOfAddress: BeginBorrowValue? {
+    if let baseReference = accessBase.reference {
+      return BeginBorrowValue(baseReference.lookThroughForwardingInstructions)
+    }
+    return nil
+  }
+
   /// Looks through forwarding instructions in the use-def chain and returns the original forwarded value.
   /// It looks through phi-arguments, terminator instructions and all kind of forwarding instructions
   /// which forward exactly one (non-trivial) operand.
@@ -222,4 +250,18 @@ let extendBorrowScopeTest = FunctionTest("extend_borrow_scope") {
 
   let result = extendBorrowScope(of: borrowValue, toOverlap: range, context)
   precondition(result == expectedResult)
+}
+
+extension ForwardingInstruction {
+  /// Returns false if changing this instruction to forward guaranteed values would forward an address-only value
+  /// without preserving its representation, which is not allowed before address lowering.
+  /// See "Forwarding Address-Only Values" in Ownership.md.
+  var canForwardGuaranteedAddressOnlyValues: Bool {
+    let function = parentFunction
+    if function.hasLoweredAddresses || preservesRepresentation {
+      return true
+    }
+    return forwardedOperands.allSatisfy { $0.value.type.isLoadable(in: function) } &&
+           forwardedResults.allSatisfy { $0.type.isLoadable(in: function) }
+  }
 }

@@ -178,6 +178,7 @@ public:
     case Reason::Deprecated:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if the restriction represents deprecation of the declaration.

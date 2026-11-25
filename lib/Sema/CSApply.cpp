@@ -1253,6 +1253,7 @@ namespace {
       case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
         return ActorIsolation::forNonisolatedNonsending();
       }
+      llvm_unreachable("covered switch");
     }
 
     /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
@@ -3533,6 +3534,12 @@ namespace {
           de.diagnose(dotLoc, diag::bad_init_ref_base, hasSuper);
         }
       }
+
+      // A `super.init` call from a Swift subclass of a C++ foreign reference
+      // type must construct the base subobject.
+      if (base->isSuperExpr() && !implicit && !SuppressDiagnostics)
+        TypeChecker::diagnoseForeignReferenceSuperInit(
+            ctor, nameLoc.getBaseNameLoc(), /*implicitlyGenerated=*/false);
 
       // Build a partial application of the delegated initializer.
       auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
@@ -8896,6 +8903,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   case ActorReferenceResult::EntersActor:
     return refResult.options.contains(ActorReferenceResult::Flags::Distributed);
   }
+  llvm_unreachable("covered switch");
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of

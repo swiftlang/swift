@@ -400,6 +400,7 @@ swift::constraints::getConversionBehavior(Type type) {
       canType->dump(out);
     });
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::constraints::hasProperSubtypes(Type type) {
@@ -432,6 +433,7 @@ bool swift::constraints::hasProperSubtypes(Type type) {
   case ConversionBehavior::Unknown:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::constraints::hasProperSupertypes(Type type) {
@@ -476,6 +478,7 @@ bool swift::constraints::hasProperSupertypes(Type type) {
   case ConversionBehavior::Unknown:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 static ClassDecl *getBridgedObjCClass(ClassDecl *classDecl) {

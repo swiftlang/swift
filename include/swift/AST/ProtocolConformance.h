@@ -186,7 +186,6 @@ protected:
       /// Whether there is an explicit global actor specified for this
       /// conformance.
       HasExplicitGlobalActor : 1,
-      : NumPadBits,
 
       /// Options.
       Options : bitmax(NumProtocolConformanceOptions, 8),
@@ -1346,6 +1345,7 @@ public:
     case BuiltinConformanceKind::Missing:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   SourceLoc getLoc() const {

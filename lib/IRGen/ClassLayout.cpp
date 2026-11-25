@@ -110,27 +110,33 @@ void ClassLayout::collectAllStoredPropertyTypes(
   }
 }
 
-std::optional<uint64_t>
-ClassLayout::computeTypedMallocTypeDescriptor(IRGenModule &IGM,
-                                              SILType selfType) const {
+std::optional<uint64_t> ClassLayout::computeTypedMallocTypeDescriptor(
+    IRGenModule &IGM, SILType selfType,
+    ArrayRef<SILType> tailElementTypes) const {
+  if (!IGM.isTypedAllocationAvailable())
+    return std::nullopt;
   if (!isFixedSize()) {
     return std::nullopt;
   }
   llvm::SmallVector<SILType> storageEntries;
 
-  auto rawPointerType = SILType::getRawPointerType(IGM.Context);
-
-  // Add the heap header as the first entry
+  auto header = HeapHeaderKind::None;
   if (hasObjCImplementation()) {
-    storageEntries.push_back(rawPointerType);
+    header = HeapHeaderKind::ObjC;
   } else if (!HeaderSize.isZero()) {
     assert(HeaderSize == IGM.RefCountedStructSize &&
            "Swift object with non-standard header size");
-    storageEntries.push_back(rawPointerType);
-    storageEntries.push_back(rawPointerType);
+    header = HeapHeaderKind::Swift;
   }
 
   collectAllStoredPropertyTypes(IGM, selfType, storageEntries);
 
-  return irgen::computeTypedMallocTypeDescriptor(IGM, storageEntries);
+  if (tailElementTypes.empty())
+    return irgen::computeTypedMallocTypeDescriptor(IGM, header, storageEntries);
+
+  // The tail-allocated arrays follow the header. Their counts aren't known
+  // here, so describe them as one array of a union of their element types.
+  return irgen::computeTypedMallocTypeDescriptor(
+      IGM, header, storageEntries,
+      TypedMemoryCallsiteFlags::HeaderPrefixedArray, tailElementTypes);
 }

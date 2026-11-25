@@ -112,6 +112,10 @@ public:
   static ProtocolConformanceRef forMissingOrInvalid(
       Type type, ProtocolDecl *proto);
 
+  /// Whether conformances to the given protocol can be "missing" rather than
+  /// invalid when a legitimate conformance doesn't exist.
+  static bool canBeMissing(ProtocolDecl *proto);
+
   bool isInvalid() const;
 
   explicit operator bool() const { return !isInvalid(); }

@@ -149,7 +149,8 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
     return !ctor->hasAsync(); // need flow-isolation for non-async.
-  };
+  }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::usesFlowSensitiveIsolation(AbstractFunctionDecl *fn) {
@@ -625,6 +626,7 @@ static bool varIsSafeAcrossActors(const ModuleDecl *fromModule, VarDecl *var,
     // If it's actor-isolated but in the same module, then it's OK too.
     return accessWithinModule;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::isLetAccessibleAnywhere(const ModuleDecl *fromModule,
@@ -842,6 +844,7 @@ bool SendableCheckContext::warnInMinimalChecking() const {
   case SendableCheck::ImplicitForExternallyVisible:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior SendableCheckContext::defaultDiagnosticBehavior() const {
@@ -874,6 +877,7 @@ SendableCheckContext::implicitSendableDiagnosticBehavior() const {
   case StrictConcurrency::Complete:
     return defaultDiagnosticBehavior();
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Determine the diagnostic behavior for a Sendable reference to the given
@@ -937,6 +941,7 @@ static bool shouldDiagnosePreconcurrencyImports(SourceFile &sf) {
   case SourceFileKind::SyntheticMacro:
       return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::diagnoseSendabilityErrorBasedOn(
@@ -1172,6 +1177,7 @@ getSendableParamDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_param_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 static
@@ -1194,6 +1200,7 @@ getSendableResultDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_result_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 static
@@ -1216,6 +1223,7 @@ getSendablePropertyDiag(SendableCheckReason refKind) {
   case SendableCheckReason::ObjC:
     return diag::non_sendable_property_in_objc;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::diagnoseNonSendableTypesInReference(
@@ -1762,6 +1770,7 @@ bool ReferencedActor::isKnownToBeLocal() const {
   case Isolated:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 const AbstractFunctionDecl *
@@ -2091,6 +2100,7 @@ static ActorIsolation getInnermostIsolatedContext(
         dc->mapTypeIntoEnvironment(isolation.getGlobalActor()))
           .withPreconcurrency(isolation.preconcurrency());
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
@@ -4960,6 +4970,7 @@ namespace {
 
         return true;
       }
+      llvm_unreachable("covered switch");
     }
 
     // Attempt to resolve the global actor type of a closure.
@@ -5107,6 +5118,7 @@ computeClosureIsolationFromParent(DeclContext *closure,
     return getNonisolatedIsolation(/*inherited=*/false);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 ActorIsolation
@@ -5676,6 +5688,7 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
         return false;
       }
       }
+      llvm_unreachable("covered switch");
       }),
       isolatedRequirements.end());
 
@@ -5958,6 +5971,7 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a property, determine the isolation when it part of a wrapped
@@ -6209,6 +6223,7 @@ static OverrideIsolationResult validOverrideIsolation(
 
     return OverrideIsolationResult::Disallowed;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Retrieve the index of the first isolated parameter of the given
@@ -6735,6 +6750,7 @@ static bool shouldSelfIsolationOverrideDefault(
     /// treated as special.
     return explicitNonisolatedIsSpecial(dc);
   }
+  llvm_unreachable("covered switch");
 }
 
 static bool isDeferBody(const Decl *D) {
@@ -8843,6 +8859,7 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool swift::isAccessibleAcrossActors(
@@ -9435,6 +9452,21 @@ ActorIsolation swift::inferConformanceIsolation(
   auto nominal = dc->getSelfNominalTypeDecl();
   if (!nominal) {
     return ActorIsolation::forNonisolated(false);
+  }
+
+  // An isolated conformance can never satisfy a 'Self: P' requirement of a
+  // protocol whose 'Self' conforms to SendableMetatype. So if the type also
+  // conforms to such a protocol that inherits from this one, there is no
+  // isolation we could infer that would be usable; leave it nonisolated and
+  // let witness checking diagnose any isolated witness directly.
+  if (auto *sendableMetatypeProto =
+          ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+    auto *proto = conformance->getProtocol();
+    for (auto *other : nominal->getAllProtocols()) {
+      if (other->inheritsFrom(proto) &&
+          other->inheritsFrom(sendableMetatypeProto))
+        return ActorIsolation::forNonisolated(false);
+    }
   }
 
   // If we are inferring isolated conformances and the conforming type is

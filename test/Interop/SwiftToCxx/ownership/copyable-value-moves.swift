@@ -43,7 +43,7 @@ public struct Value {
 // CHECK: vwTable->initializeWithCopy
 // CHECK: Value &operator =(const Value &other) noexcept {
 // CHECK-NEXT: if (!_storage.isAllocated() || !other._storage.isAllocated()) {
-// CHECK-NEXT: *this = Value(other);
+// CHECK-NEXT: *this = static_cast<class Value>(other);
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
 // CHECK: vwTable->assignWithCopy

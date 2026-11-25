@@ -82,12 +82,10 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BraceStmt, Stmt, 32,
-    : NumPadBits,
     NumElements : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(CaseStmt, Stmt, 16+32,
-    : NumPadBits,
     NumCaseBodyVars : 16,
     NumPatterns : 32
   );
@@ -95,12 +93,10 @@ protected:
   SWIFT_INLINE_BITFIELD_EMPTY(LabeledStmt, Stmt);
 
   SWIFT_INLINE_BITFIELD_FULL(DoCatchStmt, LabeledStmt, 32,
-    : NumPadBits,
     NumCatches : 32
   );
 
   SWIFT_INLINE_BITFIELD_FULL(SwitchStmt, LabeledStmt, 32,
-    : NumPadBits,
     CaseCount : 32
   );
     
@@ -111,7 +107,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(YieldStmt, Stmt, 32,
-    : NumPadBits,
     NumYields : 32
   );
 

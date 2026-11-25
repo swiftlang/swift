@@ -549,6 +549,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
   case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+  case SILInstructionKind::ValueToAddressInst:
   case SILInstructionKind::ObjCMetatypeToObjectInst:
   case SILInstructionKind::ObjCExistentialMetatypeToObjectInst:
   case SILInstructionKind::ClassifyBridgeObjectInst:
@@ -1151,6 +1152,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     }
     return RuntimeEffect::NoEffect;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a block used as a noescape function argument, attempt to find all

@@ -2497,6 +2497,12 @@ ERROR(c_func_unsupported_specifier, none,
       (StringRef, DeclName, const ValueDecl *))
 ERROR(c_unsupported_type, none, "%0 cannot be represented in C",
       (Type))
+WARNING(c_unicode_scalar_param_unsound, none,
+        "'Unicode.Scalar' parameter %0 will be exposed as 'char32_t', which "
+        "can hold values that are not valid Unicode scalars",
+        (DeclName))
+NOTE(c_unicode_scalar_param_unsound_fixit, none,
+     "use 'UInt32' and validate with 'Unicode.Scalar.init(_:)'", ())
 ERROR(c_func_async,none,
       "async functions cannot be represented in C", ())
 ERROR(c_func_throws,none,
@@ -4637,6 +4643,26 @@ ERROR(final_not_allowed_here,none,
 ERROR(attr_incompatible_with_attr,none,
       "%0 cannot be used with %1",
       (DeclAttribute, DeclAttribute))
+
+ERROR(attr_tail_allocated_requires_embedded,none,
+      "'@_tailAllocated' is only supported in Embedded Swift", ())
+ERROR(tail_allocated_init_allocation,none,
+      "%0 has '@_tailAllocated' and must be allocated with "
+      "'Builtin.allocWithTailElems', not an initializer", (Type))
+ERROR(attr_tail_allocated_actor,none,
+      "'@_tailAllocated' cannot be used on an actor", ())
+ERROR(attr_tail_allocated_inherited,none,
+      "'@_tailAllocated' cannot be used on %0 because its superclass %1 "
+      "already has it", (const ClassDecl *, const ClassDecl *))
+ERROR(attr_tail_allocated_counts_property,none,
+      "'@_tailAllocated' counts property %0 must be a 'final' instance property "
+      "of %1 of type %2 (one 'Int' per element type), not 'async' or 'throws'",
+      (Identifier, const ClassDecl *, Type))
+ERROR(attr_tail_allocated_counts_not_visible,none,
+      "'@_tailAllocated' counts property %0 must be %select{'public' or "
+      "'@usableFromInline'|'package', 'public' or '@usableFromInline'}2 "
+      "because %1 is %select{public|package}2",
+      (Identifier, const ClassDecl *, bool))
 
 ERROR(attr_target_empty_string,none,
       "'@_target' requires a non-empty target string", ())
@@ -9121,8 +9147,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
       "parameter of non-'Copyable' type %0 must specify ownership", (Type))
-ERROR(noncopyable_parameter_subscript_unsupported, none,
-      "subscripts cannot have non-'Copyable' parameters yet", ())
 NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,

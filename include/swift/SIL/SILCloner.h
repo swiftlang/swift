@@ -1806,14 +1806,15 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
-  // We cannot inline/clone debug intrinsics without a scope. If they
+  std::optional<SILDebugVariable> VarInfo = Inst->getVarInfo();
+
+  // We cannot inline/clone debug variables without a scope. If they
   // describe function arguments there is no way to determine which
   // function they belong to.
-  if (!Inst->getDebugScope())
+  if (!VarInfo->Scope)
     return;
 
   // Since we want the debug info to survive, we do not remap the location here.
-  std::optional<SILDebugVariable> VarInfo = Inst->getVarInfo();
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   remapDebugVariable(VarInfo);
 
@@ -2514,6 +2515,14 @@ void SILCloner<ImplClass>::visitCopyableToMoveOnlyWrapperAddrInst(
   recordClonedInstruction(
       inst, getBuilder().createCopyableToMoveOnlyWrapperAddr(
                 getOpLocation(inst->getLoc()), getOpValue(inst->getOperand())));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitValueToAddressInst(ValueToAddressInst *inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(inst->getDebugScope()));
+  recordClonedInstruction(
+      inst, getBuilder().createValueToAddress(getOpLocation(inst->getLoc()),
+                                              getOpValue(inst->getOperand())));
 }
 
 template <typename ImplClass>
@@ -3626,9 +3635,16 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto CountArgs =
+      getOpValueArray<8>(OperandValueArrayRef(Inst->getTailAllocatedCounts()));
+  SmallVector<SILType, 4> ElemTypes;
+  for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
+    ElemTypes.push_back(getOpType(OrigElemType));
+  }
   recordClonedInstruction(
       Inst, getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand())));
+                                          getOpValue(Inst->getOperand()),
+                                          ElemTypes, CountArgs));
 }
 
 template<typename ImplClass>

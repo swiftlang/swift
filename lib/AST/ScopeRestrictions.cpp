@@ -36,6 +36,12 @@ void ScopeRef::print(llvm::raw_ostream &os) const {
   case Kind::Body:
     os << "^" << getDepth().Value << ".body";
     return;
+  case Kind::Local:
+    os << "local " << getLocalIndex();
+    return;
+  case Kind::UnresolvedVariable:
+    os << "scopevar " << getUnresolvedVariableIndex();
+    return;
   }
   llvm_unreachable("unhandled kind");
 }

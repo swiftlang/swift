@@ -1912,6 +1912,7 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
           destFnType = origParamType.getClangType();
       }
     }
+    bool closureError = false;
     (void)emitAnyClosureExpr(
         SGF, semanticExpr, [&](AbstractClosureExpr *closure) {
           // Emit the closure body.
@@ -1921,10 +1922,13 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
                 AbstractionPattern(functionInfo.OrigType.getType(), destFnType);
             SGF.SGM.Types.withClosureTypeInfo(closure, functionInfo, [] {});
           }
-          SGF.SGM.emitClosure(closure, functionInfo);
+          closureError |= SGF.SGM.emitClosure(closure, functionInfo);
           loc = closure;
           return ManagedValue::forInContext();
         });
+    // If we had an error, bail with an undef.
+    if (closureError)
+      return SGF.emitUndef(SGF.getLoweredType(conversionExpr->getType()));
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -2374,6 +2378,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     return RValue(SGF, e, result);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 RValue RValueEmitter::visitCovariantFunctionConversionExpr(
@@ -3580,9 +3585,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 ManagedValue
 RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
                                     const FunctionTypeInfo &contextInfo) {
-  // Emit the closure body.
-  SGF.SGM.emitClosure(e, contextInfo);
-
+  // Emit the closure body, bailing with an undef on failure.
+  if (SGF.SGM.emitClosure(e, contextInfo)) {
+    return SGF.emitUndef(
+        SILType::getPrimitiveObjectType(contextInfo.ExpectedLoweredType));
+  }
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   SILLocation loc = e;
@@ -4682,8 +4689,6 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
-    SmallString<64> nameBuf;
-    
     auto name = Mangle::ASTMangler(SGM.getASTContext())
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
@@ -5720,7 +5725,7 @@ bool SILGenFunction::isInitDelegationBorrowingSelf() const {
   auto otherCtor = rebind->getCalledConstructor(isChaining)->getDecl();
   return isChaining && SILDeclRef(otherCtor, SILDeclRef::Kind::Initializer)
                            .asForeign(requiresForeignEntryPoint(otherCtor))
-                           .isForeignReferenceInitializer();
+                           .isCXXForeignReferenceInitializer();
 }
 
 /// Emit the builtin that points the C++ v-table pointers of \p self, a Swift
@@ -6931,6 +6936,16 @@ void SILGenFunction::emitOpenExistentialExprImpl(
       LValue lv = emitLValue(load->getSubExpr(),
                              SGFAccessKind::BorrowedAddressRead);
       existentialValue = emitBorrowedLValue(load, std::move(lv));
+    }
+    // Do the same for a reference to a locally-mutable parameter that is implicitly
+    // loaded from.
+    if (auto dr = dyn_cast<DeclRefExpr>(existentialExpr)) {
+      auto pd = dyn_cast<ParamDecl>(dr->getDecl());
+      if (pd && pd->getIntroducer() == VarDecl::Introducer::Var) {
+        LValue lv = emitLValue(dr,
+                               SGFAccessKind::BorrowedAddressRead);
+        existentialValue = emitBorrowedLValue(dr, std::move(lv));
+      }
     }
   }
 

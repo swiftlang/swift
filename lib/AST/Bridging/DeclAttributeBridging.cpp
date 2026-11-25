@@ -499,6 +499,7 @@ MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
   case BridgedMacroSyntaxFreestanding:
     return MacroSyntax::Freestanding;
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
@@ -763,6 +764,14 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
   return new (cContext.unbridged())
       SemanticsAttr(cValue.unbridged(), atLoc, range,
                     /*Implicit=*/false);
+}
+
+BridgedTailAllocatedAttr BridgedTailAllocatedAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
+    Identifier countsName, SourceLoc countsNameLoc, BridgedArrayRef cTypes) {
+  return TailAllocatedAttr::createParsed(cContext.unbridged(), atLoc, range,
+                                         countsName, countsNameLoc,
+                                         cTypes.unbridged<TypeRepr *>());
 }
 
 BridgedTargetAttr

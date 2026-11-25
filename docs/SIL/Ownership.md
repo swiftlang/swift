@@ -735,6 +735,10 @@ The current list of interior pointer SIL instructions are:
     pointer to the value inside a boxed existential container. Must be
     the type for which the box was initially allocated for and not for
     an "opened" archetype.
+-   [value_to_address](Instructions.md#value_to_address) - projects the address
+    of the storage of an address-only value, in opaque values mode. Unlike
+    the instructions above, its operand may have any ownership
+    (`AnyInteriorPointer`).
 
 (*) We still need to finish adding support for project_box, but all
 other interior pointers are guarded already.

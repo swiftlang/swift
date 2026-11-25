@@ -472,7 +472,7 @@ struct AliasAnalysis {
     case .stack, .global, .argument, .storeBorrow:
       // Those access bases cannot be interior pointers of a borrowed value
       return .noEffects
-    case .pointer, .index, .unidentified, .yield:
+    case .pointer, .borrowMutateAccessor, .index, .unidentified, .yield:
       // We don't know anything about this address -> get the conservative effects
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
@@ -829,6 +829,14 @@ private enum ImmutableScope {
         object = tailAddr.instance
       case .global(let global):
         if global.isLet && !basedAddress.parentFunction.canInitializeGlobal {
+          self = .wholeFunction
+          return
+        }
+        return nil
+      case .pointer(let p2a):
+        // A global `let` whose addressor is not available (otherwise the access base would be `.global`),
+        // e.g. because it's defined in another module. Such a global cannot be initialized in this function.
+        if p2a.isResultOfGlobalLetAddressorCall && !basedAddress.parentFunction.isGlobalInitOnceFunction {
           self = .wholeFunction
           return
         }

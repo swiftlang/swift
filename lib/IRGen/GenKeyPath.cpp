@@ -1693,6 +1693,7 @@ computeStaticKeyPathComponentLayout(IRGenModule &IGM,
     return layout;
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Encode a `StaticKeyPathComponentLayout` into the pair of words the

@@ -1,4 +1,0 @@
-module StaticSelf {
-  header "header.h"
-  requires cplusplus
-}

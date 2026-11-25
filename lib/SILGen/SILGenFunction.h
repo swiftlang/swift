@@ -198,6 +198,7 @@ static inline bool isBorrowAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline bool isReadAccess(SGFAccessKind kind) {
@@ -218,6 +219,7 @@ static inline bool isConsumeAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a read access kind, does it require an owned result?
@@ -589,7 +591,14 @@ public:
     ~AddressableBuffer();
   };
   llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
-    
+
+  /// The function argument of a parameter that the caller passes by address
+  /// but that opaque values represent as a guaranteed object. The address of
+  /// such a parameter is value_to_address of this argument. The value that the
+  /// parameter is bound to can be a copy of it, which has a different address.
+  llvm::DenseMap<ParamDecl *, SILFunctionArgument *>
+      GuaranteedIndirectArguments;
+
   AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   
   /// Establish the scope for the addressable buffer that might be allocated
@@ -1037,6 +1046,22 @@ public:
   /// Generates code for a class (isolated-)deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
   void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
+
+  /// The `@_tailAllocated` element types of \p classType's class, substituted
+  /// for it, as formal types and lowered with the owner's generic abstraction
+  /// (which the SIL verifier requires of `alloc_ref` and `dealloc_ref`).
+  /// Returns false if the class has none or this isn't Embedded Swift.
+  bool getTailAllocatedElementTypes(CanType classType,
+                                    SmallVectorImpl<CanType> &formalTypes,
+                                    SmallVectorImpl<SILType> &loweredTypes);
+
+  /// The tail elements of a `@_tailAllocated` class instance, for its
+  /// `dealloc_ref`: the attribute's element types and the counts read from its
+  /// counts property. Empty if the class has none or this isn't Embedded
+  /// Swift.
+  void emitTailAllocatedElements(SILLocation loc, SILValue selfValue,
+                                 SmallVectorImpl<SILType> &tailTypes,
+                                 SmallVectorImpl<SILValue> &tailCounts);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
@@ -2457,9 +2482,10 @@ public:
                             bool canUnwind, SubstitutionMap subs,
                             ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
-  void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token,
-                               SILValue allocation);
+  SILValue emitEndApplyWithRethrow(SILLocation loc,
+                                   MultipleValueInstructionResult *token,
+                                   SILValue allocation,
+                                   SILType resultType);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);

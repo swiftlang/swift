@@ -387,6 +387,7 @@ public:
     case Context::RawLayoutAttr:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether pack expansion types are supported in this context.
@@ -430,6 +431,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether we are resolving a type in a generic argument list.
@@ -474,6 +476,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether we are resolving a type in a `where` clause, generic parameter
@@ -519,6 +522,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine whether all of the given options are set.
@@ -858,7 +862,7 @@ public:
   std::optional<ScopeRef> lookUpScopeParam(ScopeName name) const;
 
   /// The scope of the access of the declaration's parameter \p index relative
-  /// to this binder, or `nullopt` if its binding was diagnosed.
+  /// to this binder, or an error scope if its binding was diagnosed.
   ScopeRef lookUpParamAccess(unsigned index) const;
 
   /// The scope of the access of `self` relative to this binder, which the

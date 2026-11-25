@@ -41,7 +41,3 @@ Work with standard C++ types.
 - ``Cxx/UnsafeCxxMutableRandomAccessIterator``
 - ``Cxx/UnsafeCxxRandomAccessIterator``
 
-### Comparison Functions
-
-- ``CxxStdlib/==(_:_:)``
-

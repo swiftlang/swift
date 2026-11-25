@@ -22,6 +22,9 @@
 namespace llvm {
   class Triple;
   class VersionTuple;
+  namespace vfs {
+  class FileSystem;
+  }
 }
 
 namespace swift {
@@ -142,12 +145,13 @@ namespace swift {
     return (lhs == rhs) && (lhs.getOSVersion() == rhs.getOSVersion());
   }
 
-  /// Get SDK build version.
-  std::string getSDKBuildVersion(StringRef SDKPath);
-  std::string getSDKBuildVersionFromPlist(StringRef Path);
+  /// Get SDK build version, reading the SDK from \p FS.
+  std::string getSDKBuildVersion(StringRef SDKPath, llvm::vfs::FileSystem &FS);
+  std::string getSDKBuildVersionFromPlist(StringRef Path,
+                                          llvm::vfs::FileSystem &FS);
 
-  /// Get SDK name.
-  std::string getSDKName(StringRef SDKPath);
+  /// Get SDK name, reading the SDK from \p FS.
+  std::string getSDKName(StringRef SDKPath, llvm::vfs::FileSystem &FS);
 } // end namespace swift
 
 #endif // SWIFT_BASIC_PLATFORM_H

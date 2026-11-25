@@ -4677,6 +4677,7 @@ irgen::emitGenericRequirementFromSubstitutions(IRGenFunction &IGF,
   case GenericRequirement::Kind::Value:
     return IGF.emitValueGenericRef(argType);
   }
+  llvm_unreachable("covered switch");
 }
 
 void GenericTypeRequirements::bindFromBuffer(IRGenFunction &IGF,
@@ -4729,6 +4730,7 @@ llvm::Type *GenericRequirement::typeForKind(IRGenModule &IGM,
   case GenericRequirement::Kind::WitnessTablePack:
     return IGM.WitnessTablePtrPtrTy;
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::Type *GenericRequirement::getType(IRGenModule &IGM) const {

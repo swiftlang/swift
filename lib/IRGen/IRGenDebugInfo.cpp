@@ -200,6 +200,8 @@ class IRGenDebugInfoImpl : public IRGenDebugInfo {
   llvm::StringMap<llvm::TrackingMDNodeRef> RuntimeErrorFnCache;
   llvm::StringSet<> OriginallyDefinedInTypes;
   llvm::StringSet<> AnchoredTypeAliases;
+  /// The typealiases already visited by anchorTypeAliasesIn().
+  llvm::SmallPtrSet<TypeAliasType *, 16> VisitedTypeAliases;
   TrackingDIRefMap DIRefMap;
   TrackingDIRefMap InnerTypeCache;
   TrackingDIRefMap ExistentialTypeAliasMap;
@@ -305,9 +307,7 @@ public:
   /// Emit a dbg.declare at the current insertion point in Builder.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
-                               DebugTypeInfo Ty, const SILDebugScope *DS,
-                               std::optional<SILLocation> VarLoc,
-                               SILDebugVariable VarInfo,
+                               DebugTypeInfo Ty, SILDebugVariable VarInfo,
                                bool InCoroContext = false,
                                ArtificialKind = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
@@ -640,7 +640,7 @@ private:
     if (MainFile && Filename.ends_with(MainFileName)) {
       SmallString<256> AbsThisFile, AbsMainFile;
       AbsThisFile = Filename;
-      llvm::sys::fs::make_absolute(AbsThisFile);
+      (void)SM.getFileSystem()->makeAbsolute(AbsThisFile);
       if (llvm::sys::path::is_absolute(MainFileName))
         AbsMainFile = MainFileName;
       else
@@ -2443,8 +2443,10 @@ private:
 
     case TypeKind::Tuple: {
       // Tuples are also represented as structs.  Since tuples are ephemeral
-      // (not nominal) they don't have a source location.
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
+      // (not nominal) they don't have a source location. A tuple containing a
+      // pack expansion has no static element layout, so it stays opaque.
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes &&
+          !BaseTy->castTo<TupleType>()->containsPackExpansionType())
         return createTuple(DbgTy, Scope, SizeInBits, AlignInBits, Flags,
                            MangledName);
       else
@@ -2863,8 +2865,9 @@ private:
     if (!Ty || Opts.DebugInfoLevel < IRGenDebugInfoLevel::ASTTypes)
       return;
     Ty.findIf([&](Type T) -> bool {
+      // Mangling is expensive, so only mangle each alias once.
       auto *Alias = llvm::dyn_cast<TypeAliasType>(T.getPointer());
-      if (!Alias)
+      if (!Alias || !VisitedTypeAliases.insert(Alias).second)
         return false;
       DebugTypeInfo AliasDbgTy = DebugTypeInfo::getForwardDecl(Alias);
       // Dedup by the alias's mangled name.
@@ -3121,6 +3124,13 @@ private:
     if (DbgTy.isNull())
       // We can't use the empty type as an index into DenseMap.
       return createType(DbgTy, "", TheCU, MainFile);
+
+    // Tuples and metatypes can be described by their mangled name alone, even
+    // when they are emitted as a typedef of the canonical type or as a forward
+    // declaration. Emit the typealiases the name refers to, for the debugger to
+    // resolve them.
+    if (isa<TupleType, AnyMetatypeType>(DbgTy.getType()))
+      anchorTypeAliasesIn(DbgTy.getType());
 
     // Only the complete type of a foreign reference type carries the
     // annotation that tells the debugger its values are references, and it
@@ -3700,7 +3710,6 @@ llvm::DINode::DIFlags IRGenDebugInfoImpl::getCallSiteRelatedAttrs() const {
   if (!Opts.DebugCallsiteInfo)
     return llvm::DINode::FlagZero;
 
-  auto SwiftLangOpts = IGM.Context.LangOpts;
   auto Loader = IGM.getSILModule().getASTContext().getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter *>(&*Loader);
   auto &CGO = Importer->getCodeGenOpts();
@@ -4036,9 +4045,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, std::optional<SILLocation> DbgInstLoc,
     SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
+  const SILDebugScope *DS = VarInfo.Scope;
   assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
@@ -4050,7 +4059,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto DInstLoc = getStartLocation(DbgInstLoc);
+  auto VarLoc = getStartLocation(VarInfo.Loc);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
@@ -4066,41 +4075,20 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (VarInfo.Constant)
     DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
-  unsigned DInstLine = DInstLoc.Line;
-
   // Self is always an artificial argument, so are variables without location.
-  if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!VarLoc.Line ||
+      (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // Create the descriptor for the variable.
-  unsigned DVarLine = DInstLine;
-  uint16_t DVarCol = DInstLoc.Column;
-  auto VarInfoLoc = VarInfo.Loc ? VarInfo.Loc : DbgInstLoc;
-  if (VarInfoLoc) {
-    auto VarLoc = VarInfoLoc->strippedForDebugVariable();
-    if (VarLoc != DbgInstLoc) {
-      auto DVarLoc = getStartLocation(VarLoc);
-      DVarLine = DVarLoc.Line;
-      DVarCol = DVarLoc.Column;
-    }
-  }
-  llvm::DIScope *VarScope = Scope;
-  if (ArgNo == 0 && VarInfo.Scope) {
-    if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
-            getOrCreateScope(VarInfo.Scope))) {
-      VarScope = VS;
-    }
-  }
-
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
   // VarInfo.Name points into tail-allocated storage in debug_value insns.
   llvm::StringRef UniqueName = VarNames.insert(VarInfo.Name).first->getKey();
-  VarID Key(VarScope, UniqueName, DVarLine, DVarCol);
+  VarID Key(Scope, UniqueName, VarLoc.Line, VarLoc.Column);
   auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
     Var = cast<llvm::DILocalVariable>(CachedVar->second);
@@ -4111,9 +4099,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     bool Preserve = true;
     if (ArgNo > 0)
       Var = DBuilder.createParameterVariable(
-          VarScope, VarInfo.Name, ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
+          Scope, VarInfo.Name, ArgNo, Unit, VarLoc.Line, DITy, Preserve, Flags);
     else
-      Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
+      Var = DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, VarLoc.Line,
                                         DITy, Preserve, Flags);
     LocalVarCache.insert({Key, llvm::TrackingMDNodeRef(Var)});
   }
@@ -4202,7 +4190,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     DIExpr = appendDIExpression(DIExpr, Fragment, IsFirstAndOnlyPiece);
     if (DIExpr)
       emitDbgIntrinsic(
-          Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
+          Builder, Piece, Var, DIExpr, VarLoc.Line, VarLoc.Column, Scope, DS,
           InCoroContext, AddrDInstrKind);
   }
 
@@ -4212,7 +4200,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (auto *DIExpr =
             appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
-                       DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
+                       DIExpr, VarLoc.Line, VarLoc.Column, Scope, DS,
                        InCoroContext, AddrDInstrKind);
   }
 }
@@ -4508,8 +4496,8 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy,
+                          {OS.str().str(), 0, false, {}, {}, DS},
                           /*InCoroContext=*/IGF.isAsync(),
                           ArtificialValue);
 }
@@ -4529,9 +4517,9 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
                                        IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
-  emitVariableDeclaration(
-      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {}, VarInfo,
-      /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
+  VarInfo.Scope = DS;
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, VarInfo,
+                          /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
 }
 
 } // anonymous namespace
@@ -4622,11 +4610,10 @@ void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
 }
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, std::optional<SILLocation> VarLoc,
     SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext, Artificial,
+      Builder, Storage, Ty, VarInfo, InCoroContext, Artificial,
       AddrDInstKind);
 }
 

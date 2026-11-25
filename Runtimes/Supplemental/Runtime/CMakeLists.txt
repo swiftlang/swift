@@ -53,6 +53,7 @@ include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 
 option(${PROJECT_NAME}_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
@@ -128,6 +129,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
   target_sources(swiftRuntime PRIVATE
     Address.swift
     AggregatingSymbolSource.swift
+    ApkFile.swift
     Backtrace.swift
     Backtrace+Codable.swift
     BacktraceFormatter.swift

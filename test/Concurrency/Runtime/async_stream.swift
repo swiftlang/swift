@@ -21,6 +21,10 @@ struct SomeError: Error, Equatable {
 
 class NotSendable {}
 
+final class UncheckedExpectation: @unchecked Sendable {
+  var fulfilled = false
+}
+
 @MainActor func testWarnings() {
   var x = 0
   _ = AsyncStream {
@@ -39,10 +43,6 @@ class NotSendable {}
 @main struct Main {
   static func main() async {
     if #available(SwiftStdlib 6.2, *) {
-      final class Expectation: @unchecked Sendable {
-        var fulfilled = false
-      }
-
       tests.test("factory method") {
         let (stream, continuation) = AsyncStream.makeStream(of: String.self)
         continuation.yield("hello")
@@ -370,9 +370,9 @@ class NotSendable {}
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
           }
@@ -384,9 +384,9 @@ class NotSendable {}
       }
 
       tests.test("termination behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
             continuation.finish()
@@ -399,9 +399,9 @@ class NotSendable {}
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
@@ -419,9 +419,9 @@ class NotSendable {}
       }
 
       tests.test("cancellation behavior on deinit with no values being awaited throwing") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
-        func scopedLifetime(_ expectation: Expectation) {
+        func scopedLifetime(_ expectation: UncheckedExpectation) {
           _ = AsyncThrowingStream(String.self) { continuation in
             continuation.onTermination = { @Sendable terminal in
               switch terminal {
@@ -941,7 +941,7 @@ class NotSendable {}
       }
 
       tests.test("unfolding init onCancel called on task cancel") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
 
         var counter = 0
         let stream = AsyncStream<Int>(unfolding: { @MainActor in
@@ -1003,7 +1003,7 @@ class NotSendable {}
       // MARK: - onTermination
 
       tests.test("onTermination finished reason") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let _ = AsyncStream<String> {
           $0.onTermination = { @Sendable reason in
             if case .finished = reason {
@@ -1017,7 +1017,7 @@ class NotSendable {}
 
       tests.test("onTermination finished reason throwing") {
         // Case A: finish() with no error -> .finished(nil)
-        let nilExpectation = Expectation()
+        let nilExpectation = UncheckedExpectation()
         let _ = AsyncThrowingStream<String, Error> {
           $0.onTermination = { @Sendable reason in
             if case .finished(let e) = reason, e == nil {
@@ -1029,7 +1029,7 @@ class NotSendable {}
         expectTrue(nilExpectation.fulfilled)
 
         // Case B: finish(throwing:) -> .finished(error)
-        let errExpectation = Expectation()
+        let errExpectation = UncheckedExpectation()
         let thrownError = SomeError()
         let _ = AsyncThrowingStream<String, Error> {
           $0.onTermination = { @Sendable reason in
@@ -1149,7 +1149,7 @@ class NotSendable {}
       // cause has yet to be determined.
       /*
       tests.test("task cancellation terminates stream") {
-        let expectation = Expectation()
+        let expectation = UncheckedExpectation()
         let (stream, continuation) = AsyncStream<Int>.makeStream()
         continuation.onTermination = { @Sendable reason in
           if case .cancelled = reason { expectation.fulfilled = true }

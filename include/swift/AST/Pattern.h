@@ -73,7 +73,6 @@ protected:
   );
 
   SWIFT_INLINE_BITFIELD_FULL(TuplePattern, Pattern, 32,
-    : NumPadBits,
     NumElements : 32
   );
 

@@ -603,6 +603,11 @@ public struct Builder {
     return notifyNew(bridged.createThrow(value.bridged).getAs(ThrowInst.self))
   }
 
+  @discardableResult
+  public func createThrowAddr() -> ThrowAddrInst {
+    return notifyNew(bridged.createThrowAddr().getAs(ThrowAddrInst.self))
+  }
+
   public func createUncheckedEnumData(enum enumVal: Value,
                                       caseIndex: Int,
                                       resultType: Type) -> UncheckedEnumDataInst {

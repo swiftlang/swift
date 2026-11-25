@@ -412,6 +412,14 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     } else if (param->getTypeInContext()->isRepresentableIn(
           language,
           const_cast<AbstractFunctionDecl *>(AFD))) {
+      // Warn about Unicode.Scalar parameters in C/Objective-C-bound decl,
+      // which is exposed as 'char32_t' and can hold invalid Unicode values.
+      if (param->getTypeInContext()->getCanonicalType()->isUnicodeScalar()) {
+        param->diagnose(diag::c_unicode_scalar_param_unsound, param->getName());
+        auto note = param->diagnose(diag::c_unicode_scalar_param_unsound_fixit);
+        if (auto *typeRepr = param->getTypeRepr())
+          note.fixItReplace(typeRepr->getSourceRange(), "UInt32");
+      }
       continue;
     }
 
@@ -555,6 +563,7 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
   case ActorIsolation::Unspecified:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static AvailabilityRange getObjCClassStubAvailability(ASTContext &ctx) {

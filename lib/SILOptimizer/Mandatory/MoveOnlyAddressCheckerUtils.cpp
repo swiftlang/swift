@@ -1453,6 +1453,29 @@ void UseState::initializeLiveness(
       }
     } else if (auto *bai = dyn_cast<BeginAccessInst>(livenessInstAndValue.first)) {
       updateForLivenessAccess(bai, livenessInstAndValue.second);
+    } else if (auto apply = FullApplySite::isa(livenessInstAndValue.first);
+               apply && apply.getCalleeFunction()
+                     && apply.getCalleeFunction()->isTransparent()) {
+      // DI will allow an application of a transparent function to a partially
+      // initialized value. The callee can use the initialized parts of the
+      // value but can't change the overall initialization state, so filter the
+      // use to the parts that are defined at the point of call.
+      auto useBits = livenessInstAndValue.second;
+      SmallBitVector useBeforeDefBits(useBits.size());
+      liveness.isUserBeforeDef(apply.getInstruction(),
+                               useBits.set_bits(), useBeforeDefBits);
+      useBits &= ~useBeforeDefBits;
+      LLVM_DEBUG(llvm::dbgs() << "Filtering use of non-def elements for transparent application:\n";
+                 llvm::dbgs() << *apply.getInstruction();
+                 llvm::dbgs() << "Use bits: ";
+                 for (unsigned i = 0; i < useBits.size(); ++i) {
+                   llvm::dbgs() << useBits[i];
+                 }
+                 llvm::dbgs() << '\n');
+      
+      liveness.updateForUse(livenessInstAndValue.first,
+                            useBits,
+                            false /*lifetime ending*/);
     } else {
       liveness.updateForUse(livenessInstAndValue.first,
                             livenessInstAndValue.second,
@@ -3109,6 +3132,16 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
     return true;
   }
+  
+  // MarkDependence of a partial_apply should already have been visited when
+  // we saw the partial_apply.
+  if (auto md = dyn_cast<MarkDependenceInst>(user)) {
+    LLVM_DEBUG(llvm::dbgs() << md->getValue());
+    if (md->isNonEscaping() && isa<PartialApplyInst>(md->getValue())) {
+      LLVM_DEBUG(llvm::dbgs() << "skipping mark_dependence on nonescaping closure\n");
+      return true;
+    }
+  }
 
   // If we don't fit into any of those categories, just track as a liveness
   // use. We assume all such uses must only be reads to the memory. So we assert
@@ -3312,7 +3345,6 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
     LLVM_DEBUG(llvm::dbgs() << "Performing forward traversal from errorUse "
                                "looking for the cause of liveness!\n");
 
-    llvm::SmallSetVector<SILInstruction *, 1> violatingInst;
     bool foundSingleBlockError = false;
     while (auto *block = worklist.pop()) {
       LLVM_DEBUG(llvm::dbgs()
@@ -4309,6 +4341,7 @@ bool ExtendUnconsumedLiveness::isLiveAtBegin(SILBasicBlock *block,
   case Effect::Gen:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ExtendUnconsumedLiveness::hasDefAfter(SILInstruction *start,

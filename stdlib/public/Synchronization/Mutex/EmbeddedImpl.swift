@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+internal import SwiftPlatform
+
 // Private inline storage for EmbeddedPlatform's opaque mutex hooks.
 @usableFromInline
 internal typealias _SwiftEmbeddedMutex = [(EMBEDDED_SWIFT_MUTEX_NUM_WORDS) of UInt]

@@ -3529,6 +3529,7 @@ getParameterFlagsForMangling(ParameterTypeFlags flags,
       return flags.withOwnershipSpecifier(ParamSpecifier::Default);
     return flags;
   }
+  llvm_unreachable("covered switch");
 }
 
 void ASTMangler::appendFunctionInputType(
@@ -5172,6 +5173,7 @@ static StringRef getPrivateDiscriminatorIfNecessary(
     return getPrivateDiscriminatorIfNecessary(
         cast<Decl>(cast<MacroExpansionDecl>(expansion)));
   }
+  llvm_unreachable("covered switch");
 }
 
 void

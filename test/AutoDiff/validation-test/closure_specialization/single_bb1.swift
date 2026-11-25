@@ -161,7 +161,7 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
 
   // CHECK4-NONE:  {{^}}// pullback #1 (t:) in test4Vjp(_:)
   // CHECK4:       {{^}}// specialized pullback #1 (t:) in test4Vjp(_:)
-  // CHECK4:       sil private @$s3out8test4VjpySf5value_S2fc8pullbacktSfFADL_1tS2f_tF62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_Sf0f1_g1_h4Cosyj1_klM2U_SfTf1nEnE_n : $@convention(thin) (Float, Float, Float, Float) -> Float {
+  // CHECK4:       sil private [closure] @$s3out8test4VjpySf5value_S2fc8pullbacktSfFADL_1tS2f_tF62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_Sf0f1_g1_h4Cosyj1_klM2U_SfTf1nEnE_n : $@convention(thin) (Float, Float, Float, Float) -> Float {
 
   func test4Derivative(_ x: Float) -> Float {
     return cos(x) * cos(x) - sin(x) * sin(x)

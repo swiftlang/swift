@@ -169,6 +169,7 @@ bool swift::ide::hasInterestingDefaultValue(const ParamDecl *param) {
   case DefaultArgumentKind::ExpressionMacro:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 void CodeCompletionStringBuilder::addChunkWithText(

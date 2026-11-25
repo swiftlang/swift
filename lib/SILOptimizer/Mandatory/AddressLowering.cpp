@@ -843,6 +843,15 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       // case, generating the argument loads is sufficient.
       if (addrType.isAddressOnly(*pass.function)) {
         pass.valueStorageMap.insertValue(load, arg);
+      } else if (!param.isConsumedInCallee()) {
+        // A loadable value has no storage in the valueStorageMap, so resolve
+        // its value_to_address here: the address is the argument itself.
+        for (Operand *use : llvm::make_early_inc_range(load->getUses())) {
+          if (auto *vta = dyn_cast<ValueToAddressInst>(use->getUser())) {
+            vta->replaceAllUsesWith(arg);
+            pass.deleter.forceDelete(vta);
+          }
+        }
       }
     }
     ++argIdx;
@@ -1161,8 +1170,29 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &cast<MarkDependenceInst>(value)
                 ->getAllOperands()[MarkDependenceInst::Dependent];
 
-  case ValueKind::MoveValueInst:
-    return &cast<MoveValueInst>(value)->getOperandRef();
+  case ValueKind::MoveValueInst: {
+    // A variable gets its own storage so that the larger value it was taken
+    // from is not kept alive until the variable's last use. Rewriting can
+    // change the answer, so after allocation consult the move's storage instead.
+    auto *move = cast<MoveValueInst>(value);
+    SILValue source = move->getOperand();
+    if (!move->isFromVarDecl() ||
+        source->getOwnershipKind() != OwnershipKind::Owned)
+      return &move->getOperandRef();
+    if (isa<UncheckedEnumDataInst>(source))
+      return nullptr;
+    if (auto *result = dyn_cast<SILPhiArgument>(source))
+      if (isa_and_nonnull<SwitchEnumInst>(result->getTerminatorForResult()))
+        return nullptr;
+    if (isa<MultipleValueInstructionResult>(source) &&
+        getProjectedDefOperand(source))
+      return nullptr;
+    return &move->getOperandRef();
+  }
+
+  case ValueKind::UncheckedOwnershipInst:
+  case ValueKind::UncheckedOwnershipConversionInst:
+    return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
 
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
@@ -2559,8 +2589,12 @@ static bool isRootScopeOpenBetween(SILInstruction *load, SILInstruction *user,
 /// \p user is the call that takes \p argValue. Only full calls qualify, since
 /// they are finished with their arguments when they return. A partial
 /// application or a coroutine could keep using the address.
-static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
-                                                        SILInstruction *user) {
+///
+/// \p guaranteedIndirectArgs are the address arguments that replaced the
+/// function's guaranteed object arguments.
+static SingleValueInstruction *
+getLoadFromStableAddress(SILValue argValue, SILInstruction *user,
+                         ArrayRef<SILValue> guaranteedIndirectArgs) {
   if (!isa<ApplyInst>(user) && !isa<TryApplyInst>(user))
     return nullptr;
 
@@ -2589,6 +2623,11 @@ static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
       root = mark->getOperand();
     } else if (auto *wrapper = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(root)) {
       root = wrapper->getOperand();
+    } else if (auto *wrapper =
+                   dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(root)) {
+      // SILGen wraps the address of a loadable argument for a no-implicit-copy
+      // parameter.
+      root = wrapper->getOperand();
     } else {
       break;
     }
@@ -2597,6 +2636,10 @@ static SingleValueInstruction *getLoadFromStableAddress(SILValue argValue,
   if (auto *access = dyn_cast<BeginAccessInst>(root)) {
     isStable = access->getAccessKind() == SILAccessKind::Read;
   }
+  // A guaranteed indirect argument is immutable and outlives the call. This is
+  // the address that value_to_address of a loadable argument resolves to.
+  if (isa<SILFunctionArgument>(root))
+    isStable = llvm::is_contained(guaranteedIndirectArgs, root);
   if (!isStable)
     return nullptr;
   auto *load = cast<SingleValueInstruction>(argValue);
@@ -2681,8 +2724,8 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // addressable parameter's buffer, is passed by that same address rather than
   // by a copy.
   if (!apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
-    if (auto *load =
-            getLoadFromStableAddress(argValue, apply.getInstruction())) {
+    if (auto *load = getLoadFromStableAddress(argValue, apply.getInstruction(),
+                                              pass.guaranteedIndirectArgs)) {
       if (SILValue addr = getAddressForArgument(
               load->getOperand(0), argValue->getType(), argBuilder, callLoc)) {
         operand->set(addr);
@@ -2789,6 +2832,7 @@ protected:
       case FullApplySiteKind::TryApplyInst:
         return cast<TryApplyInst>(apply)->getErrorBB()->begin();
     }
+    llvm_unreachable("covered switch");
   }
 
   void makeIndirectArgs(MutableArrayRef<SILValue> newCallArgs);
@@ -3008,6 +3052,7 @@ SILBasicBlock::iterator ApplyRewriter::getResultInsertionPoint() {
     llvm_unreachable("coroutines don't have indirect results");
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Return the storage address for the indirect output corresponding to the
@@ -4057,10 +4102,12 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::CanBeObjCClass:
   case BuiltinValueKind::CopyArray:
   case BuiltinValueKind::CreateAsyncTask:
+  case BuiltinValueKind::CreateSplitContinuation:
   case BuiltinValueKind::CreateTaskGroup:
   case BuiltinValueKind::CreateTaskGroupWithFlags:
   case BuiltinValueKind::DeallocRawTyped:
   case BuiltinValueKind::DestroyArray:
+  case BuiltinValueKind::DestroySplitContinuation:
   case BuiltinValueKind::GetObjCTypeEncoding:
   case BuiltinValueKind::InitializeDistributedRemoteActor:
   case BuiltinValueKind::InjectEnumTag:
@@ -4098,6 +4145,7 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::AddTaskLocalValue:
   case BuiltinValueKind::AddressOfRawLayout:
   case BuiltinValueKind::GetEnumTag:
+  case BuiltinValueKind::GetSplitContinuationAddr:
   case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
   case BuiltinValueKind::ResumeThrowingContinuationReturning:
   case BuiltinValueKind::TaskLocalValuePush:
@@ -4305,6 +4353,21 @@ protected:
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
+  void visitEndLifetimeInst(EndLifetimeInst *end) {
+    end->setOperand(addrMat.materializeAddress(use->get()));
+  }
+
+  void visitMergeIsolationRegionInst(MergeIsolationRegionInst *merge) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    merge->setOperand(use->getOperandNumber(), addr);
+  }
+
+  void visitDeinitExistentialValueInst(DeinitExistentialValueInst *deinit) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    builder.createDeinitExistentialAddr(deinit->getLoc(), addr);
+    pass.deleter.forceDelete(deinit);
+  }
+
   // In Raw SIL, extend_lifetime marks the end of a variable's scope for values
   // that have no destroy_value. There is no address form of the instruction:
   // the value's storage is already scoped by its alloc_stack.
@@ -4321,9 +4384,31 @@ protected:
 
   void visitMakeBorrowInst(MakeBorrowInst *mbi) {
     SILValue addr = addrMat.materializeAddress(use->get());
+    if (mbi->getType().isAddressOnly(*mbi->getFunction())) {
+      AddressMaterialization resultMat(pass, mbi, builder);
+      SILValue borrowAddr = resultMat.materializeAddress(mbi);
+      builder.createInitBorrowAddr(mbi->getLoc(), borrowAddr, addr);
+      markRewritten(mbi, borrowAddr);
+      return;
+    }
     auto* makeAddrBorrow = builder.createMakeAddrBorrow(mbi->getLoc(), addr);
     mbi->replaceAllUsesWith(makeAddrBorrow);
     pass.deleter.forceDelete(mbi);
+  }
+
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *dbi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    markRewritten(dbi,
+                  builder.createDereferenceBorrowAddr(dbi->getLoc(), borrowAddr));
+  }
+
+  void visitDereferenceAddrBorrowInst(DereferenceAddrBorrowInst *dabi) {
+    SILValue borrowAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    dabi->replaceAllUsesWith(
+        builder.createDereferenceBorrowAddr(dabi->getLoc(), borrowAddr));
+    pass.deleter.forceDelete(dabi);
   }
 
   void visitMarkDependenceInst(MarkDependenceInst *mdi) {
@@ -4447,6 +4532,19 @@ protected:
     markRewritten(inst, replacement);
   }
 
+  void visitUncheckedOwnershipInst(UncheckedOwnershipInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
+  }
+
+  void visitUncheckedOwnershipConversionInst(
+      UncheckedOwnershipConversionInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+    markRewritten(inst,
+                  pass.valueStorageMap.getStorage(use->get()).storageAddress);
+  }
+
   void visitMoveValueInst(MoveValueInst *mvi);
 
   void visitMoveOnlyWrapperToCopyableValueInst(
@@ -4487,6 +4585,32 @@ protected:
     }
     sbi->replaceAllUsesWith(addr);
     pass.deleter.forceDelete(sbi);
+  }
+
+  // Whether the storage of \p value is an alloc_stack, an indirect argument,
+  // an address that a callee returned or yielded, or a projection of one.
+  // Assign that storage and keep it for as long as the value's.
+  bool hasStableStorage(SILValue value) {
+    while (Operand *reusedOper = getReusedStorageOperand(value))
+      value = reusedOper->get();
+    SILValue rootAddr =
+        pass.valueStorageMap.getBaseStorage(value).storageAddress;
+    return rootAddr &&
+           (isa<AllocStackInst>(rootAddr) ||
+            isa<SILFunctionArgument>(rootAddr) || isa<ApplyInst>(rootAddr) ||
+            isa_and_nonnull<BeginApplyInst>(
+                rootAddr->getDefiningInstruction()));
+  }
+
+  // The address of an opaque value is the address of its storage.
+  void visitValueToAddressInst(ValueToAddressInst *vta) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    assert(hasStableStorage(use->get()) &&
+           "value_to_address operand's storage must be an alloc_stack, an "
+           "indirect argument, or an address returned or yielded by a callee, "
+           "or a projection of one");
+    vta->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(vta);
   }
 
   void rewriteStore(SILValue srcVal, SILValue destAddr,
@@ -4788,35 +4912,30 @@ protected:
   NO_OPAQUE_OPERAND(TupleAddrConstructor)
   NO_OPAQUE_OPERAND(Vector)
 
+  // Removed before this pass in the default pipeline.
+  NO_OPAQUE_OPERAND(Assign)
+  NO_OPAQUE_OPERAND(AssignOrInit)
+  NO_OPAQUE_OPERAND(Diagnose)
+  NO_OPAQUE_OPERAND(EndFormalScope)
+
   // Can see an opaque operand, but has no rewrite yet. This lists known gaps
   // only: a new instruction needs a rewrite, or a NO_OPAQUE_OPERAND entry
   // with a reason if none of its operands can be opaque.
-  UNIMPLEMENTED_OPAQUE_OPERAND(Assign)
-  UNIMPLEMENTED_OPAQUE_OPERAND(AssignOrInit)
   UNIMPLEMENTED_OPAQUE_OPERAND(AutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginCOWMutation)
   UNIMPLEMENTED_OPAQUE_OPERAND(BeginDeallocRef)
   UNIMPLEMENTED_OPAQUE_OPERAND(BorrowedFrom)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DeinitExistentialValue)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceAddrBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(DereferenceBorrow)
-  UNIMPLEMENTED_OPAQUE_OPERAND(Diagnose)
   UNIMPLEMENTED_OPAQUE_OPERAND(DropDeinit)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndCOWMutation)
-  UNIMPLEMENTED_OPAQUE_OPERAND(EndFormalScope)
   UNIMPLEMENTED_OPAQUE_OPERAND(EndInitLetRef)
-  UNIMPLEMENTED_OPAQUE_OPERAND(EndLifetime)
   UNIMPLEMENTED_OPAQUE_OPERAND(ExtractExecutor)
   UNIMPLEMENTED_OPAQUE_OPERAND(HopToExecutor)
   UNIMPLEMENTED_OPAQUE_OPERAND(InitExistentialRef)
-  UNIMPLEMENTED_OPAQUE_OPERAND(MergeIsolationRegion)
   UNIMPLEMENTED_OPAQUE_OPERAND(RefToBridgeObject)
   UNIMPLEMENTED_OPAQUE_OPERAND(RefToRawPointer)
   UNIMPLEMENTED_OPAQUE_OPERAND(SelectEnumAddr)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreUnowned)
   UNIMPLEMENTED_OPAQUE_OPERAND(StoreWeak)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_OPERAND(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedAutoreleaseValue)
   UNIMPLEMENTED_OPAQUE_OPERAND(UnmanagedReleaseValue)
@@ -4858,6 +4977,21 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
   }
 }
 
+static void markStorageLexical(SILValue address) {
+  if (auto base = getAccessBase(address)) {
+    if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
+      allocStack->setIsLexical();
+      return;
+    }
+    // Function arguments are inherently lexical.
+    if (isa<SILFunctionArgument>(base))
+      return;
+  }
+
+  SWIFT_ASSERT_ONLY(address->dump());
+  llvm_unreachable("^^^ unknown lexical address producer");
+}
+
 template <typename Introducer>
 void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
   assert(use == getProjectedDefOperand(introducer));
@@ -4867,20 +5001,8 @@ void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
   markRewritten(introducer, address);
 
   // Lifetime introducers are irrelevant unless they are marked lexical.
-  if (introducer->isLexical()) {
-    if (auto base = getAccessBase(address)) {
-      if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
-        allocStack->setIsLexical();
-        return;
-      }
-      // Function arguments are inherently lexical.
-      if (isa<SILFunctionArgument>(base))
-        return;
-    }
-
-    SWIFT_ASSERT_ONLY(address->dump());
-    llvm_unreachable("^^^ unknown lexical address producer");
-  }
+  if (introducer->isLexical())
+    markStorageLexical(address);
 }
 
 void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
@@ -4888,7 +5010,17 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 }
 
 void UseRewriter::visitMoveValueInst(MoveValueInst *mvi) {
-  visitLifetimeIntroducer(mvi);
+  SILValue srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+  SILValue destAddr = srcAddr;
+  if (!pass.valueStorageMap.getStorage(mvi).isDefProjection) {
+    AddressMaterialization addrMat(pass, mvi, builder);
+    destAddr = addrMat.materializeAddress(mvi);
+    builder.createCopyAddr(mvi->getLoc(), srcAddr, destAddr, IsTake,
+                           IsInitialization);
+  }
+  markRewritten(mvi, destAddr);
+  if (mvi->isLexical())
+    markStorageLexical(destAddr);
 }
 
 // Opening an opaque existential. Rewrite the opened existentials here on
@@ -5494,6 +5626,12 @@ protected:
     pass.valueStorageMap.setStorageAddress(dbi, addr);
   }
 
+  void visitMakeAddrBorrowInst(MakeAddrBorrowInst *mabi) {
+    SILValue destAddr = addrMat.materializeAddress(mabi);
+    builder.createInitBorrowAddr(mabi->getLoc(), destAddr, mabi->getOperand());
+    storage.markRewritten();
+  }
+
   // Rewrite the apply for an indirect result.
   void visitDestructureTupleInst(DestructureTupleInst *destructure) {
     SILValue srcVal = destructure->getOperand();
@@ -5658,6 +5796,7 @@ protected:
   NO_OPAQUE_RESULT(UncheckedBorrowEnumDataAddr)
   NO_OPAQUE_RESULT(UncheckedInPlaceEnumDataAddr)
   NO_OPAQUE_RESULT(UncheckedTakeEnumDataAddr)
+  NO_OPAQUE_RESULT(ValueToAddress)
   NO_OPAQUE_RESULT(VectorBaseAddr)
 
   // Results are references, boxes, metatypes, functions, or other loadable
@@ -5753,6 +5892,7 @@ protected:
   REWRITTEN_BY_USE(CopyableToMoveOnlyWrapperValue)
   REWRITTEN_BY_USE(DestructureStruct)
   REWRITTEN_BY_USE(ExplicitCopyValue)
+  REWRITTEN_BY_USE(MakeBorrow)
   REWRITTEN_BY_USE(MarkDependence)
   REWRITTEN_BY_USE(MarkUnresolvedNonCopyableValue)
   REWRITTEN_BY_USE(MoveOnlyWrapperToCopyableValue)
@@ -5762,6 +5902,8 @@ protected:
   REWRITTEN_BY_USE(TupleExtract)
   REWRITTEN_BY_USE(TuplePackExtract)
   REWRITTEN_BY_USE(UncheckedEnumData)
+  REWRITTEN_BY_USE(UncheckedOwnership)
+  REWRITTEN_BY_USE(UncheckedOwnershipConversion)
 
   // Can define an opaque result, but has no rewrite yet. This lists known
   // gaps only: a new instruction needs a rewrite, or a NO_OPAQUE_RESULT or
@@ -5775,16 +5917,12 @@ protected:
   UNIMPLEMENTED_OPAQUE_RESULT(EndInitLetRef)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadUnowned)
   UNIMPLEMENTED_OPAQUE_RESULT(LoadWeak)
-  UNIMPLEMENTED_OPAQUE_RESULT(MakeAddrBorrow)
-  UNIMPLEMENTED_OPAQUE_RESULT(MakeBorrow)
   UNIMPLEMENTED_OPAQUE_RESULT(RawPointerToRef)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnum)
   UNIMPLEMENTED_OPAQUE_RESULT(SelectEnumAddr)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnmanagedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyUnownedValue)
   UNIMPLEMENTED_OPAQUE_RESULT(StrongCopyWeakValue)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnership)
-  UNIMPLEMENTED_OPAQUE_RESULT(UncheckedOwnershipConversion)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedRefCast)
   UNIMPLEMENTED_OPAQUE_RESULT(UncheckedTrivialBitCast)
 
@@ -6136,6 +6274,16 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
 
   allocator.sinkProjections();
 
+  // Mark the function lowered now, so its conventions and verification see
+  // address form immediately.
+  //
+  // This must happen before deleting the rewritten instructions. Deleting an
+  // instruction kills its debug uses, and a killed debug_value of an
+  // address-only type keeps its address form only once the function has lowered
+  // addresses. Otherwise, it is left as an object-typed undef, which the
+  // verifier rejects.
+  function->setHasLoweredAddresses(true);
+
   deleteRewrittenInstructions(pass);
 
   StackNesting::fixNesting(function);
@@ -6144,11 +6292,6 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   // createStackAllocation or StackNesting.
   pm->invalidateAnalysis(
       function, SILAnalysis::InvalidationKind::BranchesAndInstructions);
-
-  // Mark the function lowered now, so its conventions and verification see
-  // address form immediately (the module stage only reaches Canonical after all
-  // diagnostic passes; see runSILDiagnosticPasses in Passes.cpp).
-  function->setHasLoweredAddresses(true);
 }
 
 //===----------------------------------------------------------------------===//

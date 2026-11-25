@@ -150,6 +150,33 @@ bb0(%0 : @owned $NCWrapper):
   return %17
 }
 
+sil @Holder_inlineInt_unsafeAddressor : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+
+// rdar://155572008 ([nonescapable] Fix dependency on unsafeAddress projection)
+//
+// OK: A dependence on an unsafeAddress projection (pointer_to_address + mark_dependence) is forwarded to the
+// addressor's 'self', so returning it is valid within the caller's borrow of %0.
+//
+// CHECK-LABEL: sil [ossa] @testUnsafeAddressProjection : {{.*}} {
+// CHECK: [[ADR:%.*]] = mark_dependence [nonescaping] %{{.*}} on %0
+// CHECK: [[SPAN:%.*]] = apply %{{.*}}([[ADR]])
+// CHECK: mark_dependence [nonescaping] [[SPAN]] on [[ADR]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressProjection'
+sil [ossa] @testUnsafeAddressProjection : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned Span<Int> {
+bb0(%0 : $*Holder):
+  %1 = load_borrow %0
+  %2 = function_ref @Holder_inlineInt_unsafeAddressor : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+  %4 = struct_extract %3, #UnsafePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*InlineInt
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %8 = apply %7(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = mark_dependence [unresolved] %8 on %6
+  end_borrow %1
+  return %9
+}
+
 // Test that LifetimeDependence.Scope recognizes a singly-initialized alloc_stack.
 sil [ossa] @testStackInit : $@convention(thin) () -> () {
 bb0:
@@ -511,4 +538,32 @@ bb3(%12 : @owned $Optional<@callee_guaranteed () -> ()>):
   destroy_value %12
   %14 = tuple ()
   return %14
+}
+
+struct NEPairForAccessor : ~Escapable {
+  var a: NE
+  var b: NE
+}
+
+sil @yieldNEPairForAccessor : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+sil @mutateNEPairForAccessorB : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+
+// The store target is the address result of a mutate accessor whose 'self' depends on the inout argument %0. The
+// stored value depends on %1, so it escapes.
+sil [ossa] @store_to_yield_through_mutate_accessor_result : $@convention(thin) (@inout NEPairForAccessor, @guaranteed NE) -> () {
+// expected-note @-1{{it depends on the lifetime of an argument of 'store_to_yield_through_mutate_accessor_result'}}
+bb0(%0 : $*NEPairForAccessor, %1 : @guaranteed $NE):
+  %2 = function_ref @yieldNEPairForAccessor : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+  %5 = mark_dependence [nonescaping] %3 : $*NEPairForAccessor on %0 : $*NEPairForAccessor
+  %6 = function_ref @mutateNEPairForAccessorB : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+  %7 = apply %6(%5) : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+  %8 = copy_value %1
+  %9 = mark_dependence [nonescaping] %8 : $NE on %1 : $NE
+  store %9 to [assign] %7
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-2{{this use causes the lifetime-dependent value to escape}}
+  %11 = end_apply %4 as $()
+  %12 = tuple ()
+  return %12
 }

@@ -492,6 +492,9 @@ private:
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
   unsigned IsWithoutActuallyEscapingThunk : 1;
 
+  /// See isClosure().
+  unsigned IsClosure : 1;
+
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   unsigned OptMode : NumOptimizationModeBits;
@@ -532,6 +535,10 @@ private:
   
   /// Set when this function gives trivial values explicit ownership.
   unsigned HasOwnershipForTrivialValues : 1;
+
+  /// Set while value lifetimes (inits, destroys, assigns) are undetermined.
+  /// Relaxes the SILVerifier. This flag is cleared by LifetimeResolution.
+  unsigned HasUnresolvedLifetimes : 1;
 
   static constexpr unsigned NumFunctionStageBits = 2;
 
@@ -834,6 +841,11 @@ public:
     HasOwnershipForTrivialValues = val; 
   }
 
+  bool hasUnresolvedLifetimes() const { return HasUnresolvedLifetimes; }
+  void setHasUnresolvedLifetimes(bool val = true) {
+    HasUnresolvedLifetimes = val;
+  }
+
   /// This function's SIL stage. Read this for a per-function legality query,
   /// such as whether an instruction is still legal here. For a live function it
   /// is never below the module's stage floor, and may be ahead of it.
@@ -843,7 +855,8 @@ public:
   void setFunctionStage(SILStage stage);
 
   /// Take the facts a whole-function clone inherits from the function it was
-  /// derived from: the address-lowering form and the SIL stage.
+  /// derived from: the address-lowering form, whether its lifetimes are
+  /// unresolved, and the SIL stage.
   void inheritDerivedFrom(const SILFunction *from);
 
   ForceEnableLexicalLifetimes_t forceEnableLexicalLifetimes() const {
@@ -881,6 +894,13 @@ public:
     assert(!val || isThunk() == IsReabstractionThunk);
     IsWithoutActuallyEscapingThunk = val;
   }
+
+  /// True if this is a closure (the [closure] attribute,
+  /// docs/SIL/FunctionAttributes.md): the function of a closure expression or
+  /// of a local declaration, which SILGen marks when it creates it.
+  bool isClosure() const { return IsClosure; }
+
+  void setIsClosure(bool val = true) { IsClosure = val; }
 
   bool isAsync() const { return LoweredType->isAsync(); }
 

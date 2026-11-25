@@ -658,8 +658,8 @@ func f(a : FooClass, b : LetStructMembers) {
 class MutableSubscripts {
   var x : Int = 0
 
-  subscript(x: inout Int) -> () { x += 1 } // expected-error {{'inout' may only be used on function or initializer parameters}}
-  subscript<T>(x: inout T) -> () { // expected-error {{'inout' may only be used on function or initializer parameters}}
+  subscript(x: inout Int) -> () { x += 1 }
+  subscript<T>(x: inout T) -> () {
     fatalError()
   }
 

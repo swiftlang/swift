@@ -145,6 +145,11 @@ bool SILValueOwnershipChecker::check() {
     return false;
   }
 
+  // Until its lifetimes are resolved, a value may be consumed any number of
+  // times, so skip the LinearLifetimeChecker.
+  if (value->getFunction()->hasUnresolvedLifetimes())
+    return true;
+
   SmallVector<Operand *, 32> allLifetimeEndingUsers;
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
   SmallVector<Operand *, 32> allRegularUsers;
@@ -229,6 +234,30 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // any further work to do.
     if (!isOwned) {
       continue;
+    }
+
+    // An owned value may be the base of an interior pointer: the address result
+    // of a borrow or mutate accessor with an owned self, a mark_dependence
+    // [nonescaping] address, or a value_to_address. Add the uses of the
+    // interior pointer as implicit regular users.
+    if (op->getOperandOwnership() == OperandOwnership::AnyInteriorPointer) {
+      auto interiorPointerOperand = InteriorPointerOperand::get(op);
+      assert(interiorPointerOperand.kind ==
+                 InteriorPointerOperandKind::BorrowMutateAccessor ||
+             interiorPointerOperand.kind ==
+                 InteriorPointerOperandKind::MarkDependenceNonEscaping ||
+             interiorPointerOperand.kind ==
+                 InteriorPointerOperandKind::ValueToAddress);
+      SmallVector<Operand *, 8> interiorPointerUses;
+      interiorPointerOperand.findTransitiveUses(&interiorPointerUses);
+      for (auto *interiorPointerUse : interiorPointerUses) {
+        auto ownership = interiorPointerUse->getOperandOwnership();
+        if (ownership == OperandOwnership::NonUse ||
+            ownership == OperandOwnership::DebugUse) {
+          continue;
+        }
+        nonLifetimeEndingUsers.push_back(interiorPointerUse);
+      }
     }
 
     // Otherwise, check if we have a borrow scope operand. In such a case, we

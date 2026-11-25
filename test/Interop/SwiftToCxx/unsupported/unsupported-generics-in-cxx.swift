@@ -4,6 +4,7 @@
 // RUN: cat %s | grep -v _expose > %t/clean.swift
 // RUN: %target-swift-frontend %t/clean.swift -module-name Decls -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/decls.h
 // RUN: %FileCheck %s < %t/decls.h
+// RUN: %FileCheck --check-prefix=CONTEXT %s < %t/decls.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/decls.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -91,6 +92,15 @@ public class OuterGeneric<T> {
 public func takesNestedInGenericClass(_ c: OuterGeneric<Int>.NestedClass) {}
 public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fatalError() }
 
+// Pointers other than OpaquePointer can't be generic arguments in C++.
+public func returnsDoubleOptionalPointer() -> UnsafePointer<Int>?? { nil }
+public func returnsArrayOfOptionalPointers() -> [UnsafePointer<Int>?] { [] }
+public func takesArrayOfRawPointers(_ p: [UnsafeRawPointer?]) {}
+
+public struct HasDoubleOptionalPointerProperty {
+  public var p: UnsafePointer<Int>??
+}
+
 // CHECK: supported
 
 // Struct1<UInt32> can't be represented in C++, so index1 is not printed.
@@ -142,8 +152,11 @@ public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fat
 
 // CHECK: class Struct1 { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'Struct1' can not yet be represented in C++");
 
+// CHECK: // Unavailable in C++: Swift global function 'returnsArrayOfOptionalPointers()'. Return type '[UnsafePointer<Int>?]' is not representable in C++.
+// CHECK: // Unavailable in C++: Swift global function 'returnsDoubleOptionalPointer()'. Return type 'UnsafePointer<Int>??' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'returnsGenericClass()'. Return type 'GenericClass<Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'returnsNestedInGenericClass()'. Return type 'OuterGeneric<Int>.NestedClass' is not representable in C++.
+// CHECK: // Unavailable in C++: Swift global function 'takesArrayOfRawPointers(_:)'. Parameter 'p' of type '[UnsafeRawPointer?]' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesGenericClass(_:)'. Parameter 'c' of type 'GenericClass<Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesKeyPath(_:)'. Parameter 'k' of type 'KeyPath<Int, Int>' is not representable in C++.
 // CHECK: // Unavailable in C++: Swift global function 'takesNestedInGenericClass(_:)'. Parameter 'c' of type 'OuterGeneric<Int>.NestedClass' is not representable in C++.
@@ -168,3 +181,46 @@ public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fat
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif // __cpp_concepts
 // CHECK-NEXT: class unsupportedGenericStruct { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedGenericStruct' can not yet be represented in C++");
+
+// Parameter packs and value generics have no requirements, but aren't supported
+// yet either.
+@available(SwiftStdlib 5.9, *)
+@_expose(Cxx) // expected-error {{generic requirements for generic struct 'unsupportedPack' can not yet be represented in C++}}
+public struct unsupportedPack<each T> {
+    public var x: Int
+}
+
+@available(SwiftStdlib 6.2, *)
+@_expose(Cxx) // expected-error {{generic requirements for generic struct 'unsupportedValueGeneric' can not yet be represented in C++}}
+public struct unsupportedValueGeneric<let N: Int> {
+    public var x: Int
+}
+
+// Requirements of the context apply to declarations without generic
+// parameters of their own.
+@_expose(Cxx)
+public struct GenericWithConstrainedMembers<T> {
+    public var x: Int
+
+    @_expose(Cxx) // expected-error {{generic requirements for instance method 'constrainedMethod()' can not yet be represented in C++}}
+    public func constrainedMethod() where T: Proto {}
+
+    @_expose(Cxx) // expected-error {{generic requirements for instance method 'sameTypeMethod()' can not yet be represented in C++}}
+    public func sameTypeMethod() where T == Int {}
+}
+
+extension GenericWithConstrainedMembers where T: Proto {
+    @_expose(Cxx) // expected-error {{generic requirements for struct 'NestedInConstrainedExtension' can not yet be represented in C++}}
+    public struct NestedInConstrainedExtension {
+        public var y: Int
+    }
+}
+
+// CONTEXT-NOT: constrainedMethod
+// CONTEXT-NOT: sameTypeMethod
+// CONTEXT-NOT: NestedInConstrainedExtension
+// CONTEXT: class unsupportedPack { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedPack' can not yet be represented in C++");
+// CONTEXT: class unsupportedValueGeneric { } SWIFT_UNAVAILABLE_MSG("generic requirements for generic struct 'unsupportedValueGeneric' can not yet be represented in C++");
+// CONTEXT-NOT: constrainedMethod
+// CONTEXT-NOT: sameTypeMethod
+// CONTEXT-NOT: NestedInConstrainedExtension

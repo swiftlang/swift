@@ -422,6 +422,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
   case Kind::Invalid:
     llvm_unreachable("asking invalid abstraction pattern");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::isNoncopyable(CanType substTy) const {
@@ -1586,6 +1587,31 @@ unsigned AbstractionPattern::getFlattenedValueCount() const {
 }
 
 AbstractionPattern
+AbstractionPattern::getFunctionYieldType(unsigned index) const {
+  switch (getKind()) {
+  case Kind::Opaque:
+    return *this;
+  case Kind::Type: {
+    if (isTypeParameterOrOpaqueArchetype())
+      return getOpaque();
+
+    auto yieldType =
+        cast<AnyFunctionType>(getType()).getYields()[index].getType();
+    return AbstractionPattern(getGenericSubstitutions(),
+                              getGenericSignatureForFunctionComponent(),
+                              yieldType->getCanonicalType());
+  }
+  case Kind::OpaqueFunction:
+  case Kind::OpaqueDerivativeFunction:
+    return getOpaque();
+  default:
+    llvm_unreachable("does not have function yields");
+  }
+
+  llvm_unreachable("bad kind");
+}
+
+AbstractionPattern
 AbstractionPattern::getFunctionParamType(unsigned index) const {
   switch (getKind()) {
   case Kind::Opaque:
@@ -1738,6 +1764,10 @@ ParameterTypeFlags
 AbstractionPattern::getFunctionParamFlags(unsigned index) const {
   return cast<AnyFunctionType>(getType()).getParams()[index]
            .getParameterFlags();
+}
+
+YieldTypeFlags AbstractionPattern::getFunctionYieldFlags(unsigned index) const {
+  return cast<AnyFunctionType>(getType()).getYields()[index].getFlags();
 }
 
 bool
@@ -2331,6 +2361,7 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2373,6 +2404,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2408,6 +2440,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::arePackElementsPassedIndirectly(TypeConverter &TC) const {
@@ -2486,6 +2519,7 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && CXXMethod == other.CXXMethod
       && OtherData == other.OtherData;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace {

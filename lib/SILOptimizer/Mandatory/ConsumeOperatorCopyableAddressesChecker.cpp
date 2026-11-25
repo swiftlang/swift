@@ -1165,6 +1165,7 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
+  Fn->setIsClosure(orig->isClosure());
   return Fn;
 }
 
@@ -2127,6 +2128,9 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
     return MoveConstraint::forGuaranteed(!info.isConsumedInCaller());
   }
+  case AccessRepresentation::Kind::BorrowMutateAccessor:
+    // Conservatively reject for now.
+    return MoveConstraint::Illegal;
   case AccessRepresentation::Kind::Nested: {
     auto *bai = cast<BeginAccessInst>(base.getBaseAddress());
     if (bai->getAccessKind() == SILAccessKind::Init ||
@@ -2139,6 +2143,7 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     // Conservatively reject for now.
     return MoveConstraint::Illegal;
   }
+  llvm_unreachable("covered switch");
 }
 
 // Returns true if we emitted a diagnostic and handled the single block
