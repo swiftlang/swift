@@ -48,8 +48,8 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct UsingBaseConstructorWithParam {
-// CHECK-NEXT:   public init(_: CUnsignedInt)
 // CHECK-NEXT:   public init(_: CInt)
+// CHECK-NEXT:   public init(_: CUnsignedInt)
 // CHECK-NEXT:   public var value: CInt
 // CHECK-NEXT: }
 
@@ -69,9 +69,9 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
-// CHECK-NEXT:   public init()
 // CHECK-NEXT:   @available(*, deprecated, message: "use Bool(fromCxx:)")
 // CHECK-NEXT:   public func __convertToBool() -> CBool
+// CHECK-NEXT:   public init()
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> CInt
 // CHECK-NEXT:   @available(*, unavailable, message: "use ! instead")
@@ -99,7 +99,7 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct ProtectedOperatorBoolMadePublic : CxxConvertibleToBool {
-// CHECK-NEXT:   public init()
 // CHECK-NEXT:   @available(*, deprecated, message: "use Bool(fromCxx:)")
 // CHECK-NEXT:   public func __convertToBool() -> CBool
+// CHECK-NEXT:   public init()
 // CHECK-NEXT: }
