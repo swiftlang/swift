@@ -145,6 +145,11 @@ public class Instruction : CustomStringConvertible, Hashable {
     return bridged.mayRelease()
   }
 
+  /// True if this instruction allocates memory on the stack, e.g. an `alloc_stack`.
+  public final var isAllocatingStack: Bool {
+    return bridged.isAllocatingStack()
+  }
+
   public final var hasUnspecifiedSideEffects: Bool {
     return bridged.mayHaveSideEffects()
   }
