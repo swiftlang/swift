@@ -1727,7 +1727,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
       // Compute the initializer kind from the derived method, though.
       if (auto kind = determineCtorInitializerKind(method))
-        overriddenNames[0].second.info.initKind = *kind;
+        overriddenNames[0].second.info.setInitKind(*kind);
 
       return overriddenNames[0].second;
     }
@@ -1800,7 +1800,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         }
 
         if (auto kind = determineCtorInitializerKind(method))
-          result.info.initKind = *kind;
+          result.info.setInitKind(*kind);
 
         // If this swift_name attribute maps a factory method to an
         // initializer and we were asked not to do so, ignore the
@@ -1844,7 +1844,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                   .isReference())
             // This lets a Swift subclass of this FRT initialize itself using
             // base's constructor.
-            result.info.initKind = CtorInitializerKind::ConvenienceFactory;
+            result.info.setInitKind(CtorInitializerKind::ConvenienceFactory);
       }
     }
 
@@ -1880,7 +1880,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.importAsMember = true;
 
         if (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor)
-          result.info.initKind = CtorInitializerKind::Factory;
+          result.info.setInitKind(CtorInitializerKind::Factory);
       }
 
       // Map property getters/setters.
@@ -2058,7 +2058,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   case clang::DeclarationName::CXXConstructorName: {
     isInitializer = true;
     isFunction = true;
-    result.info.initKind = CtorInitializerKind::Designated;
+    result.info.setInitKind(CtorInitializerKind::Designated);
     baseName = "init";
     auto ctor = dyn_cast<clang::CXXConstructorDecl>(D);
     if (auto templateCtor = dyn_cast<clang::FunctionTemplateDecl>(D))
@@ -2243,7 +2243,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (isInitializer) {
       if (auto kind = determineCtorInitializerKind(objcMethod))
-        result.info.initKind = *kind;
+        result.info.setInitKind(*kind);
 
       // If we would import a factory method as an initializer but were
       // asked not to, don't consider this as an initializer.

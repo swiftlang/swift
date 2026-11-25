@@ -238,7 +238,7 @@ class ImportedName {
     unsigned selfIndex;
 
     /// For an initializer, the kind of initializer to import.
-    CtorInitializerKind initKind;
+    unsigned initKind : 2;
 
     /// What kind of accessor this name refers to, if any.
     ImportedAccessorKind accessorKind : NumImportedAccessorKindBits;
@@ -268,11 +268,20 @@ class ImportedName {
     unsigned hasInvalidCustomName : 1;
 
     Info()
-        : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
+        : errorInfo(), selfIndex(),
+          initKind(unsigned(CtorInitializerKind::Designated)),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
           hasErrorInfo(false), hasAsyncInfo(false),
           hasAsyncAlternateInfo(false), hasInvalidCustomName(false) {}
+
+    CtorInitializerKind getInitKind() const {
+      return CtorInitializerKind(initKind);
+    }
+    void setInitKind(CtorInitializerKind kind) {
+      initKind = unsigned(kind);
+      assert(getInitKind() == kind && "initKind bit-field too narrow");
+    }
   } info;
 
 public:
@@ -293,7 +302,7 @@ public:
   }
 
   /// For an initializer, the kind of initializer to import.
-  CtorInitializerKind getInitKind() const { return info.initKind; }
+  CtorInitializerKind getInitKind() const { return info.getInitKind(); }
 
   /// What kind of accessor this name refers to, if any.
   ImportedAccessorKind getAccessorKind() const { return info.accessorKind; }
