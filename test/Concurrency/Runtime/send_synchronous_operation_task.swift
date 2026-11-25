@@ -4,6 +4,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
 // REQUIRES: swift_feature_SendCalls
+// REQUIRES: dispatch
 
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
