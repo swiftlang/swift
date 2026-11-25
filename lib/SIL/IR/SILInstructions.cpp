@@ -441,6 +441,12 @@ AllocBoxInst::create(SILDebugLocation Loc, CanSILBoxType BoxType,
                      UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo,
                      HasPointerEscape_t hasPointerEscape,
                      bool inferredImmutable) {
+  // An alloc_box cannot store a variable location or scope.
+  ASSERT((!Var || !Var->Loc ||
+          *Var->Loc == Loc.getLocation().strippedForDebugVariable()) &&
+         "alloc_box variable location must match the instruction location");
+  ASSERT((!Var || !Var->Scope || Var->Scope == Loc.getScope()) &&
+         "alloc_box variable scope must match the instruction scope");
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F, BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
