@@ -2433,6 +2433,21 @@ void BridgedSILDebugVariable::clearDIExpr() {
   reinterpret_cast<swift::SILDebugVariable *>(&storage)->DIExpr = {};
 }
 
+/// Strip values from the debug variable which are not used for equality: its type and deref.
+inline swift::SILDebugVariable getVariableIdentity(swift::SILDebugVariable var) {
+  var.Type = {};
+  var.DIExpr = var.DIExpr.getFragmentPart();
+  return var;
+}
+
+bool BridgedSILDebugVariable::isSameVariable(const BridgedSILDebugVariable &other) const {
+  return getVariableIdentity(unbridge()) == getVariableIdentity(other.unbridge());
+}
+
+SwiftInt BridgedSILDebugVariable::getVariableHash() const {
+  return (SwiftInt)hash_value(getVariableIdentity(unbridge()));
+}
+
 OptionalBridgedDeclObj BridgedInstruction::DebugValue_getDecl() const {
   return {getAs<swift::DebugValueInst>()->getDecl()};
 }

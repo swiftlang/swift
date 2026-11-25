@@ -782,6 +782,8 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void clearType();
   BRIDGED_INLINE void clearDIExpr();
+  BRIDGED_INLINE bool isSameVariable(const BridgedSILDebugVariable &other) const;
+  BRIDGED_INLINE SwiftInt getVariableHash() const;
 };
 
 struct BridgedInstruction {
