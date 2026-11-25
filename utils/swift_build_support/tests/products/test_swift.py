@@ -62,6 +62,7 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_observation=False,
             enable_experimental_parser_validation=False,
             swift_enable_backtracing=False,
+            swift_enable_wasm_plugins=False,
             enable_synchronization=False,
             enable_volatile=False,
             enable_runtime_module=False,
@@ -129,6 +130,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
+            '-DSWIFT_ENABLE_WASM_PLUGINS:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
             '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING=10.9',
@@ -171,6 +173,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
             '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
+            '-DSWIFT_ENABLE_WASM_PLUGINS:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE',
             '-DSWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL=FALSE',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_OSX:STRING=10.9',
@@ -580,6 +583,29 @@ class SwiftTestCase(unittest.TestCase):
              '-gline-tables-only;-v'],
             [x for x in swift.cmake_options
                 if 'SWIFT_DEBUGINFO_NON_LTO_ARGS' in x])
+
+    def test_wasm_plugins_flags(self):
+        self.args.swift_enable_wasm_plugins = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_WASM_PLUGINS:BOOL=TRUE'],
+            [x for x in swift.cmake_options
+                if 'SWIFT_ENABLE_WASM_PLUGINS' in x])
+
+        self.args.swift_enable_wasm_plugins = False
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_WASM_PLUGINS:BOOL=FALSE'],
+            [x for x in swift.cmake_options
+                if 'SWIFT_ENABLE_WASM_PLUGINS' in x])
 
     def test_stdlib_docs_flags(self):
         self.args.build_stdlib_docs = True
