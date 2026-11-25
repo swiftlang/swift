@@ -577,7 +577,8 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
   static unsigned getHashValue(const ImportNameVersion &Val) {
-    return DMIU::getHashValue(Val.rawValue) ^ Val.cArrayProjection;
+    return DMIU::getHashValue(Val.rawValue) ^ Val.cArrayProjection ^
+           (Val.concurrency << 2);
   }
   static bool isEqual(const ImportNameVersion &LHS,
                       const ImportNameVersion &RHS) {
