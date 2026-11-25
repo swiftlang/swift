@@ -1,0 +1,31 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -enable-sil-opaque-values -sil-move-only-checker -enable-sil-verify-all %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+sil @take : $@convention(thin) <T> (@in_guaranteed T) -> ()
+
+// The mark is checked and removed: the `load_borrow` reads the wrapped address
+// directly.
+//
+// CHECK-LABEL: sil [ossa] [opaque] @readBorrowedArgument : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:       bb0(%0 : @guaranteed $T):
+// CHECK-NEXT:    value_to_address %0 : $T
+// CHECK-NEXT:    [[WRAPPED:%[^,]+]] = copyable_to_moveonlywrapper_addr
+// CHECK-NEXT:    load_borrow [[WRAPPED]]
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK-LABEL: } // end sil function 'readBorrowedArgument'
+sil [ossa] @readBorrowedArgument : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = value_to_address %0 : $T
+  %2 = copyable_to_moveonlywrapper_addr %1 : $*T
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $*@moveOnly T
+  %4 = load_borrow %3 : $*@moveOnly T
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly T
+  %6 = function_ref @take : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  end_borrow %4 : $@moveOnly T
+  %8 = tuple ()
+  return %8 : $()
+}

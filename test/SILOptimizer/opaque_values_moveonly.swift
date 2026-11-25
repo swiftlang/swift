@@ -125,13 +125,13 @@ func readInDefer<T: ~Copyable>(_ a: consuming T) {
 }
 
 func consumeInAutoclosure<T: ~Copyable>(_ a: consuming T, _ c: Bool) -> Bool {
-  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  let n: T // expected-error {{non-'Copyable' 'n' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   n = a
   return c && take(n) // expected-note {{consumed here}}
 }
 
 func consumeInClosure<T: ~Copyable>(_ a: consuming T) -> Bool {
-  let n: T // expected-error {{'n' is borrowed and cannot be consumed}}
+  let n: T // expected-error {{non-'Copyable' 'n' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   n = a
   return { take(n) }() // expected-note {{consumed here}}
 }
