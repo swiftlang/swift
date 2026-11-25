@@ -538,6 +538,10 @@ def create_argument_parser():
     option('--swift-enable-backtracing', toggle_true,
            default=True,
            help='enable backtracing support')
+    option('--swift-enable-wasm-plugins', toggle_true,
+           default=False,
+           help='build swift-plugin-server with support for Wasm macro '
+                'plugins.')
     option('--swift-runtime-fixed-backtracer-path', store,
            help='if set, provide a fixed path for the Swift backtracer')
 
