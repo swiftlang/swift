@@ -7725,9 +7725,11 @@ void irgen::emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl) {
 
   if (auto classDecl = dyn_cast<ClassDecl>(decl)) {
     if (classDecl->isForeignReferenceType()) {
-      assert(!isEmbedded && "emitting foregin reference type not supported");
       ForeignReferenceTypeMetadataBuilder builder(IGM, classDecl, init);
-      builder.layout();
+      if (isEmbedded)
+        builder.embeddedLayout();
+      else
+        builder.layout();
 
       IGM.defineTypeMetadata(type, /*isPattern=*/false,
                              builder.canBeConstant(),

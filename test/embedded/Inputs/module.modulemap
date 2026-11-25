@@ -11,3 +11,8 @@ module CxxMoveOnly {
   header "cxx-move-only.h"
   requires cplusplus
 }
+
+module CxxForeignReference {
+  header "cxx-foreign-reference.h"
+  requires cplusplus
+}
