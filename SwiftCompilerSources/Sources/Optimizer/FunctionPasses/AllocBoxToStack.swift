@@ -347,7 +347,18 @@ private struct FunctionSpecializations {
       return
     }
     context.buildSpecializedFunction(specializedFunction: specializedFunc) { (specializedFunc, specContext) in
-      cloneFunction(from: original, toEmpty: specializedFunc, specContext)
+      if original.isGeneric {
+        // The specialized function has the same generic environment as the original function.
+        // Still, clone with the identity substitutions instead of using a plain cloner, because
+        // the identity replacement of a pack archetype `each T` is `Pack{repeat each T}` and not
+        // `each T`. A plain cloner would "substitute" `each T` with itself when it remaps a
+        // substitution map which contains local archetypes. Inside a pack expansion this increases
+        // the pack element level, e.g. `Pack{repeat each T}` would become `Pack{repeat (each T)^1}`.
+        cloneAndSpecializeFunction(from: original, toEmpty: specializedFunc,
+                                   substitutions: original.forwardingSubstitutionMap, specContext)
+      } else {
+        cloneFunction(from: original, toEmpty: specializedFunc, specContext)
+      }
 
       replaceBoxWithStackArguments(in: specializedFunc, original: original, specContext)
     }
