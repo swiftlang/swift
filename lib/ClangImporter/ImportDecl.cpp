@@ -3029,12 +3029,19 @@ namespace {
           return nullptr;
         }
 
-        // Escapability annotations have no effect on a foreign reference type.
+        // Escapability annotations have no effect on a foreign reference type
+        // (SWIFT_VIEW was rejected above), and neither do copyability
+        // annotations: the class is imported as usual, and references to it
+        // are copied freely.
         for (auto *swiftAttr : decl->specific_attrs<clang::SwiftAttrAttr>()) {
-          if (swiftAttr->getAttribute() == "Escapable" ||
-              swiftAttr->getAttribute().starts_with("escapable_if:"))
+          if (importer::isEscapabilityAnnotation(swiftAttr))
             Impl.diagnose(HeaderLoc(decl->getLocation()),
                           diag::escapable_foreign_reference_type,
+                          importer::getPrettySwiftAttributeName(swiftAttr),
+                          decl);
+          else if (importer::isCopyabilityAnnotation(swiftAttr))
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::noncopyable_foreign_reference_type,
                           importer::getPrettySwiftAttributeName(swiftAttr),
                           decl);
         }
@@ -4315,9 +4322,32 @@ namespace {
 
       checkBridgingAttrs(decl);
       Impl.validateSwiftAttributes(decl);
+      diagnoseRedundantReturnsIndependentValue(decl);
 
       return importFunctionDecl(decl, importedName, correctSwiftName,
                                 std::nullopt);
+    }
+
+    /// Warn if SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on \p decl.
+    void diagnoseRedundantReturnsIndependentValue(
+        const clang::FunctionDecl *decl) {
+      auto redundant = importer::getRedundantReturnsIndependentValue(
+          decl, Impl.SwiftContext);
+      if (!redundant)
+        return;
+      // Diagnose a template once, rather than once per instantiation.
+      const clang::FunctionDecl *diagnosed =
+          decl->getTemplateInstantiationPattern();
+      if (!diagnosed)
+        diagnosed = decl;
+      if (!Impl.DiagnosedRedundantReturnsIndependentValue
+               .insert(diagnosed->getCanonicalDecl())
+               .second)
+        return;
+      Impl.diagnose(HeaderLoc(decl->getLocation()),
+                    diag::returns_independent_value_has_no_effect, diagnosed,
+                    static_cast<unsigned>(redundant->kind),
+                    redundant->type.getTypePtr());
     }
 
     /// Emit diagnostics for incorrect usage of SWIFT_RETURNS_RETAINED and
@@ -5455,6 +5485,8 @@ namespace {
       if (decl->getOverloadedOperator() ==
               clang::OverloadedOperatorKind::OO_Call &&
           decl->isStatic()) {
+        // The synthesized member is implicit, so diagnose the operator itself.
+        diagnoseRedundantReturnsIndependentValue(decl);
         auto result = synthesizer.makeInstanceToStaticOperatorCallMethod(
             decl, getCArrayProjection());
         if (result)

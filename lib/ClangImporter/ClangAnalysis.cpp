@@ -1468,7 +1468,8 @@ static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
 
 std::optional<importer::CxxUnsafetyReason>
 importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                                        ASTContext &ctx) {
+                                        ASTContext &ctx,
+                                        bool ignoreReturnsIndependentValue) {
   // Returning the reason rather than reporting it through an out-parameter
   // keeps the verdict and its explanation inseparable.
   auto safe = []() -> std::optional<CxxUnsafetyReason> { return std::nullopt; };
@@ -1477,7 +1478,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
 
   // The user explicitly acknowledged this method's unsafety
   // and asked us to import it as is anyway. No renaming needed.
-  if (hasUnsafeAPIAttr(method))
+  if (!ignoreReturnsIndependentValue && hasUnsafeAPIAttr(method))
     return safe();
 
   // If it's a static method, it cannot project anything. It's fine.
@@ -1559,6 +1560,66 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   return safe();
 }
 
+std::optional<importer::RedundantReturnsIndependentValue>
+importer::getRedundantReturnsIndependentValue(const clang::FunctionDecl *decl,
+                                              ASTContext &ctx) {
+  // A declaration the importer synthesized (e.g. to call a virtual method)
+  // copies the annotation of the one it wraps, which is diagnosed instead.
+  if (decl->isImplicit() || !hasUnsafeAPIAttr(decl))
+    return std::nullopt;
+
+  // In a template instantiation, a result type spelled in terms of a template
+  // parameter may need the annotation for other template arguments. The class
+  // a constructor produces always depends on them.
+  if (auto *pattern = decl->getTemplateInstantiationPattern()) {
+    if (isa<clang::CXXConstructorDecl>(decl) ||
+        pattern->getReturnType()->isInstantiationDependentType())
+      return std::nullopt;
+  }
+
+  using Kind = RedundantReturnsIndependentValue::Kind;
+  auto redundant = [](Kind kind, clang::QualType type) {
+    return RedundantReturnsIndependentValue{kind, type};
+  };
+
+  // A constructor's return type is 'void'; the value it produces is its class.
+  bool isConstructor = isa<clang::CXXConstructorDecl>(decl);
+  clang::QualType resultType =
+      isConstructor ? decl->getASTContext().getCanonicalTagType(
+                          cast<clang::CXXConstructorDecl>(decl)->getParent())
+                    : decl->getReturnType();
+
+  std::optional<RedundantReturnsIndependentValue> result;
+  if (resultType->isVoidType())
+    result = redundant(Kind::ReturnsVoid, resultType);
+  else if (clangTypeIsForeignReference(resultType, ctx))
+    result = redundant(resultType->isPointerType()
+                           ? Kind::ReturnsPointerToForeignReference
+                           : Kind::ReturnsReferenceToForeignReference,
+                       resultType->getPointeeType());
+  // A pointer or reference may point into storage the result depends on.
+  else if (!resultType->isPointerOrReferenceType() &&
+           evaluateOrDefault(
+               ctx.evaluator,
+               ClangTypeEscapability(
+                   {resultType->getUnqualifiedDesugaredType(), nullptr}),
+               CxxEscapability::Unknown) == CxxEscapability::Escapable)
+    result = redundant(isConstructor ? Kind::ConstructsEscapable
+                                     : Kind::ReturnsEscapable,
+                       resultType);
+  if (!result)
+    return std::nullopt;
+
+  // The annotation also keeps a method that would otherwise be considered a
+  // projection (e.g. one returning an iterator) from being renamed as unsafe.
+  if (auto *method = dyn_cast<clang::CXXMethodDecl>(decl))
+    if (shouldRenameCXXMethodAsUnsafe(method, ctx,
+                                      /*ignoreReturnsIndependentValue=*/true))
+      return std::nullopt;
+
+  return result;
+}
+
 /// Whether a note at \p loc would land in a system header. Such a note names
 /// something the user cannot annotate (a libc++ implementation detail, say), so
 /// it is dropped in favour of explaining a type they control.
@@ -1589,14 +1650,20 @@ diagnoseUnsafetyReason(ClangImporter::Implementation &Impl, HeaderLoc loc,
 
   case importer::CxxUnsafetyReason::UnsafeField:
     return note(diag::cxx_unsafe_field, named, culprit);
-  case importer::CxxUnsafetyReason::UnsafeTemplateArgument:
-    return note(diag::cxx_unsafe_template_argument, named,
-                         culprit);
   case importer::CxxUnsafetyReason::ExplicitAnnotation:
     return note(diag::cxx_unsafe_explicit_annotation, named,
                          culprit);
   case importer::CxxUnsafetyReason::IndirectView:
     return note(diag::cxx_unsafe_indirect_view);
+  case importer::CxxUnsafetyReason::UnsafeTemplateArgument:
+    assert(explanation.argument && "template argument reason without one");
+    return note(diag::cxx_unsafe_template_argument, explanation.base != nullptr,
+                explanation.base, explanation.argument);
+  case importer::CxxUnsafetyReason::NonEscapableTemplateArgument:
+    assert(explanation.argument && "template argument reason without one");
+    return note(diag::cxx_unsafe_nonescapable_template_argument,
+                explanation.base != nullptr, explanation.base,
+                explanation.argument);
   }
   llvm_unreachable("covered switch");
 }
@@ -1627,6 +1694,121 @@ diagnoseUnknownEscapability(ClangImporter::Implementation &Impl, HeaderLoc loc,
                          culprit);
   }
   llvm_unreachable("covered switch");
+}
+
+/// Clang does not copy attributes from a class template to its explicit
+/// specializations, or to the instantiations of its partial specializations.
+/// If \p decl is one of those and has no escapability annotation of its own,
+/// return the primary template and the escapability annotation on it, which
+/// \p decl does not inherit.
+static std::pair<const clang::ClassTemplateDecl *, const clang::SwiftAttrAttr *>
+getUninheritedEscapabilityAnnotation(const clang::RecordDecl *decl) {
+  auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(
+      decl->getDefinitionOrSelf());
+  if (!spec)
+    return {};
+  // An instantiation of the primary template has its annotations.
+  if (!spec->isExplicitSpecialization() &&
+      !isa<clang::ClassTemplatePartialSpecializationDecl *>(
+          spec->getSpecializedTemplateOrPartial()))
+    return {};
+  if (llvm::any_of(spec->specific_attrs<clang::SwiftAttrAttr>(),
+                   importer::isEscapabilityAnnotation))
+    return {};
+
+  auto *primary = spec->getSpecializedTemplate();
+  for (auto *attr : primary->getTemplatedDecl()
+                        ->getDefinitionOrSelf()
+                        ->specific_attrs<clang::SwiftAttrAttr>())
+    if (importer::isEscapabilityAnnotation(attr))
+      return {primary, attr};
+  return {};
+}
+
+/// Explain why \p recordDecl, imported as a class if \p isClass, is unsafe.
+/// \p explainedRecords guards against explaining a record twice.
+static void explainRecord(
+    ClangImporter::Implementation &Impl, const clang::RecordDecl *recordDecl,
+    bool isClass, SourceLoc useLoc,
+    llvm::SmallPtrSetImpl<const clang::RecordDecl *> &explainedRecords) {
+  if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl,
+                                             {"unsafe", "unsafe(always)"}))
+    return;
+
+  // Unknown escapability is the root cause when it applies, and it is what the
+  // user can act on. The safety walk falls through it to the fields, so without
+  // this a conditionally-escapable type such as std::shared_ptr would be
+  // explained by whichever raw pointer its implementation happens to hold.
+  //
+  // Follow the chain of blame to its end, so the last note lands on the type
+  // whose annotation would settle the question. The visited set both prevents
+  // cycles and bounds the walk.
+  llvm::SmallPtrSet<const clang::RecordDecl *, 4> visited;
+  bool explained = false;
+  for (const clang::RecordDecl *current = recordDecl;
+       current && visited.insert(current).second;) {
+    auto unknown =
+        importer::explainUnknownEscapability(current, Impl.SwiftContext);
+    if (!unknown)
+      break;
+    explained = true;
+
+    // We can have a chain of reasons why a type is considered unsafe. Follow
+    // the chain to the record that owns the culprit and let it explain itself,
+    // rather than attributing its member here.
+    const clang::RecordDecl *next = nullptr;
+    if (unknown->owner &&
+        unknown->owner->getCanonicalDecl() != current->getCanonicalDecl())
+      next = unknown->owner;
+    else if (auto *asRecord =
+                 dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
+             asRecord && asRecord != current)
+      next = asRecord;
+
+    if (!isInSystemHeader(current)) {
+      // Naming the record the explanation moves to, not its member: the next
+      // note describes that record.
+      HeaderLoc loc(current->getLocation(), useLoc);
+      if (next)
+        diagnoseUnknownEscapability(
+            Impl, loc,
+            importer::CxxUnknownEscapabilityReason::ConditionalArgument, next);
+      else
+        diagnoseUnknownEscapability(Impl, loc, unknown->reason,
+                                    unknown->culprit);
+
+      // The specialization may have been meant to carry the annotation of its
+      // primary template, which Clang does not propagate to it.
+      if (auto [primary, attr] = getUninheritedEscapabilityAnnotation(current);
+          attr)
+        Impl.diagnose(
+            HeaderLoc(attr->getLocation(), useLoc),
+            diag::cxx_unknown_escapability_specialization_not_annotated,
+            primary, importer::getPrettySwiftAttributeName(attr));
+    }
+
+    current = next;
+  }
+  if (explained)
+    return;
+
+  if (isInSystemHeader(recordDecl))
+    return;
+
+  auto unsafe =
+      importer::explainRecordUnsafety(recordDecl, Impl.SwiftContext, isClass);
+  if (!unsafe)
+    return;
+  diagnoseUnsafetyReason(Impl, HeaderLoc(recordDecl->getLocation(), useLoc),
+                         *unsafe);
+
+  // A type imported as a class can be unsafe because of a template argument
+  // that is unsafe on its own; let the argument explain itself too.
+  if (unsafe->reason == importer::CxxUnsafetyReason::UnsafeTemplateArgument)
+    if (auto *argument = dyn_cast_or_null<clang::RecordDecl>(unsafe->culprit))
+      if (explainedRecords.insert(argument).second)
+        explainRecord(Impl, argument, /*isClass=*/false, useLoc,
+                      explainedRecords);
 }
 
 void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
@@ -1685,65 +1867,10 @@ void ClangImporter::diagnoseCxxUnsafetyReason(const ValueDecl *decl, Type type,
       dyn_cast_or_null<clang::RecordDecl>(nominal->getClangNode().getAsDecl());
   if (!recordDecl)
     return;
-  if (importer::hasSwiftAttributeOnAnyRedecl(recordDecl,
-                                             {"unsafe", "unsafe(always)"}))
-    return;
-
-  // Unknown escapability is the root cause when it applies, and it is what the
-  // user can act on. The safety walk falls through it to the fields, so without
-  // this a conditionally-escapable type such as std::shared_ptr would be
-  // explained by whichever raw pointer its implementation happens to hold.
-  //
-  // Follow the chain of blame to its end, so the last note lands on the type
-  // whose annotation would settle the question. The visited set both prevents
-  // cycles and bounds the walk.
-  llvm::SmallPtrSet<const clang::RecordDecl *, 4> visited;
-  bool explained = false;
-  for (const clang::RecordDecl *current = recordDecl;
-       current && visited.insert(current).second;) {
-    auto unknown =
-        importer::explainUnknownEscapability(current, Impl.SwiftContext);
-    if (!unknown)
-      break;
-    explained = true;
-
-    // We can have a chain of reasons why a type is considered unsafe. Follow
-    // the chain to the record that owns the culprit and let it explain itself,
-    // rather than attributing its member here.
-    const clang::RecordDecl *next = nullptr;
-    if (unknown->owner &&
-        unknown->owner->getCanonicalDecl() != current->getCanonicalDecl())
-      next = unknown->owner;
-    else if (auto *asRecord =
-                 dyn_cast_or_null<clang::RecordDecl>(unknown->culprit);
-             asRecord && asRecord != current)
-      next = asRecord;
-
-    if (!isInSystemHeader(current)) {
-      // Naming the record the explanation moves to, not its member: the next
-      // note describes that record.
-      HeaderLoc loc(current->getLocation(), useLoc);
-      if (next)
-        diagnoseUnknownEscapability(
-            Impl, loc,
-            importer::CxxUnknownEscapabilityReason::ConditionalArgument, next);
-      else
-        diagnoseUnknownEscapability(Impl, loc, unknown->reason,
-                                    unknown->culprit);
-    }
-
-    current = next;
-  }
-  if (explained)
-    return;
-
-  if (isInSystemHeader(recordDecl))
-    return;
-
-  if (auto unsafe = importer::explainRecordUnsafety(
-          recordDecl, Impl.SwiftContext, isa<ClassDecl>(nominal)))
-    diagnoseUnsafetyReason(Impl, HeaderLoc(recordDecl->getLocation(), useLoc),
-                           *unsafe);
+  llvm::SmallPtrSet<const clang::RecordDecl *, 4> explainedRecords;
+  explainedRecords.insert(recordDecl);
+  explainRecord(Impl, recordDecl, isa<ClassDecl>(nominal), useLoc,
+                explainedRecords);
 }
 
 //===----------------------------------------------------------------------===//

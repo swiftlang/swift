@@ -729,6 +729,12 @@ public:
   /// the same code path, as elsewhere.
   llvm::DenseMap<const Decl *, Diagnostic> LifetimeUnsafetyReasons;
 
+  /// The functions, or function templates, already diagnosed for a redundant
+  /// SWIFT_RETURNS_INDEPENDENT_VALUE. A function is imported once per Swift
+  /// version, and every instantiation of a template shares its annotation.
+  llvm::DenseSet<const clang::FunctionDecl *>
+      DiagnosedRedundantReturnsIndependentValue;
+
   // Caches used by ObjCInterfaceAndImplementationRequest.
   llvm::DenseMap<Decl *, Decl *> ImplementationsByInterface;
   llvm::DenseMap<Decl *, llvm::TinyPtrVector<Decl*>> InterfacesByImplementation;
@@ -2797,6 +2803,14 @@ CustomAttr *getRefCountedPtrAttr(Decl *decl);
 /// attribute string itself when it has no documented macro.
 StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
 
+/// Whether \p attr is an escapability annotation: SWIFT_SELF_CONTAINED,
+/// SWIFT_VIEW or SWIFT_SELF_CONTAINED_IF.
+bool isEscapabilityAnnotation(const clang::SwiftAttrAttr *attr);
+
+/// Whether \p attr is a copyability annotation: SWIFT_NONCOPYABLE (also spelled
+/// by SWIFT_NONCOPYABLE_WITH_DESTROY) or SWIFT_COPYABLE_IF.
+bool isCopyabilityAnnotation(const clang::SwiftAttrAttr *attr);
+
 CxxValueSemanticsKind
 getCxxValueSemanticsKind(const clang::Type *type,
                          ClangImporter::Implementation &Impl);
@@ -2848,9 +2862,10 @@ explainUnknownEscapability(const clang::RecordDecl *recordDecl,
 ///
 /// Shares the ClangDeclExplicitSafety walk rather than repeating it, so the
 /// reason cannot contradict the verdict. \p isClass must match how the record is
-/// imported: a type imported as a class inherits unsafety from its bases and
-/// from nothing else, so asking under the wrong rules can answer that a record
-/// is safe when the compiler treats it as unsafe.
+/// imported: besides its own annotations, a type imported as a class is unsafe
+/// only because of its bases and template arguments, never its fields, so
+/// asking under the wrong rules can answer that a record is safe when the
+/// compiler treats it as unsafe.
 std::optional<CxxUnsafetyExplanation>
 explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx,
                       bool isClass);
@@ -2861,10 +2876,39 @@ explainRecordUnsafety(const clang::RecordDecl *recordDecl, ASTContext &ctx,
 /// \c @unsafe. See also PrintOptions::SkipUnsafeCXXMethods.
 ///
 /// Returns which rule decided that, so a diagnostic can explain it, or nothing
-/// when the method needs no rename.
+/// when the method needs no rename. With \p ignoreReturnsIndependentValue, the
+/// answer is the one the method would get without
+/// SWIFT_RETURNS_INDEPENDENT_VALUE.
 std::optional<CxxUnsafetyReason>
 shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
-                              ASTContext &ctx);
+                              ASTContext &ctx,
+                              bool ignoreReturnsIndependentValue = false);
+
+/// Why SWIFT_RETURNS_INDEPENDENT_VALUE has no effect on a function: its result
+/// cannot depend on the lifetime of anything.
+struct RedundantReturnsIndependentValue {
+  /// The order of the cases matches returns_independent_value_has_no_effect.
+  enum Kind : unsigned {
+    ReturnsEscapable,
+    ConstructsEscapable,
+    ReturnsPointerToForeignReference,
+    ReturnsReferenceToForeignReference,
+    ReturnsVoid,
+  } kind;
+  /// The Escapable type, the foreign reference type, or 'void'.
+  clang::QualType type;
+};
+
+/// Whether SWIFT_RETURNS_INDEPENDENT_VALUE on \p decl is redundant because its
+/// result is 'void', an Escapable value or a pointer or reference to a foreign
+/// reference type. Returns nothing if the annotation is absent or has an
+/// effect, and for a declaration the importer synthesized. A result type that
+/// depends on a template parameter is never reported, since another
+/// instantiation may need the annotation. Objective-C methods are not checked:
+/// the annotation is meant for C and C++ functions.
+std::optional<RedundantReturnsIndependentValue>
+getRedundantReturnsIndependentValue(const clang::FunctionDecl *decl,
+                                    ASTContext &ctx);
 
 inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
   if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
