@@ -18,7 +18,7 @@ The following notation for generic signatures is used throughout this book, as w
 
 The requirements in a generic signature have the same semantic representation as the requirements in a trailing \texttt{where} clause, given in \DefRef{requirement def}, with a few additional properties. A generic signature always omits any redundant requirements from the list, and the remaining ones are rewritten to be ``as simple as possible.'' We will fully explain this in \ChapRef{chap:building generic signatures}, when we see how the generic signature of a declaration is built from the syntactic forms described in the previous chapter, but for now, we're just going to assume we're working with an existing generic signature that was given to us.
 
-After some preliminaries, we will go on to introduce a formal system for reasoning about requirements and type parameters in \SecRef{derived req}. This makes precise the earlier concept of the \index{interface type}\emph{interface type} of a declaration---it contains type parameters whose validity can be derived from the declaration's generic signature. \SecRef{genericsigqueries} describes \emph{generic signature queries}, which are fundamental primitives in the implementation, used by the rest of the compiler to answer questions about generic signatures. These questions will be precisely stated using our formal system.
+After some preliminaries, we will go on to introduce a formal system for reasoning about requirements and type parameters in \SecRef{derived req}. This makes precise the earlier concept of the \index{interface type}\emph{interface type} of a declaration---it contains type parameters whose validity can be derived from the declaration's generic signature. \SecRef{sec:queries} describes \emph{generic signature queries}, which are fundamental primitives in the implementation, used by the rest of the compiler to answer questions about generic signatures. These questions will be precisely stated using our formal system.
 
 \paragraph{Debugging.} The \IndexFlag{debug-generic-signatures}\texttt{-debug-generic-signatures} frontend flag gives us a glimpse into the generics implementation by printing the generic signature of each declaration being type checked. Here is a simple program with three nested generic declarations:
 \begin{Verbatim}
@@ -136,7 +136,7 @@ We expect roughly the following to happen while type checking the function body:
 \item This method returns \texttt{Self.Iterator}. We substitute \tSelf\ with $\rT$, and conclude that ``\texttt{iter1}'' has type \texttt{\rT.Iterator}.
 \item Similarly, ``\texttt{iter2}'' has type \texttt{\rU.Iterator}.
 \end{enumerate}
-Next, we consider the sub-expression ``\verb|iter1.next()!|'':
+Next, we consider the subexpression ``\verb|iter1.next()!|'':
 \begin{enumerate}
 \item The requirement signature of \texttt{Sequence} tells us that \texttt{\rT.Iterator} conforms to \texttt{IteratorProtocol}, so we know it has a \texttt{next()} method.
 \item This method returns \texttt{Optional<Self.Element>}, and we substitute \tSelf\ with \texttt{\rT.Iterator} to get \texttt{Optional<\rT.Iterator.Element>}.
@@ -303,7 +303,7 @@ We put this example aside until the next section, when we introduce more inferen
 \end{example}
 
 \paragraph{Other requirements.}
-We now extend our formal system with concrete same-type requirements, superclass requirements, and layout requirements, with the caveat that this extended theory is \index{limitation!of derived requirements}incomplete. All inferences made by these rules are correct, but they do not describe all implemented behaviors of these other requirement kinds. We will see examples of this incompleteness in \SecRef{genericsigqueries} and \SecRef{minimal requirements}.
+We now extend our formal system with concrete same-type requirements, superclass requirements, and layout requirements, with the caveat that this extended theory is \index{limitation!of derived requirements}incomplete. All inferences made by these rules are correct, but they do not describe all implemented behaviors of these other requirement kinds. We will see examples of this incompleteness in \SecRef{sec:queries} and \SecRef{minimal requirements}.
 
 We add some more elementary statements. Let $G$ be a generic signature. \IndexStepDefinition{Concrete}If $\TX$ is an explicit \index{same-type requirement!elementary statement}same-type requirement of~$G$, where~\tT\ is a type parameter and~\tX\ is a concrete type (so \tX\ is not a type parameter but it may contain type parameters):
 \begin{gather*}
@@ -351,7 +351,7 @@ At this point, we've seen all of the kinds of elementary statements that exist, 
 
 \section{Valid Type Parameters}\label{valid type params}
 
-Now, we're going to take a closer look at the valid type parameters that can be derived from a generic signature. In \ChapRef{chap:types}, we introduced two notions of equality of \index{type parameter}type parameters: \index{canonical type equality}canonical type equality tells us if they have the same spelling, and \index{reduced type equality}\emph{reduced type equality}, relative to a generic signature, also takes \index{same-type requirement!equivalence}same-type requirements into account. We will formally define reduced type equality on type parameters in this section, and generalize it to all interface types in \SecRef{genericsigqueries}.
+Now, we're going to take a closer look at the valid type parameters that can be derived from a generic signature. In \ChapRef{chap:types}, we introduced two notions of equality of \index{type parameter}type parameters: \index{canonical type equality}canonical type equality tells us if they have the same spelling, and \index{reduced type equality}\emph{reduced type equality}, relative to a generic signature, also takes \index{same-type requirement!equivalence}same-type requirements into account. We will formally define reduced type equality on type parameters in this section, and generalize it to all interface types in \SecRef{sec:queries}.
 
 Reduced type equality is an \emph{equivalence relation}, so let's review the concept now. Given a fixed set that we call the \index{domain}\emph{domain}, a relation models some property that a pair of elements might have. In programming languages, relations are typically functions taking a pair of values to a true or false result. In mathematics, we instead imagine a relation as the set of those \index{ordered pair}ordered pairs $(x,y)$ such that the property is true of $x$ and $y$.
 
@@ -682,7 +682,7 @@ The fundamental tension here is the following:
 We often apply substitution maps to requirements of \index{generic signature!type substitution}generic signatures and requirement signatures, and to the \index{interface type}interface types of declarations. Indeed, all of these semantic objects must only contain bound type parameters. We resolve this as follows:
 \begin{itemize}
 \item Requirement minimization (\SecRef{minimal requirements}) converts unbound type parameters in the \texttt{where} clause into bound type parameters when building a generic signature.
-\item Generic signature queries (\SecRef{genericsigqueries}) accept unbound type parameters. One can obtain a bound type parameter from an unbound type parameter by asking the generic signature for the unbound type parameter's \index{reduced type}\emph{reduced type}.
+\item Generic signature queries (\SecRef{sec:queries}) accept unbound type parameters. One can obtain a bound type parameter from an unbound type parameter by asking the generic signature for the unbound type parameter's \index{reduced type}\emph{reduced type}.
 \item Type resolution uses generic signature queries to form bound type parameters when resolving the interface type of a declaration (\ChapRef{chap:type resolution}).
 \end{itemize}
 
@@ -692,7 +692,7 @@ We first add an inference rule analogous to \IndexStep{AssocName}\textsc{AssocNa
 \begin{gather*}
 \AssocDeclStepDef
 \end{gather*}
-To encode the equivalence of bound and unbound dependent member types, we also add an inference rule that derives a same-type requirement between the two. That is, from each associated type declaration~\nA\ of~\tP, the \IndexStepDefinition{AssocBind}\textsc{AssocBind} inference rule derives a same-type requirement between the two bound dependent member type derived by \textsc{AssocDecl}, and and the unbound dependent member type derived by \textsc{AssocName}:
+To encode the equivalence of bound and unbound dependent member types, we also add an inference rule that derives a same-type requirement between the two. That is, from each associated type declaration~\nA\ of~\tP, the \IndexStepDefinition{AssocBind}\textsc{AssocBind} inference rule derives a same-type requirement between the two bound dependent member type derived by \textsc{AssocDecl}, and the unbound dependent member type derived by \textsc{AssocName}:
 \begin{gather*}
 \AssocBindStepDef
 \end{gather*}
@@ -977,7 +977,7 @@ In \ChapRef{chap:archetypes}, we introduce \emph{archetypes}, a self-describing 
 
 A more complete treatment of equivalence relations and partial orders can be found in a discrete mathematics textbook, such as~\cite{grimaldi}. Something to keep in mind is that some authors say that a partial order is reflexive instead of anti-reflexive, so $\leq$ is the basic operation. This necessitates the additional condition that if both $x\leq y$ and $y\geq x$ are true, then $x=y$; without this assumption, we have a \index{preorder}\emph{preorder}. Sometimes, a linear order is also called a \emph{total order}, and a set with a well-founded order is said to be \emph{well-ordered}. The type parameter order is actually a special case of a \index{shortlex order}\emph{shortlex order}. Under reasonable assumptions, a shortlex order is always well-founded. We will see another instance of a shortlex order in \SecRef{finding conformance paths}, and then generalize the concept when we introduce the theory of string rewriting in \SecRef{sec:normal form algorithm}.
 
-\section{Generic Signature Queries}\label{genericsigqueries}
+\section{Generic Signature Queries}\label{sec:queries}
 
 In the implementation, we answer questions about the derived requirements and valid type parameters of a generic signature by invoking \IndexDefinition{generic signature query}\emph{generic signature queries}. These are methods on the \texttt{GenericSignature} class, used throughout the compiler. We can formalize the behavior of these queries using the notation we developed earlier in this chapter. Each query defines a mathematical \index{function}function that takes a generic signature and at least one other piece of data, and evaluates to some property of this signature.
 
@@ -1125,7 +1125,7 @@ Let $G$ be a generic signature. An interface type is a \IndexDefinition{reduced 
 In particular, a \index{fully-concrete type!reduced type}fully-concrete type, one without type parameters, is reduced.
 \end{definition}
 
-To guarantee \index{termination}termination in \AlgRef{reduced type algorithm}, we must disallow generic signatures with self-referential \index{same-type requirement!recursive}same-type requirements. For example, if $G\vdash\SameReq{\rT}{Array<\rT>}$, Step~1a would get stuck reducing \rT, \texttt{Array<\rT>}, \texttt{Array<Array<\rT>>}, and so on. We will describe how \SecRef{subst simplification}, but for now, we just assume it won't happen.
+To guarantee \index{termination}termination in \AlgRef{reduced type algorithm}, we must disallow generic signatures with self-referential \index{same-type requirement!recursive}same-type requirements. For example, if $G\vdash\SameReq{\rT}{Array<\rT>}$, Step~1a would get stuck reducing \rT, \texttt{Array<\rT>}, \texttt{Array<Array<\rT>>}, and so on. We will describe this is prevented in \SecRef{sec:concrete types}.
 
 We state the following result without proof:
 
@@ -1328,7 +1328,7 @@ The backing storage of a generic signature. Instances of this class are allocate
 \item \IndexQuerySource{getSugaredType}\texttt{getSugaredType()} replaces the generic parameter types in the given type, which must be an interface type for this generic signature, with their ``sugared'' forms taken from this generic signature, so that their names are preserved when printed out to a string.
 \item \texttt{forEachParam()} invokes a callback on each generic parameter of the signature; the callback also receives a boolean indicating if the generic parameter type is reduced or not---a generic parameter on the left hand side of a same-type requirement is not reduced.
 \end{itemize}
-The generic signature queries from \SecRef{genericsigqueries} are methods on \texttt{GenericSignatureImpl}:
+The generic signature queries from \SecRef{sec:queries} are methods on \texttt{GenericSignatureImpl}:
 \begin{itemize}
 \item Predicate queries:
 \begin{itemize}

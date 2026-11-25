@@ -1,2 +1,3 @@
-struct G<T: Any> {}  // the requirement is useless, but okay
-let x = G<Any>()     // fine
+struct G<T: Any> {}        // the requirement is useless, but okay
+let x = G<Any>()           // fine
+let y = G<any Sequence>()  // also fine

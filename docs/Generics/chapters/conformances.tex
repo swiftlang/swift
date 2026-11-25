@@ -88,7 +88,7 @@ We can pick any valid conformance $\XP$ apart, and get back the conforming type~
 \end{tikzcd}
 \end{center}
 
-If we start with a type~\tX, look up the conformance to~\tP, and get the conforming type out of this conformance, we end up with a type canonically equivalent to \tX. (The two types might be \index{type pointer equality}distinct pointers, because conformance lookup does not always preserve \index{sugared type}type sugar.) The other direction is more subtle. If we start with a conformance~$\XP$, get the conforming type~\tX, and look up the conformance of \tX\ to \tP, we would like to find the \emph{same} conformance. We say that global conformance lookup is \emph{coherent} if this property holds. We follow the simplest approach, and only guarantee coherence if there is \emph{at most} one conformance for every possible pairing of type with protocol.
+If we start with a type~\tX, look up the conformance to~\tP, and get the conforming type out of this conformance, we end up with a type canonically equivalent to \tX. (The two types might be \index{type pointer equality}distinct pointers, because conformance lookup does not always preserve \index{sugared type}type sugar.) The other direction is more subtle. If we start with a conformance~$\XP$, get the conforming type~\tX, and look up the conformance of \tX\ to \tP, we would like to find the \emph{same} conformance. We say that global conformance lookup is \IndexDefinition{coherence}\emph{coherent} if this property holds. We follow the simplest approach, and only guarantee coherence if there is \emph{at most} one conformance for every possible pairing of type with protocol.
 
 \paragraph{Coherence.} When a conformance is stated on an extension, we allow the extended type, the conformed protocol, and the extension itself to be in different \index{module declaration!conformance}modules. There are three possibilities. First, we can conform our type to a protocol from another module:
 \begin{Verbatim}
@@ -595,7 +595,7 @@ Recall that when a protocol \tP\ \index{protocol inheritance}inherits from anoth
 \]
 
 \begin{example}\label{protocol inherit assoc conf}
-We described the \IndexProto{Collection}\tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\SelfSequence$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ of \ExRef{specialized conf example}:
+We described the \IndexProto{Collection}\tCollection\ protocol, which inherits from \tSequence, in \ExRef{protocol collection example}. The standard library \texttt{Array} also conforms to \tCollection, and not just \tSequence. Consider the specialized conformance $\ArrayIntCollection$. We can project $\SelfSequence$ from $\ArrayIntCollection$, which takes us back to the specialized conformance $\ArrayIntSequence$ from \ExRef{specialized conf example}:
 \begin{gather*}
 \SelfSequence \otimes \ArrayIntCollection \\
 \qquad {} = \SelfSequence \otimes \ArrayCollection \otimes \SubMapInt\\
@@ -765,7 +765,7 @@ Each candidate value witness gives us a \emph{partial solution}, or a list of ``
 A \emph{solution} to our problem instance is then just a very special kind of partial solution. We say that a solution is \emph{complete} if every associated type appears \emph{at least} once on the left-hand side of ``$\,\mapsto\,$'', and \emph{consistent} if every associated type appears \emph{at most} once on the left-hand side of ``$\,\mapsto\,$''. A solution \emph{covers} a disjunction if it contains one of the partial solutions from the disjunction as a subset. We state our goal as thus: given a problem instance, \textsl{we must find a complete and consistent solution that covers all disjunctions.}
 
 \begin{example}\label{assoc type inference example 2}
-Given the declarations of \ExRef{assoc type inference example 1}, the below table shows the interface type of each value requirement and candidate value witness:
+Given the declarations from \ExRef{assoc type inference example 1}, the below table shows the interface type of each value requirement and candidate value witness:
 \begin{center}
 \begin{tabular}{lll}
 \toprule

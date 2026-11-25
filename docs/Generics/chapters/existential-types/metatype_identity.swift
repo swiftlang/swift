@@ -3,14 +3,12 @@ protocol P<A, B> {
   associatedtype B
 }
 
-protocol Q {}
-
 func generic1<T>(_: T.Type) -> Any.Type {
-  return (any P<T, Bool> & Q).self
+  return (any P<T, Bool>).self
 }
 
 func generic2<T>(_: T.Type) -> Any.Type {
-  return (any P<Int, T> & Q).self
+  return (any P<Int, T>).self
 }
 
 print(generic1(Int.self) == generic2(Bool.self))

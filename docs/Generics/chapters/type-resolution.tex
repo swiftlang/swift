@@ -267,7 +267,7 @@ As we alluded at the beginning of this chapter, the behavior of member type reso
 \item Member types of the concrete superclass type, if any.
 \item If the type parameter is fixed to a concrete type via a same-type requirement, the members of this concrete type.
 \end{enumerate}
-We get the list of types that qualified lookup must look inside by collecting the results of the \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{}$, \IndexQuery{getSuperclassBound}$\Query{getSuperclassBound}{}$, and \IndexQuery{getConcreteType}$\Query{getConcreteType}{}$ \index{generic signature query}generic signature queries (\SecRef{genericsigqueries}).
+We get the list of types that qualified lookup must look inside by collecting the results of the \IndexQuery{getRequiredProtocols}$\Query{getRequiredProtocols}{}$, \IndexQuery{getSuperclassBound}$\Query{getSuperclassBound}{}$, and \IndexQuery{getConcreteType}$\Query{getConcreteType}{}$ \index{generic signature query}generic signature queries (\SecRef{sec:queries}).
 
 The first case, where qualified lookup finds an associated type declaration, is extremely important; this is how we form type parameters recursively in type resolution. If some type parameter \tT\ conforms to a protocol, say \texttt{Provider}, and this protocol declares an associated type \texttt{Entity}, then type resolution of ``\texttt{T.Entity}'' will find the associated type declaration \texttt{Entity} by performing a qualified lookup into \texttt{Provider}.
 \begin{Verbatim}
