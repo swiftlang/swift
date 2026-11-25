@@ -3978,7 +3978,7 @@ FuncDecl *SwiftDeclSynthesizer::findExplicitDestroy(
     NominalTypeDecl *nominal, const clang::RecordDecl *clangType) {
   llvm::SmallPtrSet<FuncDecl *, 2> matchingDestroyFuncs;
   llvm::TinyPtrVector<FuncDecl *> nonMatchingDestroyFuncs;
-  for (auto *swiftAttr : clangType->specific_attrs<clang::SwiftAttrAttr>()) {
+  for (auto *swiftAttr : getSwiftAttrs(clangType)) {
     auto destroyFuncName = swiftAttr->getAttribute();
     if (!destroyFuncName.consume_front("destroy:"))
       continue;

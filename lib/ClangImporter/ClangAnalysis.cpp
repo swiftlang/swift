@@ -34,11 +34,45 @@ bool importer::hasImportReferenceAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"import_reference"});
 }
 
+const clang::Decl *importer::getSwiftAttrSource(const clang::Decl *decl) {
+  // An explicit specialization has its own attributes, and an instantiated one
+  // has those of its pattern.
+  auto *spec = dyn_cast<clang::ClassTemplateSpecializationDecl>(decl);
+  if (!spec || spec->getSpecializationKind() != clang::TSK_Undeclared ||
+      spec->hasDefinition())
+    return decl;
+
+  auto *tmpl = spec->getSpecializedTemplate();
+  llvm::SmallVector<clang::ClassTemplatePartialSpecializationDecl *, 1>
+      partialSpecs;
+  tmpl->getPartialSpecializations(partialSpecs);
+  if (!partialSpecs.empty())
+    return decl;
+
+  // A member template of a class template specialization is instantiated
+  // without its swift_attrs, so find the template it was instantiated from, as
+  // Sema does when picking the pattern.
+  while (!tmpl->isMemberSpecialization()) {
+    auto *from = tmpl->getInstantiatedFromMemberTemplate();
+    if (!from)
+      break;
+    tmpl = from;
+  }
+
+  // Attributes propagate to later redeclarations only, and the template seen
+  // when the specialization was named may be an earlier one.
+  auto *pattern = tmpl->getTemplatedDecl();
+  if (auto *definition = pattern->getDefinition())
+    return definition;
+  return pattern->getMostRecentDecl();
+}
+
 bool importer::hasSwiftAttributeOnAnyRedecl(const clang::RecordDecl *decl,
                                             ArrayRef<StringRef> attrs) {
-  return llvm::any_of(decl->redecls(), [&](const clang::Decl *redecl) {
-    return hasSwiftAttribute(redecl, attrs);
-  });
+  return llvm::any_of(getSwiftAttrSource(decl)->redecls(),
+                      [&](const clang::Decl *redecl) {
+                        return hasSwiftAttribute(redecl, attrs);
+                      });
 }
 
 bool importer::isForeignReferenceRecord(const clang::RecordDecl *decl,
@@ -57,11 +91,7 @@ bool importer::isForeignReferenceRecord(const clang::RecordDecl *decl,
 }
 
 bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
-  return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
-                      [](const clang::SwiftAttrAttr *swiftAttr) {
-                        return swiftAttr->getAttribute() ==
-                               "import_opaque_pointer";
-                      });
+  return hasSwiftAttribute(decl, {"import_opaque_pointer"});
 }
 
 //===----------------------------------------------------------------------===//
@@ -178,7 +208,7 @@ struct RetainReleaseInfo {
     // the whole chain. Key on the attribute string, so that a copy inherited by
     // a later redeclaration is not counted as a second annotation.
     llvm::SmallDenseSet<StringRef, 2> seen;
-    for (auto *redecl : decl->redecls()) {
+    for (auto *redecl : getSwiftAttrSource(decl)->redecls()) {
       for (auto *attr : redecl->specific_attrs<clang::SwiftAttrAttr>()) {
         StringRef attrStr = attr->getAttribute();
         StringRef name = attrStr;
@@ -1762,11 +1792,10 @@ CustomAttr *importer::getRefCountedPtrAttr(Decl *decl) {
 
 /// Whether \p decl is annotated with SWIFT_REFCOUNTED_PTR
 static bool hasRefCountedPtrSwiftAttr(const clang::CXXRecordDecl *decl) {
-  return llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
-                      [](const clang::SwiftAttrAttr *attr) {
-                        return attr->getAttribute().starts_with(
-                            "@_refCountedPtr");
-                      });
+  return llvm::any_of(
+      getSwiftAttrs(decl), [](const clang::SwiftAttrAttr *attr) {
+        return attr->getAttribute().starts_with("@_refCountedPtr");
+      });
 }
 
 ClangImporter::Implementation::RefCountedPtrInfo

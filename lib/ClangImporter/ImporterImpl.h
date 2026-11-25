@@ -2774,6 +2774,9 @@ Identifier getOperatorName(ASTContext &ctx, Identifier op);
 TinyPtrVector<ValueDecl *> lookupDirectWithoutExtensions(NominalTypeDecl *decl,
                                                          DeclName name);
 
+/// Whether \p decl carries one of the given swift_attrs. For a class template
+/// specialization that has not been instantiated yet, this reads the
+/// attributes of its template; see getSwiftAttrSource.
 bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
