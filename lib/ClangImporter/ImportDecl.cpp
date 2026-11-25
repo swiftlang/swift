@@ -3558,10 +3558,12 @@ namespace {
           structResult->setIsCxxNonTrivial(isAddressOnly);
         }
 
-        auto gettersAndSetters = Impl.GetterSetterMap[result];
-        for (const auto &getterAndSetter : gettersAndSetters) {
-          auto getter = getterAndSetter.second.first;
-          auto setter = getterAndSetter.second.second;
+        SmallVector<std::pair<FuncDecl *, FuncDecl *>, 4> gettersAndSetters;
+        if (auto it = Impl.GetterSetterMap.find(result);
+            it != Impl.GetterSetterMap.end())
+          llvm::append_range(gettersAndSetters,
+                             llvm::make_second_range(it->second));
+        for (auto [getter, setter] : gettersAndSetters) {
           // We cannot make a computed property without a getter.
           if (!getter || getter->getDeclContext() != result)
             continue;
@@ -10762,7 +10764,7 @@ static void filterUsableVersionedAttrs(
   // We have a better attribute option if there exists another versioned attr
   // wrapper for this attribute kind with a valid version that is lower than the
   // one of the attribute we are considering
-  auto haveBetterAttr = [swiftVersionedAttributes, applicableVersion](
+  auto haveBetterAttr = [&swiftVersionedAttributes, applicableVersion](
                             clang::VersionTuple attrVersion,
                             clang::attr::Kind attrKind) -> bool {
     for (auto otherVersionedAttr : swiftVersionedAttributes) {
@@ -12150,6 +12152,12 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     }
   }
 
+  // Index the members of swiftDecl by name so that checking whether a base
+  // member is already present doesn't need a scan over all members. Built on
+  // first use, since getMembers() loads all members of swiftDecl.
+  llvm::DenseMap<DeclName, TinyPtrVector<const ValueDecl *>> membersByName;
+  bool indexedMembers = false;
+
   // Add the members here.
   for (auto member : members) {
     if (inheritance) {
@@ -12162,27 +12170,31 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       if (Impl.isMemberSynthesizedPerType(baseMember))
         continue;
 
+      if (!indexedMembers) {
+        for (auto *currentMember : swiftDecl->getMembers())
+          if (auto *vd = dyn_cast<ValueDecl>(currentMember))
+            membersByName[vd->getName()].push_back(vd);
+        indexedMembers = true;
+      }
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity for the same C array projection.
       auto memberArity = getImportedBaseMemberDeclArity(baseMember);
-      bool shouldAddBaseMember = true;
-      for (const auto *currentMember : swiftDecl->getMembers()) {
-        auto vd = dyn_cast<ValueDecl>(currentMember);
-        if (vd->getName() == baseMember->getName() &&
-            memberArity == getImportedBaseMemberDeclArity(vd) &&
-            !isCloneOfCArrayCounterpart(Impl, baseMember, vd)) {
-          shouldAddBaseMember = false;
-          break;
-        }
-      }
-      if (!shouldAddBaseMember)
+      auto it = membersByName.find(baseMember->getName());
+      if (it != membersByName.end() &&
+          llvm::any_of(it->second, [&](const ValueDecl *vd) {
+            return memberArity == getImportedBaseMemberDeclArity(vd) &&
+                   !isCloneOfCArrayCounterpart(Impl, baseMember, vd);
+          }))
         continue;
 
       // So we need to clone the member into the derived class.
       if (auto cloned =
-              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+              Impl.importBaseMemberDecl(baseMember, swiftDecl, inheritance)) {
         swiftDecl->addMember(cloned);
+        membersByName[cloned->getName()].push_back(cloned);
+      }
 
       continue;
     }

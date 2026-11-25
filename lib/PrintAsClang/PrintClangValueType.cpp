@@ -58,8 +58,8 @@ void ClangValueTypePrinter::printMetadataAccessAsVariable(
     ArrayRef<GenericRequirement> genericRequirements, int indent,
     StringRef varName) {
   ClangSyntaxPrinter printer(Context, os);
-  os << std::string(indent, ' ') << "auto " << varName << " = "
-     << cxx_synthesis::getCxxImplNamespaceName() << "::";
+  os.indent(indent) << "auto " << varName << " = "
+                    << cxx_synthesis::getCxxImplNamespaceName() << "::";
   printer.printSwiftTypeMetadataAccessFunctionCall(metadataFuncName,
                                                    genericRequirements);
   os << ";\n";
@@ -258,7 +258,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       "::swift::_impl::ValueTypeStorage::getUninitializedStorage(*this)";
   auto printReferenceCountCall = [&](raw_ostream &os, StringRef function,
                                      StringRef reference, unsigned indent = 4) {
-    os << std::string(indent, ' ');
+    os.indent(indent);
     ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
     os << function << '(' << reference << ");\n";
   };
