@@ -6073,8 +6073,19 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     // rvalue.
     SILValue ElementPtr = B.createStructElementAddr(loc, accessAddress, field);
 
-    result = emitLoad(loc, ElementPtr, abstractedTL,
-                      hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    // Read __ptrauth fields through a signed access.
+    if (getOptions().EnableImportPtrauthFieldFunctionPointers &&
+        field->getPointerAuthQualifier().isPresent()) {
+      auto *signedAccess = B.createBeginAccess(
+          loc, ElementPtr, SILAccessKind::Read, SILAccessEnforcement::Signed,
+          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+      result = emitLoad(loc, signedAccess, abstractedTL, SGFContext(),
+                        IsNotTake);
+      B.createEndAccess(loc, signedAccess, /*aborted*/ false);
+    } else {
+      result = emitLoad(loc, ElementPtr, abstractedTL,
+                        hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    }
     access.endAccess(*this);
   }
 
