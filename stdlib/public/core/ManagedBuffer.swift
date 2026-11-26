@@ -121,6 +121,7 @@ extension ManagedBuffer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
+  @_unavailableInEmbedded
   public final var capacity: Int {
     #if $Embedded
     return _tailCount
