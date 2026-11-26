@@ -88,4 +88,19 @@ void cfuncConstRefStrong(void (*_Nonnull)(const ARCStrong &));
 void blockConstRefStrong(void (^_Nonnull)(const ARCStrong &));
 #endif
 
+struct ConstRefNonTrivialFPStruct {
+    void (*_Nonnull fp)(const NonTrivial &) = nullptr;
+    void callFp(const NonTrivial &x) { fp(x); }
+};
+
+struct ConstRefTrivialFPStruct {
+    void (*_Nonnull fp)(const Trivial &) = nullptr;
+    void callFp(const Trivial &x) { fp(x); }
+};
+
+struct NullableConstRefNonTrivialFPStruct {
+    void (*_Nullable fp)(const NonTrivial &) = nullptr;
+    void callFp(const NonTrivial &x) { if (fp) fp(x); }
+};
+
 #endif // __CLOSURE__
