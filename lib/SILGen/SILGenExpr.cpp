@@ -7937,8 +7937,14 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
     assert(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
     auto isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
-    return RValue(
-        SGF, E, SGF.B.createImplicitActorToOpaqueIsolationCast(E, isolatedMV));
+    auto isolationValue =
+        SGF.B.createImplicitActorToOpaqueIsolationCast(E, isolatedMV);
+    // The cast borrows the guaranteed isolated parameter; copy it unless the
+    // context accepts a +0 value, so that consuming the result does not
+    // release the caller's actor.
+    if (!C.isGuaranteedPlusZeroOk())
+      isolationValue = isolationValue.copy(SGF, E);
+    return RValue(SGF, E, isolationValue);
   }
 
   if (isolation == ActorIsolation::ActorInstance) {
