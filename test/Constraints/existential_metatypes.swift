@@ -137,3 +137,30 @@ func testNestedMetatype() {
   foo2(bar(0)) // expected-error {{cannot convert value of type 'Int' to expected argument type 'any P.Type'}}
   foo2(metaBar(0)) // expected-error {{argument type 'Int' does not conform to expected type 'P'}}
 }
+
+// https://github.com/swiftlang/swift/issues/90076
+
+func testMetatypeOfExistentialFromGenericSubstitution() {
+  func generic<T>(_ x: T) -> T.Type { fatalError() }
+  func genericNested<T>(_ x: T) -> T.Type.Type { fatalError() }
+
+  func test(_ x: any P) {
+    let _: any P.Type = generic(x) // expected-error {{cannot convert value of type '(any P).Type' to specified type 'any P.Type'}} {{none}}
+  }
+
+  func testComposition(_ x: any P & Q) {
+    let _: any (P & Q).Type = generic(x) // expected-error {{cannot convert value of type '(any P & Q).Type' to specified type 'any (P & Q).Type'}} {{none}}
+    let _: any (P & Q).Type.Type = genericNested(x) // expected-error {{cannot convert value of type '(any P & Q).Type.Type' to specified type 'any (P & Q).Type.Type'}} {{none}}
+  }
+}
+
+func testMetatypeOfExistentialCastToExistentialMetatype(
+  _ p: (any P).Type, _ e: (any Error).Type
+) {
+  // `any P` does not conform to `P`. No value of type `(any P).Type` can
+  // satisfy `any P.Type`.
+  _ = p as! any P.Type // expected-warning {{cast from '(any P).Type' to unrelated type 'any P.Type' always fails}}
+
+  // `any Error` does conform to `Error`.
+  _ = e as! any Error.Type // expected-warning {{forced cast from '(any Error).Type' to 'any Error.Type' always succeeds; did you mean to use 'as'?}}
+}
