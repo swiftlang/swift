@@ -64,6 +64,14 @@ inline SpanOfInt initSpan(int arr[], size_t size) {
   return SpanOfInt(arr, size);
 }
 
+inline ConstSpanOfInt initConstSpanWithOversizedCount() {
+  return ConstSpanOfInt(iarray, static_cast<size_t>(-1));
+}
+
+inline SpanOfInt initSpanWithOversizedCount() {
+  return SpanOfInt(iarray, static_cast<size_t>(-1));
+}
+
 struct DependsOnSelf {
   std::vector<int> v;
   __attribute__((swift_name("get()")))

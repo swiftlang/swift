@@ -11,18 +11,3 @@ func swiftTemplateArgNotSupported() {
 func swiftTemplateArgNotSupportedExplicitCtor() {
   var _ = MagicWrapperWithExplicitCtor<String>("asdf")
 }
-
-// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
-// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::CannotBeInstantianted' requested here
-
-// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
-// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::memberWrongType' requested here
-
-// CHECK: error: no member named 'doesNotExist' in 'IntWrapper'
-// CHECK: note: in instantiation of member function 'CannotBeInstantianted<IntWrapper>::argWrongType' requested here
-public func clangErrorReportedOnInstantiation() {
-  _ = CannotBeInstantianted<IntWrapper>(CChar(0), IntWrapper())
-  var z = CannotBeInstantianted<IntWrapper>(IntWrapper())
-  z.memberWrongType()
-  z.argWrongType(IntWrapper())
-}

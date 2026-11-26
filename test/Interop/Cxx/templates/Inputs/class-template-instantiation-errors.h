@@ -37,4 +37,6 @@ struct CannotBeInstantianted {
   int incValue(T t) { return t.value + getOne(); }
 };
 
+typedef CannotBeInstantianted<IntWrapper> CannotBeInstantiantedIntWrapper;
+
 #endif // TEST_INTEROP_CXX_TEMPLATES_INPUTS_CLASS_TEMPLATE_INSTANTIATION_ERRORS_H
