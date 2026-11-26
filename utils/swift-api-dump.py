@@ -124,7 +124,7 @@ def create_parser():
 
 def output_command_result_to_file(command_args, filename):
     with open(filename, 'w') as output_file:
-        subprocess.call(command_args, stdout=output_file)
+        subprocess.check_call(command_args, stdout=output_file)
 
 
 def run_command(args):
