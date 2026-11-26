@@ -1219,7 +1219,7 @@ Symbol: id = {0x0000008c}, range = [0x0000000100004db0-0x00000001000056f0), name
 
 One can perform manual symbolication of a crash log or an executable using LLDB
 without running the actual executable. For a detailed guide on how to do this,
-see: https://lldb.llvm.org/symbolication.html.
+see: https://lldb.llvm.org/use/symbolication.html.
 
 ## Viewing allocation history, references, and page-level info
 
