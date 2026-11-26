@@ -47,16 +47,20 @@ do {
   exist.method4(false)
   // expected-error@-1 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
   // expected-error@-2 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-note@-3 {{member 'method4' refrences 'Self.A', which cannot be resolved on type 'any UnfulfillableGenericRequirements'}}
   exist.method5(false)
   // expected-error@-1 {{instance method 'method5' requires that 'Bool' conform to 'Sequence'}}
   // expected-error@-2 {{member 'method5' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-note@-3 {{member 'method5' refrences 'Self', which cannot be resolved on type 'any UnfulfillableGenericRequirements'}}
 
   exist.method7(false)
   // expected-error@-1 {{instance method 'method7' requires that 'U' conform to 'UnfulfillableGenericRequirements'}}
   // expected-error@-2 {{member 'method7' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-note@-3 {{member 'method7' refrences 'Self', which cannot be resolved on type 'any UnfulfillableGenericRequirements'}}
 
   exist.method8(false)
   // expected-error@-1 {{member 'method8' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+  // expected-note@-2 {{member 'method8' refrences 'Self.A', which cannot be resolved on type 'any UnfulfillableGenericRequirements'}}
 }
 
 // Make sure this also works in a generic context!
@@ -66,6 +70,7 @@ struct G<X, Y, Z> {
 
     exist.method8(false)
     // expected-error@-1 {{member 'method8' cannot be used on value of type 'any UnfulfillableGenericRequirements'; consider using a generic constraint instead}}
+    // expected-note@-2 {{member 'method8' refrences 'Self.A', which cannot be resolved on type 'any UnfulfillableGenericRequirements'}}
   }
 }
 protocol UnfulfillableGenericRequirementsDerived1: UnfulfillableGenericRequirements where A == Bool {}
@@ -80,6 +85,7 @@ do {
   exist2.method4(false)
   // expected-error@-1 {{member 'method4' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived2'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method4' requires that 'Bool' inherit from 'Class<Self.A>'}}
+  // expected-note@-3 {{member 'method4' refrences 'Self.A', which cannot be resolved on type 'any UnfulfillableGenericRequirementsDerived2'}}
 }
 protocol UnfulfillableGenericRequirementsDerived3: UnfulfillableGenericRequirements where A: Sequence, A.Element: Sequence {}
 do {
@@ -95,6 +101,7 @@ do {
   exist2.method6(false)
   // expected-error@-1 {{member 'method6' cannot be used on value of type 'any UnfulfillableGenericRequirementsDerived3'; consider using a generic constraint instead}}
   // expected-error@-2 {{instance method 'method6' requires that 'Bool' conform to 'UnfulfillableGenericRequirements'}}
+  // expected-note@-3 {{member 'method6' refrences 'Self.A', which cannot be resolved on type 'any UnfulfillableGenericRequirementsDerived3'}}
 }
 
 // Test that we don't determine existential availability based on type
@@ -115,6 +122,7 @@ do {
   exist.method2(false) // expected-error {{instance method 'method2' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   exist.method3(false, false) // expected-error {{instance method 'method3' requires that 'Self.A' conform to 'InvalidTypeParameters'}}
   // expected-error@-1 {{member 'method3' cannot be used on value of type 'any InvalidTypeParameters'; consider using a generic constraint instead}}
+  // expected-note@-2 {{member 'method3' refrences 'Self.A', which cannot be resolved on type 'any InvalidTypeParameters'}}
 }
 
 protocol GenericRequirementFailures {
@@ -135,6 +143,7 @@ do {
   exist.method2() // expected-error {{referencing instance method 'method2()' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
   exist.method3(false) // expected-error {{referencing instance method 'method3' on 'GenericRequirementFailures' requires the types 'Self.A' and 'Never' be equivalent}}
   // expected-error@-1 {{member 'method3' cannot be used on value of type 'any GenericRequirementFailures'; consider using a generic constraint instead}}
+  // expected-note@-2 {{member 'method3' refrences 'Self.A', which cannot be resolved on type 'any GenericRequirementFailures'}}
   exist.method4() // expected-error {{referencing instance method 'method4()' on 'GenericRequirementFailures' requires that 'Self.A' conform to 'GenericRequirementFailures'}}
 }
 protocol GenericRequirementFailuresDerived: GenericRequirementFailures where A: GenericRequirementFailures {}
