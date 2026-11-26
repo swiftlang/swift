@@ -1030,7 +1030,9 @@ extension Collection where SubSequence == Slice<Self> {
   /// - Complexity: O(1)
   @inlinable
   public subscript(bounds: Range<Index>) -> Slice<Self> {
-    _failEarlyRangeCheck(bounds, bounds: startIndex..<endIndex)
+    // startIndex <= endIndex must hold in a well-formed Collection
+    unsafe _failEarlyRangeCheck(
+      bounds, bounds: Range(uncheckedBounds: (startIndex, endIndex)))
     return Slice(base: self, bounds: bounds)
   }
 }
