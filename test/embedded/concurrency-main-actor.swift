@@ -36,5 +36,7 @@ struct Main {
     // CHECK-NEXT: main-actor task: assumed
     await MainActor.run { assumeMainActor("MainActor.run: assumed") }
     // CHECK-NEXT: MainActor.run: assumed
+    await Task.detached { assumeMainActor("detached task: assumed") }.value
+    // CHECK-NEXT: detached task: assumed
   }
 }

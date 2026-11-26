@@ -192,6 +192,11 @@ bool SerialExecutorRef::isMainExecutor() const {
   return swift_task_isMainExecutor(*this);
 }
 
+extern "C" SwiftExecutorRef _swift_task_getMainExecutor_c(void) {
+  SerialExecutorRef ref = swift_task_getMainExecutor();
+  return *reinterpret_cast<SwiftExecutorRef *>(&ref);
+}
+
 extern "C" bool _swift_task_isMainExecutor_c(SwiftExecutorRef executor) {
   SerialExecutorRef ref = *reinterpret_cast<SerialExecutorRef *>(&executor);
   return swift_task_isMainExecutor(ref);

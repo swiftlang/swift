@@ -214,13 +214,20 @@ swift::swift_task_enqueueMainExecutor(Job *job) {
     swift_task_enqueueMainExecutorOrig(job);
 }
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+extern "C" __attribute__((weak))
+__swift_ptrdiff_t _swift_concurrency_mainExecutorIsGlobal(void) {
+  return 0;
+}
+#endif
+
 SWIFT_CC(swift) static swift::SerialExecutorRef
 swift_task_getMainExecutorOrig() {
 #if SWIFT_CONCURRENCY_EMBEDDED
-  auto ref = _swift_concurrency_getMainExecutor();
-#else
-  auto ref = swift_task_getMainExecutorImpl();
+  if (_swift_concurrency_mainExecutorIsGlobal())
+    return SerialExecutorRef::generic();
 #endif
+  auto ref = swift_task_getMainExecutorImpl();
   return *reinterpret_cast<SerialExecutorRef *>(&ref);
 }
 
@@ -236,8 +243,7 @@ swift::swift_task_getMainExecutor() {
 SWIFT_CC(swift) static bool
 swift_task_isMainExecutorOrig(SerialExecutorRef executor) {
 #if SWIFT_CONCURRENCY_EMBEDDED
-  return _swift_concurrency_isMainExecutor(
-           *reinterpret_cast<SwiftExecutorRef *>(&executor));
+  return executor == swift_task_getMainExecutor();
 #else
   return swift_task_isMainExecutorImpl(
            *reinterpret_cast<SwiftExecutorRef *>(&executor));
