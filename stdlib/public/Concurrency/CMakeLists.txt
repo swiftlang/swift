@@ -21,6 +21,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   list(APPEND swift_concurrency_private_link_libraries
     Synchronization
     mincore.lib # For QueryInterruptTime()
+    OneCore.lib # For QueryInterruptTimePrecise() in Runtime/Clock
   )
 endif()
 
@@ -98,7 +99,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
   ../CompatibilityOverride/CompatibilityOverride.cpp
   Actor.cpp
   AsyncLet.cpp
-  Clock.cpp
   ConcurrencyHooks.cpp
   GlobalExecutor.cpp
   EmbeddedSupport.cpp
@@ -232,6 +232,11 @@ set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
   CFExecutor.cpp
 )
+
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES
+  Runtime/Clock/ClockEntryPoints.swift
+  Runtime/Clock/PlatformClock+POSIX.swift
+  Runtime/Clock/PlatformClock+Windows.swift)
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
 if((SWIFT_BUILD_CLANG_OVERLAYS
@@ -424,6 +429,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
+      Runtime/Clock/PlatformClock+SwiftPlatform.swift
 
       GYB_SOURCES
         ${SWIFT_CONCURRENCY_GYB_SOURCES}

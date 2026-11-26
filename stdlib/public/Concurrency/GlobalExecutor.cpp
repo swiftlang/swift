@@ -61,6 +61,10 @@
 #include "Error.h"
 #include "ExecutorImpl.h"
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "SwiftPlatform/Clocks.h"
+#endif
+
 using namespace swift;
 
 extern "C" SWIFT_CC(swift)
@@ -122,6 +126,41 @@ extern "C" void _swift_job_run_c(SwiftJob *job, SwiftExecutorRef executor)
                 *reinterpret_cast<SerialExecutorRef *>(&executor));
 }
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+// Embedded Swift has no swift_get_time and swift_get_clock_res. Read the
+// clocks through the platform abstraction layer, which has no wall clock.
+extern "C" SwiftTime swift_time_now(SwiftClockId clock)
+{
+  __swift_int64_t seconds, nanoseconds;
+  switch (clock) {
+  case SwiftContinuousClock:
+    _swift_clockContinuous_getTime(&seconds, &nanoseconds);
+    break;
+  case SwiftSuspendingClock:
+    _swift_clockSuspending_getTime(&seconds, &nanoseconds);
+    break;
+  default:
+    swift_Concurrency_fatalError(0, "invalid clock ID");
+  }
+  return SwiftTime{seconds, nanoseconds};
+}
+
+extern "C" SwiftTime swift_time_getResolution(SwiftClockId clock)
+{
+  __swift_int64_t seconds, nanoseconds;
+  switch (clock) {
+  case SwiftContinuousClock:
+    _swift_clockContinuous_getResolution(&seconds, &nanoseconds);
+    break;
+  case SwiftSuspendingClock:
+    _swift_clockSuspending_getResolution(&seconds, &nanoseconds);
+    break;
+  default:
+    swift_Concurrency_fatalError(0, "invalid clock ID");
+  }
+  return SwiftTime{seconds, nanoseconds};
+}
+#else
 extern "C" SwiftTime swift_time_now(SwiftClockId clock)
 {
   SwiftTime result;
@@ -136,6 +175,7 @@ extern "C" SwiftTime swift_time_getResolution(SwiftClockId clock)
                       (swift_clock_id)clock);
   return result;
 }
+#endif
 
 bool swift::swift_executor_isComplexEquality(SerialExecutorRef ref) {
   return ref.isComplexEquality();

@@ -58,6 +58,7 @@ import Chars
 import ChildTaskCreation
 import ClassArrayGetter
 import ClockMeasure
+import ClockNow
 import CodableTest
 import Combos
 import ContiguousArrayTests
@@ -291,6 +292,7 @@ register(ContinuationResume.benchmarks)
 register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(ClockMeasure.benchmarks)
+register(ClockNow.benchmarks)
 register(CreateObjects.benchmarks)
 register(CxxAssignment.benchmarks)
 // rdar://128520766

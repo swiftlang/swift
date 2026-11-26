@@ -44,12 +44,10 @@ extension ContinuousClock.Instant: Codable {
 extension Duration {
   internal init(_seconds s: Int64, nanoseconds n: Int64) {
     let (secHi, secLo) = s.multipliedFullWidth(by: 1_000_000_000_000_000_000)
-    // _nanoseconds is in 0 ..< 1_000_000_000, so the conversion to UInt64
-    // and multiply cannot overflow. If you somehow trap here, it is because
-    // the underlying clock hook that produced the time value is implemented
-    // incorrectly on your platform, but because we trap we can't silently
-    // get bogus data.
-    let (low, carry) = secLo.addingReportingOverflow(UInt64(n) * 1_000_000_000)
+    // A clock gives `n` in 0 ..< 1_000_000_000, so the unchecked conversion and
+    // multiply cannot overflow.
+    let (low, carry) = secLo.addingReportingOverflow(
+      UInt64(truncatingIfNeeded: n) &* 1_000_000_000)
     let high = secHi &+ (carry ? 1 : 0)
     self.init(_high: high, low: low)
   }
@@ -76,31 +74,13 @@ extension ContinuousClock {
 
   /// The minimum non-zero resolution between any two calls to `now`.
   public var minimumResolution: Swift.Duration {
-    var seconds = Int64(0)
-    var nanoseconds = Int64(0)
-#if $Embedded
-    unsafe _platformContinuousResolution(&seconds, &nanoseconds)
-#else
-    unsafe _getClockRes(
-      seconds: &seconds,
-      nanoseconds: &nanoseconds,
-      clock: _ClockID.continuous.rawValue)
-#endif
+    let (seconds, nanoseconds) = PlatformClock.continuousResolution
     return Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
   /// The current continuous instant.
   public static var now: ContinuousClock.Instant {
-    var seconds = Int64(0)
-    var nanoseconds = Int64(0)
-#if $Embedded
-    unsafe _platformContinuousTime(&seconds, &nanoseconds)
-#else
-    unsafe _getTime(
-      seconds: &seconds,
-      nanoseconds: &nanoseconds,
-      clock: _ClockID.continuous.rawValue)
-#endif
+    let (seconds, nanoseconds) = PlatformClock.continuousTime
     return Instant(
       _value: Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
     )

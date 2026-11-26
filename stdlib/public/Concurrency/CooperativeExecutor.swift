@@ -114,9 +114,7 @@ struct WaitQueue {
 
   var currentTime: CooperativeExecutor.Timestamp {
     var now: CooperativeExecutor.Timestamp = .zero
-    unsafe _getTime(seconds: &now.seconds,
-                    nanoseconds: &now.nanoseconds,
-                    clock: clock.rawValue)
+    (now.seconds, now.nanoseconds) = PlatformClock.time(of: clock)
     return now
   }
 
@@ -252,9 +250,7 @@ extension CooperativeExecutor: SchedulingExecutor {
 
   func currentTime(clock: _ClockID) -> Timestamp {
     var now: Timestamp = .zero
-    unsafe _getTime(seconds: &now.seconds,
-                    nanoseconds: &now.nanoseconds,
-                    clock: clock.rawValue)
+    (now.seconds, now.nanoseconds) = PlatformClock.time(of: clock)
     return now
   }
 
@@ -319,8 +315,8 @@ extension CooperativeExecutor: RunLoopExecutor {
       if !runQueue.isEmpty {
         // There is more to run, so don't wait for a timer
       } else if let toWait {
-        _sleep(seconds: toWait.seconds,
-               nanoseconds: toWait.nanoseconds)
+        PlatformClock.sleep(seconds: toWait.seconds,
+                            nanoseconds: toWait.nanoseconds)
       } else {
         // Stop if no more jobs are available
         break

@@ -3,4 +3,8 @@ module SwiftConcurrencyInternalShims {
     header "stdlib_shims.h"
     export *
   }
+  module clock {
+    header "ClockShims.h"
+    export *
+  }
 }
