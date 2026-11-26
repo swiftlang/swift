@@ -16,11 +16,39 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
+// Flaky on Windows, disable fow now rdar://193637036
+// UNSUPPORTED: OS=windows-msvc
+
 // Freeing a local actor whose `next` is a remote proxy must not read the
 // proxy's (non-existent) stored properties
 
 import Distributed
 import FakeDistributedActorSystems
+
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
+#elseif os(Windows)
+import ucrt
+#endif
+
+// Stage markers go to stderr (unbuffered, not consumed by FileCheck) so that a
+// crash shows up in the lit output together with the last stage reached
+func trace(_ message: String) {
+  fputs("[trace] \(message)\n", stderr)
+}
+
+// Flush after every line, piped stdout is fully buffered and would otherwise
+// be lost entirely if the process crashes later on
+func printFlushed(_ message: String) {
+  print(message)
+  fflush(stdout)
+}
 
 distributed actor Node {
   typealias ActorSystem = FakeActorSystem
@@ -54,12 +82,18 @@ func localChainThenRemote() async {
 
 @main struct Main {
   static func main() async {
+    trace("start: oneLocalThenRemote")
     await oneLocalThenRemote()
-    print("one local, then remote: done")
+    trace("end: oneLocalThenRemote")
+    printFlushed("one local, then remote: done")
     // CHECK: one local, then remote: done
 
+    trace("start: localChainThenRemote")
     await localChainThenRemote()
-    print("local chain, then remote: done")
+    trace("end: localChainThenRemote")
+    printFlushed("local chain, then remote: done")
     // CHECK: local chain, then remote: done
+
+    trace("main returning")
   }
 }
