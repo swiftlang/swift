@@ -144,13 +144,14 @@ fileprivate struct _CapacityAndFlags {
  count (which it uses to guarantee null-termination invariant). This will
  allocate the class header and a tail allocation for the requested capacity plus
  one (for the null-terminator), plus any excess `malloc` bucket space. If
- breadcrumbs need be present, they appear at the very end of the allocation.
+ breadcrumbs need be present, they appear at the end of the allocation, at the
+ last pointer-aligned offset that fits them.
 
  For small allocations, `__StringStorage.create` will round up the total
  allocation to a malloc bucket estimate (16 bytes) and claim any excess capacity
- as additional code unit capacity. For large allocations, `malloc_size` is
- consulted and any excess capacity is likewise claimed as additional code unit
- capacity.
+ as additional code unit capacity. For large allocations, `malloc_good_size` is
+ consulted before allocating and any excess capacity is likewise claimed as
+ additional code unit capacity.
  
  For "one crumb" breadcrumbs, the breadcrumbs pointer is replaced with what
  would have been the last breadcrumb itself. This allows .utf16.count to be fast
@@ -179,7 +180,8 @@ fileprivate struct _CapacityAndFlags {
 
  where:
   * `H` is the class header size (32/20 on 64/32 bit, constant)
-  * `n` is the total allocation size (estimate or `malloc_size`)
+  * `n` is the total allocation size (estimate or `malloc_good_size`), rounded
+    down to pointer alignment
   * `c` is the given count
   * `P` is the size of the breadcrumbs pointer (8/4 on 64/32 bit, constant)
 
@@ -190,62 +192,29 @@ import SwiftShims
 fileprivate func _allocate<T: AnyObject>(
   numHeaderBytes: Int,        // The size of the class header
   numTailBytes: Int,          // The desired number of tail bytes
-  growthFactor: Float? = nil, // Exponential growth factor for large allocs
   tailAllocator: (_ numTailBytes: Int) -> T // Do the actual tail allocation
 ) -> (T, realNumTailBytes: Int) {
 #if !$Embedded
   _internalInvariant(getSwiftClassInstanceExtents(T.self).1 == numHeaderBytes)
 #endif
 
-  func roundUp(_ x: Int) -> Int { (x + 15) & ~15 }
-
   let numBytes = numHeaderBytes + numTailBytes
 
-  let linearBucketThreshold = 128
-  if _fastPath(numBytes < linearBucketThreshold) {
-    // Allocate up to the nearest bucket of 16
-    let realNumBytes = roundUp(numBytes)
-    let realNumTailBytes = realNumBytes - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-    let object = tailAllocator(realNumTailBytes)
-    return (object, realNumTailBytes)
-  }
-
-  let growTailBytes: Int
-  if let growth = growthFactor {
-    growTailBytes = Swift.max(numTailBytes, Int(Float(numTailBytes) * growth))
-  } else {
-    growTailBytes = numTailBytes
-  }
-
-  let total = roundUp(numHeaderBytes + growTailBytes)
+#if !$Embedded
+  let total = _mallocGoodSize(for: numBytes)
+#else
+  let total = _roundUp(numBytes, toAlignment: 16)
+#endif
   let totalTailBytes = total - numHeaderBytes
+  _internalInvariant(totalTailBytes >= numTailBytes)
 
-  let object = tailAllocator(totalTailBytes)
-
-  let allocSize: Int?
-  #if !$Embedded
-    allocSize = unsafe _mallocSize(ofAllocation: UnsafeRawPointer(Builtin.bridgeToRawPointer(object)))
-  #else
-    allocSize = nil
-  #endif
-  if let allocSize {
-    _internalInvariant(allocSize % MemoryLayout<Int>.stride == 0)
-
-    let realNumTailBytes = allocSize - numHeaderBytes
-    _internalInvariant(realNumTailBytes >= numTailBytes)
-
-    return (object, realNumTailBytes)
-  } else {
-    return (object, totalTailBytes)
-  }
+  return (tailAllocator(totalTailBytes), totalTailBytes)
 }
 
 fileprivate func _allocateStringStorage(
   codeUnitCapacity capacity: Int,
   precalculatedUTF16Count utf16Len: Int?
 ) -> (__StringStorage, _CapacityAndFlags) {
-  let pointerSize = MemoryLayout<Int>.stride
   let headerSize = Int(_StringObject.nativeBias)
   let codeUnitSize = capacity + 1 /* code units and null */
 #if _pointerBitWidth(_64) && !WORKAROUND_LOW_ENTROPY_VA_BREADCRUMBS
@@ -254,21 +223,41 @@ fileprivate func _allocateStringStorage(
 #else
   let needBreadcrumbs = capacity >= _StringBreadcrumbs.breadcrumbStride
 #endif
-  let breadcrumbSize = needBreadcrumbs ? pointerSize : 0
+  let breadcrumbSize =
+    needBreadcrumbs ? MemoryLayout<_StringBreadcrumbs?>.size : 0
+
+  /*
+   getTailAddr_Word in _realCapacityEnd rounds up to pointer aligned, which
+   means that if the malloc_good_size in _allocate *doesn't* round to aligned
+   (which address sanitizer's version does not), then we could round up to an
+   out of bounds address. Avoid that by rounding up what we ask for to make sure
+   that the end is aligned properly.
+   */
+  let breadcrumbAlignment = MemoryLayout<_StringBreadcrumbs?>.alignment
+  _internalInvariant(headerSize % breadcrumbAlignment == 0)
+  // _oneCrumb stores an Int in the breadcrumbs slot instead of a reference.
+  _internalInvariant(
+    MemoryLayout<Int>.size <= MemoryLayout<_StringBreadcrumbs?>.size &&
+    MemoryLayout<Int>.alignment <= breadcrumbAlignment)
+  let alignedCodeUnitSize = _roundUp(
+    codeUnitSize, toAlignment: breadcrumbAlignment)
 
   let (storage, numTailBytes) = _allocate(
     numHeaderBytes: headerSize,
-    numTailBytes: codeUnitSize + breadcrumbSize
+    numTailBytes: alignedCodeUnitSize + breadcrumbSize
   ) { tailBytes in
       Builtin.allocWithTailElems_1(
         __StringStorage.self, tailBytes._builtinWordValue, UInt8.self)
   }
 
+  let realCapacity =
+    (numTailBytes - breadcrumbSize) & ~(breadcrumbAlignment - 1)
   let capAndFlags = _CapacityAndFlags(
     hasBreadcrumbs: needBreadcrumbs,
-    realCapacity: numTailBytes - breadcrumbSize)
+    realCapacity: realCapacity)
 
-  _internalInvariant(numTailBytes >= codeUnitSize + breadcrumbSize)
+  _internalInvariant(realCapacity >= codeUnitSize)
+  _internalInvariant(numTailBytes >= realCapacity + breadcrumbSize)
   return (storage, capAndFlags)
 }
 
