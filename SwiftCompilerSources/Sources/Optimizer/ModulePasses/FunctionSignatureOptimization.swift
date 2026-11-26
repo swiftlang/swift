@@ -1085,14 +1085,6 @@ private func adaptSpecializedFunction(_ specializedFunction: Function, of origin
                                       isGeneric: Bool,
                                       _ context: FunctionPassContext)
 {
-  if !isGeneric {
-    // A `debug_value undef` doesn't count as a use of a generic parameter (see
-    // `implicitlyUsesGenericParameter`). Remove it, because its type is not valid
-    // in the non-generic specialized function.
-    context.erase(instructions: specializedFunction.instructions.lazy.filter {
-      $0 is DebugValueInst && $0.operands.contains { $0.value.isUndefWithPrimaryArchetype }
-    })
-  }
   // The difference between argument indices in the specialized function and in the original function.
   var offset = 0
   for spec in argumentSpecializations {
@@ -1108,18 +1100,10 @@ private func adaptSpecializedFunction(_ specializedFunction: Function, of origin
         copy.replace(with: arg, context)
       }
       arg.set(ownership: .owned, context)
-
-      // The argument is consumed at the former copies. Therefore its `debug_value`s may end up
-      // after its lifetime. Move them to the function entry, where the argument is alive.
-      for dv in arg.uses.users(ofType: DebugValueInst.self) {
-        let firstInst = specializedFunction.instructions.first!
-        if dv != firstInst {
-          dv.move(before: firstInst, context)
-        }
-      }
+      // Note that `debug_value`s of the argument may end up after its lifetime. This is okay for
+      // the ownership verifier. Such `debug_value`s are killed later by `KillInvalidDebugValues`.
     case .dead:
-      assert(arg.users.allSatisfy { $0 is DebugValueInst })
-      context.erase(instructions: arg.users)
+      arg.killDebugUses(context)
       specializedFunction.entryBlock.eraseArgument(at: arg.index, context)
       offset -= 1
     case .explode:
@@ -1135,19 +1119,73 @@ private func adaptSpecializedFunction(_ specializedFunction: Function, of origin
         elements.append(fieldArg)
         offset += 1
       }
-      for user in arg.users {
-        switch user {
-        case is DebugValueInst:
-          context.erase(instruction: user)
-        case let structExtract as StructExtractInst:
-          structExtract.replace(with: elements[structExtract.fieldIndex], context)
-        default:
-          fatalError("unknown argument use")
-        }
+      for structExtract in arg.uses.users(ofType: StructExtractInst.self) {
+        structExtract.replace(with: elements[structExtract.fieldIndex], context)
       }
+      // TODO: salvage the debug info with a debug reconstruction block which creates the struct
+      //       from the field arguments.
+      arg.killDebugUses(context)
       specializedFunction.entryBlock.eraseArgument(at: arg.index, context)
       offset -= 1
     }
+  }
+
+  if !isGeneric {
+    // Debug uses of generic parameters don't count as uses of generic parameters (see
+    // `implicitlyUsesGenericParameter`). Such a `debug_value` is not valid in the non-generic
+    // specialized function. Replace it with a placeholder `debug_value undef : $()`.
+    let debugValues = specializedFunction.instructions.compactMap { $0 as? DebugValueInst }
+    for dv in debugValues where dv.usesPrimaryArchetype {
+      dv.replaceWithVoidedDebugValue(context)
+    }
+  }
+}
+
+private extension Argument {
+  /// Replaces all (`debug_value`) uses of the argument with `undef`.
+  func killDebugUses(_ context: FunctionPassContext) {
+    while let use = uses.first {
+      guard let dv = use.instruction as? DebugValueInst else {
+        fatalError("unknown argument use")
+      }
+      dv.killOperand(index: use.index, context)
+    }
+  }
+}
+
+private extension DebugValueInst {
+  /// Replaces this instruction with a `debug_value undef : $()` for the same variable, with an empty
+  /// tuple as variable type and without a debug info expression.
+  /// This is a placeholder for a variable whose type cannot be represented anymore, because a
+  /// generic parameter which the type depends on is removed.
+  func replaceWithVoidedDebugValue(_ context: FunctionPassContext) {
+    guard var debugVariable = self.debugVariable else {
+      context.erase(instruction: self)
+      return
+    }
+    debugVariable.removeType()
+    debugVariable.removeExpression()
+    let voidType = context.getTupleType(elements: [] as [AST.`Type`]).loweredType(in: parentFunction)
+    let builder = Builder(replacing: self, context)
+    builder.createDebugValue(value: Undef.get(type: voidType, context), debugVariable: debugVariable)
+    context.erase(instruction: self)
+  }
+
+  /// True if the operand types, the variable type or the debug reconstruction block use a
+  /// generic parameter of the function.
+  var usesPrimaryArchetype: Bool {
+    if varType.hasPrimaryArchetype || operands.contains(where: { $0.value.type.hasPrimaryArchetype }) {
+      return true
+    }
+    if let block = debugReconstructionBlock,
+       block.instructions.contains(where: { inst in
+         inst.results.contains { $0.type.hasPrimaryArchetype } ||
+         inst.operands.contains { $0.value.type.hasPrimaryArchetype }
+       })
+    {
+      return true
+    }
+    return false
   }
 }
 
@@ -1334,6 +1372,8 @@ private extension Function {
       if inst.results.contains(where: { $0.type.hasPrimaryArchetype }) {
         return true
       }
+      // Debug uses of generic parameters don't count. They are replaced by `adaptSpecializedFunction`
+      // if the specialized function is not generic.
       if !(inst is DebugValueInst),
          inst.operands.contains(where: { $0.value.isUndefWithPrimaryArchetype })
       {
