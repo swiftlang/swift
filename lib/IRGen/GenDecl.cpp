@@ -1418,6 +1418,7 @@ void IRGenerator::emitLazyDefinitions() {
          !LazySpecializedTypeMetadataRecords.empty() ||
          !LazyTypeContextDescriptors.empty() ||
          !LazyOpaqueTypeDescriptors.empty() ||
+         !DeferredOpaqueTypeDecls.empty() ||
          !LazyExtensionDescriptors.empty() ||
          !LazyFieldDescriptors.empty() ||
          !LazyFunctionDefinitions.empty() || !LazyWitnessTables.empty() ||
@@ -1475,6 +1476,11 @@ void IRGenerator::emitLazyDefinitions() {
       assert(entry.IsDescriptorUsed && !entry.IsDescriptorEmitted);
       entry.IsDescriptorEmitted = true;
       CurrentIGMPtr IGM = getGenModule(type->getDeclContext());
+      IGM->emitOpaqueTypeDecl(type);
+    }
+    while (!DeferredOpaqueTypeDecls.empty()) {
+      OpaqueTypeDecl *type = DeferredOpaqueTypeDecls.pop_back_val();
+      CurrentIGMPtr IGM = getGenModuleForOpaqueType(type);
       IGM->emitOpaqueTypeDecl(type);
     }
     while (!LazyExtensionDescriptors.empty()) {
@@ -2199,13 +2205,12 @@ void IRGenerator::emitDynamicReplacements() {
   for (auto i : indices(origFuncTypes)) {
     auto origDesc =
         LinkEntity::forOpaqueTypeDescriptor(origFuncTypes[i]->getDecl());
-    auto replDesc =
-        LinkEntity::forOpaqueTypeDescriptor(newFuncTypes[i]->getDecl());
     auto replacement = someReplacementsArray.beginStruct();
     replacement.addRelativeAddress(
         IGM.getAddrOfLLVMVariableOrGOTEquivalent(origDesc));
-    replacement.addRelativeAddress(
-        IGM.getAddrOfLLVMVariableOrGOTEquivalent(replDesc));
+    replacement.addRelativeAddress(IGM.getAddrOfOpaqueTypeDescriptor(
+        newFuncTypes[i]->getDecl(),
+        ConstantInit())); // direct relative reference.
     replacement.finishAndAddTo(someReplacementsArray);
   }
   someReplacementsArray.finishAndAddTo(autoReplacementsSome);
@@ -4425,7 +4430,11 @@ IRGenModule::getAddrOfLLVMVariableOrGOTEquivalent(LinkEntity entity) {
       // If we're doing a single-threaded WMO build, or if the entity is
       // scheduled to be emitted in the same translation unit, reference
       // it directly.
-      if (this == IRGen.getGenModule(entitySF))
+      IRGenModule *entityIGM = IRGen.getGenModule(entitySF);
+      if (entity.hasDecl())
+        if (auto *opaque = dyn_cast<OpaqueTypeDecl>(entity.getDecl()))
+          entityIGM = IRGen.getGenModuleForOpaqueType(opaque);
+      if (this == entityIGM)
         return direct();
     }
   }
