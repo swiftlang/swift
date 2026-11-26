@@ -69,7 +69,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
     -enable-experimental-feature Extern
     -enable-experimental-feature AllowRuntimeSymbolDeclarations
-    "-enable-builtin-module")
+    "-enable-builtin-module"
+    -Xfrontend -enable-sil-opaque-values)
 
   # The clock functions need POSIX clocks, which bare-metal and Windows
   # triples lack, and Apple triples need an Apple SDK. Keep this list separate
