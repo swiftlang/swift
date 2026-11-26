@@ -1245,6 +1245,33 @@ Decl *ClangImporter::Implementation::forEachCArrayProjectionImpl(
   return modernDecl;
 }
 
+/// Returns true if every field of \p decl that is non-trivial to copy is an
+/// address-discriminated __ptrauth field, looking through nested structs.
+static bool
+isNonTrivialDueToAddressDiversifiedPtrAuth(const clang::RecordDecl *decl) {
+  if (!decl->isCompleteDefinition())
+    return true;
+
+  for (auto *field : decl->fields()) {
+    if (!field->getType().isNonTrivialToPrimitiveCopy()) {
+      continue;
+    }
+    // Look through nested structs.
+    if (field->getType().isNonTrivialToPrimitiveCopy() ==
+        clang::QualType::PCK_Struct) {
+      auto *nested = field->getType()->getAsRecordDecl();
+      if (nested && isNonTrivialDueToAddressDiversifiedPtrAuth(nested))
+        continue;
+      return false;
+    }
+    if (field->getType().isNonTrivialToPrimitiveCopy() !=
+        clang::QualType::PCK_PtrAuth) {
+      return false;
+    }
+  }
+  return true;
+}
+
 namespace {
   /// Search the member tables for this class and its superclasses and try to
   /// identify the nearest VarDecl that serves as a base for an override.  We
@@ -2925,23 +2952,6 @@ namespace {
             decl->getLocation());
         return nullptr;
       }
-
-      auto isNonTrivialDueToAddressDiversifiedPtrAuth =
-          [](const clang::RecordDecl *decl) {
-            if (!decl->isCompleteDefinition())
-              return true;
-
-            for (auto *field : decl->fields()) {
-              if (!field->getType().isNonTrivialToPrimitiveCopy()) {
-                continue;
-              }
-              if (field->getType().isNonTrivialToPrimitiveCopy() !=
-                  clang::QualType::PCK_PtrAuth) {
-                return false;
-              }
-            }
-            return true;
-          };
 
       bool isNonTrivialPtrAuth = false;
       // FIXME: We should actually support strong ARC references and similar in
