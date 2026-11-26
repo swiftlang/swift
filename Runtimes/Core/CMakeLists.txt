@@ -32,6 +32,12 @@ cmake_minimum_required(VERSION 3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
+# `emit_swift_interface` emits nested swiftmodule directories, which CMake 4.1+
+# only does itself when CMP0195 is NEW. This must precede `project()`.
+if(POLICY CMP0195)
+  cmake_policy(SET CMP0195 NEW)
+endif()
+
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
@@ -114,6 +120,7 @@ defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS versi
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
 defaulted_option(SwiftCore_ENABLE_SOURCE_INFO "Enable generation of .swiftsourceinfo files")
+defaulted_option(SwiftCore_ENABLE_SYMBOL_GRAPHS "Emit symbol graphs while building")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
 defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
@@ -132,6 +139,21 @@ defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift ba
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
 defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
+
+# Carries the flags that emit symbol graphs. Targets opt in by linking it:
+#
+#   target_link_libraries(<target> PRIVATE SwiftCore_SymbolGraph)
+#
+# The output directory comes from the linking target, so the path stays correct
+# for downstream projects that import this target from the install tree.
+# Extensions of other modules are emitted as `<module>@<extended>.symbols.json`.
+add_library(SwiftCore_SymbolGraph INTERFACE)
+target_compile_options(SwiftCore_SymbolGraph INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-emit-symbol-graph-dir$<SEMICOLON>$<TARGET_PROPERTY:BINARY_DIR>/symbol-graphs>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -symbol-graph-allow-availability-platforms -Xfrontend Swift>")
+install(TARGETS SwiftCore_SymbolGraph
+  EXPORT SwiftCoreTargets)
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)

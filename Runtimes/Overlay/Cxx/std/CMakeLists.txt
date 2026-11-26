@@ -49,6 +49,10 @@ install(TARGETS swiftCxxStdlib
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCxxStdlib)
+if(${PROJECT_NAME}_ENABLE_SYMBOL_GRAPHS)
+  target_link_libraries(swiftCxxStdlib PRIVATE SwiftCore_SymbolGraph)
+  set_property(DIRECTORY APPEND PROPERTY ADDITIONAL_CLEAN_FILES "${CMAKE_CURRENT_BINARY_DIR}/symbol-graphs")
+endif()
 install_swift_interface(swiftCxxStdlib)
 
 embed_manifest(swiftCxxStdlib)
