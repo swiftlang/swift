@@ -5,7 +5,7 @@
 
 # Swift Programming Language
 
-## Welcome to Swift
+## Welcome to Swift!
 
 Swift is a high-performance system programming language.  It has a clean
 and modern syntax, offers seamless access to existing C and Objective-C code
