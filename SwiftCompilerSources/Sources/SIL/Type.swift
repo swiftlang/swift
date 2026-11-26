@@ -183,6 +183,18 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.getFunctionTypeWithCalleeConvention(convention.bridged).type
   }
 
+  /// The execution semantics of the function, such as exactly-once, or nil if it can be called any
+  /// number of times.
+  public var executionSemantics: ExecutionSemantics? {
+    let semantics = bridged.getFunctionExecutionSemantics()
+    return semantics.hasValue ? semantics.value : nil
+  }
+
+  /// Returns a function type with the given execution semantics, or with none if `semantics` is nil.
+  public func getFunctionType(withExecutionSemantics semantics: ExecutionSemantics?) -> Type {
+    return bridged.getFunctionTypeWithExecutionSemantics(semantics != nil, semantics ?? .atMostOnce).type
+  }
+
   /// True if a function with this type can be code-generated in Embedded Swift.
   /// These are basically all non-generic functions. But also certain generic functions are supported:
   /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for

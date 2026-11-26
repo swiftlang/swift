@@ -579,6 +579,28 @@ BridgedType BridgedType::getFunctionTypeWithCalleeConvention(
   return swift::SILType::getPrimitiveObjectType(newType);
 }
 
+BridgedOptionalExecutionSemantics
+BridgedType::getFunctionExecutionSemantics() const {
+  if (auto semantics =
+          unbridged().castTo<swift::SILFunctionType>()->getExecutionSemantics())
+    return *semantics;
+  return {};
+}
+
+BridgedType BridgedType::getFunctionTypeWithExecutionSemantics(
+    bool hasExecutionSemantics,
+    swift::ExecutionSemantics executionSemantics) const {
+  auto fnType = unbridged().castTo<swift::SILFunctionType>();
+  auto newType = fnType->getWithExtInfo(
+      fnType->getExtInfo()
+          .intoBuilder()
+          .withExecutionSemantics(hasExecutionSemantics
+                                      ? std::optional(executionSemantics)
+                                      : std::nullopt)
+          .build());
+  return swift::SILType::getPrimitiveObjectType(newType);
+}
+
 BridgedArgumentConvention BridgedType::getCalleeConvention() const {
   auto fnType = unbridged().getAs<swift::SILFunctionType>();
   return getArgumentConvention(fnType->getCalleeConvention());

@@ -131,3 +131,99 @@ bb0:
   %3 = thin_to_thick_function %2 to $@callee_guaranteed (@guaranteed B) -> @owned A
   return %3
 }
+
+sil @useOnce : $@convention(thin) (@owned @noescape @once @callee_owned (@guaranteed B) -> @owned A) -> ()
+
+// The thickened function keeps the exactly-once or at-most-once semantics,
+// because a conversion can't form a noncopyable function.
+//
+// COMBINE-LABEL:    sil [ossa] @thicken_exactly_once :
+// COMBINE:            %[[#O0:]] = function_ref @$s2CS4implyAA1BCAA1ACF
+// COMBINE:            %[[#O1:]] = thin_to_thick_function %[[#O0]] to $@noescape @once @callee_owned (@guaranteed A) -> @owned B
+// COMBINE:            %[[#O2:]] = convert_function %[[#O1]] to $@noescape @once @callee_owned (@guaranteed B) -> @owned A
+// COMBINE:            apply {{%.*}}(%[[#O2]])
+// COMBINE:          } // end sil function 'thicken_exactly_once'
+sil [ossa] @thicken_exactly_once : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %1 = convert_function %0 to $@convention(thin) (@guaranteed B) -> @owned A
+  %2 = thin_to_thick_function %1 to $@noescape @once @callee_owned (@guaranteed B) -> @owned A
+  %3 = function_ref @useOnce : $@convention(thin) (@owned @noescape @once @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned @noescape @once @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+sil @useCallableOnce : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed B) -> @owned A) -> ()
+
+// COMBINE-LABEL:    sil [ossa] @thicken_at_most_once :
+// COMBINE:            %[[#C0:]] = function_ref @$s2CS4implyAA1BCAA1ACF
+// COMBINE:            %[[#C1:]] = thin_to_thick_function %[[#C0]] to $@noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B
+// COMBINE:            %[[#C2:]] = convert_function %[[#C1]] to $@noescape @callable(once) @callee_owned (@guaranteed B) -> @owned A
+// COMBINE:            apply {{%.*}}(%[[#C2]])
+// COMBINE:          } // end sil function 'thicken_at_most_once'
+sil [ossa] @thicken_at_most_once : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %1 = convert_function %0 to $@convention(thin) (@guaranteed B) -> @owned A
+  %2 = thin_to_thick_function %1 to $@noescape @callable(once) @callee_owned (@guaranteed B) -> @owned A
+  %3 = function_ref @useCallableOnce : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+// COMBINE-LABEL:    sil [ossa] @thicken_escaping_exactly_once :
+// COMBINE:            %[[#X0:]] = function_ref @$s2CS4implyAA1BCAA1ACF
+// COMBINE:            %[[#X1:]] = thin_to_thick_function %[[#X0]] to $@once @callee_owned (@guaranteed A) -> @owned B
+// COMBINE:            %[[#X2:]] = convert_function %[[#X1]] to $@once @callee_owned (@guaranteed B) -> @owned A
+// COMBINE:            return %[[#X2]]
+// COMBINE:          } // end sil function 'thicken_escaping_exactly_once'
+sil [ossa] @thicken_escaping_exactly_once : $@convention(thin) () -> @owned @once @callee_owned (@guaranteed B) -> @owned A {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %1 = convert_function %0 to $@convention(thin) (@guaranteed B) -> @owned A
+  %2 = thin_to_thick_function %1 to $@once @callee_owned (@guaranteed B) -> @owned A
+  return %2
+}
+
+sil @useCallableOnceImpl : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B) -> ()
+
+// A thin function has no context to deinit, so the conversion without actually
+// deiniting becomes an ordinary conversion of the thin function.
+//
+// COMBINE-LABEL:    sil [ossa] @noescape_without_actually_deiniting :
+// COMBINE:            %[[#D0:]] = function_ref @$s2CS4implyAA1BCAA1ACF
+// COMBINE:            %[[#D1:]] = thin_to_thick_function %[[#D0]] to $@noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B
+// COMBINE-NOT:        convert_function
+// COMBINE:            apply {{%.*}}(%[[#D1]])
+// COMBINE:          } // end sil function 'noescape_without_actually_deiniting'
+sil [ossa] @noescape_without_actually_deiniting : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %1 = thin_to_thick_function %0 to $@once @callee_owned (@guaranteed A) -> @owned B
+  %2 = convert_function %1 to [without_actually_deiniting] $@callable(once) @callee_owned (@guaranteed A) -> @owned B
+  %3 = convert_escape_to_noescape %2 to $@noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B
+  %4 = function_ref @useCallableOnceImpl : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned (@guaranteed A) -> @owned B) -> ()
+  %6 = tuple ()
+  return %6
+}
+
+// COMBINE-LABEL:    sil [ossa] @noescape_exactly_once_conversion :
+// COMBINE:            %[[#N0:]] = function_ref @$s2CS4implyAA1BCAA1ACF
+// COMBINE:            %[[#N1:]] = thin_to_thick_function %[[#N0]] to $@noescape @once @callee_owned (@guaranteed A) -> @owned B
+// COMBINE:            %[[#N2:]] = convert_function %[[#N1]] to $@noescape @once @callee_owned (@guaranteed B) -> @owned A
+// COMBINE:            apply {{%.*}}(%[[#N2]])
+// COMBINE:          } // end sil function 'noescape_exactly_once_conversion'
+sil [ossa] @noescape_exactly_once_conversion : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$s2CS4implyAA1BCAA1ACF : $@convention(thin) (@guaranteed A) -> @owned B
+  %1 = thin_to_thick_function %0 to $@once @callee_owned (@guaranteed A) -> @owned B
+  %2 = convert_function %1 to $@once @callee_owned (@guaranteed B) -> @owned A
+  %3 = convert_escape_to_noescape %2 to $@noescape @once @callee_owned (@guaranteed B) -> @owned A
+  %4 = function_ref @useOnce : $@convention(thin) (@owned @noescape @once @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned @noescape @once @callee_owned (@guaranteed B) -> @owned A) -> ()
+  %6 = tuple ()
+  return %6
+}
