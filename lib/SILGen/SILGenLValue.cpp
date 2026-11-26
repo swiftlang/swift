@@ -3180,7 +3180,8 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
     }
   }
   
-  if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType())) {
+  if (SGF.SGM.Types.isIndirectPlusZeroSelfParameter(e->getType()) ||
+      SGF.isBorrowAccessorReadOfBorrowedParameter(e)) {
     ctx = SGFContext::AllowGuaranteedPlusZero;
   }
 
@@ -3202,6 +3203,47 @@ static ManagedValue visitRecNonInOutBase(SILGenLValue &SGL, Expr *e,
 
 static CanType getBaseFormalType(Expr *baseExpr) {
   return baseExpr->getType()->getWithoutSpecifierType()->getCanonicalType();
+}
+
+bool SILGenFunction::isBorrowAccessorReadOfBorrowedParameter(Expr *e) {
+  for (bool isOutermost = true;; isOutermost = false) {
+    LookupExpr *lookup;
+    AccessSemantics semantics;
+    if (auto *member = dyn_cast<MemberRefExpr>(e)) {
+      lookup = member;
+      semantics = member->getAccessSemantics();
+    } else if (auto *subscript = dyn_cast<SubscriptExpr>(e)) {
+      lookup = subscript;
+      semantics = subscript->getAccessSemantics();
+    } else {
+      // The root has to be a copyable parameter that the function borrows, so
+      // that nothing can end its lifetime before the use.
+      auto *declRef = dyn_cast<DeclRefExpr>(e);
+      if (isOutermost || !declRef || e->getType()->isNoncopyable())
+        return false;
+      auto found = VarLocs.find(declRef->getDecl());
+      if (found == VarLocs.end())
+        return false;
+      auto *arg = dyn_cast<SILFunctionArgument>(
+          lookThroughMoveOnlyCheckerPattern(found->second.value));
+      return arg &&
+             arg->getArgumentConvention().isGuaranteedConventionInCallee();
+    }
+
+    auto *storage = cast<AbstractStorageDecl>(lookup->getMember().getDecl());
+    auto strategy = storage->getAccessStrategy(
+        semantics, AccessKind::Read, SGM.M.getSwiftModule(),
+        F.getResilienceExpansion(),
+        std::make_pair<>(lookup->getSourceRange(), FunctionDC),
+        /*useOldABI=*/false);
+    bool isBorrow = strategy.hasAccessor() &&
+                    strategy.getAccessor() == AccessorKind::Borrow;
+    if (!isBorrow &&
+        (isOutermost || strategy.getKind() != AccessStrategy::Storage))
+      return false;
+
+    e = lookup->getBase();
+  }
 }
 
 class LLVM_LIBRARY_VISIBILITY SILGenBorrowedBaseVisitor
