@@ -123,7 +123,9 @@ extension Span where Element: ~Copyable {
   public init<T: CxxSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = unsafe UnsafeBufferPointer(start: span.data(), count: Int(span.size()))
+    let count = Int(span.size())
+    precondition(count >= 0, "count must be positive")
+    let buffer = unsafe UnsafeBufferPointer(start: span.data(), count: count)
     let newSpan = unsafe Span(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
     self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
@@ -139,7 +141,9 @@ extension MutableSpan where Element: ~Copyable {
   public init<T: CxxMutableSpan<Element>>(
     _unsafeCxxSpan span: borrowing T,
   ) {
-    let buffer = unsafe UnsafeMutableBufferPointer(start: span.data(), count: Int(span.size()))
+    let count = Int(span.size())
+    precondition(count >= 0, "count must be positive")
+    let buffer = unsafe UnsafeMutableBufferPointer(start: span.data(), count: count)
     let newSpan = unsafe MutableSpan(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
     self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
