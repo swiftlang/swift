@@ -164,6 +164,11 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
   if (isa<DynamicSelfType>(type))
     return false;
 
+  // Neither does a SIL function type. It can appear as the payload of a
+  // lowered Optional, e.g. in the Self of a witness thunk.
+  if (isa<SILFunctionType>(type))
+    return false;
+
   // If this is an exact source, and it's an interesting type, add this
   // as a fulfillment.
   if (isExact && keys.isInterestingType(type)) {
