@@ -16,6 +16,7 @@ set(SWIFT_CXX_SOURCES
     CxxRandomAccessCollection.swift
     CxxSequence.swift
     CxxIterable.swift
+    CxxMainActor.swift
     CxxVector.swift
     CxxSpan.swift
     UnsafeCxxIterators.swift
