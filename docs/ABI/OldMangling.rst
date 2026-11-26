@@ -81,7 +81,7 @@ Globals
 
   entity ::= nominal-type                // named type declaration
   entity ::= static? entity-kind context entity-name
-  entity-kind ::= 'F'                    // function (ctor, accessor, etc.)
+  entity-kind ::= 'F'                    // function (ctor, accessor, and so on)
   entity-kind ::= 'v'                    // variable (let/var)
   entity-kind ::= 'i'                    // subscript ('i'ndex) itself (not the individual accessors)
   entity-kind ::= 'I'                    // initializer
@@ -325,7 +325,7 @@ types.  However, in some cases it is more useful to encode the exact
 implementation details of a function type.
 
 Any ``<impl-function-attribute>`` productions must appear in the order
-in which they are specified above: e.g. a pseudogeneric C function is
+in which they are specified above: for example, a pseudogeneric C function is
 mangled with ``Ccg``.  ``g`` and ``G`` are exclusive and mark the presence
 of a generic signature immediately following.
 
