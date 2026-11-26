@@ -301,6 +301,9 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::UnknownOS:
     return "none";
   case llvm::Triple::UEFI:
+    // UEFI is a freestanding, non-Darwin target with no platform SDK, so it
+    // uses the same resource layout as other bare-metal ("none") targets.
+    return "none";
   case llvm::Triple::LiteOS:
   case llvm::Triple::Managarm:
     llvm_unreachable("unsupported OS");
