@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if (os(macOS) || os(Linux) || os(Android) || os(Windows)) && (arch(x86_64) || arch(arm64))
+#if arch(x86_64) || arch(arm64)
 
 #if canImport(Darwin)
 import Darwin
