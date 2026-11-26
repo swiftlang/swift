@@ -24,6 +24,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Enum.h"
@@ -1826,6 +1827,78 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
   } else {
     return nullptr;
   }
+}
+
+namespace {
+struct MetatypeSwiftValueKey {
+  /// The lookup key, the metatype that was boxed.
+  const Metadata *type;
+
+  friend llvm::hash_code hash_value(const MetatypeSwiftValueKey &key) {
+    return llvm::hash_value(key.type);
+  }
+};
+
+struct MetatypeSwiftValueEntry {
+  const Metadata *type;
+
+  /// The `__SwiftValue` box that stands for `type` as an object.
+  ///
+  /// The cache holds a strong reference to it forever, just as metatypes
+  /// themselves are never destroyed.
+  HeapObject *box;
+
+  MetatypeSwiftValueEntry(MetatypeSwiftValueKey key, HeapObject *box)
+      : type(key.type), box(box) {}
+
+  bool matchesKey(const MetatypeSwiftValueKey &key) {
+    return type == key.type;
+  }
+
+  friend llvm::hash_code hash_value(const MetatypeSwiftValueEntry &value) {
+    return hash_value(MetatypeSwiftValueKey{value.type});
+  }
+
+  static size_t getExtraAllocationSize(MetatypeSwiftValueKey key,
+                                       HeapObject *box) {
+    return 0;
+  }
+
+  size_t getExtraAllocationSize() const {
+    return 0;
+  }
+};
+} // end unnamed namespace
+
+/// The boxes that metatypes have been bridged to `AnyObject` with, so that
+/// bridging the same metatype always produces the same object.
+static ConcurrentReadableHashMap<MetatypeSwiftValueEntry> MetatypeSwiftValues;
+
+/// Return the box previously recorded for `type` at +1, or null if there is
+/// none yet.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+HeapObject *_swift_getSwiftValueForMetatype(const Metadata *type) {
+  auto snapshot = MetatypeSwiftValues.snapshot();
+  if (auto *entry = snapshot.find(MetatypeSwiftValueKey{type}))
+    return swift_retain(entry->box);
+  return nullptr;
+}
+
+/// Record `box` as the box for `type` unless another one was recorded first,
+/// and return the recorded box at +1.
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
+HeapObject *_swift_setSwiftValueForMetatype(HeapObject *box,
+                                             const Metadata *type) {
+  HeapObject *result = nullptr;
+  MetatypeSwiftValueKey key{type};
+  MetatypeSwiftValues.getOrInsert(key, [&](MetatypeSwiftValueEntry *entry,
+                                           bool created) {
+    if (created)
+      ::new (entry) MetatypeSwiftValueEntry(key, swift_retain(box));
+    result = entry->box;
+    return true; // Keep the new entry.
+  });
+  return swift_retain(result);
 }
 #endif
 

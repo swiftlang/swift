@@ -360,6 +360,7 @@ For non-reference types -- including struct, enum, and tuple types -- the castin
 If bridging fails, the value will be copied into an opaque heap-allocated container that is compatible with Objective-C memory management.  The sole purpose of this container is to allow arbitrary Swift types to be cast to and from `AnyObject` so they may be shared with Objective-C functions that need to call Swift code.  The Objective-C code cannot use the contents of this container; it can only store the reference and pass it back into Swift functions.
 
 For platforms that do not support an Objective-C runtime, there is an alternate implementation of the internal container type that supports the same casting operations with `AnyObject`.
+On those platforms metatypes are not reference types, so they are boxed as well, but each metatype always reuses the same container: casting a metatype to `AnyObject` repeatedly produces the same object, just as a class metatype produces its class object on platforms with an Objective-C runtime.
 
 XXX TODO The runtime logic has code to cast protocol types to `AnyObject` only if they are compatible with `__SwiftValue`.  What is the practical effect of this logic?  Does it mean that casting a protocol type to `AnyObject` will sometimes unwrap (if the protocol is incompatible) and sometimes not?  What protocols are affected by this?
 
