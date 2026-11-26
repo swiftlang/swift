@@ -68,14 +68,16 @@ func testConsumingNoncopyableCapture(_ r: consuming Resource) {
   }
 }
 
+// The call consumes the closure, so the combiner moves the consumed capture into
+// a direct call and deletes the closure.
+//
 // CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callAtMostOnce{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> () {
 // CHECK: bb0([[R:%.*]] : @owned $Resource):
 // CHECK: [[CLOSURE_IMPL:%.*]] = function_ref @{{.*}}testConsumingNoncopyableCapture{{.*}} : $@convention(thin) (@owned Resource) -> ()
-// CHECK: [[PA:%.*]] = partial_apply [on_stack] [called_at_most_once] [[CLOSURE_IMPL]]([[R]]) : $@convention(thin) (@owned Resource) -> ()
-// CHECK-NOT: retain_value
-// CHECK-NOT: copy_value
-// CHECK: apply [[PA]]()
-// CHECK: }
+// CHECK-NOT: partial_apply
+// CHECK: apply [[CLOSURE_IMPL]]([[R]])
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function
 
 
 @inline(never)

@@ -3,17 +3,17 @@
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -no-allocations -c -o %t/a.o
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | %FileCheck %s --check-prefix=SYMBOLS
 // RUN: %target-embedded-link %t/a.o -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --check-prefixes=CHECK,ONONE
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -no-allocations -O -c -o %t/a_opt.o
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a_opt.o | %FileCheck %s --check-prefix=SYMBOLS
 // RUN: %target-embedded-link %t/a_opt.o -o %t/a_opt.out
-// RUN: %target-run %t/a_opt.out | %FileCheck %s --check-prefixes=CHECK,OPT
+// RUN: %target-run %t/a_opt.out | %FileCheck %s
 
 // With allocations, dropping an escaping closure also frees its context. The
 // explicit optimization levels override the optimize test modes.
-// RUN: %target-run-simple-swift(-Onone -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim -D ALLOCATIONS) | %FileCheck %s --check-prefixes=CHECK,ALLOCATIONS,ONONE
-// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim -D ALLOCATIONS) | %FileCheck %s --check-prefixes=CHECK,ALLOCATIONS,OPT
+// RUN: %target-run-simple-swift(-Onone -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim -D ALLOCATIONS) | %FileCheck %s --check-prefixes=CHECK,ALLOCATIONS
+// RUN: %target-run-simple-swift(-O -enable-experimental-feature Embedded -enable-experimental-feature OnceFunctions -parse-as-library -runtime-compatibility-version none -wmo -Xfrontend -disable-objc-interop %target-embedded-posix-shim -D ALLOCATIONS) | %FileCheck %s --check-prefixes=CHECK,ALLOCATIONS
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
@@ -102,12 +102,8 @@ struct Main {
     // CHECK-NEXT: 10
     // CHECK-NEXT: 10
     print(consumedCapture(false, 20))
-    // FIXME: The optimized programs leak the resource, because SILCombine
-    // combines the closure's call in callIf without destroying the capture on
-    // the path that drops the closure (rdar://192544750). Check for its deinit
-    // with CHECK-NEXT once that's fixed.
-    // ONONE-NEXT: deinit
-    // ONONE-NEXT: 20
+    // CHECK-NEXT: deinit
+    // CHECK-NEXT: 20
     // CHECK-NEXT: 0
 
     print(borrowedCapture(true, 30))

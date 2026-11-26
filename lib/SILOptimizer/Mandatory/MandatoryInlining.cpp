@@ -77,16 +77,6 @@ enum class MandatoryInlining_t {
   inlineAlways
 };
 
-static bool isLexicalPartialApply(PartialApplyInst *pai) {
-  for (Operand *use : pai->getUses()) {
-    if (auto *mv = dyn_cast<MoveValueInst>(use->getUser())) {
-      if (mv->isLexical())
-        return true;
-    }
-  }
-  return false;
-}
-
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -321,6 +311,23 @@ static  bool fixupReferenceCounts(
     });
   }
   return invalidatedStackNesting;
+}
+
+/// Returns true if fixupReferenceCounts() can copy the captures of the closure
+/// \p pai, which its call consumes, for its inlined call. See
+/// canCopyCapturesOfConsumedClosure().
+static bool canFixupReferenceCountsOfConsumedClosure(
+    PartialApplyInst *pai, ArrayRef<ParameterConvention> conventions) {
+  // fixupReferenceCounts() expects the closure to consume each capture, which
+  // only an escaping closure does, and it doesn't copy consumed address
+  // captures or packs.
+  if (pai->isOnStack() || !canCopyCapturesOfConsumedClosure(pai))
+    return false;
+  return llvm::none_of(conventions, [](ParameterConvention convention) {
+    return convention == ParameterConvention::Indirect_In ||
+           convention == ParameterConvention::Indirect_In_CXX ||
+           isPackParameter(convention);
+  });
 }
 
 // Handle the case where the callee of the apply is either a load or a
@@ -969,6 +976,19 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       if (!Inliner.canInlineApplySite(InnerAI))
         continue;
 
+      // The call of an at-most-once or exactly-once closure consumes it, so
+      // after inlining the call, the closure has to be deleted, unless an
+      // escaping closure's captures can be copied for the inlined body.
+      bool deletesClosure = false;
+      SmallVector<SILInstruction *, 4> closureUses;
+      if (PAI && isClosureConsumedByCall(PAI)) {
+        deletesClosure =
+            canReplaceCallsOfConsumedClosure(PAI, InnerAI, closureUses);
+        if (!deletesClosure && !canFixupReferenceCountsOfConsumedClosure(
+                                   PAI, CapturedArgConventions))
+          continue;
+      }
+
       // Inline function at I, which also changes I to refer to the first
       // instruction inlined in the case that it succeeds. We purposely
       // process the inlined body after inlining, because the inlining may
@@ -978,16 +998,26 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
                               << " into @" << InnerAI.getFunction()->getName()
                               << "\n");
 
-      // If we intend to inline a partial_apply function that is not on the
-      // stack, then we need to balance the reference counts for correctness.
-      //
-      // NOTE: If our partial apply is on the stack, it only has point uses (and
-      // hopefully eventually guaranteed) uses of the captured arguments.
-      //
-      // NOTE: If we have a thin_to_thick_function, we do not need to worry
-      // about such things since a thin_to_thick_function does not capture any
-      // arguments.
-      if (PAI && PAI->isOnStack() == PartialApplyInst::NotOnStack) {
+      // A closure that its call consumes is deleted after the call is
+      // inlined, so its captures don't need copies. The captures that the
+      // call would destroy with the closure are destroyed after it instead.
+      if (deletesClosure) {
+        makeCapturesOwnedByClosureLexical(PAI, deleter.getCallbacks());
+        llvm::copy(PAI->getArguments(),
+                   FullArgs.end() - PAI->getNumArguments());
+        destroyUnconsumedCapturesAfterCall(PAI, InnerAI,
+                                           deleter.getCallbacks());
+      } else if (PAI && PAI->isOnStack() == PartialApplyInst::NotOnStack) {
+        // If we intend to inline a partial_apply function that is not on the
+        // stack, then we need to balance the reference counts for correctness.
+        //
+        // NOTE: If our partial apply is on the stack, it only has point uses
+        // (and hopefully eventually guaranteed) uses of the captured
+        // arguments.
+        //
+        // NOTE: If we have a thin_to_thick_function, we do not need to worry
+        // about such things since a thin_to_thick_function does not capture
+        // any arguments.
         bool IsCalleeGuaranteed =
             PAI->getType().castTo<SILFunctionType>()->isCalleeGuaranteed();
         auto CapturedArgs = MutableArrayRef<SILValue>(FullArgs).take_back(
@@ -1017,6 +1047,13 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       if (!lastBB) {
         ASSERT(!PAI || PAI->isOnStack());
         continue;
+      }
+
+      if (deletesClosure) {
+        // Delete through the deleter, which tracks dead instructions.
+        auto callbacks = deleter.getCallbacks().onDelete(
+            [&](SILInstruction *inst) { deleter.forceDelete(inst); });
+        deleteClosureOfReplacedCalls(PAI, closureUses, callbacks);
       }
 
       // When inlining an OSSA function into a non-OSSA function, ownership of

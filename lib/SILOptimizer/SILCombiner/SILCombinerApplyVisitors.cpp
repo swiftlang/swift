@@ -89,11 +89,13 @@ SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   if (argsAreKeptAlive)
     invalidatedStackNesting = true;
 
-  // Try to delete the partial_apply.
+  // Try to delete the partial_apply, unless tryOptimizeApplyOfPartialApply
+  // already did.
   // In case it became dead because of tryOptimizeApplyOfPartialApply, we don't
   // need to copy all arguments again (to extend their lifetimes), because it
   // was already done in tryOptimizeApplyOfPartialApply.
-  if (tryDeleteDeadClosure(pai, getInstModCallbacks(), !argsAreKeptAlive))
+  if (!pai->isDeleted() &&
+      tryDeleteDeadClosure(pai, getInstModCallbacks(), !argsAreKeptAlive))
     invalidatedStackNesting = true;
 
   return nullptr;

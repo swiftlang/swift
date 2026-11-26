@@ -902,22 +902,16 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
          isa<MoveValueInst>(inst);
 }
 
-static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
-                                                 SILParameterInfo paramInfo,
-                                                 const SILFunction &F) {
-  // If we have a non-trivial type and the argument is passed in @inout, we do
-  // not need to destroy it here. This is something that is implicit in the
-  // partial_apply design that will be revisited when partial_apply is
-  // redesigned.
-  if (paramInfo.isIndirectMutating())
+/// Returns true if the context of an escaping closure owns a capture of
+/// \p type that the closure's function takes as \p paramInfo, which is true
+/// unless the capture is trivial or inout.
+static bool isCaptureOwnedByEscapingClosure(SILType type,
+                                            SILParameterInfo paramInfo,
+                                            const SILFunction &function) {
+  // An inout capture isn't destroyed.
+  if (SILArgumentConvention(paramInfo.getConvention()).isInoutConvention())
     return false;
-
-  // If we have a trivial type, we do not need to put in any extra releases.
-  if (arg->getType().isTrivial(F))
-    return false;
-
-  // We handle all other cases.
-  return true;
+  return !type.isTrivial(function);
 }
 
 void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
@@ -990,8 +984,8 @@ void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILParameterInfo paramInfo,
                                            InstModCallbacks callbacks,
                                            IsDeadEnd_t isDeadEnd) {
-  if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
-                                            builder.getFunction()))
+  if (!isCaptureOwnedByEscapingClosure(arg->getType(), paramInfo,
+                                       builder.getFunction()))
     return;
 
   emitDestroyOperation(builder, loc, arg, callbacks, isDeadEnd);
@@ -1057,19 +1051,15 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
                                         SmallVectorImpl<Operand *> &argOperands,
                                         bool includeTrivialAddrArgs) {
   ApplySite applySite(pai);
-  SILFunctionConventions calleeConv = applySite.getSubstCalleeConv();
-  unsigned firstCalleeArgIdx = applySite.getSubstCalleeArgIndexOfFirstAppliedArg();
-  auto argList = pai->getArgumentOperands();
   SILFunction *F = pai->getFunction();
 
-  for (unsigned i : indices(argList)) {
-    auto argConv = calleeConv.getSILArgumentConvention(firstCalleeArgIdx + i);
-    if (argConv.isInoutConvention())
-      continue;
-
-    Operand &argOp = argList[i];
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    SILParameterInfo paramInfo = applySite.getParamInfoForOperand(argOp);
     SILType ty = argOp.get()->getType();
-    if (!ty.isTrivial(*F) || (includeTrivialAddrArgs && ty.isAddress()))
+    bool isInout =
+        SILArgumentConvention(paramInfo.getConvention()).isInoutConvention();
+    if (isCaptureOwnedByEscapingClosure(ty, paramInfo, *F) ||
+        (includeTrivialAddrArgs && ty.isAddress() && !isInout))
       argOperands.push_back(&argOp);
   }
 }
@@ -1236,16 +1226,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // captures, and is responsible for releasing them via its destructor.
     // Release such captures here to make up for that.
     if (pa->isNoncopyable()) {
-      SILBuilderContext builderCtxt(pa->getModule());
-      for (Operand &argOp : pa->getArgumentOperands()) {
-        // A capture that was transferred to a combined apply is undef.
-        if (!isCaptureOwnedByOnStackClosure(argOp) ||
-            isa<SILUndef>(argOp.get()))
-          continue;
-
-        SILBuilderWithScope builder(pa, builderCtxt);
-        emitDestroyOperation(builder, pa->getLoc(), argOp.get(), callbacks);
-      }
+      SILBuilderWithScope builder(pa);
+      emitDestroysOfCapturesOwnedByClosure(pa, builder, pa->getLoc(),
+                                           callbacks);
     }
 
     for (auto *inst : reverse(deleteInsts)) {
@@ -1310,6 +1293,197 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
   salvageDebugInfo(closure);
   callbacks.deleteInst(closure);
   return true;
+}
+
+bool swift::isCaptureOwnedByClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai)
+    return false;
+  if (pai->isOnStack())
+    return isCaptureOwnedByOnStackClosure(argOp);
+  ApplySite site(pai);
+  return site.isArgumentOperand(argOp) &&
+         isCaptureOwnedByEscapingClosure(argOp.get()->getType(),
+                                         site.getParamInfoForOperand(argOp),
+                                         *pai->getFunction());
+}
+
+void swift::emitDestroysOfCapturesOwnedByClosure(PartialApplyInst *pai,
+                                                 SILBuilder &builder,
+                                                 SILLocation loc,
+                                                 InstModCallbacks callbacks,
+                                                 IsDeadEnd_t isDeadEnd) {
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    // A capture that was transferred to a combined apply is undef.
+    if (isa<SILUndef>(argOp.get()) || !isCaptureOwnedByClosure(argOp))
+      continue;
+    // A dead end needs no destroy of a value in memory, and destroy_addr has
+    // no dead-end form, so it would run the value's deinit.
+    if (isDeadEnd && argOp.get()->getType().isAddress())
+      continue;
+    emitDestroyOperation(builder, loc, argOp.get(), callbacks, isDeadEnd);
+  }
+}
+
+/// Returns true if \p value, which is a closure or a value that forwards it,
+/// is forwarded to a `move_value [lexical]`.
+static bool hasLexicalMove(SingleValueInstruction *value) {
+  for (Operand *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (auto *mvi = dyn_cast<MoveValueInst>(user)) {
+      if (mvi->isLexical() || hasLexicalMove(mvi))
+        return true;
+    } else if (isa<ConvertFunctionInst>(user) ||
+               (isa<MarkDependenceInst>(user) &&
+                use->getOperandNumber() == MarkDependenceInst::Dependent)) {
+      if (hasLexicalMove(cast<SingleValueInstruction>(user)))
+        return true;
+    }
+  }
+  return false;
+}
+
+bool swift::isLexicalPartialApply(PartialApplyInst *pai) {
+  return hasLexicalMove(pai);
+}
+
+bool swift::isClosureConsumedByCall(PartialApplyInst *pai) {
+  return pai->isCallConsuming() && pai->getFunctionType()->isCalleeConsumed();
+}
+
+/// Collects the uses of \p value, which is the closure or a value that forwards
+/// it, other than the calls in \p calls and debug uses. Each use is collected
+/// after the uses of its result. See canReplaceCallsOfConsumedClosure().
+static bool
+collectUsesOfConsumedClosure(SingleValueInstruction *value,
+                             const SmallPtrSetImpl<SILInstruction *> &calls,
+                             bool allowDestroys,
+                             SmallVectorImpl<SILInstruction *> &closureUses) {
+  for (Operand *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (calls.contains(user)) {
+      if (use != FullApplySite(user).getCalleeOperand())
+        return false;
+      continue;
+    }
+    // Debug uses are salvaged rather than deleted.
+    if (isa<DebugValueInst>(user))
+      continue;
+    if (auto *dvi = dyn_cast<DestroyValueInst>(user)) {
+      if (!allowDestroys && !dvi->isDeadEnd())
+        return false;
+    } else if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user)) {
+      if (!allowDestroys)
+        return false;
+    } else if (isa<MoveValueInst>(user) || isa<ConvertFunctionInst>(user) ||
+               (isa<MarkDependenceInst>(user) &&
+                use->getOperandNumber() == MarkDependenceInst::Dependent)) {
+      if (!collectUsesOfConsumedClosure(cast<SingleValueInstruction>(user),
+                                        calls, allowDestroys, closureUses))
+        return false;
+    } else if (!isa<DeallocStackInst>(user)) {
+      return false;
+    }
+    closureUses.push_back(user);
+  }
+  return true;
+}
+
+bool swift::canReplaceCallsOfConsumedClosure(
+    PartialApplyInst *pai, ArrayRef<FullApplySite> calls,
+    SmallVectorImpl<SILInstruction *> &closureUses) {
+  DEBUG_ASSERT(isClosureConsumedByCall(pai));
+  ApplySite site(pai);
+  SILFunction *function = pai->getFunction();
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    SILValue arg = argOp.get();
+    // A replaced call could be outside the store_borrow's scope.
+    if (isa<StoreBorrowInst>(arg))
+      return false;
+    // An escaping closure captures the value in memory when it's formed, and
+    // the memory may be changed or deallocated before a replaced call.
+    if (!pai->isOnStack() && arg->getType().isAddress())
+      return false;
+    // A replaced call that consumes a capture the context doesn't own would
+    // need a copy of it.
+    if (!arg->getType().isTrivial(*function) &&
+        site.getParamInfoForOperand(argOp).isConsumedInCallee() &&
+        !isCaptureOwnedByClosure(argOp))
+      return false;
+  }
+
+  SmallPtrSet<SILInstruction *, 4> callInsts;
+  for (FullApplySite call : calls)
+    callInsts.insert(call.getInstruction());
+  bool allowDestroys = !pai->getFunctionType()->isNondeinitable();
+  return collectUsesOfConsumedClosure(pai, callInsts, allowDestroys,
+                                      closureUses);
+}
+
+bool swift::canCopyCapturesOfConsumedClosure(PartialApplyInst *pai) {
+  DEBUG_ASSERT(isClosureConsumedByCall(pai));
+  if (pai->getFunctionType()->isNondeinitable())
+    return false;
+  return llvm::none_of(pai->getArgumentOperands(), [](Operand &argOp) {
+    return argOp.get()->getType().isMoveOnly() &&
+           isCaptureOwnedByClosure(argOp);
+  });
+}
+
+void swift::makeCapturesOwnedByClosureLexical(PartialApplyInst *pai,
+                                              InstModCallbacks callbacks) {
+  if (!pai->getFunction()->hasOwnership() || !isLexicalPartialApply(pai))
+    return;
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  for (Operand &argOp : pai->getArgumentOperands()) {
+    SILValue arg = argOp.get();
+    if (!arg->getType().isObject() ||
+        arg->getOwnershipKind() != OwnershipKind::Owned || arg->isLexical() ||
+        !isCaptureOwnedByClosure(argOp))
+      continue;
+    auto *mvi = SILBuilderWithScope(pai).createMoveValue(loc, arg, IsLexical);
+    callbacks.createdNewInst(mvi);
+    argOp.set(mvi);
+  }
+}
+
+void swift::destroyUnconsumedCapturesAfterCall(PartialApplyInst *pai,
+                                               FullApplySite call,
+                                               InstModCallbacks callbacks) {
+  ApplySite site(pai);
+  auto loc = RegularLocation::getAutoGeneratedLocation();
+  call.insertAfterApplication([&](SILBuilder &builder) {
+    for (Operand &argOp : pai->getArgumentOperands()) {
+      if (isa<SILUndef>(argOp.get()) || !isCaptureOwnedByClosure(argOp) ||
+          site.getParamInfoForOperand(argOp).isConsumedInCallee())
+        continue;
+      emitDestroyOperation(builder, loc, argOp.get(), callbacks);
+    }
+  });
+}
+
+static void killDebugUses(SILInstruction *inst);
+
+void swift::deleteClosureOfReplacedCalls(PartialApplyInst *pai,
+                                         ArrayRef<SILInstruction *> closureUses,
+                                         InstModCallbacks callbacks) {
+  for (auto *user : closureUses) {
+    if (isa<DestroyValueInst>(user) || isa<StrongReleaseInst>(user) ||
+        isa<ReleaseValueInst>(user)) {
+      auto isDeadEnd = IsntDeadEnd;
+      if (auto *dvi = dyn_cast<DestroyValueInst>(user))
+        isDeadEnd = dvi->isDeadEnd();
+      SILBuilderWithScope builder(user);
+      emitDestroysOfCapturesOwnedByClosure(pai, builder, user->getLoc(),
+                                           callbacks, isDeadEnd);
+    }
+    // A conversion of the closure can't be salvaged, because the closure is
+    // deleted too.
+    killDebugUses(user);
+    callbacks.deleteInst(user);
+  }
+  killDebugUses(pai);
+  callbacks.deleteInst(pai);
 }
 
 bool swift::simplifyUsers(SingleValueInstruction *inst) {
