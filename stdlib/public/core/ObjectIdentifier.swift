@@ -17,6 +17,11 @@
 /// This unique identifier is valid for comparisons only during the lifetime
 /// of the instance.
 ///
+/// An `ObjectIdentifier` doesn't retain the instance it identifies, so holding
+/// on to an identifier doesn't keep the instance alive. After the instance is
+/// deallocated, a new instance can be allocated at the same address, and its
+/// identifier can compare equal to the old one.
+///
 /// In Swift, only instances of classes, instances of actors, and metatypes
 /// have unique identities. There's no notion of identity for structures,
 /// enumerations, functions, or tuples.
