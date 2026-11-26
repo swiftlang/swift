@@ -28,20 +28,23 @@ void DeclCollector::collect(BraceStmt *Scope, SourceFile &SF,
   }
 }
 
-bool DeclCollector::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction DeclCollector::walkToDeclPre(Decl *D,
+                                                      CharSourceRange Range) {
   // Want to walk through top level code decls (which are implicitly added
   // for top level non-decl code) and pattern binding decls (which contain
   // the var decls that we care about).
   if (isa<TopLevelCodeDecl>(D) || isa<PatternBindingDecl>(D))
-    return true;
+    return Action::Continue();
 
   if (!D->isImplicit())
     Decls.insert(D);
-  return false;
+  return Action::SkipNode();
 }
 
-bool DeclCollector::walkToExprPre(Expr *E) { return !isa<ClosureExpr>(E); }
+ASTWalker::PreWalkAction DeclCollector::walkToExprPre(Expr *E) {
+  return Action::VisitNodeIf(!isa<ClosureExpr>(E));
+}
 
-bool DeclCollector::walkToStmtPre(Stmt *S) {
-  return S->isImplicit() || !startsNewScope(S);
+ASTWalker::PreWalkAction DeclCollector::walkToStmtPre(Stmt *S) {
+  return Action::VisitNodeIf(S->isImplicit() || !startsNewScope(S));
 }
