@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+// main.swift builds the backtracer only for 64-bit targets, and this file uses it.
 #if (os(Linux) || os(Android)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Glibc)

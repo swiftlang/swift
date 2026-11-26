@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Only built where main.swift is.
-#if (os(macOS) || os(Linux) || os(Android) || os(Windows)) && (arch(x86_64) || arch(arm64))
+// main.swift builds the backtracer only for 64-bit targets, and this file uses it.
+#if arch(x86_64) || arch(arm64)
 
 #if canImport(Darwin)
 import Darwin

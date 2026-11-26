@@ -878,14 +878,14 @@ Generate a backtrace for the parent process.
     }
   }
 
-  #if os(Linux) || os(Android) || os(anyAppleOS)
+  #if os(Linux) || canImport(Android) || os(anyAppleOS)
   static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)
 
     var newAttrs = oldAttrs
 
-    #if os(Linux) || os(Android)
+    #if os(Linux) || canImport(Android)
     newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
     #else
     newAttrs.c_lflag &= ~UInt(ICANON | ECHO)

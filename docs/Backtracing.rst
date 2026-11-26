@@ -362,10 +362,9 @@ Android
 
 Crash catching is not enabled by default on Android, because the system already
 writes a crash report (a tombstone) for every crashing process.  You can enable
-it by setting ``SWIFT_BACKTRACE`` to ``enable=yes``, which is useful for
-programs you run from ``adb shell``, such as test runners.  You will also need
-to copy ``swift-backtrace`` to the device and pass its location with
-``SWIFT_BACKTRACE=swift-backtrace=<path-to-swift-backtrace>``.
+it for programs you run from ``adb shell``, such as test runners: copy
+``swift-backtrace`` to the device and set
+``SWIFT_BACKTRACE=enable=yes,swift-backtrace=<path-to-swift-backtrace>``.
 
 The runtime installs its signal handlers over the ones installed by the system,
 and passes the signal back to them after the backtrace, so the tombstone is

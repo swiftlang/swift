@@ -33,7 +33,7 @@ internal import BacktracingImpl.Runtime
 
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 
-#if os(Linux) || os(Android)
+#if os(Linux) || canImport(Android)
 typealias thread = swift.runtime.backtrace.thread
 #endif
 
@@ -81,7 +81,7 @@ internal func parseUInt64<S: StringProtocol>(_ s: S) -> UInt64? {
   }
 }
 
-#if os(macOS) || os(Linux) || os(Android)
+#if os(macOS) || os(Linux) || canImport(Android)
 
 struct PosixError: Error {
   var errno: Int32
@@ -233,7 +233,7 @@ extension Sequence {
   }
 }
 
-#if os(Android)
+#if canImport(Android)
 // Bionic's `FILE` is an incomplete type, so it is imported as an opaque pointer.
 typealias CFilePointer = OpaquePointer
 #else
