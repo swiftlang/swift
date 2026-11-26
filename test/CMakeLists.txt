@@ -459,10 +459,14 @@ foreach(SDK ${SWIFT_SDKS})
 
       swift_generate_lit_swift_features_cfg("${test_bin_dir}/lit.swift-features.cfg")
       swift_generate_lit_swift_features_cfg("${validation_test_bin_dir}/lit.swift-features.cfg")
-      add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX}
+      # Regenerate after any compiler build so lit sees Features.def changes.
+      add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX} ALL
         DEPENDS
           "${test_bin_dir}/lit.swift-features.cfg"
           "${validation_test_bin_dir}/lit.swift-features.cfg")
+      if(TARGET swiftBasic)
+        add_dependencies(swiftBasic lit_swift_features_cfg_${VARIANT_SUFFIX})
+      endif()
 
       # Restore old values in case they were reset above for Wasm-hosted SDKs.
       set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB ${SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_old})
