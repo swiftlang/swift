@@ -628,22 +628,25 @@ struct AllocationKind {
   constexpr AllocationKind(Kind kind) : kind(kind) {}
   constexpr operator Kind() { return kind; }
 
-  StringRef getAllocationFunctionName() {
+  StringRef getAllocationFunctionName(bool isSwiftCoroCC) {
     switch (kind) {
     case Normal:
-      return "_swift_coro_alloc";
+      return isSwiftCoroCC ? "_swift_coro_alloc_corocc" : "_swift_coro_alloc";
     case Frame:
-      return "_swift_coro_alloc_frame";
+      return isSwiftCoroCC ? "_swift_coro_alloc_frame_corocc"
+                           : "_swift_coro_alloc_frame";
     }
     llvm_unreachable("covered switch");
   }
 
-  StringRef getDeallocationFunctionName() {
+  StringRef getDeallocationFunctionName(bool isSwiftCoroCC) {
     switch (kind) {
     case Normal:
-      return "_swift_coro_dealloc";
+      return isSwiftCoroCC ? "_swift_coro_dealloc_corocc"
+                           : "_swift_coro_dealloc";
     case Frame:
-      return "_swift_coro_dealloc_frame";
+      return isSwiftCoroCC ? "_swift_coro_dealloc_frame_corocc"
+                           : "_swift_coro_dealloc_frame";
     }
     llvm_unreachable("covered switch");
   }
@@ -910,7 +913,9 @@ private:
 
 llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
   return IGM.getOrCreateHelperFunction(
-      kind.getAllocationFunctionName(), IGM.CoroAllocationTy,
+      kind.getAllocationFunctionName(IGM.SwiftCoroCC ==
+                                     llvm::CallingConv::SwiftCoro),
+      IGM.CoroAllocationTy,
       {IGM.CoroAllocatorPtrTy, IGM.CoroAllocationTy, IGM.SizeTy, IGM.Int64Ty},
       [kind](IRGenFunction &IGF) {
         auto isSwiftCoroCCAvailable =
@@ -956,7 +961,9 @@ llvm::Constant *getCoroAllocFn(AllocationKind kind, IRGenModule &IGM) {
 
 llvm::Constant *getCoroDeallocFn(AllocationKind kind, IRGenModule &IGM) {
   return IGM.getOrCreateHelperFunction(
-      kind.getDeallocationFunctionName(), IGM.VoidTy,
+      kind.getDeallocationFunctionName(IGM.SwiftCoroCC ==
+                                       llvm::CallingConv::SwiftCoro),
+      IGM.VoidTy,
       {IGM.CoroAllocatorPtrTy, IGM.CoroAllocationTy, IGM.CoroAllocationTy},
       [kind](IRGenFunction &IGF) {
         auto isSwiftCoroCCAvailable =
