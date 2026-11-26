@@ -362,6 +362,8 @@ private:
 
   Decl *handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const;
 
+  llvm::Error fatalIfLayoutAffectingMemberError(llvm::Error error) const;
+
   Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
                                           Decl *container,
                                           llvm::Error &&error) const;
