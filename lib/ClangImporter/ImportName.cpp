@@ -2679,7 +2679,7 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
 
   CacheKeyType key(decl, version);
   if (!givenName) {
-    if (auto cachedRes = importNameCache[key]) {
+    if (auto cachedRes = importNameCache.lookup(key)) {
       if (auto *Stats = swiftCtx.Stats)
         ++Stats->getFrontendCounters().ClangNameImportCacheHit;
       return cachedRes;
@@ -2690,8 +2690,8 @@ ImportedName NameImporter::importName(const clang::NamedDecl *decl,
   auto res = importNameImpl(decl, version, givenName);
 
   // Add information about the async version of the name to the non-async
-  // version of the name.
-  if (!version.supportsConcurrency()) {
+  // version of the name. Only Objective-C methods can be imported as async.
+  if (!version.supportsConcurrency() && isa<clang::ObjCMethodDecl>(decl)) {
     if (auto importedAsyncName = importName(decl, version.withConcurrency(true),
                                             givenName)) {
       res.info.hasAsyncAlternateInfo = importedAsyncName.info.hasAsyncInfo;

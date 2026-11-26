@@ -509,8 +509,7 @@ public:
       seenTypes[D] = { EmissionState::Defined, true };
       return true;
     }
-    auto &state = seenTypes[D];
-    return state.first == EmissionState::Defined;
+    return seenTypes.lookup(D).first == EmissionState::Defined;
   }
 
   bool require(const TypeDecl *D) { return requireTypes(D, declsToWrite); }
@@ -801,7 +800,7 @@ public:
     if (addImport(CD))
       return true;
 
-    if (seenTypes[CD].first == EmissionState::Defined)
+    if (seenTypes.lookup(CD).first == EmissionState::Defined)
       return true;
 
     bool allRequirementsSatisfied = true;
@@ -880,7 +879,7 @@ public:
     if (addImport(PD))
       return true;
 
-    if (seenTypes[PD].first == EmissionState::Defined)
+    if (seenTypes.lookup(PD).first == EmissionState::Defined)
       return true;
 
     bool allRequirementsSatisfied = true;
@@ -945,7 +944,7 @@ public:
       forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
-    if (seenTypes[ED].first == EmissionState::Defined)
+    if (seenTypes.lookup(ED).first == EmissionState::Defined)
       return true;
 
     addImportsForReferencedAvailabilityDomains(ED);
