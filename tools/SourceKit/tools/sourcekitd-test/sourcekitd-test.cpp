@@ -930,6 +930,17 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
     break;
   }
 
+  case SourceKitRequest::CollectDeclarationUSR: {
+    sourcekitd_request_dictionary_set_uid(Req, KeyRequest,
+                                          RequestCollectDeclarationUSR);
+    if (Opts.Offset || Opts.Line > 0)
+      sourcekitd_request_dictionary_set_int64(Req, KeyOffset, ByteOffset);
+    if (Opts.Length)
+      sourcekitd_request_dictionary_set_int64(Req, KeyLength, Opts.Length);
+    addRequestOptionsDirect(Req, Opts);
+    break;
+  }
+
 #define SEMANTIC_REFACTORING(KIND, NAME, ID)                                   \
   case SourceKitRequest::KIND:                                                 \
     setRefactoringFields(Req, Opts, KindRefactoring##KIND, SourceBuf.get());   \
@@ -1534,6 +1545,11 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
     case SourceKitRequest::CollectVariableType:
       printVariableType(Info, SourceBuf.get(), llvm::outs());
+      break;
+
+    case SourceKitRequest::CollectDeclarationUSR:
+      printRawVariant(sourcekitd_variant_dictionary_get_value(Info,
+                                                              KeyDeclarations));
       break;
 
     case SourceKitRequest::DocInfo:
