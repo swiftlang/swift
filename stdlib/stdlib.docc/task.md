@@ -56,6 +56,12 @@
 - ``Swift/withTaskCancellationShield(operation:)-2lzl8``
 - ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 
+### Cancellation Scopes
+
+- ``Swift/withTaskCancellationScope(_:)-9rf6d``
+- ``Swift/withTaskCancellationScope(_:)-3mlgc``
+- ``Swift/TaskCancellationScope``
+
 ### Suspending Execution
 
 - ``Swift/Task/yield()``

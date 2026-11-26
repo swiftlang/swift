@@ -230,7 +230,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Concurrency/ChildTaskCreation
     single-source/Concurrency/ClockMeasure
     single-source/Concurrency/ContinuationResume
-    single-source/Concurrency/TaskIsCancelledCancellationScopes
+    single-source/Concurrency/TaskCancellation
     single-source/Concurrency/TaskDeadlines
     single-source/WithUnsafeCurrentTask
     single-source/WordCount

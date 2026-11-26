@@ -595,8 +595,9 @@ class TaskCancellationScopeRecord : public TaskStatusRecord {
   /// Necessary to trigger cancellation handlers nested in the scope when cancelled.
   ///
   /// The scope does not retain the task, it is structurally guaranteed
-  /// to remain alive while the scope is active.
-  AsyncTask *OwningTask;
+  /// to remain alive while the scope is active. Signed, since other threads
+  /// reach the record through a `TaskCancellationScope`.
+  AsyncTask *__ptrauth_swift_cancellation_scope_owning_task OwningTask;
 
   /// Packed state
   ///
@@ -634,6 +635,15 @@ public:
   }
   size_t getReason() const {
     return (State.load(std::memory_order_relaxed) >> 1) & ReasonMask;
+  }
+  /// Returns the cancellation state as a `CancellationStatus` word. The flag
+  /// and the reason are read together so that they are consistent.
+  size_t getIsCancelledWithReason() const {
+    auto state = State.load(std::memory_order_relaxed);
+    if (!(state & CancelledBit))
+      return CancellationStatus().getOpaqueValue();
+    return CancellationStatus::cancelled((state >> 1) & ReasonMask)
+        .getOpaqueValue();
   }
   /// Cancel the scope, recording `reason`.
   /// Only 3 bits of the reason are used, remaining bits are reserved for future evolution.

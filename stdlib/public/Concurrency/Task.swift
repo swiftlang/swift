@@ -1104,12 +1104,7 @@ public struct UnsafeCurrentTask {
   @available(StdlibDeploymentTarget 6.5, *)
   @export(implementation)
   public var cancellationReason: CancellationError.Reason? {
-    // Packed encoding: bit 0 is the isCancelled flag; bits 1..3 carry the
-    // `CancellationError.Reason` raw value. One runtime call returns both.
-    let packed = unsafe _taskGetIsCancelledWithReason(_rawTask)
-    guard packed & 1 != 0 else { return nil }
-    let raw = UInt8(truncatingIfNeeded: packed >> 1)
-    return CancellationError.Reason(_rawValue: raw) ?? .unspecified
+    .init(_cancellationStatus: unsafe _taskGetIsCancelledWithReason(_rawTask))
   }
 
   /// Checks if this task is executing in a scope with a task cancellation shield activated by the

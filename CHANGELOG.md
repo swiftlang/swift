@@ -111,6 +111,22 @@
   `withUnsafeMutablePointer(to:)`, `withUnsafeBytes(of:)` and
   `withUnsafeMutableBytes(of:)`.
 
+* [SE-0568][]:
+  Introduced task cancellation scopes, available as `withTaskCancellationScope`,
+  which runs an operation inside a scope that can be cancelled on its own,
+  without cancelling the whole task and without creating a child task. Code
+  inside a cancelled scope observes the cancellation the same as the
+  cancellation of a task, and the enclosing task stays uncancelled:
+
+  ```swift
+  await withTaskCancellationScope { scope in
+    scope.cancel()
+    print(Task.isCancelled) // true
+    try? await Task.sleep(for: .seconds(1)) // returns immediately
+  }
+  print(Task.isCancelled) // false, the task itself was never cancelled
+  ```
+
 * [SE-0526][]:
   Introduced task deadlines, available as `withDeadline(in:)`, which runs
   an operation within a time limit, and cancels the operation's scope when
@@ -11402,6 +11418,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
 [SE-0551]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0551-span-of-one.md
 [SE-0564]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0564-split-continuations.md
+[SE-0568]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0568-task-cancellation-scopes.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

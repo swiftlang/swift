@@ -1838,6 +1838,9 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t TaskFutureWaitQueue = 0xb144; // = 45380
   const uint16_t TaskNextWaitingTask = 0xc489; // = 50313
 
+  /// The task that owns a cancellation scope record. It's address-diversified.
+  const uint16_t TaskCancellationScopeOwningTask = 0xce0d; // = 52749
+
   /// The task to resume in a NullaryContinuationJob.
   const uint16_t NullaryContinuationJobContinuation = 0xc898; // = 51352
 
@@ -3144,6 +3147,35 @@ public:
 
   FLAGSET_DEFINE_FIELD_ACCESSORS(Kind, Kind_width, TaskOptionRecordKind,
                                  getKind, setKind)
+};
+
+/// The cancellation state of a task or a cancellation scope, in the word that
+/// the runtime returns to Swift, e.g. from
+/// `swift_task_getIsCancelledWithReason`. `_CancellationStatus` in the Swift
+/// `_Concurrency` module mirrors this layout.
+class CancellationStatus : public FlagSet<size_t> {
+public:
+  enum {
+    IsCancelled  = 0,
+    /// The raw value of `CancellationError.Reason`.
+    Reason       = 1,
+    Reason_width = 3,
+  };
+
+  explicit CancellationStatus(size_t bits) : FlagSet(bits) {}
+  constexpr CancellationStatus() {}
+
+  /// The status of something that is cancelled with the given reason.
+  static CancellationStatus cancelled(size_t reason) {
+    CancellationStatus status;
+    status.setIsCancelled(true);
+    status.setReason(reason);
+    return status;
+  }
+
+  FLAGSET_DEFINE_FLAG_ACCESSORS(IsCancelled, isCancelled, setIsCancelled)
+  FLAGSET_DEFINE_FIELD_ACCESSORS(Reason, Reason_width, size_t,
+                                 getReason, setReason)
 };
 
 /// Flags passed to swift_continuation_init.

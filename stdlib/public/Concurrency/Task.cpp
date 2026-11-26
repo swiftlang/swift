@@ -2860,12 +2860,9 @@ size_t swift::swift_task_getIsCancelledWithReasonWithFlags(
     reason = task->getCancellationReasonInCurrentContext();
   }
 
-  // The return value must encode the isCancelled and reason into one word.
-  // See Concurrency.h for more details.
-  constexpr size_t isCancelledBit = 1u;
   if (!reason)
-    return 0;
-  return isCancelledBit | (*reason << 1);
+    return CancellationStatus().getOpaqueValue();
+  return CancellationStatus::cancelled(*reason).getOpaqueValue();
 }
 
 template <typename FunctionPtrType>

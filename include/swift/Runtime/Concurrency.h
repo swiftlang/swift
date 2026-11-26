@@ -700,12 +700,21 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_cancelCancellationScope(
     TaskCancellationScopeRecord *record, size_t flags);
 
-/// Return whether the passed-in cancellation scope has been cancelled.
-/// This does not check the task cancellation status, just the scope.
+/// Return whether the passed-in cancellation scope has been cancelled, and if
+/// so, the reason of its cancellation. This does not check the task
+/// cancellation status, just the scope.
+///
+/// The return value has the same layout as the return value of
+/// `swift_task_getIsCancelledWithReason`: bit 0 is the `isCancelled` flag and
+/// bits 1-3 hold the `CancellationError.Reason` raw value. All other bits are
+/// zero and reserved for future evolution.
+///
+/// May be called from any thread.
 ///
 /// Runtime availability: Swift 6.5
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_cancellationScopeIsCancelled(TaskCancellationScopeRecord *record);
+size_t swift_task_cancellationScopeGetIsCancelledWithReason(
+    TaskCancellationScopeRecord *record);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 size_t swift_task_getJobFlags(AsyncTask* task);
@@ -731,6 +740,8 @@ bool swift_task_isCancelled(AsyncTask* task);
 /// - `C` (bit 0):     `isCancelled` flag. 0 = not cancelled, 1 = cancelled.
 /// - `reason` (1..3): `CancellationError.Reason.rawValue` (3 bits).
 /// - `reserved`:      All other bits are zero; reserved for future evolution.
+///
+/// `CancellationStatus` in `MetadataValues.h` defines this layout.
 ///
 /// Runtime availability: Swift 6.5. Its Swift signature is
 ///

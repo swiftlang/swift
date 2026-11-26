@@ -227,7 +227,7 @@ import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
-import TaskIsCancelledCancellationScopes
+import TaskCancellation
 import TaskIDBenchmark
 import TaskLocalGet
 import TaskRegistryStress
@@ -460,7 +460,7 @@ register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
-register(TaskIsCancelledCancellationScopes.benchmarks)
+register(TaskCancellation.benchmarks)
 register(TaskIDBenchmark.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(TaskRegistryStress.benchmarks)

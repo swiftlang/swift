@@ -1104,12 +1104,13 @@ swift_task_cancelCancellationScopeImpl(
 }
 
 SWIFT_CC(swift)
-static bool
-swift_task_cancellationScopeIsCancelledImpl(TaskCancellationScopeRecord *record) {
-  // Read the record's own atomic flag directly. Safe from any thread.
+static size_t
+swift_task_cancellationScopeGetIsCancelledWithReasonImpl(
+    TaskCancellationScopeRecord *record) {
+  // Read the record's own atomic state directly. Safe from any thread.
   if (!record)
-    return false;
-  return record->isCancelled();
+    return 0;
+  return record->getIsCancelledWithReason();
 }
 
 std::optional<size_t>
