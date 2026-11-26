@@ -300,6 +300,13 @@ public:
   /// default explicitly via -dwarf-version.
   uint8_t DWARFVersion = 5;
 
+  /// Name for the split DWARF file (embedded as DW_AT_dwo_name in skeleton CU).
+  /// Derived as basename of SplitDwarfOutput.
+  std::string SplitDwarfFile;
+
+  /// Output path for the split DWARF file (.dwo).
+  std::string SplitDwarfOutput;
+
   /// The command line string that is to be stored in the debug info.
   std::string DebugFlags;
 
