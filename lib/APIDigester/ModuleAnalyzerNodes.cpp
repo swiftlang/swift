@@ -68,7 +68,10 @@ bool swift::ide::api::hasValidParentPtr(SDKNodeKind kind) {
   }
 }
 
-SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
+SDKContext::SDKContext(CheckerOptions Opts,
+                       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS)
+    : SourceMgr(FS ? FS : llvm::vfs::createPhysicalFileSystem()),
+      Diags(SourceMgr), Opts(Opts) {}
 
 DiagnosticEngine &SDKContext::getDiags(SourceLoc Loc) {
   // If the location is invalid, we just use the locally created DiagEngine.
@@ -2676,7 +2679,7 @@ void swift::ide::api::dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os,
   opts.SkipOSCheck = false;
   opts.SkipRemoveDeprecatedCheck = false;
   opts.Verbose = false;
-  SDKContext ctx(opts);
+  SDKContext ctx(opts, MD->getASTContext().SourceMgr.getFileSystem());
   llvm::SmallVector<ModuleDecl*, 4> modules;
   if (!Empty) {
     modules.push_back(MD);

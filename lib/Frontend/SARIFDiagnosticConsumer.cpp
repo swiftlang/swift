@@ -32,6 +32,7 @@
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -54,7 +55,9 @@ class SARIFDiagnosticConsumer : public DiagnosticConsumer {
   /// engine as the serialized diagnostics consumer does. Always returns true,
   /// the "an error occurred" result of finishProcessing().
   bool reportFailure(Diag<StringRef, StringRef> diagID, StringRef reason) {
-    SourceManager dummyMgr;
+    // The diagnostic has no source location, so no files are needed.
+    SourceManager dummyMgr(
+        llvm::makeIntrusiveRefCnt<llvm::vfs::InMemoryFileSystem>());
     DiagnosticEngine DE(dummyMgr);
     PrintingDiagnosticConsumer PDC;
     DE.addConsumer(PDC);

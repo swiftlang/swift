@@ -103,7 +103,7 @@ bool ExplicitModuleInterfaceBuilder::collectDepsForSerialization(
   // serializing resource dir inputs we need to check for
   // relative _and_ absolute prefixes.
   SmallString<128> AbsResourcePath(ResourcePath);
-  llvm::sys::fs::make_absolute(AbsResourcePath);
+  (void)fs.makeAbsolute(AbsResourcePath);
 
   auto DTDeps = Instance.getDependencyTracker()->getDependencies();
   SmallVector<std::string, 16> InitialDepNames(DTDeps.begin(), DTDeps.end());
@@ -411,7 +411,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
     // This process may have a different module output path. If the other
     // process doesn't build the interface to this output path, we should try
     // building ourselves.
-    auto bufferOrError = llvm::MemoryBuffer::getFile(OutPath);
+    auto bufferOrError = sourceMgr.getFileSystem()->getBufferForFile(OutPath);
     if (!bufferOrError)
       continue;
     if (ModuleBuffer)

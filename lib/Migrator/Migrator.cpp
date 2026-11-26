@@ -23,6 +23,7 @@
 #include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/IOSandbox.h"
 
 using namespace swift;
 using namespace swift::migrator;
@@ -31,6 +32,11 @@ bool migrator::updateCodeAndEmitRemapIfNeeded(CompilerInstance *Instance) {
   const auto &Invocation = Instance->getInvocation();
   if (!Invocation.getMigratorOptions().shouldRunMigrator())
     return false;
+
+  // The migrator is legacy code that accesses the file system directly instead
+  // of through the virtual file system and output backend, so it is not
+  // sandboxed.
+  auto BypassSandbox = llvm::sys::sandbox::scopedDisable();
 
   // Delete the remap file, in case someone is re-running the Migrator. If the
   // file fails to compile and we don't get a chance to overwrite it, the old
