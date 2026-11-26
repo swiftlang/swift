@@ -125,6 +125,7 @@ namespace Lowering {
 }
 
 namespace irgen {
+  struct Field;
   class Address;
   class ClangTypeConverter;
   class ClassMetadataLayout;
@@ -1172,7 +1173,7 @@ public:
   const TypeInfo &adoptTypeInfo(std::unique_ptr<TypeInfo> typeInfo);
 
   void dumpAbstractTypeLayoutInfo(CanType type, StringRef mangledName,
-                                  StringRef origin);
+                                  StringRef origin, Field member);
   const TypeInfo &getWitnessTablePtrTypeInfo();
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getSwiftContextPtrTypeInfo();

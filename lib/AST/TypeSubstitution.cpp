@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -31,6 +32,14 @@
 #include "swift/Basic/Defer.h"
 
 using namespace swift;
+
+AbstractTypeLayout *AbstractTypeLayout::getWithSubstitutions(
+    ASTContext &, SubstitutionMap substitutions) {
+  if (substitutions.empty())
+    return this;
+
+  llvm_unreachable("substitution of abstract type layouts is not implemented");
+}
 
 //===----------------------------------------------------------------------===//
 // Type::subst() and friends

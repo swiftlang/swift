@@ -401,6 +401,13 @@ public:
   
   std::string mangleObjCRuntimeName(const NominalTypeDecl *Nominal);
 
+  std::string mangleTypeWithPrefix(Type type,
+                                   GenericSignature sig = nullptr) {
+    beginMangling();
+    appendType(type, sig);
+    return finalize();
+  }
+
   std::string mangleTypeWithoutPrefix(Type type,
                                       GenericSignature sig = nullptr) {
     appendType(type, sig);

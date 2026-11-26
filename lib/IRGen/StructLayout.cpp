@@ -18,6 +18,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -692,12 +693,18 @@ unsigned irgen::countExportableFields(IRGenModule &IGM,
 }
 
 SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
+  return getType(IGM, baseType, TypeExpansionContext::minimal());
+}
+
+SILType Field::getType(IRGenModule &IGM, SILType baseType,
+                       TypeExpansionContext context) const {
   switch (getKind()) {
   case Field::Var:
-    return baseType.getFieldType(getVarDecl(), IGM.getSILModule(),
-                                 TypeExpansionContext::minimal());
-  case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return baseType.getFieldType(getVarDecl(), IGM.getSILModule(), context);
+  case Field::MissingMember: {
+    return baseType.getFieldType(getMissingMemberDecl(), IGM.getSILTypes(),
+                                 context);
+  }
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
@@ -711,9 +718,12 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
 Type Field::getInterfaceType(IRGenModule &IGM) const {
   switch (getKind()) {
   case Field::Var:
-    return getVarDecl()->getInterfaceType();
-  case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return getVarDecl() ? getVarDecl()->getInterfaceType() : Type();
+  case Field::MissingMember: {
+    auto *layout = getMissingMemberDecl()->StorageLayout;
+    assert(layout && "missing field has no storage layout");
+    return HiddenType::get(IGM.Context, layout, CanType());
+  }
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
   case Field::NonDefaultDistributedActorStorage:
@@ -725,13 +735,27 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
 StringRef Field::getName() const {
   switch (getKind()) {
   case Field::Var:
-    return getVarDecl()->getName().str();
+    return getVarDecl() ? getVarDecl()->getName().str() : "hidden_field";
   case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return getMissingMemberDecl()->getName().getBaseIdentifier().str();
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
   case Field::NonDefaultDistributedActorStorage:
     return NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME;
+  }
+  llvm_unreachable("bad field kind");
+}
+
+DeclContext *Field::getDeclContext() const {
+  switch (getKind()) {
+  case Field::Var:
+    assert(getVarDecl() && "physical field has no declaration context");
+    return getVarDecl()->getDeclContext();
+  case Field::MissingMember:
+    return getMissingMemberDecl()->getDeclContext();
+  case Field::DefaultActorStorage:
+  case Field::NonDefaultDistributedActorStorage:
+    llvm_unreachable("artificial field has no declaration context");
   }
   llvm_unreachable("bad field kind");
 }

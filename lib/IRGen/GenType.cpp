@@ -54,6 +54,7 @@
 #include "IRGenModule.h"
 #include "Address.h"
 #include "Explosion.h"
+#include "Field.h"
 #include "GenOpaque.h"
 #include "HeapTypeInfo.h"
 #include "IndirectTypeInfo.h"
@@ -2560,7 +2561,8 @@ const TypeInfo &IRGenModule::getTypeInfoForLowered(CanType T) {
 
 void IRGenModule::dumpAbstractTypeLayoutInfo(CanType type,
                                              StringRef mangledName,
-                                             StringRef origin) {
+                                             StringRef origin,
+                                             Field member) {
   auto dumpKind = getOptions().DumpAbstractTypeLayoutInfo;
   auto shouldDump =
       [dumpKind](IRGenOptions::AbstractTypeLayoutInfoDumpKind kind) {
@@ -2569,8 +2571,16 @@ void IRGenModule::dumpAbstractTypeLayoutInfo(CanType type,
                dumpKind == kind;
       };
 
+  auto *enclosingNominal = member.getDeclContext()->getSelfNominalTypeDecl();
+  assert(enclosingNominal && "stored property has no enclosing nominal type");
+  auto enclosingMangledName =
+      Mangle::ASTMangler(enclosingNominal->getASTContext())
+          .mangleNominalType(enclosingNominal);
+
   auto &OS = llvm::outs();
   OS << "=== Abstract type layout information ===\n"
+     << "enclosingType: " << enclosingMangledName << "\n"
+     << "memberName: " << member.getName() << "\n"
      << "mangledName: " << mangledName << "\n"
      << "origin: " << origin << "\n";
 
@@ -2997,12 +3007,11 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    auto *layoutInfo = hidden->getLayoutInfoDecl();
-    assert(layoutInfo && layoutInfo->Layout &&
-           layoutInfo->Layout->typeInfoRepresentation &&
+    auto *layout = hidden->getLayout();
+    assert(layout->typeInfoRepresentation &&
            "HiddenType must carry a serialized TypeInfo representation");
     return createTypeInfoFromSerializableRepresentation(
-               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+               IGM, *layout->typeInfoRepresentation)
         .release();
   }
   }

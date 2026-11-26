@@ -827,6 +827,24 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
   }
 }
 
+Expected<SILLayout *> ModuleFile::getSILLayoutChecked(SILLayoutID ID) {
+  assert(ID > 0 && ID <= SILLayouts.size() && "invalid SIL layout ID");
+
+  auto &layoutOrOffset = SILLayouts[ID - 1];
+  if (layoutOrOffset.isComplete())
+    return layoutOrOffset;
+
+  BCOffsetRAII saveOffset(DeclTypeCursor);
+  if (auto error =
+          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(layoutOrOffset)))
+    return std::move(error);
+  auto layout = readSILLayout(DeclTypeCursor);
+  if (!layout)
+    return diagnoseFatal();
+  layoutOrOffset = layout;
+  return layout;
+}
+
 namespace swift {
 class ProtocolConformanceDeserializer {
   ModuleFile &MF;
@@ -2229,35 +2247,6 @@ static TypeDecl *
 findNestedTypeDeclInModule(ModuleDecl *extensionModule,
                            Identifier name, NominalTypeDecl *parent)  {
   return findNestedTypeDeclInModule(nullptr, extensionModule, name, parent);
-}
-
-void ModuleFile::consumeHiddenTypeXRefPathPieces(
-    llvm::BitstreamCursor &cursor, uint32_t pathLen,
-    SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces) {
-  using namespace decls_block;
-  for (uint32_t index = 0; index < pathLen; ++index) {
-    auto entry = fatalIfUnexpected(
-        cursor.advance(AF_DontPopBlockAtEnd));
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      fatal(diagnoseFatal());
-
-    SmallVector<uint64_t, 8> scratch;
-    StringRef blobData;
-    unsigned recordID = fatalIfUnexpected(
-        cursor.readRecord(entry.ID, scratch, &blobData));
-    if (recordID != XREF_TYPE_PATH_PIECE)
-      fatal(diagnoseFatal());
-
-    IdentifierID nameID, privateDiscriminator;
-    bool inProtocolExtension, importedFromClang;
-    XRefTypePathPieceLayout::readRecord(
-        scratch, nameID, privateDiscriminator, inProtocolExtension,
-        importedFromClang);
-    if (privateDiscriminator)
-      fatal(diagnoseFatal());
-    pieces.push_back({getIdentifier(nameID), inProtocolExtension,
-                      importedFromClang});
-  }
 }
 
 /// Appends to \p results the imported clang class template specialization with
@@ -4191,6 +4180,7 @@ public:
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     bool isIUO;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
@@ -4206,6 +4196,7 @@ public:
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
+                                       memberAbstractTypeLayoutID,
                                        isIUO,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
@@ -4241,7 +4232,8 @@ public:
       MF.diagnoseAndConsumeError(overridden.takeError());
 
       return llvm::make_error<OverrideError>(
-          name, getErrorFlags(), numVTableEntries);
+          name, getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID, interfaceTypeID);
     }
 
     // Extract the accessor IDs.
@@ -4259,7 +4251,8 @@ public:
       if (!dependency) {
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            getErrorFlags(), numVTableEntries);
+            getErrorFlags(), numVTableEntries,
+            memberAbstractTypeLayoutID, interfaceTypeID);
       }
     }
 
@@ -4282,7 +4275,10 @@ public:
 
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTypeOrError)
-      return interfaceTypeOrError.takeError();
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(interfaceTypeOrError.takeError()),
+          getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID, interfaceTypeID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -6035,7 +6031,6 @@ class SerializableTypeInfoReader {
     uint64_t bits;
   };
 
-  ModuleFile &MF;
   llvm::BitstreamCursor &Cursor;
   SmallVector<uint64_t, 64> Scratch;
   bool Invalid = false;
@@ -6176,23 +6171,14 @@ class SerializableTypeInfoReader {
     result.explosionSize = explosionSize;
     for (uint64_t fieldIndex = 0; fieldIndex < fieldCount; ++fieldIndex) {
       SerializableRecordFieldRepresentation field;
-      swift::serialization::TypeID fieldTypeID;
       uint64_t index;
       bool isTriviallyDestroyable;
       uint64_t layoutKind;
       if (!readRecord<SerializableRecordFieldLayout>(
-              fieldTypeID, field.layout.ByteOffset,
-              field.layout.ByteOffsetForLayout, index,
+              field.layout.ByteOffset, field.layout.ByteOffsetForLayout, index,
               isTriviallyDestroyable, layoutKind,
               field.storage.Begin, field.storage.End))
         return false;
-      if (fieldTypeID) {
-        auto fieldType = MF.getTypeChecked(fieldTypeID);
-        if (fieldType)
-          field.type = *fieldType;
-        else
-          llvm::consumeError(fieldType.takeError());
-      }
       field.layout.Index = index;
       field.layout.IsTriviallyDestroyable = isTriviallyDestroyable;
       field.layout.TheKind = layoutKind;
@@ -6232,9 +6218,8 @@ class SerializableTypeInfoReader {
   }
 
 public:
-  SerializableTypeInfoReader(ModuleFile &moduleFile,
-                             llvm::BitstreamCursor &cursor)
-      : MF(moduleFile), Cursor(cursor) {}
+  explicit SerializableTypeInfoReader(llvm::BitstreamCursor &cursor)
+      : Cursor(cursor) {}
 
   std::optional<SILTypeProperties> readSILTypeProperties() {
     using namespace decls_block;
@@ -6322,21 +6307,11 @@ public:
 };
 } // namespace
 
-llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+llvm::Expected<AbstractTypeLayout *>
+ModuleFile::deserializeAbstractTypeLayout(BitOffset offset) {
   using namespace decls_block;
-  if (!DID)
-    return nullptr;
-
-  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
-         "invalid hidden type layout decl ID");
-  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
-  if (declOrOffset.isComplete())
-    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
-
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (auto error =
-          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+  if (auto error = diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(offset)))
     return std::move(error);
 
   SmallVector<uint64_t, 64> scratch;
@@ -6347,20 +6322,19 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
     return diagnoseFatal();
   unsigned recordID = fatalIfUnexpected(
       DeclTypeCursor.readRecord(entry.ID, scratch, &blobData));
-  if (recordID != HIDDEN_TYPE_LAYOUT_INFO)
+  if (recordID != ABSTRACT_TYPE_LAYOUT_INFO)
     return diagnoseFatal();
 
   IdentifierID mangledNameID;
-  DeclID parentDeclID;
   uint64_t rawReferenceCounting;
-  HiddenTypeLayoutInfoLayout::readRecord(
-      scratch, mangledNameID, parentDeclID, rawReferenceCounting);
+  AbstractTypeLayoutInfoLayout::readRecord(scratch, mangledNameID,
+                                           rawReferenceCounting);
 
   std::optional<ReferenceCounting> referenceCounting;
   if (!decodeReferenceCounting(rawReferenceCounting, referenceCounting))
     return diagnoseFatal();
 
-  SerializableTypeInfoReader reader(*this, DeclTypeCursor);
+  SerializableTypeInfoReader reader(DeclTypeCursor);
   auto typeProperties = reader.readSILTypeProperties();
   if (!typeProperties)
     return diagnoseFatal();
@@ -6368,20 +6342,46 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
   if (!representation)
     return diagnoseFatal();
 
-  auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
-                                                 getAssociatedModule());
-  decl->MangledName = getIdentifierText(mangledNameID);
-  if (parentDeclID)
-    decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
-
   auto layout = std::make_unique<AbstractTypeLayout>();
+  layout->mangledName = getIdentifierText(mangledNameID).str();
   layout->typeProperties = *typeProperties;
   layout->referenceCountingSystem = referenceCounting;
   layout->typeInfoRepresentation = std::move(representation);
-  decl->Layout = layout.get();
-  DeserializedHiddenTypeLayouts.push_back(std::move(layout));
-  declOrOffset = decl;
-  return decl;
+  auto *result = layout.get();
+  DeserializedAbstractTypeLayouts.push_back(std::move(layout));
+  return result;
+}
+
+llvm::Expected<AbstractTypeLayout *>
+ModuleFile::getAbstractMemberTypeLayout(MemberAbstractTypeLayoutID ID) {
+  if (!ID)
+    return nullptr;
+
+  assert(ID <= AbstractMemberTypeLayouts.size() &&
+         "invalid abstract member type layout ID");
+  auto &declOrOffset = AbstractMemberTypeLayouts[ID - 1];
+  if (declOrOffset.isComplete())
+    return declOrOffset.get();
+
+  auto layout = deserializeAbstractTypeLayout(declOrOffset);
+  if (!layout)
+    return layout.takeError();
+  declOrOffset = layout.get();
+  return layout;
+}
+
+BitOffset ModuleFile::getSerializedTypeOffset(TypeID ID) const {
+  assert(ID && ID <= Core->Types.size() && "invalid serialized type ID");
+  return BitOffset(Core->Types[ID - 1]);
+}
+
+BitOffset ModuleFile::getSerializedDeclOffset(DeclID ID) const {
+  assert(ID && ID <= Core->Decls.size() && "invalid serialized decl ID");
+  return BitOffset(Core->Decls[ID - 1]);
+}
+
+llvm::BitstreamCursor ModuleFile::getDeclTypeCursorForReplay() const {
+  return Core->DeclTypeCursor;
 }
 
 static std::optional<AvailabilityDomainKind>
@@ -7603,44 +7603,6 @@ DeclDeserializer::getDeclCheckedImpl(
     uint32_t pathLen;
     decls_block::XRefLayout::readRecord(scratch, baseModuleID, pathLen);
 
-    auto fallback = MF.HiddenTypeFallbackMap.find(thisDeclID);
-    bool canUseHiddenTypeFallback =
-        fallback != MF.HiddenTypeFallbackMap.end() &&
-        MF.getContext().LangOpts.hasFeature(
-            Feature::SerializeAbstractTypeLayoutForHiddenTypes);
-    if (canUseHiddenTypeFallback) {
-      SmallVector<HiddenTypeLayoutInfoDecl::XRefPathPiece, 2> originalPath;
-      auto pathCursor = MF.DeclTypeCursor;
-      MF.consumeHiddenTypeXRefPathPieces(pathCursor, pathLen, originalPath);
-
-      auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
-      if (resolved) {
-        declOrOffset = resolved.get();
-        break;
-      }
-
-      auto hidden = MF.getHiddenTypeLayoutInfoDecl(fallback->second);
-      if (!hidden) {
-        llvm::consumeError(resolved.takeError());
-        return hidden.takeError();
-      }
-      if (!hidden.get())
-        return resolved;
-
-      if (baseModuleID == OBJC_HEADER_MODULE_ID) {
-        hidden.get()->OriginalModuleIsObjCHeader = true;
-      } else {
-        assert(baseModuleID >= NUM_SPECIAL_IDS &&
-               "unexpected special module in hidden type XREF");
-        hidden.get()->OriginalModuleName = MF.getIdentifier(baseModuleID);
-      }
-      hidden.get()->OriginalXRefPath =
-          MF.getContext().AllocateCopy(originalPath);
-      declOrOffset = hidden.get();
-      llvm::consumeError(resolved.takeError());
-      break;
-    }
-
     auto resolved = MF.resolveCrossReference(baseModuleID, pathLen);
     if (!resolved)
       return resolved;
@@ -8046,16 +8008,6 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   auto declOrError = MF.getDeclChecked(declID);
   if (!declOrError)
     return declOrError.takeError();
-
-  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
-    CanType parent = parentTy.get()
-                         ? parentTy.get()->getCanonicalType()
-                         : CanType();
-    CanType type = CanType(
-        HiddenType::get(MF.getContext(), hidden->MangledName, hidden, parent));
-    MF.getContext().recordRecoveredHiddenType(type);
-    return type;
-  }
 
   // Look through compatibility aliases.
   if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {
@@ -8695,28 +8647,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_BOX_TYPE)(
   SubstitutionMapID subMapID;
   decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
 
-  // Get the layout.
-  auto getLayout = [&MF](SILLayoutID layoutID) -> Expected<SILLayout *> {
-    assert(layoutID > 0 && layoutID <= MF.SILLayouts.size() &&
-           "invalid layout ID");
-
-    auto &layoutOrOffset = MF.SILLayouts[layoutID - 1];
-    if (layoutOrOffset.isComplete()) {
-      return layoutOrOffset;
-    }
-
-    BCOffsetRAII saveOffset(MF.DeclTypeCursor);
-    if (auto error = MF.diagnoseFatalIfNotSuccess(
-            MF.DeclTypeCursor.JumpToBit(layoutOrOffset)))
-      return std::move(error);
-    auto layout = MF.readSILLayout(MF.DeclTypeCursor);
-    if (!layout)
-      return MF.diagnoseFatal();
-    layoutOrOffset = layout;
-    return layout;
-  };
-
-  auto layout = getLayout(layoutID);
+  auto layout = MF.getSILLayoutChecked(layoutID);
   if (!layout)
     return layout.takeError();
   if (!*layout)
@@ -9448,6 +9379,28 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
   return suppliedMissingMember;
 }
 
+Decl *ModuleFile::handleErrorAndSupplyMissingStructMember(
+    ASTContext &context, llvm::Error &&error,
+    StructDecl *containingStruct) {
+  Decl *suppliedMissingMember = nullptr;
+  auto errorInfo = takeErrorInfo(std::move(error));
+  if (errorInfo->isA<DeclDeserializationError>()) {
+    auto *declError = static_cast<DeclDeserializationError *>(errorInfo.get());
+    if (auto layoutID = declError->getMemberAbstractTypeLayoutID()) {
+      auto layout = getAbstractMemberTypeLayout(layoutID);
+      if (!layout)
+        fatal(layout.takeError());
+      if (auto typeID = declError->getMemberInterfaceTypeID())
+        layout.get()->serializedType = {this, typeID};
+      suppliedMissingMember = MissingMemberDecl::create(
+          context, containingStruct, declError->getName(), 0,
+          declError->needsFieldOffsetVectorEntry(), layout.get());
+    }
+  }
+  diagnoseAndConsumeError(std::move(errorInfo));
+  return suppliedMissingMember;
+}
+
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
   diagnoseAndConsumeError(std::move(error));
@@ -9457,7 +9410,7 @@ ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
                                               Decl *container,
-                                              llvm::Error &&error) const {
+                                              llvm::Error &&error) {
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
@@ -9467,6 +9420,11 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
   if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
     return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
                                                   containingProto);
+  }
+
+  if (auto *containingStruct = dyn_cast<StructDecl>(container)) {
+    return handleErrorAndSupplyMissingStructMember(
+        context, std::move(error), containingStruct);
   }
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }

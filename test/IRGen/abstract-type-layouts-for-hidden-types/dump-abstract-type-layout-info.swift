@@ -47,12 +47,13 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 }
 
 // CHECK-BOTH: === Abstract type layout information ===
+// CHECK-BOTH-NEXT: enclosingType: $s7Library7WrapperV
+// CHECK-BOTH-NEXT: memberName: hidden
 // CHECK-BOTH-NEXT: mangledName: $sSo13HiddenCStructa
 // CHECK-LIBRARY-NEXT: origin: serialization
 // CHECK-CLIENT-NEXT: origin: recovery
 // CHECK-BOTH-NEXT: TypeLowering:
 // CHECK-BOTH-NEXT:   class: TrivialTypeLowering
-// CHECK-BOTH-NEXT:   Expansion: Maximal
 // CHECK-BOTH-NEXT:   isTrivial: true.
 // CHECK-BOTH-NEXT:   isEscapable: true.
 // CHECK-BOTH-NEXT:   isNonTrivialOnlyBecauseNonEscapable: false.
@@ -175,7 +176,8 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 // CHECK-BOTH-NEXT:     - index: 0
 // CHECK-BOTH-NEXT:       TypeInfo:
 // CHECK-BOTH-NEXT:         class: LoadableStructTypeInfo
-// CHECK-BOTH-NEXT:         storageType: %Ts5Int32V = type <{ i32 }>
+// CHECK-LIBRARY-NEXT:      storageType: %Ts5Int32V = type <{ i32 }>
+// CHECK-CLIENT-NEXT:       storageType: <{ i32 }>
 // CHECK-BOTH-NEXT:         kind: loadable
 // CHECK-BOTH-NEXT:         bestKnownAlignment: 4
 // CHECK-BOTH-NEXT:         abiAccessible: true
@@ -254,7 +256,8 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 // CHECK-BOTH-NEXT:     - index: 1
 // CHECK-BOTH-NEXT:       TypeInfo:
 // CHECK-BOTH-NEXT:         class: LoadableStructTypeInfo
-// CHECK-BOTH-NEXT:         storageType: %TSd = type <{ double }>
+// CHECK-LIBRARY-NEXT:      storageType: %TSd = type <{ double }>
+// CHECK-CLIENT-NEXT:       storageType: <{ double }>
 // CHECK-BOTH-NEXT:         kind: loadable
 // CHECK-BOTH-NEXT:         bestKnownAlignment: 8
 // CHECK-BOTH-NEXT:         abiAccessible: true

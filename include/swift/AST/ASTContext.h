@@ -132,12 +132,18 @@ namespace swift {
   class TupleTypeElt;
   class EnumElementDecl;
   class MacroDecl;
+  class MissingMemberDecl;
   class ProtocolDecl;
   class SubstitutableType;
   class SourceManager;
   class ValueDecl;
   class DiagnosticEngine;
   struct RawComment;
+
+  struct RecoveredAbstractMemberTypeLayout {
+    MissingMemberDecl *Member;
+    CanType Type;
+  };
   class DocComment;
   class SearchPathOptions;
   class SILBoxType;
@@ -1295,11 +1301,13 @@ public:
   iterator_range<llvm::MapVector<Identifier, ModuleDecl *>::const_iterator>
   getLoadedModules() const;
 
-  /// Record a type whose declaration was recovered from serialized abstract
-  /// layout information after its cross-reference could not be resolved.
-  void recordRecoveredHiddenType(CanType type);
+  /// Record a missing member whose type was reconstructed from its serialized
+  /// abstract layout.
+  void recordRecoveredAbstractMemberTypeLayout(MissingMemberDecl *member,
+                                               CanType type);
 
-  ArrayRef<CanType> getRecoveredHiddenTypes() const;
+  ArrayRef<RecoveredAbstractMemberTypeLayout>
+  getRecoveredAbstractMemberTypeLayouts() const;
 
   /// Returns the number of loaded modules known by this context to be loaded.
   unsigned getNumLoadedModules() const {

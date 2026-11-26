@@ -158,7 +158,7 @@ public:
   ArrayRef<FileDependency> Dependencies;
   ArrayRef<std::tuple<std::string, bool>> PublicDependentLibraries;
 
-  /// IRGen options used to derive TypeInfo for hidden layout records.
+  /// IRGen options used to derive TypeInfo for abstract layout records.
   const IRGenOptions *IRGenOpts = nullptr;
 
   bool AutolinkForceLoad = false;
@@ -176,6 +176,7 @@ public:
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
   bool EnableHiddenTypeLayoutSerializationRemarks = false;
+  bool SkipWritingAbstractTypeLayouts = false;
   bool IsInterfaceSDKRelative = false;
 };
 

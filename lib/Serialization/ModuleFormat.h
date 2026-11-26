@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1051; // SIL function closure flag
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1052; // Abstract member type layout records
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -67,9 +67,10 @@ const uint32_t SWIFTMODULE_HASH_SEED = 5381;
 
 using DeclIDField = BCFixed<31>;
 
-// TypeID must be the same as DeclID because it is stored in the same way.
-using TypeID = DeclID;
 using TypeIDField = DeclIDField;
+
+using MemberAbstractTypeLayoutID = DeclID;
+using MemberAbstractTypeLayoutIDField = DeclIDField;
 
 using TypeIDWithBitField = BCFixed<32>;
 
@@ -1802,6 +1803,7 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
+    MemberAbstractTypeLayoutIDField, // fallback abstract type layout
     BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
@@ -2759,10 +2761,9 @@ namespace decls_block {
   constexpr uint8_t NoReferenceCounting =
       static_cast<uint8_t>(ReferenceCounting::Error) + 1;
 
-  using HiddenTypeLayoutInfoLayout = BCRecordLayout<
-    HIDDEN_TYPE_LAYOUT_INFO,
-    IdentifierIDField, // mangled identity of the hidden type
-    DeclIDField,       // parent type declaration, if any
+  using AbstractTypeLayoutInfoLayout = BCRecordLayout<
+    ABSTRACT_TYPE_LAYOUT_INFO,
+    IdentifierIDField, // mangled identity of the abstract type
     BCFixed<4>         // ReferenceCounting, or NoReferenceCounting
   >;
 
@@ -2810,7 +2811,6 @@ namespace decls_block {
 
   using SerializableRecordFieldLayout = BCRecordLayout<
     RECORD_FIELD,
-    TypeIDField, // Swift field type, or zero if it has no Swift representation
     BCVBR<32>,  // byte offset
     BCVBR<32>,  // byte offset used during layout
     BCVBR<16>,  // LLVM struct or non-fixed element index
@@ -2935,9 +2935,8 @@ namespace index_block {
     SUBSTITUTION_MAP_OFFSETS,
     CLANG_TYPE_OFFSETS,
     EXPORTED_PRESPECIALIZATION_DECLS,
-    HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS,
-    HIDDEN_TYPE_FALLBACK_TABLE,
-    LastRecordKind = HIDDEN_TYPE_FALLBACK_TABLE,
+    ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS,
+    LastRecordKind = ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS,
   };
 
   constexpr const unsigned RecordIDFieldWidth = 5;

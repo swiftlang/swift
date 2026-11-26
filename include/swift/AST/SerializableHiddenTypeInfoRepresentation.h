@@ -18,7 +18,6 @@
 #ifndef SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H
 #define SWIFT_AST_SERIALIZABLEHIDDENTYPEINFOREPRESENTATION_H
 
-#include "swift/AST/Type.h"
 #include "swift/AST/TypeInfoStorage.h"
 #include "llvm/IR/Type.h"
 #include <cstdint>
@@ -112,7 +111,6 @@ public:
 };
 
 struct SerializableRecordFieldRepresentation {
-  Type type;
   std::unique_ptr<SerializableHiddenTypeInfoRepresentation> typeInfo;
   irgen::ElementLayoutStorage layout;
   irgen::RecordFieldStorage storage;

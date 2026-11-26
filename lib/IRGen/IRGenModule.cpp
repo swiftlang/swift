@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/IRGenRequests.h"
@@ -73,6 +74,7 @@
 #include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
+#include "Field.h"
 #include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
@@ -2391,9 +2393,11 @@ bool IRGenModule::finalize() {
 
   if (getOptions().DumpAbstractTypeLayoutInfo !=
       IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
-    for (auto type : Context.getRecoveredHiddenTypes()) {
-      auto hidden = cast<HiddenType>(type);
-      dumpAbstractTypeLayoutInfo(type, hidden->getMangledName(), "recovery");
+    for (auto recovered : Context.getRecoveredAbstractMemberTypeLayouts()) {
+      auto hidden = cast<HiddenType>(recovered.Type);
+      dumpAbstractTypeLayoutInfo(
+          recovered.Type, hidden->getMangledName(), "recovery",
+          Field(recovered.Member));
     }
   }
 
