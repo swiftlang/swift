@@ -23,43 +23,33 @@ function(emit_swift_interface target)
   # generated with the previous logic
   if(EXISTS "${module_directory}" AND NOT IS_DIRECTORY "${module_directory}")
     message(STATUS "Removing regular file '${module_directory}' to support nested swiftmodule generation")
-    file(REMOVE ${module_directory})
+    file(REMOVE "${module_directory}")
   endif()
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule>")
-  set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-    "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule"
-    "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftdoc"
-    "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftsourceinfo")
   if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftmodule>")
-    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-      "${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftmodule"
-      "${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftdoc"
-      "${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftsourceinfo")
   endif()
-  add_custom_command(OUTPUT "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule"
-    DEPENDS ${target})
   target_sources(${target}
     INTERFACE
-      $<BUILD_INTERFACE:${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftmodule>)
+      FILE_SET swift_modules
+      TYPE HEADERS
+      BASE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
+      FILES "${module_directory}")
+  set_source_files_properties("${module_directory}" PROPERTIES GENERATED TRUE)
+  set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+    "${module_directory}")
 
   # Generate textual swift interfaces is library-evolution is enabled
   if(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION)
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftinterface>
       $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.private.swiftinterface>)
-    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-      "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.swiftinterface"
-      "${module_directory}/${SwiftOverlay_MODULE_TRIPLE}.private.swiftinterface")
     if(SwiftOverlay_VARIANT_MODULE_TRIPLE)
       target_compile_options(${target} PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftinterface>"
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
-    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-      "${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.swiftinterface"
-      "${module_directory}/${SwiftOverlay_VARIANT_MODULE_TRIPLE}.private.swiftinterface")
     endif()
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-library-level$<SEMICOLON>api>
