@@ -162,15 +162,15 @@ protocol ClientProtocol {}
 // ok, conforming a type from another module to a protocol within this module is totally fine
 extension Sample1: ClientProtocol {}
 
-struct MySample7: @retroactive SampleProtocol1 {} // expected-error {{'@retroactive' only applies in inheritance clauses in extensions}}{{19-32=}}
+struct MySample7: @retroactive SampleProtocol1 {} // expected-error {{'@retroactive' can only be used as a type attribute in inheritance clauses in extensions}}{{19-32=}}
 
 extension MySample7: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'MySample7' is declared in this module}}{{22-35=}}
 
 extension Int: @retroactive ClientProtocol {} // expected-warning {{'retroactive' attribute does not apply; 'ClientProtocol' is declared in this module}}{{16-29=}}
 
-func f(_ x: @retroactive Int) {} // expected-error {{'@retroactive' only applies in inheritance clauses in extensions}}
+func f(_ x: @retroactive Int) {} // expected-error {{'@retroactive' can only be used as a type attribute in inheritance clauses in extensions}}
 
-var x: @retroactive Int { 0 } // expected-error {{'@retroactive' only applies in inheritance clauses in extensions}}
+var x: @retroactive Int { 0 } // expected-error {{'@retroactive' can only be used as a type attribute in inheritance clauses in extensions}}
 
 #if os(macOS)
 
