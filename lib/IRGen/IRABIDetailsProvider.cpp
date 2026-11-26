@@ -238,8 +238,12 @@ public:
   std::optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
     auto declRef = SILDeclRef(fd);
-    auto function = Lowering::SILGenModule(*silMod, declRef.getModuleContext())
-                        .getFunction(declRef, swift::NotForDefinition);
+    // Reuse the SILGenModule: destroying one verifies the whole SILModule,
+    // which grows with every lowered function.
+    if (!silGenMod)
+      silGenMod = std::make_unique<Lowering::SILGenModule>(
+          *silMod, silMod->getSwiftModule());
+    auto function = silGenMod->getFunction(declRef, swift::NotForDefinition);
 
     IGM.lowerSILFunction(function);
     auto silFuncType = function->getLoweredFunctionType();
@@ -381,6 +385,8 @@ public:
   std::unique_ptr<SILModule> silMod;
   IRGenerator IRGen;
   IRGenModule IGM;
+  // Destroyed before IGM and silMod; its destructor verifies silMod.
+  std::unique_ptr<Lowering::SILGenModule> silGenMod;
   llvm::SpecificBumpPtrAllocator<SignatureExpansionABIDetails>
       signatureExpansions;
 };
