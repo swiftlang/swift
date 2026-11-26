@@ -92,7 +92,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   assert(rawTy);
   rawTy = toRawDecl->mapTypeIntoEnvironment(rawTy);
 
-  if (enumDecl->isObjC()) {
+  if (enumDecl->isCCompatibleEnum()) {
     // Special case: ObjC enums are represented by their raw value, so just use
     // a bitcast.
 
