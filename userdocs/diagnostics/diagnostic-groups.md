@@ -28,6 +28,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:add-preconcurrency-import>
 - <doc:always-available-domain>
 - <doc:trailing-closure-matching>
+- <doc:c-implementation-visibility>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
 - <doc:deprecated-declaration>
@@ -80,6 +81,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:always-available-domain>
 - <doc:always-unsafe>
 - <doc:trailing-closure-matching>
+- <doc:c-implementation-visibility>
 - <doc:actor-isolated-mutating-async>
 - <doc:actor-isolated-call>
 - <doc:sendable-closure-captures>
