@@ -1,4 +1,4 @@
-// RUN: not %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop 2>&1 | %FileCheck %s
+// RUN: not %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default 2>&1 | %FileCheck %s
 
 // Function template specializations are instantiated when IRGen emits them, so
 // errors in their bodies are reported then.
