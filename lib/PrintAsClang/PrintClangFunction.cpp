@@ -776,6 +776,12 @@ static bool printDirectReturnOrParamCType(
     os << "// Stub struct to be used to pass/return values to/from Swift "
           "functions.\n";
     os << "struct " << stubName << " {\n";
+
+    unsigned pointerSize = emittedModule->getASTContext()
+                               .LangOpts.Target.getArchPointerBitWidth() /
+                           8;
+    unsigned currentEnd = 0;
+
     abiTypeInfo.enumerateRecordMembers([&](clang::CharUnits offset,
                                            clang::CharUnits end, Type t) {
       auto info =
@@ -786,7 +792,26 @@ static bool printDirectReturnOrParamCType(
       os << "  " << info->name;
       if (info->canBeNullable)
         os << " _Nullable";
-      os << " _" << (fields.size() + 1) << ";\n";
+      os << " _" << (fields.size() + 1);
+
+      // The generated stub has one field per swiftcc component. Clang lowers
+      // the stub for swiftcc by merging fields that fit a
+      // pointer-sized chunk, so when the C layout places a field in an
+      // earlier chunk than swiftcc does, the two sides disagree. We use
+      // `aligned` in these cases to ensure each field starts in the same
+      // chunk that swiftcc expects.
+      auto size = (end - offset).getQuantity();
+      unsigned stride = llvm::PowerOf2Ceil(size);
+      auto alignment = std::min(stride, pointerSize);
+      auto maxAlign = std::max(stride, pointerSize);
+      if (!fields.empty() &&
+          llvm::alignTo(currentEnd, alignment) != offset.getQuantity() &&
+          llvm::alignTo(currentEnd, maxAlign) <= offset.getQuantity()) {
+        os << " __attribute__((aligned(" << maxAlign << ")))";
+        alignment = maxAlign;
+      }
+      currentEnd = llvm::alignTo(currentEnd, alignment) + size;
+      os << ";\n";
       fields.push_back(std::make_pair(offset, end));
     });
     os << "};\n\n";
