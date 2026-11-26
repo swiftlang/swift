@@ -5842,9 +5842,6 @@ function Build-SymbolKit([Hashtable] $Platform,
 function Build-DocC([Hashtable] $Platform,
                     [Hashtable] $Compilers,
                     [string]    $SwiftSDK) {
-  # TODO: Re-enable debug info once https://github.com/swiftlang/swift/issues/88563 is fixed.
-  $DebugInfo = $false
-
   Build-CMakeProject `
     -Src $SourceCache\swift-docc `
     -Bin (Get-ProjectBinaryCache $Platform DocC) `
