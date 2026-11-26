@@ -6529,9 +6529,21 @@ namespace {
                                          /*genericParams=*/nullptr, bodyParams,
                                          resultTy, async, throws, dc, decl);
 
-      result->setAccess(limitAccessForCArrayProjection(
-          getOverridableAccessLevel(dc, decl),
-          decl));
+      // An accessor gets its storage's access. A property's accessors don't
+      // have to agree about objc_direct, so computing an accessor's access
+      // from its own method could give it a different access than its
+      // storage. Set it now instead of letting it be inherited lazily; the C
+      // array projection verifier only sees access that has been computed.
+      if (accessorInfo) {
+        auto *storage = accessorInfo->Storage;
+        result->setAccess(accessorInfo->Kind == AccessorKind::Set
+                              ? storage->getSetterFormalAccess()
+                              : storage->getFormalAccess());
+      } else {
+        result->setAccess(limitAccessForCArrayProjection(
+            getOverridableAccessLevel(dc, decl),
+            decl));
+      }
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() ==
@@ -11004,8 +11016,18 @@ void ClangImporter::Implementation::importAttributes(
              "objc_direct declarations are expected to be an AbstractFunctionDecl");
       MappedDecl->addAttribute(new (C) FinalAttr(/*IsImplicit=*/true));
       if (auto accessorDecl = dyn_cast<AccessorDecl>(MappedDecl)) {
-        auto attr = new (C) FinalAttr(/*isImplicit=*/true);
-        accessorDecl->getStorage()->addAttribute(attr);
+        auto *storage = accessorDecl->getStorage();
+        storage->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
+
+        // Final storage can't be 'open'. Storage is still 'open' here if the
+        // property isn't declared direct (for a subscript, if its getter isn't
+        // direct), so make it and its accessors 'public'.
+        if (storage->getFormalAccess() == AccessLevel::Open) {
+          storage->overwriteAccess(AccessLevel::Public);
+          if (auto *getter = storage->getAccessor(AccessorKind::Get))
+            getter->overwriteAccess(AccessLevel::Public);
+          storage->overwriteSetterAccess(AccessLevel::Public);
+        }
       }
     }
   }
