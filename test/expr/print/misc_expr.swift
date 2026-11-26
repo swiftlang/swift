@@ -138,3 +138,22 @@ struct S {
   func foo() {}
 }
 let fn = S.foo
+
+let tuple = (1, "a")
+let tupleFirst = tuple.0
+// CHECK: @_hasInitialValue internal let tupleFirst: Int = tuple.0
+
+let labeledTuple = (x: 1, y: 2)
+let labeledY = labeledTuple.y
+// CHECK: @_hasInitialValue internal let labeledY: Int = labeledTuple.y
+
+@objc class HasObjCSubscript {
+  @objc subscript(i: Int) -> Int { return i }
+}
+
+func dynamicSubscript(_ obj: AnyObject) {
+  let v = obj[0]
+}
+// CHECK: internal func dynamicSubscript(_ obj: AnyObject) {
+// CHECK:   @_hasInitialValue let v: Int? = obj[0]
+// CHECK: }
