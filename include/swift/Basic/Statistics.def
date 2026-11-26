@@ -365,6 +365,12 @@ FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 /// one leaf scope.
 FRONTEND_STATISTIC(Sema, NumLeafScopes)
 
+/// Number of type bindings, expression types and overload choices recorded
+/// into partial and complete solutions while solving expression type
+/// constraints. A solution that copies more than its own component changed
+/// makes this grow superlinearly with the number of components.
+FRONTEND_STATISTIC(Sema, NumSolutionEntriesRecorded)
+
 /// Number of constraints considered per attempt to
 /// contract constraint graph edges.
 /// This is a measure of complexity of the contraction algorithm.

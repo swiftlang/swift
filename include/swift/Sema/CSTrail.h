@@ -335,6 +335,11 @@ public:
     return Changes.size();
   }
 
+  /// The changes recorded since the trail had the given length.
+  ArrayRef<Change> getChangesSince(unsigned fromIndex) const {
+    return ArrayRef<Change>(Changes).slice(fromIndex);
+  }
+
   void undo(unsigned toIndex);
 
   SWIFT_DEBUG_DUMP;
