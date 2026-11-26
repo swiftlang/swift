@@ -303,6 +303,7 @@ LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @
 LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 LANGUAGE_FEATURE(BuiltinAllocRawTyped, 0, "Builtin.allocRawTyped/deallocRawTyped")
 LANGUAGE_FEATURE(BuiltinTypedAllocationID, 0, "Builtin.typedAllocationID")
+LANGUAGE_FEATURE(SubscriptParametersWithOwnership, 562, "Ownership of subscript parameters")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -635,10 +636,6 @@ EXPERIMENTAL_FEATURE(StandaloneSwiftAvailability, true)
 
 /// Allow enabling dynamic exclusivity in Embedded Swift.
 EXPERIMENTAL_FEATURE(EmbeddedDynamicExclusivity, true)
-
-/// Enable subscript parameters that have ownership (inout, borrowing,
-/// consuming).
-EXPERIMENTAL_FEATURE(SubscriptParametersWithOwnership, true)
 
 /// Emit typed allocation calls in Embedded Swift.
 EXPERIMENTAL_FEATURE(TypedAllocation, true)
