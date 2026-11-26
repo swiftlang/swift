@@ -99,7 +99,7 @@ do {
     let _: [any Command] = [a, b].filter { _ in true }
 
     let _: [any Command] = [a, b].compactMap { .some($0) }
-    // expected-error@-1 {{argument type 'Super' does not conform to expected type 'Command'}}
+    // expected-error@-1 {{cannot convert argument #1 with type 'Super' to expected type 'Command' in call to 'some'}}
     let _: [any Command] = [a, b].compactMap { Optional($0) }
     // expected-error@-1 {{cannot convert value of type 'Optional<Super>' to closure result type '(any Command)?'}}
 

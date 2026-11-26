@@ -23,7 +23,8 @@ extension View {
 
 struct V: View {
   var body: some View {
-    GeometryReader { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    GeometryReader {
+      // expected-error@+1{{function value passed to 'aspectRatio' as argument #1 could be any of '(Double?, ContentMode) -> Image', '(Size, ContentMode) -> Image' but 'Size' is expected}}
       Image().aspectRatio(aspectRatio, contentMode: .fill)
     }
   }

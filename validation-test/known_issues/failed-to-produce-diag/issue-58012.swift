@@ -20,6 +20,7 @@ extension P where Self == S<Double> {
 protocol View {}
 
 struct Text: View {
+  // expected-note@+1 2{{candidate expects value of type 'S<Int>.Input' (aka 'Int') for parameter #1 (got 'Bool')}}
   init<F: P>(_ input: F.Input, format: F) {}
 }
 
@@ -29,11 +30,12 @@ struct Builder {
 }
 
 struct V {
-  @Builder var body: some View { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  @Builder var body: some View {
+    // expected-error@+1{{cannot convert argument #1 with type 'Bool' to any of 'S<Double>.Input', 'S<Int>.Input' in initializer}}
     Text(false, format: .a)
   }
 }
 
 func test() {
-  _ = Text(false, format: .a) // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  _ = Text(false, format: .a) // expected-error {{cannot convert argument #1 with type 'Bool' to any of 'S<Double>.Input', 'S<Int>.Input' in initializer}}
 }

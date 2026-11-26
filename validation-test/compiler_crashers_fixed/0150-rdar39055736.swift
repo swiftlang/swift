@@ -12,5 +12,5 @@ import Foundation
 
 func baz(bar: Bar) {
   max(bar, bar.foo?.x ?? 0)
-  // expected-error@-1 {{cannot convert value of type 'any Bar' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert argument #1 with type 'any Bar' to expected type 'Int' in call to 'max'}}
 }
