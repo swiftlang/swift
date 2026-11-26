@@ -30,6 +30,7 @@ add_swift_unittest(SwiftBasicTests
   MultiMapCacheTest.cpp
   PointerIntEnumTest.cpp
   PointerIntPairTest.cpp
+  PlatformTest.cpp
   PrefixMapTest.cpp
   RangeTest.cpp
   SmallMapTest.cpp

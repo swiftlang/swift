@@ -308,7 +308,8 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   llvm_unreachable("unsupported OS");
 }
 
-llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
+static std::optional<llvm::VersionTuple>
+getVersionForVersionedTarget(const llvm::Triple &triple) {
   if (triple.isMacOSX()) {
     llvm::VersionTuple OSVersion;
     triple.getMacOSXVersion(OSVersion);
@@ -324,7 +325,27 @@ llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
   } else if (triple.isAndroid()) {
     return triple.getEnvironmentVersion();
   }
-  return llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0);
+  return std::nullopt;
+}
+
+std::optional<llvm::VersionTuple>
+swift::getDeploymentTargetVersionForTriple(const llvm::Triple &triple) {
+  if ((triple.isMacOSX() || triple.isiOS() || triple.isWatchOS() ||
+       triple.isXROS() || triple.isOSWindows()) &&
+      triple.getOSVersion().empty())
+    return std::nullopt;
+  if (triple.isAndroid() && triple.getEnvironmentVersion().empty())
+    return std::nullopt;
+
+  auto version = getVersionForVersionedTarget(triple);
+  if (!version || version->empty())
+    return std::nullopt;
+  return version;
+}
+
+llvm::VersionTuple swift::getVersionForTriple(const llvm::Triple &triple) {
+  return getVersionForVersionedTarget(triple).value_or(
+      llvm::VersionTuple(/*Major=*/0, /*Minor=*/0, /*Subminor=*/0));
 }
 
 StringRef swift::getMajorArchitectureName(const llvm::Triple &Triple) {
