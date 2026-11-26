@@ -1,0 +1,36 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -eager-specializer %s | %FileCheck %s --implicit-check-not='{{^sil .*Tg5}}' --implicit-check-not='{{^sil .*Ts5}}'
+// RUN: %target-sil-opt -enable-sil-verify-all -onone-prespecializer %s | %FileCheck %s --implicit-check-not='{{^sil .*Tg5}}' --implicit-check-not='{{^sil .*Ts5}}'
+
+// A function marked never to be specialized gets no specialization from its
+// _specialize attributes, and the passes don't crash on it.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: sil [_semantics "optimize.sil.specialize.generic.never"] {{.*}}@neverSpecialize :
+// CHECK:       bb0(%0 : $*T, %1 : $*T):
+// CHECK-NEXT:    copy_addr %1 to [init] %0
+// CHECK-NEXT:    [[R:%.*]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK-NEXT:  } // end sil function 'neverSpecialize'
+sil [_semantics "optimize.sil.specialize.generic.never"] [_specialize exported: false, kind: full, where T == Int] [ossa] @neverSpecialize : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to [init] %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [_semantics "optimize.sil.specialize.generic.never"] [_specialize exported: true, kind: full, where T == Int] [ossa] @neverSpecializeExported :
+// CHECK:       bb0(%0 : $*T, %1 : $*T):
+// CHECK-NEXT:    copy_addr %1 to [init] %0
+// CHECK-NEXT:    [[R:%.*]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK-NEXT:  } // end sil function 'neverSpecializeExported'
+sil [_semantics "optimize.sil.specialize.generic.never"] [_specialize exported: true, kind: full, where T == Int] [ossa] @neverSpecializeExported : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+bb0(%0 : $*T, %1 : $*T):
+  copy_addr %1 to [init] %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
