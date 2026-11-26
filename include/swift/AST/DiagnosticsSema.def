@@ -4093,6 +4093,13 @@ ERROR(override_class_declaration_in_extension,none,
 ERROR(override_with_more_effects,none,
       "cannot override non-%1 %kindonly0 with %1 %kindonly0",
       (const ValueDecl *, StringRef))
+ERROR(override_needs_getter,none,
+      "%kind0 cannot override a %kindonly0 that is read through a getter, "
+      "because %select{its read accessor has a scoped lifetime dependence|"
+      "it has a 'borrow' accessor}1", (const ValueDecl *, bool))
+ERROR(override_needs_borrow_accessor,none,
+      "%kind0 must have a 'borrow' accessor because the overridden %kindonly0 "
+      "has one", (const ValueDecl *))
 ERROR(override_typed_throws,none,
       "%kindonly0 that throws %1 cannot override one that throws %2",
       (const AbstractFunctionDecl *, Type, Type))
