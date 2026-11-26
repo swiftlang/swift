@@ -2436,7 +2436,10 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     Identifier discriminator;
     if (generic->isOutermostPrivateOrFilePrivateScope()) {
       auto *containingFile = cast<FileUnit>(generic->getModuleScopeContext());
-      discriminator = containingFile->getDiscriminatorForPrivateDecl(generic);
+      // Clang modules do not provide a namespace, so no discriminator is
+      // needed, even for non-public C++ members.
+      if (!isa<ClangModuleUnit>(containingFile))
+        discriminator = containingFile->getDiscriminatorForPrivateDecl(generic);
     }
 
     bool isProtocolExt = DC->getParent()->getExtendedProtocolDecl();
@@ -2622,7 +2625,8 @@ void Serializer::writeCrossReference(const Decl *D) {
     if (type->isOutermostPrivateOrFilePrivateScope()) {
       auto *containingFile =
          cast<FileUnit>(type->getDeclContext()->getModuleScopeContext());
-      discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
+      if (!isa<ClangModuleUnit>(containingFile))
+        discriminator = containingFile->getDiscriminatorForPrivateDecl(type);
     }
 
     Identifier name = type->getName();
