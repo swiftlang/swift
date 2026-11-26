@@ -17,6 +17,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/RemoteInspection/TypeRef.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/ReflectionDiag.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
 #include "llvm/Object/COFF.h"
 #include "llvm/Object/MachOUniversal.h"
@@ -103,6 +104,9 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       O = ObjectOwner.get();
     }
 
+    REFLECTION_DIAG("loaded binary #%zu '%s' (arch option '%s')",
+                    ObjectFiles.size(), BinaryFilename.c_str(), Arch.str().c_str());
+
     // Retain the objects that own section memory
     BinaryOwners.push_back(std::move(BinaryOwner));
     ObjectOwners.push_back(std::move(ObjectOwner));
@@ -154,6 +158,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       if (StringRef(Line).starts_with("//"))
         continue;
 
+      REFLECTION_DIAG("lowering typeref: %s", Line.c_str());
       Demangle::Demangler Dem;
       auto Demangled = Dem.demangleType(Line);
       auto Result = swift::Demangle::decodeMangledType(builder, Demangled);
@@ -170,6 +175,8 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef, nullptr);
       if (TypeInfo == nullptr) {
         stream << "Invalid lowering\n";
+        REFLECTION_DIAG("lowering FAILED for '%s': %s", Line.c_str(),
+                        builder.getTypeConverter().takeLastError().c_str());
         continue;
       }
       TypeInfo->dump(stream);
