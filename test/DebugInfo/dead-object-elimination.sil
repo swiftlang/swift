@@ -1,0 +1,627 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -dead-object-elimination %s | %FileCheck %s
+
+// Variables living in memory removed by DeadObjectElimination are described by the values
+// of the memory.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct Pair {
+  @_hasStorage var i: Int { get set }
+  @_hasStorage var j: Int { get set }
+}
+
+// The alloc_stack's variable is described after each store, by a debug_value of the stored value.
+// On the alloc_stack, before the first store, it is killed, as the memory is not initialized.
+
+// CHECK-LABEL: sil [ossa] @store_sequence :
+// CHECK:       bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:    debug_value undef : $Int, var, name "x"
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    debug_value %1, var, name "x"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'store_sequence'
+sil [ossa] @store_sequence : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int, var, name "x"
+  store %0 to [trivial] %2
+  store %1 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The allocated value is used by the load in bb3, creating a phi argument
+// for it.
+// Each store receives a debug_value for "x". For "x" to remain available
+// in bb3, a debug_value using the phi is created.
+// "y", which only exists in bb3 after all stores, is rewritten to use the
+// available value.
+
+// CHECK-LABEL: sil [ossa] @phi_at_join_used :
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    br bb3(%0)
+// CHECK:       bb2:
+// CHECK-NEXT:    debug_value %1, var, name "x"
+// CHECK-NEXT:    br bb3(%1)
+// CHECK:       bb3([[PHI:%[0-9]+]] : $Int):
+// CHECK-NEXT:    debug_value [[PHI]], var, name "x"
+// CHECK-NEXT:    debug_value [[PHI]], let, name "y"
+// CHECK-NEXT:    return [[PHI]]
+// CHECK:       } // end sil function 'phi_at_join_used'
+sil [ossa] @phi_at_join_used : $@convention(thin) (Int, Int, Builtin.Int1) -> Int {
+bb0(%0 : $Int, %1 : $Int, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Int, var, name "x"
+  cond_br %2, bb1, bb2
+bb1:
+  store %0 to [trivial] %3
+  br bb3
+bb2:
+  store %1 to [trivial] %3
+  br bb3
+bb3:
+  debug_value %3, let, name "y", expr op_deref
+  %9 = load [trivial] %3
+  dealloc_stack %3
+  return %9
+}
+
+// No phi is created only for debug info. The value of "y" cannot be known in
+// bb3, so it is killed. "x" is not killed in bb3, which allows the value to
+// remain available if the cond_br is constant folded later.
+
+// CHECK-LABEL: sil [ossa] @no_phi_at_join :
+// CHECK:       bb3:
+// CHECK-NEXT:    debug_value undef : $Int, let, name "y"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'no_phi_at_join'
+sil [ossa] @no_phi_at_join : $@convention(thin) (Int, Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Int, var, name "x"
+  cond_br %2, bb1, bb2
+bb1:
+  store %0 to [trivial] %3
+  br bb3
+bb2:
+  store %1 to [trivial] %3
+  br bb3
+bb3:
+  debug_value %3, let, name "y", expr op_deref
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+}
+
+// The struct has one field stored into. The struct is recreated for the load,
+// and the debug_value uses it directly.
+
+// CHECK-LABEL: sil [ossa] @whole_debug_value_partial_store_used :
+// CHECK:       bb0(%0 : $Pair, %1 : $Int):
+// CHECK-NEXT:    debug_value undef : $Pair, var, name "p"
+// CHECK-NEXT:    debug_value %0, var, name "p"
+// CHECK-NEXT:    destructure_struct %0
+// CHECK-NEXT:    [[S:%[0-9]+]] = struct $Pair (%1,
+// CHECK-NEXT:    debug_value [[S]], var, name "p"
+// CHECK-NEXT:    [[J:%[0-9]+]] = struct_extract [[S]], #Pair.j
+// CHECK-NEXT:    return [[J]]
+// CHECK:       } // end sil function 'whole_debug_value_partial_store_used'
+sil [ossa] @whole_debug_value_partial_store_used : $@convention(thin) (Pair, Int) -> Int {
+bb0(%0 : $Pair, %1 : $Int):
+  %2 = alloc_stack $Pair, var, name "p"
+  store %0 to [trivial] %2
+  %4 = struct_element_addr %2, #Pair.i
+  store %1 to [trivial] %4
+  %6 = struct_element_addr %2, #Pair.j
+  %7 = load [trivial] %6
+  dealloc_stack %2
+  return %7
+}
+
+// Without a load, the new value of the memory is not computed after a field store.
+// The debug_value after the partial store is killed.
+// TODO: A reconstruction block should be used to recreate the struct.
+
+// CHECK-LABEL: sil [ossa] @whole_debug_value_partial_store :
+// CHECK:       bb0(%0 : $Pair, %1 : $Int):
+// CHECK-NEXT:    debug_value undef : $Pair, var, name "p"
+// CHECK-NEXT:    debug_value %0, var, name "p"
+// CHECK-NEXT:    debug_value undef : $Pair, var, name "p"
+// CHECK:       } // end sil function 'whole_debug_value_partial_store'
+sil [ossa] @whole_debug_value_partial_store : $@convention(thin) (Pair, Int) -> () {
+bb0(%0 : $Pair, %1 : $Int):
+  %2 = alloc_stack $Pair, var, name "p"
+  store %0 to [trivial] %2
+  %4 = struct_element_addr %2, #Pair.i
+  store %1 to [trivial] %4
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// With a partial store and a debug_value on the same projection,
+// the debug_value uses the stored value directly.
+
+// CHECK-LABEL: sil [ossa] @partial_debug_value_same_partial_store :
+// CHECK:       bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:    debug_value %0, let, name "i"
+// CHECK:       } // end sil function 'partial_debug_value_same_partial_store'
+sil [ossa] @partial_debug_value_same_partial_store : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Pair
+  %3 = struct_element_addr %2, #Pair.i
+  store %0 to [trivial] %3
+  %5 = struct_element_addr %2, #Pair.j
+  store %1 to [trivial] %5
+  debug_value %3, let, name "i", expr op_deref
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The debug_value uses a projection, when only the full value is available.
+// TODO: A reconstruction block should be used with a struct_extract.
+
+// CHECK-LABEL: sil [ossa] @partial_debug_value_whole_store :
+// CHECK:       bb0(%0 : $Pair):
+// CHECK-NEXT:    debug_value undef : $Int, let, name "i"
+// CHECK:       } // end sil function 'partial_debug_value_whole_store'
+sil [ossa] @partial_debug_value_whole_store : $@convention(thin) (Pair) -> () {
+bb0(%0 : $Pair):
+  %1 = alloc_stack $Pair
+  store %0 to [trivial] %1
+  %3 = struct_element_addr %1, #Pair.i
+  debug_value %3, let, name "i", expr op_deref
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The reconstruction block of the variable's debug value is cloned after each store.
+
+// CHECK-LABEL: sil [ossa] @reconstruction_block :
+// CHECK:       bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:    debug_value undef : $*Int, var, name "o", type $Optional<Int>, transform {
+// CHECK-NEXT:    bb0(%0 : $*Int):
+// CHECK-NEXT:      %1 = load undef : $*Int
+// CHECK-NEXT:      %2 = enum $Optional<Int>, #Optional.some!enumelt, %1
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    debug_value %0, var, name "o", type $Optional<Int>, transform {
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      %1 = enum $Optional<Int>, #Optional.some!enumelt, %0
+// CHECK-NEXT:      return %1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    debug_value %1, var, name "o", type $Optional<Int>, transform {
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      %1 = enum $Optional<Int>, #Optional.some!enumelt, %0
+// CHECK-NEXT:      return %1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'reconstruction_block'
+sil [ossa] @reconstruction_block : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  debug_value %2, var, name "o", type $Optional<Int>, transform {
+  bb0(%3 : $*Int):
+    %4 = load %3
+    %5 = enum $Optional<Int>, #Optional.some!enumelt, %4
+    return %5
+  }
+  store %0 to [trivial] %2
+  store %1 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// A debug_value with multiple operands is cloned at each store as well.
+// The first operand is rewritten with the load removed, the second operand is left alone.
+
+// CHECK-LABEL: sil [ossa] @multiple_operands :
+// CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+// CHECK-NEXT:    debug_value (%0, %2), let, name "t", type $(Int, Int), transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = tuple (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    debug_value (%1, %2), let, name "t", type $(Int, Int), transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = tuple (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'multiple_operands'
+sil [ossa] @multiple_operands : $@convention(thin) (Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+  %3 = alloc_stack $Int
+  store %0 to [trivial] %3
+  debug_value (%3 : $*Int, %2 : $Int), let, name "t", type $(Int, Int), transform {
+  bb0(%a : $*Int, %b : $Int):
+    %l = load %a
+    %t = tuple (%l, %b)
+    return %t
+  }
+  store %1 to [trivial] %3
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+}
+
+// Both operands read the same memory, so both are rewritten, also in the clone.
+// CHECK-LABEL: sil [ossa] @same_memory_twice :
+// CHECK:       bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:    debug_value (%0, %0), let, name "t", type $(Int, Int), transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = tuple (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    debug_value (%1, %1), let, name "t", type $(Int, Int), transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = tuple (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_memory_twice'
+sil [ossa] @same_memory_twice : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %0 to [trivial] %2
+  debug_value (%2 : $*Int, %2 : $*Int), let, name "t", type $(Int, Int), transform {
+  bb0(%a : $*Int, %b : $*Int):
+    %la = load %a
+    %lb = load %b
+    %t = tuple (%la, %lb)
+    return %t
+  }
+  store %1 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The operands read different fields, which are rewritten separately.
+
+// CHECK-LABEL: sil [ossa] @different_fields :
+// CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+// CHECK-NEXT:    debug_value (%0, %1), var, name "p", type $Pair, transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = struct $Pair (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    debug_value (%2, %1), var, name "p", type $Pair, transform {
+// CHECK:         bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:      %2 = struct $Pair (%0, %1)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'different_fields'
+sil [ossa] @different_fields : $@convention(thin) (Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int):
+  %3 = alloc_stack $Pair
+  %4 = struct_element_addr %3, #Pair.i
+  %5 = struct_element_addr %3, #Pair.j
+  store %0 to [trivial] %4
+  store %1 to [trivial] %5
+  debug_value (%4 : $*Int, %5 : $*Int), var, name "p", type $Pair, transform {
+  bb0(%a : $*Int, %b : $*Int):
+    %la = load %a
+    %lb = load %b
+    %s = struct $Pair (%la, %lb)
+    return %s
+  }
+  store %2 to [trivial] %4
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+}
+
+// The operands read two removed allocations, as SROA produces. The debug_value is cloned
+// at each store to either allocation, with the new values.
+
+// CHECK-LABEL: sil [ossa] @two_dead_objects :
+// CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
+// CHECK-NEXT:    debug_value (%0, %1), let, name "t", type $(Int, Int), transform {
+// CHECK:         debug_value (%2, %1), let, name "t", type $(Int, Int), transform {
+// CHECK:         debug_value (%2, %3), let, name "t", type $(Int, Int), transform {
+// CHECK:         [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'two_dead_objects'
+sil [ossa] @two_dead_objects : $@convention(thin) (Int, Int, Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Int):
+  %4 = alloc_stack $Int
+  %5 = alloc_stack $Int
+  store %0 to [trivial] %4
+  store %1 to [trivial] %5
+  debug_value (%4 : $*Int, %5 : $*Int), let, name "t", type $(Int, Int), transform {
+  bb0(%a : $*Int, %b : $*Int):
+    %la = load %a
+    %lb = load %b
+    %t = tuple (%la, %lb)
+    return %t
+  }
+  store %2 to [trivial] %4
+  store %3 to [trivial] %5
+  dealloc_stack %5
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// The variable is changed to a constant before the last store, so it is not cloned at the store.
+
+// CHECK-LABEL: sil [ossa] @constant_before_store :
+// CHECK:       bb0(%0 : $Int64, %1 : $Int64):
+// CHECK-NEXT:    debug_value undef : $Int64, var, name "x"
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    debug_value (), var, name "x", transform {
+// CHECK-NEXT:    bb0:
+// CHECK-NEXT:      %0 = integer_literal $Builtin.Int64, 42
+// CHECK-NEXT:      %1 = struct $Int64 (%0)
+// CHECK-NEXT:      return %1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'constant_before_store'
+sil [ossa] @constant_before_store : $@convention(thin) (Int64, Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64):
+  %2 = alloc_stack $Int64, var, name "x", loc "t.swift":2:7
+  store %0 to [trivial] %2
+  debug_value (), var, name "x", transform {
+  bb0:
+    %3 = integer_literal $Builtin.Int64, 42
+    %4 = struct $Int64 (%3)
+    return %4
+  }, loc "t.swift":2:7
+  store %1 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The store in bb3 receives a clone of the debug_value, as it is dominated by the same debug_value.
+
+// CHECK-LABEL: sil [ossa] @join_equal :
+// CHECK:       bb3:
+// CHECK-NEXT:    debug_value %2, var, name "x"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'join_equal'
+sil [ossa] @join_equal : $@convention(thin) (Int, Int, Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Builtin.Int1):
+  %4 = alloc_stack $Int, var, name "x"
+  cond_br %3, bb1, bb2
+bb1:
+  store %0 to [trivial] %4
+  br bb3
+bb2:
+  store %1 to [trivial] %4
+  br bb3
+bb3:
+  store %2 to [trivial] %4
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// Same with a reconstruction block.
+
+// CHECK-LABEL: sil [ossa] @join_reconstruction_block_clones :
+// CHECK:       bb3:
+// CHECK-NEXT:    debug_value %2, var, name "o", type $Optional<Int>, transform {
+// CHECK:         bb0(%0 : $Int):
+// CHECK-NEXT:      %1 = enum $Optional<Int>, #Optional.some!enumelt, %0
+// CHECK-NEXT:      return %1
+// CHECK-NEXT:    }
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'join_reconstruction_block_clones'
+sil [ossa] @join_reconstruction_block_clones : $@convention(thin) (Int, Int, Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Int, %3 : $Builtin.Int1):
+  %4 = alloc_stack $Int
+  debug_value %4, var, name "o", type $Optional<Int>, transform {
+  bb0(%5 : $*Int):
+    %6 = load %5
+    %7 = enum $Optional<Int>, #Optional.some!enumelt, %6
+    return %7
+  }
+  cond_br %3, bb1, bb2
+bb1:
+  store %0 to [trivial] %4
+  br bb3
+bb2:
+  store %1 to [trivial] %4
+  br bb3
+bb3:
+  store %2 to [trivial] %4
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// The store and join do not receive debug values, as the variable is a different constant
+// depending on the branch taken.
+
+// CHECK-LABEL: sil [ossa] @join_constants :
+// CHECK:       bb3:
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'join_constants'
+sil [ossa] @join_constants : $@convention(thin) (Int64, Builtin.Int1) -> () {
+bb0(%0 : $Int64, %1 : $Builtin.Int1):
+  %2 = alloc_stack $Int64, var, name "x", loc "t.swift":11:7
+  cond_br %1, bb1, bb2
+bb1:
+  debug_value (), var, name "x", transform {
+  bb0:
+    %3 = integer_literal $Builtin.Int64, 1
+    %4 = struct $Int64 (%3)
+    return %4
+  }, loc "t.swift":11:7
+  br bb3
+bb2:
+  debug_value (), var, name "x", transform {
+  bb0:
+    %5 = integer_literal $Builtin.Int64, 2
+    %6 = struct $Int64 (%5)
+    return %6
+  }, loc "t.swift":11:7
+  br bb3
+bb3:
+  store %0 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// At the store in the join, the variable may be a constant or the newly stored value depending
+// on the branch taken. As the branch taken is unknown, the debug_value is killed.
+// TODO: If the debug_value is an aggregate where a field does match, use a joining algorithm
+// to keep the known field available.
+
+// CHECK-LABEL: sil [ossa] @join_mixed :
+// CHECK:       bb3:
+// CHECK-NEXT:    debug_value undef : $Int64, var, name "x"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'join_mixed'
+sil [ossa] @join_mixed : $@convention(thin) (Int64, Int64, Builtin.Int1) -> () {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Int64, var, name "x", loc "t.swift":21:7
+  store %0 to [trivial] %3
+  cond_br %2, bb1, bb2
+bb1:
+  debug_value (), var, name "x", transform {
+  bb0:
+    %4 = integer_literal $Builtin.Int64, 1
+    %5 = struct $Int64 (%4)
+    return %5
+  }, loc "t.swift":21:7
+  br bb3
+bb2:
+  br bb3
+bb3:
+  store %1 to [trivial] %3
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+}
+
+// In a loop, the undef created at the allocation is necessary to invalidate
+// the value from the previous iteration.
+
+// CHECK-LABEL: sil [ossa] @allocation_in_loop :
+// CHECK:       bb1:
+// CHECK-NEXT:    debug_value undef : $Int, var, name "x"
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    cond_br %1, bb2, bb3
+// CHECK:       } // end sil function 'allocation_in_loop'
+sil [ossa] @allocation_in_loop : $@convention(thin) (Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int1):
+  br bb1
+bb1:
+  %3 = alloc_stack $Int, var, name "x"
+  store %0 to [trivial] %3
+  dealloc_stack %3
+  cond_br %1, bb2, bb3
+bb2:
+  br bb1
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// The debug_value must still be cloned in the dead-end block bb2.
+
+// CHECK-LABEL: sil [ossa] @store_in_dead_end_block :
+// CHECK:       bb0(%0 : $Int, %1 : $Int, %2 : $Builtin.Int1):
+// CHECK-NEXT:    debug_value undef : $Int, var, name "x"
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    cond_br %2, bb1, bb2
+// CHECK:       bb2:
+// CHECK-NEXT:    debug_value %1, var, name "x"
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'store_in_dead_end_block'
+sil [ossa] @store_in_dead_end_block : $@convention(thin) (Int, Int, Builtin.Int1) -> () {
+bb0(%0 : $Int, %1 : $Int, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Int, var, name "x"
+  store %0 to [trivial] %3
+  cond_br %2, bb1, bb2
+bb1:
+  dealloc_stack %3
+  %r = tuple ()
+  return %r
+bb2:
+  store %1 to [trivial] %3
+  unreachable
+}
+
+// Only one of the fields is initialized at the store, so the debug_value clone at
+// the store is killed.
+// TODO: A debug reconstruction block could be created to make one field available.
+
+// CHECK-LABEL: sil [ossa] @no_store_of_whole_value :
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    debug_value undef : $Pair, var, name "p"
+// CHECK-NEXT:    debug_value undef : $Pair, var, name "p"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'no_store_of_whole_value'
+sil [ossa] @no_store_of_whole_value : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Pair, var, name "p"
+  %2 = struct_element_addr %1, #Pair.i
+  store %0 to [trivial] %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The initial debug value reads the memory before it is initialized, so it is killed.
+// The clone at the store receives the value.
+
+// CHECK-LABEL: sil [ossa] @debug_value_before_initialization :
+// CHECK:       bb0(%0 : $Int):
+// CHECK-NEXT:    debug_value undef : $Int, var, name "x"
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'debug_value_before_initialization'
+sil [ossa] @debug_value_before_initialization : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  debug_value %1, var, name "x", expr op_deref
+  store %0 to [trivial] %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// The debug value before the allocation describes the variable until the allocation
+// changes its location.
+
+// CHECK-LABEL: sil [ossa] @described_before_allocation :
+// CHECK:       bb0(%0 : $Int, %1 : $Int):
+// CHECK-NEXT:    debug_value %0, var, name "x"
+// CHECK-NEXT:    debug_value undef : $Int, var, name "x"
+// CHECK-NEXT:    debug_value %1, var, name "x"
+// CHECK-NEXT:    [[R:%[0-9]+]] = tuple ()
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'described_before_allocation'
+sil [ossa] @described_before_allocation : $@convention(thin) (Int, Int) -> () {
+bb0(%0 : $Int, %1 : $Int):
+  debug_value %0, var, name "x", loc "t.swift":31:7
+  %2 = alloc_stack $Int, var, name "x", loc "t.swift":31:7
+  store %1 to [trivial] %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}

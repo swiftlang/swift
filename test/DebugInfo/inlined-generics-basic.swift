@@ -69,13 +69,13 @@ public class C<R> {
     g((r, s))
     // Note to maintainers: the relative order of the constant dbg_values here
     // seem to flip back and forth.
-    // IR: #dbg_value(i{{.*}} 0, ![[GI_U:[0-9]+]]
     // IR: #dbg_value(i{{.*}} 0, ![[GI_T:[0-9]+]]
+    // IR: #dbg_value(i{{.*}} 0, ![[GI_U:[0-9]+]]
     // IR: call {{.*}}3use{{.*}}(i{{.*}} 0)
 #sourceLocation(file: "f.swift", line: 5)
     g(Int(0))
-    // IR: #dbg_value(i1 false, ![[GB_U:[0-9]+]]
     // IR: #dbg_value(i1 false, ![[GB_T:[0-9]+]]
+    // IR: #dbg_value(i1 false, ![[GB_U:[0-9]+]]
     // IR: call {{.*}}3use{{.*}}(i1 false)
 #sourceLocation(file: "f.swift", line: 6)
     g(false)

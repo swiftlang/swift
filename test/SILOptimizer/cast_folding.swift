@@ -368,10 +368,11 @@ func test8() -> Bool {
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding5test9SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: debug_value undef {{.*}}, let, name "a", argno 1
-// FIXME: cast9's local variable "ao" is missing
-// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %2 = struct $Bool
-// CHECK-NEXT: return %2
+// CHECK-NEXT: debug_value undef : $*any P, let, name "ao", expr op_deref
+// CHECK-NEXT: debug_value undef : $*any P, let, name "ao", expr op_deref
+// CHECK-NEXT: %3 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %4 = struct $Bool
+// CHECK-NEXT: return %4
 @inline(never)
 func test9() -> Bool {
   return cast9(A())
@@ -435,10 +436,10 @@ func test13_2() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test13_3SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast13's parameter "t" is missing
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value undef : $*any P, let, name "t", argno 1, expr op_deref
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test13_3() -> Bool {
     return cast13(A() as P)
@@ -480,10 +481,10 @@ func test15_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test15_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast15's parameter "t" is missing
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value undef : $*any P, let, name "t", argno 1, expr op_deref
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test15_2() -> Bool {
     return cast15(A() as P)
@@ -502,10 +503,10 @@ func test16_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test16_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast16's parameter "t" is missing
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value undef : $*any P, let, name "t", argno 1, expr op_deref
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test16_2() -> Bool {
     return cast16(A() as P)
@@ -603,10 +604,10 @@ func test21_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test21_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// FIXME: cast21's parameter "t" is missing
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value undef : $*any P, let, name "t", argno 1, expr op_deref
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test21_2() -> Bool {
     return cast21(A() as P)
