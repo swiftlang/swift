@@ -1,5 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
 
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
 // RUN: %target-swift-emit-sil %s -sil-verify-all > /dev/null
@@ -9,7 +8,7 @@
 //
 // When passing a `(T) throws(E) -> R` closure to a parameter of type
 // `(T) throws -> U` where `U` is a generic type variable substituted to
-// `R` (which is itself a tuple — possibly `Void`), SILGen must build a
+// `R` (which is itself a tuple — possibly `Void`), SILGen used to build a
 // reabstraction thunk whose inner result is `@out R` and whose outer
 // result is `@out T` (an opaque archetype that happens to substitute to
 // `R`). The ResultPlanner used to route this through a parallel tuple
@@ -18,18 +17,17 @@
 // tripping an assertion during thunk emission (and earlier causing a
 // `SmallVector grow_pod` crash in IRGen).
 //
-// Each case below exercises the reabstraction through a different
-// combination of inner tuple arity, element types, and outer throws
-// convention. Every reabstraction thunk should forward the inner
-// closure's `@out R` slot directly into the outer's `@out T` slot via
-// `try_apply` (the planner's addInPlace optimization), and re-erase
-// the typed error into `any Error` on the failure edge.
+// The closure is now lowered at the parameter's abstraction pattern with
+// the type-erased error type, so it is passed directly, without a thunk
+// (https://github.com/swiftlang/swift/issues/92312). Each case below
+// covers a different combination of tuple arity, element types, and outer
+// throws convention.
 
 enum E: Error { case foo }
 
 struct Holder {
   // Three distinct entry points, differing only in the outer throws
-  // convention the thunk must target. All three used to crash.
+  // convention. All three used to crash.
 
   mutating func rethrowsBytes<T>(_ body: (UnsafeMutableRawPointer) throws -> T) rethrows -> T {
     fatalError()
@@ -44,19 +42,17 @@ struct Holder {
 
 // ----------------------------------------------------------------------------
 // Case 1: empty tuple (Void) via `rethrows`.
-// Inner:  `@out ()` + `@error E`
-// Outer:  `@out ()` + `@error any Error`
+// Closure: `@out ()` + `@error any Error`
 // ----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil hidden [ossa] @$s36typed_throws_tuple_into_opaque_thunk12compilesVoidyyKF
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSvyt36typed_throws_tuple_into_opaque_thunk1EOIetyrzo_Svyts5Error_pIegyrzo_TR
-// CHECK: bb0([[OUT:%.*]] : $*(), [[PTR:%.*]] : $UnsafeMutableRawPointer, [[INNER:%.*]] : $@convention(thin) (UnsafeMutableRawPointer) -> (@out (), @error E)):
-// CHECK-NEXT: try_apply [[INNER]]([[OUT]], [[PTR]]) {{.*}} normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-// CHECK: [[NORMAL]]
-// CHECK: return
-// CHECK: [[ERROR]]({{%.*}} : $E):
-// CHECK: alloc_existential_box $any Error, $E
-// CHECK: throw
+// CHECK: [[CLOSURE1:%.*]] = function_ref @$s36typed_throws_tuple_into_opaque_thunk12compilesVoidyyKFySvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <()>
+// CHECK-NEXT: [[THICK1:%.*]] = thin_to_thick_function [[CLOSURE1]]
+// CHECK-NOT: thunk
+// CHECK: function_ref @$s36typed_throws_tuple_into_opaque_thunk6HolderV13rethrowsBytesyxxSvKXEKlF
+// CHECK-NEXT: try_apply {{%[0-9]+}}<()>({{%[0-9]+}}, [[THICK1]], {{%[0-9]+}})
+// CHECK-LABEL: sil private [ossa] @$s36typed_throws_tuple_into_opaque_thunk12compilesVoidyyKFySvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <()> {
+// CHECK: bb0({{%[0-9]+}} : $*(), {{%[0-9]+}} : $UnsafeMutableRawPointer):
 func compilesVoid() throws {
   var h = Holder()
   try h.rethrowsBytes { (p) throws(E) in
@@ -64,14 +60,18 @@ func compilesVoid() throws {
 }
 
 // ----------------------------------------------------------------------------
-// Case 2: trivial 2-tuple via `rethrows`. Same addInPlace thunk shape
-// — regression check that the fix isn't tied to empty tuples.
+// Case 2: trivial 2-tuple via `rethrows`. Regression check that the fix
+// isn't tied to empty tuples.
 // ----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil hidden [ossa] @$s36typed_throws_tuple_into_opaque_thunk14compilesPairOfSi_SitSgyKF
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSvSi_Sit36typed_throws_tuple_into_opaque_thunk1EOIetyrzo_SvSi_Sits5Error_pIegyrzo_TR
-// CHECK: bb0([[OUT2:%.*]] : $*(Int, Int), [[PTR2:%.*]] : $UnsafeMutableRawPointer, [[INNER2:%.*]] : $@convention(thin) (UnsafeMutableRawPointer) -> (@out (Int, Int), @error E)):
-// CHECK-NEXT: try_apply [[INNER2]]([[OUT2]], [[PTR2]])
+// CHECK: [[CLOSURE2:%.*]] = function_ref @$s36typed_throws_tuple_into_opaque_thunk14compilesPairOfSi_SitSgyKFSi_SitSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, Int)>
+// CHECK-NEXT: [[THICK2:%.*]] = thin_to_thick_function [[CLOSURE2]]
+// CHECK-NOT: thunk
+// CHECK: function_ref @$s36typed_throws_tuple_into_opaque_thunk6HolderV13rethrowsBytesyxxSvKXEKlF
+// CHECK-NEXT: try_apply {{%[0-9]+}}<(Int, Int)>({{%[0-9]+}}, [[THICK2]], {{%[0-9]+}})
+// CHECK-LABEL: sil private [ossa] @$s36typed_throws_tuple_into_opaque_thunk14compilesPairOfSi_SitSgyKFSi_SitSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, Int)> {
+// CHECK: bb0({{%[0-9]+}} : $*(Int, Int), {{%[0-9]+}} : $UnsafeMutableRawPointer):
 func compilesPairOf() throws -> (Int, Int)? {
   var h = Holder()
   return try h.rethrowsBytes { (p) throws(E) -> (Int, Int) in
@@ -82,16 +82,20 @@ func compilesPairOf() throws -> (Int, Int)? {
 // ----------------------------------------------------------------------------
 // Case 3: heterogeneous 3-tuple containing a reference-counted element
 // (`String`) via `throws`. The outer convention is `throws` (rather than
-// `rethrows`), and the non-trivial element exercises copy/destroy along
-// the addInPlace path. Crash manifests identically to the other shapes
-// because the planner state is driven by inner-result slot count, not
+// `rethrows`), and the non-trivial element is stored into the closure's
+// `@out` result. The crash manifested identically to the other shapes
+// because the planner state was driven by inner-result slot count, not
 // the specific element types.
 // ----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil hidden [ossa] @$s36typed_throws_tuple_into_opaque_thunk14compilesTripleSi_SSSbtSgyKF
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSvSi_SSSbt36typed_throws_tuple_into_opaque_thunk1EOIetyrzo_SvSi_SSSbts5Error_pIegyrzo_TR
-// CHECK: bb0([[OUT3:%.*]] : $*(Int, String, Bool), [[PTR3:%.*]] : $UnsafeMutableRawPointer, [[INNER3:%.*]] : $@convention(thin) (UnsafeMutableRawPointer) -> (@out (Int, String, Bool), @error E)):
-// CHECK-NEXT: try_apply [[INNER3]]([[OUT3]], [[PTR3]])
+// CHECK: [[CLOSURE3:%.*]] = function_ref @$s36typed_throws_tuple_into_opaque_thunk14compilesTripleSi_SSSbtSgyKFSi_SSSbtSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, String, Bool)>
+// CHECK-NEXT: [[THICK3:%.*]] = thin_to_thick_function [[CLOSURE3]]
+// CHECK-NOT: thunk
+// CHECK: function_ref @$s36typed_throws_tuple_into_opaque_thunk6HolderV0B5BytesyxxSvKXEKlF
+// CHECK-NEXT: try_apply {{%[0-9]+}}<(Int, String, Bool)>({{%[0-9]+}}, [[THICK3]], {{%[0-9]+}})
+// CHECK-LABEL: sil private [ossa] @$s36typed_throws_tuple_into_opaque_thunk14compilesTripleSi_SSSbtSgyKFSi_SSSbtSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, String, Bool)> {
+// CHECK: bb0({{%[0-9]+}} : $*(Int, String, Bool), {{%[0-9]+}} : $UnsafeMutableRawPointer):
 func compilesTriple() throws -> (Int, String, Bool)? {
   var h = Holder()
   return try h.throwsBytes { (p) throws(E) -> (Int, String, Bool) in
@@ -100,14 +104,19 @@ func compilesTriple() throws -> (Int, String, Bool)? {
 }
 
 // ----------------------------------------------------------------------------
-// Case 4: throws(any Error) on the outer function. Reabstraction for
-// `rethrows` and `throws(any Error)` lowers to the same SIL function
-// type, so case 2's thunk is shared here — just confirm the function
-// itself is emitted and references it by the same mangled name.
+// Case 4: throws(any Error) on the outer function. `rethrows` and
+// `throws(any Error)` lower to the same SIL function type, so the closure
+// has the same lowered type as in case 2.
 // ----------------------------------------------------------------------------
 
 // CHECK-LABEL: sil hidden [ossa] @$s36typed_throws_tuple_into_opaque_thunk20compilesThrowsAnyAllSi_SitSgyKF
-// CHECK: function_ref @$sSvSi_Sit36typed_throws_tuple_into_opaque_thunk1EOIetyrzo_SvSi_Sits5Error_pIegyrzo_TR
+// CHECK: [[CLOSURE4:%.*]] = function_ref @$s36typed_throws_tuple_into_opaque_thunk20compilesThrowsAnyAllSi_SitSgyKFSi_SitSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, Int)>
+// CHECK-NEXT: [[THICK4:%.*]] = thin_to_thick_function [[CLOSURE4]]
+// CHECK-NOT: thunk
+// CHECK: function_ref @$s36typed_throws_tuple_into_opaque_thunk6HolderV0B8AnyBytesyxxSvKXEKlF
+// CHECK-NEXT: try_apply {{%[0-9]+}}<(Int, Int)>({{%[0-9]+}}, [[THICK4]], {{%[0-9]+}})
+// CHECK-LABEL: sil private [ossa] @$s36typed_throws_tuple_into_opaque_thunk20compilesThrowsAnyAllSi_SitSgyKFSi_SitSvAA1EOYKXEfU_ : $@convention(thin) @substituted <τ_0_0> (UnsafeMutableRawPointer) -> (@out τ_0_0, @error any Error) for <(Int, Int)> {
+// CHECK: bb0({{%[0-9]+}} : $*(Int, Int), {{%[0-9]+}} : $UnsafeMutableRawPointer):
 func compilesThrowsAnyAll() throws -> (Int, Int)? {
   var h = Holder()
   return try h.throwsAnyBytes { (p) throws(E) -> (Int, Int) in
