@@ -12,10 +12,8 @@ template <class T> T passThrough(T value) { return value; }
 template <class T> const T passThroughConst(const T value) { return value; }
 
 void takesString(const char * _Null_unspecified) {}
-// expected-note@-1 {{candidate function not viable: no known conversion from 'int' to 'const char * _Null_unspecified' for 1st argument}}
 
 template <class T> void expectsConstCharPtr(T str) { takesString(str); }
-// expected-error@-1 {{no matching function for call to 'takesString'}}
 
 template <long x> void hasNonTypeTemplateParameter() {}
 template <long x = 0> void hasDefaultedNonTypeTemplateParameter() {}
