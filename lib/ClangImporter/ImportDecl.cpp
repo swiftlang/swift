@@ -12250,21 +12250,6 @@ void ClangImporter::Implementation::loadStorageMembers(Decl *D,
                              "load-storage-members", D);
   ASSERT(D);
 
-  // If a Clang decl has no owning module, then it needs to be added to the
-  // bridging header lookup table. This has most likely already been done, but
-  // in some cases, such as when processing DWARF imported AST nodes from LLDB,
-  // it has not. Do it here just to be safe. Template instantiations belong to
-  // the module of their pattern.
-  if (auto namedDecl = dyn_cast_or_null<clang::NamedDecl>(D->getClangDecl())) {
-    if (!namedDecl->hasOwningModule() &&
-        !importer::getClangOwningModule(namedDecl, getClangASTContext())) {
-      auto mutableNamedDecl = const_cast<clang::NamedDecl *>(namedDecl);
-      addBridgeHeaderTopLevelDecls(mutableNamedDecl);
-      addEntryToLookupTable(*BridgingHeaderLookupTable,
-                            mutableNamedDecl, *nameImporter);
-    }
-  }
-
   if (isa_and_nonnull<clang::NamespaceDecl>(D->getClangDecl())) {
     // Namespace members will only be loaded lazily.
     cast<EnumDecl>(D)->forceSetHasLazyMembers();
