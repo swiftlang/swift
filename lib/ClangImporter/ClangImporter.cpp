@@ -8671,7 +8671,11 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     return nullptr;
   }
 
-  sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
+  // Importing the specialization only needs its declaration, unless the
+  // return type has to be deduced from the body. IRGen instantiates the
+  // definition when it emits the function.
+  if (spec->getReturnType()->isUndeducedType())
+    sema.DeduceReturnType(spec, spec->getLocation());
   // Even if the declaration can be instantiated, the definition may contain
   // a substitution failure that renders spec invalid as a side-effect.
   if (spec->isInvalidDecl()) {
