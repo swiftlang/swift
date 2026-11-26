@@ -5,6 +5,24 @@
 
 ## Swift (next)
 
+* [SE-0558][]:
+  Introduced bulk update operations for `MutableSpan` and `MutableRawSpan`.
+  `updateAll(copying:)` and `updateSubrange(_:copying:)` copy from a `Span`
+  using bulk memory operations. Variants with the `moving:` label move elements
+  out of an `OutputSpan` without copying them, supporting noncopyable elements.
+
+  `updateElements(startingAt:copyingAll:)` overwrites elements of a span with
+  all elements from an `Iterable`. `updateElements(startingAt:copyingFrom:)`
+  copies elements from an `Iterable`'s `BorrowingIterator` instead.
+
+  ```swift
+  destination.updateAll(copying: source)
+
+  var index = 0
+  destination.updateElements(startingAt: &index, copyingAll: header)
+  destination.updateElements(startingAt: &index, copyingAll: payload)
+  ```
+
 * [SE-0564][]:
   A new form of `withContinuation` that accepts an `async` body and passes two halves of a
   continuation: the `Continuation` that resumes it, and a new
@@ -11401,6 +11419,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [SE-0526]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0526-deadline.md
 [SE-0551]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0551-span-of-one.md
+[SE-0558]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0558-mutablespan-bulk-updates.md
 [SE-0564]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0564-split-continuations.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
