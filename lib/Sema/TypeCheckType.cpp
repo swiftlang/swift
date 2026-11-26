@@ -3888,6 +3888,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
         getDeclContext()->getSelfProtocolDecl()) {
       diagnoseInvalid(repr, attr->getAtLoc(),
                       diag::typeattr_not_inheritance_clause, attr);
+      diagnose(attr->getAtLoc(), diag::note_typeattr_inheritance_clause, attr);
       ty = ErrorType::get(getASTContext());
     } else if (!ty->isConstraintType()) {
       diagnoseInvalid(repr, attr->getAtLoc(), diag::typeattr_not_existential,
@@ -3922,6 +3923,9 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
                       diag::typeattr_not_extension_inheritance_clause,
                       retroactiveAttr)
           .fixItRemove(retroactiveAttr->getSourceRange());
+      diagnose(retroactiveAttr->getAtLoc(),
+               diag::note_typeattr_extension_inheritance_clause,
+               retroactiveAttr);
       ty = ErrorType::get(getASTContext());
     }
   }
@@ -3946,6 +3950,8 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
       diagnoseInvalid(repr, attr->getAtLoc(),
                       diag::typeattr_not_protocol_inheritance_clause, attr)
           .fixItRemove(attr->getSourceRange());
+      diagnose(attr->getAtLoc(),
+               diag::note_typeattr_protocol_inheritance_clause, attr);
       ty = ErrorType::get(getASTContext());
     } else {
       // The new parent must be just a protocol.
