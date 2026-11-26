@@ -266,6 +266,12 @@ class BuildScriptInvocation(object):
                 "--install-destdir", os.path.abspath(args.install_destdir)
             ]
 
+        if args.lldb_link_against_compiler_dylib_at_path:
+            impl_args += [
+                "--lldb-link-against-compiler-dylib-at-path",
+                args.lldb_link_against_compiler_dylib_at_path
+            ]
+
         if args.skip_build:
             impl_args += ["--skip-build"]
         if not args.build_benchmarks:
