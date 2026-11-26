@@ -1711,97 +1711,37 @@ ParserResult<TypeRepr> Parser::parseGenericValueLiteral() {
 // Speculative type list parsing
 //===----------------------------------------------------------------------===//
 
-static bool isGenericTypeDisambiguatingToken(Parser &P) {
-  auto &tok = P.Tok;
-  switch (tok.getKind()) {
-  default:
-    // If this is the end of the expr (wouldn't match parseExprSequenceElement),
-    // prefer generic type list over an illegal unary postfix '>' operator.
-    return P.isStartOfSwiftDecl() || P.isStartOfStmt(/*prefer expr=*/true);
-  case tok::r_paren:
-  case tok::r_square:
-  case tok::l_brace:
-  case tok::r_brace:
-  case tok::period:
-  case tok::period_prefix:
-  case tok::comma:
-  case tok::semi:
-  case tok::eof:
-  case tok::code_complete:
-  case tok::exclaim_postfix:
-  case tok::question_postfix:
-  case tok::colon:
-    return true;
-
-  case tok::oper_binary_spaced:
-    if (tok.getText() == "&")
-      return true;
-
-    LLVM_FALLTHROUGH;
-  case tok::oper_binary_unspaced:
-  case tok::oper_postfix:
-    // These might be '?' or '!' type modifiers.
-    return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
-
-  case tok::l_paren:
-  case tok::l_square:
-    // These only apply to the generic type if they don't start a new line.
-    return !tok.isAtStartOfLine();
-  }
-}
-
 bool Parser::canParseAsGenericArgumentList() {
   if (!Tok.isAnyOperator() || Tok.getText() != "<")
     return false;
 
   BacktrackingScope backtrack(*this);
-
-  if (canParseGenericArguments())
-    return isGenericTypeDisambiguatingToken(*this);
-
-  return false;
+  return canParseGenericArguments();
 }
 
 bool Parser::canParseGenericArguments() {
   // Parse the opening '<'.
-  if (!startsWithLess(Tok))
+  if (!startsWithLess(Tok) ||
+      Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc) != Tok.getLoc()) {
     return false;
+  }
   consumeStartingLess();
 
-  if (startsWithGreater(Tok)) {
-    consumeStartingGreater();
-    return true;
-  }
-
-  do {
-    // With LiteralExpressions enabled, a generic argument may be a
-    // parenthesized value expression such as '(1 + 2)'. Treat a parenthesized
-    // group as a value expression only when it is immediately followed by ','
-    // or '>'; otherwise parse it as a type so that parenthesized and function
-    // types like '(Int, Int) -> Bool' are still recognized.
-    bool parsedValueExpr = false;
-    if (Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
-        Tok.is(tok::l_paren)) {
+  while (Tok.isNot(tok::eof, tok::r_paren, tok::r_square, tok::r_brace)) {
+    if (startsWithGreater(Tok)) {
+      consumeStartingGreater();
+      return true;
+    }
+    {
       CancellableBacktrackingScope backtrack(*this);
-      skipSingle();
-      if (Tok.is(tok::comma) || startsWithGreater(Tok)) {
+      if (canParseTypeIdentifier()) {
         backtrack.cancelBacktrack();
-        parsedValueExpr = true;
+        continue;
       }
     }
-    if (!parsedValueExpr && !canParseType())
-      return false;
-
-    // Parse the comma, if the list continues.
-    // This could be the trailing comma.
-  } while (consumeIf(tok::comma) && !startsWithGreater(Tok));
-
-  if (!startsWithGreater(Tok)) {
-    return false;
-  } else {
-    consumeStartingGreater();
-    return true;
+    skipSingle();
   }
+  return false;
 }
 
 bool Parser::canParseTypeSimple() {
