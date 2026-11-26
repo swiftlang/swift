@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -typo-correction-limit 23
+// RUN: %target-typecheck-verify-swift -typo-correction-limit 24
 // RUN: not %target-swift-frontend -typecheck -disable-typo-correction -diagnostic-style llvm %s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -typo-correction-limit 0 -diagnostic-style llvm%s 2>&1 | %FileCheck %s -check-prefix=DISABLED
 // RUN: not %target-swift-frontend -typecheck -DIMPORT_FAIL %s -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=DISABLED
@@ -220,3 +220,6 @@ extension P2 {
     _ = a // expected-error {{cannot find 'a' in scope}}
   }
 }
+
+func compoundName(x: Int) {} // expected-note {{did you mean 'compoundName(x:)'?}}
+let compoundReference = compoundName(_:) // expected-error {{cannot find 'compoundName(_:)' in scope}}
