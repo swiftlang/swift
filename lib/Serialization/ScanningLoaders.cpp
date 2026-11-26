@@ -199,20 +199,22 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
         std::vector<StringRef> compiledCandidatesRefs(
             compiledCandidates.begin(), compiledCandidates.end());
 
-        // If this interface specified '-autolink-force-load', add it to the
-        // set of linked libraries for this module.
-        std::vector<LinkLibrary> linkLibraries;
-        if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
-          std::string linkName = realModuleName.str().str();
-          auto linkNameArgIt = llvm::find(ArgsRefs, "-module-link-name");
-          if (linkNameArgIt != ArgsRefs.end())
-            linkName = *(linkNameArgIt + 1);
-          linkLibraries.push_back(
-              {linkName,
-               isFramework ? LibraryKind::Framework : LibraryKind::Library,
-               /*static=*/false, /*force_load=*/true});
-        }
+        // Report the link libraries that the binary module built from this
+        // interface would serialize, so a dependency reports the same link
+        // libraries whether it is resolved as an interface or a binary module.
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+        std::vector<LinkLibrary> linkLibraries;
+        auto linkNameArgIt = llvm::find(ArgsRefs, "-module-link-name");
+        if (linkNameArgIt != ArgsRefs.end() &&
+            std::next(linkNameArgIt) != ArgsRefs.end()) {
+          bool forceLoad =
+              llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end();
+          linkLibraries.emplace_back(*std::next(linkNameArgIt),
+                                     LibraryKind::Library, isStatic, forceLoad);
+        }
+        if (isFramework)
+          linkLibraries.emplace_back(realModuleName.str(),
+                                     LibraryKind::Framework, isStatic);
         bool isStrictMemorySafety =
             llvm::find(ArgsRefs, "-strict-memory-safety") != ArgsRefs.end();
 
