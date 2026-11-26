@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_COMMON_H
 
+#include "swift/AST/AutoDiff.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILDifferentiabilityWitness.h"
@@ -24,6 +25,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/Differentiation/DifferentiationInvoker.h"
+#include <optional>
 
 namespace swift {
 
@@ -36,6 +38,36 @@ class ADContext;
 //===----------------------------------------------------------------------===//
 // Helpers
 //===----------------------------------------------------------------------===//
+
+/// Find the async-let start whose result-buffer pointer defines this address.
+BuiltinInst *getAsyncLetStart(const PointerToAddressInst *address);
+
+/// Select async lets with an active result buffer.
+bool shouldDifferentiateAsyncLet(BuiltinInst *start,
+                                 const DifferentiableActivityInfo &activity,
+                                 const AutoDiffConfig &config);
+
+/// Adapt an initializer VJP to the task's indirect result convention.
+SILValue createAsyncLetVJPClosure(SILBuilder &builder, ADContext &context,
+                                  SILLocation loc, SILValue vjp);
+
+/// A selected async let in the original function.
+struct AsyncLetInfo {
+  BuiltinInst *start;
+  explicit AsyncLetInfo(BuiltinInst *start) : start(start) {}
+  PartialApplyInst *getInitializer() const;
+  bool isGet(SILInstruction *inst) const;
+  bool isResultAddress(SILInstruction *inst) const;
+
+  AllocStackInst *getBuffer() const;
+  IndexSubset *getParameterIndices() const;
+  SILType getResultStorageType() const;
+  bool isInitializerInstruction(SILInstruction *inst) const;
+};
+
+std::optional<AsyncLetInfo>
+getAsyncLet(SILInstruction *inst, const DifferentiableActivityInfo &activity,
+            const AutoDiffConfig &config);
 
 /// Prints an "[AD] " prefix to `llvm::dbgs()` and returns the debug stream.
 /// This is being used to print short debug messages within the AD pass.

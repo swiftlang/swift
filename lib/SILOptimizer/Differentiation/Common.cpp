@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Differentiation/Common.h"
-#include "swift/SIL/SILDifferentiabilityWitness.h"
+#include "swift/AST/AutoDiff.h"
+#include "swift/AST/Builtins.h"
+#include "swift/AST/SubstitutionMap.h"
 
 #define DEBUG_TYPE "differentiation"
 
@@ -24,14 +26,194 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
+#include "swift/SILOptimizer/Differentiation/Thunk.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 
 namespace swift {
 namespace autodiff {
 
 raw_ostream &getADDebugStream() { return llvm::dbgs() << "[AD] "; }
+
+static BuiltinInst *getAsyncLetStartForResultPointer(SILValue pointer) {
+  for (auto use : pointer->getUses()) {
+    auto *bi = dyn_cast<BuiltinInst>(use->getUser());
+    if (!bi)
+      continue;
+
+    if (bi->getBuiltinKind() ==
+            BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
+        use->getOperandNumber() == bi->getNumOperands() - 1)
+      return bi;
+  }
+
+  return nullptr;
+}
+
+BuiltinInst *getAsyncLetStart(const PointerToAddressInst *pta) {
+  return getAsyncLetStartForResultPointer(pta->getOperand());
+}
+
+static BuiltinInst *getAsyncLetStart(SILInstruction *inst) {
+  if (!inst)
+    return nullptr;
+  if (auto *start = dyn_cast<BuiltinInst>(inst))
+    return start->getBuiltinKind() ==
+                   BuiltinValueKind::StartAsyncLetWithLocalBuffer
+               ? start
+               : nullptr;
+  if (auto *address = dyn_cast<PointerToAddressInst>(inst))
+    return getAsyncLetStart(static_cast<const PointerToAddressInst *>(address));
+  if (auto *pointer = dyn_cast<AddressToPointerInst>(inst))
+    return getAsyncLetStartForResultPointer(pointer);
+  if (auto *buffer = dyn_cast<AllocStackInst>(inst)) {
+    for (auto *use : buffer->getUses())
+      if (auto *pointer = dyn_cast<AddressToPointerInst>(use->getUser()))
+        if (auto *start = getAsyncLetStartForResultPointer(pointer))
+          return start;
+    return nullptr;
+  }
+  if (auto *get = dyn_cast<ApplyInst>(inst)) {
+    auto *callee = get->getCalleeFunction();
+    if (!callee || callee->getName() != "swift_asyncLet_get" ||
+        get->getNumArguments() != 2)
+      return nullptr;
+    auto *start = dyn_cast<BuiltinInst>(get->getArgument(0));
+    return start &&
+                   start->getBuiltinKind() ==
+                       BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
+                   get->getArgument(1) == start->getArguments().back()
+               ? start
+               : nullptr;
+  }
+  if (!isa<PartialApplyInst, ConvertFunctionInst, ConvertEscapeToNoEscapeInst>(
+          inst))
+    return nullptr;
+  auto closure = lookThroughAsyncLetClosureUsers(
+      SILValue(cast<SingleValueInstruction>(inst)));
+  // Match the initializer operand; cleanup may also use this closure.
+  for (auto *use : closure->getUses())
+    if (auto *start = dyn_cast<BuiltinInst>(use->getUser());
+        start &&
+        start->getBuiltinKind() ==
+            BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
+        use->getOperandNumber() == 1)
+      return start;
+  return nullptr;
+}
+
+bool shouldDifferentiateAsyncLet(BuiltinInst *start,
+                                 const DifferentiableActivityInfo &activity,
+                                 const AutoDiffConfig &config) {
+  return start->getBuiltinKind() ==
+             BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
+         activity.isActive(start->getArguments().back(), config);
+}
+
+PartialApplyInst *AsyncLetInfo::getInitializer() const {
+  auto *initializer = cast<PartialApplyInst>(
+      findAsyncLetPartialApplyFromStart(start->getOperand(1)));
+  assert(initializer->getNumArguments() ==
+             initializer->getSubstCalleeType()->getNumParameters() &&
+         "async-let initializer must bind every parameter");
+  return initializer;
+}
+
+AllocStackInst *AsyncLetInfo::getBuffer() const {
+  auto *pointer = cast<AddressToPointerInst>(start->getArguments()[2]);
+  return cast<AllocStackInst>(pointer->getOperand());
+}
+
+IndexSubset *AsyncLetInfo::getParameterIndices() const {
+  auto &function = *start->getFunction();
+  auto captures = getInitializer()->getArguments();
+  SmallVector<unsigned, 4> indices;
+  for (unsigned i = 0; i != captures.size(); ++i)
+    if (captures[i]->getType().isDifferentiable(function.getModule()))
+      indices.push_back(i);
+  // Preserve capture positions, including gaps for nondifferentiable values.
+  return IndexSubset::get(function.getASTContext(), captures.size(), indices);
+}
+
+SILType AsyncLetInfo::getResultStorageType() const {
+  auto &parent = *start->getFunction();
+  auto &module = parent.getModule();
+  auto type =
+      getInitializer()->getSubstCalleeType()->getUnsubstitutedType(module);
+  auto *results = IndexSubset::get(parent.getASTContext(),
+                                   type->getNumAutoDiffSemanticResults(), {0});
+  type = type->getAutoDiffDerivativeFunctionType(
+                 getParameterIndices(), results,
+                 AutoDiffDerivativeFunctionKind::VJP, module.Types,
+                 LookUpConformanceInModule())
+             ->getUnsubstitutedType(module);
+  assert(type->getNumResults() == 2 &&
+         type->getResults().front().isFormalIndirect() &&
+         type->getResults().back().getConvention() == ResultConvention::Owned &&
+         "expected an indirect primal and an owned pullback");
+  return type->getAllResultsSubstType(parent.getModule(),
+                                      parent.getTypeExpansionContext());
+}
+
+SILValue createAsyncLetVJPClosure(SILBuilder &builder, ADContext &context,
+                                  SILLocation loc, SILValue vjp) {
+  auto &caller = builder.getFunction();
+  auto &module = caller.getModule();
+  auto &astContext = module.getASTContext();
+  auto sourceType =
+      vjp->getType().castTo<SILFunctionType>()->getUnsubstitutedType(module);
+  assert(sourceType->isAsync() && !sourceType->isCoroutine() &&
+         !sourceType->getNumParameters() && !sourceType->isNoEscape() &&
+         !sourceType->hasErasedIsolation());
+  assert(sourceType->getNumResults() == 2 &&
+         sourceType->getResults().front().isFormalIndirect() &&
+         sourceType->getResults().back().getConvention() ==
+             ResultConvention::Owned);
+
+  // Preserve the native pullback ABI inside the indirect task result.
+  auto storageType = sourceType->getAllResultsSubstType(
+      module, caller.getTypeExpansionContext());
+  SILResultInfo result(storageType.getASTType(), ResultConvention::Indirect);
+  auto entryType = SILFunctionType::get(
+      CanGenericSignature(), sourceType->getExtInfo(),
+      sourceType->getCoroutineKind(), sourceType->getCalleeConvention(), {}, {},
+      {result}, sourceType->getOptionalErrorResult(), SubstitutionMap(),
+      SubstitutionMap(), astContext);
+
+  SILOptFunctionBuilder functions(context.getTransform());
+  return reabstractFunction(
+      builder, functions, loc, vjp, entryType,
+      [](SubstitutionMap substitutions) { return substitutions; });
+}
+
+bool AsyncLetInfo::isInitializerInstruction(SILInstruction *inst) const {
+  if (!isa<PartialApplyInst, ConvertFunctionInst, ConvertEscapeToNoEscapeInst>(
+          inst))
+    return false;
+  return getAsyncLetStart(inst) == start;
+}
+
+bool AsyncLetInfo::isGet(SILInstruction *inst) const {
+  return isa<ApplyInst>(inst) && getAsyncLetStart(inst) == start;
+}
+
+bool AsyncLetInfo::isResultAddress(SILInstruction *inst) const {
+  auto *address = dyn_cast_or_null<PointerToAddressInst>(inst);
+  return address && getAsyncLetStart(address) == start;
+}
+
+std::optional<AsyncLetInfo>
+getAsyncLet(SILInstruction *inst, const DifferentiableActivityInfo &activity,
+            const AutoDiffConfig &config) {
+  auto *start = getAsyncLetStart(inst);
+  if (!start || !shouldDifferentiateAsyncLet(start, activity, config))
+    return std::nullopt;
+  return AsyncLetInfo(start);
+}
 
 //===----------------------------------------------------------------------===//
 // Helpers
