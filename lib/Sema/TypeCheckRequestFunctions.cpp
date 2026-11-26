@@ -448,7 +448,7 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
   auto &ctx = dc->getASTContext();
   Type type = evaluateOrDefault(
       evaluator,
-      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::NonGeneric},
+      CustomAttrTypeRequest{mutableAttr, dc, CustomAttrTypeKind::ResultBuilder},
       Type());
   if (!type || type->hasError()) return Type();
 
@@ -482,6 +482,16 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
       mutableAttr->setInvalid();
       return Type();
     }
+  }
+
+  // Omitted generic arguments are inferred when resolving the attribute's type.
+  // If they couldn't be, because the declaration has no result type to infer
+  // them from, the attribute is invalid.
+  if (type->hasUnboundGenericType() || type->hasPlaceholder()) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::result_builder_generic_inference_failed, attr);
+    mutableAttr->setInvalid();
+    return Type();
   }
 
   return type->mapTypeOutOfEnvironment();

@@ -15,3 +15,17 @@ tuplify(true) {
   }
 }
 
+
+let array: [String] = makeArray {
+  "format"
+  "--in-place"
+}
+
+let dictionary: [String: Int] = makeDictionary {
+  ("format", 1)
+}
+
+let ints: [Int] = makeGenericArray {
+  1
+  2
+}
