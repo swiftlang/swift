@@ -177,7 +177,7 @@ param
   [string] $SyftVersion = "1.40.0",
 
   # CMake
-  [string] $CMakeVersion = "4.4.1",
+  [string] $CMakeVersion = "4.5.1",
 
   # Ninja
   [string] $NinjaVersion = "1.13.2",
@@ -634,6 +634,24 @@ $KnownCMakes = @{
       FileName = "cmake-4.4.1-windows-arm64.zip"
       CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "share", "cmake-4.4")
       Path = [IO.Path]::Combine("$ArtifactCache", "cmake-4.4.1-windows-arm64", "cmake-4.4.1-windows-arm64", "bin", "cmake.exe")
+    };
+  };
+  "4.5.1" = @{
+    AMD64 = @{
+      Artifact = "cmake-4.5.1-windows-amd64"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-windows-x86_64.zip"
+      SHA256 = "BFE6EADB245DC8213E0D3FEEA316B520CB2AAE92F5667FFD76059BA6B05C430C"
+      FileName = "cmake-4.5.1-windows-x86_64.zip"
+      CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.5.1-windows-amd64", "cmake-4.5.1-windows-x86_64", "share", "cmake-4.5")
+      Path = [IO.Path]::Combine("$ArtifactCache", "cmake-4.5.1-windows-amd64", "cmake-4.5.1-windows-x86_64", "bin", "cmake.exe")
+    };
+    ARM64 = @{
+      Artifact = "cmake-4.5.1-windows-arm64"
+      URL = "https://github.com/Kitware/CMake/releases/download/v4.5.1/cmake-4.5.1-windows-arm64.zip"
+      SHA256 = "6782F11382941BB85C406EB3BD32A702222D8956535AE9CEC5EE77395BE2CC78"
+      FileName = "cmake-4.5.1-windows-arm64.zip"
+      CMakeRoot = [IO.Path]::Combine("$ArtifactCache", "cmake-4.5.1-windows-arm64", "cmake-4.5.1-windows-arm64", "share", "cmake-4.5")
+      Path = [IO.Path]::Combine("$ArtifactCache", "cmake-4.5.1-windows-arm64", "cmake-4.5.1-windows-arm64", "bin", "cmake.exe")
     };
   }
 }
