@@ -1,0 +1,9 @@
+// {"frontendArgs":["-emit-ir","-O","-module-name","main"],"kind":"custom","signature":"visitPackExplosion(swift::irgen::IRGenFunction&, swift::CanTypeWrapper<swift::PackType>, llvm::function_ref<void (swift::CanType, unsigned int, llvm::Value*, llvm::Value*)>)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"emitIndexOfStructuralPackComponent"}
+// RUN: not --crash %target-swift-frontend -emit-ir -O -module-name main %s
+import Builtin
+
+sil @a : $<each T> () -> Builtin.PackIndex {
+bb0:
+  %0 = scalar_pack_index 1 of $Pack{repeat each T, Builtin.Int1}
+  return %0 : $Builtin.PackIndex
+}
