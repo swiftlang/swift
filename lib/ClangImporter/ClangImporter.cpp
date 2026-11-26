@@ -3186,7 +3186,8 @@ bool ClangImporter::Implementation::DiagnosticWalker::TraverseParmVarDecl(
   // types, we avoid diagnosing these types as a type diagnosis without a
   // "parameter not imported" note on the referencing param decl is inconsistent
   // behaviour and could be confusing.
-  if (Impl.ImportDiagnostics[D].size()) {
+  if (auto it = Impl.ImportDiagnostics.find(D);
+      it != Impl.ImportDiagnostics.end() && !it->second.empty()) {
     // Since the parameter decl in question has been diagnosed (we didn't bail
     // before importing this param) continue the traversal as normal.
     return clang::RecursiveASTVisitor<DiagnosticWalker>::TraverseParmVarDecl(D);
@@ -6247,7 +6248,11 @@ diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Impl,
 
 bool ClangImporter::Implementation::emitDiagnosticsForTarget(
     ImportDiagnosticTarget target, clang::SourceLocation fallbackLoc) {
-  for (const auto &entry : llvm::reverse(ImportDiagnostics[target])) {
+  auto diagsIt = ImportDiagnostics.find(target);
+  if (diagsIt == ImportDiagnostics.end())
+    return false;
+  const auto &diags = diagsIt->second;
+  for (const auto &entry : llvm::reverse(diags)) {
     clang::SourceLocation loc = entry.loc.isValid() ? entry.loc : fallbackLoc;
     HeaderLoc hdrLoc(loc);
     if (const auto *declTarget = target.dyn_cast<const clang::Decl *>()) {
@@ -6270,7 +6275,7 @@ bool ClangImporter::Implementation::emitDiagnosticsForTarget(
       diagnose(hdrLoc, entry.diag);
     }
   }
-  return ImportDiagnostics[target].size();
+  return !diags.empty();
 }
 
 /// The indices of the template parameters that a std type's escapability and
