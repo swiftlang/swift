@@ -9942,10 +9942,12 @@ void SwiftDeclConverter::importNonOverriddenMirroredMethods(DeclContext *dc,
 
   // Write up sync and async versions.
   for (const auto &asyncImport : asyncImports) {
-    addCompletionHandlerAttribute(
-        asyncImport.second,
-        syncImports[asyncImport.first],
-        Impl.SwiftContext);
+    auto syncIt = syncImports.find(asyncImport.first);
+    addCompletionHandlerAttribute(asyncImport.second,
+                                  syncIt != syncImports.end()
+                                      ? ArrayRef<Decl *>(syncIt->second)
+                                      : ArrayRef<Decl *>(),
+                                  Impl.SwiftContext);
   }
 }
 

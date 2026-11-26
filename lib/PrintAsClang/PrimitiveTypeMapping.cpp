@@ -74,8 +74,8 @@ void PrimitiveTypeMapping::initialize(ASTContext &ctx) {
     auto typealias = dyn_cast<TypeAliasDecl>(decl);
     if (applyToUnderlying && typealias) {
       auto underlying = typealias->getDeclaredInterfaceType()->getAnyNominal();
-      if (underlying && !mappedTypeNames.contains(underlying))
-        mappedTypeNames[underlying] = info;
+      if (underlying)
+        mappedTypeNames.try_emplace(underlying, info);
     }
   };
 
