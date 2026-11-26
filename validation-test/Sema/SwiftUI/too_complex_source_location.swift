@@ -33,10 +33,16 @@ struct ContentView: View {
         ScrollView {
           VStack {
             VStack {
-              // Note: The code here is on a single line to ensure we're able to
-              // handle the multiple SDK versions we have in CI.
-              Picker(selection: $selection) { ForEach(["a", "b", "c"], id: \.self) { Text($0).foregroundStyl(.red) } /* Typo is here */ } label: {  }.pickerStyle(.segmented)
-              // expected-error@-1 {{ reasonable time}}
+              VStack {
+                VStack {
+                  // Note: The code here is on a single line to ensure we're able to
+                  // handle the multiple SDK versions we have in CI.
+                  Picker(selection: $selection) { ForEach(["a", "b", "c"], id: \.self) { Text($0).foregroundStyl(.red) } /* Typo is here */ } label: {  }.pickerStyle(.segmented)
+                  // expected-error@-1 {{ reasonable time}}
+                }
+                .padding(.vertical)
+              }
+              .padding(.vertical)
             }
             .padding(.vertical)
           }

@@ -701,33 +701,29 @@ func callitVariadic<T>(_ fs: () -> T...) -> T {
 }
 
 func test_55680_Tuple() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitTuple(1) { // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitTuple(1) {
     (print("hello"), 0)
   }
 }
 
 func test_55680() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callit { // expected-note@:10{{generic parameter 'T' inferred as '()' from closure return expression}}
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callit {
     print("hello")
   }
 }
 
 func test_55680_Args() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitArgs(1) { // expected-note@:17{{generic parameter 'T' inferred as '()' from closure return expression}}
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitArgs(1) {
     print("hello")
   }
 }
 
 func test_55680_ArgsFn() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitArgsFn(1) { // expected-note@:19{{generic parameter 'T' inferred as '()' from closure return expression}}
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitArgsFn(1) {
     { print("hello") }
   }
 }
@@ -747,9 +743,8 @@ func test_55680_GenericArg() -> Int {
 }
 
 func test_55680_Variadic() -> Int {
-  // expected-error@+2{{conflicting arguments to generic parameter 'T' ('()' vs. 'Int')}}
-  // expected-note@+1:3{{generic parameter 'T' inferred as 'Int' from context}}
-  callitVariadic({ // expected-note@:18{{generic parameter 'T' inferred as '()' from closure return expression}}
+  // expected-error@+1{{cannot convert return expression of type '()' to return type 'Int'}}
+  callitVariadic({
     print("hello")
   })
 }
@@ -1204,11 +1199,11 @@ func f60781<T>(_ x: T) -> T { x }
 func f60781<T>(_ x: T, _ y: T) -> T { x }
 
 func test60781() -> Int {
-  f60781({ 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
+  f60781({ 1 }) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 }
 
 func test60781_MultiArg() -> Int {
-  f60781({ 1 }, { 1 }) // expected-error{{conflicting arguments to generic parameter 'T' ('Int' vs. '() -> Int')}}
+  f60781({ 1 }, { 1 }) // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 }
 
 @resultBuilder

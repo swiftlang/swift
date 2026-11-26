@@ -67,6 +67,8 @@ public:
 struct AmbiguousBindings {
   llvm::DenseMap<TypeVariableType *, llvm::SmallSetVector<ConflictedType *, 4>>
       conflictMap;
+  llvm::DenseMap<TypeVariableType *, llvm::SmallVector<ConstraintFix *, 4>>
+  inScopeFixes;
 
   void print(llvm::raw_ostream &out) const;
 };
@@ -293,6 +295,8 @@ public:
   Type getParamType(bool lookThroughAutoclosure = true) const {
     return getParamTypeImpl(FnType, lookThroughAutoclosure);
   }
+
+  /// \returns the raw type, including potentially type variable,
 
   /// \returns The interface type of the parameter which the argument is being
   /// applied to.

@@ -24,7 +24,7 @@ public func test(_ _: AnyObject) {}
 
 // TODO: make this a better error (https://github.com/swiftlang/swift/issues/90322).
 test(Empty.create()) // expected-error {{argument type 'Empty?' expected to be an instance of a class or class-constrained type}}
-test([Empty.create()][0]) // expected-error {{failed to produce diagnostic for expression}}
+test([Empty.create()][0]) // expected-error {{argument type 'Empty?' expected to be an instance of a class or class-constrained type}}
 
 //--- test2.swift
 

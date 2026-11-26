@@ -81,10 +81,11 @@ struct RoundedButtonStyle<Background: View & ShapeStyle>: ButtonStyle {
 }
 
 struct ReceiptView: View {
-  var body: some View { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  var body: some View {
     Button(action: {}, label: { Text("Receipt") })
       .buttonStyle(
         RoundedButtonStyleBuilder()
+          // expected-error@+1{{cannot convert value of type 'LinearGradient' to expected argument type 'Color'}}
           .color(LinearGradient(colors: [.red, .blue], startPoint: .top, endPoint: .bottom), for: .normal)
           .color(Color.green, for: .highlighted)
           .build()

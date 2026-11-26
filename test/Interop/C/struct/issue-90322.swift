@@ -22,4 +22,4 @@ import Test
 
 func test(_: AnyObject) {}
 
-test([Empty.create()][0]) // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+test([Empty.create()][0]) // expected-error {{argument type 'Empty?' expected to be an instance of a class or class-constrained type}}
