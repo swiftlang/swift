@@ -3049,6 +3049,7 @@ function Build-EarlySwiftDriver([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
       BUILD_TESTING = "NO";
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       # TODO(compnerd) - remove `-Xfrontend -use-static-resource-dir` - this is inferred by the `-static-stdlib`.
       CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
@@ -3169,6 +3170,7 @@ function Get-CompilersDefines([Hashtable] $Platform,
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    CMAKE_Swift_COMPILATION_MODE = "wholemodule";
     CMAKE_Swift_FLAGS = if ($LTO -ne "none") { @("-use-ld=lld") } else { @() };
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
     LLDB_LIBXML2_VERSION = "2.11.5";
@@ -4387,6 +4389,7 @@ function Build-XCTest([Hashtable] $Platform,
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_INSTALL_BINDIR = $Platform.BinaryDir;
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       XCTest_INSTALL_NESTED_SUBDIR = "YES";
@@ -5115,6 +5118,7 @@ function Build-System([Hashtable] $Platform,
     -SwiftSDK $SwiftSDK `
     -BuildTargets default `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
@@ -5151,6 +5155,7 @@ function Build-ToolsProtocols([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
     }
 }
@@ -5204,6 +5209,7 @@ function Build-ToolsSupportCore([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
@@ -5224,6 +5230,7 @@ function Build-LLBuild([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
       LLBUILD_SUPPORT_BINDINGS = "Swift";
@@ -5283,6 +5290,7 @@ function Build-ArgumentParser([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
       BUILD_EXAMPLES = "NO";
@@ -5306,6 +5314,7 @@ function Build-Driver([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
@@ -5357,6 +5366,7 @@ function Build-Collections([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
@@ -5373,6 +5383,7 @@ function Build-ASN1([Hashtable] $Platform,
     -SwiftSDK $SwiftSDK `
     -BuildTargets default `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
@@ -5389,6 +5400,7 @@ function Build-Certificates([Hashtable] $Platform,
     -SwiftSDK $SwiftSDK `
     -BuildTargets default `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
@@ -5496,6 +5508,7 @@ function Build-Format([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "YES";
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       SwiftSyntax_DIR = $SwiftSyntax_DIR;
@@ -5572,6 +5585,7 @@ function Build-IndexStoreDB([Hashtable] $Platform,
     -SwiftSDK $SwiftSDK `
     -BuildTargets default `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       BUILD_SHARED_LIBS = "NO";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       CMAKE_C_FLAGS = @("-I$SwiftSDK\usr\include", "-I$SwiftSDK\usr\include\Block");
@@ -5593,6 +5607,7 @@ function Build-SourceKitLSP([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftSyntax_DIR = $SwiftSyntax_DIR;
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
@@ -5800,6 +5815,7 @@ function Build-Inspect([Hashtable] $Platform,
                        [Hashtable] $Compilers,
                        [string]    $SwiftSDK) {
   $Defines = @{
+    CMAKE_Swift_COMPILATION_MODE = "wholemodule";
     CMAKE_Swift_FLAGS = @(
       "-Xcc", "-I$SwiftSDK\usr\include",
       "-Xcc", "-I$SwiftSDK\usr\lib\swift",
@@ -5854,6 +5870,9 @@ function Build-DocC([Hashtable] $Platform,
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
     -Defines @{
+      CMAKE_Swift_COMPILATION_MODE = "wholemodule";
+      # https://gitlab.kitware.com/cmake/cmake/-/work_items/28041
+      CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
