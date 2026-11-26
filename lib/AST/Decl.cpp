@@ -5556,6 +5556,11 @@ DeclABIRoleInfoRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
 abi_role_detail::Storage abi_role_detail::computeStorage(Decl *decl) {
   ASSERT(decl);
 
+  // Imported declarations can't have an `@abi` attribute or be the ABI-only
+  // counterpart of one, so don't fill the request cache with them.
+  if (decl->hasClangNode())
+    return Storage(decl, ABIRole::Either);
+
   auto &ctx = decl->getASTContext();
 
   auto result = evaluateOrDefault(ctx.evaluator, DeclABIRoleInfoRequest{decl},
