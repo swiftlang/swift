@@ -5204,7 +5204,7 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(
     properties |= RecursiveTypeProperties::SolverAllocated;
     properties |= RecursiveTypeProperties::HasTypeVariable;
   }
-  properties &= ~RecursiveTypeProperties::IsLValue;
+  properties -= RecursiveTypeProperties::IsLValue;
   return properties;
 }
 
@@ -5228,41 +5228,24 @@ static bool isAnyFunctionTypeCanonical(ArrayRef<AnyFunctionType::Param> params,
   return result->isCanonical();
 }
 
-// For now, generic function types cannot be dependent (in fact,
-// they erase dependence) or contain type variables, and they're
-// always materializable.
-// FIXME: This doesn't seem great, we should consider changing it to be opt-out
-// rather than opt-in.
 static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(ArrayRef<AnyFunctionType::Param> params,
                                       ArrayRef<AnyFunctionType::Yield> yields,
                                       Type result, Type globalActor,
                                       Type thrownError) {
-  static_assert(RecursiveTypeProperties::BitWidth == 20,
-                "revisit this if you add new recursive type properties");
-  RecursiveTypeProperties properties;
+  RecursiveTypeProperties properties =
+    getFunctionRecursiveProperties(params, yields, result, globalActor,
+                                   thrownError, /*dependencies*/ {});
 
+  ASSERT(!properties.hasTypeVariable());
+  ASSERT(!properties.isLValue());
+
+  // For now, assume that generic function types always bind any
+  // type parameters that appear within them.
   using Prop = RecursiveTypeProperties::Property;
-  auto mask = (unsigned)Prop::HasError | Prop::IsUnsafe | Prop::HasPlaceholder;
+  properties -= Prop::HasTypeParameter;
+  properties -= Prop::HasParameterPack;
 
-  auto unionBits = [&](Type ty) {
-    if (!ty)
-      return;
-    auto bits = ty->getRecursiveProperties().getBits();
-    properties |= Prop(bits & mask);
-  };
-
-  for (auto param : params)
-    unionBits(param.getPlainType());
-  for (auto yield : yields)
-    unionBits(yield.getType());
-
-  if (result->getRecursiveProperties().hasDynamicSelf())
-    properties |= RecursiveTypeProperties::HasDynamicSelf;
-
-  unionBits(result);
-  unionBits(globalActor);
-  unionBits(thrownError);
   return properties;
 }
 
@@ -6146,8 +6129,6 @@ CanSILFunctionType SILFunctionType::get(
   void *mem = ctx.Allocate(bytes, alignof(SILFunctionType));
 
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 20,
-                "revisit this if you add new recursive type properties");
   for (auto &param : params)
     properties |= param.getInterfaceType()->getRecursiveProperties();
   for (auto &yield : yields)
@@ -6160,7 +6141,8 @@ CanSILFunctionType SILFunctionType::get(
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   if (genericSig || patternSubs) {
-    properties.removeHasTypeParameter();
+    properties -= RecursiveTypeProperties::HasTypeParameter;
+    properties -= RecursiveTypeProperties::HasParameterPack;
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
