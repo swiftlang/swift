@@ -134,7 +134,7 @@ func getGeneric2<T : ~Escapable>(_ outValue: inout T, _ /* borrowing inferred */
   outValue = inValue
 }
 
-@_lifetime(outValueI: immortal) // OK
+@_lifetime(outValueI: immortal) // expected-error{{invalid 'immortal' lifetime dependence for parameter 'outValueI'}}
 func getImmortalNE(_ outValueI: inout NE, _ inValueI: borrowing NE) {
   outValueI = NE()
 }
