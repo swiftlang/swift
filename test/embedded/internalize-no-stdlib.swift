@@ -25,9 +25,9 @@ public func main() {
   start(p: Concrete())
 }
 
+// CHECK-ELF: @swift_abi = weak_odr constant i32 2, section ".swift_abi"
 // CHECK-ELF: @_swift1_autolink_entries =
-// CHECK-ELF: @llvm.used = appending global [1 x ptr] [ptr @_swift1_autolink_entries], section "llvm.metadata"
-// CHECK-ELF-NOT: @llvm.used
+// CHECK-ELF: @llvm.used = appending global [2 x ptr] [ptr @swift_abi, ptr @_swift1_autolink_entries], section "llvm.metadata" 
 
-// CHECK-MACHO-NOT: @llvm.compiler.used
-// CHECK-MACHO-NOT: @llvm.used
+// CHECK-MACHO: @swift_abi = weak_odr constant i32 2, section "__TEXT,__swift_abi"
+// CHECK-MACHO: @llvm.used = appending global [1 x ptr] [ptr @swift_abi], section "llvm.metadata" 
