@@ -21,9 +21,7 @@ protocol Foo {
 }
 
 public struct Baz: Foo {
-  // FIXME: "compiler-generated" is wrong since the getter is explicit
-  // https://github.com/swiftlang/swift/issues/94426
-  var bar: NoEscapeNoCopy { // expected-note {{error in compiler-generated 'get'}}
+  var bar: NoEscapeNoCopy {
     NoEscapeNoCopy(p: nil) // expected-error {{lifetime-dependent value escapes its scope}}
     // expected-note@-1 {{it depends on the lifetime of this parent value}}
   } // expected-note {{this use causes the lifetime-dependent value to escape}}
