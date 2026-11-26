@@ -6,9 +6,6 @@
 // RUN:   -use-clang-function-types -sil-verify-all | %FileCheck %s
 // REQUIRES: objc_interop
 
-// Disable temporarily for rebranch
-// REQUIRES: rdar188269750
-
 //--- Library.swift
 @inlinable
 public func invoke(_ block: @convention(block) (CInt) -> CInt, _ value: CInt) -> CInt {
