@@ -316,7 +316,7 @@ private:
       }
     }
 
-    // Collect CAS deppendencies from clang modules.
+    // Collect CAS dependencies from clang modules.
     if (!clangDepDetails.CASClangIncludeTreeRootID.empty()) {
       if (addIncludeTree(clangDepDetails.CASClangIncludeTreeRootID))
         return true;
