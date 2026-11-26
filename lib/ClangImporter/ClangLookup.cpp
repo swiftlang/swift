@@ -126,29 +126,41 @@ directRecordMemberLookup(ClangImporter &Importer,
                          UnifiedStatsReporter *stats) {
   SmallVector<const clang::NamedDecl *, 4> result;
 
-  // Class template instances aren't in the lookup table.
-  // Import all member names to figure out which one(s) we're looking for.
-  if (isa<clang::ClassTemplateSpecializationDecl>(whereDecl)) {
+  // Class template instances (and member classes instantiated with them)
+  // aren't in the lookup table. Import all member names to figure out which
+  // imported names we're looking for.
+  auto *cxxWhereDecl = dyn_cast<clang::CXXRecordDecl>(whereDecl);
+  if (isa<clang::ClassTemplateSpecializationDecl>(whereDecl) ||
+      (cxxWhereDecl && cxxWhereDecl->getInstantiatedFromMemberClass())) {
     // TODO: we could make this faster if we can cache class templates in the
     //       lookup table as well.
 
-    for (auto *member : whereDecl->decls()) {
-      auto *namedDecl = dyn_cast<clang::NamedDecl>(member);
-      if (!namedDecl)
-        continue;
-
+    auto considerMember = [&](const clang::NamedDecl *namedDecl) {
       if (stats)
         ++stats->getFrontendCounters()
               .ClangRecordMemberLookupTemplateMembersScanned;
 
       auto memberName = Importer.importName(namedDecl);
       if (!memberName)
-        continue;
+        return;
 
       // Use the base names here because *sometimes* our input name won't have
       // any arguments.
       if (name.getBaseName() == memberName.getBaseName())
         result.push_back(namedDecl);
+    };
+
+    for (auto *member : whereDecl->decls()) {
+      auto *ND = dyn_cast<clang::NamedDecl>(member);
+      if (!ND)
+        continue;
+
+      considerMember(ND);
+
+      // Unscoped enums have their enumerators in the enclosing record.
+      if (auto *ED = dyn_cast<clang::EnumDecl>(ND); ED && !ED->isScoped())
+        for (auto *ECD : ED->enumerators())
+          considerMember(ECD);
     }
 
     return result;
