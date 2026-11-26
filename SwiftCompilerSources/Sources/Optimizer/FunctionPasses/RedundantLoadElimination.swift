@@ -663,7 +663,9 @@ private func replace(load: LoadingInstruction,
     let block = availableValue.instruction.parentBlock
     var predecessorInst = availableValue.instruction.previous
     // Splitting a store can also delete the `struct` and `tuple` instructions which define the stored value.
-    while let inst = predecessorInst, inst is StructInst || inst is TupleInst {
+    // Deleting such a `struct` or `tuple` also deletes its `debug_value` users (salvaging debug info
+    // replaces them with new `debug_value`s of the elements).
+    while let inst = predecessorInst, inst is StructInst || inst is TupleInst || inst is DebugValueInst {
       predecessorInst = inst.previous
     }
     let value = provideValue(for: load, from: availableValue, context)
