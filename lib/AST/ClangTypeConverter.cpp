@@ -1125,10 +1125,16 @@ ClangTypeConverter::getClangTemplateArguments(
   // Keep track of the types we failed to convert so we can return a useful
   // error.
   SmallVector<Type, 2> failedTypes;
-  for (clang::NamedDecl *param : *templateParams) {
-    // Note: all template parameters must be template type parameters. This is
-    // verified when we import the Clang decl.
-    auto templateParam = cast<clang::TemplateTypeParmDecl>(param);
+  for (auto [index, param] : llvm::enumerate(*templateParams)) {
+    // Class templates get a generic parameter for every template parameter,
+    // but only type parameters can be substituted from Swift.
+    auto templateParam = dyn_cast<clang::TemplateTypeParmDecl>(param);
+    if (!templateParam) {
+      failedTypes.push_back(index < genericArgs.size()
+                                ? genericArgs[index]
+                                : ErrorType::get(Context));
+      continue;
+    }
     // We must have found a defaulted parameter at the end of the list.
     if (templateParam->getIndex() >= genericArgs.size()) {
       templateArgs.push_back(clang::TemplateArgument(
