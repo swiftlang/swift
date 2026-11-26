@@ -163,4 +163,15 @@ extension BridgedSILDebugVariable {
   public var scope: DebugScope? {
     getScope().debugScope
   }
+
+  /// Removes a stored variable type. A `debug_value` created with this variable then takes the
+  /// type of its operand as variable type.
+  public mutating func removeType() {
+    clearType()
+  }
+
+  /// Removes the debug info expression, e.g. a fragment or `op_deref`.
+  public mutating func removeExpression() {
+    clearDIExpr()
+  }
 }
