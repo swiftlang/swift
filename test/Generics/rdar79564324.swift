@@ -23,21 +23,16 @@ public func test<T : P>(_ t: T) where T == T.A {
 
 // CHECK-LABEL: Requirement machine for fresh signature < T U >
 // CHECK-NEXT: Rewrite system: {
-// CHECK-NEXT: - [P].[P] => [P] [permanent]
 // CHECK-NEXT: - [P].A => [P:A] [permanent]
 // CHECK-NEXT: - [P:A].[P] => [P:A]
 // CHECK-NEXT: - [P].[Copyable] => [P] [explicit]
 // CHECK-NEXT: - [P].[Escapable] => [P] [explicit]
 // CHECK-NEXT: - [P:A].[Copyable] => [P:A] [explicit]
 // CHECK-NEXT: - [P:A].[Escapable] => [P:A] [explicit]
-// CHECK-NEXT: - [P].[P:A] => [P:A]
 // CHECK-NEXT: - [P:A].A => [P:A].[P:A]
 // CHECK-NEXT: - [P].[Deinitable] => [P]
 // CHECK-NEXT: - [P:A].[Deinitable] => [P:A]
-// CHECK-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // CHECK-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
-// CHECK-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
-// CHECK-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // CHECK-NEXT: - τ_0_0.A => τ_0_0
 // CHECK-NEXT: - τ_0_1.[P] => τ_0_1
 // CHECK-NEXT: - τ_0_1.A => τ_0_0
@@ -52,11 +47,9 @@ public func test<T : P>(_ t: T) where T == T.A {
 // CHECK-NEXT: - τ_0_0.[P:A] => τ_0_0
 // CHECK-NEXT: }
 // CHECK: Property map: {
-// CHECK-NEXT:   [P] => { conforms_to: [P Copyable Escapable Deinitable] }
 // CHECK-NEXT:   [P:A] => { conforms_to: [P Copyable Escapable Deinitable] }
-// CHECK-NEXT:   [Copyable] => { conforms_to: [Copyable Deinitable] }
-// CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
-// CHECK-NEXT:   [Deinitable] => { conforms_to: [Deinitable] }
+// CHECK-NEXT:   [P] => { conforms_to: [Copyable Escapable Deinitable] }
+// CHECK-NEXT:   [Copyable] => { conforms_to: [Deinitable] }
 // CHECK-NEXT:   τ_0_1 => { conforms_to: [P Copyable Escapable Deinitable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [Copyable Escapable Deinitable P] }
 // CHECK-NEXT: }

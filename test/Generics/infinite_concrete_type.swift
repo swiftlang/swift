@@ -2,8 +2,8 @@
 
 class G<T> {}
 
-protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
-// expected-note@-1 {{failed rewrite rule is [P1:B].[superclass: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].B>>>>>>>>>>>>>>>>>>>>>>] => [P1:B]}}
+protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete type nesting limit exceeded}}
+// expected-note@-1 {{failed rewrite rule is [P1:A].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].A>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => [P1:A]}}
   associatedtype A where A == G<B>
   associatedtype B where B == G<A>
 }
@@ -49,7 +49,7 @@ class Base<T> {}
 class Derived<T, U> : Base<(T, U)> {}
 
 protocol TooManyDifferences {
-// expected-error@-1 {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
+// expected-error@-1 {{cannot build rewrite system for protocol; concrete type nesting limit exceeded}}
 // expected-note@-2 {{failed rewrite rule is }}
   associatedtype A1 where A1: Derived<B, C>, A2: Base<B>, A1 == A2
   associatedtype A2
