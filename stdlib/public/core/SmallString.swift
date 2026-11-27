@@ -215,11 +215,72 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     get {
-      // TODO(String performance): In-vector-register operation
-      return self.withUTF8 { utf8 in
-        let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
-        return unsafe _SmallString(rebased)._unsafelyUnwrappedUnchecked
+      // Extract substring using bit manipulation on CPU registers
+      let start = bounds.lowerBound
+      let end = bounds.upperBound
+      let subCount = end - start
+
+      guard subCount > 0 else { return _SmallString() }
+      guard subCount <= _SmallString.capacity else {
+        // Fallback for invalid range
+        return self.withUTF8 { utf8 in
+          let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
+          return unsafe _SmallString(rebased)._unsafelyUnwrappedUnchecked
+        }
       }
+
+      let leading: UInt64
+      let trailing: UInt64
+
+      if start < 8 {
+        if end <= 8 {
+          // Substring entirely in leading word
+          let shiftAmount = UInt64(start) &* 8
+          let mask = UInt64.max &>> (64 &- UInt64(subCount) &* 8)
+          leading = (self.leadingRawBits &>> shiftAmount) & mask
+          trailing = 0
+        } else {
+          // Substring spans both words.
+          // Pack bytes into the correct _SmallString layout:
+          //   new leading  = bytes 0 ..< min(subCount, 8)
+          //   new trailing = bytes 8 ..< subCount  (empty when subCount ≤ 8)
+          let leadingBits = 8 - start   // bytes from first word
+          let complementBits = start    // bytes from second word that complete new leading
+
+          // Extract leadingBits bytes from first word
+          let leadingShift = UInt64(start) &* 8
+          let leadingFromOrig = (self.leadingRawBits &>> leadingShift)
+                              & (UInt64.max &>> (64 &- UInt64(leadingBits) &* 8))
+
+          // Extract up to complementBits bytes from second word, shift up to fill new leading.
+          // complementBits ∈ [0..7], so (1 &<< (n*8)) &- 1 is safe (n ≤ 7 < 8).
+          let complementMask = (UInt64(1) &<< (UInt64(complementBits) &* 8)) &- 1
+          let leadingFromTrailing = (self.trailingRawBits & complementMask)
+                                  &<< (UInt64(leadingBits) &* 8)
+
+          // Mask to min(subCount, 8) bytes.
+          let leadingBytes = Swift.min(subCount, 8)
+          leading = (leadingFromOrig | leadingFromTrailing)
+                  & (UInt64.max &>> (64 &- UInt64(leadingBytes) &* 8))
+
+          if subCount > 8 {
+            let tailBits = subCount - 8
+            trailing = (self.trailingRawBits &>> (UInt64(complementBits) &* 8))
+                     & (UInt64.max &>> (64 &- UInt64(tailBits) &* 8))
+          } else {
+            trailing = 0
+          }
+        }
+      } else {
+        // Substring entirely in trailing word
+        let trailingStart = start - 8
+        let shiftAmount = UInt64(trailingStart) &* 8
+        let mask = UInt64.max &>> (64 &- UInt64(subCount) &* 8)
+        leading = (self.trailingRawBits &>> shiftAmount) & mask
+        trailing = 0
+      }
+
+      return _SmallString(leading: leading, trailing: trailing, count: subCount)
     }
     // This setter is required for _SmallString to be a valid MutableCollection.
     // Since _SmallString is internal and this setter unused, we cheat.
@@ -325,11 +386,25 @@ extension _SmallString {
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
-    // TODO(SIMD): The below can be replaced with just be a masked unaligned
-    // vector load
+    // Unaligned 64-bit loads
     let ptr = unsafe input.baseAddress._unsafelyUnwrappedUnchecked
-    let leading = unsafe _bytesToUInt64(ptr, Swift.min(input.count, 8))
-    let trailing = unsafe count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
+    var leading: UInt64
+    let trailing: UInt64
+
+    if count <= 8 {
+      // Single unaligned load for small strings
+      leading = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
+      let mask = UInt64.max &>> (64 &- UInt64(count) &* 8)
+      leading = leading & mask
+      trailing = 0
+    } else {
+      // Two unaligned loads for larger strings
+      leading = unsafe UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
+      let trailingRaw = unsafe UnsafeRawPointer(ptr + 8).loadUnaligned(as: UInt64.self).littleEndian
+      let trailingCount = count &- 8
+      let mask = (UInt64(1) &<< (UInt64(trailingCount) &* 8)) &- 1
+      trailing = trailingRaw & mask
+    }
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
@@ -349,21 +424,39 @@ extension _SmallString {
 
   @usableFromInline // @testable
   internal init?(_ base: _SmallString, appending other: _SmallString) {
-    let totalCount = base.count + other.count
+    let otherCount = other.count
+
+    if otherCount == 0 {
+      // Fast path: nothing to append
+      self = base
+      return
+    }
+
+    let baseCount = base.count
+
+    if baseCount == 0 {
+      self = other
+      return
+    }
+
+    let totalCount = baseCount + otherCount
     guard totalCount <= _SmallString.capacity else { return nil }
 
-    // TODO(SIMD): The below can be replaced with just be a couple vector ops
-
-    var result = base
-    var writeIdx = base.count
-    for readIdx in 0..<other.count {
-      result[writeIdx] = other[readIdx]
-      writeIdx &+= 1
+    // Use _UInt128 arithmetic to concatenate the two small strings.
+    // .littleEndian normalizes byte order before arithmetic, making this
+    // endian-safe without any #if _endian guards.
+    func convert(_ s: _SmallString) -> _UInt128 {
+      let bits = s.zeroTerminatedRawCodeUnits
+      return .init(high: bits.1.littleEndian, low: bits.0.littleEndian)
     }
-    _internalInvariant(writeIdx == totalCount)
 
-    let (leading, trailing) = result.zeroTerminatedRawCodeUnits
-    self.init(leading: leading, trailing: trailing, count: totalCount)
+    let resultInt = (convert(other) &<< _UInt128(8 &* baseCount)) &+ convert(base)
+
+    self.init(
+      leading: resultInt.low.littleEndian,
+      trailing: resultInt.high.littleEndian,
+      count: totalCount
+    )
   }
 }
 
