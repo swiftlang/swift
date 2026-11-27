@@ -35,6 +35,7 @@
 namespace swift {
 
 class ExtensionDecl;
+class InheritedProtocolConformance;
 class ModuleDecl;
 
 /// Keeps track of the protocols to which a particular nominal type conforms.
@@ -493,6 +494,11 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
   /// Update a lookup table with conformances from newly-added extensions.
   void updateLookupTable(NominalTypeDecl *nominal, ConformanceStage stage);
+
+  /// Register an inherited conformance discovered by an implicit-conformance
+  /// request before this table resolves competing sources.
+  void registerImplicitInheritedConformance(
+      ClassDecl *classDecl, InheritedProtocolConformance *conformance);
 
   /// Register deserialized protocol conformances for the given (serialized)
   /// declaration context.
