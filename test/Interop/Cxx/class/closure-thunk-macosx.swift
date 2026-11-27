@@ -21,6 +21,25 @@ public func testClosureToFuncPtr() {
  cfuncARCStrong({N in})
 }
 
+// A named function converted to a C function pointer gets the same C entry
+// point as a closure.
+// CHECK-LABEL: sil [ossa] @$s4main26testNamedFunctionToFuncPtryyF : $@convention(thin) () -> () {
+// CHECK: %[[V0:.*]] = function_ref @$s4main13takeARCStrongyySo0C0VFTo : $@convention(c) (@owned ARCStrong) -> ()
+// CHECK: apply %{{.*}}(%[[V0]]) : $@convention(c) (@convention(c) (@owned ARCStrong) -> ()) -> ()
+
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s4main13takeARCStrongyySo0C0VFTo : $@convention(c) (@owned ARCStrong) -> () {
+// CHECK: bb0(%[[V0:.*]] : @owned $ARCStrong):
+// CHECK: %[[V1:.*]] = begin_borrow %[[V0]] : $ARCStrong
+// CHECK: apply %{{.*}}(%[[V1]]) : $@convention(thin) (@guaranteed ARCStrong) -> ()
+// CHECK: end_borrow %[[V1]] : $ARCStrong
+// CHECK: destroy_value %[[V0]] : $ARCStrong
+
+func takeARCStrong(_ a: ARCStrong) {}
+
+public func testNamedFunctionToFuncPtr() {
+  cfuncARCStrong(takeARCStrong)
+}
+
 // CHECK: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sSo10NonTrivialVIegr_ABIeyBr_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> @out NonTrivial) -> @out NonTrivial {
 // CHECK: bb0(%[[V0:.*]] : $*NonTrivial, %[[V1:.*]] : $*@block_storage @callee_guaranteed () -> @out NonTrivial):
 // CHECK: %[[V2:.*]] = project_block_storage %[[V1]] : $*@block_storage @callee_guaranteed () -> @out NonTrivial
