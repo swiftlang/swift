@@ -267,6 +267,11 @@ CLANG_MACRO_DEFINED("SWIFT_IMPORT_STDLIB_SYMBOL")
 
 CLANG_MACRO_CXX("SWIFT_NOEXCEPT", , "noexcept", )
 
+// C++11 spells `alignas` and C11 spells `_Alignas`.
+// Structs that use this macro are visible to both C and C++, so the spelling
+// must depend on `__cplusplus`.
+CLANG_MACRO_CXX("SWIFT_ALIGNAS", "(N)", "alignas(N)", "_Alignas(N)")
+
 CLANG_MACRO_BODY("SWIFT_C_INLINE_THUNK", \
     "# if __has_attribute(always_inline)\n" \
     "# if __has_attribute(nodebug)\n" \
