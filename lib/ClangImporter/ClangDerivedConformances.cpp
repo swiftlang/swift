@@ -172,15 +172,15 @@ static ValueDecl *lookupOperator(
   // Look up global operators. We want to do the filtering before import to avoid
   // overly eager imports.
   auto &ctx = decl->getASTContext();
-  auto loader = ctx.getClangModuleLoader();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   auto clangDecl = decl->getClangDecl();
   auto *clangModule =
       importer::getClangOwningModule(clangDecl, clangDecl->getASTContext());
-  auto lookupTable = ctx.getClangModuleLoader()->findLookupTable(clangModule);
+  auto lookupTable = importer->findLookupTable(clangModule);
   // Look up operators in the namespace context first.
   for (auto entry : lookupTable->lookupMemberOperators(DeclBaseName(id))) {
     if (isValidClangGlobal(dyn_cast<clang::FunctionDecl>(entry))) {
-      return cast_or_null<ValueDecl>(loader->importDeclDirectly(entry));
+      return cast_or_null<ValueDecl>(importer->importDeclDirectly(entry));
     }
   }
   // Look up operators in the global namespace
@@ -193,7 +193,7 @@ static ValueDecl *lookupOperator(
     if (!decl)
       continue;
     if (isValidClangGlobal(decl)) {
-      return cast_or_null<ValueDecl>(loader->importDeclDirectly(decl));
+      return cast_or_null<ValueDecl>(importer->importDeclDirectly(decl));
     }
   }
 

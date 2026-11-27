@@ -4771,9 +4771,7 @@ namespace {
             // If the method is imported as mutating, this implicitly makes the
             // parameter indirect.
             selfIsInOut =
-                !isa<ClassDecl>(dc) &&
-                Impl.SwiftContext.getClangModuleLoader()->isCXXMethodMutating(
-                    mdecl);
+                !isa<ClassDecl>(dc) && importer::isCXXMethodMutating(mdecl);
             selfIsConsuming =
                 mdecl->getRefQualifier() == clang::RefQualifierKind::RQ_RValue;
           }

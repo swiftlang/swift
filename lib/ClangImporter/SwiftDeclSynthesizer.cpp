@@ -3192,7 +3192,8 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
 
   ASTContext &ctx = funcDecl->getASTContext();
   clang::ASTContext &clangCtx = clangParam->getASTContext();
-  clang::Sema &clangSema = ctx.getClangModuleLoader()->getClangSema();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  clang::Sema &clangSema = importer->getClangSema();
 
   auto clangDeclName = clang::DeclarationName(
       &clangCtx.Idents.get(("__cxx" + funcDecl->getNameStr()).str()));
@@ -3220,12 +3221,12 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   defaultArgFuncDecl->setAccess(clang::AccessSpecifier::AS_public);
   defaultArgFuncDecl->setBody(defaultArgReturnStmt);
 
-  ctx.getClangModuleLoader()->registerSynthesizedClangDecl(defaultArgFuncDecl,
-                                                           defaultArgFuncDecl);
+  importer->registerSynthesizedClangDecl(defaultArgFuncDecl,
+                                         defaultArgFuncDecl);
 
   // Import `func __cxx__defaultArg_XYZ() -> ParamTY` into Swift.
   auto defaultArgGenerator = dyn_cast_or_null<FuncDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(defaultArgFuncDecl));
+      importer->importDeclDirectly(defaultArgFuncDecl));
   if (!defaultArgGenerator)
     return {nullptr, /*isTypeChecked=*/true};
 
@@ -3318,7 +3319,8 @@ synthesizeFunctionConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   ASTContext &ctx = constructor->getASTContext();
   clang::ASTContext &clangCtx = functionTypeClangDecl->getASTContext();
-  auto clangImporter = ctx.getClangModuleLoader();
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
   auto &clangSema = clangImporter->getClangSema();
 
   // operator() might be declared on a base type of the functional type.

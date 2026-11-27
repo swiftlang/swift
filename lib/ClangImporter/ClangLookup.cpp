@@ -267,8 +267,7 @@ void importer::forEachCXXNamespaceMember(
   auto *namespaceDecl =
       cast<clang::NamespaceDecl>(namespaceEnum->getClangDecl());
   auto &ctx = namespaceEnum->getASTContext();
-  auto *clangModuleLoader =
-      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   // Keep track of which names we've seen and which decls we've imported.
   // When we lookup a member by name, we import all of them at once.
@@ -276,7 +275,7 @@ void importer::forEachCXXNamespaceMember(
   llvm::SmallPtrSet<Decl *, 16> seenImports;
 
   auto importMember = [&](const clang::NamedDecl *nd) {
-    DeclName importedName = clangModuleLoader->importName(nd);
+    DeclName importedName = importer->importName(nd);
     if (!importedName || !seenNames.insert(importedName).second)
       return;
 
@@ -307,7 +306,7 @@ void importer::forEachCXXNamespaceMember(
     specWorklist.insert_range(tmpl->specializations());
 
     for (auto *spec : specWorklist) {
-      auto *imported = clangModuleLoader->importDeclDirectly(spec);
+      auto *imported = importer->importDeclDirectly(spec);
       if (imported && seenImports.insert(imported).second)
         emit(cast<ValueDecl>(imported));
     }
