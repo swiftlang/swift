@@ -7,9 +7,9 @@ sil_stage canonical
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 @com(interface: "10000000-0000-0000-0000-000000000002")
-public protocol ITarget: AnyObject {}
+public protocol ITarget {}
 
 // A guaranteed scalar cast cannot release its source or retain its result.
 // QueryInterface does not satisfy that contract, even for class-bound types.

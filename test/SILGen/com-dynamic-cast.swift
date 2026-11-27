@@ -11,7 +11,7 @@ public protocol ISource { func value() -> Int32 }
 public protocol ITarget { func value() -> Int32 }
 
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol IClassSource: AnyObject {}
+public protocol IClassSource {}
 
 // CHECK-LABEL: sil [ossa] @$s1M11conditional
 // CHECK: [[COPYABLE:%[0-9]+]] = moveonlywrapper_to_copyable [guaranteed]

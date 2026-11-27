@@ -2388,6 +2388,11 @@ ERROR(com_module_missing_type, none,
 ERROR(com_interface_inherits_non_marker, none,
       "COM interface %0 cannot inherit non-COM, non-marker protocol %1",
       (DeclName, DeclName))
+ERROR(com_interface_inherits_anyobject, none,
+      "COM interface %0 cannot be constrained to 'AnyObject'", (DeclName))
+NOTE(com_interface_inherits_anyobject_note, none,
+     "COM conformances are class-only by construction; a COM interface is not "
+     "a native Swift class reference", ())
 ERROR(com_interface_inherits_non_protocol, none,
       "COM interface %0 cannot inherit non-protocol type %1",
       (DeclName, Type))

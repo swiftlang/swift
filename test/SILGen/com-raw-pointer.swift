@@ -9,7 +9,7 @@ import Builtin
 protocol IItem {}
 
 @com(interface: "51000000-0000-0000-0000-000000000002")
-protocol IClassItem: IItem, AnyObject {}
+protocol IClassItem: IItem {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}6borrow
 // CHECK: moveonlywrapper_to_copyable [guaranteed]

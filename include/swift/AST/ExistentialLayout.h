@@ -109,6 +109,11 @@ struct ExistentialLayout {
   /// '& AnyObject' member or because of a superclass or protocol constraint.
   bool requiresClass() const;
 
+  /// Whether the existential is constrained to native Swift class references.
+  /// Unlike requiresClass(), this ignores the class-only rule of COM
+  /// interfaces, which are not native class references.
+  bool requiresNativeClass() const;
+
   /// Returns the existential's superclass, if any; this is either an explicit
   /// superclass term in a composition type, or the superclass of one of the
   /// protocols.

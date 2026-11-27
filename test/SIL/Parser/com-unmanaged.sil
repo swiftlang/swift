@@ -6,7 +6,7 @@ sil_stage canonical
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol IValue: AnyObject {}
+public protocol IValue {}
 
 // Class-bound COM interfaces permit reference storage, but their ownership
 // operations do not use Swift reference counting.

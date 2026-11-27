@@ -8,7 +8,7 @@ import Swift
 @com(interface: "10000000-0000-0000-0000-000000000001")
 public protocol IItem { func value(_ offset: Int32) -> Int32 }
 @com(interface: "10000000-0000-0000-0000-000000000002")
-public protocol IClassItem: IItem, AnyObject {}
+public protocol IClassItem: IItem {}
 
 // Lookup and application borrow the same storage without copying the receiver.
 // CHECK-LABEL: sil [ossa] @borrowed

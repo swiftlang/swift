@@ -6,7 +6,7 @@
 protocol IItem {}
 
 @com(interface: "45000000-0000-0000-0000-000000000002")
-protocol IObject: AnyObject {}
+protocol IObject {}
 
 @com(interface: "45000000-0000-0000-0000-000000000003")
 protocol IDerived: IItem {}

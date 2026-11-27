@@ -7040,7 +7040,9 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
     for (auto ip : inverses) {
       auto kp = getKnownProtocolKind(ip);
 
-      if (layout.requiresClass()) {
+      // COM interfaces are class-only by conformance rule rather than by a
+      // native class constraint, so they can be composed with inverses.
+      if (layout.requiresNativeClass()) {
         auto superclass = layout.explicitSuperclass;
         diagnose(repr->getStartLoc(),
                  diag::inverse_with_class_constraint,

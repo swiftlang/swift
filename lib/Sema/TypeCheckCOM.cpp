@@ -423,6 +423,7 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
   }
 
   SmallVector<InheritedNominalEntry, 4> inherited;
+  bool ignoredAnyObject = false;
   if (protocol->wasDeserialized()) {
     for (auto *base : protocol->getInheritedProtocols()) {
       inherited.emplace_back(base, SourceLoc(), /*inheritedTypeRepr=*/nullptr,
@@ -430,8 +431,6 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
                              /*isSuppressed=*/false);
     }
   } else {
-    // Class constraints do not participate in the COM interface hierarchy.
-    bool ignoredAnyObject = false;
     InvertibleProtocolSet inverses;
     inherited = getDirectlyInheritedNominalTypeDecls(protocol, inverses,
                                                       ignoredAnyObject);
@@ -459,6 +458,17 @@ COMInterfaceHierarchyRequest::evaluate(Evaluator &evaluator,
   }
 
   bool invalid = false;
+
+  // COM conformances are class-only, but a COM interface is not a native
+  // Swift class reference. Constraining one to AnyObject would make the type
+  // checker permit class-reference operations that cannot be lowered.
+  if (ignoredAnyObject) {
+    C.Diags.diagnose(protocol->getLoc(), diag::com_interface_inherits_anyobject,
+                     protocol->getName());
+    C.Diags.diagnose(protocol->getLoc(),
+                     diag::com_interface_inherits_anyobject_note);
+    invalid = true;
+  }
 
   SmallVector<ProtocolDecl *, 4> markers;
   auto record = [&](ProtocolDecl *marker) {

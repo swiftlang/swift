@@ -781,7 +781,9 @@ Type GenericSignatureImpl::getUpperBound(Type type,
     if (proto->getInvertibleProtocolKind())
       continue;
 
-    if (proto->requiresClass())
+    // A COM interface is class-only but not a native class, so it does not
+    // make an explicit '& AnyObject' redundant.
+    if (proto->requiresNativeClass())
       hasExplicitAnyObject = false;
 
     auto *baseType = proto->getDeclaredInterfaceType()->castTo<ProtocolType>();

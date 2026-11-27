@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 @com(interface: "00000000-0000-0000-C000-000000000046")
-protocol IUnknown: AnyObject { }
+protocol IUnknown { }
 // expected-error@-2 {{'@com' requires '-enable-experimental-com-interop'}}
 
 @com

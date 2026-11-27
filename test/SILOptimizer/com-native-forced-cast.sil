@@ -7,7 +7,7 @@ sil_stage canonical
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 public class NativeBase {}
 public class NativeDerived: NativeBase {}
 

@@ -19,7 +19,7 @@ import ForeignCOM
 protocol IMissing {}
 
 @com(interface: "10000000-0000-0000-0000-000000000005")
-protocol IClassValue: IValue, AnyObject {}
+protocol IClassValue: IValue {}
 
 @inline(never)
 func conditional(_ source: borrowing any IValue) -> (any IProperty)? {

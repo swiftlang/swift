@@ -3,7 +3,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-com-interop -I %t
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-protocol ISource: AnyObject {}
+protocol ISource {}
 protocol NativeSource: AnyObject {}
 final class NativeObject {}
 

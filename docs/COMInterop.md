@@ -104,8 +104,9 @@ protocol cannot contribute requirements to a COM vtable. A protocol that refines
 a COM interface must itself have an `@com(interface:)` identity, and identities
 must be unique within an ABI chain.
 
-COM conformances are class-only, even though a COM protocol does not need to
-spell `AnyObject` as an inherited protocol. A conformance must be declared in
+COM conformances are class-only, but a COM interface is not a native Swift
+class reference, so a COM protocol cannot inherit or otherwise be constrained to
+`AnyObject`. A conformance must be declared in
 the implementation type's module and cannot be conditional.
 
 ### Implementations

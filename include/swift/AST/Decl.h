@@ -6089,7 +6089,21 @@ public:
   }
 
   /// True if this protocol can only be conformed to by class types.
+  ///
+  /// This includes COM interfaces, whose conformances are class-only by
+  /// conformance rule. Use requiresNativeClass() to ask whether the protocol
+  /// carries a class constraint (e.g. 'AnyObject') that makes its conforming
+  /// types native Swift class references.
   bool requiresClass() const;
+
+  /// True if this protocol is constrained to native Swift class references,
+  /// via 'AnyObject', a superclass, or a class-bound inherited protocol.
+  ///
+  /// This is false for a COM interface: its conformances are class-only, but
+  /// the interface is not a native reference and must not be treated as one.
+  bool requiresNativeClass() const {
+    return requiresClass() && !isCOMInterface();
+  }
 
   /// Determine whether an existential conforming to this protocol can be
   /// matched with a generic type parameter constrained to this protocol.

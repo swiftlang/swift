@@ -94,7 +94,7 @@ public func inoutReceiver(_ interface: inout any IBase, _ value: CInt) -> CInt {
 }
 
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol IProperties: AnyObject {
+public protocol IProperties {
   var value: CInt { get set }
   subscript(_ index: CInt) -> CInt { get }
   func reset()
@@ -102,18 +102,14 @@ public protocol IProperties: AnyObject {
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}12readProperty
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
-// CHECK:         [[COPY:%.*]] = copy_value [[OPEN]]
-// CHECK:         [[SELF:%.*]] = begin_borrow [[COPY]]
 // CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
-// CHECK:         [[BORROW:%.*]] = store_borrow [[SELF]] to [[STORAGE]]
+// CHECK:         [[BORROW:%.*]] = store_borrow [[OPEN]] to [[STORAGE]]
 // CHECK:         [[METHOD:%.*]] = com_method [[BORROW]], #IProperties.value!getter
 // CHECK-SAME:    $@convention(com_method)
 // CHECK-SAME:    @in_guaranteed
 // CHECK-SAME:    type-defs: [[OPEN]];
 // CHECK:         apply [[METHOD]]<{{.*}}>([[BORROW]])
 // CHECK:         end_borrow [[BORROW]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
 public func readProperty(_ interface: borrowing any IProperties) -> CInt {
@@ -132,7 +128,6 @@ public func readProperty(_ interface: borrowing any IProperties) -> CInt {
 // CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[STORAGE]])
 // CHECK:         destroy_addr [[STORAGE]]
 // CHECK:         dealloc_stack [[STORAGE]]
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         return
 public func writeProperty(_ interface: borrowing any IProperties, _ value: CInt) {
   interface.value = value
@@ -140,18 +135,14 @@ public func writeProperty(_ interface: borrowing any IProperties, _ value: CInt)
 
 // CHECK-LABEL: sil [ossa] @$s{{.*}}13readSubscript
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IProperties
-// CHECK:         [[COPY:%.*]] = copy_value [[OPEN]]
-// CHECK:         [[SELF:%.*]] = begin_borrow [[COPY]]
 // CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
-// CHECK:         [[BORROW:%.*]] = store_borrow [[SELF]] to [[STORAGE]]
+// CHECK:         [[BORROW:%.*]] = store_borrow [[OPEN]] to [[STORAGE]]
 // CHECK:         [[METHOD:%.*]] = com_method [[BORROW]], #IProperties.subscript!getter
 // CHECK-SAME:    $@convention(com_method)
 // CHECK-SAME:    @in_guaranteed
 // CHECK-SAME:    type-defs: [[OPEN]];
 // CHECK:         apply [[METHOD]]<{{.*}}>({{%.*}}, [[BORROW]])
 // CHECK:         end_borrow [[BORROW]]
-// CHECK:         end_borrow [[SELF]]
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         dealloc_stack [[STORAGE]]
 // CHECK:         return
 public func readSubscript(_ interface: borrowing any IProperties, _ index: CInt) -> CInt {

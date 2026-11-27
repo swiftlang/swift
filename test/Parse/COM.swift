@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -enable-experimental-com-interop -parse -verify %s -I %t
 
 @com(interface: "00000000-0000-0000-C000-000000000046")
-protocol IUnknown: AnyObject { }
+protocol IUnknown { }
 
 @com
 class C0 { }

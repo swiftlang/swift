@@ -1,7 +1,7 @@
 import COMIdentity
 
 @com(interface: "10000000-0000-0000-0000-000000000006")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 
 public protocol NativeMarker: AnyObject {}
 public class NativeBase {}

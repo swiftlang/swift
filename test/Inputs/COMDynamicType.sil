@@ -2,7 +2,7 @@ sil_stage canonical
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000006")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 public protocol Native: AnyObject {}
 
 sil [ossa] @com_dynamic_type : $@convention(thin) (@guaranteed any ISource) -> (@thick Any.Type, @thick Any.Type) {
