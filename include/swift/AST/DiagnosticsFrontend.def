@@ -159,6 +159,10 @@ ERROR(error_immediate_mode_unsupported_build,none,
       "immediate mode (-interpret) is not supported by this compiler build", ())
 ERROR(error_missing_frontend_action,none,
       "no frontend action was selected", ())
+ERROR(error_driver_tool_unsupported_action,none,
+      "frontend action flags are not supported by this tool", ())
+ERROR(error_driver_tool_unexpected_input_file,none,
+      "unexpected input file '%0'", (StringRef))
 ERROR(error_invalid_source_location_str,none,
       "invalid source location string '%0'", (StringRef))
 ERROR(error_no_source_location_scope_map,none,

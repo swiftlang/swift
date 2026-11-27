@@ -4699,6 +4699,21 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
+  return parseArgs(ParsedArgs, Diags, ConfigurationFileBuffers,
+                   workingDirectory, mainExecutablePath, std::move(FS));
+}
+
+bool CompilerInvocation::parseArgs(
+    llvm::opt::ArgList &ParsedArgs, DiagnosticEngine &Diags,
+    SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>>
+        *ConfigurationFileBuffers,
+    StringRef workingDirectory, StringRef mainExecutablePath,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  using namespace options;
+
+  if (!FS)
+    FS = llvm::vfs::createPhysicalFileSystem();
+
   // Parse options that control diagnostic behavior as early as possible, so
   // that they can influence the behavior of diagnostics emitted during the
   // rest of parsing.
@@ -4815,6 +4830,97 @@ bool CompilerInvocation::parseArgs(
   // reporting of ioi references from spi decls.
   if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
     LangOpts.EnableSPIOnlyImports = true;
+  }
+
+  return false;
+}
+
+bool CompilerInvocation::parseDriverToolArgs(
+    llvm::opt::OptTable &Table, ArrayRef<const char *> Args,
+    llvm::opt::InputArgList &ParsedArgs, unsigned ToolFlagsToInclude,
+    DiagnosticEngine &Diags) {
+  using namespace options;
+
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  ParsedArgs = Table.ParseArgs(Args, MissingIndex, MissingCount,
+                               ToolFlagsToInclude | FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ParsedArgs));
+    }
+    return true;
+  }
+
+  return false;
+}
+
+bool CompilerInvocation::parseDriverToolFrontendArgs(
+    const llvm::opt::InputArgList &ParsedArgs,
+    ArrayRef<llvm::opt::OptSpecifier> ExcludedOptions, DiagnosticEngine &Diags,
+    StringRef workingDirectory, StringRef mainExecutablePath,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS) {
+  using namespace options;
+
+  llvm::opt::ArgStringList FrontendArgStrings;
+  for (const llvm::opt::Arg *A : ParsedArgs) {
+    const llvm::opt::Option &Opt = A->getOption();
+    if (llvm::any_of(ExcludedOptions, [&](llvm::opt::OptSpecifier Spec) {
+          return Opt.matches(Spec);
+        }))
+      continue;
+
+    // Forward FrontendOptions plus positional inputs (OPT_INPUT) so parseArgs
+    // handles all input and action parsing; skip tool-only options (including
+    // -Xfrontend, whose values are appended below to match swift-driver).
+    if (!Opt.hasFlag(FrontendOption) && !Opt.matches(OPT_INPUT))
+      continue;
+
+    A->render(ParsedArgs, FrontendArgStrings);
+  }
+
+  for (const llvm::opt::Arg *A : ParsedArgs.filtered(OPT_Xfrontend)) {
+    FrontendArgStrings.push_back(A->getValue());
+  }
+
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
+  llvm::opt::InputArgList FrontendArgs = Table->ParseArgs(
+      FrontendArgStrings, MissingIndex, MissingCount, FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   FrontendArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+  if (FrontendArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : FrontendArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(FrontendArgs));
+    }
+    return true;
+  }
+
+  if (parseArgs(FrontendArgs, Diags, /*ConfigurationFileBuffers=*/nullptr,
+                workingDirectory, mainExecutablePath, std::move(FS)))
+    return true;
+
+  if (FrontendOpts.InputsAndOutputs.hasInputs()) {
+    Diags.diagnose(SourceLoc(), diag::error_driver_tool_unexpected_input_file,
+                   FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput());
+    return true;
+  }
+
+  if (FrontendOpts.RequestedAction != FrontendOptions::ActionType::NoneAction) {
+    Diags.diagnose(SourceLoc(), diag::error_driver_tool_unsupported_action);
+    return true;
   }
 
   return false;

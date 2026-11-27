@@ -1,6 +1,7 @@
 add_swift_unittest(SwiftFrontendTests
   ArgParsingTest.cpp
   CompileJobCacheKeyTest.cpp
+  DriverToolArgsTest.cpp
   FeatureParsingTest.cpp
   IsFeatureEnabledTests.cpp
   StrictConcurrencyTests.cpp)
