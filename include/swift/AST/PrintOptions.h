@@ -966,6 +966,7 @@ public:
     PO.SkipPrivateSystemDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
+    PO.ExplodePatternBindingDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
     PO.SkipImplicit = true;
