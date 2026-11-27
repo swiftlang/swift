@@ -140,7 +140,8 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
     let builder = Builder(after: copy.loadingInstruction, location: allocStack.location, context)
     builder.createDebugValue(value: copy.sourceAddress, debugVariable: debugVar)
   }
-  context.erase(instructionIncludingAllUsers: copy.loadingInstruction)
+  // The store of the load must not be salvaged, as its effect does not disappear.
+  context.erase(instructionIncludingAllUsers: copy.loadingInstruction, salvageDebugInfo: false)
   context.erase(instructionIncludingAllUsers: allocStack)
 }
 

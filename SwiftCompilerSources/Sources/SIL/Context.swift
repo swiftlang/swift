@@ -232,8 +232,9 @@ extension MutatingContext {
   }
 
   /// Removes and deletes `inst` and all its users.
-  /// `debug_value` users of any deleted instruction will be rewritten.
-  public func erase(instructionIncludingAllUsers inst: Instruction) {
+  /// If `salvageDebugInfo` is true, `debug_value` users of any deleted instruction will be rewritten.
+  /// Otherwise, the deleted instructions must not have any `debug_value` users.
+  public func erase(instructionIncludingAllUsers inst: Instruction, salvageDebugInfo: Bool = true) {
     if inst.isDeleted {
       return
     }
@@ -242,10 +243,10 @@ extension MutatingContext {
       // use-list. Therefore we cannot iterate with a `for use in result.uses`.
       // Debug users must not be deleted before salvageDebugInfo is called later.
       while let use = result.uses.ignoreDebugUses.first {
-        erase(instructionIncludingAllUsers: use.instruction)
+        erase(instructionIncludingAllUsers: use.instruction, salvageDebugInfo: salvageDebugInfo)
       }
     }
-    erase(instruction: inst)
+    erase(instruction: inst, salvageDebugInfo: salvageDebugInfo)
   }
 
   public func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
