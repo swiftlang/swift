@@ -35,6 +35,10 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
 BridgedDiagnosticArgument::BridgedDiagnosticArgument(Identifier identifier)
     : BridgedDiagnosticArgument(DiagnosticArgument(identifier)) {}
 
+BridgedDiagnosticArgument BridgedDiagnosticArgument_createUnsigned(unsigned value) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(value));
+}
+
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
 
