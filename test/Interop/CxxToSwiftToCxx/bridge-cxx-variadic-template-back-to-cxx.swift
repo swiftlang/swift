@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend %t/use-templates.swift -module-name UseTemplates -typecheck -verify -emit-clang-header-path %t/UseTemplates.h -I %t -cxx-interoperability-mode=default -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend %t/use-templates.swift -module-name UseTemplates -typecheck -verify -emit-clang-header-path %t/UseTemplates.h -I %t -cxx-interoperability-mode=default -clang-header-expose-decls=all-public -emit-clang-header-nonmodular-includes
 // RUN: %FileCheck %s --input-file %t/UseTemplates.h
-// RUN: %check-interop-cxx-header-in-clang(%t/UseTemplates.h -include %t/templates.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/UseTemplates.h -I %t)
 
 //--- templates.h
 namespace test {
@@ -39,6 +39,7 @@ public func mixed(_ value: test.Mixed) -> test.Mixed { value }
 public func nonType(_ value: test.ValueArguments) -> test.ValueArguments { value }
 public func defaulted(_ value: test.Defaulted) -> test.Defaulted { value }
 
+// CHECK: #include <templates.h>
 // CHECK: SWIFT_INLINE_THUNK test::Fixed<int, 7U, double> defaulted(const test::Fixed<int, 7U, double>& value)
 // CHECK: SWIFT_INLINE_THUNK test::Pack<> empty(const test::Pack<>& value)
 // CHECK: SWIFT_INLINE_THUNK test::HeadAndPack<int, double, char> mixed(const test::HeadAndPack<int, double, char>& value)
