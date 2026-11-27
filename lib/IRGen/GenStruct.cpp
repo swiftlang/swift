@@ -574,6 +574,14 @@ namespace {
       LoadableClangRecordTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
 
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // Run the deinit synthesized from a destroy operation, if any.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T))
+        return;
+      StructTypeInfoBase::consume(IGF, explosion, atomicity, T);
+    }
+
     void addToAggLowering(IRGenModule &, SwiftAggLowering &lowering,
                           Size offset) const override {
       for (const auto &input : AggLoweringInputs) {
