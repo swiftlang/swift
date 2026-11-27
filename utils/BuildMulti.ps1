@@ -93,6 +93,18 @@ if ($OwnVsDevShellCache) {
   $env:SWIFT_BUILD_VSDEVSHELL_CACHE = [IO.Path]::Combine([IO.Path]::GetTempPath(), "swift-vsdevshell-$([Guid]::NewGuid())")
 }
 $BuildMultiStart = [DateTime]::Now
+Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
+[DllImport("kernel32.dll")]
+public static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
+"@
+# The time all processors have spent busy and idle since boot.
+function Get-ProcessorTimes {
+  $IdleTime = $KernelTime = $UserTime = [long] 0
+  $null = [Win32.Kernel32]::GetSystemTimes([ref] $IdleTime, [ref] $KernelTime, [ref] $UserTime)
+  # The kernel time includes the idle time.
+  return @{ Busy = $KernelTime + $UserTime - $IdleTime; Idle = $IdleTime }
+}
+$BuildMultiStartProcessorTimes = Get-ProcessorTimes
 $BuildFailure = $null
 $Jobs = New-Object System.Collections.ArrayList
 $CompletedJobs = New-Object System.Collections.ArrayList
@@ -102,8 +114,8 @@ $StandardOutput = [Console]::OpenStandardOutput()
 
 # The parameters of this script that every run of build.ps1 takes. This script
 # chooses the parts of each run, cleans in the first one, and gives each run its
-# own trace.
-$Excluded = @("Toolchain", "TestPhase", "Clean", "DependenciesOnly", "Stage", "Trace")
+# own trace, from which it prints the summary of all the runs.
+$Excluded = @("Toolchain", "TestPhase", "Clean", "DependenciesOnly", "Stage", "Summary", "Trace")
 $SharedArguments = @{}
 foreach ($Argument in $PSBoundParameters.GetEnumerator()) {
   if ($Argument.Key -notin $Excluded) {
@@ -140,8 +152,7 @@ function ConvertTo-CommandLineArgument([string] $Argument) {
 function Start-BuildJob([string] $Name, [Hashtable] $Overrides = @{}, [switch] $BelowNormal, [switch] $Followed) {
   Write-EndedBuildJobs
   $Arguments = $SharedArguments.Clone()
-  if ($Summary) { $Arguments.Summary = $true }
-  if ($Trace) {
+  if ($Summary -or $Trace) {
     $Arguments.Trace = $true
     $Arguments.Stage = "$JobLogs\$Name"
   }
@@ -479,6 +490,122 @@ function Write-BuildRuns {
   Write-Host "Total: $("{0:hh\:mm\:ss}" -f ([DateTime]::Now - $BuildMultiStart))"
 }
 
+# Prints the steps of all the runs like build.ps1 -Summary does, with the run of
+# each step, from the traces of the runs. The percentages are of the time of the
+# whole build, so the steps that ran at the same time add up to more than it.
+# The steps without substeps that more than two runs did, like getting the
+# dependencies, are added up in one line.
+function Write-BuildSummary([TimeSpan] $TotalTime, [double] $TotalCPU) {
+  function Get-TraceArgument([PSCustomObject] $Event, [string] $Name) {
+    if ($Event.PSObject.Properties["args"] -and $Event.args.PSObject.Properties[$Name]) { return $Event.args.$Name }
+    return ""
+  }
+
+  $Roots = New-Object System.Collections.ArrayList
+  $UntrackedTime = [TimeSpan]::Zero
+  foreach ($Job in ($CompletedJobs | Sort-Object { $_.Process.StartTime })) {
+    if (-not (Test-Path $Job.Trace)) { continue }
+    try {
+      $Events = @((Get-Content -Raw $Job.Trace | ConvertFrom-Json).traceEvents | Where-Object { $_.ph -eq "X" -and $_.pid -eq 0 })
+    } catch {
+      continue
+    }
+    $RunTime = [TimeSpan]::Zero
+    $Open = New-Object System.Collections.Stack
+    foreach ($Event in ($Events | Sort-Object { [long]$_.ts }, { -[long]$_.dur })) {
+      $CPU = Get-TraceArgument $Event "CPU"
+      $Entry = [PSCustomObject]@{
+        "Build Step" = $Event.name
+        Variant = Get-TraceArgument $Event "Variant"
+        Platform = Get-TraceArgument $Event "Platform"
+        Arch = Get-TraceArgument $Event "Arch"
+        End = [long]$Event.ts + [long]$Event.dur
+        "Elapsed Time" = [TimeSpan]::FromTicks([long]$Event.dur * 10)
+        CPU = if ($CPU -ne "") { [double]$CPU } else { 0 }
+        Runs = @($Job.Name)
+        Children = New-Object System.Collections.ArrayList
+      }
+      # A step is a substep of the last step that contains it.
+      while ($Open.Count -and $Open.Peek().End -lt $Entry.End) { [void]$Open.Pop() }
+      if ($Open.Count) {
+        [void]$Open.Peek().Children.Add($Entry)
+      } else {
+        [void]$Roots.Add($Entry)
+        $RunTime += $Entry."Elapsed Time"
+      }
+      $Open.Push($Entry)
+    }
+    $Elapsed = $Job.Process.ExitTime - $Job.Process.StartTime
+    if ($Elapsed -gt $RunTime) { $UntrackedTime += $Elapsed - $RunTime }
+  }
+
+  $Count = @{}
+  foreach ($Entry in $Roots) {
+    if ($Entry.Children.Count) { continue }
+    $Key = "$($Entry.'Build Step')|$($Entry.Variant)|$($Entry.Platform)|$($Entry.Arch)"
+    $Count[$Key] = 1 + $(if ($Count.Contains($Key)) { $Count[$Key] } else { 0 })
+  }
+  $Merged = [ordered]@{}
+  $Entries = New-Object System.Collections.ArrayList
+  foreach ($Entry in $Roots) {
+    $Key = "$($Entry.'Build Step')|$($Entry.Variant)|$($Entry.Platform)|$($Entry.Arch)"
+    $Merge = $Entry.Children.Count -eq 0 -and $Count[$Key] -gt 2
+    if ($Merge -and $Merged.Contains($Key)) {
+      $Into = $Merged[$Key]
+      $Seconds = $Into."Elapsed Time".TotalSeconds + $Entry."Elapsed Time".TotalSeconds
+      if ($Seconds -gt 0) {
+        $Into.CPU = ($Into.CPU * $Into."Elapsed Time".TotalSeconds + $Entry.CPU * $Entry."Elapsed Time".TotalSeconds) / $Seconds
+      }
+      $Into."Elapsed Time" += $Entry."Elapsed Time"
+      $Into.Runs += $Entry.Runs
+    } else {
+      if ($Merge) { $Merged[$Key] = $Entry }
+      [void]$Entries.Add($Entry)
+    }
+  }
+  if ($UntrackedTime -gt [TimeSpan]::Zero) {
+    [void]$Entries.Add([PSCustomObject]@{
+      "Build Step" = "(untracked)"; Variant = ""; Platform = ""; Arch = ""; "Elapsed Time" = $UntrackedTime
+      CPU = $null; Runs = @(); Children = @()
+    })
+  }
+
+  function ConvertTo-SummaryRows([PSCustomObject] $Entry, [int] $Depth) {
+    $Self = ""
+    if ($Entry.Children.Count) {
+      $ChildrenTicks = [long] 0
+      foreach ($Child in $Entry.Children) { $ChildrenTicks += $Child."Elapsed Time".Ticks }
+      $Self = "{0:hh\:mm\:ss\.ff}" -f ($Entry."Elapsed Time" - [TimeSpan]::FromTicks($ChildrenTicks))
+    }
+    $Run = if ($Depth -gt 0) { "" } elseif ($Entry.Runs.Count -gt 2) { "$($Entry.Runs.Count) runs" } else { $Entry.Runs -join ", " }
+    [PSCustomObject]@{
+      "Build Step" = "$("  " * $Depth)$($Entry.'Build Step')"
+      Variant = $Entry.Variant
+      Platform = $Entry.Platform
+      Arch = $Entry.Arch
+      "Elapsed Time" = "{0:hh\:mm\:ss\.ff}" -f $Entry."Elapsed Time"
+      Self = $Self
+      "%" = "$([math]::Round($Entry.'Elapsed Time'.TotalSeconds / $TotalTime.TotalSeconds * 100, 1))%"
+      CPU = if ($null -ne $Entry.CPU) { "$([math]::Round($Entry.CPU * 100))%" } else { "" }
+      Run = $Run
+    }
+    foreach ($Child in ($Entry.Children | Sort-Object -Descending -Property "Elapsed Time")) {
+      ConvertTo-SummaryRows $Child ($Depth + 1)
+    }
+  }
+
+  $Rows = foreach ($Entry in ($Entries | Sort-Object -Descending -Property "Elapsed Time")) {
+    ConvertTo-SummaryRows $Entry 0
+  }
+  $TotalRow = [PSCustomObject]@{
+    "Build Step" = "TOTAL"; Variant = ""; Platform = ""; Arch = ""
+    "Elapsed Time" = "{0:hh\:mm\:ss\.ff}" -f $TotalTime; Self = ""; "%" = "100.0%"
+    CPU = "$([math]::Round($TotalCPU * 100))%"; Run = ""
+  }
+  Write-Host -ForegroundColor Cyan "Summary:"
+  @($Rows) + $TotalRow | Format-Table -AutoSize | Out-String -Width 300 | Write-Host
+}
+
 # Writes the traces of the runs as one, each run with its own tracks.
 function Write-BuildRunTraces([string] $Path) {
   $Events = New-Object System.Collections.ArrayList
@@ -715,6 +842,16 @@ if ($Failure) {
     Remove-Item -Recurse -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE -ErrorAction Ignore
   }
   Write-BuildRuns
+  if ($Summary) {
+    $EndProcessorTimes = Get-ProcessorTimes
+    $BusyTime = $EndProcessorTimes.Busy - $BuildMultiStartProcessorTimes.Busy
+    $AllTime = $BusyTime + $EndProcessorTimes.Idle - $BuildMultiStartProcessorTimes.Idle
+    try {
+      Write-BuildSummary ([DateTime]::Now - $BuildMultiStart) $(if ($AllTime -gt 0) { $BusyTime / $AllTime } else { 0 })
+    } catch {
+      Write-Warning "Could not write the summary: $_"
+    }
+  }
   if ($Trace) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
