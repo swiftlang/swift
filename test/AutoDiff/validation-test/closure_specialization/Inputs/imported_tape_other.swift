@@ -1,0 +1,8 @@
+import _Differentiation
+import TapeLibrary
+
+// A second primary file specializes the same imported VJP.
+@differentiable(reverse, wrt: x)
+public func clientOther(_ x: Float, _ flag: Bool) -> Float {
+  importedBranch(x, Int(1), flag)
+}

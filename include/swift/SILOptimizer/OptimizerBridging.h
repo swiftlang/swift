@@ -162,6 +162,11 @@ struct BridgedLoopTree {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock splitEdge(BridgedBasicBlock bb, SwiftInt edgeIndex, BridgedDomTree domTree) const;
 };
 
+struct BridgedSynthesizedSourceFile {
+  BridgedSourceFile sourceFile;
+  BridgedDeclContext declContext;
+};
+
 struct BridgedPassContext {
   swift::SwiftPassInvocation * _Nonnull invocation;
 
@@ -197,6 +202,10 @@ struct BridgedPassContext {
   BridgedDiagnosticEngine getDiagnosticEngine() const;
   BRIDGED_INLINE bool isWholeModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleDecl() const;
+  // The name must be unambiguous in the current module.
+  OptionalBridgedDeclObj lookupUniqueModuleValue(BridgedStringRef name) const;
+  BridgedSynthesizedSourceFile
+  getSynthesizedSourceFile(BridgedFunction function) const;
 
   // SIL modifications
 
@@ -280,6 +289,13 @@ struct BridgedPassContext {
       BridgedArrayRef bridgedDifferentiableFunctionArgs,
       BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
+
+  BridgedOwnedString mangleWithAutoDiffBranchTracingEnum(
+      BridgedType enumType, SwiftInt argIdx, BridgedFunction vjp,
+      BridgedFunction pullback) const;
+  BridgedOwnedString mangleAutoDiffBranchTracingEnum(
+      BridgedStringRef prefix, BridgedASTType schema, BridgedFunction vjp,
+      BridgedSourceFile sourceFile) const;
 
   bool inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;

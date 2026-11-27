@@ -136,6 +136,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   ClosurePropPreviousArg = 11,
   EscapingClosureProp = 12,
   DifferentiableFunctionProp = 13,
+  AutoDiffBranchTracingEnum = 14,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.

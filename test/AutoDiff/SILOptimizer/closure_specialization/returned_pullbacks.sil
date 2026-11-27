@@ -1,0 +1,178 @@
+// Derived from test/AutoDiff/validation-test/closure_specialization/returned_pullbacks_pipeline.swift.
+
+// Specialize a derivative whose direct result is the pullback. The false
+// branch multiplies as well to keep both tape payloads nonempty.
+
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization -dce %s -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+@differentiable(reverse, wrt: x)
+func fourthPower(_ x: inout Float)
+
+@differentiable(reverse, wrt: x)
+public func branch(_ x: inout Float, _ square: Bool)
+
+enum _AD__$s17ReturnedPullbacks11fourthPoweryySfzF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@usableFromInline
+@frozen enum _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@usableFromInline
+@frozen enum _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0, (Float) -> (Float, Float), (inout Float) -> Float))
+  case bb1((predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0, (inout Float) -> Float))
+}
+
+// reverse-mode derivative of fourthPower(_:)
+sil @$s17ReturnedPullbacks11fourthPoweryySfzFTJrSpSr : $@convention(thin) (@inout Float) -> @owned @callee_guaranteed (@inout Float) -> () {
+} // end sil function '$s17ReturnedPullbacks11fourthPoweryySfzFTJrSpSr'
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of branch(_:_:)
+// CHECK:           sil [ossa] @$s17ReturnedPullbacks6branchyySfz_SbtFTJrSUpSr :
+// CHECK:             // function_ref specialized pullback of branch(_:_:)
+// CHECK-NEXT:        %[[#ROOT:]] = function_ref @$s17ReturnedPullbacks6branchyySfz_SbtFTJpSUpSr00190_46$s17ReturnedPullbacks6branchyySfz_SbtFTJrSUpSr$s4main118_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_bb1_1_c3b3dd23f10610d55ba4c5c45a5c6a81OD_vADIBfmJfefTf1nbn_n : $@convention(thin) (@inout Float, @owned _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_bb1_1_c3b3dd23f10610d55ba4c5c45a5c6a81,
+// CHECK-NEXT:        %[[#PB:]] = partial_apply [callee_guaranteed] %[[#ROOT]](
+// CHECK-NEXT:        return %[[#PB]]
+// CHECK-NEXT:      } // end sil function
+// reverse-mode derivative of branch(_:_:)
+sil [ossa] @$s17ReturnedPullbacks6branchyySfz_SbtFTJrSUpSr : $@convention(thin) (@inout Float, Bool) -> @owned @callee_guaranteed (@inout Float) -> () {
+bb0(%0 : $*Float, %1 : $Bool):
+  %4 = struct_extract %1, #Bool._value
+  %5 = tuple ()
+  cond_br %4, bb1, bb2
+
+bb1:
+  %7 = enum $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %5
+  %8 = load [trivial] %0
+  %9 = struct_extract %8, #Float._value
+  // function_ref closure #1 in static Float._vjpMultiplyAssign(_:_:)
+  %10 = function_ref @$sSf16_DifferentiationE18_vjpMultiplyAssignyyt5value_S2fzc8pullbacktSfz_SftFZS2fzcfU_ : $@convention(thin) (@inout Float, Float, Float) -> Float
+  %11 = partial_apply [callee_guaranteed] %10(%8, %8) : $@convention(thin) (@inout Float, Float, Float) -> Float
+  %12 = builtin "fmul_FPIEEE32"(%9, %9) : $Builtin.FPIEEE32
+  %13 = struct $Float (%12)
+  store %13 to [trivial] %0
+  %15 = tuple $(predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (@inout Float) -> Float) (%7, %11)
+  %16 = enum $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %15
+  br bb3(%16)
+
+bb2:
+  %18 = enum $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %5
+  %19 = load [trivial] %0
+  %20 = struct_extract %19, #Float._value
+  %21 = builtin "fmul_FPIEEE32"(%20, %20) : $Builtin.FPIEEE32
+  %22 = struct $Float (%21)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %23 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %24 = partial_apply [callee_guaranteed] %23(%19, %19) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref closure #1 in static Float._vjpMultiplyAssign(_:_:)
+  %25 = function_ref @$sSf16_DifferentiationE18_vjpMultiplyAssignyyt5value_S2fzc8pullbacktSfz_SftFZS2fzcfU_ : $@convention(thin) (@inout Float, Float, Float) -> Float
+  %26 = partial_apply [callee_guaranteed] %25(%19, %22) : $@convention(thin) (@inout Float, Float, Float) -> Float
+  %27 = builtin "fmul_FPIEEE32"(%20, %21) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  store %28 to [trivial] %0
+  %30 = tuple $(predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (@inout Float) -> Float) (%18, %24, %26)
+  %31 = enum $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %30
+  br bb3(%31)
+
+bb3(%33 : @owned $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0):
+  // function_ref reverse-mode derivative of fourthPower(_:)
+  %34 = function_ref @$s17ReturnedPullbacks11fourthPoweryySfzFTJrSpSr : $@convention(thin) (@inout Float) -> @owned @callee_guaranteed (@inout Float) -> ()
+  %35 = apply %34(%0) : $@convention(thin) (@inout Float) -> @owned @callee_guaranteed (@inout Float) -> ()
+  // function_ref pullback of branch(_:_:)
+  %36 = function_ref @$s17ReturnedPullbacks6branchyySfz_SbtFTJpSUpSr : $@convention(thin) (@inout Float, @owned _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (@inout Float) -> ()) -> ()
+  %37 = partial_apply [callee_guaranteed] %36(%33, %35) : $@convention(thin) (@inout Float, @owned _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (@inout Float) -> ()) -> ()
+  return %37
+} // end sil function '$s17ReturnedPullbacks6branchyySfz_SbtFTJrSUpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of branch(_:_:)
+// CHECK:           sil private [ossa] @$s17ReturnedPullbacks6branchyySfz_SbtFTJpSUpSr00190_46$s17ReturnedPullbacks6branchyySfz_SbtFTJrSUpSr$s4main118_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_bb1_1_c3b3dd23f10610d55ba4c5c45a5c6a81OD_vADIBfmJfefTf1nbn_n : $@convention(thin) (@inout Float, @owned _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_bb1_1_c3b3dd23f10610d55ba4c5c45a5c6a81,
+// CHECK:             switch_enum {{.*}} #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0_spec_bb2_1_2_bb1_1_c3b3dd23f10610d55ba4c5c45a5c6a81.
+// CHECK:           } // end sil function
+// pullback of branch(_:_:)
+sil private [ossa] @$s17ReturnedPullbacks6branchyySfz_SbtFTJpSUpSr : $@convention(thin) (@inout Float, @owned _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (@inout Float) -> ()) -> () {
+bb0(%0 : $*Float, %1 : @owned $_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0, %2 : @owned $@callee_guaranteed (@inout Float) -> ()):
+  %4 = alloc_stack $Float, var, name "derivative of 'x' in scope at returned_pullbacks_pipeline.swift:69:7 (scope #1)"
+  %5 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %6 = struct $Float (%5)
+  store %6 to [trivial] %4
+  %8 = alloc_stack $Float, var, name "derivative of 'x' in scope at returned_pullbacks_pipeline.swift:73:7 (scope #2)"
+  store %6 to [trivial] %8
+  %10 = apply %2(%0) : $@callee_guaranteed (@inout Float) -> ()
+  destroy_value %2
+  %12 = load [trivial] %0
+  store %12 to [trivial] %8
+  store %12 to [trivial] %4
+  switch_enum %1, case #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%16 : @owned $(predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (@inout Float) -> Float)):
+  (%17, %18, %19) = destructure_tuple %16
+  %20 = apply %19(%8) : $@callee_guaranteed (@inout Float) -> Float
+  destroy_value %19
+  %22 = struct_extract %20, #Float._value
+  %23 = builtin "fadd_FPIEEE32"(%22, %5) : $Builtin.FPIEEE32
+  %24 = struct $Float (%23)
+  %25 = apply %18(%24) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %18
+  %27 = tuple_extract %25, 0
+  %28 = tuple_extract %25, 1
+  %29 = struct_extract %27, #Float._value
+  %30 = builtin "fadd_FPIEEE32"(%29, %5) : $Builtin.FPIEEE32
+  %31 = struct_extract %28, #Float._value
+  %32 = builtin "fadd_FPIEEE32"(%31, %5) : $Builtin.FPIEEE32
+  %33 = struct_element_addr %8, #Float._value
+  %34 = load [trivial] %33
+  %35 = builtin "fadd_FPIEEE32"(%34, %32) : $Builtin.FPIEEE32
+  %36 = struct $Float (%35)
+  store %36 to [trivial] %8
+  %38 = builtin "fadd_FPIEEE32"(%35, %30) : $Builtin.FPIEEE32
+  %39 = struct $Float (%38)
+  store %39 to [trivial] %8
+  br bb3(%39)
+
+bb2(%43 : @owned $(predecessor: _AD__$s17ReturnedPullbacks6branchyySfz_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (@inout Float) -> Float)):
+  (%44, %45) = destructure_tuple %43
+  %46 = apply %45(%4) : $@callee_guaranteed (@inout Float) -> Float
+  destroy_value %45
+  %48 = struct_extract %46, #Float._value
+  %49 = builtin "fadd_FPIEEE32"(%48, %5) : $Builtin.FPIEEE32
+  %50 = struct_element_addr %4, #Float._value
+  %51 = load [trivial] %50
+  %52 = builtin "fadd_FPIEEE32"(%51, %49) : $Builtin.FPIEEE32
+  %53 = struct $Float (%52)
+  store %53 to [trivial] %4
+  br bb3(%53)
+
+bb3(%57 : $Float):
+  store %57 to [trivial] %0
+  dealloc_stack %8
+  dealloc_stack %4
+  %61 = tuple ()
+  return %61
+} // end sil function '$s17ReturnedPullbacks6branchyySfz_SbtFTJpSUpSr'
+
+// closure #1 in static Float._vjpMultiplyAssign(_:_:)
+sil @$sSf16_DifferentiationE18_vjpMultiplyAssignyyt5value_S2fzc8pullbacktSfz_SftFZS2fzcfU_ : $@convention(thin) (@inout Float, Float, Float) -> Float {
+} // end sil function '$sSf16_DifferentiationE18_vjpMultiplyAssignyyt5value_S2fzc8pullbacktSfz_SftFZS2fzcfU_'
+
+// closure #1 in static Float._vjpMultiply(lhs:rhs:)
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float) {
+} // end sil function '$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'

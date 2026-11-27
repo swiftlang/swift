@@ -1,0 +1,232 @@
+// Derived from test/AutoDiff/validation-test/closure_specialization/serialized_tape_pipeline.swift.
+
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s --implicit-check-not=_wrt_0_spec
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+@usableFromInline
+@frozen enum _AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+  case bb1((predecessor: _AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+}
+
+@frozen enum _AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@frozen enum _AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0 {
+  case bb0(())
+}
+
+@frozen enum _AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+  case bb1((predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+}
+
+sil [serialized] @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) {
+} // end sil function '$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'
+
+sil [serialized] @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float) {
+} // end sil function '$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'
+
+//===----------------------------------------------------------------------===//
+// A package-serialized pullback keeps a nonserialized VJP from rewriting the tape.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// pullback of branch(_:_:)
+// CHECK-NOT:       {{^sil }}
+// CHECK:           sil shared [serialized_for_package] [ossa] @$s3src6branchyS2f_SbtFTJpSUpSr :
+// CHECK:             switch_enum %[[#]], case #_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt:
+// CHECK:             = apply %[[#]](%[[#]]) : $@callee_guaranteed (Float) -> (Float, Float)
+// CHECK:           } // end sil function
+// pullback of branch(_:_:)
+sil shared [serialized_for_package] [ossa] @$s3src6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float {
+bb0(%0 : $Float, %1 : @owned $_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0
+  switch_enum %1, case #_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb2, case #_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb1
+
+bb1(%4 : @owned $(predecessor: _AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%5, %6) = destructure_tuple %4
+  %7 = apply %6(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %6
+  %9 = tuple_extract %7, 0
+  %10 = tuple_extract %7, 1
+  %11 = struct_extract %9, #Float._value
+  %12 = builtin "fadd_FPIEEE32"(%11, %2) : $Builtin.FPIEEE32
+  %13 = struct_extract %10, #Float._value
+  %14 = builtin "fadd_FPIEEE32"(%13, %12) : $Builtin.FPIEEE32
+  %15 = struct $Float (%14)
+  br bb3(%15)
+
+bb2(%17 : @owned $(predecessor: _AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%18, %19) = destructure_tuple %17
+  %20 = apply %19(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %19
+  %22 = tuple_extract %20, 0
+  %23 = tuple_extract %20, 1
+  %24 = struct_extract %22, #Float._value
+  %25 = builtin "fadd_FPIEEE32"(%24, %2) : $Builtin.FPIEEE32
+  %26 = struct_extract %23, #Float._value
+  %27 = builtin "fadd_FPIEEE32"(%26, %25) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  br bb3(%28)
+
+bb3(%30 : $Float):
+  return %30
+} // end sil function '$s3src6branchyS2f_SbtFTJpSUpSr'
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of branch(_:_:)
+// CHECK-NOT:       {{^sil }}
+// CHECK:           sil [ossa] @$s3src6branchyS2f_SbtFTJrSUpSr :
+// CHECK:             %[[#CALLBACK:]] = partial_apply [callee_guaranteed]
+// CHECK:             = tuple {{.*}}%[[#CALLBACK]]
+// CHECK:             // function_ref pullback of branch(_:_:)
+// CHECK-NEXT:        %[[#PB:]] = function_ref @$s3src6branchyS2f_SbtFTJpSUpSr :
+// CHECK-NEXT:        = partial_apply [callee_guaranteed] %[[#PB]](
+// CHECK:           } // end sil function
+// reverse-mode derivative of branch(_:_:)
+sil [ossa] @$s3src6branchyS2f_SbtFTJrSUpSr : $@convention(thin) (Float, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $Bool):
+  %2 = struct_extract %1, #Bool._value
+  %3 = tuple ()
+  cond_br %2, bb2, bb1
+
+bb1:
+  %5 = enum $_AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %3
+  %6 = struct_extract %0, #Float._value
+  %7 = builtin "fadd_FPIEEE32"(%6, %6) : $Builtin.FPIEEE32
+  %8 = struct $Float (%7)
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %9 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %10 = thin_to_thick_function %9 to $@callee_guaranteed (Float) -> (Float, Float)
+  %11 = tuple $(predecessor: _AD__$s3src6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%5, %10)
+  %12 = enum $_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %11
+  br bb3(%8, %12)
+
+bb2:
+  %14 = enum $_AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %3
+  %15 = struct_extract %0, #Float._value
+  %16 = builtin "fmul_FPIEEE32"(%15, %15) : $Builtin.FPIEEE32
+  %17 = struct $Float (%16)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %18 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %19 = partial_apply [callee_guaranteed] %18(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %20 = tuple $(predecessor: _AD__$s3src6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%14, %19)
+  %21 = enum $_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %20
+  br bb3(%17, %21)
+
+bb3(%23 : $Float, %24 : @owned $_AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  // function_ref pullback of branch(_:_:)
+  %25 = function_ref @$s3src6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %26 = partial_apply [callee_guaranteed] %25(%24) : $@convention(thin) (Float, @owned _AD__$s3src6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %27 = tuple (%23, %26)
+  return %27
+} // end sil function '$s3src6branchyS2f_SbtFTJrSUpSr'
+
+//===----------------------------------------------------------------------===//
+// A serialized derivative retains its original tape and callbacks.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of branch(_:_:)
+// CHECK-NOT:       {{^sil }}
+// CHECK:           {{^}}sil [serialized] [ossa] @$s13serialization6branchyS2f_SbtFTJrSUpSr :
+// CHECK:             %[[#CALLBACK:]] = partial_apply [callee_guaranteed]
+// CHECK:             = tuple {{.*}}%[[#CALLBACK]]
+// CHECK:             // function_ref pullback of branch(_:_:)
+// CHECK-NEXT:        %[[#]] = function_ref @$s13serialization6branchyS2f_SbtFTJpSUpSr :
+
+// reverse-mode derivative of branch(_:_:)
+sil [serialized] [ossa] @$s13serialization6branchyS2f_SbtFTJrSUpSr : $@convention(thin) (Float, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $Bool):
+  %2 = struct_extract %1, #Bool._value
+  %3 = tuple ()
+  cond_br %2, bb2, bb1
+
+bb1:
+  %5 = enum $_AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %3
+  %6 = struct_extract %0, #Float._value
+  %7 = builtin "fadd_FPIEEE32"(%6, %6) : $Builtin.FPIEEE32
+  %8 = struct $Float (%7)
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %9 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %10 = thin_to_thick_function %9 to $@callee_guaranteed (Float) -> (Float, Float)
+  %11 = tuple $(predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%5, %10)
+  %12 = enum $_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %11
+  br bb3(%8, %12)
+
+bb2:
+  %14 = enum $_AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %3
+  %15 = struct_extract %0, #Float._value
+  %16 = builtin "fmul_FPIEEE32"(%15, %15) : $Builtin.FPIEEE32
+  %17 = struct $Float (%16)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %18 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %19 = partial_apply [callee_guaranteed] %18(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %20 = tuple $(predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%14, %19)
+  %21 = enum $_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %20
+  br bb3(%17, %21)
+
+bb3(%23 : $Float, %24 : @owned $_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  // function_ref pullback of branch(_:_:)
+  %25 = function_ref @$s13serialization6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %26 = partial_apply [callee_guaranteed] %25(%24) : $@convention(thin) (Float, @owned _AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %27 = tuple (%23, %26)
+  return %27
+} // end sil function '$s13serialization6branchyS2f_SbtFTJrSUpSr'
+
+// CHECK-LABEL:     {{^}}// pullback of branch(_:_:)
+// CHECK-NOT:       {{^sil }}
+// CHECK:           {{^}}sil [serialized] [ossa] @$s13serialization6branchyS2f_SbtFTJpSUpSr :
+// CHECK:             switch_enum {{.*}}, case #_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt:
+// CHECK:             = apply %[[#]](%[[#]]) : $@callee_guaranteed (Float) -> (Float, Float)
+
+// pullback of branch(_:_:)
+sil [serialized] [ossa] @$s13serialization6branchyS2f_SbtFTJpSUpSr : $@convention(thin) (Float, @owned _AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float {
+bb0(%0 : $Float, %1 : @owned $_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  switch_enum %1, case #_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb2, case #_AD__$s13serialization6branchyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb1
+
+bb1(%4 : @owned $(predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%5, %6) = destructure_tuple %4
+  %7 = apply %6(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %6
+  %9 = tuple_extract %7, 0
+  %10 = tuple_extract %7, 1
+  %11 = struct_extract %9, #Float._value
+  %12 = builtin "fadd_FPIEEE32"(%11, %2) : $Builtin.FPIEEE32
+  %13 = struct_extract %10, #Float._value
+  %14 = builtin "fadd_FPIEEE32"(%13, %12) : $Builtin.FPIEEE32
+  %15 = struct $Float (%14)
+  br bb3(%15)
+
+bb2(%17 : @owned $(predecessor: _AD__$s13serialization6branchyS2f_SbtF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%18, %19) = destructure_tuple %17
+  %20 = apply %19(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %19
+  %22 = tuple_extract %20, 0
+  %23 = tuple_extract %20, 1
+  %24 = struct_extract %22, #Float._value
+  %25 = builtin "fadd_FPIEEE32"(%24, %2) : $Builtin.FPIEEE32
+  %26 = struct_extract %23, #Float._value
+  %27 = builtin "fadd_FPIEEE32"(%26, %25) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  br bb3(%28)
+
+bb3(%30 : $Float):
+  return %30
+} // end sil function '$s13serialization6branchyS2f_SbtFTJpSUpSr'

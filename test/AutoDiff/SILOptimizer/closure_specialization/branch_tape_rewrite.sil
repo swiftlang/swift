@@ -1,0 +1,1093 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-types -autodiff-closure-specialization -sil-combine %s -o - | %FileCheck %s
+
+// Derived from test/AutoDiff/validation-test/closure_specialization/branch_tape_rewrite.swift.
+// The fallback cases retain whole-payload forwarding from before CFG simplification.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+public struct BranchingMethod : Differentiable {
+  @_hasStorage var stored: Float { get set }
+  @_hasStorage @_hasInitialValue var optional: Float? { get set }
+  init(stored: Float, optional: Float?)
+  @differentiable(reverse, wrt: self)
+  public func method() -> Float
+  struct TangentVector : AdditiveArithmetic, Differentiable {
+    @_hasStorage var stored: Float { get set }
+    @_hasStorage var optional: Optional<Float>.TangentVector { get set }
+    static func + (lhs: BranchingMethod.TangentVector, rhs: BranchingMethod.TangentVector) -> BranchingMethod.TangentVector
+    static func - (lhs: BranchingMethod.TangentVector, rhs: BranchingMethod.TangentVector) -> BranchingMethod.TangentVector
+    typealias TangentVector = BranchingMethod.TangentVector
+    @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: BranchingMethod.TangentVector, _ b: BranchingMethod.TangentVector) -> Bool
+    init(stored: Float, optional: Optional<Float>.TangentVector)
+    static var zero: BranchingMethod.TangentVector { get }
+  }
+  mutating func move(by offset: BranchingMethod.TangentVector)
+}
+
+@differentiable(reverse, wrt: x)
+public func condTuple(_ x: Float) -> Float
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, (Float) -> Float))
+  case bb1((predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes9condTupleyS2fF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0, (Float) -> Float))
+  case bb1((predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+enum _AD__$s11BranchTapes15BranchingMethodV6stored8optionalACSf_SfSgtcfC_bb0__Pred__src_0_wrt_0_1 {
+}
+
+public struct FallbackMethod : Differentiable {
+  @_hasStorage var stored: Float { get set }
+  @_hasStorage @_hasInitialValue var optional: Float? { get set }
+  init(stored: Float, optional: Float?)
+  @differentiable(reverse, wrt: self)
+  public func method() -> Float
+  struct TangentVector : AdditiveArithmetic, Differentiable {
+    @_hasStorage var stored: Float { get set }
+    @_hasStorage var optional: Optional<Float>.TangentVector { get set }
+    static func + (lhs: FallbackMethod.TangentVector, rhs: FallbackMethod.TangentVector) -> FallbackMethod.TangentVector
+    static func - (lhs: FallbackMethod.TangentVector, rhs: FallbackMethod.TangentVector) -> FallbackMethod.TangentVector
+    typealias TangentVector = FallbackMethod.TangentVector
+    @_implements(Equatable, ==(_:_:)) static func __derived_struct_equals(_ a: FallbackMethod.TangentVector, _ b: FallbackMethod.TangentVector) -> Bool
+    init(stored: Float, optional: Optional<Float>.TangentVector)
+    static var zero: FallbackMethod.TangentVector { get }
+  }
+  mutating func move(by offset: FallbackMethod.TangentVector)
+}
+
+@differentiable(reverse, wrt: x)
+public func condTupleFallback(_ x: Float) -> Float
+
+@usableFromInline
+@frozen enum _AD__$s3src14FallbackMethodV6methodSfyF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, (Float) -> Float))
+  case bb1((predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src17condTupleFallbackyS2fF_bb0__Pred__src_0_wrt_0 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0 {
+  case bb2((predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0, (Float) -> Float))
+  case bb1((predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0, (Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+enum _AD__$s3src14FallbackMethodV6stored8optionalACSf_SfSgtcfC_bb0__Pred__src_0_wrt_0_1 {
+}
+
+sil @$s3src14FallbackMethodV6stored8optionalACSf_SfSgtcfCTJpSSUpSr : $@convention(thin) (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+sil [transparent] [thunk] [ossa] @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+sil @$s11BranchTapes15BranchingMethodV6stored8optionalACSf_SfSgtcfCTJpSSUpSr : $@convention(thin) (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+sil @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+sil @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+
+//===----------------------------------------------------------------------===//
+// Rewrite the tape for BranchingMethod.method()
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of BranchingMethod.method()
+// CHECK:           {{^}}bb3(%[[#METHOD_TAPE:]] : $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_5b70c8a81d3968ab27c07c1d7f344aca,
+// CHECK:             // function_ref specialized pullback of BranchingMethod.method()
+// CHECK-NEXT:        %[[#METHOD_FN:]] = function_ref @$s11BranchTapes15BranchingMethodV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktm1_n5FZSf_N6SfcfU_S2fAES2fTf1nnEE_n00199_51$s11BranchTapes15BranchingMethodV6methodSfyFTJrSpSr$s4main122_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_5b70c8a81d3968ab27c07c1d7f344acaOD_urJIFfehgnfTf1nbnnnn_n : $@convention(thin) (Float, @owned _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_5b70c8a81d3968ab27c07c1d7f344aca, Float, Float, Float, Float) -> BranchingMethod.TangentVector
+// CHECK-NEXT:        %[[#METHOD_CLOSURE:]] = partial_apply [callee_guaranteed] %[[#METHOD_FN]](%[[#METHOD_TAPE]], %[[#]], %[[#]], %[[#]], %[[#]])
+// CHECK-NEXT:        %[[#METHOD_RESULT:]] = tuple (%[[#]] : $Float, %[[#METHOD_CLOSURE]]
+// CHECK-NEXT:        return %[[#METHOD_RESULT]]
+
+// reverse-mode derivative of BranchingMethod.method()
+sil [ossa] @$s11BranchTapes15BranchingMethodV6methodSfyFTJrSpSr : $@convention(method) (BranchingMethod) -> (Float, @owned @callee_guaranteed (Float) -> BranchingMethod.TangentVector) {
+bb0(%0 : $BranchingMethod):
+  %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %3 = struct $Float (%2)
+  %4 = struct_extract %0, #BranchingMethod.stored
+  %5 = struct_extract %4, #Float._value
+  %6 = builtin "fmul_FPIEEE32"(%2, %5) : $Builtin.FPIEEE32
+  %7 = struct $Float (%6)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %8 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %9 = partial_apply [callee_guaranteed] %8(%4, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+  %10 = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %11 = partial_apply [callee_guaranteed] %10(%9) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %12 = struct_extract %0, #BranchingMethod.optional
+  // function_ref pullback of BranchingMethod.init(stored:optional:)
+  %18 = function_ref @$s11BranchTapes15BranchingMethodV6stored8optionalACSf_SfSgtcfCTJpSSUpSr : $@convention(thin) (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+  %19 = thin_to_thick_function %18 to $@callee_guaranteed (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+  %21 = tuple (%11, %19)
+  switch_enum %12, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%23 : $Float):
+  %24 = enum $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %21
+  %26 = struct_extract %23, #Float._value
+  %27 = builtin "fmul_FPIEEE32"(%26, %6) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  %29 = partial_apply [callee_guaranteed] %8(%7, %23) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %31 = tuple $(predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%24, %29)
+  %32 = enum $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %31
+  br bb3(%32, %28)
+
+bb2:
+  %34 = enum $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %21
+  %35 = builtin "fmul_FPIEEE32"(%2, %6) : $Builtin.FPIEEE32
+  %36 = struct $Float (%35)
+  %37 = partial_apply [callee_guaranteed] %8(%7, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %38 = partial_apply [callee_guaranteed] %10(%37) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %40 = tuple $(predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float) (%34, %38)
+  %41 = enum $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %40
+  br bb3(%41, %36)
+
+bb3(%43 : @owned $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, %44 : $Float):
+  %45 = struct_extract %44, #Float._value
+  %46 = builtin "fmul_FPIEEE32"(%2, %45) : $Builtin.FPIEEE32
+  %47 = struct $Float (%46)
+  %48 = partial_apply [callee_guaranteed] %8(%44, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %49 = partial_apply [callee_guaranteed] %10(%48) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %50 = builtin "fmul_FPIEEE32"(%46, %45) : $Builtin.FPIEEE32
+  %51 = struct $Float (%50)
+  %52 = partial_apply [callee_guaranteed] %8(%44, %47) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref pullback of BranchingMethod.method()
+  %53 = function_ref @$s11BranchTapes15BranchingMethodV6methodSfyFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> BranchingMethod.TangentVector
+  %54 = partial_apply [callee_guaranteed] %53(%43, %49, %52) : $@convention(thin) (Float, @owned _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> BranchingMethod.TangentVector
+  %55 = tuple (%51, %54)
+  return %55
+} // end sil function '$s11BranchTapes15BranchingMethodV6methodSfyFTJrSpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of BranchingMethod.method()
+// CHECK:           sil private [ossa] @$s11BranchTapes15BranchingMethodV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktm1_n5FZSf_N6SfcfU_S2fAES2fTf1nnEE_n00199_51$s11BranchTapes15BranchingMethodV6methodSfyFTJrSpSr$s4main122_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_5b70c8a81d3968ab27c07c1d7f344acaOD_urJIFfehgnfTf1nbnnnn_n
+// CHECK:             // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+// CHECK-NEXT:        %[[#MULTIPLY:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_
+// CHECK:             apply %[[#MULTIPLY]](
+// CHECK:           {{^}}bb{{[0-9]+}}({{.*}} : $((Float, Float), ())
+// CHECK:           } // end sil function
+
+// pullback of BranchingMethod.method()
+sil private [ossa] @$s11BranchTapes15BranchingMethodV6methodSfyFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> BranchingMethod.TangentVector {
+bb0(%0 : $Float, %1 : @owned $_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, %2 : @owned $@callee_guaranteed (Float) -> Float, %3 : @owned $@callee_guaranteed (Float) -> (Float, Float)):
+  %5 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %6 = struct $Float (%5)
+  %7 = enum $Optional<Float>, #Optional.some!enumelt, %6
+  %19 = apply %3(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %3
+  %21 = tuple_extract %19, 0
+  %22 = tuple_extract %19, 1
+  %23 = struct_extract %22, #Float._value
+  %24 = builtin "fadd_FPIEEE32"(%5, %23) : $Builtin.FPIEEE32
+  %26 = apply %2(%21) : $@callee_guaranteed (Float) -> Float
+  destroy_value %2
+  %28 = struct_extract %26, #Float._value
+  %29 = builtin "fadd_FPIEEE32"(%24, %28) : $Builtin.FPIEEE32
+  switch_enum %1, case #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%41 : @owned $(predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float)):
+  (%42, %43) = destructure_tuple %41
+  %44 = builtin "fadd_FPIEEE32"(%29, %5) : $Builtin.FPIEEE32
+  %45 = struct $Float (%44)
+  %47 = apply %43(%45) : $@callee_guaranteed (Float) -> Float
+  destroy_value %43
+  %49 = struct_extract %47, #Float._value
+  %50 = builtin "fadd_FPIEEE32"(%49, %5) : $Builtin.FPIEEE32
+  %51 = builtin "fadd_FPIEEE32"(%5, %50) : $Builtin.FPIEEE32
+  %59 = unchecked_enum_data %42, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb2__Pred__src_0_wrt_0.bb0!enumelt
+  br bb3(%7, %59, %51)
+
+bb2(%61 : @owned $(predecessor: _AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%62, %63) = destructure_tuple %61
+  %64 = builtin "fadd_FPIEEE32"(%29, %5) : $Builtin.FPIEEE32
+  %65 = struct $Float (%64)
+  %67 = apply %63(%65) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %63
+  %69 = tuple_extract %67, 0
+  %70 = tuple_extract %67, 1
+  %71 = struct_extract %69, #Float._value
+  %72 = builtin "fadd_FPIEEE32"(%71, %5) : $Builtin.FPIEEE32
+  %73 = struct_extract %70, #Float._value
+  %74 = builtin "fadd_FPIEEE32"(%73, %5) : $Builtin.FPIEEE32
+  %75 = builtin "fadd_FPIEEE32"(%5, %74) : $Builtin.FPIEEE32
+  %77 = builtin "fadd_FPIEEE32"(%72, %5) : $Builtin.FPIEEE32
+  %78 = builtin "fadd_FPIEEE32"(%77, %5) : $Builtin.FPIEEE32
+  %79 = struct $Float (%78)
+  %80 = enum $Optional<Float>, #Optional.some!enumelt, %79
+  %87 = unchecked_enum_data %62, #_AD__$s11BranchTapes15BranchingMethodV6methodSfyF_bb1__Pred__src_0_wrt_0.bb0!enumelt
+  br bb3(%80, %87, %75)
+
+bb3(%89 : $Optional<Float>, %90 : @owned $(@callee_guaranteed (Float) -> Float, @callee_guaranteed (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)), %91 : $Builtin.FPIEEE32):
+  (%92, %93) = destructure_tuple %90
+  %94 = unchecked_enum_data %89, #Optional.some!enumelt
+  %95 = struct_extract %94, #Float._value
+  %96 = builtin "fadd_FPIEEE32"(%5, %95) : $Builtin.FPIEEE32
+  %101 = builtin "fadd_FPIEEE32"(%91, %5) : $Builtin.FPIEEE32
+  %102 = builtin "fadd_FPIEEE32"(%96, %5) : $Builtin.FPIEEE32
+  %108 = builtin "fadd_FPIEEE32"(%101, %5) : $Builtin.FPIEEE32
+  %109 = builtin "fadd_FPIEEE32"(%102, %5) : $Builtin.FPIEEE32
+  %113 = builtin "fadd_FPIEEE32"(%108, %5) : $Builtin.FPIEEE32
+  %114 = builtin "fadd_FPIEEE32"(%109, %5) : $Builtin.FPIEEE32
+  %118 = builtin "fadd_FPIEEE32"(%113, %5) : $Builtin.FPIEEE32
+  %119 = builtin "fadd_FPIEEE32"(%114, %5) : $Builtin.FPIEEE32
+  %123 = builtin "fadd_FPIEEE32"(%5, %118) : $Builtin.FPIEEE32
+  %124 = builtin "fadd_FPIEEE32"(%5, %119) : $Builtin.FPIEEE32
+  %128 = builtin "fadd_FPIEEE32"(%123, %5) : $Builtin.FPIEEE32
+  %129 = struct $Float (%128)
+  %130 = builtin "fadd_FPIEEE32"(%124, %5) : $Builtin.FPIEEE32
+  %131 = struct $Float (%130)
+  %132 = enum $Optional<Float>, #Optional.some!enumelt, %131
+  %133 = struct $Optional<Float>.TangentVector (%132)
+  %134 = struct $BranchingMethod.TangentVector (%129, %133)
+  %135 = apply %93(%134) : $@callee_guaranteed (BranchingMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+  destroy_value %93
+  %137 = tuple_extract %135, 0
+  %138 = tuple_extract %135, 1
+  %139 = struct_extract %137, #Float._value
+  %140 = builtin "fadd_FPIEEE32"(%139, %5) : $Builtin.FPIEEE32
+  %141 = struct $Float (%140)
+  %142 = struct_extract %138, #Optional.TangentVector.value
+  switch_enum %142, case #Optional.none!enumelt: bb4, case #Optional.some!enumelt: bb5
+
+bb4:
+  br bb6(%7)
+
+bb5(%145 : $Float):
+  %146 = unchecked_enum_data %142, #Optional.some!enumelt
+  %147 = struct_extract %146, #Float._value
+  %148 = builtin "fadd_FPIEEE32"(%147, %5) : $Builtin.FPIEEE32
+  %149 = struct $Float (%148)
+  %150 = enum $Optional<Float>, #Optional.some!enumelt, %149
+  br bb6(%150)
+
+bb6(%152 : $Optional<Float>):
+  %153 = apply %92(%141) : $@callee_guaranteed (Float) -> Float
+  destroy_value %92
+  %155 = struct_extract %153, #Float._value
+  %156 = builtin "fadd_FPIEEE32"(%155, %5) : $Builtin.FPIEEE32
+  %157 = builtin "fadd_FPIEEE32"(%5, %156) : $Builtin.FPIEEE32
+  %158 = unchecked_enum_data %152, #Optional.some!enumelt
+  %159 = struct_extract %158, #Float._value
+  %160 = builtin "fadd_FPIEEE32"(%5, %159) : $Builtin.FPIEEE32
+  %161 = struct $Float (%160)
+  %162 = enum $Optional<Float>, #Optional.some!enumelt, %161
+  %163 = struct $Float (%157)
+  %164 = struct $Optional<Float>.TangentVector (%162)
+  %165 = struct $BranchingMethod.TangentVector (%163, %164)
+  return %165
+} // end sil function '$s11BranchTapes15BranchingMethodV6methodSfyFTJpSpSr'
+
+//===----------------------------------------------------------------------===//
+// Rewrite the tape for condTuple(_:)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of condTuple(_:)
+// CHECK-NOT:         = thin_to_thick_function
+// CHECK:           {{^}}bb3(%[[#TUPLE_TAPE:]] : $_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2_afa75d50bef6cbdd033c49503256c00c,
+// CHECK:             // function_ref specialized pullback of condTuple(_:)
+// CHECK-NEXT:        %[[#COND_FN:]] = function_ref @$s11BranchTapes9condTupleyS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_0ef1_g4E12_i16Subtract3lhs3rhsk1_l1_mnl1_mo1_mP2U_ACTf1nnccc_n00173_37$s11BranchTapes9condTupleyS2fFTJrSpSr$s4main110_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2_afa75d50bef6cbdd033c49503256c00cOD_tmHBEeFqfweTf1nb_n : $@convention(thin) (Float, @owned _AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2_afa75d50bef6cbdd033c49503256c00c) -> Float
+// CHECK-NEXT:        %[[#COND_CLOSURE:]] = partial_apply [callee_guaranteed] %[[#COND_FN]](%[[#TUPLE_TAPE]])
+// CHECK-NEXT:        %[[#COND_RESULT:]] = tuple (%[[#]] : $Float, %[[#COND_CLOSURE]]
+// CHECK-NEXT:        return %[[#COND_RESULT]]
+
+// reverse-mode derivative of condTuple(_:)
+sil [ossa] @$s11BranchTapes9condTupleyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  %4 = struct_extract %0, #Float._value
+  %5 = builtin "fadd_FPIEEE32"(%4, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %6 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %7 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float)
+  %9 = builtin "fsub_FPIEEE32"(%4, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+  %10 = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %11 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float)
+  %13 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %14 = builtin "fcmp_olt_FPIEEE32"(%13, %4) : $Builtin.Int1
+  %15 = tuple (%7, %11), forwarding: @owned
+  cond_br %14, bb1, bb2
+
+bb1:
+  %17 = enum $_AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %15
+  %21 = builtin "fsub_FPIEEE32"(%5, %4) : $Builtin.FPIEEE32
+  %22 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float)
+  %24 = builtin "fadd_FPIEEE32"(%9, %4) : $Builtin.FPIEEE32
+  %25 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float)
+  %27 = tuple $(predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)) (%17, %22, %25)
+  %28 = enum $_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %27
+  br bb3(%28, %24, %21)
+
+bb2:
+  %30 = enum $_AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0, #_AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %15
+  %31 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %32 = struct $Float (%31)
+  %33 = builtin "fmul_FPIEEE32"(%31, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %34 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %35 = partial_apply [callee_guaranteed] %34(%0, %32) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+  %36 = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %37 = partial_apply [callee_guaranteed] %36(%35) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %40 = tuple $(predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float) (%30, %37)
+  %41 = enum $_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %40
+  br bb3(%41, %4, %33)
+
+bb3(%43 : @owned $_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, %44 : $Builtin.FPIEEE32, %45 : $Builtin.FPIEEE32):
+  %46 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float)
+  %47 = builtin "fsub_FPIEEE32"(%5, %45) : $Builtin.FPIEEE32
+  %48 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float)
+  %49 = builtin "fadd_FPIEEE32"(%47, %44) : $Builtin.FPIEEE32
+  %50 = struct $Float (%49)
+  %51 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float)
+  // function_ref pullback of condTuple(_:)
+  %52 = function_ref @$s11BranchTapes9condTupleyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %53 = partial_apply [callee_guaranteed] %52(%43, %46, %48, %51) : $@convention(thin) (Float, @owned _AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %54 = tuple (%50, %53)
+  return %54
+} // end sil function '$s11BranchTapes9condTupleyS2fFTJrSpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of condTuple(_:)
+// CHECK:           sil private [ossa] @$s11BranchTapes9condTupleyS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_0ef1_g4E12_i16Subtract3lhs3rhsk1_l1_mnl1_mo1_mP2U_ACTf1nnccc_n00173_37$s11BranchTapes9condTupleyS2fFTJrSpSr$s4main110_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0_spec_bb2_1_bb1_1_2_afa75d50bef6cbdd033c49503256c00cOD_tmHBEeFqfweTf1nb_n
+// CHECK:           {{^}}bb0(%[[#SEED:]] : $Float,
+// CHECK:             // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+// CHECK-NEXT:        %[[#ADD:]] = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_
+// CHECK-NEXT:        // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+// CHECK-NEXT:        %[[#SUB:]] = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_
+// CHECK-NOT:         = thin_to_thick_function
+// CHECK:             %[[#ADD_RESULT:]] = apply %[[#ADD]](%[[#SEED]])
+// CHECK-NEXT:        %[[#ADD_TANGENT:]] = tuple_extract %[[#ADD_RESULT]] : $(Float, Float), 0
+// CHECK:             %[[#SUB_RESULT:]] = apply %[[#SUB]](%[[#ADD_TANGENT]])
+// CHECK-NEXT:        %[[#SUB_TANGENT:]] = tuple_extract %[[#SUB_RESULT]] : $(Float, Float), 0
+// CHECK:             apply %[[#ADD]](%[[#SUB_TANGENT]])
+// CHECK:           {{^}}bb{{[0-9]+}}({{.*}} : $((), ())
+// CHECK:           } // end sil function
+
+// pullback of condTuple(_:)
+sil private [ossa] @$s11BranchTapes9condTupleyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+bb0(%0 : $Float, %1 : @owned $_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0, %2 : @owned $@callee_guaranteed (Float) -> (Float, Float), %3 : @owned $@callee_guaranteed (Float) -> (Float, Float), %4 : @owned $@callee_guaranteed (Float) -> (Float, Float)):
+  %5 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %22 = apply %4(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %4
+  %24 = tuple_extract %22, 0
+  %25 = tuple_extract %22, 1
+  %26 = struct_extract %25, #Float._value
+  %27 = builtin "fadd_FPIEEE32"(%5, %26) : $Builtin.FPIEEE32
+  %29 = apply %3(%24) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %3
+  %31 = tuple_extract %29, 0
+  %32 = tuple_extract %29, 1
+  %33 = struct_extract %32, #Float._value
+  %34 = builtin "fadd_FPIEEE32"(%5, %33) : $Builtin.FPIEEE32
+  %36 = apply %2(%31) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %2
+  %38 = tuple_extract %36, 0
+  %39 = tuple_extract %36, 1
+  %40 = struct_extract %39, #Float._value
+  %41 = builtin "fadd_FPIEEE32"(%5, %40) : $Builtin.FPIEEE32
+  %43 = struct_extract %38, #Float._value
+  %44 = builtin "fadd_FPIEEE32"(%5, %43) : $Builtin.FPIEEE32
+  switch_enum %1, case #_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s11BranchTapes9condTupleyS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%56 : @owned $(predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float)):
+  (%57, %58) = destructure_tuple %56
+  %59 = builtin "fadd_FPIEEE32"(%27, %5) : $Builtin.FPIEEE32
+  %61 = builtin "fadd_FPIEEE32"(%34, %5) : $Builtin.FPIEEE32
+  %62 = struct $Float (%61)
+  %64 = apply %58(%62) : $@callee_guaranteed (Float) -> Float
+  destroy_value %58
+  %66 = struct_extract %64, #Float._value
+  %67 = builtin "fadd_FPIEEE32"(%66, %59) : $Builtin.FPIEEE32
+  %73 = unchecked_enum_data %57, #_AD__$s11BranchTapes9condTupleyS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt
+  br bb3(%67, %73, %44, %41, %5, %5)
+
+bb2(%75 : @owned $(predecessor: _AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  (%76, %77, %78) = destructure_tuple %75
+  %79 = builtin "fadd_FPIEEE32"(%27, %5) : $Builtin.FPIEEE32
+  %80 = struct $Float (%79)
+  %82 = apply %78(%80) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %78
+  %84 = tuple_extract %82, 0
+  %85 = tuple_extract %82, 1
+  %86 = struct_extract %84, #Float._value
+  %87 = builtin "fadd_FPIEEE32"(%86, %5) : $Builtin.FPIEEE32
+  %88 = struct_extract %85, #Float._value
+  %89 = builtin "fadd_FPIEEE32"(%88, %5) : $Builtin.FPIEEE32
+  %90 = builtin "fadd_FPIEEE32"(%44, %89) : $Builtin.FPIEEE32
+  %92 = builtin "fadd_FPIEEE32"(%5, %87) : $Builtin.FPIEEE32
+  %94 = builtin "fadd_FPIEEE32"(%34, %5) : $Builtin.FPIEEE32
+  %95 = struct $Float (%94)
+  %97 = apply %77(%95) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %77
+  %99 = tuple_extract %97, 0
+  %100 = tuple_extract %97, 1
+  %101 = struct_extract %99, #Float._value
+  %102 = builtin "fadd_FPIEEE32"(%101, %5) : $Builtin.FPIEEE32
+  %103 = struct_extract %100, #Float._value
+  %104 = builtin "fadd_FPIEEE32"(%103, %5) : $Builtin.FPIEEE32
+  %105 = builtin "fadd_FPIEEE32"(%90, %104) : $Builtin.FPIEEE32
+  %107 = builtin "fadd_FPIEEE32"(%5, %102) : $Builtin.FPIEEE32
+  %109 = builtin "fadd_FPIEEE32"(%41, %5) : $Builtin.FPIEEE32
+  %111 = builtin "fadd_FPIEEE32"(%109, %5) : $Builtin.FPIEEE32
+  %112 = builtin "fadd_FPIEEE32"(%105, %5) : $Builtin.FPIEEE32
+  %114 = builtin "fadd_FPIEEE32"(%112, %5) : $Builtin.FPIEEE32
+  %115 = builtin "fadd_FPIEEE32"(%111, %5) : $Builtin.FPIEEE32
+  %116 = builtin "fadd_FPIEEE32"(%114, %5) : $Builtin.FPIEEE32
+  %117 = builtin "fadd_FPIEEE32"(%115, %5) : $Builtin.FPIEEE32
+  %118 = builtin "fadd_FPIEEE32"(%116, %117) : $Builtin.FPIEEE32
+  %124 = unchecked_enum_data %76, #_AD__$s11BranchTapes9condTupleyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt
+  br bb3(%118, %124, %5, %5, %107, %92)
+
+bb3(%126 : $Builtin.FPIEEE32, %127 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)), %128 : $Builtin.FPIEEE32, %129 : $Builtin.FPIEEE32, %130 : $Builtin.FPIEEE32, %131 : $Builtin.FPIEEE32):
+  (%132, %133) = destructure_tuple %127
+  %134 = builtin "fadd_FPIEEE32"(%131, %5) : $Builtin.FPIEEE32
+  %135 = struct $Float (%134)
+  %137 = apply %133(%135) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %133
+  %139 = tuple_extract %137, 0
+  %140 = tuple_extract %137, 1
+  %141 = struct_extract %139, #Float._value
+  %142 = builtin "fadd_FPIEEE32"(%141, %126) : $Builtin.FPIEEE32
+  %143 = struct_extract %140, #Float._value
+  %144 = builtin "fadd_FPIEEE32"(%143, %142) : $Builtin.FPIEEE32
+  %145 = builtin "fadd_FPIEEE32"(%130, %5) : $Builtin.FPIEEE32
+  %146 = struct $Float (%145)
+  %148 = apply %132(%146) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %132
+  %150 = tuple_extract %148, 0
+  %151 = tuple_extract %148, 1
+  %152 = struct_extract %150, #Float._value
+  %153 = builtin "fadd_FPIEEE32"(%152, %144) : $Builtin.FPIEEE32
+  %154 = struct_extract %151, #Float._value
+  %155 = builtin "fadd_FPIEEE32"(%154, %153) : $Builtin.FPIEEE32
+  %156 = builtin "fadd_FPIEEE32"(%129, %155) : $Builtin.FPIEEE32
+  %158 = builtin "fadd_FPIEEE32"(%128, %156) : $Builtin.FPIEEE32
+  %159 = struct $Float (%158)
+  return %159
+} // end sil function '$s11BranchTapes9condTupleyS2fFTJpSpSr'
+
+//===----------------------------------------------------------------------===//
+// Retain the tape for FallbackMethod.method()
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of FallbackMethod.method()
+// CHECK:             // function_ref specialized pullback of FallbackMethod.method()
+// CHECK-NEXT:        %[[#METHOD_FN:]] = function_ref @$s3src14FallbackMethodV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_S2fAES2fTf1nnEE_n : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> FallbackMethod.TangentVector
+// CHECK-NEXT:        %[[#METHOD_CLOSURE:]] = partial_apply [callee_guaranteed] %[[#METHOD_FN]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> FallbackMethod.TangentVector
+// CHECK-NEXT:        %[[#METHOD_RESULT:]] = tuple (%[[#]] : $Float, %[[#METHOD_CLOSURE]]
+// CHECK-NEXT:        return %[[#METHOD_RESULT]]
+
+// reverse-mode derivative of FallbackMethod.method()
+sil [ossa] @$s3src14FallbackMethodV6methodSfyFTJrSpSr : $@convention(method) (FallbackMethod) -> (Float, @owned @callee_guaranteed (Float) -> FallbackMethod.TangentVector) {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $FallbackMethod):
+  %2 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %3 = struct $Float (%2)
+  %4 = struct_extract %0, #FallbackMethod.stored
+  %5 = struct_extract %4, #Float._value
+  %6 = builtin "fmul_FPIEEE32"(%2, %5) : $Builtin.FPIEEE32
+  %7 = struct $Float (%6)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %8 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %9 = partial_apply [callee_guaranteed] %8(%4, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+  %10 = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %11 = partial_apply [callee_guaranteed] %10(%9) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %12 = struct_extract %0, #FallbackMethod.optional
+  // function_ref pullback of FallbackMethod.init(stored:optional:)
+  %18 = function_ref @$s3src14FallbackMethodV6stored8optionalACSf_SfSgtcfCTJpSSUpSr : $@convention(thin) (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+  %19 = thin_to_thick_function %18 to $@callee_guaranteed (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector) // ownership: none
+  %21 = tuple (%11, %19)
+  switch_enum %12, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%23 : $Float):
+  %24 = enum $_AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, #_AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %21
+  %26 = struct_extract %23, #Float._value
+  %27 = builtin "fmul_FPIEEE32"(%26, %6) : $Builtin.FPIEEE32
+  %28 = struct $Float (%27)
+  %29 = partial_apply [callee_guaranteed] %8(%7, %23) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %31 = tuple $(predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float)) (%24, %29)
+  %32 = enum $_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, #_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %31
+  br bb3(%32, %28)
+
+bb2:
+  %34 = enum $_AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, #_AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %21
+  %35 = builtin "fmul_FPIEEE32"(%2, %6) : $Builtin.FPIEEE32
+  %36 = struct $Float (%35)
+  %37 = partial_apply [callee_guaranteed] %8(%7, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %38 = partial_apply [callee_guaranteed] %10(%37) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %40 = tuple $(predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float) (%34, %38)
+  %41 = enum $_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, #_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %40
+  br bb3(%41, %36)
+
+bb3(%43 : @owned $_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, %44 : $Float):
+  %45 = struct_extract %44, #Float._value
+  %46 = builtin "fmul_FPIEEE32"(%2, %45) : $Builtin.FPIEEE32
+  %47 = struct $Float (%46)
+  %48 = partial_apply [callee_guaranteed] %8(%44, %3) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %49 = partial_apply [callee_guaranteed] %10(%48) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %50 = builtin "fmul_FPIEEE32"(%46, %45) : $Builtin.FPIEEE32
+  %51 = struct $Float (%50)
+  %52 = partial_apply [callee_guaranteed] %8(%44, %47) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref pullback of FallbackMethod.method()
+  %53 = function_ref @$s3src14FallbackMethodV6methodSfyFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> FallbackMethod.TangentVector
+  %54 = partial_apply [callee_guaranteed] %53(%43, %49, %52) : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> FallbackMethod.TangentVector
+  %55 = tuple (%51, %54)
+  return %55
+} // end sil function '$s3src14FallbackMethodV6methodSfyFTJrSpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of FallbackMethod.method()
+// CHECK:           sil private [ossa] @$s3src14FallbackMethodV6methodSfyFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_S2fAES2fTf1nnEE_n : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, Float, Float, Float, Float) -> FallbackMethod.TangentVector {
+// CHECK:           {{^}}bb0(%[[#SEED:]] : $Float, %[[#]] : @owned $_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, %[[#CAP1:]] : $Float, %[[#CAP2:]] : $Float, %[[#CAP3:]] : $Float, %[[#CAP4:]] : $Float):
+// CHECK:             // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+// CHECK-NEXT:        %[[#ADAPTER:]] = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP
+// CHECK:             // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+// CHECK-NEXT:        %[[#MUL:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_
+// CHECK:             %[[#MUL_CLOSURE:]] = partial_apply [callee_guaranteed] %[[#MUL]](%[[#CAP1]], %[[#CAP2]])
+// CHECK-NOT:         = partial_apply
+// CHECK:             %[[#MUL_RESULT:]] = apply %[[#MUL]](%[[#SEED]], %[[#CAP3]], %[[#CAP4]])
+// CHECK-NEXT:        %[[#GRAD:]] = tuple_extract %[[#MUL_RESULT]] : $(Float, Float), 0
+// CHECK:             apply %[[#ADAPTER]](%[[#GRAD]], %[[#MUL_CLOSURE]])
+// CHECK:           } // end sil function
+
+// pullback of FallbackMethod.method()
+sil private [ossa] @$s3src14FallbackMethodV6methodSfyFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> Float, @owned @callee_guaranteed (Float) -> (Float, Float)) -> FallbackMethod.TangentVector {
+[%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%1: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%2: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%3: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $Float, %1 : @owned $_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0, %2 : @owned $@callee_guaranteed (Float) -> Float, %3 : @owned $@callee_guaranteed (Float) -> (Float, Float)):
+  %5 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %6 = struct $Float (%5)
+  %7 = enum $Optional<Float>, #Optional.some!enumelt, %6
+  %19 = apply %3(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %3
+  %21 = tuple_extract %19, 0
+  %22 = tuple_extract %19, 1
+  %23 = struct_extract %22, #Float._value
+  %24 = builtin "fadd_FPIEEE32"(%5, %23) : $Builtin.FPIEEE32
+  %26 = apply %2(%21) : $@callee_guaranteed (Float) -> Float
+  destroy_value %2
+  %28 = struct_extract %26, #Float._value
+  %29 = builtin "fadd_FPIEEE32"(%24, %28) : $Builtin.FPIEEE32
+  switch_enum %1, case #_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s3src14FallbackMethodV6methodSfyF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%41 : @owned $(predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float)):
+  (%42, %43) = destructure_tuple %41
+  %44 = builtin "fadd_FPIEEE32"(%29, %5) : $Builtin.FPIEEE32
+  %45 = struct $Float (%44)
+  %47 = apply %43(%45) : $@callee_guaranteed (Float) -> Float
+  destroy_value %43
+  %49 = struct_extract %47, #Float._value
+  %50 = builtin "fadd_FPIEEE32"(%49, %5) : $Builtin.FPIEEE32
+  %51 = builtin "fadd_FPIEEE32"(%5, %50) : $Builtin.FPIEEE32
+  switch_enum %42, case #_AD__$s3src14FallbackMethodV6methodSfyF_bb2__Pred__src_0_wrt_0.bb0!enumelt: bb7
+
+bb2(%60 : @owned $(predecessor: _AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float))):
+  (%61, %62) = destructure_tuple %60
+  %63 = builtin "fadd_FPIEEE32"(%29, %5) : $Builtin.FPIEEE32
+  %64 = struct $Float (%63)
+  %66 = apply %62(%64) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %62
+  %68 = tuple_extract %66, 0
+  %69 = tuple_extract %66, 1
+  %70 = struct_extract %68, #Float._value
+  %71 = builtin "fadd_FPIEEE32"(%70, %5) : $Builtin.FPIEEE32
+  %72 = struct_extract %69, #Float._value
+  %73 = builtin "fadd_FPIEEE32"(%72, %5) : $Builtin.FPIEEE32
+  %74 = builtin "fadd_FPIEEE32"(%5, %73) : $Builtin.FPIEEE32
+  %76 = builtin "fadd_FPIEEE32"(%71, %5) : $Builtin.FPIEEE32
+  br bb3(undef : $Float)
+
+bb3(%78 : $Float):
+  br bb5(%6)
+
+bb4(%80 : $Optional<Float>):
+  switch_enum %61, case #_AD__$s3src14FallbackMethodV6methodSfyF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb6
+
+bb5(%88 : $Float):
+  %89 = builtin "fadd_FPIEEE32"(%76, %5) : $Builtin.FPIEEE32
+  %90 = struct $Float (%89)
+  %91 = enum $Optional<Float>, #Optional.some!enumelt, %90
+  br bb4(%91)
+
+bb6(%93 : @owned $(@callee_guaranteed (Float) -> Float, @callee_guaranteed (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector))):
+  br bb8(%80, %93, %74, %7)
+
+bb7(%95 : @owned $(@callee_guaranteed (Float) -> Float, @callee_guaranteed (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector))):
+  br bb8(%7, %95, %51, %7)
+
+bb8(%97 : $Optional<Float>, %98 : @owned $(@callee_guaranteed (Float) -> Float, @callee_guaranteed (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)), %99 : $Builtin.FPIEEE32, %100 : $Optional<Float>):
+  (%101, %102) = destructure_tuple %98
+  switch_enum %100, case #Optional.none!enumelt: bb9, case #Optional.some!enumelt: bb10
+
+bb9:
+  switch_enum %97, case #Optional.none!enumelt: bb11, case #Optional.some!enumelt: bb12
+
+bb10(%105 : $Float):
+  switch_enum %97, case #Optional.none!enumelt: bb14, case #Optional.some!enumelt: bb15
+
+bb11:
+  br bb13(%97)
+
+bb12(%108 : $Float):
+  br bb13(%97)
+
+bb13(%110 : $Optional<Float>):
+  %115 = builtin "fadd_FPIEEE32"(%99, %5) : $Builtin.FPIEEE32
+  switch_enum %110, case #Optional.none!enumelt: bb16, case #Optional.some!enumelt: bb17
+
+bb14:
+  br bb13(%100)
+
+bb15(%118 : $Float):
+  %119 = unchecked_enum_data %100, #Optional.some!enumelt
+  %120 = struct_extract %119, #Float._value
+  %121 = unchecked_enum_data %97, #Optional.some!enumelt
+  %122 = struct_extract %121, #Float._value
+  %123 = builtin "fadd_FPIEEE32"(%120, %122) : $Builtin.FPIEEE32
+  %124 = struct $Float (%123)
+  %125 = enum $Optional<Float>, #Optional.some!enumelt, %124
+  br bb13(%125)
+
+bb16:
+  br bb18(%6)
+
+bb17(%128 : $Float):
+  br bb20(%6)
+
+bb18(%130 : $Float):
+  br bb19(%7)
+
+bb19(%132 : $Optional<Float>):
+  %138 = builtin "fadd_FPIEEE32"(%115, %5) : $Builtin.FPIEEE32
+  switch_enum %132, case #Optional.none!enumelt: bb21, case #Optional.some!enumelt: bb22
+
+bb20(%140 : $Float):
+  %141 = unchecked_enum_data %110, #Optional.some!enumelt
+  %142 = struct_extract %141, #Float._value
+  %143 = builtin "fadd_FPIEEE32"(%142, %5) : $Builtin.FPIEEE32
+  %144 = struct $Float (%143)
+  %145 = enum $Optional<Float>, #Optional.some!enumelt, %144
+  br bb19(%145)
+
+bb21:
+  br bb23(%6)
+
+bb22(%148 : $Float):
+  br bb25(%6)
+
+bb23(%150 : $Float):
+  br bb24(%7)
+
+bb24(%152 : $Optional<Float>):
+  %156 = builtin "fadd_FPIEEE32"(%138, %5) : $Builtin.FPIEEE32
+  switch_enum %152, case #Optional.none!enumelt: bb26, case #Optional.some!enumelt: bb27
+
+bb25(%158 : $Float):
+  %159 = unchecked_enum_data %132, #Optional.some!enumelt
+  %160 = struct_extract %159, #Float._value
+  %161 = builtin "fadd_FPIEEE32"(%160, %5) : $Builtin.FPIEEE32
+  %162 = struct $Float (%161)
+  %163 = enum $Optional<Float>, #Optional.some!enumelt, %162
+  br bb24(%163)
+
+bb26:
+  br bb28(%6)
+
+bb27(%166 : $Float):
+  br bb30(%6)
+
+bb28(%168 : $Float):
+  br bb29(%7)
+
+bb29(%170 : $Optional<Float>):
+  br bb31(%6)
+
+bb30(%175 : $Float):
+  %176 = unchecked_enum_data %152, #Optional.some!enumelt
+  %177 = struct_extract %176, #Float._value
+  %178 = builtin "fadd_FPIEEE32"(%177, %5) : $Builtin.FPIEEE32
+  %179 = struct $Float (%178)
+  %180 = enum $Optional<Float>, #Optional.some!enumelt, %179
+  br bb29(%180)
+
+bb31(%182 : $Float):
+  br bb33(%6)
+
+bb32(%184 : $Optional<Float>):
+  %188 = builtin "fadd_FPIEEE32"(%156, %5) : $Builtin.FPIEEE32
+  switch_enum %170, case #Optional.none!enumelt: bb34, case #Optional.some!enumelt: bb35
+
+bb33(%190 : $Float):
+  br bb32(%7)
+
+bb34:
+  br bb36(%6)
+
+bb35(%193 : $Float):
+  br bb38(%6)
+
+bb36(%195 : $Float):
+  br bb37(%7)
+
+bb37(%197 : $Optional<Float>):
+  %201 = builtin "fadd_FPIEEE32"(%5, %188) : $Builtin.FPIEEE32
+  switch_enum %184, case #Optional.none!enumelt: bb39, case #Optional.some!enumelt: bb40
+
+bb38(%203 : $Float):
+  %204 = unchecked_enum_data %170, #Optional.some!enumelt
+  %205 = struct_extract %204, #Float._value
+  %206 = builtin "fadd_FPIEEE32"(%205, %5) : $Builtin.FPIEEE32
+  %207 = struct $Float (%206)
+  %208 = enum $Optional<Float>, #Optional.some!enumelt, %207
+  br bb37(%208)
+
+bb39:
+  switch_enum %197, case #Optional.none!enumelt: bb41, case #Optional.some!enumelt: bb42
+
+bb40(%211 : $Float):
+  switch_enum %197, case #Optional.none!enumelt: bb44, case #Optional.some!enumelt: bb45
+
+bb41:
+  br bb43(%197)
+
+bb42(%214 : $Float):
+  br bb43(%197)
+
+bb43(%216 : $Optional<Float>):
+  %220 = builtin "fadd_FPIEEE32"(%201, %5) : $Builtin.FPIEEE32
+  %221 = struct $Float (%220)
+  switch_enum %216, case #Optional.none!enumelt: bb46, case #Optional.some!enumelt: bb47
+
+bb44:
+  br bb43(%184)
+
+bb45(%224 : $Float):
+  %225 = unchecked_enum_data %184, #Optional.some!enumelt
+  %226 = struct_extract %225, #Float._value
+  %227 = unchecked_enum_data %197, #Optional.some!enumelt
+  %228 = struct_extract %227, #Float._value
+  %229 = builtin "fadd_FPIEEE32"(%226, %228) : $Builtin.FPIEEE32
+  %230 = struct $Float (%229)
+  %231 = enum $Optional<Float>, #Optional.some!enumelt, %230
+  br bb43(%231)
+
+bb46:
+  br bb48(%6)
+
+bb47(%234 : $Float):
+  br bb50(%6)
+
+bb48(%236 : $Float):
+  br bb49(%7)
+
+bb49(%238 : $Optional<Float>):
+  %239 = struct $Optional<Float>.TangentVector (%238)
+  %240 = struct $FallbackMethod.TangentVector (%221, %239)
+  %241 = apply %102(%240) : $@callee_guaranteed (FallbackMethod.TangentVector) -> (Float, Optional<Float>.TangentVector)
+  destroy_value %102
+  %243 = tuple_extract %241, 0
+  %244 = tuple_extract %241, 1
+  %245 = struct_extract %243, #Float._value
+  %246 = builtin "fadd_FPIEEE32"(%245, %5) : $Builtin.FPIEEE32
+  %247 = struct $Float (%246)
+  %248 = struct_extract %244, #Optional.TangentVector.value
+  switch_enum %248, case #Optional.none!enumelt: bb51, case #Optional.some!enumelt: bb52
+
+bb50(%250 : $Float):
+  %251 = unchecked_enum_data %216, #Optional.some!enumelt
+  %252 = struct_extract %251, #Float._value
+  %253 = builtin "fadd_FPIEEE32"(%252, %5) : $Builtin.FPIEEE32
+  %254 = struct $Float (%253)
+  %255 = enum $Optional<Float>, #Optional.some!enumelt, %254
+  br bb49(%255)
+
+bb51:
+  br bb53(%6)
+
+bb52(%258 : $Float):
+  br bb55(%6)
+
+bb53(%260 : $Float):
+  br bb54(%7)
+
+bb54(%262 : $Optional<Float>):
+  %263 = apply %101(%247) : $@callee_guaranteed (Float) -> Float
+  destroy_value %101
+  %265 = struct_extract %263, #Float._value
+  %266 = builtin "fadd_FPIEEE32"(%265, %5) : $Builtin.FPIEEE32
+  %267 = builtin "fadd_FPIEEE32"(%5, %266) : $Builtin.FPIEEE32
+  br bb56(%6)
+
+bb55(%269 : $Float):
+  %270 = unchecked_enum_data %248, #Optional.some!enumelt
+  %271 = struct_extract %270, #Float._value
+  %272 = builtin "fadd_FPIEEE32"(%271, %5) : $Builtin.FPIEEE32
+  %273 = struct $Float (%272)
+  %274 = enum $Optional<Float>, #Optional.some!enumelt, %273
+  br bb54(%274)
+
+bb56(%276 : $Float):
+  switch_enum %262, case #Optional.none!enumelt: bb58, case #Optional.some!enumelt: bb59
+
+bb57(%278 : $Optional<Float>):
+  %279 = struct $Float (%267)
+  %280 = struct $Optional<Float>.TangentVector (%278)
+  %281 = struct $FallbackMethod.TangentVector (%279, %280)
+  return %281
+
+bb58:
+  br bb57(%7)
+
+bb59(%285 : $Float):
+  %286 = unchecked_enum_data %262, #Optional.some!enumelt
+  %287 = struct_extract %286, #Float._value
+  %288 = builtin "fadd_FPIEEE32"(%5, %287) : $Builtin.FPIEEE32
+  %289 = struct $Float (%288)
+  %290 = enum $Optional<Float>, #Optional.some!enumelt, %289
+  br bb57(%290)
+} // end sil function '$s3src14FallbackMethodV6methodSfyFTJpSpSr'
+
+//===----------------------------------------------------------------------===//
+// Retain the tape for condTupleFallback(_:)
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL:     {{^}}// reverse-mode derivative of condTupleFallback(_:)
+// CHECK:             // function_ref specialized pullback of condTupleFallback(_:)
+// CHECK-NEXT:        %[[#TUPLE_FN:]] = function_ref @$s3src17condTupleFallbackyS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_0ef1_g4E12_i16Subtract3lhs3rhsk1_l1_mnl1_mo1_mP2U_ACTf1nnccc_n : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0) -> Float
+// CHECK-NEXT:        %[[#TUPLE_CLOSURE:]] = partial_apply [callee_guaranteed] %[[#TUPLE_FN]](%[[#]]) : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0) -> Float
+// CHECK-NEXT:        %[[#TUPLE_RESULT:]] = tuple (%[[#]] : $Float, %[[#TUPLE_CLOSURE]]
+// CHECK-NEXT:        return %[[#TUPLE_RESULT]]
+
+// reverse-mode derivative of condTupleFallback(_:)
+sil [ossa] @$s3src17condTupleFallbackyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $Float):
+  %4 = struct_extract %0, #Float._value
+  %5 = builtin "fadd_FPIEEE32"(%4, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %6 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %7 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %9 = builtin "fsub_FPIEEE32"(%4, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+  %10 = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %11 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %13 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %14 = builtin "fcmp_olt_FPIEEE32"(%13, %4) : $Builtin.Int1
+  %15 = tuple (%7, %11), forwarding: @owned
+  cond_br %14, bb1, bb2
+
+bb1:
+  %17 = enum $_AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %15
+  %21 = builtin "fsub_FPIEEE32"(%5, %4) : $Builtin.FPIEEE32
+  %22 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %24 = builtin "fadd_FPIEEE32"(%9, %4) : $Builtin.FPIEEE32
+  %25 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %27 = tuple $(predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)) (%17, %22, %25)
+  %28 = enum $_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %27
+  br bb3(%28, %24, %21)
+
+bb2:
+  %30 = enum $_AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0, #_AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %15
+  %31 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %32 = struct $Float (%31)
+  %33 = builtin "fmul_FPIEEE32"(%31, %4) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %34 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %35 = partial_apply [callee_guaranteed] %34(%0, %32) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+  %36 = function_ref @$sS3fIegydd_TJSpSSUpSrUSUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %37 = partial_apply [callee_guaranteed] %36(%35) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %40 = tuple $(predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float) (%30, %37)
+  %41 = enum $_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, #_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %40
+  br bb3(%41, %4, %33)
+
+bb3(%43 : @owned $_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, %44 : $Builtin.FPIEEE32, %45 : $Builtin.FPIEEE32):
+  %46 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %47 = builtin "fsub_FPIEEE32"(%5, %45) : $Builtin.FPIEEE32
+  %48 = thin_to_thick_function %10 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  %49 = builtin "fadd_FPIEEE32"(%47, %44) : $Builtin.FPIEEE32
+  %50 = struct $Float (%49)
+  %51 = thin_to_thick_function %6 to $@callee_guaranteed (Float) -> (Float, Float) // ownership: none
+  // function_ref pullback of condTupleFallback(_:)
+  %52 = function_ref @$s3src17condTupleFallbackyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %53 = partial_apply [callee_guaranteed] %52(%43, %46, %48, %51) : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %54 = tuple (%50, %53)
+  return %54
+} // end sil function '$s3src17condTupleFallbackyS2fFTJrSpSr'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of condTupleFallback(_:)
+// CHECK:           sil private [ossa] @$s3src17condTupleFallbackyS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktl1_m5FZSf_M6SfcfU_0ef1_g4E12_i16Subtract3lhs3rhsk1_l1_mnl1_mo1_mP2U_ACTf1nnccc_n : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0) -> Float {
+
+// pullback of condTupleFallback(_:)
+sil private [ossa] @$s3src17condTupleFallbackyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float), @owned @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+[%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%1: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%2: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%3: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[%4: noescape v**, read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+[global: read,write,copy,destroy,allocate,deinit_barrier]
+bb0(%0 : $Float, %1 : @owned $_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0, %2 : @owned $@callee_guaranteed (Float) -> (Float, Float), %3 : @owned $@callee_guaranteed (Float) -> (Float, Float), %4 : @owned $@callee_guaranteed (Float) -> (Float, Float)):
+  %5 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %22 = apply %4(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %4
+  %24 = tuple_extract %22, 0
+  %25 = tuple_extract %22, 1
+  %26 = struct_extract %25, #Float._value
+  %27 = builtin "fadd_FPIEEE32"(%5, %26) : $Builtin.FPIEEE32
+  %29 = apply %3(%24) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %3
+  %31 = tuple_extract %29, 0
+  %32 = tuple_extract %29, 1
+  %33 = struct_extract %32, #Float._value
+  %34 = builtin "fadd_FPIEEE32"(%5, %33) : $Builtin.FPIEEE32
+  %36 = apply %2(%31) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %2
+  %38 = tuple_extract %36, 0
+  %39 = tuple_extract %36, 1
+  %40 = struct_extract %39, #Float._value
+  %41 = builtin "fadd_FPIEEE32"(%5, %40) : $Builtin.FPIEEE32
+  %43 = struct_extract %38, #Float._value
+  %44 = builtin "fadd_FPIEEE32"(%5, %43) : $Builtin.FPIEEE32
+  switch_enum %1, case #_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0.bb2!enumelt: bb1, case #_AD__$s3src17condTupleFallbackyS2fF_bb3__Pred__src_0_wrt_0.bb1!enumelt: bb2
+
+bb1(%56 : @owned $(predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> Float)):
+  (%57, %58) = destructure_tuple %56
+  %59 = builtin "fadd_FPIEEE32"(%27, %5) : $Builtin.FPIEEE32
+  %61 = builtin "fadd_FPIEEE32"(%34, %5) : $Builtin.FPIEEE32
+  %62 = struct $Float (%61)
+  %64 = apply %58(%62) : $@callee_guaranteed (Float) -> Float
+  destroy_value %58
+  %66 = struct_extract %64, #Float._value
+  %67 = builtin "fadd_FPIEEE32"(%66, %59) : $Builtin.FPIEEE32
+  switch_enum %57, case #_AD__$s3src17condTupleFallbackyS2fF_bb2__Pred__src_0_wrt_0.bb0!enumelt: bb4
+
+bb2(%74 : @owned $(predecessor: _AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0, @callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  (%75, %76, %77) = destructure_tuple %74
+  %78 = builtin "fadd_FPIEEE32"(%27, %5) : $Builtin.FPIEEE32
+  %79 = struct $Float (%78)
+  %81 = apply %77(%79) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %77
+  %83 = tuple_extract %81, 0
+  %84 = tuple_extract %81, 1
+  %85 = struct_extract %83, #Float._value
+  %86 = builtin "fadd_FPIEEE32"(%85, %5) : $Builtin.FPIEEE32
+  %87 = struct_extract %84, #Float._value
+  %88 = builtin "fadd_FPIEEE32"(%87, %5) : $Builtin.FPIEEE32
+  %89 = builtin "fadd_FPIEEE32"(%44, %88) : $Builtin.FPIEEE32
+  %91 = builtin "fadd_FPIEEE32"(%5, %86) : $Builtin.FPIEEE32
+  %93 = builtin "fadd_FPIEEE32"(%34, %5) : $Builtin.FPIEEE32
+  %94 = struct $Float (%93)
+  %96 = apply %76(%94) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %76
+  %98 = tuple_extract %96, 0
+  %99 = tuple_extract %96, 1
+  %100 = struct_extract %98, #Float._value
+  %101 = builtin "fadd_FPIEEE32"(%100, %5) : $Builtin.FPIEEE32
+  %102 = struct_extract %99, #Float._value
+  %103 = builtin "fadd_FPIEEE32"(%102, %5) : $Builtin.FPIEEE32
+  %104 = builtin "fadd_FPIEEE32"(%89, %103) : $Builtin.FPIEEE32
+  %106 = builtin "fadd_FPIEEE32"(%5, %101) : $Builtin.FPIEEE32
+  %108 = builtin "fadd_FPIEEE32"(%41, %5) : $Builtin.FPIEEE32
+  %110 = builtin "fadd_FPIEEE32"(%108, %5) : $Builtin.FPIEEE32
+  %111 = builtin "fadd_FPIEEE32"(%104, %5) : $Builtin.FPIEEE32
+  %113 = builtin "fadd_FPIEEE32"(%111, %5) : $Builtin.FPIEEE32
+  %114 = builtin "fadd_FPIEEE32"(%110, %5) : $Builtin.FPIEEE32
+  %115 = builtin "fadd_FPIEEE32"(%113, %5) : $Builtin.FPIEEE32
+  %116 = builtin "fadd_FPIEEE32"(%114, %5) : $Builtin.FPIEEE32
+  %117 = builtin "fadd_FPIEEE32"(%115, %116) : $Builtin.FPIEEE32
+  switch_enum %75, case #_AD__$s3src17condTupleFallbackyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb3
+
+bb3(%124 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  br bb5(%117, %124, %5, %5, %106, %91)
+
+bb4(%126 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  br bb5(%67, %126, %44, %41, %5, %5)
+
+bb5(%128 : $Builtin.FPIEEE32, %129 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float)), %130 : $Builtin.FPIEEE32, %131 : $Builtin.FPIEEE32, %132 : $Builtin.FPIEEE32, %133 : $Builtin.FPIEEE32):
+  (%134, %135) = destructure_tuple %129
+  %136 = builtin "fadd_FPIEEE32"(%133, %5) : $Builtin.FPIEEE32
+  %137 = struct $Float (%136)
+  %139 = apply %135(%137) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %135
+  %141 = tuple_extract %139, 0
+  %142 = tuple_extract %139, 1
+  %143 = struct_extract %141, #Float._value
+  %144 = builtin "fadd_FPIEEE32"(%143, %128) : $Builtin.FPIEEE32
+  %145 = struct_extract %142, #Float._value
+  %146 = builtin "fadd_FPIEEE32"(%145, %144) : $Builtin.FPIEEE32
+  %147 = builtin "fadd_FPIEEE32"(%132, %5) : $Builtin.FPIEEE32
+  %148 = struct $Float (%147)
+  %150 = apply %134(%148) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %134
+  %152 = tuple_extract %150, 0
+  %153 = tuple_extract %150, 1
+  %154 = struct_extract %152, #Float._value
+  %155 = builtin "fadd_FPIEEE32"(%154, %146) : $Builtin.FPIEEE32
+  %156 = struct_extract %153, #Float._value
+  %157 = builtin "fadd_FPIEEE32"(%156, %155) : $Builtin.FPIEEE32
+  %158 = builtin "fadd_FPIEEE32"(%131, %157) : $Builtin.FPIEEE32
+  %160 = builtin "fadd_FPIEEE32"(%130, %158) : $Builtin.FPIEEE32
+  %161 = struct $Float (%160)
+  return %161
+} // end sil function '$s3src17condTupleFallbackyS2fFTJpSpSr'

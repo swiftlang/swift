@@ -1,0 +1,252 @@
+// Derived from test/AutoDiff/validation-test/closure_specialization/payload_flow_pipeline.swift.
+
+// Rewrite a pullback join receiving payloads from two predecessor tapes.
+
+// RUN: %FileCheck %s --check-prefix=INPUT < %s
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+@differentiable(reverse, wrt: (x, y))
+public func mergedPayload(_ x: Float, _ y: Float) -> Float
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb0__Pred__src_0_wrt_0_1 {
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1 {
+  case bb0(((Float) -> (Float, Float), (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1 {
+  case bb2((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+  case bb1((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1 {
+  case bb3((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1 {
+  case bb3((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+}
+
+@usableFromInline
+@frozen enum _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1 {
+  case bb5((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+  case bb4((predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1, (Float) -> (Float, Float)))
+}
+
+sil @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+
+sil @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+
+sil @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+
+// reverse-mode derivative of mergedPayload(_:_:)
+sil [ossa] @$s12payload_flow13mergedPayloadyS2f_SftFTJrSSpSr : $@convention(thin) (Float, Float) -> (Float, @owned @callee_guaranteed (Float) -> (Float, Float)) {
+bb0(%0 : $Float, %1 : $Float):
+  %4 = struct_extract %0, #Float._value
+  %5 = struct_extract %1, #Float._value
+  %6 = builtin "fadd_FPIEEE32"(%4, %5) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %7 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %8 = thin_to_thick_function %7 to $@callee_guaranteed (Float) -> (Float, Float)
+  %10 = builtin "fsub_FPIEEE32"(%4, %5) : $Builtin.FPIEEE32
+  // function_ref closure #1 in static Float._vjpSubtract(lhs:rhs:)
+  %11 = function_ref @$sSf16_DifferentiationE12_vjpSubtract3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %12 = thin_to_thick_function %11 to $@callee_guaranteed (Float) -> (Float, Float)
+  %14 = builtin "fcmp_olt_FPIEEE32"(%4, %5) : $Builtin.Int1
+  %15 = tuple (%8, %12), forwarding: @owned
+  cond_br %14, bb1, bb2
+
+bb1:
+  %17 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1.bb0!enumelt, %15
+  %18 = builtin "fadd_FPIEEE32"(%6, %5) : $Builtin.FPIEEE32
+  %19 = thin_to_thick_function %7 to $@callee_guaranteed (Float) -> (Float, Float)
+  %21 = tuple $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float)) (%17, %19)
+  %22 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1.bb1!enumelt, %21
+  br bb3(%22, %18)
+
+bb2:
+  %24 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1.bb0!enumelt, %15
+  %25 = builtin "fsub_FPIEEE32"(%10, %5) : $Builtin.FPIEEE32
+  %26 = thin_to_thick_function %11 to $@callee_guaranteed (Float) -> (Float, Float)
+  %28 = tuple $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float)) (%24, %26)
+  %29 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1.bb2!enumelt, %28
+  br bb3(%29, %25)
+
+bb3(%31 : @owned $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, %32 : $Builtin.FPIEEE32):
+  %33 = builtin "fadd_FPIEEE32"(%32, %4) : $Builtin.FPIEEE32
+  %34 = struct $Float (%33)
+  %35 = thin_to_thick_function %7 to $@callee_guaranteed (Float) -> (Float, Float)
+  %37 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  %38 = builtin "fcmp_olt_FPIEEE32"(%37, %4) : $Builtin.Int1
+  %39 = tuple $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float)) (%31, %35)
+  cond_br %38, bb4, bb5
+
+bb4:
+  %41 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1.bb3!enumelt, %39
+  %42 = builtin "fmul_FPIEEE32"(%33, %4) : $Builtin.FPIEEE32
+  %43 = struct $Float (%42)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %44 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %45 = partial_apply [callee_guaranteed] %44(%0, %34) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %46 = tuple $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float)) (%41, %45)
+  %47 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1.bb4!enumelt, %46
+  br bb6(%43, %47)
+
+bb5:
+  %49 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1.bb3!enumelt, %39
+  %50 = builtin "fadd_FPIEEE32"(%33, %5) : $Builtin.FPIEEE32
+  %51 = struct $Float (%50)
+  %52 = thin_to_thick_function %7 to $@callee_guaranteed (Float) -> (Float, Float)
+  %53 = tuple $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float)) (%49, %52)
+  %54 = enum $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1.bb5!enumelt, %53
+  br bb6(%51, %54)
+
+bb6(%56 : $Float, %57 : @owned $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1):
+  // function_ref pullback of mergedPayload(_:_:)
+  %58 = function_ref @$s12payload_flow13mergedPayloadyS2f_SftFTJpSSpSr : $@convention(thin) (Float, @owned _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1) -> (Float, Float)
+  %59 = partial_apply [callee_guaranteed] %58(%57) : $@convention(thin) (Float, @owned _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1) -> (Float, Float)
+  %60 = tuple (%56, %59)
+  return %60
+} // end sil function '$s12payload_flow13mergedPayloadyS2f_SftFTJrSSpSr'
+
+// INPUT-LABEL:     {{^}}// pullback of mergedPayload(_:_:)
+// INPUT-NEXT:      {{^}}sil private [ossa] @$s12payload_flow13mergedPayloadyS2f_SftFTJpSSpSr :
+// INPUT:             %[[#LEFT:]] = unchecked_enum_data %[[#]], #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1.bb3!enumelt
+// INPUT-NEXT:        br [[JOIN:bb[0-9]+]]({{.*}}, %[[#LEFT]])
+// INPUT:             %[[#RIGHT:]] = unchecked_enum_data %[[#]], #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1.bb3!enumelt
+// INPUT-NEXT:        br [[JOIN]]({{.*}}, %[[#RIGHT]])
+// INPUT:           [[JOIN]]({{.*}}, %[[#PAYLOAD:]] : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+// INPUT-NEXT:        (%[[#]], %[[#CALLBACK:]]) = destructure_tuple %[[#PAYLOAD]]
+// INPUT:             %[[#]] = apply %[[#CALLBACK]]
+
+// CHECK-LABEL:     {{^}}// specialized pullback of mergedPayload(_:_:)
+// CHECK:           sil private [ossa] @$s12payload_flow13mergedPayloadyS2f_SftFTJpSSpSr00194_48$s12payload_flow13mergedPayloadyS2f_SftFTJrSSpSr$s4main120_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1_spec_bb5_1_bb4_1_07cdb543896d80460606d14dc656dc67OD_fdEGDfyhgifTf1nb_n :
+// CHECK:             %[[#LEFT:]] = unchecked_enum_data %[[#]], #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1_spec_bb3_1_72fad355dc75ad7f2c16fb2fce22a94f.bb3!enumelt
+// CHECK-NEXT:        br [[JOIN:bb[0-9]+]]({{.*}}, %[[#LEFT]])
+// CHECK:             %[[#RIGHT:]] = unchecked_enum_data %[[#]], #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1_spec_bb3_1_93d8be27a738e9585458153921fb0024.bb3!enumelt
+// CHECK-NEXT:        br [[JOIN]]({{.*}}, %[[#RIGHT]])
+// CHECK:           [[JOIN]]({{.*}}, %[[#PAYLOAD:]] : $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1_spec_bb2_1_bb1_1_73849a5b48e1c85f5d156d9317a6ba27, ())):
+// CHECK-NEXT:        (%[[#]], %[[#]]) = destructure_tuple %[[#PAYLOAD]]
+// pullback of mergedPayload(_:_:)
+sil private [ossa] @$s12payload_flow13mergedPayloadyS2f_SftFTJpSSpSr : $@convention(thin) (Float, @owned _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1) -> (Float, Float) {
+bb0(%0 : $Float, %1 : @owned $_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  switch_enum %1, case #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1.bb5!enumelt: bb1, case #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb6__Pred__src_0_wrt_0_1.bb4!enumelt: bb2
+
+bb1(%18 : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+  (%19, %20) = destructure_tuple %18
+  %21 = apply %20(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %20
+  %23 = tuple_extract %21, 0
+  %24 = tuple_extract %21, 1
+  %25 = struct_extract %23, #Float._value
+  %26 = builtin "fadd_FPIEEE32"(%25, %2) : $Builtin.FPIEEE32
+  %27 = struct_extract %24, #Float._value
+  %28 = builtin "fadd_FPIEEE32"(%27, %2) : $Builtin.FPIEEE32
+  %35 = unchecked_enum_data %19, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb5__Pred__src_0_wrt_0_1.bb3!enumelt
+  br bb3(%2, %28, %26, %35)
+
+bb2(%37 : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+  (%38, %39) = destructure_tuple %37
+  %40 = apply %39(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %39
+  %42 = tuple_extract %40, 0
+  %43 = tuple_extract %40, 1
+  %44 = struct_extract %42, #Float._value
+  %45 = builtin "fadd_FPIEEE32"(%44, %2) : $Builtin.FPIEEE32
+  %46 = struct_extract %43, #Float._value
+  %47 = builtin "fadd_FPIEEE32"(%46, %2) : $Builtin.FPIEEE32
+  %54 = unchecked_enum_data %38, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb4__Pred__src_0_wrt_0_1.bb3!enumelt
+  br bb3(%47, %2, %45, %54)
+
+bb3(%56 : $Builtin.FPIEEE32, %57 : $Builtin.FPIEEE32, %58 : $Builtin.FPIEEE32, %59 : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+  (%60, %61) = destructure_tuple %59
+  %62 = builtin "fadd_FPIEEE32"(%58, %2) : $Builtin.FPIEEE32
+  %63 = struct $Float (%62)
+  %64 = apply %61(%63) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %61
+  %66 = tuple_extract %64, 0
+  %67 = tuple_extract %64, 1
+  %68 = struct_extract %66, #Float._value
+  %69 = builtin "fadd_FPIEEE32"(%68, %2) : $Builtin.FPIEEE32
+  %70 = struct_extract %67, #Float._value
+  %71 = builtin "fadd_FPIEEE32"(%70, %56) : $Builtin.FPIEEE32
+  %72 = builtin "fadd_FPIEEE32"(%2, %69) : $Builtin.FPIEEE32
+  switch_enum %60, case #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1.bb2!enumelt: bb4, case #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb3__Pred__src_0_wrt_0_1.bb1!enumelt: bb5
+
+bb4(%85 : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+  (%86, %87) = destructure_tuple %85
+  %88 = builtin "fadd_FPIEEE32"(%72, %2) : $Builtin.FPIEEE32
+  %89 = struct $Float (%88)
+  %91 = apply %87(%89) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %87
+  %93 = tuple_extract %91, 0
+  %94 = tuple_extract %91, 1
+  %95 = struct_extract %93, #Float._value
+  %96 = builtin "fadd_FPIEEE32"(%95, %2) : $Builtin.FPIEEE32
+  %97 = struct_extract %94, #Float._value
+  %98 = builtin "fadd_FPIEEE32"(%97, %57) : $Builtin.FPIEEE32
+  %104 = unchecked_enum_data %86, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb2__Pred__src_0_wrt_0_1.bb0!enumelt
+  br bb6(%98, %2, %96, %104)
+
+bb5(%106 : @owned $(predecessor: _AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1, @callee_guaranteed (Float) -> (Float, Float))):
+  (%107, %108) = destructure_tuple %106
+  %109 = builtin "fadd_FPIEEE32"(%72, %2) : $Builtin.FPIEEE32
+  %110 = struct $Float (%109)
+  %112 = apply %108(%110) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %108
+  %114 = tuple_extract %112, 0
+  %115 = tuple_extract %112, 1
+  %116 = struct_extract %114, #Float._value
+  %117 = builtin "fadd_FPIEEE32"(%116, %2) : $Builtin.FPIEEE32
+  %118 = struct_extract %115, #Float._value
+  %119 = builtin "fadd_FPIEEE32"(%118, %57) : $Builtin.FPIEEE32
+  %125 = unchecked_enum_data %107, #_AD__$s12payload_flow13mergedPayloadyS2f_SftF_bb1__Pred__src_0_wrt_0_1.bb0!enumelt
+  br bb6(%119, %117, %2, %125)
+
+bb6(%127 : $Builtin.FPIEEE32, %128 : $Builtin.FPIEEE32, %129 : $Builtin.FPIEEE32, %130 : @owned $(@callee_guaranteed (Float) -> (Float, Float), @callee_guaranteed (Float) -> (Float, Float))):
+  (%131, %132) = destructure_tuple %130
+  %133 = builtin "fadd_FPIEEE32"(%129, %2) : $Builtin.FPIEEE32
+  %134 = struct $Float (%133)
+  %135 = apply %132(%134) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %132
+  %137 = tuple_extract %135, 0
+  %138 = tuple_extract %135, 1
+  %139 = struct_extract %137, #Float._value
+  %140 = builtin "fadd_FPIEEE32"(%139, %71) : $Builtin.FPIEEE32
+  %141 = struct_extract %138, #Float._value
+  %142 = builtin "fadd_FPIEEE32"(%141, %127) : $Builtin.FPIEEE32
+  %143 = builtin "fadd_FPIEEE32"(%128, %2) : $Builtin.FPIEEE32
+  %144 = struct $Float (%143)
+  %145 = apply %131(%144) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %131
+  %147 = tuple_extract %145, 0
+  %148 = tuple_extract %145, 1
+  %149 = struct_extract %147, #Float._value
+  %150 = builtin "fadd_FPIEEE32"(%149, %140) : $Builtin.FPIEEE32
+  %151 = struct $Float (%150)
+  %152 = struct_extract %148, #Float._value
+  %153 = builtin "fadd_FPIEEE32"(%152, %142) : $Builtin.FPIEEE32
+  %154 = struct $Float (%153)
+  %157 = tuple (%151, %154)
+  return %157
+} // end sil function '$s12payload_flow13mergedPayloadyS2f_SftFTJpSSpSr'

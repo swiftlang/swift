@@ -1,0 +1,136 @@
+// Derived from test/AutoDiff/validation-test/closure_specialization/specialization_and_inlining_pipeline.swift.
+
+// Rewrite a generically specialized pullback and replay both callbacks.
+
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+enum _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l<τ_0_0> {
+  case bb0(())
+}
+
+enum _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l<τ_0_0> {
+  case bb0(())
+}
+
+enum _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<τ_0_0> {
+  case bb2((predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l<τ_0_0>, (Float) -> (Float, Float)))
+  case bb1((predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l<τ_0_0>, (Float) -> Float))
+}
+
+sil shared [ossa] @$s8Inlining6branchyS2f_SfxmSbtlFlTJrSUUUpSrSi_Tg5 : $@convention(thin) (Float, Float, @thick Int.Type, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float, %1 : $Float, %2 : $@thick Int.Type, %3 : $Bool):
+  %8 = struct_extract %3, #Bool._value
+  %9 = tuple ()
+  cond_br %8, bb1, bb2
+
+bb1:
+  %11 = enum $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l<Int>, #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l.bb0!enumelt, %9
+  %12 = struct_extract %0, #Float._value
+  %13 = struct_extract %1, #Float._value
+  %14 = builtin "fadd_FPIEEE32"(%12, %13) : $Builtin.FPIEEE32
+  %15 = struct $Float (%14)
+  // function_ref closure #1 in static Float._vjpAdd(lhs:rhs:)
+  %16 = function_ref @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float)
+  %17 = thin_to_thick_function %16 to $@callee_guaranteed (Float) -> (Float, Float)
+  // function_ref autodiff subset parameters thunk for pullback from @escaping @callee_guaranteed (@unowned Float) -> (@unowned Float, @unowned Float)
+  %18 = function_ref @$sS3fIegydd_TJSpSSUpSrSUUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %19 = partial_apply [callee_guaranteed] %18(%17) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float
+  %20 = tuple $(predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l<Int>, @callee_guaranteed (Float) -> Float) (%11, %19)
+  %21 = enum $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>, #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l.bb1!enumelt, %20
+  br bb3(%15, %21)
+
+bb2:
+  %23 = enum $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l<Int>, #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l.bb0!enumelt, %9
+  %24 = struct_extract %0, #Float._value
+  %25 = builtin "fmul_FPIEEE32"(%24, %24) : $Builtin.FPIEEE32
+  %26 = struct $Float (%25)
+  // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+  %27 = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %28 = partial_apply [callee_guaranteed] %27(%0, %0) : $@convention(thin) (Float, Float, Float) -> (Float, Float)
+  %29 = tuple $(predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l<Int>, @callee_guaranteed (Float) -> (Float, Float)) (%23, %28)
+  %30 = enum $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>, #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l.bb2!enumelt, %29
+  br bb3(%26, %30)
+
+bb3(%32 : $Float, %33 : @owned $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>):
+  // function_ref specialized pullback of branch<A>(_:_:_:_:)
+  %34 = function_ref @$s8Inlining6branchyS2f_SfxmSbtlFlTJpSUUUpSrSi_Tg5 : $@convention(thin) (Float, @owned _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>) -> Float
+  %35 = partial_apply [callee_guaranteed] %34(%33) : $@convention(thin) (Float, @owned _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>) -> Float
+  %36 = tuple (%32, %35)
+  return %36
+} // end sil function '$s8Inlining6branchyS2f_SfxmSbtlFlTJrSUUUpSrSi_Tg5'
+
+// CHECK-LABEL:     {{^}}// specialized pullback of branch<A>(_:_:_:_:)
+// CHECK:           sil private [ossa] @$s8Inlining6branchyS2f_SfxmSbtlFlTJpSUUUpSrSi_Tg500187_49$s8Inlining6branchyS2f_SfxmSbtlFlTJrSUUUpSrSi_Tg5$s4main112_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l_spec_bb2_1_bb1_1_2fa0dbd82f7553c531c9cf8391d19204OD_HrIEAfdGfbfTf1nb_n :
+// CHECK:             switch_enum %[[#]], case #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l_spec_bb2_1_bb1_1_2fa0dbd82f7553c531c9cf8391d19204.bb2!enumelt: bb[[#]], case #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l_spec_bb2_1_bb1_1_2fa0dbd82f7553c531c9cf8391d19204.bb1!enumelt:
+// CHECK:             // function_ref closure #1 in static Float._vjpMultiply(lhs:rhs:)
+// CHECK-NEXT:        %[[#MUL:]] = function_ref @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ :
+// CHECK-NEXT:        %[[#]] = apply %[[#MUL]](
+// CHECK:             // function_ref autodiff subset parameters thunk for pullback
+// CHECK-NEXT:        %[[#THUNK:]] = function_ref @$sS3fIegydd_TJSpSSUpSrSUUP :
+// CHECK-NEXT:        %[[#]] = apply %[[#THUNK]](
+// CHECK:           } // end sil function
+
+// Int-specialized pullback of branch<A>(_:_:_:_:)
+sil private [ossa] @$s8Inlining6branchyS2f_SfxmSbtlFlTJpSUUUpSrSi_Tg5 : $@convention(thin) (Float, @owned _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>) -> Float {
+bb0(%0 : $Float, %1 : @owned $_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l<Int>):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0 // 0
+  switch_enum %1, case #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l.bb2!enumelt: bb1, case #_AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb3__Pred__src_0_wrt_0_l.bb1!enumelt: bb2
+
+bb1(%5 : @owned $(predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb2__Pred__src_0_wrt_0_l<Int>, @callee_guaranteed (Float) -> (Float, Float))):
+  (%6, %7) = destructure_tuple %5
+  %8 = apply %7(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  destroy_value %7
+  %10 = tuple_extract %8, 0
+  %11 = tuple_extract %8, 1
+  %12 = struct_extract %10, #Float._value
+  %13 = builtin "fadd_FPIEEE32"(%12, %2) : $Builtin.FPIEEE32
+  %14 = struct_extract %11, #Float._value
+  %15 = builtin "fadd_FPIEEE32"(%14, %13) : $Builtin.FPIEEE32
+  %16 = struct $Float (%15)
+  br bb3(%16)
+
+bb2(%19 : @owned $(predecessor: _AD__$s8Inlining6branchyS2f_SfxmSbtlF_bb1__Pred__src_0_wrt_0_l<Int>, @callee_guaranteed (Float) -> Float)):
+  (%20, %21) = destructure_tuple %19
+  %22 = apply %21(%0) : $@callee_guaranteed (Float) -> Float
+  destroy_value %21
+  %24 = struct_extract %22, #Float._value
+  %25 = builtin "fadd_FPIEEE32"(%24, %2) : $Builtin.FPIEEE32
+  %26 = struct $Float (%25)
+  br bb3(%26)
+
+bb3(%29 : $Float):
+  return %29
+} // end sil function '$s8Inlining6branchyS2f_SfxmSbtlFlTJpSUUUpSrSi_Tg5'
+
+sil shared [transparent] [thunk] [ossa] @$sS3fIegydd_TJSpSSUpSrSUUP : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> (Float, Float)) -> Float {
+bb0(%0 : $Float, %1 : @guaranteed $@callee_guaranteed (Float) -> (Float, Float)):
+  %2 = apply %1(%0) : $@callee_guaranteed (Float) -> (Float, Float)
+  %3 = tuple_extract %2, 0
+  return %3
+} // end sil function '$sS3fIegydd_TJSpSSUpSrSUUP'
+
+sil shared [ossa] @$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float, Float, Float) -> (Float, Float) {
+bb0(%0 : $Float, %1 : @closureCapture $Float, %2 : @closureCapture $Float):
+  %3 = struct_extract %1, #Float._value
+  %4 = struct_extract %0, #Float._value
+  %5 = builtin "fmul_FPIEEE32"(%3, %4) : $Builtin.FPIEEE32
+  %6 = struct $Float (%5)
+  %7 = struct_extract %2, #Float._value
+  %8 = builtin "fmul_FPIEEE32"(%7, %4) : $Builtin.FPIEEE32
+  %9 = struct $Float (%8)
+  %10 = tuple (%6, %9)
+  return %10
+} // end sil function '$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'
+
+sil shared [ossa] @$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_ : $@convention(thin) (Float) -> (Float, Float) {
+bb0(%0 : $Float):
+  %1 = tuple (%0, %0)
+  return %1
+} // end sil function '$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_'
