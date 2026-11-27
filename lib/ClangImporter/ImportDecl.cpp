@@ -3508,8 +3508,7 @@ namespace {
                     cxxRecordDecl);
             for (auto *methodDecl : generatedCxxMethodDecls) {
               if (Decl *importedInitDecl =
-                      Impl.SwiftContext.getClangModuleLoader()
-                          ->importDeclDirectly(methodDecl))
+                      Impl.importDecl(methodDecl, Impl.CurrentVersion))
                 result->addMember(importedInitDecl);
             }
           }
