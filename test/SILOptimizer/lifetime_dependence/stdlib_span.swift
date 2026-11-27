@@ -60,3 +60,31 @@ func testUBPStorageEscape(array: [Int64]) {
   } // expected-note{{this use causes the lifetime-dependent value to escape}}
   read(span)
 }
+
+// =============================================================================
+// Optional.span and Optional.mutableSpan
+// =============================================================================
+
+@_lifetime(borrow o)
+func escapingOptionalSpan(_ o: Int?) -> Span<Int> { // expected-note {{it depends on the lifetime of argument 'o'}}
+  return o.span // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{this use causes the lifetime-dependent value to escape}}
+}
+
+func readInts(_ span: Span<Int>) {}
+
+func conflictingMutation() {
+  var o: Int? = 1
+  let span = o.span // expected-note {{conflicting access is here}}
+  o = nil // expected-error {{overlapping accesses to 'o'}}
+  readInts(span)
+}
+
+func writeInts(_ span: inout MutableSpan<Int>) {}
+
+func conflictingBorrow() {
+  var o: Int? = 1
+  var span = o.mutableSpan // expected-error {{overlapping accesses to 'o'}}
+  _ = o.span // expected-note {{conflicting access is here}}
+  writeInts(&span)
+}

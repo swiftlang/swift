@@ -34,3 +34,7 @@ func testRawSpan(_ span: RawSpan) {
   _ = span.dropFirst(5)  // expected-error {{has been renamed to 'extracting(droppingFirst:)'}}
   _ = span.dropLast(5)   // expected-error {{has been renamed to 'extracting(droppingLast:)'}}
 }
+
+func testOptional(_ optional: Int?) {
+  _ = optional._span()   // expected-warning {{'_span()' is deprecated}} expected-note {{use 'span' instead}}{{16-21=span}}{{21-23=}}
+}
