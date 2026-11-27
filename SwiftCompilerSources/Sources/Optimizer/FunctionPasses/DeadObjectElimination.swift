@@ -1010,7 +1010,8 @@ private struct UseCollector : AddressDefUseWalker {
     var users = Stack<Instruction>(context)
     defer { users.deinitialize() }
 
-    for user in value.users {
+    // Debug uses don't extend the lifetime.
+    for user in value.uses.ignoreDebugUses.users {
       users.append(user)
       if let beginBorrow = user as? BeginBorrowInst {
         users.append(contentsOf: beginBorrow.scopeEndingOperands.users)
