@@ -1,8 +1,18 @@
 // Verify that -emit-imported-modules does not attempt to resolve or expand
 // freestanding or attached macros during parse-only module import collection.
 
-// RUN: %target-swift-frontend -emit-imported-modules -parse-as-library -module-name Test -D ENABLED %s 2>&1 | %FileCheck %s --match-full-lines --implicit-check-not=ConditionalDisabled --implicit-check-not=error: --implicit-check-not=warning:
-// RUN: %target-swift-frontend -emit-imported-modules -module-name Test -D ENABLED %s 2>&1 | %FileCheck %s --match-full-lines --implicit-check-not=ConditionalDisabled --implicit-check-not=error: --implicit-check-not=warning:
+// RUN: %empty-directory(%t/stats)
+// RUN: %target-swift-frontend -emit-imported-modules -parse-as-library -module-name Test -D ENABLED -stats-output-dir %t/stats -fine-grained-timers -print-zero-stats %s 2>&1 | %FileCheck %s --match-full-lines --implicit-check-not=ConditionalDisabled --implicit-check-not=error: --implicit-check-not=warning:
+// RUN: %target-swift-frontend -emit-imported-modules -module-name Test -D ENABLED -stats-output-dir %t/stats -fine-grained-timers -print-zero-stats %s 2>&1 | %FileCheck %s --match-full-lines --implicit-check-not=ConditionalDisabled --implicit-check-not=error: --implicit-check-not=warning:
+
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ResolveMacroRequest == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandMacroExpansionDeclRequest == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandMacroExpansionExprRequest == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandPeerMacroRequest == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandSynthesizedMemberMacroRequest == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandExtensionMacros == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandMemberAttributeMacros == 0' %t/stats
+// RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExpandAccessorMacros == 0' %t/stats
 
 // CHECK:      Foo
 // CHECK-NEXT: A
