@@ -522,13 +522,16 @@ if ($DependenciesOnly) {
 
 $CompilerTests = @()
 $PackageTests = @()
+$FoundationTests = @()
 $OtherTests = @()
 if ($Test -and -not $IsCrossCompiling) {
   $CompilerTests = @($Test | Where-Object { $_ -in "clang", "lld", "lldb", "lldb-swift", "llvm", "swift", "swift-prepare" })
-  $PackageTests = @($Test | Where-Object { $_ -in "foundation", "swift-format", "sourcekit-lsp", "swiftpm", "llbuild" })
+  $PackageTests = @($Test | Where-Object { $_ -in "swift-format", "sourcekit-lsp", "swiftpm", "llbuild" })
+  # These take as long as check-swift, so they run on their own.
+  $FoundationTests = @($Test | Where-Object { $_ -eq "foundation" })
   # The xctest tests use the FileCheck that the compiler tests build, and the
   # libdispatch that the dispatch tests rebuild.
-  $OtherTests = @($Test | Where-Object { $_ -notin $CompilerTests -and $_ -notin $PackageTests })
+  $OtherTests = @($Test | Where-Object { $_ -notin $CompilerTests -and $_ -notin $PackageTests -and $_ -notin $FoundationTests })
 }
 
 # The runs of build.ps1 that build parts of the toolchain build the compiler
@@ -668,6 +671,9 @@ if ($Test -and -not $IsCrossCompiling) {
   # The package tests build in their own trees, with the toolchain of the image.
   # They run at the same priority as the tests of the compilers, as the tests of
   # SourceKit-LSP time out when they wait for processors.
+  if ($FoundationTests) {
+    $TestJobs += Start-BuildJob "Test-Foundation" (Get-Run @{ Test = $FoundationTests; TestPhase = "Run" })
+  }
   if ($PackageTests) {
     $TestJobs += Start-BuildJob "Test-Packages" (Get-Run @{ Test = $PackageTests; TestPhase = "Run" })
   }
