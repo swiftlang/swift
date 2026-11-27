@@ -677,7 +677,9 @@ SILBuilder::createKilledDebugValue(SILLocation Loc, SILDebugVariable Var,
       createDebugValue(Loc, SILUndef::get(F, *type), Var, wasMoved);
   if (!debugValue)
     return nullptr;
-  // Rewrite the undef placeholder to use an undef of the correct type.
+  // Kill the operand, replacing the operand with an undef whose type category
+  // (address or object) matches the vartype, and stripping the op_deref if
+  // the type is an object.
   debugValue->killOperand(0, *type);
   return debugValue;
 }
