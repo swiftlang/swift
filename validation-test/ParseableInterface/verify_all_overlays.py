@@ -52,6 +52,8 @@ for filename in os.listdir(sdk_overlay_dir):
         # Private modules of `PlatformExecutors`, built without library
         # evolution and without a module interface.
         "_PlatformExecutorsCollections",
+        "_PlatformExecutorsSystem",
+        "_PlatformExecutorsSystemSockets",
     ]:
         continue
 

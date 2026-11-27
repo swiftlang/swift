@@ -162,10 +162,12 @@ if(SwiftRuntime_ENABLE_platformexecutors)
   ExternalProject_Get_Property(PlatformExecutorsCore BINARY_DIR)
   set(_platform_executors_core_binary_dir "${BINARY_DIR}")
   set(_platform_executors_options)
-  if(DEFINED SwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR)
-    list(APPEND _platform_executors_options
-      -DSwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR=${SwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR})
-  endif()
+  foreach(option SWIFT_COLLECTIONS_SOURCE_DIR ENABLE_IO_URING SWIFT_SYSTEM_SOURCE_DIR)
+    if(DEFINED SwiftPlatformExecutors_${option})
+      list(APPEND _platform_executors_options
+        -DSwiftPlatformExecutors_${option}=${SwiftPlatformExecutors_${option}})
+    endif()
+  endforeach()
   ExternalProject_Add(PlatformExecutors
     PREFIX "PlatformExecutors"
     SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/PlatformExecutors"

@@ -40,6 +40,23 @@ if(NOT IS_DIRECTORY "${${PROJECT_NAME}_SWIFT_COLLECTIONS_SOURCE_DIR}/Sources/Bas
   message(FATAL_ERROR "Swift PlatformExecutors needs the swift-collections checkout, which is not at ${${PROJECT_NAME}_SWIFT_COLLECTIONS_SOURCE_DIR}")
 endif()
 
+# The experimental io_uring backend on Linux with glibc, the
+# `ExperimentalIOUring` trait of swift-platform-executors. It uses swift-system,
+# built from the swift-system checkout as private modules.
+option(${PROJECT_NAME}_ENABLE_IO_URING
+  "Enable the experimental io_uring backend on Linux with glibc" OFF)
+set(${PROJECT_NAME}_SWIFT_SYSTEM_SOURCE_DIR
+  "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/../swift-system"
+  CACHE PATH "Path to the swift-system checkout")
+if(${PROJECT_NAME}_ENABLE_IO_URING)
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    message(FATAL_ERROR "The io_uring backend of Swift PlatformExecutors is only for Linux")
+  endif()
+  if(NOT IS_DIRECTORY "${${PROJECT_NAME}_SWIFT_SYSTEM_SOURCE_DIR}/Sources/SystemSockets")
+    message(FATAL_ERROR "The io_uring backend of Swift PlatformExecutors needs a swift-system checkout with SystemSockets, which is not at ${${PROJECT_NAME}_SWIFT_SYSTEM_SOURCE_DIR}")
+  endif()
+endif()
+
 # Hook point for vendor-specific extensions to the build system
 # Allowed extension points:
 #   - DefaultSettings.cmake
@@ -100,4 +117,7 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 add_subdirectory(_PlatformExecutorsCollections)
+if(${PROJECT_NAME}_ENABLE_IO_URING)
+  add_subdirectory(_PlatformExecutorsSystem)
+endif()
 add_subdirectory(PlatformExecutors)

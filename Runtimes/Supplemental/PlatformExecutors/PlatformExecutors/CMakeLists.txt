@@ -134,6 +134,27 @@ if(NOT BUILD_SHARED_LIBS)
   target_compile_options(swiftPlatformExecutors PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsCollections>")
 endif()
+# The experimental io_uring backend, the `ExperimentalIOUring` trait of the
+# package. It imports `SystemPackage` and `SystemSockets` of swift-system, which
+# are built as the private modules `_PlatformExecutorsSystem` and
+# `_PlatformExecutorsSystemSockets`, with `CSystem` as
+# `_PlatformExecutorsSystemCShims`.
+if(SwiftPlatformExecutors_ENABLE_IO_URING)
+  target_compile_options(swiftPlatformExecutors PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-D ExperimentalIOUring>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-module-alias SystemPackage=_PlatformExecutorsSystem>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-module-alias SystemSockets=_PlatformExecutorsSystemSockets>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-module-alias CSystem=_PlatformExecutorsSystemCShims>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${SwiftPlatformExecutors_SYSTEM_C_MODULE_MAP}>")
+  if(NOT BUILD_SHARED_LIBS)
+    target_compile_options(swiftPlatformExecutors PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsSystem>"
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsSystemSockets>")
+  endif()
+  target_link_libraries(swiftPlatformExecutors PRIVATE
+    swift_PlatformExecutorsSystem
+    swift_PlatformExecutorsSystemSockets)
+endif()
 target_link_libraries(swiftPlatformExecutors PRIVATE
   swift_PlatformExecutorsCShims
   swift_PlatformExecutorsCollections

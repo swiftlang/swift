@@ -177,6 +177,8 @@ if "@SWIFT_ENABLE_PLATFORM_EXECUTORS@" == "TRUE":
     config.available_features.add('platform_executors_core')
 if "@SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS@" == "TRUE":
     config.available_features.add('platform_executors')
+if "@SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING@" == "TRUE":
+    config.available_features.add('platform_executors_io_uring')
 if "@SWIFT_ENABLE_VOLATILE@" == "TRUE":
     config.available_features.add('volatile')
 if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB@" == "TRUE":

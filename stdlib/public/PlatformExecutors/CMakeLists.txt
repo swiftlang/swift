@@ -106,12 +106,35 @@ if(SWIFT_BUILD_STATIC_STDLIB)
     -Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsCollections)
 endif()
 
+# The experimental io_uring backend on Linux, the `ExperimentalIOUring` trait of
+# the package. It imports `SystemPackage` and `SystemSockets` of swift-system,
+# which are built as the private modules `_PlatformExecutorsSystem` and
+# `_PlatformExecutorsSystemSockets`, with `CSystem` as
+# `_PlatformExecutorsSystemCShims`.
+set(swift_platform_executors_linux_compile_flags)
+set(swift_platform_executors_linux_module_depends)
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING)
+  list(APPEND swift_platform_executors_linux_compile_flags
+    -D ExperimentalIOUring
+    -module-alias SystemPackage=_PlatformExecutorsSystem
+    -module-alias SystemSockets=_PlatformExecutorsSystemSockets
+    -module-alias CSystem=_PlatformExecutorsSystemCShims
+    -Xcc -fmodule-map-file=${SWIFTLIB_DIR}/_PlatformExecutorsSystemCShims/module.modulemap)
+  if(SWIFT_BUILD_STATIC_STDLIB)
+    list(APPEND swift_platform_executors_linux_compile_flags
+      -Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsSystem
+      -Xfrontend -public-autolink-library -Xfrontend swift_PlatformExecutorsSystemSockets)
+  endif()
+  list(APPEND swift_platform_executors_linux_module_depends
+    _PlatformExecutorsSystem _PlatformExecutorsSystemSockets)
+endif()
+
 add_swift_target_library(swiftPlatformExecutors ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${PLATFORM_EXECUTORS_SOURCES}
 
   SWIFT_MODULE_DEPENDS _PlatformExecutorsCore _PlatformExecutorsCollections _Concurrency Synchronization
   SWIFT_MODULE_DEPENDS_ANDROID Android
-  SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX Glibc ${swift_platform_executors_linux_module_depends}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT WinSDK
@@ -124,6 +147,8 @@ add_swift_target_library(swiftPlatformExecutors ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     ${swift_platform_executors_compile_flags}
+  SWIFT_COMPILE_FLAGS_LINUX
+    ${swift_platform_executors_linux_compile_flags}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   TARGET_SDKS ANDROID LINUX LINUX_STATIC FREEBSD WINDOWS

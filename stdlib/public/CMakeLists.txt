@@ -488,9 +488,12 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
   if(SWIFT_ENABLE_PLATFORM_EXECUTORS)
     add_subdirectory(_PlatformExecutorsCore)
     if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
-      # swift-system is only needed for the `ExperimentalIOUring` trait of the
-      # package, which isn't enabled here.
       add_subdirectory(_PlatformExecutorsCollections)
+      # swift-system is only needed for the `ExperimentalIOUring` trait of the
+      # package.
+      if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING)
+        add_subdirectory(_PlatformExecutorsSystem)
+      endif()
       add_subdirectory(PlatformExecutors)
     endif()
   endif()

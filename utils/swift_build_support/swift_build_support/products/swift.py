@@ -75,8 +75,9 @@ class Swift(product.Product):
         # Add volatile flag.
         self.cmake_options.extend(self._enable_volatile)
 
-        # Add platform executors flag.
+        # Add platform executors flags.
         self.cmake_options.extend(self._enable_platform_executors)
+        self.cmake_options.extend(self._enable_platform_executors_io_uring)
 
         # Add runtime module flag.
         self.cmake_options.extend(self._enable_runtime_module)
@@ -263,6 +264,11 @@ updated without updating swift.py?")
     def _enable_platform_executors(self):
         return [('SWIFT_ENABLE_PLATFORM_EXECUTORS:BOOL',
                  self.args.enable_platform_executors)]
+
+    @property
+    def _enable_platform_executors_io_uring(self):
+        return [('SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING:BOOL',
+                 self.args.enable_platform_executors_io_uring)]
 
     @property
     def _enable_runtime_module(self):

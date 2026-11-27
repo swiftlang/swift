@@ -872,6 +872,29 @@ if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS AND NOT SWIFT_ENABLE_SYNCHRON
   set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS FALSE)
 endif()
 
+# The experimental io_uring backend of `PlatformExecutors` on Linux, the
+# `ExperimentalIOUring` trait of swift-platform-executors. It uses swift-system,
+# built from the swift-system checkout as private modules.
+option(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING
+  "Enable the experimental io_uring backend of PlatformExecutors on Linux"
+  FALSE)
+set(SWIFT_PATH_TO_SWIFT_SYSTEM_SOURCE
+  "${CMAKE_CURRENT_SOURCE_DIR}/../swift-system"
+  CACHE PATH "Path to the swift-system checkout")
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING AND
+   NOT SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
+  message(STATUS "Not building the io_uring backend of PlatformExecutors: "
+    "PlatformExecutors isn't built")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING FALSE)
+endif()
+# The io_uring backend needs the socket support of swift-system.
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING AND
+   NOT IS_DIRECTORY "${SWIFT_PATH_TO_SWIFT_SYSTEM_SOURCE}/Sources/SystemSockets")
+  message(STATUS "Not building the io_uring backend of PlatformExecutors: "
+    "${SWIFT_PATH_TO_SWIFT_SYSTEM_SOURCE}/Sources/SystemSockets does not exist")
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING FALSE)
+endif()
+
 option(SWIFT_ENABLE_DISPATCH
   "Enable use of libdispatch"
   TRUE)
@@ -1538,6 +1561,12 @@ if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS)
   endif()
 endif()
 
+# The io_uring backend is only for Linux with glibc.
+if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING AND
+   (NOT SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS OR NOT "LINUX" IN_LIST SWIFT_SDKS))
+  set(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING FALSE)
+endif()
+
 if(SWIFT_PARALLEL_LINK_JOBS)
   if(NOT CMAKE_MAKE_PROGRAM MATCHES "ninja")
     message(WARNING "Job pooling is only available with Ninja generators.")
@@ -1635,6 +1664,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
   message(STATUS "Platform Executors Core:            ${SWIFT_ENABLE_PLATFORM_EXECUTORS}")
   message(STATUS "Platform Executors (non-Apple):     ${SWIFT_ENABLE_PLATFORM_EXECUTORS_IMPLEMENTATIONS}")
+  message(STATUS "Platform Executors io_uring:        ${SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING}")
   message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
   message(STATUS "Runtime Support:                    ${SWIFT_ENABLE_RUNTIME_MODULE}")
   message(STATUS "C++ Interop Support:                ${SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP}")
@@ -1956,6 +1986,11 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           string(APPEND runtimes_to_enable |PlatformExecutors)
           set(platform_executors_options
             -DSwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR:PATH=${SWIFT_PATH_TO_SWIFT_COLLECTIONS_SOURCE})
+          if(SWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING AND sdk STREQUAL "LINUX")
+            list(APPEND platform_executors_options
+              -DSwiftPlatformExecutors_ENABLE_IO_URING:BOOL=YES
+              -DSwiftPlatformExecutors_SWIFT_SYSTEM_SOURCE_DIR:PATH=${SWIFT_PATH_TO_SWIFT_SYSTEM_SOURCE})
+          endif()
         endif()
       endif()
       if(sdk STREQUAL "OSX")
