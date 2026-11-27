@@ -48,6 +48,11 @@ func testNCWithDeinit() {
   #endif
 }
 
+// A non-trivial C struct returned by value is owned, not autoreleased.
+func testReturnNCWithDeinit() {
+  _ = makeNonCopyableWithDeinit()
+}
+
 #if ERRORS
 // expected-warning@+1{{destroy operation 'freeCopyableType' is only allowed on non-copyable types; did you mean to use SWIFT_NONCOPYABLE?}}
 func copyableType(_: CopyableType) { }
@@ -75,6 +80,8 @@ func extra(_: borrowing ExtraDestroy) { }
 // CHECK-SIL: [[SELF_RELOAD:%[0-9]+]] = load [[SELF_ALLOC]]
 // CHECK-SIL: [[FN:%[0-9]+]] = function_ref @{{.*}}freeNonCopyableWithDeinit{{.*}} : $@convention(c) (NonCopyableWithDeinit) -> ()
 // CHECK-SIL:  apply [[FN]]([[SELF_RELOAD]]) : $@convention(c) (NonCopyableWithDeinit) -> ()
+
+// CHECK-SIL: sil {{.*}}[asmname "makeNonCopyableWithDeinit"] {{.*}} : $@convention(c) () -> @owned NonCopyableWithDeinit
 
 // CHECK-IR-LABEL: define hidden swiftcc void @"$s19noncopyable_structs19consumeNCWithDeinityySo015NonCopyableWithE0VnF"
 // CHECK-IR: call swiftcc void @"$sSo21NonCopyableWithDeinitVfD"

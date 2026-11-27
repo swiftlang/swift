@@ -33,6 +33,7 @@ extern "C" {
 #endif
 
 void freeNonCopyableWithDeinit(NonCopyableWithDeinit ncd);
+NonCopyableWithDeinit makeNonCopyableWithDeinit(void);
 void freeNonCopyableWithAPINotesDeinit(NonCopyableWithAPINotesDeinit ncd);
 void freeCopyableType(CopyableType ct);
 

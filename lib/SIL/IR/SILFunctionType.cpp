@@ -4271,11 +4271,9 @@ public:
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
       return ResultConvention::Unowned;
-    if (FnType->getReturnType()
-            ->getUnqualifiedDesugaredType()
-            ->getAsCXXRecordDecl()) {
+    // A non-trivial C or C++ record returned by value is owned by the caller.
+    if (FnType->getReturnType()->getAsRecordDecl())
       return ResultConvention::Owned;
-    }
 
     return ResultConvention::Autoreleased;
   }
