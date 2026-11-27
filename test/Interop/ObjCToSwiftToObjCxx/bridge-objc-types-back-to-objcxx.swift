@@ -125,13 +125,23 @@ public class KVOCookieMonster {
 // CHECK-NEXT: SWIFT_EXTERN void $s9UseObjCTy04takeB17CProtocolNullableyySo0bE0_pSgF(id <ObjCProtocol> _Nullable x) SWIFT_NOEXCEPT SWIFT_CALL; // takeObjCProtocolNullable(_:)
 // CHECK-NEXT: #endif
 
-// CHECK: inline const constexpr bool isUsableInGenericContext<ObjCKlass*> = true;
+// CHECK: #ifndef SWIFT_GENERIC_TRAITS_sSo9ObjCKlassCMa
+// CHECK-NEXT: #define SWIFT_GENERIC_TRAITS_sSo9ObjCKlassCMa
+// CHECK-NEXT: #pragma clang diagnostic push
+// CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
+// CHECK-NEXT: template<>
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<ObjCKlass*> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct TypeMetadataTrait<ObjCKlass*> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return UseObjCTy::_impl::$sSo9ObjCKlassCMa(0)._0;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
+// CHECK-NEXT: namespace _impl{
+// CHECK-NEXT: } // namespace
+// CHECK-NEXT: #pragma clang diagnostic pop
+// CHECK-NEXT: #endif // SWIFT_GENERIC_TRAITS_sSo9ObjCKlassCMa
+// CHECK-NEXT: #endif // defined(__OBJC__)
 
 // CHECK: SWIFT_INLINE_THUNK id <ObjCProtocol> _Nonnull retObjCProtocol() noexcept SWIFT_SYMBOL("s:9UseObjCTy03retB9CProtocolSo0bE0_pyF") SWIFT_WARN_UNUSED_RESULT NS_RETURNS_RETAINED {
 // CHECK-NEXT:  return (__bridge_transfer id <ObjCProtocol>)(__bridge void *)UseObjCTy::_impl::$s9UseObjCTy03retB9CProtocolSo0bE0_pyF();
