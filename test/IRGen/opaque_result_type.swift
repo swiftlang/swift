@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/chex.py < %s > %t/opaque_result_type.swift
-// RUN: %target-swift-frontend -enable-experimental-named-opaque-types -enable-implicit-dynamic -target %target-swift-5.1-abi-triple -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
+// RUN: %target-swift-frontend -enable-implicit-dynamic -target %target-swift-5.1-abi-triple -emit-ir %t/opaque_result_type.swift | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-NODEBUG %t/opaque_result_type.swift
 
 // rdar://76863553
 // UNSUPPORTED: OS=watchos && CPU=x86_64
@@ -195,18 +195,6 @@ public func useFoo(x: String, y: C) {
 // CHECK: [[CONFORMANCE:%.*]] = call swiftcc ptr @swift_getOpaqueTypeConformance{{2?}}(ptr {{.*}}, ptr [[OPAQUE]], [[WORD:i32|i64]] 1)
 // CHECK: [[TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}({{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_Md", ptr @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_MR")
 // CHECK: call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr [[CONFORMANCE]], ptr [[TYPE]]
-
-// Make sure we can mangle named opaque result types
-struct Boom<T: P> {
-  var prop1: Int = 5
-  var prop2: <U, V> (U, V) = ("hello", 5)
-}
-
-// CHECK-LABEL: define {{.*}} @"$s18opaque_result_type9gimmeBoomypyF
-// CHECK: call swiftcc void @"$s18opaque_result_type4BoomV5prop15prop2ACyxGSi_AcEQr_QR_tvpQOyx_Qo__AcEQr_QR_tvpQOyx_Qo0_ttcfcfA0_"
-public func gimmeBoom() -> Any {
-  Boom<String>(prop1: 5)
-}
 
 // CHECK-LABEL: define {{.*}} @"$sSS18opaque_result_type1PAA1AAaBP_AA1OPWT"
 // CHECK: [[OPAQUE:%.*]] = call {{.*}} @"$sSS18opaque_result_typeE3pooQryFQOMg"

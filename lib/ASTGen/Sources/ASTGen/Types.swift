@@ -48,8 +48,6 @@ extension ASTGenVisitor {
       return self.generate(metatypeType: node)
     case .missingType(let node):
       return self.generate(missingType: node)
-    case .namedOpaqueReturnType(let node):
-      return self.generate(namedOpaqueReturnType: node).asTypeRepr
     case .optionalType(let node):
       return self.generate(optionalType: node).asTypeRepr
     case .packElementType(let node):
@@ -62,6 +60,9 @@ extension ASTGenVisitor {
       return self.generate(suppressedType: node).asTypeRepr
     case .tupleType(let node):
       return self.generate(tupleType: node).asTypeRepr
+    default:
+      // for staging out '.namedOpaqueReturnType(_)'
+      fatalError("deliberately unhandled node")
     }
   }
 
@@ -300,12 +301,6 @@ extension ASTGenVisitor {
       arrowLoc: self.generateSourceLoc(node.returnClause.arrow),
       resultType: generate(type: node.returnClause.type)
     )
-  }
-
-  func generate(namedOpaqueReturnType node: NamedOpaqueReturnTypeSyntax) -> BridgedNamedOpaqueReturnTypeRepr {
-    let genericParams = self.generate(genericParameterClause: node.genericParameterClause)
-    let baseTy = generate(type: node.type)
-    return .createParsed(self.ctx, base: baseTy, genericParamList: genericParams)
   }
 
   func generate(someOrAnyType node: SomeOrAnyTypeSyntax) -> BridgedTypeRepr {

@@ -1399,13 +1399,6 @@ public:
   parseType(Diag<> MessageID,
             ParseTypeReason reason = ParseTypeReason::Unspecified);
 
-  /// Parse a type optionally prefixed by a list of named opaque parameters. If
-  /// no params present, return 'type'. Otherwise, return 'type-named-opaque'.
-  ///
-  ///   type-named-opaque:
-  ///     generic-params type
-  ParserResult<TypeRepr> parseTypeWithOpaqueParams(Diag<> MessageID);
-
   ParserResult<TypeRepr>
     parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason);
 

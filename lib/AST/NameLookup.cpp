@@ -3475,7 +3475,6 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::Placeholder:
   case TypeReprKind::Pack:
   case TypeReprKind::OpaqueReturn:
-  case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Sending:

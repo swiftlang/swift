@@ -113,9 +113,8 @@ bool TypeRepr::findIf(llvm::function_ref<bool(TypeRepr *)> pred,
 // TODO [OPAQUE SUPPORT]: We should probably use something like `Type`'s
 // `RecursiveProperties` to track this instead of computing it.
 bool TypeRepr::hasOpaque() {
-  return isa<NamedOpaqueReturnTypeRepr>(this) ||
-    findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); },
-           /*walkIntoGenericArgumentExprs=*/true);
+  return findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); },
+                /*walkIntoGenericArgumentExprs=*/true);
 }
 
 bool TypeRepr::isParenType() const {
@@ -885,26 +884,6 @@ void ExistentialTypeRepr::printImpl(ASTPrinter &Printer,
                                     NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("any", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
-}
-
-SourceLoc NamedOpaqueReturnTypeRepr::getStartLocImpl() const {
-  return GenericParams->getLAngleLoc();
-}
-
-SourceLoc NamedOpaqueReturnTypeRepr::getEndLocImpl() const {
-  return Base->getEndLoc();
-}
-
-SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
-  return Base->getLoc();
-}
-
-void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
-                                  const PrintOptions &Opts,
-                                  NonRecursivePrintOptions nrOpts) const {
-  GenericParams->print(Printer, Opts);
-  Printer << ' ';
-  printTypeRepr(Base, Printer, Opts);
 }
 
 void InverseTypeRepr::printImpl(ASTPrinter &Printer,
