@@ -41,19 +41,20 @@ extension StoreBorrowInst : Simplifiable, SILCombineSimplifiable {
       return false
     }
 
-    // "Move" `debug_value` instructions to the `store_borrow`'s destination operand, i.e. the `alloc_stack`
-    // This allows salvageDebugInfo to correctly reconstruct the `debug_value` for the source operand.
+    // Rewrite `debug_value` uses in place to describe the source value.
+    // This is safe because the borrowed address is immutable and holds exactly the source.
     // ```
-    //   %2 = store_borrow %1
-    //   debug_value %2
+    //   %2 = store_borrow %0 to %1
+    //   debug_value %2, let, name "x", expr op_deref
     // ```
     // ->
     // ```
-    //   %2 = store_borrow %1
-    //   debug_value %1
-    // ``
-    for use in uses where use.instruction is DebugValueInst {
-      use.set(to: destination, context)
+    //   debug_value %0, let, name "x"
+    // ```
+    for use in uses.filter(usersOfType: DebugValueInst.self) {
+      let debugValue = use.instruction as! DebugValueInst
+      use.set(to: source, context)
+      debugValue.stripDeref(index: use.index)
     }
 
     context.erase(instructionIncludingAllUsers: self)

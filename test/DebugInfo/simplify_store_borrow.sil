@@ -1,0 +1,135 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=store_borrow | %FileCheck %s
+
+import Swift
+import Builtin
+
+class C {}
+
+struct S {
+  @_hasStorage let c: C { get }
+  @_hasStorage let i: Int { get }
+  init(c: C, i: Int)
+}
+
+sil [ossa] @use : $@convention(thin) (@in_guaranteed C) -> ()
+
+// A dead store_borrow's debug_value is rewritten in place to the source.
+// CHECK-LABEL: sil [ossa] @dead_store_borrow :
+// CHECK:         alloc_stack $C
+// CHECK-NEXT:    debug_value %0, let, name "x"
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'dead_store_borrow'
+sil [ossa] @dead_store_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  debug_value %2, let, name "x", expr op_deref
+  end_borrow %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// Each variable keeps its own store_borrow's source.
+// CHECK-LABEL: sil [ossa] @two_dead_store_borrows :
+// CHECK:         alloc_stack $C
+// CHECK-NEXT:    debug_value %0, let, name "x"
+// CHECK-NEXT:    debug_value %1, let, name "y"
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'two_dead_store_borrows'
+sil [ossa] @two_dead_store_borrows : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %2 = alloc_stack $C
+  %3 = store_borrow %0 to %2
+  debug_value %3, let, name "x", expr op_deref
+  end_borrow %3
+  %5 = store_borrow %1 to %2
+  debug_value %5, let, name "y", expr op_deref
+  end_borrow %5
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The rewritten debug_value is not hoisted above other debug_values of the
+// same variable.
+// CHECK-LABEL: sil [ossa] @dead_store_borrow_keeps_position :
+// CHECK:         alloc_stack $C
+// CHECK-NEXT:    debug_value %1, let, name "x"
+// CHECK-NEXT:    debug_value %0, let, name "x"
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'dead_store_borrow_keeps_position'
+sil [ossa] @dead_store_borrow_keeps_position : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %2 = alloc_stack $C
+  %3 = store_borrow %0 to %2
+  debug_value %1, let, (name "x", loc "t.swift":1:5)
+  debug_value %3, let, (name "x", loc "t.swift":1:5), expr op_deref
+  end_borrow %3
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// Only the store_borrow operand is rewritten; the load is folded away.
+// CHECK-LABEL: sil [ossa] @dead_store_borrow_multi_operand :
+// CHECK:         alloc_stack $C
+// CHECK-NEXT:    debug_value (%1, %0), let, name "s", type $S, transform {
+// CHECK:         bb0(%0 : $Int, %1 : $C):
+// CHECK-NEXT:      %2 = struct $S (%1, %0)
+// CHECK-NEXT:      return %2
+// CHECK-NEXT:    }
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'dead_store_borrow_multi_operand'
+sil [ossa] @dead_store_borrow_multi_operand : $@convention(thin) (@guaranteed C, Int) -> () {
+bb0(%0 : @guaranteed $C, %1 : $Int):
+  %2 = alloc_stack $C
+  %3 = store_borrow %0 to %2
+  debug_value (%1 : $Int, %3 : $*C), let, name "s", type $S, transform {
+  bb0(%0 : $Int, %1 : $*C):
+    %2 = load %1 : $*C
+    %3 = struct $S (%2 : $C, %0 : $Int)
+    return %3 : $S
+  }
+  end_borrow %3
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// The alloc_stack's own variable is salvaged at the store_borrow.
+// CHECK-LABEL: sil [ossa] @dead_store_borrow_alloc_var :
+// CHECK:         alloc_stack $C, let, name "t"
+// CHECK-NEXT:    debug_value %0, let, name "t"
+// CHECK-NEXT:    dealloc_stack
+// CHECK:       } // end sil function 'dead_store_borrow_alloc_var'
+sil [ossa] @dead_store_borrow_alloc_var : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C, let, name "t"
+  %2 = store_borrow %0 to %1
+  end_borrow %2
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+// A forwarded store_borrow's debug_value keeps describing the borrowed address.
+// CHECK-LABEL: sil [ossa] @forwarded_store_borrow :
+// CHECK:         load_borrow %0
+// CHECK-NEXT:    debug_value %0, let, name "x", expr op_deref
+// CHECK-NOT:     debug_value
+// CHECK:       } // end sil function 'forwarded_store_borrow'
+sil [ossa] @forwarded_store_borrow : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = load_borrow %0
+  %2 = alloc_stack $C
+  %3 = store_borrow %1 to %2
+  debug_value %3, let, name "x", expr op_deref
+  %f = function_ref @use : $@convention(thin) (@in_guaranteed C) -> ()
+  %a = apply %f(%3) : $@convention(thin) (@in_guaranteed C) -> ()
+  end_borrow %3
+  end_borrow %1
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
