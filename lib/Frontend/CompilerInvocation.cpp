@@ -1139,8 +1139,6 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
   // compilers because that's how existing experimental feature flags work.
   if (Args.hasArg(OPT_enable_experimental_static_assert))
     Opts.enableFeature(Feature::StaticAssert);
-  if (Args.hasArg(OPT_enable_experimental_named_opaque_types))
-    Opts.enableFeature(Feature::NamedOpaqueTypes);
   if (Args.hasArg(OPT_enable_experimental_flow_sensitive_concurrent_captures))
     Opts.enableFeature(Feature::FlowSensitiveConcurrencyCaptures);
   if (Args.hasArg(OPT_enable_experimental_move_only)) {

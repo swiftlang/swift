@@ -822,10 +822,6 @@ def disable_subst_sil_function_types :
   Flag<["-"], "disable-subst-sil-function-types">,
   HelpText<"Disable substituted function types for SIL type lowering of function values">;
 
-def enable_experimental_named_opaque_types :
-  Flag<["-"], "enable-experimental-named-opaque-types">,
-  HelpText<"Enable experimental support for named opaque result types">;
-
 def enable_explicit_existential_types :
   Flag<["-"], "enable-explicit-existential-types">,
   HelpText<"Enable experimental support for explicit existential types">;

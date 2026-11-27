@@ -888,11 +888,6 @@ DisableImplicitStringProcessingImport("disable-implicit-string-processing-module
                                       llvm::cl::desc("Disable implicit import of _StringProcessing module"),
                                       llvm::cl::init(false));
 
-static llvm::cl::opt<bool> EnableExperimentalNamedOpaqueTypes(
-    "enable-experimental-named-opaque-types",
-    llvm::cl::desc("Enable experimental support for named opaque result types"),
-    llvm::cl::Hidden, llvm::cl::cat(Category), llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
 EnableExperimentalDistributed("enable-experimental-distributed",
                               llvm::cl::desc("Enable experimental distributed actors and functions"),
@@ -4707,9 +4702,6 @@ int main(int argc, char *argv[]) {
         options::LazyTypecheck;
   }
 
-  if (options::EnableExperimentalNamedOpaqueTypes) {
-    InitInvok.getLangOptions().enableFeature(Feature::NamedOpaqueTypes);
-  }
   if (options::EnableBareSlashRegexLiterals) {
     InitInvok.getLangOptions().enableFeature(Feature::BareSlashRegexLiterals);
     InitInvok.getLangOptions().EnableExperimentalStringProcessing = true;

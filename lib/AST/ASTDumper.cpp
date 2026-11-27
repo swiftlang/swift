@@ -5001,13 +5001,6 @@ public:
     printFoot();
   }
 
-  void visitNamedOpaqueReturnTypeRepr(NamedOpaqueReturnTypeRepr *T,
-                                      Label label) {
-    printCommon("type_named_opaque_return", label);
-    printRec(T->getBase(), Label::optional("base"));
-    printFoot();
-  }
-
   void visitExistentialTypeRepr(ExistentialTypeRepr *T, Label label) {
     printCommon("type_existential", label);
     printRec(T->getConstraint(), Label::optional("constraint"));
