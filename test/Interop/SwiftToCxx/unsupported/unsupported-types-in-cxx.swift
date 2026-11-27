@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
+// RUN: %FileCheck --check-prefix=INOUT %s < %t/functions.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -45,3 +46,8 @@ public struct Container {
 public typealias unsupportedTypeAliasNested = Container.NestedStruct
 
 // CHECK: // Unavailable in C++: Swift type alias 'unsupportedTypeAliasNested'
+
+// Unlike '()', 'inout ()' is passed by address.
+public func takesInoutVoid(_ x: inout ()) {}
+
+// INOUT: // Unavailable in C++: Swift global function 'takesInoutVoid(_:)'. Parameter 'x' of type '()' is not representable in C++.

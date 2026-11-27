@@ -237,6 +237,21 @@ public:
 
   std::optional<LoweredFunctionSignature>
   getFunctionLoweredSignature(AbstractFunctionDecl *fd) {
+    // FIXME: Tuple parameter mapping support.
+    for (auto param : *fd->getParameters()) {
+      auto paramTy = param->getInterfaceType();
+      // A parameter with an error type, e.g. a redeclared one, has no lowered
+      // parameter to map to.
+      if (paramTy->hasError())
+        return std::nullopt;
+      if (auto *tuple = paramTy->getAs<TupleType>()) {
+        // An 'inout ()' parameter is passed by address, unlike '()', so it
+        // can't be skipped like an empty tuple.
+        if (tuple->getNumElements() > 0 || param->isInOut())
+          return std::nullopt;
+      }
+    }
+
     auto declRef = SILDeclRef(fd);
     auto function = Lowering::SILGenModule(*silMod, declRef.getModuleContext())
                         .getFunction(declRef, swift::NotForDefinition);
@@ -249,15 +264,7 @@ public:
     if (silFuncType->getLanguage() != SILFunctionLanguage::Swift)
       return std::nullopt;
 
-    // FIXME: Tuple parameter mapping support.
     llvm::SmallVector<const ParamDecl *, 8> silParamMapping;
-    for (auto param : *fd->getParameters()) {
-      if (auto *tuple =
-              param->getInterfaceType()->getAs<TupleType>()) {
-        if (tuple->getNumElements() > 0)
-          return std::nullopt;
-      }
-    }
 
     auto funcPointerKind =
         FunctionPointerKind(FunctionPointerKind::BasicKind::Function);
