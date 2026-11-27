@@ -421,6 +421,7 @@ private struct ExtendableScope {
       if let definingInst = value.definingInstruction {
         return definingInst
       }
+      // A terminator result begins in its own block: it does not exist on the terminator's other successors.
       return value.parentBlock.instructions.first!
     }
   }

@@ -1282,6 +1282,42 @@ bb0:
   return %12
 }
 
+sil @getHolderOrThrow : $@convention(thin) () -> (@owned Holder, @error any Error)
+
+// Extend the destroy of an owned try_apply result within its normal successor. The error successor has no such value
+// to destroy.
+//
+// CHECK-LABEL: sil [ossa] @testExtendTryApplyResult : $@convention(thin) () -> @error any Error {
+// CHECK:   try_apply %{{.*}}() : $@convention(thin) () -> (@owned Holder, @error any Error), normal bb1, error bb2
+// CHECK: bb1([[HOLDER:%[0-9]+]] : @owned $Holder):
+// CHECK:   [[MD:%[0-9]+]] = mark_dependence [unresolved] %{{.*}} on [[HOLDER]]
+// CHECK-NOT: destroy_value [[HOLDER]]
+// CHECK:   apply %{{.*}}([[MD]]) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   destroy_value [[MD]]
+// CHECK-NEXT:   destroy_value [[HOLDER]]
+// CHECK: bb2([[ERROR:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT:   throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'testExtendTryApplyResult'
+sil [ossa] @testExtendTryApplyResult : $@convention(thin) () -> @error any Error {
+bb0:
+  %0 = function_ref @getHolderOrThrow : $@convention(thin) () -> (@owned Holder, @error any Error)
+  try_apply %0() : $@convention(thin) () -> (@owned Holder, @error any Error), normal bb1, error bb2
+
+bb1(%2 : @owned $Holder):
+  %3 = function_ref @getOwnedNE : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@guaranteed Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  destroy_value %2
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %5
+  %10 = tuple ()
+  return %10
+
+bb2(%12 : @owned $any Error):
+  throw %12
+}
+
 // rdar://191117232: a dependent value stored into an inout argument is live-out on every function exit, not only on
 // return. The access scope must be extended up to the throw, throw_addr, or unwind, and must end before it.
 

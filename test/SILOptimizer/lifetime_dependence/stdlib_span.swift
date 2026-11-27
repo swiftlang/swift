@@ -60,3 +60,18 @@ func testUBPStorageEscape(array: [Int64]) {
   } // expected-note{{this use causes the lifetime-dependent value to escape}}
   read(span)
 }
+
+// =============================================================================
+// Span of a temporary
+// =============================================================================
+
+struct LoadError: Error {}
+
+func loadBytes() throws(LoadError) -> [UInt8] { [] }
+
+func countBytes(_ span: Span<UInt8>) -> Int { span.count }
+
+// The temporary array only exists on the normal path of the throwing call.
+func testSpanOfThrowingResult() throws(LoadError) -> Int {
+  countBytes(try loadBytes().span)
+}
