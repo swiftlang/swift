@@ -1773,6 +1773,25 @@ function Invoke-Exclusively([string] $Name, [ScriptBlock] $Block) {
   }
 }
 
+# Enter-VsDevShell runs VsDevCmd.bat, which starts many processes and takes
+# long when the processors are busy, so the changes that it makes to the
+# environment are reused for the next calls with the same arguments, and by the
+# runs of this script that BuildMulti.ps1 starts, through files in a directory
+# that the first run creates.
+$VsDevShellChanges = @{}
+$OwnVsDevShellCache = -not $env:SWIFT_BUILD_VSDEVSHELL_CACHE
+if ($OwnVsDevShellCache) {
+  $env:SWIFT_BUILD_VSDEVSHELL_CACHE = [IO.Path]::Combine([IO.Path]::GetTempPath(), "swift-vsdevshell-$([Guid]::NewGuid())")
+}
+
+function Get-EnvironmentVariables {
+  $Variables = @{}
+  foreach ($Variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+    $Variables[$Variable.Key] = $Variable.Value
+  }
+  return $Variables
+}
+
 function Invoke-VsDevShell([Hashtable] $Platform) {
   if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
     Write-Warning "Invoke-VsDevShell called on non-Windows platform."
@@ -1787,8 +1806,62 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 
   # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
-  Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-  Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+  $CacheFile = [IO.Path]::Combine($env:SWIFT_BUILD_VSDEVSHELL_CACHE, "$($DevCmdArguments -replace '[^A-Za-z0-9.=]+', '_').json")
+  if (-not $script:VsDevShellChanges.Contains($DevCmdArguments) -and (Test-Path $CacheFile)) {
+    # Windows PowerShell does not enumerate the array that ConvertFrom-Json returns.
+    $Cached = Get-Content -Raw -ErrorAction Stop $CacheFile | ConvertFrom-Json
+    $script:VsDevShellChanges[$DevCmdArguments] = @(foreach ($Change in $Cached) {
+      @{ Name = $Change.Name; Value = $Change.Value; Prefix = $Change.Prefix; Suffix = $Change.Suffix }
+    })
+  }
+
+  if ($script:VsDevShellChanges.Contains($DevCmdArguments)) {
+    foreach ($Change in $script:VsDevShellChanges[$DevCmdArguments]) {
+      $Value = $Change.Value
+      if ($null -ne $Change.Prefix) {
+        $Value = $Change.Prefix + [Environment]::GetEnvironmentVariable($Change.Name) + $Change.Suffix
+      }
+      [Environment]::SetEnvironmentVariable($Change.Name, $Value)
+    }
+  } else {
+    $Before = Get-EnvironmentVariables
+
+    Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+    Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+
+    # VsDevCmd.bat adds entries around the values of lists like PATH.
+    $After = Get-EnvironmentVariables
+    $Changes = @()
+    foreach ($Name in $After.Keys) {
+      $Old = $Before[$Name]
+      $New = $After[$Name]
+      if ($Old -ceq $New) { continue }
+      $Index = if ($Old -and $New.Contains(";")) { $New.IndexOf($Old, [StringComparison]::Ordinal) } else { -1 }
+      if ($Index -ge 0) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $New.Substring(0, $Index); Suffix = $New.Substring($Index + $Old.Length) }
+      } else {
+        $Changes += @{ Name = $Name; Value = $New; Prefix = $null; Suffix = $null }
+      }
+    }
+    foreach ($Name in $Before.Keys) {
+      if (-not $After.Contains($Name)) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $null; Suffix = $null }
+      }
+    }
+    $script:VsDevShellChanges[$DevCmdArguments] = $Changes
+
+    # Written to another file first, as other runs may read it at any time.
+    # The first run to write it wins.
+    New-Item -ItemType Directory -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE | Out-Null
+    $TemporaryFile = "$CacheFile.$PID.tmp"
+    ConvertTo-Json -InputObject $Changes -Depth 3 | Set-Content -Path $TemporaryFile -Encoding UTF8
+    try {
+      Move-Item -ErrorAction Stop $TemporaryFile $CacheFile
+    } catch {
+      Remove-Item -ErrorAction Ignore $TemporaryFile
+    }
+  }
+
 
   if ($CustomWinSDKRoot) {
     # Using a non-installed Windows SDK. Setup environment variables manually.
@@ -1949,7 +2022,11 @@ function Get-Dependencies {
 
         Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
+        # The build only uses the compilers with assertions, the SDKs and the
+        # runtime of the pinned toolchain.
+        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | Where-Object {
+          $_.Name -notmatch "noasserts|^(dbg|ide|python)\." -and ($Android -or $_.Name -ne "android.msi")
+        } | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
@@ -3220,13 +3297,18 @@ function Get-CompilersDefines([Hashtable] $Platform,
     @{}
   }
 
+  # The C and C++ compilations use as many jobs as there are processors, and
+  # ninja runs a few more jobs, so that the long chains of Swift modules, which
+  # build with custom commands and link rules, start as soon as they can.
+  $PoolDefines = @{ LLVM_PARALLEL_COMPILE_JOBS = "$([Environment]::ProcessorCount)" }
+
   $DispatchDefines = if ($DispatchPackage) {
     @{ dispatch_DIR = $DispatchPackage }
   } else {
     @{}
   }
 
-  return $TestDefines + $DebugDefines + $DispatchDefines + @{
+  return $TestDefines + $DebugDefines + $PoolDefines + $DispatchDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3312,19 +3394,22 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
-  Build-CMakeProject `
-    -Src $SourceCache\llvm-project\llvm `
-    -Bin (Get-ProjectBinaryCache $Platform $Project) `
-    -InstallTo "$ToolchainRoot\usr" `
-    -Platform $Platform `
-    -Assembler $Assembler `
-    -CCompiler $CCompiler `
-    -CXXCompiler $CXXCompiler `
-    -SwiftCompiler $SwiftCompiler `
-    -SwiftSDK $SwiftSDK `
-    -BuildTargets @("install-distribution") `
-    -CacheScript $CacheScript `
-    -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  Invoke-IsolatingEnvVars {
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = [Environment]::ProcessorCount + 4
+    Build-CMakeProject `
+      -Src $SourceCache\llvm-project\llvm `
+      -Bin (Get-ProjectBinaryCache $Platform $Project) `
+      -InstallTo "$ToolchainRoot\usr" `
+      -Platform $Platform `
+      -Assembler $Assembler `
+      -CCompiler $CCompiler `
+      -CXXCompiler $CXXCompiler `
+      -SwiftCompiler $SwiftCompiler `
+      -SwiftSDK $SwiftSDK `
+      -BuildTargets @("install-distribution") `
+      -CacheScript $CacheScript `
+      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  }
 
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
@@ -6877,6 +6962,9 @@ if ($IncludeSBoM) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
     Write-TimingTrace "$TimingTraceDir\build-timings.json"
+  }
+  if ($OwnVsDevShellCache) {
+    Remove-Item -Recurse -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE -ErrorAction Ignore
   }
 }
 
