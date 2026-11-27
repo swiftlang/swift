@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import Builtin
 import _SynchronizationShims
 #if canImport(Android)
 import Android
@@ -48,6 +49,10 @@ extension Atomic where Value == UInt32 {
   // woken (or errno on failure); callers typically discard it.
   internal borrowing func _futexWake(count: UInt32) -> UInt32 {
     unsafe _swift_stdlib_futex_wake(.init(_rawAddress), count)
+  }
+
+  internal borrowing func _tsanAcquire() {
+    _swift_stdlib_tsan_acquire(UInt(Builtin.ptrtoint_Word(_rawAddress)))
   }
 }
 
@@ -162,6 +167,7 @@ extension _MutexHandle {
           )
           if exchanged {
             // Locked!
+            storage._tsanAcquire()
             return
           }
           // CAS failed: another thread beat us to `locked`, or a thread in the kernel phase wrote `contended`.
@@ -197,6 +203,7 @@ extension _MutexHandle {
         if visibleToSpinners {
           _ = slowPathDepth.wrappingSubtract(1, ordering: .relaxed)
         }
+        storage._tsanAcquire()
         // Locked!
         return
       }
