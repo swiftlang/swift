@@ -89,3 +89,21 @@ func passFuncRefs() -> CInt {
 
 // CHECK: sil {{.*}}[clang callFuncRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32
 // CHECK: sil {{.*}}[clang callFuncRvalueRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32
+
+func passFuncPtrRvalueRef() -> CInt {
+  return callFuncPtrRvalueRef(consuming: getStaticInt)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrRvalueRef] @{{.*}} : $@convention(c) (@in_cxx Optional<@convention(c) () -> Int32>) -> Int32
+
+func passFuncPtrPtrRvalueRef(_ f: UnsafeMutablePointer<(@convention(c) () -> CInt)?>) -> CInt {
+  return callFuncPtrPtrRvalueRef(consuming: f)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrPtrRvalueRef] @{{.*}} : $@convention(c) (@in_cxx Optional<UnsafeMutablePointer<Optional<@convention(c) () -> Int32>>>) -> Int32
+
+func passFuncPtrArrayRvalueRef(_ fs: ((@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?)) -> CInt {
+  return callFuncPtrArrayRvalueRef(consuming: fs)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrArrayRvalueRef] @{{.*}} : $@convention(c) (@in_cxx (Optional<@convention(c) () -> Int32>, Optional<@convention(c) () -> Int32>, Optional<@convention(c) () -> Int32>)) -> Int32
