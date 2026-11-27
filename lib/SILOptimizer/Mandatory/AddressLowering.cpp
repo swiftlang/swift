@@ -1327,6 +1327,17 @@ static SILValue getProjectedUseValue(Operand *operand) {
   return SILValue();
 }
 
+/// A guaranteed cast of a loadable value has no operand storage to borrow. Its
+/// own storage holds a bitwise copy of the operand that nothing destroys.
+static bool isGuaranteedCastOfLoadable(SILValue value) {
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed ||
+      !isa<UncheckedValueCastInst>(value))
+    return false;
+  auto *castInst = cast<SingleValueInstruction>(value);
+  return !castInst->getOperand(0)->getType().isAddressOnly(
+      *castInst->getFunction());
+}
+
 static bool doesNotNeedStackAllocation(SILValue value) {
   auto *defInst = value->getDefiningInstruction();
   if (!defInst)
@@ -1543,6 +1554,11 @@ void OpaqueStorageAllocation::allocateValue(SILValue value) {
   // Check for values that inherently project storage from their operand.
   if (auto *storageOper = getProjectedDefOperand(value)) {
     pass.valueStorageMap.recordDefProjection(storageOper, value);
+    return;
+  }
+
+  if (isGuaranteedCastOfLoadable(value)) {
+    createStackAllocationStorage(value);
     return;
   }
 
@@ -1793,7 +1809,8 @@ SILInstruction *AddressLoweringState::getLatestOpeningInst(SILType ty) const {
 // immediately before the return. This allows the return to be rewritten by
 // loading from storage.
 AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
-  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed &&
+  assert((value->getOwnershipKind() != OwnershipKind::Guaranteed ||
+          isGuaranteedCastOfLoadable(value)) &&
          "creating storage for a guaranteed value implies a copy");
   // Instructions that produce an opened type never reach here because they
   // have guaranteed ownership--they project their storage. We reach this
@@ -4691,6 +4708,15 @@ protected:
       return;
     }
 
+    // A forwarding cast of an owned source moves it into the result.
+    if (use->isLifetimeEnding()) {
+      SILValue load = builder.createTrivialLoadOr(
+          uncheckedCastInst->getLoc(), destAddr, LoadOwnershipQualifier::Take);
+      uncheckedCastInst->replaceAllUsesWith(load);
+      pass.deleter.forceDelete(uncheckedCastInst);
+      return;
+    }
+
     // For loadable cast destination type, replace copies with load copies.
     if (Operand *use = uncheckedCastInst->getSingleUse()) {
       if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
@@ -5532,6 +5558,9 @@ protected:
     ApplyRewriter(applyInst, pass).convertApplyWithIndirectResults();
   }
 
+  // Storing through a view of the result's storage keeps MemoryLifetimeVerifier
+  // from tracking it, which an unowned or guaranteed result needs because
+  // nothing destroys it.
   void rewriteOpaqueUncheckedCastDef(SingleValueInstruction *uncheckedCast) {
     SILValue srcVal = uncheckedCast->getOperand(0);
     assert(!srcVal->getType().isAddressOnly(*pass.function) &&
@@ -5542,10 +5571,17 @@ protected:
     auto loc = uncheckedCast->getLoc();
     SILValue srcView = builder.createUncheckedAddrCast(
         loc, destAddr, srcVal->getType().getAddressType());
-    auto qual = srcVal->getType().isTrivial(*pass.function)
-                    ? StoreOwnershipQualifier::Trivial
-                    : StoreOwnershipQualifier::Init;
-    builder.createStore(loc, srcVal, srcView, qual);
+    if (srcVal->getType().isTrivial(*pass.function)) {
+      builder.createStore(loc, srcVal, srcView,
+                          StoreOwnershipQualifier::Trivial);
+    } else {
+      // Store a bitwise copy of a source that the cast does not consume.
+      if (!uncheckedCast->getOperandRef(0).isLifetimeEnding()) {
+        srcVal = builder.createUncheckedOwnershipConversion(
+            loc, srcVal, OwnershipKind::Owned);
+      }
+      builder.createStore(loc, srcVal, srcView, StoreOwnershipQualifier::Init);
+    }
     storage.markRewritten();
   }
 
