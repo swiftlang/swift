@@ -1240,6 +1240,11 @@ private:
                                      bool isClassMethod,
                                      bool isNSUIntegerSubscript = false,
                                      const SubscriptDecl *SD = nullptr) {
+    // Members are filtered on their storage, which can be valid while its
+    // accessor is not, e.g. after parse errors. An accessor's isInvalid() only
+    // consults its interface type once computed, so compute it here.
+    if (AFD->getInterfaceType()->hasError() || AFD->isInvalid())
+      return;
     std::optional<ForeignAsyncConvention> asyncConvention =
         AFD->getForeignAsyncConvention();
     std::optional<ForeignErrorConvention> errorConvention =
