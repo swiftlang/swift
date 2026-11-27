@@ -874,3 +874,129 @@ extension AddressUseDefWalker {
     }
   }
 }
+
+/// The path of an `AddressMutationWalker`. It tracks only `isExact` and ignores the fields the walk passes through.
+public struct AddressMutationPath : WalkingPath {
+  /// False if the address may not be exactly the walked memory.
+  let isExact: Bool
+
+  init(isExact: Bool) { self.isExact = isExact }
+  public func merge(with other: Self) -> Self { Self(isExact: isExact && other.isExact) }
+  public func pop(kind: FieldKind) -> (index: Int, path: Self)? { nil }
+  public func popIfMatches(_ kind: FieldKind, index: Int?) -> Self? { self }
+  public func push(_ kind: FieldKind, index: Int) -> Self { self }
+}
+
+/// A def-use walker which reports the uses that may write to, or consume, the walked memory.
+///
+/// The SIL verifier ignores a possible mutation, and an optimization treats it as a write. Changes to the walk
+/// must keep these rules:
+/// - Pass over a use without a callback only if it does not write. Otherwise an optimization misses a write.
+/// - Report a use as a definite mutation only if `isMutatedAddress` is true and the path is exact. Otherwise the
+///   verifier rejects valid SIL.
+/// - Walk the uses of a derived address that may not be exactly the walked memory with an inexact path. The walk
+///   does so for `tail_addr`, `unchecked_addr_cast` and `index_addr` without `[projection]`.
+public protocol AddressMutationWalker : AddressDefUseWalker where Path == AddressMutationPath {
+  /// Called for a use which definitely writes to, or consumes, the walked memory.
+  mutating func definiteMutation(of operand: Operand) -> WalkResult
+
+  /// Called for a use which may write to, or consume, the walked memory, including a use the walk does not know.
+  mutating func possibleMutation(of operand: Operand) -> WalkResult
+}
+
+extension AddressMutationWalker {
+  public mutating func walkDownMutations(ofAddress address: Value) -> WalkResult {
+    walkDownUses(ofAddress: address, path: AddressMutationPath(isExact: true))
+  }
+
+  public mutating func walkDown(address: Operand, path: AddressMutationPath) -> WalkResult {
+    switch address.instruction {
+    case let beginAccess as BeginAccessInst where beginAccess.accessKind != .read:
+      return possibleMutation(of: address)
+    case let openExistential as OpenExistentialAddrInst where !openExistential.isImmutable:
+      if possibleMutation(of: address) == .abortWalk {
+        return .abortWalk
+      }
+    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst, is InitExistentialAddrInst,
+         is MarkUninitializedInst, is DropDeinitInst:
+      if possibleMutation(of: address) == .abortWalk {
+        return .abortWalk
+      }
+    default:
+      break
+    }
+    return walkDownDefault(address: address, path: path)
+  }
+
+  public mutating func leafUse(address: Operand, path: AddressMutationPath) -> WalkResult {
+    if address.isMutatedAddress {
+      return path.isExact ? definiteMutation(of: address) : possibleMutation(of: address)
+    }
+    switch address.instruction {
+    case is LoadInst, is SourceDestAddrInstruction:
+      // `isMutatedAddress` already handled `load [take]` and the destination or taken source of a copy.
+      return .continueWalk
+    case let partialApply as PartialApplyInst:
+      return partialApply.isOnStack && partialApply.convention(of: address)?.isGuaranteed == true
+        ? .continueWalk : possibleMutation(of: address)
+    case let cast as CheckedCastAddrBranchInst:
+      switch cast.consumptionKind {
+      case .CopyOnSuccess, .TestOnly:
+        return address == cast.sourceOperand ? .continueWalk : possibleMutation(of: address)
+      case .TakeAlways, .TakeOnSuccess:
+        return possibleMutation(of: address)
+      }
+    case let apply as FullApplySite:
+      return apply.convention(of: address)?.isGuaranteed == true ? .continueWalk : possibleMutation(of: address)
+    case let yield as YieldInst:
+      return yield.convention(of: address).isGuaranteed ? .continueWalk : possibleMutation(of: address)
+    case let indexing as IndexingInstruction:
+      return walkDownUses(ofAddress: indexing, path: AddressMutationPath(isExact: false))
+    case let addrCast as UncheckedAddrCastInst:
+      return walkDownUses(ofAddress: addrCast, path: AddressMutationPath(isExact: false))
+    case is LoadBorrowInst, is DebugValueInst, is FixLifetimeInst, is IgnoredUseInst,
+         is AddressToPointerInst, is SwitchEnumAddrInst, is SelectEnumAddrInst,
+         is ValueMetatypeInst, is ExistentialMetatypeInst, is MarkDependenceAddrInst:
+      return .continueWalk
+    default:
+      return possibleMutation(of: address)
+    }
+  }
+}
+
+private extension Operand {
+  // Returns true if the operand's instruction is definitely writing to the operand's address value.
+  var isMutatedAddress: Bool {
+    assert(value.type.isAddress)
+    switch instruction {
+    case let store as StoringInstruction:
+      return self == store.destinationOperand
+    case let copy as SourceDestAddrInstruction:
+      if self == copy.destinationOperand {
+        return true
+      } else if self == copy.sourceOperand && copy.isTakeOfSource {
+        return true
+      }
+      return false
+    case let load as LoadInst:
+      return load.loadOwnership == .take
+    case let partialApply as PartialApplyInst:
+      if !partialApply.isOnStack,
+         let convention = partialApply.convention(of: self)
+      {
+        switch convention {
+        case .indirectIn, .indirectInGuaranteed:
+          // Such operands are consumed by the `partial_apply` and therefore count as "written".
+          return true
+        default:
+          return false
+        }
+      }
+      return false
+    case is DestroyAddrInst, is IsUniqueInst:
+      return true
+    default:
+      return false
+    }
+  }
+}

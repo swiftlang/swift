@@ -293,7 +293,7 @@ extension VectorBaseAddrInst : VerifiableInstruction {
 // _definitely_ will mutate the memory.
 // Otherwise the risk would be too big for false alarms. It also means that this verification is not perfect and
 // might miss some subtle violations.
-private struct MutatingUsesWalker : AddressDefUseWalker {
+private struct MutatingUsesWalker : AddressMutationWalker {
   let context: VerificationContext
   var mutatingInstructions: InstructionSet
 
@@ -307,7 +307,7 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
   }
 
   mutating func findMutatingUses(of address: Value) {
-    _ = walkDownUses(ofAddress: address, path: UnusedWalkingPath())
+    _ = walkDownMutations(ofAddress: address)
   }
 
   mutating func verifyNoMutatingUsesInLiverange(of load: LoadBorrowInst) {
@@ -351,57 +351,15 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
     }
   }
 
-  mutating func walkDown(address: Operand, path: UnusedWalkingPath) -> WalkResult {
-    if let beginAccess = address.instruction as? BeginAccessInst, beginAccess.accessKind != .read {
-      // Don't verify that there are no stores in read-only access scopes if there is a conflicting scope.
-      // This is a programming error, but the compiler should not crash. The violation is caught at runtime.
-      return .continueWalk
-    }
-    return walkDownDefault(address: address, path: path)
-  }
-
-  mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
-    if address.isMutatedAddress {
-      mutatingInstructions.insert(address.instruction)
-    }
+  mutating func definiteMutation(of operand: Operand) -> WalkResult {
+    mutatingInstructions.insert(operand.instruction)
     return .continueWalk
   }
-}
 
-private extension Operand {
-  // Returns true if the operand's instruction is definitely writing to the operand's address value.
-  var isMutatedAddress: Bool {
-    assert(value.type.isAddress)
-    switch instruction {
-    case let store as StoringInstruction:
-      return self == store.destinationOperand
-    case let copy as SourceDestAddrInstruction:
-      if self == copy.destinationOperand {
-        return true
-      } else if self == copy.sourceOperand && copy.isTakeOfSource {
-        return true
-      }
-      return false
-    case let load as LoadInst:
-      return load.loadOwnership == .take
-    case let partialApply as PartialApplyInst:
-      if !partialApply.isOnStack,
-         let convention = partialApply.convention(of: self)
-      {
-        switch convention {
-        case .indirectIn, .indirectInGuaranteed:
-          // Such operands are consumed by the `partial_apply` and therefore count as "written".
-          return true
-        default:
-          return false
-        }
-      }
-      return false
-    case is DestroyAddrInst, is IsUniqueInst:
-      return true
-    default:
-      return false
-    }
+  mutating func possibleMutation(of operand: Operand) -> WalkResult {
+    // Also called for a conflicting access scope. That is a programming error, but the compiler should not crash.
+    // The violation is caught at runtime.
+    return .continueWalk
   }
 }
 
