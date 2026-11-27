@@ -137,12 +137,13 @@ public struct SSAUpdater<Context: MutatingContext> {
       }
       // Merge values from the end of each predecessor.
       for pred in current.predecessors {
-        if let value = getComputedValue(atEndOf: pred) {
-          if !merge(value) {
-            return nil
-          }
-        } else {
+        guard let value = getComputedValue(atEndOf: pred) else {
+          // If the value is not found in this block, walk up its predecessors.
           worklist.pushIfNotVisited(pred)
+          continue
+        }
+        if !merge(value) {
+          return nil
         }
       }
     }
