@@ -245,9 +245,9 @@ template <class Runtime>
 struct TargetEnumValueWitnessTable : TargetValueWitnessTable<Runtime> {
 #define WANT_ONLY_ENUM_VALUE_WITNESSES
 #define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
+  typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
 #define FUNCTION_VALUE_WITNESS(LOWER_ID, UPPER_ID, RET, PARAMS) \
-  ValueWitnessTypes::LOWER_ID LOWER_ID;
+  typename TargetValueWitnessTypes<Runtime>::LOWER_ID LOWER_ID;
 
 #include "swift/ABI/ValueWitness.def"
 

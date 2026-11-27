@@ -95,11 +95,10 @@ using TargetSignedContextPointer
 
 /// A relative pointer to a type context descriptor.
 template <typename Runtime,
-          template<typename> class Context = TargetContextDescriptor>
-using TargetRelativeContextPointer =
-  RelativeIndirectablePointer<const Context<Runtime>,
-                              /*nullable*/ true, int32_t,
-                              TargetSignedContextPointer<Runtime, Context>>;
+          template <typename> class Context = TargetContextDescriptor>
+using TargetRelativeContextPointer = TargetRelativeIndirectablePointer<
+      Runtime, const Context<Runtime>, /*nullable*/ true, int32_t,
+      TargetSignedContextPointer<Runtime, Context>>;
 using RelativeContextPointer = TargetRelativeContextPointer<InProcess>;
 
 /// A relative-indirectable pointer to a type context descriptor, with
@@ -132,10 +131,11 @@ struct TargetObjCProtocolPrefix {
 template <typename Runtime>
 class TargetProtocolDescriptorRef {
   using StoredPointer = typename Runtime::StoredPointer;
+  using StoredSize = typename Runtime::StoredSize;
   using ProtocolDescriptorPointer =
     ConstTargetMetadataPointer<Runtime, TargetProtocolDescriptor>;
 
-  enum : StoredPointer {
+  enum : StoredSize {
     // The bit used to indicate whether this is an Objective-C protocol.
     IsObjCBit = 0x1U,
   };
@@ -330,21 +330,23 @@ template <typename Runtime>
 struct TargetTypeReference {
   union {
     /// A direct reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<TargetContextDescriptor<Runtime>>
+    TargetRelativeDirectPointer<Runtime, TargetContextDescriptor<Runtime>>
       DirectTypeDescriptor;
 
     /// An indirect reference to a TypeContextDescriptor or ProtocolDescriptor.
-    RelativeDirectPointer<
-        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> * __ptrauth_swift_type_descriptor>>
+    TargetRelativeDirectPointer<
+        Runtime,
+        TargetSignedPointer<Runtime, TargetContextDescriptor<Runtime> *
+                                         __ptrauth_swift_type_descriptor>>
       IndirectTypeDescriptor;
 
     /// An indirect reference to an Objective-C class.
-    RelativeDirectPointer<
-        ConstTargetMetadataPointer<Runtime, TargetClassMetadataType>>
+    TargetRelativeDirectPointer<
+        Runtime, ConstTargetMetadataPointer<Runtime, TargetClassMetadataType>>
       IndirectObjCClass;
 
     /// A direct reference to an Objective-C class name.
-    RelativeDirectPointer<const char>
+    TargetRelativeDirectPointer<Runtime, const char>
       DirectObjCClassName;
   };
 

@@ -96,12 +96,18 @@ struct InProcess {
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = FarRelativeDirectPointer<T, Nullable>;
 
-  template <typename T, bool Nullable = false>
+  template <typename T, bool Nullable = false, typename Offset = int32_t,
+            typename IndirectType = const T *>
   using RelativeIndirectablePointer =
-    RelativeIndirectablePointer<T, Nullable>;
+    RelativeIndirectablePointer<T, Nullable, Offset, IndirectType>;
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = RelativeDirectPointer<T, Nullable>;
+
+  template <typename T, typename IntTy, bool Nullable = false,
+            typename Offset = int32_t>
+  using RelativeDirectPointerIntPair =
+    RelativeDirectPointerIntPair<T, IntTy, Nullable, Offset>;
 
   template <typename T, bool Nullable = true, typename Offset = int32_t>
 #if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
@@ -167,14 +173,19 @@ struct External {
   template <typename T, bool Nullable = false>
   using FarRelativeDirectPointer = StoredPointer;
 
-  template <typename T, bool Nullable = false>
-  using RelativeIndirectablePointer = int32_t;
+  template <typename T, bool Nullable = false, typename Offset = int32_t,
+            typename IndirectType = const T *>
+  using RelativeIndirectablePointer = Offset;
 
   template <typename T, bool Nullable = true>
   using RelativeDirectPointer = int32_t;
 
+  template <typename T, typename IntTy, bool Nullable = false,
+            typename Offset = int32_t>
+  using RelativeDirectPointerIntPair = Offset;
+
   template <typename T, bool Nullable = true, typename Offset = int32_t>
-  using CompactFunctionPointer = int32_t;
+  using CompactFunctionPointer = Offset;
 
   StoredPointer getStrippedSignedPointer(const StoredSignedPointer pointer) const {
     return swift_ptrauth_strip(pointer);
@@ -200,9 +211,17 @@ template <typename Runtime, typename Pointee, bool Nullable = true>
 using TargetRelativeDirectPointer
   = typename Runtime::template RelativeDirectPointer<Pointee, Nullable>;
 
-template <typename Runtime, typename Pointee, bool Nullable = true>
+template <typename Runtime, typename Pointee, bool Nullable = true,
+          typename Offset = int32_t, typename IndirectType = const Pointee *>
 using TargetRelativeIndirectablePointer
-  = typename Runtime::template RelativeIndirectablePointer<Pointee,Nullable>;
+  = typename Runtime::template RelativeIndirectablePointer<
+        Pointee, Nullable, Offset, IndirectType>;
+
+template <typename Runtime, typename Pointee, typename IntTy,
+          bool Nullable = false, typename Offset = int32_t>
+using TargetRelativeDirectPointerIntPair
+  = typename Runtime::template RelativeDirectPointerIntPair<Pointee, IntTy,
+                                                            Nullable, Offset>;
 
 template <typename Runtime, typename Pointee, bool Nullable = true,
           typename Offset = int32_t>
