@@ -255,8 +255,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
     if (auto *stats = ctx.Stats)
       ++stats->getFrontendCounters().ClangNamespaceMemberLookupMatched;
 
-    if (auto *importedDecl =
-            ctx.getClangModuleLoader()->importDeclDirectly(foundDecl))
+    if (auto *importedDecl = Importer.importDeclDirectly(foundDecl))
       collector.add(cast<ValueDecl>(importedDecl));
   }
   return result;
@@ -268,7 +267,8 @@ void importer::forEachCXXNamespaceMember(
   auto *namespaceDecl =
       cast<clang::NamespaceDecl>(namespaceEnum->getClangDecl());
   auto &ctx = namespaceEnum->getASTContext();
-  auto *clangModuleLoader = ctx.getClangModuleLoader();
+  auto *clangModuleLoader =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   // Keep track of which names we've seen and which decls we've imported.
   // When we lookup a member by name, we import all of them at once.
@@ -397,7 +397,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   CollectLookupResults collector(name.getBaseName(), result, Importer.Impl);
 
   // Find the results that are actually a member of "recordDecl".
-  ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (const clang::NamedDecl *found : directResults) {
     // We should not import 'found' if the following are all true:
     //
@@ -424,7 +423,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       continue;
 
     auto *imported =
-        cast_or_null<ValueDecl>(clangModuleLoader->importDeclDirectly(found));
+        cast_or_null<ValueDecl>(Importer.importDeclDirectly(found));
     if (!imported)
       continue;
 
@@ -437,13 +436,13 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         if (alternate->getBaseName() != name.getBaseName() ||
             alternate->getDeclContext() != imported->getDeclContext())
           continue;
-        if (auto *clonedAlternate = clangModuleLoader->importBaseMemberDecl(
+        if (auto *clonedAlternate = Importer.importBaseMemberDecl(
                 alternate, inheritingDecl, inheritance))
           result.push_back(clonedAlternate);
       }
 
-      imported = clangModuleLoader->importBaseMemberDecl(
-          imported, inheritingDecl, inheritance);
+      imported =
+          Importer.importBaseMemberDecl(imported, inheritingDecl, inheritance);
       if (!imported)
         continue;
     }
@@ -465,7 +464,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       auto ownVD = dyn_cast<VarDecl>(m);
       if (ownVD && ownVD->hasName() && ownVD->getBaseName() == name &&
           !ownVD->hasClangNode() &&
-          !clangModuleLoader->getOriginalForClonedMember(ownVD)) {
+          !Importer.getOriginalForClonedMember(ownVD)) {
         derivedHasOwnSynthesizedVar = true;
         break;
       }
@@ -476,14 +475,14 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
           namedMember->getBaseName() != name ||
-          clangModuleLoader->isMemberSynthesizedPerType(namedMember) ||
-          clangModuleLoader->getOriginalForClonedMember(namedMember))
+          Importer.isMemberSynthesizedPerType(namedMember) ||
+          Importer.getOriginalForClonedMember(namedMember))
         continue;
 
       if (derivedHasOwnSynthesizedVar && isa<VarDecl>(namedMember))
         continue;
 
-      auto *imported = clangModuleLoader->importBaseMemberDecl(
+      auto *imported = Importer.importBaseMemberDecl(
           namedMember, inheritingDecl, inheritance);
       if (!imported)
         continue;
@@ -536,7 +535,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         // Skip circular bases to avoid unbounded recursion
         continue;
 
-      if (auto import = clangModuleLoader->importDeclDirectly(baseRecord)) {
+      if (auto import = Importer.importDeclDirectly(baseRecord)) {
         // If we are looking up the base class, go no further. We will have
         // already found it during the other lookup.
         if (cast<ValueDecl>(import)->getName() == name)
