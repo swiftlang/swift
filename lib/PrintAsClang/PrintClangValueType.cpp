@@ -83,7 +83,7 @@ printCValueTypeStorageStruct(raw_ostream &os, const NominalTypeDecl *typeDecl,
   os << "struct ";
   printCTypeName(os, typeDecl);
   os << " {\n";
-  os << "  _Alignas(" << layout.alignment << ") ";
+  os << "  SWIFT_ALIGNAS(" << layout.alignment << ") ";
   os << "char _storage[" << layout.size << "];\n";
   os << "};\n\n";
 }

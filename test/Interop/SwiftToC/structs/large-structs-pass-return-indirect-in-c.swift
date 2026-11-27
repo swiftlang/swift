@@ -8,7 +8,7 @@ public struct StructSeveralI64 {
     let x1, x2, x3, x4, x5: Int64
 }
 // CHECK:      struct Structs_StructSeveralI64 {
-// CHECK-NEXT:   _Alignas(8) char _storage[40];
+// CHECK-NEXT:   SWIFT_ALIGNAS(8) char _storage[40];
 // CHECK-NEXT: };
 
 // CHECK-NOT: swift_interop
