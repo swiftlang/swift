@@ -93,10 +93,7 @@ public:
 
   void initBindingSet();
 
-  inference::BindingSet &getBindingSet() {
-    ASSERT(hasBindingSet());
-    return *Set;
-  }
+  inference::BindingSet &getBindingSet();
 
   const inference::BindingSet &getBindingSet() const {
     ASSERT(hasBindingSet());
