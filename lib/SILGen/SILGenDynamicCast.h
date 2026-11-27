@@ -38,6 +38,10 @@ RValue emitUnconditionalCheckedCast(SILGenFunction &SGF,
                                     CheckedCastKind castKind,
                                     SGFContext C);
 
+RValue emitUnconditionalCheckedCast(SILGenFunction &SGF, SILLocation loc,
+                                    ManagedValue operand, Type operandType,
+                                    Type targetType, SGFContext C);
+
 RValue emitConditionalCheckedCast(SILGenFunction &SGF, SILLocation loc,
                                   ManagedValue operand, Type operandType,
                                   Type targetType, CheckedCastKind castKind,
