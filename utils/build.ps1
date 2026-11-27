@@ -960,6 +960,7 @@ function Write-TimingTrace([string] $Path) {
       args = [ordered]@{
         Platform = $Entry.Platform
         Arch = $Entry.Arch
+        Variant = $Entry.Variant
         CPU = [math]::Round($Entry.CPU, 2)
       }
     }
