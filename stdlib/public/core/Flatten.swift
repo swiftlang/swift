@@ -38,6 +38,8 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
   }
 }
 
+extension FlattenSequence: BitwiseCopyable where Base: BitwiseCopyable {}
+
 extension FlattenSequence: Sendable where Base: Sendable {}
 
 extension FlattenSequence {
@@ -55,6 +57,10 @@ extension FlattenSequence {
     }
   }
 }
+
+extension FlattenSequence.Iterator: BitwiseCopyable
+  where Base.Iterator: BitwiseCopyable,
+        Base.Element.Iterator: BitwiseCopyable {}
 
 extension FlattenSequence.Iterator: Sendable
   where Base.Iterator: Sendable, Base.Element.Iterator: Sendable {}
@@ -166,6 +172,9 @@ extension FlattenSequence where Base: Collection, Base.Element: Collection {
     }
   }
 }
+
+extension FlattenSequence.Index: BitwiseCopyable
+  where Base.Index: BitwiseCopyable, Base.Element.Index: BitwiseCopyable {}
 
 extension FlattenSequence.Index: Sendable
   where Base.Index: Sendable, Base.Element.Index: Sendable {}
