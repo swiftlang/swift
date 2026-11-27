@@ -416,6 +416,10 @@ static void desugarConformanceRequirement(
       subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
                            LayoutConstraint::getLayoutConstraint(
                              LayoutConstraintKind::Class));
+    } else if (compositionType->hasExplicitAnyReference()) {
+      subReqs.emplace_back(RequirementKind::Layout, req.getFirstType(),
+                           LayoutConstraint::getLayoutConstraint(
+                               LayoutConstraintKind::ObjectReference));
     }
 
     for (auto memberType : compositionType->getMembers()) {

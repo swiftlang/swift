@@ -821,8 +821,13 @@ Type GenericSignatureImpl::getUpperBound(Type type,
     types.push_back(baseType);
   }
 
+  // ProtocolCompositionType::get() drops '& _AnyReference' if it's redundant.
+  auto layout = getLayoutConstraint(type);
+  bool hasExplicitAnyReference = layout && layout->isObjectReference();
+
   return ProtocolCompositionType::get(ctx, types, inverses,
-                                      hasExplicitAnyObject);
+                                      hasExplicitAnyObject,
+                                      hasExplicitAnyReference);
 }
 
 Type GenericSignatureImpl::getExistentialType(Type paramTy) const {

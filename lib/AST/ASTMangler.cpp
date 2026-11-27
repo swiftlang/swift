@@ -3877,6 +3877,11 @@ void ASTMangler::appendRequirement(const Requirement &reqt,
 
   switch (reqt.getKind()) {
   case RequirementKind::Layout:
+    // For now, we erase AnyReference at runtime,
+    // just like we do for marker protocols.
+    if (!AllowMarkerProtocols &&
+        reqt.getLayoutConstraint()->isObjectReference())
+      return;
     break;
   case RequirementKind::Conformance: {
     // If we don't allow marker protocols but we have one here, skip it.
@@ -4789,6 +4794,9 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
     break;
   case LayoutConstraintKind::NativeRefCountedObject:
     appendOperatorParam("N");
+    break;
+  case LayoutConstraintKind::ObjectReference:
+    appendOperatorParam("O");
     break;
   case LayoutConstraintKind::Class:
     appendOperatorParam("C");

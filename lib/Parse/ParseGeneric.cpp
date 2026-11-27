@@ -345,6 +345,7 @@ ParserStatus Parser::parseGenericWhereClause(
           // There was a bug in the layout constraint.
           Status.setIsParseError();
         }
+
         auto Layout = LayoutInfo;
         // Types in SIL mode may contain layout constraints.
         if (!AllowLayoutConstraints && !isInSILMode()) {

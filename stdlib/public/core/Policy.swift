@@ -178,6 +178,12 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
+/// The protocol to which all classes and foreign reference types implicitly conform to. 
+/// Every AnyObject is also a AnyReference, but the opposite is not true.
+///
+/// This is an experimental feature. To use it, pass '-enable-experimental-feature AnyReference'.
+public typealias _AnyReference = Builtin._AnyReference
+
 #if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///

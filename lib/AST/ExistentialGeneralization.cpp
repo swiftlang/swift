@@ -109,7 +109,8 @@ private:
     }
     return ProtocolCompositionType::get(ctx, newMembers,
                                         origType->getInverses(),
-                                        origType->hasExplicitAnyObject());
+                                        origType->hasExplicitAnyObject(),
+                                        origType->hasExplicitAnyReference());
   }
 
   // Generalize the type arguments of nominal types.

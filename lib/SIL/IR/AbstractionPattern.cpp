@@ -2614,6 +2614,7 @@ public:
       
       case LayoutConstraintKind::UnknownLayout:
       case LayoutConstraintKind::Trivial:
+      case LayoutConstraintKind::ObjectReference:
         // These constraints don't really constrain the ABI, so we can
         // eliminate them.
         layout = LayoutConstraint();
@@ -2988,7 +2989,8 @@ public:
         TC.Context,
         substMembers,
         pct->getInverses(),
-        pct->hasExplicitAnyObject()));
+        pct->hasExplicitAnyObject(),
+        pct->hasExplicitAnyReference()));
   }
 
   /// Visit a tuple pattern.  Note that, because of vanishing tuples,
