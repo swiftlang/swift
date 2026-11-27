@@ -6732,14 +6732,23 @@ ERROR(sendable_raw_storage,none,
       "protocol", (DeclName))
 
 ERROR(typeattr_not_inheritance_clause,none,
-      "%0 only applies in inheritance clauses",
+      "%0 is not applicable in this position",
       (const TypeAttribute *))
+NOTE(note_typeattr_inheritance_clause,none,
+     "%0 can only be used in an inheritance clause",
+     (const TypeAttribute *))
 ERROR(typeattr_not_extension_inheritance_clause,none,
-      "%0 only applies in inheritance clauses in extensions",
+      "%0 is not applicable in this position",
       (const TypeAttribute *))
+NOTE(note_typeattr_extension_inheritance_clause,none,
+     "%0 can only be used in an inheritance clause in an extension",
+     (const TypeAttribute *))
 ERROR(typeattr_not_protocol_inheritance_clause,none,
-      "%0 only applies in inheritance clause of a protocol extension",
+      "%0 is not applicable in this position",
       (const TypeAttribute *))
+NOTE(note_typeattr_protocol_inheritance_clause,none,
+     "%0 can only be used in an inheritance clause of a protocol extension",
+     (const TypeAttribute *))
 ERROR(typeattr_not_existential,none,
       "%0 cannot apply to non-protocol type %1",
       (const TypeAttribute *, Type))
