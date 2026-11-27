@@ -847,6 +847,35 @@ Expr *swift::buildPropertyWrapperInitCall(
   return initializer;
 }
 
+Expr *swift::buildPropertyWrapperAttributeInitCall(const VarDecl *var) {
+  Type outermostWrapperType = var->getAttachedPropertyWrapperType(0);
+  if (!outermostWrapperType)
+    return nullptr;
+
+  ASTContext &ctx = var->getASTContext();
+  auto *outermostWrapperAttr = var->getOutermostAttachedPropertyWrapper();
+  bool isImplicit = false;
+
+  // Retrieve the outermost wrapper argument. If there isn't one, we're
+  // performing default initialization.
+  auto outermostArgs = outermostWrapperAttr->getArgs();
+  if (!outermostArgs) {
+    SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
+    outermostArgs =
+        ArgumentList::createImplicit(ctx, fakeParenLoc, {}, fakeParenLoc);
+    isImplicit = true;
+  }
+
+  SourceLoc typeLoc;
+  if (auto *repr = outermostWrapperAttr->getTypeRepr()) {
+    typeLoc = repr->getLoc();
+  }
+  auto typeExpr =
+      TypeExpr::createImplicitHack(typeLoc, outermostWrapperType, ctx);
+  return CallExpr::create(ctx, typeExpr, outermostArgs,
+                          /*implicit*/ isImplicit);
+}
+
 bool swift::isWrappedValueOfPropWrapper(VarDecl *var) {
   if (!var->isStatic())
     if (auto *dc = var->getDeclContext())

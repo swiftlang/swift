@@ -2118,6 +2118,44 @@ struct TestDefaultableIntWrapper {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/93792 - default init without
+// parentheses infers a generic parameter that only the init constrains
+enum Green {}
+
+@propertyWrapper
+struct WithTag<T, Tag> { // expected-note 2 {{'Tag' declared as parameter to type 'WithTag'}}
+  var wrappedValue: T
+
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+
+  init() where Tag == Green {
+    fatalError()
+  }
+}
+
+struct TestWithTag {
+  @WithTag var member: Int
+
+  func types() {
+    let _: WithTag<Int, Green> = _member
+  }
+
+  func local() {
+    @WithTag var local: Int
+    let _: WithTag<Int, Green> = _local
+    _ = local
+  }
+
+  func parameter(@WithTag parameter: Int) {} // expected-error {{generic parameter 'Tag' could not be inferred}} expected-note {{explicitly specify}}
+
+  func nested() {
+    @WithTag @WithTag var nested: Int // expected-error {{generic parameter 'Tag' could not be inferred}} expected-note {{explicitly specify}}
+    _ = nested
+  }
+}
+
 @propertyWrapper
 public struct NonVisibleImplicitInit {
 // expected-error@-1 {{internal initializer 'init()' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleImplicitInit' (which is public)}}
