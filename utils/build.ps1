@@ -118,7 +118,22 @@ Default: @("X64","X86","ARM64")
 Remove selected build outputs before building.
 
 .PARAMETER Toolchain
-Build the toolchain.
+The parts of the toolchain to build, in this order:
+- Bootstrap: the tools that the build uses, the Stage1 compilers, and the SDK of
+  the host, which the rest of the toolchain is built against.
+- Compilers: the Stage2 compilers.
+- Tools: the developer tools that only need the Stage1 compilers and the SDK of
+  the host.
+- Finish: what needs the Stage2 compilers or the tools: the compiler runtime, the
+  macros, the makeOptions tool of swift-driver, SwiftPM, swift-format and
+  SourceKit-LSP, then the binding of the executables of the toolchain to the
+  runtime.
+Stage2 is Compilers, Tools and Finish. All (the default) builds every part, and
+Skip none of them, for example to run tests with a toolchain that is built.
+$true and $false are All and Skip. The runs that build some of the parts only
+build the compiler runtime of the SDKs of -Windows and -Android, and not these
+SDKs, which build with All or Skip. BuildMulti.ps1 builds Compilers and Tools
+at the same time, in separate runs of this script.
 
 .PARAMETER Package
 Build the MSI installers and packaging.
@@ -228,7 +243,7 @@ param
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
   # Build Phases
-  [switch] $Toolchain = $true,
+  [object] $Toolchain = "All",
   [switch] $Package = $false,
 
   # Incremental Build Support
@@ -291,6 +306,17 @@ if ($Test -contains "*") {
 if ($UseHostToolchain -is [string]) {
   $UseHostToolchain = [System.Convert]::ToBoolean($UseHostToolchain)
 }
+
+# -Toolchain was a switch, so $true and $false still work.
+$AllToolchainPhases = @("Bootstrap", "Compilers", "Tools", "Finish")
+$ToolchainPhases = @(switch -Regex ("$Toolchain") {
+  '^(\$?true|All)$' { $AllToolchainPhases }
+  '^Stage2$' { @("Compilers", "Tools", "Finish") }
+  '^(Bootstrap|Compilers|Tools|Finish)$' { $Matches[1] }
+  '^(\$?false|Skip)$' { }
+  default { throw "Unknown -Toolchain '$Toolchain', expected All, Bootstrap, Stage2, Compilers, Tools, Finish or Skip" }
+})
+$BuildSDKs = (-not $ToolchainPhases) -or ($ToolchainPhases.Count -eq $AllToolchainPhases.Count)
 
 ## Declare static build and build tool parameters.
 
@@ -2007,7 +2033,7 @@ function Get-Dependencies {
 
     # WiX is needed both for packaging and for extracting the pinned toolchain
     # installer that bootstraps toolchain builds.
-    if ($Toolchain -or $Package) {
+    if ($ToolchainPhases -or $Package) {
       $DotNetRuntimeInfo = Get-DotNetRuntime
       $DotNetArchive = "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier).zip"
       DownloadAndVerify $DotNetRuntimeInfo.URL "$ArtifactCache\$DotNetArchive" $DotNetRuntimeInfo.SHA256
@@ -2028,7 +2054,7 @@ function Get-Dependencies {
       Write-Success "GNUWin32 make 4.4.1"
     }
 
-    if (-not $Toolchain) { return }
+    if (-not $ToolchainPhases) { return }
 
     DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -5296,6 +5322,31 @@ function Build-Driver([Hashtable] $Platform,
                       [string]    $LLVM_DIR,
                       [string]    $Clang_DIR,
                       [string]    $Swift_DIR) {
+  $Defines = @{
+    BUILD_SHARED_LIBS = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
+    LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
+    ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+    SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+    SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
+    } else {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
+    };
+    SWIFT_DRIVER_BUILD_TOOLS = "NO";
+  }
+  # makeOptions uses the headers of the Stage2 compilers, so it only builds
+  # with their build tree.
+  if ($Swift_DIR) {
+    $Defines.SWIFT_DRIVER_BUILD_TOOLS = "YES"
+    $Defines += @{
+      LLVM_DIR = $LLVM_DIR;
+      Clang_DIR = $Clang_DIR;
+      Swift_DIR = $Swift_DIR;
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform Driver) `
@@ -5305,23 +5356,7 @@ function Build-Driver([Hashtable] $Platform,
     -CXXCompiler $Compilers.CXX `
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
-      SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
-      } else {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
-      };
-      SWIFT_DRIVER_BUILD_TOOLS = "YES";
-      LLVM_DIR = $LLVM_DIR;
-      Clang_DIR = $Clang_DIR;
-      Swift_DIR = $Swift_DIR;
-    }
+    -Defines $Defines
 }
 
 function Build-Crypto([Hashtable] $Platform,
@@ -6197,7 +6232,7 @@ if ($Clean) {
   }
 }
 
-if ($Toolchain) {
+if ($ToolchainPhases -contains "Bootstrap") {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
   if ($HostPlatform.OS -eq [OS]::Windows) {
     (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
@@ -6247,9 +6282,13 @@ if ($Toolchain) {
     SupplementalRuntimes = $SDKSupplementalRuntimes;
   }
 
-  # ── Stage2 Compiler ───────────────────────────────────────────────────────
+  # The Stage2 compilers and the tools use these too.
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
+}
+
+if ($ToolchainPhases -contains "Compilers") {
+  # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
@@ -6260,24 +6299,9 @@ if ($Toolchain) {
   }
   Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
+}
 
-  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  Get-SelectedSDKBuilds | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
-  }
-
-  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
-  Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-TestingMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-
+if ($ToolchainPhases -contains "Tools") {
   # ── Stage2 Toolchain ──────────────────────────────────────────────────────
   Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
   Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
@@ -6295,10 +6319,6 @@ if ($Toolchain) {
   Invoke-BuildStep Build-Driver $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-
-    LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
-    Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
-    Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
   }
   Invoke-BuildStep Build-ASN1 $HostPlatform @{
     Compilers = $Compilers.Stage1;
@@ -6333,19 +6353,9 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
-  Invoke-BuildStep Build-PackageManager $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
   Invoke-BuildStep Build-Markdown $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Format $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
   Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
   Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
@@ -6360,14 +6370,54 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
   }
-  Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
+  Invoke-BuildStep Build-Inspect $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
+}
+
+if ($ToolchainPhases -contains "Finish") {
+  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
+  Get-SelectedSDKBuilds | ForEach-Object {
+    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+  }
+
+  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
+  Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
+    SwiftCompiler   = $Compilers.Stage1.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+  Invoke-BuildStep Build-TestingMacros $HostPlatform @{
+    SwiftCompiler   = $Compilers.Stage1.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+
+  # ── Stage2 Tools ──────────────────────────────────────────────────────────
+  # swift-driver again, with its makeOptions tool.
+  Invoke-BuildStep Build-Driver $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+
+    LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
+    Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
+    Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
+  }
+  Invoke-BuildStep Build-PackageManager $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-Inspect $HostPlatform @{
+  Invoke-BuildStep Build-Format $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+  Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
@@ -6417,11 +6467,11 @@ if ($Toolchain) {
   }
 }
 
-if ($IncludeDS2) {
+if ($IncludeDS2 -and $BuildSDKs) {
   Invoke-BuildStep Build-RegsGen2 $BuildPlatform
 }
 
-if ($Windows) {
+if ($Windows -and $BuildSDKs) {
   Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Windows
@@ -6482,7 +6532,7 @@ if ($Windows) {
   ).Count -gt 0
   # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
   # copies after the final runtime image is in place.
-  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
+  if (($ToolchainPhases -contains "Finish") -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
@@ -6498,7 +6548,7 @@ if ($Windows) {
   }
 }
 
-if ($Android) {
+if ($Android -and $BuildSDKs) {
   Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
@@ -6574,7 +6624,7 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
+  if (($ToolchainPhases -notcontains "Finish") -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
