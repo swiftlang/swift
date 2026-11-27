@@ -220,7 +220,8 @@ function Get-BuildJobLastLine([PSCustomObject] $Job) {
     return ""
   }
   if (-not $Lines) { return "" }
-  $Line = $Lines[-1].Trim()
+  # Write-Host encodes it with the code page of the console.
+  $Line = $Lines[-1].Trim() -replace "[^\x20-\x7E]", "?"
   if ($Line.Length -gt 200) { $Line = "$($Line.Substring(0, 200))..." }
   return $Line
 }
@@ -368,6 +369,9 @@ $LitListPattern = "^(Failed|Unexpectedly Passed|Unresolved|Timed Out) Tests \(\d
 $LitResultPattern = "^(FAIL|XPASS|UNRESOLVED|TIMEOUT): (.+) \(\d+ of \d+(, \d+ of \d+ attempts)?\)$"
 # lit prints the output of each of these tests between these lines.
 $LitOutputPattern = "^\*{20} TEST '(.+)' FAILED \*{20}$"
+# The tests of SourceKit-LSP print the records that it logged, which report
+# expected errors too, from this line to a line with "---".
+$LogRecordPattern = "^\[[^\]]+\] \w+ \d{4}-\d\d-\d\d \d\d:\d\d:\d\d"
 
 # Prints the lists of the tests that failed and the lines that report failures
 # in the logs of the jobs that failed, with the lines that follow these, as the
@@ -397,8 +401,16 @@ function Write-BuildJobFailures {
     $Shown = New-Object System.Collections.Generic.List[string]
     $Next = 0
     $Found = 0
+    $InLogRecord = $false
     for ($Index = 0; $Index -lt $Lines.Count; $Index++) {
-      if ($Lines[$Index] -cmatch $LitListPattern) {
+      if ($Lines[$Index] -cmatch $LogRecordPattern) {
+        $InLogRecord = $true
+      } elseif ($Lines[$Index] -ceq "---") {
+        $InLogRecord = $false
+      }
+      if ($InLogRecord) {
+        continue
+      } elseif ($Lines[$Index] -cmatch $LitListPattern) {
         # The list, with at most 200 tests.
         $End = $Index + 1
         while ($End -lt $Lines.Count -and $Lines[$End].StartsWith("  ") -and $End -le $Index + 200) { $End++ }
