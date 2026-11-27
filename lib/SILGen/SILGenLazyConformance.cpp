@@ -144,6 +144,13 @@ void SILGenModule::useConformancesFromType(SILInstruction *inst, CanType type) {
     return;
 
   type.visit([&](Type t) {
+    // TypeWalker visits a box's substitutions but not its fields.
+    if (auto *boxTy = t->getAs<SILBoxType>()) {
+      for (auto &field : boxTy->getLayout()->getFields())
+        useConformancesFromType(inst, field.getLoweredType());
+      return;
+    }
+
     auto *decl = t->getAnyNominal();
     if (!decl)
       return;
@@ -243,6 +250,10 @@ public:
     SGM.useConformancesFromObjectiveCType(AEBI, AEBI->getFormalConcreteType());
     for (auto conformance : AEBI->getConformances())
       SGM.useConformance(AEBI, conformance);
+  }
+
+  void visitAllocBoxInst(AllocBoxInst *ABI) {
+    SGM.useConformancesFromType(ABI, ABI->getType().getASTType());
   }
 
   void visitAllocGlobalInst(AllocGlobalInst *AGI) {
