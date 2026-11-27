@@ -1,0 +1,4 @@
+module ExceptionSupportReporter {
+  header "exception-support-reporter.h"
+  requires cplusplus
+}

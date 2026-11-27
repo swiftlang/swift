@@ -7,3 +7,8 @@ module CxxStdlibShim {
   header "libcxxstdlibshim.h"
   requires cplusplus
 }
+
+module _SwiftCxxExceptionSupport {
+  header "libcxxexceptionshim.h"
+  requires cplusplus
+}
