@@ -31,8 +31,14 @@ inline void *AlignedAlloc(size_t size, size_t align) {
 #if defined(_WIN32)
   void *r = _aligned_malloc(size, align);
   assert(r && "_aligned_malloc failed");
-#elif __STDC_VERSION__-0 >= 201112l
-  // C11 supports aligned_alloc
+#elif __cplusplus-0 >= 201703l && \
+    (!defined(__APPLE__) || \
+     __ENVIRONMENT_MAC_OS_X_VERSION_MIN_REQUIRED__ >= 101500 || \
+     __ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__ >= 130000 || \
+     __ENVIRONMENT_TV_OS_VERSION_MIN_REQUIRED__ >= 130000 || \
+     __ENVIRONMENT_WATCH_OS_VERSION_MIN_REQUIRED__ >= 60000)
+  // C11 ("through" C++17) supports aligned_alloc. On Apple platforms it is
+  // only available starting with macOS 10.15, iOS/tvOS 13.0 and watchOS 6.0
   void *r = aligned_alloc(align, size);
   assert(r && "aligned_alloc failed");
 #else
