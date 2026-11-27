@@ -2973,12 +2973,6 @@ BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedArrayRef elements,
     swift::SourceLoc lParenLoc, swift::SourceLoc rParenLoc);
 
-SWIFT_NAME(
-    "BridgedNamedOpaqueReturnTypeRepr.createParsed(_:base:genericParamList:)")
-BridgedNamedOpaqueReturnTypeRepr BridgedNamedOpaqueReturnTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr baseTy,
-    BridgedGenericParamList genericParams);
-
 SWIFT_NAME("BridgedOpaqueReturnTypeRepr.createParsed(_:someKeywordLoc:base:)")
 BridgedOpaqueReturnTypeRepr
 BridgedOpaqueReturnTypeRepr_createParsed(BridgedASTContext cContext,

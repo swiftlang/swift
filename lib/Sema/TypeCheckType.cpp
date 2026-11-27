@@ -2662,8 +2662,7 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
   // e.g. `func foo(_: (some P).S)`, is sugar for a generic parameter and is
   // well-formed.
   auto *baseRepr = repr->getBase()->getWithoutParens();
-  if ((isa<OpaqueReturnTypeRepr>(baseRepr) ||
-       isa<NamedOpaqueReturnTypeRepr>(baseRepr)) &&
+  if (isa<OpaqueReturnTypeRepr>(baseRepr) &&
       parentTy->is<OpaqueTypeArchetypeType>()) {
     if (!options.contains(TypeResolutionFlags::SilenceDiagnostics)) {
       diagnose(repr->getNameLoc(), diag::opaque_type_member_type,
@@ -3166,48 +3165,6 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Existential: {
     auto *existential = cast<ExistentialTypeRepr>(repr);
     return resolveExistentialType(existential, options);
-  }
-
-  case TypeReprKind::NamedOpaqueReturn: {
-    // If the named opaque result type is in a valid position, resolution
-    // should happen in the context of an `OpaqueTypeDecl`. This decl is
-    // implicit in the source and is created in such contexts by evaluation of
-    // an `OpaqueResultTypeRequest`.
-    auto opaqueRepr = cast<NamedOpaqueReturnTypeRepr>(repr);
-    if (auto opaqueDecl = dyn_cast<OpaqueTypeDecl>(getDeclContext())) {
-      // Resolve the base type within this context.
-
-      // FIXME: Temporary hack to resolve an identifier type to one of the
-      // generic parameters of the opaque return type. This should be subsumed
-      // be proper name lookup, OF COURSE.
-      auto *unqualIdentRepr =
-          dyn_cast<UnqualifiedIdentTypeRepr>(opaqueRepr->getBase());
-      if (unqualIdentRepr && !unqualIdentRepr->hasGenericArgList()) {
-        Identifier name = unqualIdentRepr->getNameRef().getBaseIdentifier();
-        if (auto gpDecl = opaqueRepr->getGenericParams()
-                ->lookUpGenericParam(name)) {
-          auto outerGenericSignature = opaqueDecl->getNamingDecl()
-                                           ->getInnermostDeclContext()
-                                           ->getGenericSignatureOfContext();
-
-          SubstitutionMap subs;
-          if (outerGenericSignature)
-            subs = outerGenericSignature->getIdentitySubstitutionMap();
-
-          return OpaqueTypeArchetypeType::get(
-              opaqueDecl, gpDecl->getDeclaredInterfaceType(), subs);
-        }
-      }
-
-      return resolveType(opaqueRepr->getBase(), options);
-    }
-
-    // We are not inside an `OpaqueTypeDecl`, so diagnose an error.
-    if (!(options & TypeResolutionFlags::SilenceDiagnostics)) {
-      diagnose(repr->getStartLoc(), diag::unsupported_opaque_type);
-    }
-
-    return ErrorType::get(getASTContext());
   }
 
   case TypeReprKind::Placeholder: {
@@ -7473,7 +7430,6 @@ private:
     case TypeReprKind::Ownership:
     case TypeReprKind::Composition:
     case TypeReprKind::OpaqueReturn:
-    case TypeReprKind::NamedOpaqueReturn:
     case TypeReprKind::Existential:
     case TypeReprKind::UnqualifiedIdent:
     case TypeReprKind::QualifiedIdent:

@@ -1,22 +1,18 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   -enable-experimental-feature ScopeRestrictions \
 // RUN:   | %sanitize-address > %t/astgen.ast
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   -enable-experimental-feature ScopeRestrictions \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature NamedOpaqueTypes \
 // RUN:   -enable-experimental-feature ScopeRestrictions
 
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_NamedOpaqueTypes
 // REQUIRES: swift_feature_ScopeRestrictions
 
 // rdar://116686158
@@ -95,5 +91,3 @@ func testInlineArray() {
   let _ = [3 of Int](repeating: 0)
   let _ = [3 of _](repeating: 0)
 }
-
-func testNamedOpaqueReturnTy() -> <T> T { return () }

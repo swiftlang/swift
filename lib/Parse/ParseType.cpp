@@ -704,27 +704,6 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
   return ty;
 }
 
-ParserResult<TypeRepr> Parser::parseTypeWithOpaqueParams(Diag<> MessageID) {
-  GenericParamList *genericParams = nullptr;
-  if (Context.LangOpts.hasFeature(Feature::NamedOpaqueTypes)) {
-    auto result = maybeParseGenericParams();
-    genericParams = result.getPtrOrNull();
-    if (result.hasCodeCompletion())
-      return makeParserCodeCompletionStatus();
-  }
-
-  auto typeResult = parseType(MessageID);
-  if (auto type = typeResult.getPtrOrNull()) {
-    return makeParserResult(
-        ParserStatus(typeResult),
-        genericParams ? new (Context)
-                            NamedOpaqueReturnTypeRepr(type, genericParams)
-                      : type);
-  } else {
-    return typeResult;
-  }
-}
-
 ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
   auto codeCompleteResult = [&]() {
     // Synthesize an ErrorTypeRepr here to ensure we extend the result type of
@@ -741,7 +720,7 @@ ParserResult<TypeRepr> Parser::parseDeclResultType(Diag<> MessageID) {
     return codeCompleteResult();
   }
 
-  auto result = parseTypeWithOpaqueParams(MessageID);
+  auto result = parseType(MessageID);
   if (result.hasCodeCompletion())
     return codeCompleteResult();
 

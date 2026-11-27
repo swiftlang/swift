@@ -123,7 +123,6 @@ UNINTERESTING_FEATURE(MemberImportVisibility)
 // ----------------------------------------------------------------------------
 
 UNINTERESTING_FEATURE(StaticAssert)
-UNINTERESTING_FEATURE(NamedOpaqueTypes)
 UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)

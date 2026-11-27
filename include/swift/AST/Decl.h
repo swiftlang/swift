@@ -3648,7 +3648,7 @@ public:
   /// Get the representative for this value's opaque result type, if it has one.
   /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
   /// types might appear in one or more structural positions, e.g.  (some P,
-  /// some Q), or we might have a `NamedOpaqueReturnTypeRepr`.
+  /// some Q).
   TypeRepr *getOpaqueResultTypeRepr() const;
 
   /// Get the representative for this value's result type, if it has one.

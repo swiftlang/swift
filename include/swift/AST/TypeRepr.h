@@ -1404,42 +1404,6 @@ private:
   friend class TypeRepr;
 };
 
-/// A TypeRepr for a type with a generic parameter list of named opaque return
-/// types.
-///
-/// This can occur only as the return type of a function declaration, or the
-/// type of a property, to specify types which should be abstracted from
-/// callers, given a set of generic constraints that the concrete types satisfy:
-///
-/// func foo() -> <T: Collection> T { return [1] }
-class NamedOpaqueReturnTypeRepr : public TypeRepr {
-  TypeRepr *Base;
-  GenericParamList *GenericParams;
-
-public:
-  NamedOpaqueReturnTypeRepr(TypeRepr *Base, GenericParamList *GenericParams)
-      : TypeRepr(TypeReprKind::NamedOpaqueReturn), Base(Base),
-        GenericParams(GenericParams) {
-    assert(Base && GenericParams);
-  }
-
-  TypeRepr *getBase() const { return Base; }
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::NamedOpaqueReturn;
-  }
-  static bool classof(const NamedOpaqueReturnTypeRepr *T) { return true; }
-
-private:
-  SourceLoc getStartLocImpl() const;
-  SourceLoc getEndLocImpl() const;
-  SourceLoc getLocImpl() const;
-  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
-                 NonRecursivePrintOptions nrOpts) const;
-  friend class TypeRepr;
-};
-
 /// A TypeRepr for an existential type spelled with \c any
 ///
 /// Can appear anywhere a normal existential type would. This is
@@ -1697,7 +1661,6 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Ownership:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
-  case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
   case TypeReprKind::PackElement:
     return false;
