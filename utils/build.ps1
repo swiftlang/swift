@@ -1756,6 +1756,23 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   }
 }
 
+# Runs $Block while no other run of this script runs a block with this name, as
+# BuildMulti.ps1 runs several of them at the same time.
+function Invoke-Exclusively([string] $Name, [ScriptBlock] $Block) {
+  $Mutex = New-Object System.Threading.Mutex($false, "Global\swift-build-$Name")
+  try {
+    try {
+      [void]$Mutex.WaitOne()
+    } catch [System.Threading.AbandonedMutexException] {
+      # The previous owner died; the mutex is ours now.
+    }
+    & $Block
+  } finally {
+    $Mutex.ReleaseMutex()
+    $Mutex.Dispose()
+  }
+}
+
 function Invoke-VsDevShell([Hashtable] $Platform) {
   if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
     Write-Warning "Invoke-VsDevShell called on non-Windows platform."
@@ -4421,7 +4438,12 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
       $SDKSettings.SupportedTargets.windows.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.windows.LLVMTargetSys = "windows"
       $SDKSettings.SupportedTargets.windows.LLVMTargetTripleEnvironment = "msvc"
-      $SDKSettings.SupportedTargets.windows.Archs = $WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      # BuildMulti.ps1 builds the SDKs of the other architectures in other runs,
+      # and installs them before the run that builds the SDK of the host.
+      $InstalledArchs = @("WindowsX64", "WindowsX86", "WindowsArm64") | ForEach-Object { $KnownPlatforms[$_].Architecture.LLVMName } | Where-Object {
+        Test-Path "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\usr\lib\swift\windows\$_"
+      }
+      $SDKSettings.SupportedTargets.windows.Archs = @($WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) + @($InstalledArchs) | Sort-Object -Unique
     }
     Android {
       $SDKSettings.SupportedTargets.android.LLVMTargetVendor = "unknown"
@@ -4770,15 +4792,18 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
+  # TODO: remove this once the migration is completed. Resync writes into the
+  # source tree, which the runs that build other architectures share.
+  Invoke-Exclusively "Resync" {
+    Invoke-IsolatingEnvVars {
+      Invoke-VsDevShell $BuildPlatform
 
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
+      Push-Location "${SourceCache}\swift\Runtimes"
+      $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+      $CMakeBin = (Get-CMake).Path
+      Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+      Pop-Location
+    }
   }
 
   Invoke-IsolatingEnvVars {
@@ -5846,6 +5871,12 @@ function Test-SourceKitLSP {
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
 
+    # The tests wait for the background indexing, which runs at the lowest
+    # priority, so they wait longer when other tests run at the same time.
+    if (-not $env:SOURCEKIT_LSP_TEST_TIMEOUT) {
+      $env:SOURCEKIT_LSP_TEST_TIMEOUT = "600"
+    }
+
     Build-SPMProject `
       -Action TestParallel `
       -Src "$SourceCache\sourcekit-lsp" `
@@ -6576,7 +6607,8 @@ if ($ToolchainPhases -contains "Finish") {
 }
 
 if ($IncludeDS2 -and $BuildSDKs) {
-  Invoke-BuildStep Build-RegsGen2 $BuildPlatform
+  # The runs that build the SDKs of other platforms share its build tree.
+  Invoke-Exclusively "RegsGen2" { Invoke-BuildStep Build-RegsGen2 $BuildPlatform }
 }
 
 if ($Windows -and $BuildSDKs) {
@@ -6616,9 +6648,13 @@ if ($Windows -and $BuildSDKs) {
 
   Write-PlatformInfoPlist Windows
 
-  Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  # It builds against the SDK of the host, which BuildMulti.ps1 does not build
+  # with the SDKs of the other architectures.
+  if ($WindowsSDKBuilds -contains $HostPlatform) {
+    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
   }
 
   # Copy static dependencies
@@ -6843,3 +6879,6 @@ if ($IncludeSBoM) {
     Write-TimingTrace "$TimingTraceDir\build-timings.json"
   }
 }
+
+# BuildMulti.ps1 reads the exit code, which a native command could have set.
+exit 0
