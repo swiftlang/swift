@@ -36,7 +36,7 @@ final class E {
 
 struct Holder {
   var c: C
-  var span: Thing {
+  var normalSpan: Thing {
     @_lifetime(borrow self) get { _overrideLifetime(Thing(), borrowing: self) }
   }
   var throwingSpan: Thing {
@@ -89,11 +89,11 @@ func localVarThenVar(_ d: D) {
 }
 
 func optionalVarForce(_ g: G) {
-  use(g.h!.span)
+  use(g.h!.normalSpan)
 }
 
 func iuoVarLocal(_ g: G) {
-  let t = g.iuo.span
+  let t = g.iuo.normalSpan
   use(t)
 }
 
@@ -122,7 +122,7 @@ func classPropChain(_ h: C) {
 }
 
 func optionalVarChain(_ g: G) {
-  f(g.h?.span) // expected-error {{lifetime-dependent value escapes its scope}}
+  f(g.h?.normalSpan) // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on this scoped access to variable 'h'}}
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }
