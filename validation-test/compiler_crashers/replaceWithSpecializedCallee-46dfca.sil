@@ -1,0 +1,16 @@
+// {"frontendArgs":["-emit-sil","-O","-module-name","main"],"kind":"custom","signature":"swift::replaceWithSpecializedCallee(swift::ApplySite, swift::SILValue, swift::ReabstractionInfo const&, swift::TypeReplacements const&)","signatureAssert":"Assertion failed: (!resultOut), function replaceWithSpecializedCallee","signatureNext":"replaceWithSpecializedFunction"}
+// RUN: not --crash %target-swift-frontend -emit-sil -O -module-name main %s
+import Builtin
+
+sil @a : $@yield_once @convention(thin) <T> () -> @out T {
+bb0(%0 : $*T):
+  unreachable
+}
+
+sil @b : $() -> () {
+bb0:
+  %0 = function_ref @a : $@yield_once @convention(thin) <T> () -> @out T
+  %1 = alloc_stack $Builtin.Int64
+  %2 = begin_apply %0<Builtin.Int64>(%1) : $@yield_once @convention(thin) <T> () -> @out T
+  unreachable
+}
