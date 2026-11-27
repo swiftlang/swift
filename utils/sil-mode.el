@@ -1,18 +1,26 @@
-;; -*- lexical-binding: nil; -*-
-;;===--- sil-mode.el ------------------------------------------------------===;;
-;;
+;;; sil-mode.el --- SIL major mode                   -*- lexical-binding: nil; -*-
+
+;; Copyright (C) 2014 - 2026  Apple Inc. and the Swift project authors
+
+;; Keywords: languages
+;; Version: 0.0.1
+
+;;; Commentary:
+
 ;; This source file is part of the Swift.org open source project
-;;
-;; Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+
 ;; Licensed under Apache License v2.0 with Runtime Library Exception
 ;;
 ;; See https://swift.org/LICENSE.txt for license information
 ;; See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-;;
-;;===----------------------------------------------------------------------===;;
 
-(eval-when-compile
-  (require 'cl))
+;;; Code:
+(require 'rx)
+
+(defgroup sil nil
+  "Major-mode for SIL."
+  :group 'languages
+  :prefix "sil-mode-")
 
 ;; Create mode-specific tables.
 (defvar sil-mode-syntax-table nil
@@ -211,7 +219,7 @@
    '("$[0-9]+" . font-lock-variable-name-face)
 
    )
-  "Syntax highlighting for SIL"
+  "Syntax highlighting for SIL."
   )
 
 ;; ---------------------- Syntax table ---------------------------
@@ -259,14 +267,13 @@
   "Abbrev table used while in SIL mode.")
 (define-abbrev-table 'sil-mode-abbrev-table ())
 
-(defvar sil-mode-hook nil)
 (defvar sil-mode-map nil)   ;; Create a mode-specific keymap.
 
 (unless sil-mode-map
   (setq sil-mode-map (make-sparse-keymap))
-  (define-key sil-mode-map "\t" 'tab-to-tab-stop)
-  (define-key sil-mode-map "\es" 'center-line)
-  (define-key sil-mode-map "\eS" 'center-paragraph))
+  (define-key sil-mode-map (kbd "C-c C-c") 'sil-mode-display-function-cfg)
+  (define-key sil-mode-map (kbd "C-c C-r") 'sil-mode-display-region-cfg)
+  (define-key sil-mode-map (kbd "C-c C-d") 'sil-mode-demangle))
 
 ;;; Helper functions
 
@@ -278,63 +285,148 @@
 (defvar sil-mode-viewcfg-renderer "dot")
 (defvar sil-mode-viewcfg-buffer-name "*viewcfg*")
 
-(defcustom sil-mode-viewcfg-command-default "viewcfg"
-  "The path to the viewcfg command that should be used to dump
-  partial cfgs if we can not find viewcfg locally ourselves using swift-project-settings")
+(define-obsolete-variable-alias
+  'sil-mode-viewcfg-command-default
+  'sil-mode-viewcfg-command
+  "sil-mode 0.1")
+
 ;; TODO: If we have swift-project-settings enabled, we will know the swift
 ;; source root directory. This will let us just use the absolute path to
 ;; viewcfg.
-(defun get-viewcfg-command() sil-mode-viewcfg-command-default)
+(defcustom sil-mode-viewcfg-command "viewcfg"
+  "The viewcfg command used to dump partial CFGs."
+  :type 'string
+  :group 'sil)
 
-(defvar sil-mode-viewcfg-command (get-viewcfg-command)
-  "The path to the viewcfg command that should be used")
+(defun sil-mode-display-region-cfg (start end)
+  "Display the CFG of the code in the region.
 
-(defun sil-mode-display-function-cfg()
+Called from a program, START and END specify the region to display."
+  (interactive "r")
+  (let* ((process-connection-type nil)
+          (p (start-process sil-mode-viewcfg-program-name
+               sil-mode-viewcfg-buffer-name
+               sil-mode-viewcfg-command
+               (concat "--renderer=" sil-mode-viewcfg-renderer))))
+    (process-send-region p start end)
+    (process-send-eof p)))
+
+(defun sil-mode-display-function-cfg ()
+  "Display the CFG of the SIL function at `point'."
   (interactive)
-  ;; First we need to find the previous '{' and then the next '}'.
   (save-mark-and-excursion
-    (let ((brace-start (re-search-backward "{\s*$"))
-          (brace-end (re-search-forward "^} // end sil function '" nil t))
-          (process-connection-type nil))
-      ;; See if we failed to find } // end sil function. If we did, search again
-      ;; for ^} itself and see if we find anything.
-      (if (null brace-end)
-          (setq brace-end (re-search-forward "^}")))
-      (let ((p (start-process sil-mode-viewcfg-program-name
-                              sil-mode-viewcfg-buffer-name
-                              sil-mode-viewcfg-command
-                              (concat "--renderer=" sil-mode-viewcfg-renderer))))
-        (process-send-region p brace-start brace-end)
-       (process-send-eof p)))))
+    (mark-defun)
+    (sil-mode-display-region-cfg (point) (mark))))
+
+(defcustom sil-mode-demangle-command "swift demangle"
+  "The command used by `sil-mode-demangle' to demangle Swift symbols.
+
+This is used as the COMMAND argument of `shell-command-on-region'. It
+should accept text containing Swift symbols from standard input, and
+return the demangled result on standard output."
+  :type 'string
+  :group 'sil)
+
+;;;###autoload
+(defun sil-mode-demangle (start end)
+  "Demangle a mangled Swift name.
+
+Pass the region between START and END to `sil-mode-demangle-command'.
+Interactively, demangle the symbol at point, or the contents of the
+region if it is active."
+  (interactive "R")
+  (let ((region
+          (if start
+            (cons start end)
+            (bounds-of-thing-at-point 'symbol))))
+    (shell-command-on-region (car region) (cdr region)
+      sil-mode-demangle-command
+      "*Swift Demangle*")))
+
+;;; Defun motion and `imenu' helpers
+
+(defun sil--decl-regex (kind)
+  "Build a regexp for a declaration of a name in SIL of the given KIND."
+  (rx line-start (* (syntax whitespace))
+      (literal kind)
+      (+ (syntax whitespace))
+      (* (not ?@))
+      ?@
+      (group (+ (not (or " " ":"))))))
+
+(defvar sil--function-decl (sil--decl-regex "sil"))
+(defvar sil--global-decl (sil--decl-regex "sil_global"))
+(defvar sil--differentiability-witness-decl
+  (sil--decl-regex "sil_differentiability_witness"))
+
+(defvar sil--type-decl
+  (rx line-start (* (syntax whitespace))
+      (* (or "open" "public" "package" "internal" "fileprivate" "private"
+	     "final")
+	 (+ (syntax whitespace)))
+      (or "struct" "class" "enum" "protocol")
+      (+ (syntax whitespace))
+      (group
+       (+ (not (syntax whitespace))))))
+
+(defvar sil--vtable-decl
+  (rx line-start (* (syntax whitespace))
+      "sil_vtable"
+      (+ (syntax whitespace))
+      (? "[serialized]" (* (syntax whitespace)))
+      (group (+ (not (any " " "{"))))))
+
+(defun sil-mode-beginning-of-defun-function (&optional arg)
+  "Move to the start of a SIL definition, ARG times."
+  (interactive "^p")
+  (re-search-backward
+    (rx line-start (or "sil" (regexp sil--type-decl)) (* nonl) (group ?{))
+    nil t (or arg 1)))
+
+(defun sil-mode-end-of-defun-function ()
+  "Move to the end of a SIL definition."
+  ;; Search forward for a closing bracket after which we are at `ppss-depth' 0.
+  ;; This ensures we skip debug_value reconstruction blocks, which are also
+  ;; delimited by curly brackets.
+  (while (when (search-forward "}" nil t)
+	   (> (ppss-depth (syntax-ppss)) 0)))
+  ;; Move past a comment on the same line as the closing bracket.  This ensures
+  ;; "// end sil function" comments are included as part of the defun.
+  (when (looking-at "\\s-*\\(//.*\\)?$")
+    (forward-line)))
 
 ;;; Top Level Entry point
 
-(defun sil-mode ()
+;;;###autoload
+(define-derived-mode sil-mode prog-mode "SIL"
   "Major mode for editing SIL source files.
-  \\{sil-mode-map}
-  Runs sil-mode-hook on startup."
-  (interactive)
-  (kill-all-local-variables)
-  (use-local-map sil-mode-map)         ;; Provides the local keymap.
+\\{sil-mode-map}"
 
+  :syntax-table sil-mode-syntax-table
   (make-local-variable 'font-lock-defaults)
-  (setq major-mode 'sil-mode           ;; This is how describe-mode
-                                       ;; finds the doc string to print.
-  mode-name "SIL"                      ;; This name goes into the modeline.
-  font-lock-defaults `(sil-font-lock-keywords))
+  (setq font-lock-defaults `(sil-font-lock-keywords))
 
   (setq local-abbrev-table sil-mode-abbrev-table)
-  (set-syntax-table sil-mode-syntax-table)
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
-  (font-lock-mode 1)                   ;; Enable syntax highlighting
-  (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
-                                       ;;   customize the mode with a hook.
+  ;; Enable defun navigation for SIL functions and types.
+  (setq-local beginning-of-defun-function 'sil-mode-beginning-of-defun-function)
+  (setq-local end-of-defun-function 'sil-mode-end-of-defun-function)
+
+  ;; Populate `imenu' with function, global, vtable & type declarations.
+  ;; TODO: Add imenu entries for witness tables (very hard with regex).
+  (setq imenu-generic-expression
+	`((nil ,sil--function-decl 1)
+	  ("Types" ,sil--type-decl 1)
+	  ("Globals" ,sil--global-decl 1)
+	  ("VTables" ,sil--vtable-decl 1))))
+
+
 
 ;; Associate .sil files with sil-mode
-(setq auto-mode-alist
-   (append '(("\\.sil$" . sil-mode)) auto-mode-alist))
+;;;###autoload
+(add-to-list 'auto-mode-alist '("\\.sil$" . sil-mode))
 
 (provide 'sil-mode)
-;; end of sil-mode.el
+;;; sil-mode.el ends here
