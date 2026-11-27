@@ -7664,7 +7664,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
         // load [take] the value out of the address and return it.
         ManagedValue value =
           SGF.B.createLoadTake(E, mv);
-        return RValue(SGF, {value}, subType.getASTType());
+        return RValue(SGF, E, subType.getASTType(), value);
       }
 
       // Emit a copy_addr [take] into a temporary location.
@@ -7675,11 +7675,11 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
       SILValue dest = optTemp->getAddressForInPlaceInitialization(SGF, E);
       SGF.B.createCopyAddr(E, mv.getValue(), dest, IsTake, IsInitialization);
       optTemp->finishInitialization(SGF);
-      return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), optTemp->getManagedAddress());
     }
 
     if (mv.getType().isTrivial(SGF.F))
-      return RValue(SGF, {mv}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), mv);
 
     // Otherwise, it's an object.
 
@@ -7690,7 +7690,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     // Set the [allows_diagnostics] flag to indicate this move originated from
     // an explicit 'consume' at the language level.
     cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
-    return RValue(SGF, {mv}, subType.getASTType());
+    return RValue(SGF, E, subType.getASTType(), mv);
   }
 
 
@@ -7723,16 +7723,16 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     if (subType.isLoadableOrOpaque(SGF.F)) {
       ManagedValue value =
           SGF.B.createLoadTake(E, optTemp->getManagedAddress());
-      return RValue(SGF, {value}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), value);
     }
 
-    return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+    return RValue(SGF, E, subType.getASTType(), optTemp->getManagedAddress());
   }
 
   if (subType.isLoadableOrOpaque(SGF.F)) {
     ManagedValue mv = SGF.emitRValue(subExpr).getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
-      return RValue(SGF, {mv}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), mv);
     mv = SGF.B.createMoveValue(E, mv);
     // Set the flag so we check this.
     cast<MoveValueInst>(mv.getValue())->setAllowsDiagnostics(true);
@@ -7743,7 +7743,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
           MarkUnresolvedNonCopyableValueInst::CheckKind::
               ConsumableAndAssignable);
     }
-    return RValue(SGF, {mv}, subType.getASTType());
+    return RValue(SGF, E, subType.getASTType(), mv);
   }
 
   // If we aren't loadable, then create a temporary initialization and
@@ -7772,7 +7772,7 @@ RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
     SGF.B.createMarkUnresolvedMoveAddr(subExpr, mv.getValue(), toAddr);
   }
   optTemp->finishInitialization(SGF);
-  return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+  return RValue(SGF, E, subType.getASTType(), optTemp->getManagedAddress());
 }
 
 RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
@@ -7799,7 +7799,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
         value = SGF.emitManagedLoadCopy(E, value.getUnmanagedValue());
       }
       ManagedValue copy = SGF.B.createExplicitCopyValue(E, value);
-      return RValue(SGF, {copy}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), copy);
     }
 
     LValue lv =
@@ -7811,8 +7811,8 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
       // the value.
       if (subType.isTrivial(SGF.F)
           && !address.getType().isMoveOnlyWrapped()) {
-        return RValue(SGF, {SGF.B.createLoadCopy(E, address)},
-                      subType.getASTType());
+        return RValue(SGF, E, subType.getASTType(),
+                      SGF.B.createLoadCopy(E, address));
       }
 
       // Use a formal access load borrow so this closes in the writeback scope
@@ -7823,14 +7823,14 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
         value = SGF.B.createGuaranteedMoveOnlyWrapperToCopyableValue(E, value);
         // If we have a trivial value after unwrapping, just return that.
         if (value.getType().isTrivial(SGF.F))
-          return RValue(SGF, {value}, subType.getASTType());
+          return RValue(SGF, E, subType.getASTType(), value);
       }
 
       // We purposely, use a lexical cleanup here so that the cleanup lasts
       // through the formal evaluation scope.
       ManagedValue copy = SGF.B.createExplicitCopyValue(E, value);
 
-      return RValue(SGF, {copy}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), copy);
     }
 
     auto optTemp = SGF.emitTemporary(E, SGF.getTypeLowering(subType));
@@ -7843,7 +7843,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
     SGF.B.createExplicitCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
                                  IsInitialization);
     optTemp->finishInitialization(SGF);
-    return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+    return RValue(SGF, E, subType.getASTType(), optTemp->getManagedAddress());
   }
 
   if (subType.isLoadableOrOpaque(SGF.F)) {
@@ -7851,7 +7851,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
       SGF.emitRValue(subExpr, SGFContext::AllowImmediatePlusZero)
          .getAsSingleValue(SGF, subExpr);
     if (mv.getType().isTrivial(SGF.F))
-      return RValue(SGF, {mv}, subType.getASTType());
+      return RValue(SGF, E, subType.getASTType(), mv);
     {
       // We use a formal evaluation scope so we tightly scope the formal access
       // borrow below.
@@ -7870,7 +7870,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
       if (!mv.getType().isTrivial(SGF.F))
         mv = SGF.B.createExplicitCopyValue(E, mv);
     }
-    return RValue(SGF, {mv}, subType.getASTType());
+    return RValue(SGF, E, subType.getASTType(), mv);
   }
 
   // If we aren't loadable, then create a temporary initialization and
@@ -7893,7 +7893,7 @@ RValue RValueEmitter::visitCopyExpr(CopyExpr *E, SGFContext C) {
   SGF.B.createExplicitCopyAddr(subExpr, fromAddr, toAddr, IsNotTake,
                                IsInitialization);
   optTemp->finishInitialization(SGF);
-  return RValue(SGF, {optTemp->getManagedAddress()}, subType.getASTType());
+  return RValue(SGF, E, subType.getASTType(), optTemp->getManagedAddress());
 }
 
 RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
