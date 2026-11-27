@@ -139,7 +139,12 @@ import Musl
 import Android
 #endif
 
+#if os(FreeBSD)
+// FreeBSD's RTLD_DEFAULT is -2.
+let rtldDefault = UnsafeMutableRawPointer(bitPattern: Int(-2))
+#else
 let rtldDefault: UnsafeMutableRawPointer? = nil
+#endif
 
 #if INTERNAL_CHECKS_ENABLED
 @_silgen_name("swift_getMetadataSection")
