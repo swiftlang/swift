@@ -98,7 +98,6 @@ func test_ranking_with_protocol_refinement() {
 
 // rdar://189930184
 
-// FIXME: This behavior is completely broken.
 protocol ExpressibleBySQLLiteral {}
 
 extension Int: ExpressibleBySQLLiteral {}
@@ -125,10 +124,8 @@ func testOverloaded() {
   // CHECK: apply [[FN]]<Pack{Int}>
   let _: Int = executeOverloaded()
 
-  // FIXME: For some reason, we inject into the optional here.
-
   // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking17executeOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
-  // CHECK: apply [[FN]]<Pack{Int}>
+  // CHECK: apply [[FN]]<Pack{Optional<Int>}>
 
   let _: Int? = executeOverloaded()
 
@@ -144,8 +141,6 @@ func testNotOverloaded() {
   // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking20executeNotOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
   // CHECK: apply [[FN]]<Pack{Int}>
   let _: Int = executeNotOverloaded()
-
-  // But not here!
 
   // CHECK: [[FN:%.*]] = function_ref @$s33variadic_generic_overload_ranking20executeNotOverloadedxxQp_tyRvzAA23ExpressibleBySQLLiteralRzlF
   // CHECK: apply [[FN]]<Pack{Optional<Int>}>
