@@ -20,7 +20,7 @@ sil_scope 9 { parent @test_undef_address_only : $@convention(thin) () -> () }
 // The transform block returns Builtin.Int32 but the fragment narrows to
 // Builtin.Int64.
 // CHECK-LABEL: Begin Error in function test_type_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value type must match the fragment-narrowed variable type
 // CHECK-LABEL: End Error in function test_type_mismatch
 sil @test_type_mismatch : $@convention(thin) () -> () {
 bb0:
@@ -35,7 +35,7 @@ bb0:
 
 // The block arg is Int32 but SSA operand is Int64.
 // CHECK-LABEL: Begin Error in function test_arg_type_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug reconstruction block argument type must match its operand type
 // CHECK-LABEL: End Error in function test_arg_type_mismatch
 sil @test_arg_type_mismatch : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
@@ -50,7 +50,7 @@ bb0(%arg : $Builtin.Int64):
 
 // Transform returns object type but op_deref is present (expects address).
 // CHECK-LABEL: Begin Error in function test_deref_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value cannot have both a reconstruction block and an op_deref unless its type is address-only
 // CHECK-LABEL: End Error in function test_deref_mismatch
 sil @test_deref_mismatch : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
@@ -64,7 +64,7 @@ bb0(%arg : $Builtin.Int64):
 
 // No transform: SSA type doesn't match fragment-narrowed vartype.
 // CHECK-LABEL: Begin Error in function test_no_transform_type_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value type must match the fragment-narrowed variable type
 // CHECK-LABEL: End Error in function test_no_transform_type_mismatch
 sil @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%arg : $Builtin.Int32):
@@ -75,7 +75,7 @@ bb0(%arg : $Builtin.Int32):
 
 // Fragment field doesn't belong to the running type (Int32._value used on Int64).
 // CHECK-LABEL: Begin Error in function test_fragment_wrong_parent
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value fragments must narrow the variable type
 // CHECK-LABEL: End Error in function test_fragment_wrong_parent
 sil @test_fragment_wrong_parent : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
@@ -86,7 +86,7 @@ bb0(%arg : $Builtin.Int64):
 
 // TupleFragment type doesn't match running type.
 // CHECK-LABEL: Begin Error in function test_tuple_fragment_type_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value fragments must narrow the variable type
 // CHECK-LABEL: End Error in function test_tuple_fragment_type_mismatch
 sil @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
@@ -98,7 +98,7 @@ bb0(%arg : $Builtin.Int64):
 // The transform block must have one argument per operand: here it has no args,
 // while the debug_value has an operand.
 // CHECK-LABEL: Begin Error in function test_arg_count_mismatch
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug reconstruction block argument count must match debug_value operand count
 // CHECK-LABEL: End Error in function test_arg_count_mismatch
 sil @test_arg_count_mismatch : $@convention(thin) (Builtin.Int64) -> () {
 bb0(%arg : $Builtin.Int64):
@@ -114,7 +114,7 @@ bb0(%arg : $Builtin.Int64):
 // A debug_value without operands can only describe its variable through a
 // transform block.
 // CHECK-LABEL: Begin Error in function test_no_operand_without_transform
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: debug_value without a reconstruction block must have a single operand
 // CHECK-LABEL: End Error in function test_no_operand_without_transform
 sil @test_no_operand_without_transform : $@convention(thin) () -> () {
 bb0:
@@ -126,7 +126,7 @@ bb0:
 // An object category value of an address-only type cannot be lowered by IRGen.
 // Instead, it should be represented with an address type and an op_deref.
 // CHECK-LABEL: Begin Error in function test_undef_address_only
-// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK:       SIL verification failed: undef debug_value of an address-only type must be an address
 // CHECK-LABEL: End Error in function test_undef_address_only
 sil @test_undef_address_only : $@convention(thin) () -> () {
 bb0:
