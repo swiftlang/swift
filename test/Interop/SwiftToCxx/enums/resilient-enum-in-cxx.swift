@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend %s -enable-library-evolution -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums.h
 // RUN: %FileCheck --check-prefixes=CHECK,OLD_CASE %s < %t/enums.h
+// RUN: %FileCheck --check-prefix=UNINHABITED %s < %t/enums.h
 
 // RUN: %target-swift-frontend %s -enable-library-evolution -D NEW_CASE -module-name Enums -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/enums_new_case.h
 // RUN: %FileCheck --check-prefixes=CHECK,NEW_CASE %s < %t/enums_new_case.h
@@ -35,6 +36,14 @@ public func printFoo(_ x: Foo) {
 public enum Empty {
 
 }
+
+// An uninhabited result is printed as `void`, but a resilient one is still
+// returned indirectly, which isn't supported yet.
+public func returnsEmpty() -> Empty {
+    fatalError()
+}
+
+// UNINHABITED: // Unavailable in C++: Swift global function 'returnsEmpty()'.
 
 // CHECK:         // Tags for resilient enum Empty
 // CHECK-NEXT:    extern "C" {

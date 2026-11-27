@@ -975,6 +975,11 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     // FIXME: support multiple indirect results.
     if (signature.getNumIndirectResultValues() > 1)
       return ClangRepresentation::unsupported;
+    // An uninhabited result is printed as `void`, but a resilient one is still
+    // returned indirectly.
+    // FIXME: support uninhabited results returned indirectly.
+    if (resultTy->isVoid() && signature.getNumIndirectResultValues() > 0)
+      return ClangRepresentation::unsupported;
 
     if (!directResultType) {
       functionSignatureOS << "void";
