@@ -5,7 +5,6 @@
 // Android NDK layout might need more flags to find libc++
 // XFAIL: OS=linux-androideabi
 // XFAIL: OS=linux-android
-// XFAIL: OS=freebsd
 
 // CHECK: enum FakeNamespace {
 // CHECK:   static func foo(_ x: CInt)
