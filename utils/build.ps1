@@ -1149,6 +1149,7 @@ enum Project {
 
   CDispatch
   Stage2Compilers
+  Stage2CompilersNoAsserts
   Compilers
   FoundationMacros
   TestingMacros
@@ -6371,7 +6372,7 @@ if ($Toolchain) {
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers -SummaryVariant "Stage2/NoAsserts" @{
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2CompilersNoAsserts -SummaryVariant "Stage2/NoAsserts" @{
       Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
