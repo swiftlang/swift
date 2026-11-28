@@ -141,12 +141,12 @@ extension OutputRawSpan {
     if let baseAddress = buffer.baseAddress {
       _precondition(
         unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
-        "Buffer must not wrap around the address space"
+        "Buffer must not wrap around the address space."
       )
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputRawSpan count is not within capacity"
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
+      "OutputRawSpan count is invalid or greater than capacity."
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
@@ -237,7 +237,10 @@ extension OutputRawSpan {
   // Can we use: @_semantics("fixed_storage.check_index")
   @export(implementation) @inline(__always)
   internal func _checkIndex(_ position: Int) {
-    _precondition(position >= 0 && position < byteCount, "Index out of bounds")
+    _precondition(
+      UInt(bitPattern: position) < UInt(bitPattern: byteCount),
+      "Index out of bounds"
+    )
   }
 
   /// Accesses the byte at the specified offset in the span.
@@ -573,6 +576,9 @@ extension OutputRawSpan {
 @available(SwiftStdlib 6.4, *)
 extension OutputRawSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<UInt8>.BorrowingIterator
+
+  @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
   @export(implementation)
@@ -585,6 +591,113 @@ extension OutputRawSpan: Iterable {
   @_lifetime(borrow self)
   public func makeBorrowingIterator() -> Span<UInt8>.BorrowingIterator {
     .init(Span(viewing: self.bytes))
+  }
+}
+
+extension OutputRawSpan {
+  /// Remove all bytes from this span, and return an input span that takes
+  /// ownership of the bytes.
+  ///
+  /// The `InputRawSpan` returned by this function represents a mutation of
+  /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
+  /// in use.
+  ///
+  /// The returned input span has a `capacity` equal to the number of bytes
+  /// held by this span, and has no free capacity for prepending.
+  ///
+  /// - Returns: An `InputRawSpan` containing the bytes that were in this span.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeAll() -> InputRawSpan {
+    consumeSuffix(maxByteCount: byteCount)
+  }
+
+  /// Remove all bytes from this span by passing all of them to a closure
+  /// through an input span.
+  ///
+  /// The input span has a capacity equal to this span's initialized byte
+  /// count.
+  ///
+  /// - Parameter consumer: A closure that receives an `InputRawSpan`
+  ///     containing the initialized bytes of this `OutputRawSpan`.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeAll<E: Error, R: ~Copyable>(
+    consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
+  ) throws(E) -> R {
+    try consumeSuffix(maxByteCount: byteCount, consumingWith: consumer)
+  }
+
+  /// Returns a new input span that takes ownership of up to n bytes from the
+  /// end of this span.
+  ///
+  /// The `InputRawSpan` returned by this function represents a mutation of
+  /// `self`, and `self` cannot be used until the `InputRawSpan` is no longer
+  /// in use.
+  ///
+  /// The returned input span has a `capacity` equal to the number of bytes
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter n: The maximum number of bytes to consume.
+  ///     `n` must not be negative. If it exceeds `byteCount`,
+  ///     all bytes are consumed.
+  /// - Returns: An `InputRawSpan` containing the consumed bytes, in their
+  ///     original order.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeSuffix(
+    maxByteCount n: Int
+  ) -> InputRawSpan {
+    _precondition(
+      n >= 0, "Can't consume a negative number of bytes"
+    )
+    let c = Swift.min(n, byteCount)
+    let start = unsafe _pointer?.advanced(by: byteCount &- c)
+    let buffer = unsafe UnsafeMutableRawBufferPointer(start: start, count: c)
+    let result = unsafe InputRawSpan(
+      _uncheckedBuffer: buffer, initializedCount: c
+    )
+    _count &-= c
+    return unsafe _overrideLifetime(result, mutating: &self)
+  }
+
+  /// Calls a closure with an input span that takes ownership of up to n bytes
+  /// from the end of this span.
+  ///
+  /// The input span has a capacity equal to the number of bytes it holds.
+  ///
+  /// - Parameters:
+  ///   - n: The maximum number of bytes to consume.
+  ///       `n` must not be negative. If it exceeds `byteCount`,
+  ///       all bytes are consumed.
+  ///   - consumer: A closure that receives an `InputRawSpan` containing
+  ///       the consumed bytes, in their original order.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeSuffix<E: Error, R: ~Copyable>(
+    maxByteCount n: Int,
+    consumingWith consumer: (consuming InputRawSpan) throws(E) -> R
+  ) throws(E) -> R {
+    let suffix = consumeSuffix(maxByteCount: n)
+    return try consumer(suffix)
+  }
+
+  /// Removes and returns the last byte of this span, if it exists.
+  ///
+  /// - Returns: The last byte of the span if the span isn't empty;
+  ///    otherwise, `nil`.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func popLast() -> UInt8? {
+    guard !isEmpty else { return nil }
+    return removeLast()
   }
 }
 #endif

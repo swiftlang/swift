@@ -1428,6 +1428,77 @@ suite.test("init(bytesOf:) from value: compare with indirect approach")
   }
 }
 
+suite.test("updateAll(moving:) and updateSubrange(_:moving:) from an InputRawSpan")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  func prepend(_ bytes: [UInt8], to source: inout InputRawSpan) {
+    for byte in bytes.reversed() {
+      source.prepend(byte)
+    }
+  }
+
+  let destination = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4, alignment: 1
+  )
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 8, alignment: 1
+  )
+  defer {
+    destination.deallocate()
+    storage.deallocate()
+  }
+  destination.initializeMemory(as: UInt8.self, repeating: 0xff)
+  storage.initializeMemory(as: UInt8.self, repeating: 0)
+
+  var source = InputRawSpan(buffer: storage, initializedCount: 0)
+  var span = MutableRawSpan(_unsafeBytes: destination)
+
+  prepend([1, 2, 3, 4], to: &source)
+  span.updateAll(moving: &source)
+  expectEqual(Array(destination), [1, 2, 3, 4])
+  expectTrue(source.isEmpty)
+  expectEqual(source.freeCapacity, 8)
+
+  prepend([9, 8], to: &source)
+  span.updateSubrange(1..<3, moving: &source)
+  expectEqual(Array(destination), [1, 9, 8, 4])
+  expectTrue(source.isEmpty)
+
+  prepend([7], to: &source)
+  span.updateSubrange(3..., moving: &source)
+  expectEqual(Array(destination), [1, 9, 8, 7])
+
+  prepend([5, 6, 7, 8], to: &source)
+  span.updateSubrange(..., moving: &source)
+  expectEqual(Array(destination), [5, 6, 7, 8])
+  expectTrue(source.isEmpty)
+}
+
+suite.test("updateAll(moving:) from an InputRawSpan with a mismatched count")
+.require(.crashTesting)
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let destination = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4, alignment: 1
+  )
+  let storage = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 4, alignment: 1
+  )
+  defer {
+    destination.deallocate()
+    storage.deallocate()
+  }
+  destination.initializeMemory(as: UInt8.self, repeating: 0)
+
+  var source = InputRawSpan(buffer: storage, initializedCount: 0)
+  source.prepend(1)
+  var span = MutableRawSpan(_unsafeBytes: destination)
+  expectCrashLater(withDebugMessage: "Source byte count doesn't match")
+  span.updateAll(moving: &source)
+}
+
 private func send(_: borrowing some Sendable & ~Copyable & ~Escapable) {}
 
 suite.test("MutableRawSpan Sendability")

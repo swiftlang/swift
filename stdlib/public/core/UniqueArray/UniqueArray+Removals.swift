@@ -104,3 +104,103 @@ extension UniqueArray where Element: ~Copyable {
     return removeLast()
   }
 }
+
+@available(SwiftStdlib 6.5, *)
+extension UniqueArray where Element: ~Copyable {
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of the array.
+  ///
+  /// The `InputSpan` returned by this function represents a mutation of the
+  /// array, and the array cannot be used until the `InputSpan` is consumed or
+  /// destroyed. When it goes out of scope, any elements it still holds are
+  /// deinitialized.
+  ///
+  /// The returned input span has a `capacity` equal to the number of elements
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
+  ///     all elements are consumed.
+  /// - Returns: An `InputSpan` containing the consumed elements, in their
+  ///     original order.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeSuffix(
+    maxCount n: Int
+  ) -> InputSpan<Element> {
+    _storage.consumeSuffix(maxCount: n)
+  }
+
+  /// Calls a closure with an input span that takes ownership of up to n
+  /// elements from the end of the array.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the number of elements it holds.
+  ///
+  /// - Parameters:
+  ///   - n: The maximum number of elements to consume.
+  ///       `n` must not be negative. If it exceeds `count`,
+  ///       all elements are consumed.
+  ///   - consumer: A closure that takes ownership of an `InputSpan`
+  ///       containing the consumed elements, in their original order.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeSuffix<E: Error, R: ~Copyable>(
+    maxCount n: Int,
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let suffix = consumeSuffix(maxCount: n)
+    return try consumer(suffix)
+  }
+
+  /// Removes all elements from the array, and returns an input span
+  /// that takes ownership of the elements.
+  ///
+  /// The `InputSpan` returned by this function represents a mutation of the
+  /// array, and the array cannot be used until the `InputSpan` is consumed or
+  /// destroyed. When it goes out of scope, any elements it still holds are
+  /// deinitialized.
+  ///
+  /// The returned input span has a `capacity` equal to the number of elements
+  /// it holds, and has no free capacity for prepending. The array keeps its
+  /// allocated capacity.
+  ///
+  /// - Returns: An `InputSpan` containing the elements that were in the array.
+  ///
+  /// - Complexity: O(1)
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeAll() -> InputSpan<Element> {
+    consumeSuffix(maxCount: count)
+  }
+
+  /// Removes all elements from the array by passing them to a closure
+  /// through an input span.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the array's count.
+  ///
+  /// - Parameter consumer: A closure that takes ownership of an `InputSpan`
+  ///     containing the elements of this array.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeAll<E: Error, R: ~Copyable>(
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    try consumeSuffix(maxCount: count, consumingWith: consumer)
+  }
+}

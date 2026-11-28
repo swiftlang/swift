@@ -104,6 +104,27 @@ extension OutputSpan where Element: ~Copyable {
   @export(implementation)
   @_transparent
   public var isFull: Bool { count == _nnCapacity() }
+
+  /// Unsafely accesses the number of initialized elements in this span.
+  ///
+  /// Writing through the returned reference changes `count` without
+  /// initializing or deinitializing any element. The caller must keep the
+  /// span consistent: the new count must be between 0 and `capacity`, and
+  /// exactly that many slots at the start of the buffer
+  /// must hold initialized elements.
+  ///
+  /// The returned reference represents a mutation of `self`, and `self`
+  /// cannot be used until the reference is no longer in use.
+  @available(StdlibDeploymentTarget 6.4, *)
+  @unsafe
+  @export(implementation)
+  public var _unsafeStoredCount: MutableRef<Int> {
+    @_lifetime(&self)
+    @_transparent
+    mutating get {
+      MutableRef(&_count)
+    }
+  }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -127,8 +148,8 @@ extension OutputSpan where Element: ~Copyable  {
   /// The memory in `buffer` must remain valid throughout the lifetime
   /// of the newly-created `OutputSpan`. Its prefix must contain
   /// `initializedCount` initialized instances, followed by uninitialized
-  /// memory. The default value of `initializedCount` is 0, representing
-  /// the common case of a completely uninitialized `buffer`.
+  /// memory. An `initializedCount` of 0 represents the common case of a
+  /// completely uninitialized `buffer`.
   ///
   /// - Parameters:
   ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
@@ -146,10 +167,12 @@ extension OutputSpan where Element: ~Copyable  {
         unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
         "Buffer must not wrap around the address space"
       )
+    } else {
+      _precondition(buffer.count == 0)
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputSpan count is not within capacity"
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
+      "OutputSpan count is invalid or greater than capacity."
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
@@ -166,8 +189,8 @@ extension OutputSpan {
   /// The memory in `buffer` must remain valid throughout the lifetime
   /// of the newly-created `OutputSpan`. Its prefix must contain
   /// `initializedCount` initialized instances, followed by uninitialized
-  /// memory. The default value of `initializedCount` is 0, representing
-  /// the common case of a completely uninitialized `buffer`.
+  /// memory. An `initializedCount` of 0 represents the common case of a
+  /// completely uninitialized `buffer`.
   ///
   /// - Parameters:
   ///   - buffer: a slice of an `UnsafeMutableBufferPointer` to be initialized
@@ -200,7 +223,8 @@ extension OutputSpan where Element: ~Copyable {
     unsafe Range(_uncheckedBounds: (0, count))
   }
 
-  // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
+  // SILOptimizer looks for fixed_storage.check_index semantics
+  // for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
   @export(implementation)
@@ -240,8 +264,7 @@ extension OutputSpan where Element: ~Copyable {
   public subscript(unchecked index: Index) -> Element {
     @_unsafeSelfDependentResult
     borrow {
-      unsafe UnsafePointer<Element>(
-        _unsafeAddressOfElement(unchecked: index)).pointee
+      unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index)).pointee
     }
     @_unsafeSelfDependentResult
     @_lifetime(self: copy self)
@@ -338,6 +361,19 @@ extension OutputSpan where Element: ~Copyable {
     unsafe _tail().withMemoryRebound(to: Element.self, capacity: n) {
       _ = unsafe $0.deinitialize(count: n)
     }
+  }
+
+  /// Removes and returns the last element of this span, if it exists.
+  ///
+  /// - Returns: The last element of the span if the span isn't empty;
+  ///    otherwise, `nil`.
+  ///
+  /// - Complexity: O(1)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func popLast() -> Element? {
+    guard !isEmpty else { return nil }
+    return removeLast()
   }
 
   /// Remove all this span's elements and return its memory
@@ -524,6 +560,14 @@ extension OutputSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
+  /// Append every element of the source buffer.
+  ///
+  /// Every element of the source buffer must be initialized.
+  /// Callers must ensure that the free capacity of `self` is at least
+  /// as large as the buffer's element count.
+  ///
+  /// - Parameter source: A buffer of initialized elements to move to the end
+  ///     of this span.
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(
@@ -532,7 +576,6 @@ extension OutputSpan where Element: ~Copyable {
     guard source.count > 0 else { return }
     unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
       let dstEnd = dstCount + source.count
-      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
         .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._moveInitializeAll(fromContentsOf: source)
@@ -544,6 +587,7 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(self: copy self)
   @_lifetime(source: copy source)
   internal mutating func _append(moving source: inout OutputSpan<Element>) {
+    _precondition(source.count <= freeCapacity, "OutputSpan capacity overflow")
     unsafe source.withUnsafeMutableBufferPointer { src, srcCount in
       let range = unsafe Range(uncheckedBounds: (0, srcCount))
       let items = unsafe src.extracting(unchecked: range)
@@ -556,12 +600,19 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: Copyable {
+  /// Append a copy of every element of the source buffer.
+  ///
+  /// Every element of the source buffer must be initialized.
+  /// Callers must ensure that the free capacity of `self` is at least
+  /// as large as the buffer's element count.
+  ///
+  /// - Parameter source: A buffer of initialized elements to copy to the end
+  ///     of this span.
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(copying source: UnsafeBufferPointer<Element>) {
     unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
       let dstEnd = dstCount + source.count
-      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
         .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._initializeAll(fromContentsOf: source)
@@ -572,14 +623,122 @@ extension OutputSpan where Element: Copyable {
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(copying source: Span<Element>) {
+    _precondition(source.count <= freeCapacity, "OutputSpan capacity overflow")
     source.withUnsafeBufferPointer { buffer in
       unsafe self._append(copying: buffer)
     }
   }
 }
 
+extension OutputSpan where Element: ~Copyable {
+  /// Remove all elements from this span, and return an input span that takes
+  /// ownership of the elements.
+  ///
+  /// The `InputSpan` returned by this function represents a mutation of `self`,
+  /// and `self` cannot be used until the `InputSpan` is consumed or destroyed.
+  ///
+  /// The returned input span has a `capacity` equal to the number of elements
+  /// held by this span, and has no free capacity for prepending.
+  ///
+  /// - Returns: An `InputSpan` containing the elements that were in this span.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeAll() -> InputSpan<Element> {
+    consumeSuffix(maxCount: count)
+  }
+
+  /// Remove all elements from this span by passing all of its elements to
+  /// a closure through an input span.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the self's initialized count.
+  ///
+  /// - Parameter consumer: A closure that takes ownership of an `InputSpan`
+  ///     containing the initialized elements of this `OutputSpan`.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeAll<E: Error, R: ~Copyable>(
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    try consumeSuffix(maxCount: count, consumingWith: consumer)
+  }
+
+  /// Returns a new input span that takes ownership of up to n elements from the
+  /// end of this span.
+  ///
+  /// The `InputSpan` returned by this function represents a mutation of `self`,
+  /// and `self` cannot be used until the `InputSpan` is consumed or destroyed.
+  /// When it goes out of scope, any elements it still holds are deinitialized.
+  ///
+  /// The returned input span has a `capacity` equal to the number of elements
+  /// it holds, and has no free capacity for prepending.
+  ///
+  /// - Parameter n: The maximum number of elements to consume.
+  ///     `n` must not be negative. If it exceeds `count`,
+  ///     all elements are consumed.
+  /// - Returns: An `InputSpan` containing the consumed elements, in their
+  ///     original order.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  @_lifetime(&self)
+  public mutating func consumeSuffix(
+    maxCount n: Int
+  ) -> InputSpan<Element> {
+    _precondition(
+      n >= 0, "Can't consume a negative number of elements"
+    )
+    let c = Swift.min(n, count)
+    let start: UnsafeMutablePointer<Element>? =
+      unsafe _pointer?.advanced(
+        by: (count &- c) &* MemoryLayout<Element>.stride
+      ).assumingMemoryBound(to: Element.self)
+    let buffer = unsafe UnsafeMutableBufferPointer(start: start, count: c)
+    let result = unsafe InputSpan<Element>(
+      _uncheckedBuffer: buffer, initializedCount: c
+    )
+    _count &-= c
+    return unsafe _overrideLifetime(result, mutating: &self)
+  }
+
+  /// Calls a closure with an input span that takes ownership of up to n
+  /// elements from the end of this span.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the number of elements it holds.
+  ///
+  /// - Parameters:
+  ///   - n: The maximum number of elements to consume.
+  ///       `n` must not be negative. If it exceeds `count`,
+  ///       all elements are consumed.
+  ///   - consumer: A closure that takes ownership of an `InputSpan`
+  ///       containing the consumed elements, in their original order.
+  /// - Returns: The value returned by `consumer`.
+  @available(SwiftStdlib 6.5, *)
+  @export(implementation)
+  public mutating func consumeSuffix<E: Error, R: ~Copyable>(
+    maxCount n: Int,
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let suffix = consumeSuffix(maxCount: n)
+    return try consumer(suffix)
+  }
+}
+
 @available(SwiftStdlib 6.4, *)
 extension OutputSpan: Iterable where Element: ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  public typealias BorrowingIterator = Span<Element>.BorrowingIterator
+
   @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
