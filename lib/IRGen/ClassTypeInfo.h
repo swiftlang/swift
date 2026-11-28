@@ -21,7 +21,6 @@
 #include "HeapTypeInfo.h"
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/ClangModuleLoader.h"
 #include "clang/AST/Decl.h"
 
 namespace swift {
@@ -77,16 +76,7 @@ public:
   /// (retain, release) Clang functions to call. Returns {nullptr, nullptr} for
   /// any type without custom reference counting.
   std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
-  getCustomRefCountingOperations() const {
-    auto *record =
-        dyn_cast_or_null<clang::RecordDecl>(getClass()->getClangDecl());
-    if (!record)
-      return {nullptr, nullptr};
-    return getClass()
-        ->getASTContext()
-        .getClangModuleLoader()
-        ->getForeignReferenceTypeOperations(record);
-  }
+  getCustomRefCountingOperations() const;
 
   const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type,
                                     bool forBackwardDeployment) const;
