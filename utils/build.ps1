@@ -5772,7 +5772,8 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
     -Path "$ToolchainInstallRoot\usr\lib\swift\windows\_InternalSwiftScan.lib" `
     -Destination "$ToolchainInstallRoot\usr\lib"
 
-  # Switch to swift-driver
+  # Switch to swift-driver and copy swift-driver tools. The latter is necessary for the NoAsserts
+  # variant, which otherwise carries the early swift-driver from the native compiler build.
   $SwiftDriver = ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-driver.exe"))
   Copy-Item -Force `
     -Path $SwiftDriver `
@@ -5780,6 +5781,12 @@ function Repair-Toolchain([string] $ToolchainInstallRoot) {
   Copy-Item -Force `
     -Path $SwiftDriver `
     -Destination "$ToolchainInstallRoot\usr\bin\swiftc.exe"
+  Copy-Item -Force `
+    -Path $SwiftDriver `
+    -Destination "$ToolchainInstallRoot\usr\bin\swift-driver.exe"
+  Copy-Item -Force `
+    -Path ([IO.Path]::Combine((Get-ProjectBinaryCache $HostPlatform Driver), "bin", "swift-help.exe")) `
+    -Destination "$ToolchainInstallRoot\usr\bin\swift-help.exe"
 
   # Copy swift-inspect tools.
   Copy-Item -Force `
