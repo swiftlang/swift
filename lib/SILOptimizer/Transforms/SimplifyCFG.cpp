@@ -1322,11 +1322,17 @@ static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
     "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
 
 /// Returns true if \p block has less instructions than \p other.
+/// Debug instructions are not counted, so they cannot change the block order.
 static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
-  auto blockIter = block->begin();
-  auto blockEnd = block->end();
-  auto otherIter = other->begin();
-  auto otherEnd = other->end();
+  auto isNonDebug = [](SILInstruction &inst) {
+    return !inst.isDebugInstruction();
+  };
+  auto blockInsts = llvm::make_filter_range(*block, isNonDebug);
+  auto otherInsts = llvm::make_filter_range(*other, isNonDebug);
+  auto blockIter = blockInsts.begin();
+  auto blockEnd = blockInsts.end();
+  auto otherIter = otherInsts.begin();
+  auto otherEnd = otherInsts.end();
   while (true) {
     if (otherIter == otherEnd)
       return false;
