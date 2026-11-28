@@ -65,6 +65,15 @@ void OwnedFormalAccess::finishImpl(SILGenFunction &SGF) {
 }
 
 //===----------------------------------------------------------------------===//
+//                       AddressableBufferFormalAccess
+//===----------------------------------------------------------------------===//
+
+void AddressableBufferFormalAccess::finishImpl(SILGenFunction &SGF) {
+  SGF.emitLocalVariableAddressableBufferCleanup(CleanupLocation(loc), decl,
+                                                CleanupHandle::invalid());
+}
+
+//===----------------------------------------------------------------------===//
 //                          Formal Evaluation Scope
 //===----------------------------------------------------------------------===//
 
