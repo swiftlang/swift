@@ -217,6 +217,7 @@ def update_worktrees_to_scheme(
     update_args.clean = False
     update_args.stash = False
     update_args.skip_history = False
+    update_args.skip_tags = False
     update_args.partial_clone = False
     update_args.verbose = args.verbose
     update_args.n_processes = args.n_processes
