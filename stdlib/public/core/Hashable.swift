@@ -55,10 +55,11 @@
 /// custom type.
 ///
 /// In your `hash(into:)` implementation, call `combine(_:)` on the provided
-/// `Hasher` instance with the essential components of your type. To ensure
-/// that your type meets the semantic requirements of the `Hashable` and
-/// `Equatable` protocols, it's a good idea to also customize your type's
-/// `Equatable` conformance to match.
+/// `Hasher` instance with each component your `==` implementation compares.
+/// If equality ignores a stored property, leave it out of `hash(into:)` too.
+/// Including it can make equal values hash differently, which can break
+/// lookups in sets and dictionaries. Omitting a component that
+/// equality compares can increase hash collisions and slow down lookups.
 ///
 /// As an example, consider a `GridPoint` type that describes a location in a
 /// grid of buttons. Here's the initial declaration of the `GridPoint` type:

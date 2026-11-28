@@ -22,6 +22,10 @@
 /// including strings, numeric and Boolean types, enumeration cases without
 /// associated values, and even sets themselves.
 ///
+/// A set uses the element type's `==` operator to determine uniqueness.
+/// Two elements with the same hash value can both be in a set if they
+/// compare unequal.
+///
 /// Swift makes it as easy to create a new set as to create a new array. Simply
 /// assign an array literal to a variable or constant with the `Set` type
 /// specified.
