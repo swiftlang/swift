@@ -351,8 +351,9 @@ public protocol Sequence<Element> {
   /// The default implementation returns 0. If you provide your own
   /// implementation, make sure to compute the value nondestructively.
   ///
-  /// - Complexity: O(1), except if the sequence also conforms to `Collection`.
-  ///   In this case, see the documentation of `Collection.underestimatedCount`.
+  /// - Complexity: O(*n*) in general, where *n* is the number of elements.
+  ///   The default sequence implementation takes O(1). The default
+  ///   collection implementation has the same complexity as `count`.
   var underestimatedCount: Int { get }
 
   /// Sequences whose `Element` is `Equatable` and that are able to quickly
@@ -802,8 +803,7 @@ extension Sequence {
   /// The default implementation returns 0. If you provide your own
   /// implementation, make sure to compute the value nondestructively.
   ///
-  /// - Complexity: O(1), except if the sequence also conforms to `Collection`.
-  ///   In this case, see the documentation of `Collection.underestimatedCount`.
+  /// - Complexity: O(1).
   @inlinable
   public var underestimatedCount: Int {
     return 0
