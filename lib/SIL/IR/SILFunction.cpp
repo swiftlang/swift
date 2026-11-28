@@ -1223,10 +1223,13 @@ bool SILFunction::hasDynamicSelfMetadata() const {
       selfTy = dynamicSelfTy.getSelfType();
   }
 
-  if (selfTy.isForeignReferenceType())
+  // The metadata of a foreign reference type, or of a Swift subclass of one,
+  // cannot be loaded from an instance.
+  auto classDecl = selfTy.getClassDecl();
+  if (!classDecl || classDecl->getForeignReferenceSuperclassOrSelf())
     return false;
 
-  return !!selfTy.getClassDecl();
+  return true;
 }
 
 bool SILFunction::hasName(const char *Name) const {

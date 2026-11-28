@@ -126,7 +126,7 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
 
         // Foreign class types can be symbolically referenced.
         if (clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType ||
-            const_cast<ClassDecl *>(clazz)->isForeignReferenceType())
+            clazz->getForeignReferenceSuperclassOrSelf())
           return true;
 
         // Otherwise no.
