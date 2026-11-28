@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1200,15 +1200,24 @@ extension Collection {
 
     var result = ContiguousArray<T>()
     result.reserveCapacity(n)
-
+    result._makeMutableAndUnique()
+    let base = unsafe result._buffer.firstElementAddress
+    var written = 0
     var i = self.startIndex
-
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+    do throws(E) {
+      for _ in 0..<n {
+        unsafe (base + written).initialize(to: try transform(self[i]))
+        written &+= 1
+        formIndex(after: &i)
+      }
+    } catch {
+      result._buffer.mutableCount = written
+      result._endMutation()
+      throw error
     }
-
     _expectEnd(of: self, is: i)
+    result._buffer.mutableCount = n
+    result._endMutation()
     return Array(result)
   }
 
