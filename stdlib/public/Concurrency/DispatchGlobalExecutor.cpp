@@ -62,20 +62,6 @@ extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
 
 using namespace swift;
 
-#if SWIFT_CONCURRENCY_EMBEDDED
-extern "C" SWIFT_CC(swift)
-SwiftExecutorRef swift_embedded_dispatch_getMainExecutor();
-
-static SwiftExecutorRef embeddedMainExecutor() {
-  return swift_embedded_dispatch_getMainExecutor();
-}
-
-static bool isEmbeddedMainExecutor(SwiftExecutorRef executor) {
-  return swift_executor_getIdentity(executor) ==
-         swift_executor_getIdentity(embeddedMainExecutor());
-}
-#endif
-
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   SwiftJob *job = (SwiftJob*) _job;
@@ -83,7 +69,7 @@ static void __swift_run_job(void *_job) {
   auto executor =
       job->schedulerPrivate[SwiftJobDispatchQueueIndex] ==
               dispatch_get_main_queue()
-          ? embeddedMainExecutor()
+          ? swift_executor_main()
           : swift_executor_generic();
   swift_job_run(job, executor);
 #else
@@ -423,14 +409,6 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec, long long nsec,
 
 void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
   swift_dispatchEnqueueMain(job);
-}
-
-SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
-  return embeddedMainExecutor();
-}
-
-bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
-  return isEmbeddedMainExecutor(executor);
 }
 
 void _swift_concurrency_asyncMain(void) { dispatch_main(); }
