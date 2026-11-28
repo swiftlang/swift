@@ -1,0 +1,95 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+
+// When a generic function is specialized so that an indirect result or
+// parameter of pack type becomes direct, the cloner creates an alloc_stack that
+// replaces the indirect argument. If the specialized type no longer contains a
+// pack, the pack loops still run (exactly once), so the memory lifetime isn't
+// statically verifiable anymore and the alloc_stack must be [dynamic_lifetime].
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil @get : $@convention(thin) <U> () -> @out U
+sil @consume : $@convention(thin) <U> (@in U) -> ()
+
+// CHECK-LABEL: sil shared [ossa] @$s11pack_resultSb_QP_Tg5 : $@convention(thin) () -> Bool {
+// CHECK:         alloc_stack [dynamic_lifetime] $Bool
+// CHECK:       } // end sil function '$s11pack_resultSb_QP_Tg5'
+sil [ossa] @pack_result : $@convention(thin) <each T> () -> @out (repeat each T) {
+bb0(%0 : $*(repeat each T)):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = pack_length $Pack{repeat each T}
+  br bb1(%1)
+
+bb1(%4 : $Builtin.Word):
+  %5 = builtin "cmp_eq_Word"(%4, %3) : $Builtin.Int1
+  cond_br %5, bb3, bb2
+
+bb2:
+  %6 = dynamic_pack_index %4 of $Pack{repeat each T}
+  %7 = open_pack_element %6 of <each T> at <Pack{repeat each T}>, shape $each T, id 1
+  %8 = tuple_pack_element_addr %6 of %0 as $*@pack_element(1) each T
+  %9 = function_ref @get : $@convention(thin) <U> () -> @out U
+  %10 = apply %9<@pack_element(1) each T>(%8) : $@convention(thin) <U> () -> @out U
+  %11 = builtin "add_Word"(%4, %2) : $Builtin.Word
+  br bb1(%11)
+
+bb3:
+  %12 = tuple ()
+  return %12
+}
+
+sil [ossa] @call_pack_result : $@convention(thin) () -> Bool {
+bb0:
+  %0 = alloc_stack $Bool
+  %1 = function_ref @pack_result : $@convention(thin) <each T> () -> @out (repeat each T)
+  %2 = apply %1<Pack{Bool}>(%0) : $@convention(thin) <each T> () -> @out (repeat each T)
+  %3 = load [trivial] %0
+  dealloc_stack %0
+  return %3
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s10pack_paramSb_QP_Tg5 : $@convention(thin) (Optional<Bool>) -> () {
+// CHECK:         alloc_stack [dynamic_lifetime] $Optional<Bool>
+// CHECK:       } // end sil function '$s10pack_paramSb_QP_Tg5'
+sil [ossa] @pack_param : $@convention(thin) <each T> (@in Optional<(repeat each T)>) -> () {
+bb0(%0 : $*Optional<(repeat each T)>):
+  %1 = integer_literal $Builtin.Word, 0
+  %2 = integer_literal $Builtin.Word, 1
+  %3 = pack_length $Pack{repeat each T}
+  %4 = unchecked_take_enum_data_addr %0, #Optional.some!enumelt
+  br bb1(%1)
+
+bb1(%5 : $Builtin.Word):
+  %6 = builtin "cmp_eq_Word"(%5, %3) : $Builtin.Int1
+  cond_br %6, bb3, bb2
+
+bb2:
+  %7 = dynamic_pack_index %5 of $Pack{repeat each T}
+  %8 = open_pack_element %7 of <each T> at <Pack{repeat each T}>, shape $each T, id 2
+  %9 = tuple_pack_element_addr %7 of %4 as $*@pack_element(2) each T
+  %10 = function_ref @consume : $@convention(thin) <U> (@in U) -> ()
+  %11 = apply %10<@pack_element(2) each T>(%9) : $@convention(thin) <U> (@in U) -> ()
+  %12 = builtin "add_Word"(%5, %2) : $Builtin.Word
+  br bb1(%12)
+
+bb3:
+  %13 = tuple ()
+  return %13
+}
+
+sil [ossa] @call_pack_param : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Optional<Bool>
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [trivial] %2
+  inject_enum_addr %1, #Optional.some!enumelt
+  %3 = function_ref @pack_param : $@convention(thin) <each T> (@in Optional<(repeat each T)>) -> ()
+  %4 = apply %3<Pack{Bool}>(%1) : $@convention(thin) <each T> (@in Optional<(repeat each T)>) -> ()
+  dealloc_stack %1
+  %6 = tuple ()
+  return %6
+}

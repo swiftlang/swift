@@ -355,13 +355,12 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 
 // MARK: Dynamic indexing of single-element packs
 //
-// rdar://190731025: Eliminating pack types from a loop over a single-element
-// pack would expose lifetime verifier errors, so we do not for now, even though
-// such packs are homogeneous.
+// Single-element packs are homogeneous, so they are handled like any other
+// homogeneous pack.
 
 // CHECK-LABEL: sil [ossa] @single_element_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
-// CHECK:         open_pack_element
-// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*@pack_element
+// CHECK-NOT:     open_pack_element
+// CHECK:         pointer_to_address %0 : $Builtin.RawPointer to $*Int32
 // CHECK-LABEL: } // end sil function 'single_element_dpi'
 sil [ossa] @single_element_dpi : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
 bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
@@ -391,17 +390,22 @@ bb0(%0 : $Builtin.RawPointer):
 
 sil [ossa] @get_out : $@convention(thin) <T> () -> @out T
 
-// The Optional payload is only initialized because the loop runs exactly once,
-// which does not satisfy the verifier if the unchecked_addr_cast is eliminated,
-// so it must not be, for now (rdar://190731025).
+// rdar://190731025
+//
+// The Optional payload is only initialized because the loop runs exactly once.
+// Once the element type is concrete, the verifier can't see that, so the
+// alloc_stack must be [dynamic_lifetime] to avoid a memory verifier error.
+// Specializing a pack allocation to a single concrete type now sets that flag,
+// so single-element pack loops are safe to specialize.
 //
 // CHECK-LABEL: sil [ossa] @single_element_optional_loop : $@convention(thin) () -> Optional<Bool> {
-// CHECK:         open_pack_element
-// CHECK:         unchecked_addr_cast {{%[0-9]+}} : $*Bool to $*@pack_element
+// CHECK-NOT:     open_pack_element
+// CHECK:         alloc_stack [dynamic_lifetime] $Optional<Bool>
+// CHECK:         unchecked_addr_cast {{%[0-9]+}} : $*Bool to $*Bool
 // CHECK-LABEL: } // end sil function 'single_element_optional_loop'
 sil [ossa] @single_element_optional_loop : $@convention(thin) () -> Optional<Bool> {
 bb0:
-  %addr = alloc_stack $Optional<Bool>
+  %addr = alloc_stack [dynamic_lifetime] $Optional<Bool>
   %payload = init_enum_data_addr %addr, #Optional.some!enumelt
   %zero = integer_literal $Builtin.Word, 0
   %one = integer_literal $Builtin.Word, 1
