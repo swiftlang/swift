@@ -74,17 +74,50 @@ int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
 
 /// Emit parser diagnostics for given source file.. Returns non-zero if any
 /// diagnostics were emitted.
+///
+/// When \p delayFunctionBodies is set, diagnostics inside function bodies that
+/// ASTGen will build on demand are held back until the body is built.
 int swift_ASTGen_emitParserDiagnostics(
     BridgedASTContext astContext,
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
-    int downgradePlaceholderErrorsToWarnings);
+    int downgradePlaceholderErrorsToWarnings, int delayFunctionBodies);
 
 // Build AST nodes for the top-level entities in the syntax.
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedNullableDecl attachedDecl,
-    BridgedASTContext astContext, void *_Nonnull outputContext,
+    BridgedASTContext astContext, int delayFunctionBodies,
+    void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
+
+// Build the members of the nominal type or extension \p decl, whose members
+// were delayed by `swift_ASTGen_buildTopLevelASTNodes`, and pass each to the
+// callback. Returns the fingerprint of the members.
+BridgedFingerprint swift_ASTGen_buildMembers(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedDecl decl, BridgedDeclContext declContext,
+    BridgedASTContext astContext, swift::SourceLoc bodyStart,
+    void *_Nonnull outputContext,
+    void (*_Nonnull)(BridgedDecl, void *_Nonnull));
+
+// Build the body of the function-like declaration \p decl, whose body was
+// delayed by `swift_ASTGen_buildTopLevelASTNodes`, and attach it.
+void swift_ASTGen_buildFunctionBody(BridgedDiagnosticEngine diagEngine,
+                                    void *_Nonnull sourceFile,
+                                    BridgedDecl decl,
+                                    BridgedDeclContext declContext,
+                                    BridgedASTContext astContext,
+                                    swift::SourceLoc bodyStart);
+
+// Build the body of the function-like declaration \p decl from \p bodyText, the
+// text of its replacement body, beginning at the `{`, and attach it. This is for
+// a body that lives in a buffer of its own rather than in the syntax tree of
+// \p sourceFile, such as the replacement for an edited body in an incremental
+// recompile.
+void swift_ASTGen_buildReplacementFunctionBody(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedDecl decl, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedStringRef bodyText);
 
 BridgedFingerprint
 swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,

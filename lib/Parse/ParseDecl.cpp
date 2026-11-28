@@ -236,7 +236,8 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
         /*emitOnlyErrors=*/true,
         /*downgradePlaceholderErrorsToWarnings=*/
         Context.LangOpts.Playground ||
-            Context.LangOpts.WarnOnEditorPlaceholder);
+            Context.LangOpts.WarnOnEditorPlaceholder,
+        /*delayFunctionBodies=*/false);
     if (hadSyntaxError) {
       // We might have emitted warnings in the C++ parser but no errors, in
       // which case we still have `hadAnyError() == false`. To avoid

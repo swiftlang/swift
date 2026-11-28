@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Statistic.h"
 
 using namespace swift;
 
@@ -123,6 +124,17 @@ void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
 }
 
+void BridgedASTContext_recordFunctionBodyParsed(BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumFunctionsParsed;
+}
+
+void BridgedASTContext_recordIterableDeclContextParsed(
+    BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumIterableDeclContextParsed;
+}
+
 void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
                                     BridgedSwiftClosure closure) {
   cDecl.unbridged()->forEachDeclToHoist([&](Decl *D) {
@@ -220,6 +232,47 @@ void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl,
                                    BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);
+}
+
+void BridgedDecl_setBodyDelayed(BridgedDecl decl, SourceRange range,
+                                bool hasNestedTypeDeclarations) {
+  auto *afd = cast<AbstractFunctionDecl>(decl.unbridged());
+  afd->setBodyDelayed(range);
+  afd->setHasNestedTypeDeclarations(hasNestedTypeDeclarations);
+}
+
+void BridgedDecl_setMembersDelayed(BridgedDecl decl,
+                                   bool hasOperatorDeclarations,
+                                   bool hasNestedClassDeclarations,
+                                   bool hasDerivativeDeclarations) {
+  IterableDeclContext *idc;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl.unbridged()))
+    idc = nominal;
+  else
+    idc = cast<ExtensionDecl>(decl.unbridged());
+  if (hasOperatorDeclarations)
+    idc->setMaybeHasOperatorDeclarations();
+  if (hasNestedClassDeclarations)
+    idc->setMaybeHasNestedClassDeclarations();
+  if (hasDerivativeDeclarations)
+    idc->setMaybeHasDerivativeDeclarations();
+}
+
+void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setHasNestedTypeDeclarations(value);
+}
+
+void BridgedDecl_setBodyFingerprint(BridgedDecl decl,
+                                    BridgedFingerprint fingerprint) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBodyFingerprint(fingerprint.unbridged());
+}
+
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body,
+                                      BridgedFingerprint fingerprint) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBodyParsed(body.unbridged(), fingerprint.unbridged());
 }
 
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
@@ -336,6 +389,7 @@ static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
+  IDC->setMaybeHasDerivativeDeclarations();
   // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
   ctx.evaluator.cacheOutput(ParseMembersRequest{IDC},
                             FingerprintAndMembers{fp, members});
