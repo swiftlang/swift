@@ -91,6 +91,13 @@ public:
     asImpl().addReservedWord();
   }
 
+  void embeddedLayout() {
+    // The embedded layout consists of:
+    // -1 : vwt
+    //  0 : metadata flags
+    super::layout();
+  }
+
   CanType getTargetType() const {
     return Target->getDeclaredType()->getCanonicalType();
   }

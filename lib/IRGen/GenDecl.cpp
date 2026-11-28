@@ -5725,7 +5725,11 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       if (auto *classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (classDecl->isGenericContext()) {
+        // C++ foreign reference types use foreign type metadata, which is
+        // emitted by noteUseOfTypeMetadata above.
+        if (classDecl->isForeignReferenceType()) {
+          // Nothing to do.
+        } else if (classDecl->isGenericContext()) {
           IRGen.noteUseOfSpecializedClassMetadata(concreteType);
         } else {
           IRGen.noteUseOfClassMetadata(concreteType);

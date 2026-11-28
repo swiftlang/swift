@@ -673,8 +673,11 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
     
     // We need to realize classes with the ObjC runtime.
     if (auto c = dyn_cast<ClassDecl>(theDecl)) {
-      
-      assert(hasKnownSwiftMetadata(IGF.IGM, c));
+      // In Embedded Swift, the metadata of a C++ foreign reference type is
+      // statically addressable.
+      assert(hasKnownSwiftMetadata(IGF.IGM, c) ||
+             (IGF.IGM.isEmbeddedWithExistentials() &&
+              c->isForeignReferenceType()));
       metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
     }
     auto response = MetadataResponse::forComplete(metadata);
