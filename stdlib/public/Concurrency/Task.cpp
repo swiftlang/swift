@@ -640,19 +640,27 @@ Job *AsyncTask::flagAsEnqueuedOnExecutor(SerialExecutorRef newExecutor) {
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
 }
 
-// Always and only called by the task on itself
-void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord) {
-  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsSuspended() with dependencyRecord %p", this,
+// Always and only called by the task on itself. Publishes the records that
+// `linkRecords` links below `dependencyStatusRecord` in the same status update,
+// and doesn't suspend if `linkRecords` returns false.
+static bool flagTaskAsSuspended(
+    AsyncTask *task, TaskDependencyStatusRecord *dependencyStatusRecord,
+    bool withLock,
+    llvm::function_ref<bool(const ActiveTaskStatus &, TaskStatusRecord *)>
+        linkRecords) {
+  SWIFT_TASK_DEBUG_LOG("[Dependency] %p->flagAsSuspended() with dependencyRecord %p", task,
                   dependencyStatusRecord);
   assert(dependencyStatusRecord != NULL);
 
-  auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
   // We can only be suspended if we were previously running. See state
   // transitions listed out in Task.h
   assert(oldStatus.isRunning());
 
-  addStatusRecord(this, dependencyStatusRecord, oldStatus, [&](ActiveTaskStatus unused,
-                  ActiveTaskStatus &newStatus) {
+  auto suspend = [&](ActiveTaskStatus status, ActiveTaskStatus &newStatus) {
+    if (linkRecords && !linkRecords(status, dependencyStatusRecord))
+      return false;
+
     newStatus = newStatus.withRunning(false);
     newStatus = newStatus.withoutStoredPriorityEscalation();
     newStatus = newStatus.withTaskDependency();
@@ -669,25 +677,41 @@ void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusReco
     // published it in the ActiveTaskStatus since someone else could
     // concurrently made us runnable.
     dependencyStatusRecord->performEscalationAction(
-        this, oldStatus.getStoredPriority(), newStatus.getStoredPriority());
+        task, status.getStoredPriority(), newStatus.getStoredPriority());
 
-    // Always add the dependency status record
+    // Keep the status the record is published in for the override below.
+    oldStatus = status;
     return true;
-  });
+  };
+  bool added =
+      withLock ? addStatusRecordWithLock(task, dependencyStatusRecord,
+                                         oldStatus, suspend)
+               : addStatusRecord(task, dependencyStatusRecord, oldStatus,
+                                 suspend);
+  if (!added)
+    return false;
 
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
   // Successfully dropped task drain lock, make sure to remove override on
   // thread due to task
   if (oldStatus.isStoredPriorityEscalated()) {
      SWIFT_TASK_DEBUG_LOG("[Override] Reset override %#x on thread from task %p",
-       oldStatus.getStoredPriority(), this);
+       oldStatus.getStoredPriority(), task);
      swift_dispatch_lock_override_end((qos_class_t) oldStatus.getStoredPriority());
   }
 #endif
 
-  swift_task_exitThreadLocalContext((char *)&_private().ExclusivityAccessSet[0]);
-  restoreTaskVoucher(this);
-  return;
+  swift_task_exitThreadLocalContext(
+      (char *)&task->_private().ExclusivityAccessSet[0]);
+  restoreTaskVoucher(task);
+  return true;
+}
+
+void AsyncTask::flagAsSuspended(TaskDependencyStatusRecord *dependencyStatusRecord) {
+  [[maybe_unused]] bool suspended =
+      flagTaskAsSuspended(this, dependencyStatusRecord, /*withLock=*/false,
+                          /*linkRecords=*/nullptr);
+  assert(suspended);
 }
 
 void AsyncTask::destroyTaskDependency(TaskDependencyStatusRecord *dependencyRecord) {
@@ -731,6 +755,15 @@ void AsyncTask::flagAsSuspendedOnTask(AsyncTask *task) {
 }
 
 void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *context) {
+  [[maybe_unused]] bool suspended = flagAsSuspendedOnContinuation(
+      context, /*withLock=*/false, /*linkRecords=*/nullptr);
+  assert(suspended);
+}
+
+bool AsyncTask::flagAsSuspendedOnContinuation(
+    ContinuationAsyncContext *context, bool withLock,
+    llvm::function_ref<bool(const ActiveTaskStatus &, TaskStatusRecord *)>
+        linkRecords) {
   assert(_private().dependencyRecord == nullptr);
 
   void *allocation = _swift_task_alloc_specific(this, sizeof(class TaskDependencyStatusRecord));
@@ -738,7 +771,10 @@ void AsyncTask::flagAsSuspendedOnContinuation(ContinuationAsyncContext *context)
   SWIFT_TASK_DEBUG_LOG("[Dependency] Create a dependencyRecord %p for dependency on continuation %p", allocation, context);
   _private().dependencyRecord = record;
 
-  this->flagAsSuspended(record);
+  if (flagTaskAsSuspended(this, record, withLock, linkRecords))
+    return true;
+  destroyTaskDependency(record);
+  return false;
 }
 
 void AsyncTask::flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup) {

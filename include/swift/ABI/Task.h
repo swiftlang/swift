@@ -68,6 +68,7 @@ class AsyncContext;
 class Job;
 struct OpaqueValue;
 struct SwiftError;
+class ActiveTaskStatus;
 class TaskStatusRecord;
 class TaskDependencyStatusRecord;
 class TaskExecutorPreferenceStatusRecord;
@@ -561,6 +562,15 @@ public:
   /// waiting on.
   void flagAsSuspendedOnTask(AsyncTask *task);
   void flagAsSuspendedOnContinuation(ContinuationAsyncContext *context);
+
+  /// Like the above, but publishes the records that `linkRecords` links below
+  /// the dependency record in the same status update, and doesn't suspend if
+  /// `linkRecords` returns false. `linkRecords` runs inside the status update,
+  /// possibly more than once and with the status record lock held.
+  bool flagAsSuspendedOnContinuation(
+      ContinuationAsyncContext *context, bool withLock,
+      llvm::function_ref<bool(const ActiveTaskStatus &, TaskStatusRecord *)>
+          linkRecords);
   void flagAsSuspendedOnTaskGroup(TaskGroup *taskGroup);
 
 private:

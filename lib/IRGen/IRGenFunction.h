@@ -57,6 +57,7 @@ namespace swift {
 namespace irgen {
   class DynamicMetadataRequest;
   class Explosion;
+  class OptionalExplosion;
   class FunctionRef;
   class HeapLayout;
   class HeapNonFixedOffsets;
@@ -235,14 +236,18 @@ public:
   void emitResumeAsyncContinuationThrowing(llvm::Value *continuation,
                                            llvm::Value *error);
 
+  /// Defined in GenConcurrency.cpp. Each handler is an optional closure of the
+  /// given optional type.
   void emitAwaitSplitContinuation(llvm::Value *continuation,
-                                     Address resumeBuffer,
-                                     SILType resumeTy,
-                                     llvm::BasicBlock *normalBB,
-                                     llvm::PHINode *optionalErrorPhi,
-                                     llvm::BasicBlock *optionalErrorBB);
+                                  OptionalExplosion &cancellationHandler,
+                                  SILType cancellationHandlerType,
+                                  OptionalExplosion &escalationHandler,
+                                  SILType escalationHandlerType,
+                                  Address resumeBuffer, SILType resumeTy,
+                                  llvm::BasicBlock *normalBB,
+                                  llvm::PHINode *optionalErrorPhi,
+                                  llvm::BasicBlock *optionalErrorBB);
 
-  void emitDestroySplitContinuation(llvm::Value *continuation);
 
   void emitClearSensitive(Address address, llvm::Value *size);
 

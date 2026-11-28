@@ -398,6 +398,11 @@ class IRGenSILFunction :
 public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILValue, StackAddress> LoweredPartialApplyAllocations;
+
+  /// The storage of a split continuation, which the createSplitContinuation
+  /// builtin allocates in this frame and the paired destroySplitContinuation
+  /// builtin deallocates.
+  llvm::DenseMap<SILValue, StackAddress> SplitContinuationAllocations;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
 
   /// All alloc_ref instructions which allocate the object on the stack.
@@ -4031,6 +4036,46 @@ static void emitBuiltinStackDealloc(IRGenSILFunction &IGF,
   }
 }
 
+static void emitBuiltinCreateSplitContinuation(IRGenSILFunction &IGF,
+                                               swift::BuiltinInst *i) {
+  // The storage of the continuation has a fixed size, so it doesn't depend on
+  // the runtime's layout.
+  StackAddress storage = IGF.emitStaticArrayAlloca(
+      IGF.IGM.Int8PtrTy, IGF.IGM.getPointerSize(),
+      IGF.IGM.getSize(Size(NumWords_SplitContinuation)),
+      Alignment(Alignment_SplitContinuation), "split.continuation");
+
+  // SILGen allocates the result buffer with an ordinary alloc_stack, at the
+  // abstraction the resumers and the await use for it.
+  Address result = IGF.getLoweredAddress(i->getOperand(0));
+
+  auto *call = IGF.Builder.CreateCall(
+      IGF.IGM.getContinuationInitSplitFunctionPointer(),
+      {storage.getAddress().getAddress(),
+       IGF.Builder.CreateBitOrPointerCast(result.getAddress(),
+                                          IGF.IGM.OpaquePtrTy)});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+
+  IGF.SplitContinuationAllocations[i] = storage;
+
+  auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
+  Explosion out;
+  out.add(IGF.Builder.CreateBitOrPointerCast(
+      storage.getAddress().getAddress(), rawContTI.getStorageType()));
+  IGF.setLoweredExplosion(i, out);
+}
+
+static void emitBuiltinDestroySplitContinuation(IRGenSILFunction &IGF,
+                                                swift::BuiltinInst *i) {
+  // The SIL verifier pairs the destroy with its create, so the operand is the
+  // createSplitContinuation builtin itself.
+  auto found = IGF.SplitContinuationAllocations.find(i->getOperand(0));
+  assert(found != IGF.SplitContinuationAllocations.end() &&
+         "destroySplitContinuation without its createSplitContinuation");
+  IGF.emitDeallocateStaticAlloca(found->second);
+}
+
 static void emitBuiltinCreateAsyncTask(IRGenSILFunction &IGF,
                                        swift::BuiltinInst *i) {
   assert(i->getOperandValues().size() == 7 &&
@@ -4068,6 +4113,12 @@ void IRGenSILFunction::visitBuiltinInst(swift::BuiltinInst *i) {
 
   case BuiltinValueKind::CreateAsyncTask:
     return emitBuiltinCreateAsyncTask(*this, i);
+
+  case BuiltinValueKind::CreateSplitContinuation:
+    return emitBuiltinCreateSplitContinuation(*this, i);
+
+  case BuiltinValueKind::DestroySplitContinuation:
+    return emitBuiltinDestroySplitContinuation(*this, i);
 
   default:
     break;
@@ -9477,6 +9528,14 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
     Address resumeBuffer = getLoweredAddress(splitGet->getArguments()[1]);
     SILType resumeTy = splitGet->getArguments()[1]->getType().getObjectType();
 
+    // Each handler is an optional closure. A handler that is known statically
+    // to be nil or not is peepholed.
+    SILValue cancellationValue = splitGet->getArguments()[2];
+    SILValue escalationValue = splitGet->getArguments()[3];
+    OptionalExplosion cancellation =
+        getLoweredOptionalExplosion(cancellationValue);
+    OptionalExplosion escalation = getLoweredOptionalExplosion(escalationValue);
+
     auto *normalDestBB = getLoweredBB(i->getResumeBB()).bb;
     bool hasError = i->getErrorBB() != nullptr;
     auto *errorDestBB = hasError ? getLoweredBB(i->getErrorBB()).bb : nullptr;
@@ -9486,8 +9545,10 @@ void IRGenSILFunction::visitAwaitAsyncContinuationInst(
 
     // The value is delivered into the resume buffer, so the resume successor
     // takes no arguments and there is nothing to add to its PHI nodes.
-    emitAwaitSplitContinuation(continuation, resumeBuffer, resumeTy,
-                                  normalDestBB, errorPhi, errorDestBB);
+    emitAwaitSplitContinuation(continuation, cancellation,
+                               cancellationValue->getType(), escalation,
+                               escalationValue->getType(), resumeBuffer,
+                               resumeTy, normalDestBB, errorPhi, errorDestBB);
     return;
   }
 

@@ -437,21 +437,10 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  case BuiltinValueKind::CreateSplitContinuation: {
-    // Ignore the metatype argument; the result type comes from the
-    // substitution.
-    (void)args.claimAll();
-    auto resultTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
-    auto metadata = IGF.emitTypeMetadataRef(resultTy);
-    auto call = IGF.Builder.CreateCall(
-        IGF.IGM.getContinuationCreateSplitFunctionPointer(), {metadata});
-    call->setCallingConv(IGF.IGM.SwiftCC);
-    // The call returns the RawUnsafeContinuation for the new continuation.
-    auto &rawContTI = IGF.IGM.getRawUnsafeContinuationTypeInfo();
-    out.add(IGF.Builder.CreateBitOrPointerCast(call,
-                                               rawContTI.getStorageType()));
-    return;
-  }
+  case BuiltinValueKind::CreateSplitContinuation:
+  case BuiltinValueKind::DestroySplitContinuation:
+    llvm_unreachable("lowered by IRGenSILFunction, which pairs the storage "
+                     "of the two");
 
   case BuiltinValueKind::GetSplitContinuationAddr: {
     // Binding the continuation to this frame is done by the
@@ -460,12 +449,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto continuation = args.claimNext();
     (void)args.claimAll();
     out.add(continuation);
-    return;
-  }
-
-  case BuiltinValueKind::DestroySplitContinuation: {
-    auto continuation = args.claimNext();
-    IGF.emitDestroySplitContinuation(continuation);
     return;
   }
 

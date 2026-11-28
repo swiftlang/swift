@@ -586,16 +586,14 @@ Added: __swift_concurrency_debug_synchronous_operation_adapter
 
 // Split continuations: the ContinuationWaiter wait half (the resume half reuses
 // the existing Continuation) and the split continuation runtime entry points
-// it is built on.  The cancellation and priority-escalation handlers installed on
-// a suspension use the ordinary per-handler entry points, so they add nothing.
+// it is built on.
 Added: _$ss18ContinuationWaiterVMa
 Added: _$ss18ContinuationWaiterVMn
 Added: _$ss18ContinuationWaiterVsRi_zrlE7contextAByxq_GBc_tcfC
 Added: _$ss18ContinuationWaiterVsRi_zrlE7contextBcvg
 Added: _$ss18ContinuationWaiterVsRi_zrlEfD
-Added: _swift_continuation_createSplit
+Added: _swift_continuation_initSplit
 Added: _swift_continuation_awaitSplit
-Added: _swift_continuation_destroySplit
 Added: _swift_continuation_resumeOnExecutors
 
 // CheckedContinuation.resumeSynchronously: the checked resume-once logic

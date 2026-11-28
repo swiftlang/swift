@@ -1172,6 +1172,15 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
                         SpecialPointerAuthDiscriminators::TaskResumeContext);
 
+  opts.CancellationNotificationWithReasonFunction = PointerAuthSchema(
+      codeKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::
+          CancellationNotificationWithReasonFunction);
+
+  opts.EscalationNotificationFunction = PointerAuthSchema(
+      codeKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::EscalationNotificationFunction);
+
   opts.AsyncContextExtendedFrameEntry = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::SwiftAsyncContextExtendedFrameEntry);

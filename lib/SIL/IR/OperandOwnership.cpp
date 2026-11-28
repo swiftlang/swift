@@ -1212,7 +1212,8 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskPopDeadline)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, CreateSplitContinuation)
 // The resume buffer is passed by address, and address operands are trivial at
 // the SIL level.
-BUILTIN_OPERAND_OWNERSHIP(TrivialUse, GetSplitContinuationAddr)
+// The runtime uses the handlers until the await resumes.
+BUILTIN_OPERAND_OWNERSHIP(BitwiseEscape, GetSplitContinuationAddr)
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, DestroySplitContinuation)
 
 #undef BUILTIN_OPERAND_OWNERSHIP

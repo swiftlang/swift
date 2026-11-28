@@ -12,24 +12,68 @@ import Builtin
 import Swift
 import _Concurrency
 
-// The continuation is a stack allocation, so it is created and destroyed in
-// the same function.
+// The continuation's storage is allocated in the frame of the function that
+// creates it, and its result buffer is an ordinary stack allocation. A result
+// of a fixed-size type needs no metadata and no task allocation.
 // CHECK-LABEL: define{{.*}} swiftcc void @split_create_destroy()
-// CHECK:   [[TOK:%.*]] = call swiftcc ptr @swift_continuation_createSplit(ptr
-// CHECK:   call swiftcc void @swift_continuation_destroySplit(ptr [[TOK]])
+// CHECK-DAG:   [[STORAGE:%.*]] = alloca ptr, i64 24, align 16
+// CHECK-DAG:   [[RESULT:%.*]] = alloca i32, align 4
+// CHECK-NOT: swift_task_alloc
+// CHECK-NOT: metadata
+// CHECK:   call swiftcc void @swift_continuation_initSplit(ptr [[STORAGE]], ptr [[RESULT]])
+// The destroy doesn't call into the runtime.
+// CHECK-NOT: call {{.*}}@swift_
 // CHECK: }
-// CHECK: declare extern_weak swiftcc ptr @swift_continuation_createSplit(ptr)
-// CHECK: declare extern_weak swiftcc void @swift_continuation_destroySplit(ptr)
+// CHECK: declare extern_weak swiftcc void @swift_continuation_initSplit(ptr, ptr)
 sil @split_create_destroy : $@convention(thin) () -> () {
 bb0:
-  %mt = metatype $@thin Builtin.Int32.Type
-  %tok = builtin "createSplitContinuation"<Builtin.Int32>(%mt : $@thin Builtin.Int32.Type) : $Builtin.RawUnsafeContinuation
+  %buf = alloc_stack $Builtin.Int32
+  %tok = builtin "createSplitContinuation"<Builtin.Int32>(%buf : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
   %d = builtin "destroySplitContinuation"(%tok : $Builtin.RawUnsafeContinuation) : $()
+  dealloc_stack %buf : $*Builtin.Int32
   %t = tuple ()
   return %t : $()
 }
 
-// CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1)
+// The result buffer of a type without a fixed size comes from the task
+// allocator in an async function, like any other alloc_stack, and is released
+// after the destroy.
+// CHECK-LABEL: define{{.*}} swifttailcc void @split_create_destroy_generic(
+// CHECK:   [[RESULT:%.*]] = call swiftcc ptr @swift_task_alloc(
+// CHECK:   call swiftcc void @swift_continuation_initSplit(ptr {{%.*}}, ptr [[RESULT]])
+// CHECK:   call swiftcc void @swift_task_dealloc(ptr [[RESULT]])
+// CHECK: }
+sil @split_create_destroy_generic : $@convention(thin) @async <T> (@thick T.Type) -> () {
+bb0(%t : $@thick T.Type):
+  %buf = alloc_stack $T
+  %tok = builtin "createSplitContinuation"<T>(%buf : $*T) : $Builtin.RawUnsafeContinuation
+  %d = builtin "destroySplitContinuation"(%tok : $Builtin.RawUnsafeContinuation) : $()
+  dealloc_stack %buf : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// Handlers that are statically present get a record buffer each. The function
+// and context of each closure are stored at the words where the runtime expects
+// them. With pointer authentication, the function is resigned from its type's
+// discriminator to its word's address blended with the discriminator of the
+// runtime field: CancellationNotificationWithReasonFunction (62877) and
+// EscalationNotificationFunction (30817).
+// CHECK-LABEL: define{{.*}} swifttailcc void @split_await(ptr swiftasync %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr %5)
+// CHECK:   [[CANCELFN:%.*]] = getelementptr inbounds ptr, ptr [[CANCELRECORD:%split.cancellation.record[0-9]*]], i32 2
+// CHECK-ptrauth:   [[CANCELADDR:%.*]] = ptrtoint ptr [[CANCELFN]] to i64
+// CHECK-ptrauth:   [[CANCELDISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[CANCELADDR]], i64 62877)
+// CHECK-ptrauth:   call i64 @llvm.ptrauth.resign(i64 {{%.*}}, i32 0, i64 62877, i32 0, i64 [[CANCELDISC]])
+// CHECK-noptrauth: store ptr %2, ptr [[CANCELFN]]
+// CHECK:   [[CANCELCTX:%.*]] = getelementptr inbounds ptr, ptr [[CANCELRECORD]], i32 3
+// CHECK:   store ptr {{%.*}}, ptr [[CANCELCTX]]
+// CHECK:   [[ESCFN:%.*]] = getelementptr inbounds ptr, ptr [[ESCRECORD:%split.escalation.record[0-9]*]], i32 2
+// CHECK-ptrauth:   [[ESCADDR:%.*]] = ptrtoint ptr [[ESCFN]] to i64
+// CHECK-ptrauth:   [[ESCDISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ESCADDR]], i64 30817)
+// CHECK-ptrauth:   call i64 @llvm.ptrauth.resign(i64 {{%.*}}, i32 0, i64 30817, i32 0, i64 [[ESCDISC]])
+// CHECK-noptrauth: store ptr %4, ptr [[ESCFN]]
+// CHECK:   [[ESCCTX:%.*]] = getelementptr inbounds ptr, ptr [[ESCRECORD]], i32 3
+// CHECK:   store ptr {{%.*}}, ptr [[ESCCTX]]
 // CHECK:   [[CTXADDR:%.*]] = getelementptr inbounds nuw %swift.task, ptr %1, i32 0, i32 {{[0-9]+}}
 // CHECK:   [[CTX:%.*]] = load ptr, ptr [[CTXADDR]]
 // With pointer authentication, the context is authenticated after the load, and
@@ -57,7 +101,7 @@ bb0:
 // CHECK-ptrauth:   [[SIGNEDPTR:%.*]] = inttoptr i64 [[SIGNED]] to ptr
 // CHECK-ptrauth:   store ptr [[SIGNEDPTR]], ptr [[RESUMEFIELD]]
 // CHECK-noptrauth: store ptr @split_awaitTQ0_, ptr [[RESUMEFIELD]]
-// CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1)
+// CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1, ptr [[CANCELRECORD]], ptr [[ESCRECORD]])
 // CHECK: }
 
 // CHECK-LABEL: define internal swifttailcc void @split_awaitTQ0_(ptr swiftasync %0)
@@ -66,11 +110,56 @@ bb0:
 // CHECK:   [[VALUE:%.*]] = load i32, ptr [[RESULT]]
 // CHECK:   store i32 [[VALUE]]
 // CHECK: }
-// CHECK: declare extern_weak swifttailcc void @swift_continuation_awaitSplit(ptr)
-sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
+// CHECK: declare extern_weak swifttailcc void @swift_continuation_awaitSplit(ptr, ptr, ptr)
+sil @split_await : $@convention(thin) @async (Builtin.RawUnsafeContinuation, @guaranteed @noescape @callee_guaranteed (UInt8) -> (), @guaranteed @noescape @callee_guaranteed (UInt8, UInt8) -> ()) -> () {
+entry(%continuation : $Builtin.RawUnsafeContinuation, %onCancel : $@noescape @callee_guaranteed (UInt8) -> (), %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> ()):
+  %a = alloc_stack $Builtin.Int32
+  %c = enum $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, #Optional.some!enumelt, %onCancel : $@noescape @callee_guaranteed (UInt8) -> ()
+  %e = enum $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>, #Optional.some!enumelt, %onEscalated : $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, %c : $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, %e : $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>) : $Builtin.RawUnsafeContinuation
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  %t = tuple ()
+  return %t : $()
+}
+
+// Handlers that are statically nil need no record buffer and are passed as
+// null.
+// CHECK-LABEL: define{{.*}} swifttailcc void @split_await_none(ptr swiftasync %0, ptr %1)
+// CHECK-NOT: split.{{cancellation|escalation}}.record
+// CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1, ptr null, ptr null)
+// CHECK: }
+sil @split_await_none : $@convention(thin) @async (Builtin.RawUnsafeContinuation) -> () {
 entry(%continuation : $Builtin.RawUnsafeContinuation):
   %a = alloc_stack $Builtin.Int32
-  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32) : $Builtin.RawUnsafeContinuation
+  %c = enum $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, #Optional.none!enumelt
+  %e = enum $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>, #Optional.none!enumelt
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, %c : $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, %e : $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>) : $Builtin.RawUnsafeContinuation
+  await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
+bb1:
+  dealloc_stack %a : $*Builtin.Int32
+  %t = tuple ()
+  return %t : $()
+}
+
+// Handlers that may be nil are checked at runtime, and passed as their record
+// buffer or null.
+// CHECK-LABEL: define{{.*}} swifttailcc void @split_await_dynamic(ptr swiftasync %0, ptr %1, ptr %2, ptr %3, ptr %4, ptr %5)
+// CHECK:   [[CANCELNIL:%.*]] = icmp eq ptr %2, null
+// CHECK:   br i1 [[CANCELNIL]], label %split.cancellation.cont, label %split.cancellation.some
+// CHECK: split.cancellation.cont:
+// CHECK:   [[CANCEL:%.*]] = phi ptr [ [[CANCELREC:%split.cancellation.record[0-9]*]], %split.cancellation.some ], [ null, %entry ]
+// CHECK:   [[ESCNIL:%.*]] = icmp eq ptr %4, null
+// CHECK:   br i1 [[ESCNIL]], label %split.escalation.cont, label %split.escalation.some
+// CHECK: split.escalation.cont:
+// CHECK:   [[ESC:%.*]] = phi ptr [ [[ESCREC:%split.escalation.record[0-9]*]], %split.escalation.some ], [ null, %split.cancellation.cont ]
+// CHECK:   musttail call swifttailcc void @swift_continuation_awaitSplit(ptr %1, ptr [[CANCEL]], ptr [[ESC]])
+// CHECK: }
+sil @split_await_dynamic : $@convention(thin) @async (Builtin.RawUnsafeContinuation, @guaranteed Optional<@noescape @callee_guaranteed (UInt8) -> ()>, @guaranteed Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>) -> () {
+entry(%continuation : $Builtin.RawUnsafeContinuation, %c : $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, %e : $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>):
+  %a = alloc_stack $Builtin.Int32
+  %cont = builtin "getSplitContinuationAddr"<Builtin.Int32>(%continuation : $Builtin.RawUnsafeContinuation, %a : $*Builtin.Int32, %c : $Optional<@noescape @callee_guaranteed (UInt8) -> ()>, %e : $Optional<@noescape @callee_guaranteed (UInt8, UInt8) -> ()>) : $Builtin.RawUnsafeContinuation
   await_async_continuation %cont : $Builtin.RawUnsafeContinuation, resume bb1
 bb1:
   dealloc_stack %a : $*Builtin.Int32
