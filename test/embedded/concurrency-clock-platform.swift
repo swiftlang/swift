@@ -1,9 +1,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %t/values.swift -c -o %t/values.o
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature Extern -parse-as-library %t/values.swift -c -o %t/values.o
 // RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %t/values_clock.c -o %t/values_clock.o
-// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/values.o %t/values_clock.o -o %t/values.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple -lswift_Concurrency %if OS=macosx %{ -lswift_ConcurrencyDefaultExecutor %} %target-embedded-concurrency-threading-shim -dead_strip
+// RUN: %target-clang -x c -std=c11 -I %swift_obj_root/include -c %t/time.c -o %t/time.o
+// RUN: %target-embedded-link %target-clang-resource-dir-opt %t/values.o %t/values_clock.o %t/time.o -o %t/values.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple -lswift_Concurrency %if OS=macosx %{ -lswift_ConcurrencyDefaultExecutor %} %target-embedded-concurrency-threading-shim -dead_strip
 // RUN: %target-run %t/values.out | %FileCheck %t/values.swift
 
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %t/suspending_only.swift -c -o %t/suspending_only.o
@@ -16,6 +17,23 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_feature_Extern
+
+//--- time.c
+#include <swift/ExecutorImpl.h>
+
+void test_timeNow(int clock, long long *seconds, long long *nanoseconds) {
+  SwiftTime time = swift_time_now(clock);
+  *seconds = time.seconds;
+  *nanoseconds = time.nanoseconds;
+}
+
+void test_timeResolution(int clock, long long *seconds,
+                         long long *nanoseconds) {
+  SwiftTime time = swift_time_getResolution(clock);
+  *seconds = time.seconds;
+  *nanoseconds = time.nanoseconds;
+}
 
 //--- values_clock.c
 #include <swift/EmbeddedPlatform.h>
@@ -45,17 +63,19 @@ void _swift_clockSuspending_getResolution(__swift_int64_t *s,
 //--- values.swift
 import _Concurrency
 
-@_silgen_name("swift_get_time")
-func swift_get_time(
+// swift_time_now and swift_time_getResolution of ExecutorImpl.h, through the
+// C wrappers in time.c.
+@_extern(c, "test_timeNow")
+func swift_time_now(
+  _ clock: CInt,
   _ seconds: UnsafeMutablePointer<Int64>,
-  _ nanoseconds: UnsafeMutablePointer<Int64>,
-  _ clock: CInt)
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
 
-@_silgen_name("swift_get_clock_res")
-func swift_get_clock_res(
+@_extern(c, "test_timeResolution")
+func swift_time_getResolution(
+  _ clock: CInt,
   _ seconds: UnsafeMutablePointer<Int64>,
-  _ nanoseconds: UnsafeMutablePointer<Int64>,
-  _ clock: CInt)
+  _ nanoseconds: UnsafeMutablePointer<Int64>)
 
 let continuousClockID: CInt = 1
 let suspendingClockID: CInt = 2
@@ -69,12 +89,12 @@ func report(_ label: StaticString, _ duration: Duration) {
 
 func report(
   _ label: StaticString,
-  _ read: (UnsafeMutablePointer<Int64>, UnsafeMutablePointer<Int64>, CInt) -> Void,
+  _ read: (CInt, UnsafeMutablePointer<Int64>, UnsafeMutablePointer<Int64>) -> Void,
   _ clock: CInt
 ) {
   var seconds: Int64 = 0
   var nanoseconds: Int64 = 0
-  read(&seconds, &nanoseconds, clock)
+  read(clock, &seconds, &nanoseconds)
   print(label, terminator: ": ")
   print(seconds, terminator: " ")
   print(nanoseconds)
@@ -94,14 +114,14 @@ struct Main {
     report("suspending resolution", suspending.minimumResolution)
     // CHECK-NEXT: suspending resolution: 0 66
 
-    report("swift_get_time continuous", swift_get_time, continuousClockID)
-    // CHECK-NEXT: swift_get_time continuous: 11 22
-    report("swift_get_clock_res continuous", swift_get_clock_res, continuousClockID)
-    // CHECK-NEXT: swift_get_clock_res continuous: 0 33
-    report("swift_get_time suspending", swift_get_time, suspendingClockID)
-    // CHECK-NEXT: swift_get_time suspending: 44 55
-    report("swift_get_clock_res suspending", swift_get_clock_res, suspendingClockID)
-    // CHECK-NEXT: swift_get_clock_res suspending: 0 66
+    report("swift_time_now continuous", swift_time_now, continuousClockID)
+    // CHECK-NEXT: swift_time_now continuous: 11 22
+    report("swift_time_getResolution continuous", swift_time_getResolution, continuousClockID)
+    // CHECK-NEXT: swift_time_getResolution continuous: 0 33
+    report("swift_time_now suspending", swift_time_now, suspendingClockID)
+    // CHECK-NEXT: swift_time_now suspending: 44 55
+    report("swift_time_getResolution suspending", swift_time_getResolution, suspendingClockID)
+    // CHECK-NEXT: swift_time_getResolution suspending: 0 66
   }
 }
 

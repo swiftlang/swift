@@ -62,16 +62,7 @@ extension SuspendingClock {
   /// The current instant accounting for machine suspension.
   @available(StdlibDeploymentTarget 5.7, *)
   public static var now: SuspendingClock.Instant {
-    var seconds = Int64(0)
-    var nanoseconds = Int64(0)
-#if $Embedded
-    unsafe _platformSuspendingTime(&seconds, &nanoseconds)
-#else
-    unsafe _getTime(
-      seconds: &seconds,
-      nanoseconds: &nanoseconds,
-      clock: _ClockID.suspending.rawValue)
-#endif
+    let (seconds, nanoseconds) = PlatformClock.suspendingTime
     return Instant(
       _value: Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
     )
@@ -80,16 +71,7 @@ extension SuspendingClock {
   /// The minimum non-zero resolution between any two calls to `now`.
   @available(StdlibDeploymentTarget 5.7, *)
   public var minimumResolution: Swift.Duration {
-    var seconds = Int64(0)
-    var nanoseconds = Int64(0)
-#if $Embedded
-    unsafe _platformSuspendingResolution(&seconds, &nanoseconds)
-#else
-    unsafe _getClockRes(
-      seconds: &seconds,
-      nanoseconds: &nanoseconds,
-      clock: _ClockID.suspending.rawValue)
-#endif
+    let (seconds, nanoseconds) = PlatformClock.suspendingResolution
     return Swift.Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 }

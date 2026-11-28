@@ -8,7 +8,6 @@ add_library(swift_Concurrency
   Actor.cpp
   AsyncLet.cpp
   AsyncStream.cpp
-  Clock.cpp
   ConcurrencyHooks.cpp
   EmbeddedSupport.cpp
   Error.cpp
@@ -76,6 +75,9 @@ add_library(swift_Concurrency
   Executor.swift
   ExecutorAssertions.swift
   ExecutorBridge.swift
+  Runtime/Clock/ClockEntryPoints.swift
+  Runtime/Clock/PlatformClock+POSIX.swift
+  Runtime/Clock/PlatformClock+Windows.swift
   GlobalActor.swift
   GlobalConcurrentExecutor.swift
   MainActor.swift
@@ -154,6 +156,7 @@ target_link_libraries(swift_Concurrency PRIVATE
   $<$<PLATFORM_ID:Android>:log>
   $<$<PLATFORM_ID:Windows>:Synchronization>
   $<$<PLATFORM_ID:Windows>:mincore>
+  $<$<PLATFORM_ID:Windows>:OneCore>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>
   # Link to the runtime that we are just building.
   swiftCore)

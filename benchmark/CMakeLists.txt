@@ -229,6 +229,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Concurrency/AsyncStreamYield
     single-source/Concurrency/ChildTaskCreation
     single-source/Concurrency/ClockMeasure
+    single-source/Concurrency/ClockNow
     single-source/Concurrency/ContinuationResume
     single-source/Concurrency/TaskIsCancelledCancellationScopes
     single-source/Concurrency/TaskDeadlines
