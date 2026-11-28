@@ -2323,22 +2323,13 @@ checkInvertibleRequirementsStructural(const Metadata *type,
       return std::nullopt;
     }
 
-    llvm::ArrayRef<GenericRequirementDescriptor> reqs(
-        shape.getReqSigRequirements(), shape.getNumReqSigRequirements());
-    // Look for any suppressed protocol requirements. If the existential
-    // has suppressed a protocol that is not ignored, then the existential
-    // does not meet the specified requirements.
-    for (const auto& req : reqs) {
-      if (req.getKind() != GenericRequirementKind::InvertedProtocols)
-        continue;
-
-      auto suppressed = req.getInvertedProtocols();
-      auto missing = suppressed - ignored;
-      if (!missing.empty()) {
-        return TYPE_LOOKUP_ERROR_FMT(
-            "existential type missing invertible protocols %x",
-            missing.rawBits());
-      }
+    // If the existential has suppressed a protocol that is not ignored, then
+    // the existential does not meet the specified requirements.
+    auto missing = shape.getSelfInvertedProtocols() - ignored;
+    if (!missing.empty()) {
+      return TYPE_LOOKUP_ERROR_FMT(
+          "existential type missing invertible protocols %x",
+          missing.rawBits());
     }
 
     return std::nullopt;
