@@ -93,6 +93,7 @@ private func registerSwiftPasses() {
   registerPass(destroyHoisting, { destroyHoisting.run($0) })
   registerPass(mandatoryDestroyHoisting, { mandatoryDestroyHoisting.run($0) })
   registerPass(initializeStaticGlobalsPass, { initializeStaticGlobalsPass.run($0) })
+  registerPass(forwardChainSinking, { forwardChainSinking.run($0) })
   registerPass(objCBridgingOptimization, { objCBridgingOptimization.run($0) })
   registerPass(objectOutliner, { objectOutliner.run($0) })
   registerPass(stackPromotion, { stackPromotion.run($0) })
