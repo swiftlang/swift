@@ -1919,7 +1919,13 @@ public:
               (DebugVarTy.isAddress() && lhs == rhs.getObjectType()) ||
               // When cloning SIL (e.g. in LoopUnroll) local archetypes are uniqued
               // and therefore distinct in cloned instructions.
-              (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()),
+              (lhs.hasLocalArchetype() && rhs.hasLocalArchetype()) ||
+              // A local archetype cannot be described by a debug_value operand,
+              // so SILCloner and killDebugUses describe such a variable with
+              // `debug_value undef : $()`, while other instructions for the
+              // same variable, such as its alloc_stack, keep the type.
+              (lhs.isVoid() && rhs.hasLocalArchetype()) ||
+              (lhs.hasLocalArchetype() && rhs.isVoid()),
               "Two variables with different type but same scope");
     }
 
