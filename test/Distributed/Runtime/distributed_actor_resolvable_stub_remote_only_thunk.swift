@@ -45,6 +45,19 @@ distributed actor GreeterImpl: Greeter {
   }
 }
 
+// A '@Resolvable' protocol which also inherits 'Codable', with a distributed
+// computed property accessed through the stub (rdar://142761605).
+@Resolvable
+protocol CodableCounter: DistributedActor, Codable where ActorSystem == FakeRoundtripActorSystem {
+  distributed var number: Int { get }
+}
+
+distributed actor CodableCounterImpl: CodableCounter {
+  distributed var number: Int {
+    13
+  }
+}
+
 func callSome(_ greeter: some Greeter) async throws -> String {
   try await greeter.greet(name: "some")
 }
@@ -74,6 +87,17 @@ func callSome(_ greeter: some Greeter) async throws -> String {
       let count = try! await greeter.count
       // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.count
       expectEqual(count, 42)
+    }
+
+    tests.test("distributed var on a resolved Codable protocol stub reaches the actor system") {
+      let system = FakeRoundtripActorSystem()
+      let real = CodableCounterImpl(actorSystem: system)
+
+      let counter: any CodableCounter = try! $CodableCounter.resolve(id: real.id, using: system)
+
+      let number = try! await counter.number
+      // CHECK: >> remoteCall: on:main.$CodableCounter, target:main.$CodableCounter.number
+      expectEqual(number, 13)
     }
 
     await runAllTestsAsync()
