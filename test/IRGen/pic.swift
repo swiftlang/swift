@@ -1,10 +1,8 @@
 // <rdar://problem/15358345> Check that we always use PIC relocations on all
 // platforms.
 
-// https://github.com/apple/swift/issues/54619
-// XFAIL: OS=linux-android && CPU=aarch64
+// UNSUPPORTED: CPU=wasm32, OS=linux-gnu && !(CPU=aarch64 || CPU=x86_64)
 // XFAIL: OS=linux-androideabi && CPU=armv7
-// UNSUPPORTED: OS=linux-gnu, CPU=wasm32
 
 // RUN: %target-swift-frontend %s -module-name main -S -o - | %FileCheck -check-prefix=%target-cpu -check-prefix=%target-cpu-%target-abi -check-prefix=%target-cpu-%target-abi-%target-sdk-name %s
 
@@ -73,14 +71,14 @@ public func use_global() -> Int {
 // arm64:        ldr x0, [sp, #16]
 
 // aarch64-LABEL: $s4main10use_globalSiyF:
+// aarch64-SYSV:         adrp [[REG1:x[0-9]+]], $s4main6globalSivp
+// aarch64-SYSV:         str [[REG1]], [sp]
 // aarch64-SYSV:         bl swift_beginAccess
-// aarch64-SYSV-linux:   adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
-// aarch64-SYSV-android: adrp [[REG1:x[0-9]+]], ($s4main6globalSivp)
-// aarch64-SYSV:         add [[REG1]], [[REG1]], :lo12:($s4main6globalSivp)
-// aarch64-SYSV:         ldr [[REG2:x[0-9]+]], {{\[}}[[REG1]]{{\]}}
-// aarch64-SYSV:         str [[REG2]], [sp]
+// aarch64-SYSV:         ldr [[REG2:x[0-9]+]], [sp]
+// aarch64-SYSV:         ldr [[REG3:x[0-9]+]], {{\[}}[[REG2]], :lo12:$s4main6globalSivp]
+// aarch64-SYSV:         str [[REG3]], [sp, #16]
 // aarch64-SYSV:         bl swift_endAccess
-// aarch64-SYSV:         ldr x0, [sp]
+// aarch64-SYSV:         ldr x0, [sp, #16]
 
 // aarch64-WIN:          adrp [[REG1:x[0-9]+]], $s4main6globalSivp
 // aarch64-WIN:          add  [[REG1]], [[REG1]], :lo12:$s4main6globalSivp
