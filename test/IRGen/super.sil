@@ -63,7 +63,7 @@ bb0(%0 : $ChildToResilientParent):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s5super22ChildToResilientParentC6methodyyF"(ptr swiftself %0)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class22ResilientOutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK: [[FN:%.*]] =  call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC6methodyyFTq")
+// CHECK: [[FN:%.*]] =  call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC6methodyyFTq{{(\.ptrauth)?}}")
 // CHECK: call void
 
 // static super.ChildToResilientParent.classMethod () -> ()
@@ -81,7 +81,7 @@ bb0(%0 : $@thick ChildToResilientParent.Type):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s5super22ChildToResilientParentC11classMethodyyFZ"(ptr swiftself %0)
 // CHECK: [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s15resilient_class22ResilientOutsideParentCMa"([[INT]] 0)
 // CHECK: [[SUPER_METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
-// CHECK: [[FN:%.*]] =  call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC0B6MethodyyFZTq")
+// CHECK: [[FN:%.*]] =  call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC0B6MethodyyFZTq{{(\.ptrauth)?}}")
 // CHECK: call swiftcc void
 
 // resilient_class.OutsideParent.method () -> ()
@@ -151,7 +151,7 @@ bb0(%0 : $ResilientOutsideChild):
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%.*]] = load ptr, ptr [[SUPER_METADATA_PTR]]
-// CHECK: [[FN:%.*]] = call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC6methodyyFTq")
+// CHECK: [[FN:%.*]] = call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC6methodyyFTq{{(\.ptrauth)?}}")
 // CHECK: call void
 
 // static ext.super.resilient_class.ResilientOutsideChild.callSuperClassMethod () -> ()
@@ -172,7 +172,7 @@ bb0(%0 : $@thick ResilientOutsideChild.Type):
 // CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[TMP]], 0
 // CHECK: [[SUPER_METADATA_PTR:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], i32 1
 // CHECK: [[SUPER_METADATA:%.*]] = load ptr, ptr [[SUPER_METADATA_PTR]]
-// CHECK: [[FN:%.*]] = call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC0B6MethodyyFZTq")
+// CHECK: [[FN:%.*]] = call swiftcc ptr @"$s15resilient_class22ResilientOutsideParentCMu"(ptr [[SUPER_METADATA]], ptr @"$s15resilient_class22ResilientOutsideParentC0B6MethodyyFZTq{{(\.ptrauth)?}}")
 // CHECK: call swiftcc void
 
 sil_vtable ChildToResilientParent {

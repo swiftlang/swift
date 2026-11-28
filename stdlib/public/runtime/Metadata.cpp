@@ -1016,6 +1016,8 @@ static Lazy<SingletonTypeMetadataCache> SingletonMetadata;
 MetadataResponse
 swift::swift_getSingletonMetadata(MetadataRequest request,
                                   const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   auto result = SingletonMetadata.get().getOrInsert(description, request,
                                                     description);
 
@@ -4101,12 +4103,16 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
   return log2;
 }
 
+// The class_ro pointer of a class object that the compiler emits is signed on
+// arm64e, so strip the signature as well as the flag bits.
 static inline ClassROData *getROData(ClassMetadata *theClass) {
-  return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+  return (ClassROData *)(swift_strip_data(theClass->Data) &
+                         ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
 static inline ClassROData *getROData(ObjCClass *theClass) {
-  return (ClassROData*)(theClass->RODataAndFlags & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+  return (ClassROData *)(swift_strip_data(theClass->RODataAndFlags) &
+                         ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 // This gets called if we fail during copyGenericClassObjcName().  Its job is
 // to generate a unique name, even though the name won't be very helpful if
@@ -5066,6 +5072,10 @@ void *
 swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
                                const MethodDescriptor *method,
                                const ClassDescriptor *description) {
+  method = swift_auth_data_non_address(
+      method, SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   assert(metadata->isTypeMetadata());
 
 #ifndef NDEBUG
@@ -6823,7 +6833,7 @@ static bool doesNotRequireInstantiation(
 
 #if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_type =
-  ptrauth_key_process_independent_code;
+  ptrauth_key_process_independent_data;
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -6832,13 +6842,11 @@ static void initAssociatedConformanceWitness(const Metadata **slot,
                                              const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
-  // FIXME: this should use ptrauth_key_process_independent_data
-  // now that it no longer stores a function pointer.
-  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+  swift_ptrauth_init_data(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 
 static const unsigned swift_ptrauth_key_associated_conformance =
-  ptrauth_key_process_independent_code;
+  ptrauth_key_process_independent_data;
 
 /// Given an unsigned pointer to an associated-conformance protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -6846,9 +6854,7 @@ static void initAssociatedConformanceProtocolWitness(void **slot, void *witness,
                                               const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
-  // FIXME: this should use ptrauth_key_process_independent_data
-  // now that it no longer stores a function pointer.
-  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+  swift_ptrauth_init_data(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 #endif
 
@@ -6918,10 +6924,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
                              // might be proven unused and null'ed)
     return;
 
-  // FIXME: these should both use ptrauth_key_process_independent_data now.
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
   case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    swift_ptrauth_copy(
+    swift_ptrauth_copy_data(
         dest, src, reqt.Flags.getExtraDiscriminator(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                              // might be proven unused and null'ed)
@@ -7026,25 +7031,28 @@ instantiateWitnessTable(const Metadata *Type,
   // Advance the address point; the private storage area is accessed via
   // negative offsets.
   auto table = fullTable + privateSizeInWords;
+
+  // Put the conformance descriptor in place. It's signed with the address of
+  // the table, so don't copy it from the pattern.
+  static_assert(WitnessTableFirstRequirementOffset == 1,
+                "the conformance descriptor is the only header field");
+  reinterpret_cast<WitnessTable *>(table)->setDescription(conformance);
+
   if (auto pattern =
           reinterpret_cast<void * const *>(
             &*conformance->getWitnessTablePattern())) {
     auto requirements = protocol->getRequirements();
 
     // Fill in the provided part of the requirements from the pattern.
-    for (size_t i = 0, e = numPatternWitnesses; i < e; ++i) {
+    for (size_t i = WitnessTableFirstRequirementOffset, e = numPatternWitnesses;
+         i < e; ++i) {
       size_t requirementIndex = i - WitnessTableFirstRequirementOffset;
-      if (i < WitnessTableFirstRequirementOffset)
-        table[i] = pattern[i];
-      else
-        copyProtocolWitness(&table[i], &pattern[i],
-                            requirements[requirementIndex]);
+      copyProtocolWitness(&table[i], &pattern[i],
+                          requirements[requirementIndex]);
     }
   } else {
-    // Put the conformance descriptor in place. Instantiation will fill in the
-    // rest.
+    // Instantiation will fill in the rest.
     assert(numPatternWitnesses == 0);
-    table[0] = (void *)conformance;
   }
 
   // Copy any instantiation arguments that correspond to conditional
@@ -7152,9 +7160,9 @@ getNondependentWitnessTable(const ProtocolConformanceDescriptor *conformance,
 }
 
 const WitnessTable *
-swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
-                             const Metadata *type,
-                             const void * const *instantiationArgs) {
+swift::_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                        const Metadata *type,
+                        const void * const *instantiationArgs) {
   if (auto *prebuilt =
           getLibPrespecializedWitnessTable(conformance, type))
     return prebuilt;
@@ -7200,6 +7208,18 @@ swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
 
   // Our returned 'status' is the witness table itself.
   return uniqueForeignWitnessTableRef(result.second);
+}
+
+const WitnessTable *
+swift::swift_getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                             const Metadata *type,
+                             const void * const *instantiationArgs) {
+  // Compiled code passes the conformance descriptor signed.
+  return _getWitnessTable(
+      swift_auth_data_non_address(
+          conformance,
+          SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor),
+      type, instantiationArgs);
 }
 
 namespace {
@@ -7452,9 +7472,9 @@ static RelativeGenericWitnessTableCache &getCacheForRelativeWitness(
 }
 
 const RelativeWitnessTable *
-swift::swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
-                             const Metadata *type,
-                             const void * const *instantiationArgs) {
+swift::_getWitnessTableRelative(
+    const ProtocolConformanceDescriptor *conformance, const Metadata *type,
+    const void * const *instantiationArgs) {
   /// Local function to unique a foreign witness table, if needed.
   auto uniqueForeignWitnessTableRef =
       [conformance](const WitnessTable *candidate) {
@@ -7501,6 +7521,18 @@ swift::swift_getWitnessTableRelative(const ProtocolConformanceDescriptor *confor
   // Mark this as a dynamic (conditional conformance) protocol witness table.
   return reinterpret_cast<RelativeWitnessTable*>(((uintptr_t)table) |
                                                  (uintptr_t)0x1);
+}
+
+const RelativeWitnessTable *
+swift::swift_getWitnessTableRelative(
+    const ProtocolConformanceDescriptor *conformance, const Metadata *type,
+    const void * const *instantiationArgs) {
+  // Compiled code passes the conformance descriptor signed.
+  return _getWitnessTableRelative(
+      swift_auth_data_non_address(
+          conformance,
+          SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor),
+      type, instantiationArgs);
 }
 
 /// Find the name of the associated type with the given descriptor.

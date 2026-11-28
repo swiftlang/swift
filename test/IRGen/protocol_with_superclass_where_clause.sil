@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name protocol_with_superclass | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -module-name protocol_with_superclass | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-ptrauth -DINT=i%target-ptrsize
 
 sil_stage canonical
 
@@ -31,6 +31,7 @@ sil hidden @checkExistentialDowncast : $@convention(thin) (@owned Concrete, @own
 bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRefinesClass, %4 : $SubProto):
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %0
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %0, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %5 = unconditional_checked_cast %0 : $Concrete to ProtoRefinesClass
@@ -39,6 +40,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %5 : $ProtoRefinesClass
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %0
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %0, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %6 = unconditional_checked_cast %0 : $Concrete to SubProto
@@ -65,6 +67,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %8 : $SubProto
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %{{[0-9]+}}
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %{{[0-9]+}}, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass17ProtoRefinesClassMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %9 = unconditional_checked_cast %2 : $SuperProto & Concrete to ProtoRefinesClass
@@ -73,6 +76,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %9 : $ProtoRefinesClass
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %{{[0-9]+}}
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %{{[0-9]+}}, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass8SubProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %10 = unconditional_checked_cast %2 : $SuperProto & Concrete to SubProto
@@ -97,6 +101,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %12 : $SubDerived
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %{{[0-9]+}}
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %{{[0-9]+}}, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %13 = unconditional_checked_cast %3 : $ProtoRefinesClass to OtherProto & Concrete
@@ -105,6 +110,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %13 : $OtherProto & Concrete
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %{{[0-9]+}}
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s24protocol_with_superclass11SubConcreteCMa"(i{{[0-9]+}} 0)
   // CHECK-NEXT:        [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_superclass_unconditional(ptr %{{[0-9]+}}, ptr [[ISA]], ptr [[METADATA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
@@ -123,6 +129,7 @@ bb0(%0 : $Concrete, %1 : $SuperProto, %2 : $SuperProto & Concrete, %3 : $ProtoRe
   strong_release %15 : $MoreDerived
 
   // CHECK:        [[ISA:%.*]] = load ptr, ptr %{{[0-9]+}}
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK-NEXT:        [[RESULT:%.*]] = call { ptr, ptr } @dynamic_cast_existential_1_unconditional(ptr %{{[0-9]+}}, ptr [[ISA]], {{.*}} @"$s24protocol_with_superclass10OtherProtoMp"
   // CHECK-NEXT:        [[FIRST:%.*]] = extractvalue { ptr, ptr } [[RESULT]], 0
   %16 = unconditional_checked_cast %4 : $SubProto to OtherProto & Concrete

@@ -3202,7 +3202,10 @@ llvm::Constant *irgen::emitGlobalBlock(IRGenModule &IGM,
   auto blockFields = builder.beginStruct();
 
   auto header = blockFields.beginStruct(IGM.ObjCBlockStructTy);
-  header.add(getBlockIsa(IGM, "_NSConcreteGlobalBlock"));
+  // Sign the isa as for a stack block; clang signs its global blocks' isa too.
+  header.addSignedPointer(getBlockIsa(IGM, "_NSConcreteGlobalBlock"),
+                          IGM.getOptions().PointerAuth.ObjCIsaPointers,
+                          PointerAuthEntity());
   header.addInt32(flags);
   header.addInt32(0);
   header.addSignedPointer(
@@ -3257,8 +3260,14 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
 
   // Store the block header.
   auto layout = IGF.IGM.DataLayout.getStructLayout(IGF.IGM.ObjCBlockStructTy);
-  IGF.Builder.CreateStore(NSConcreteStackBlock,
-                          IGF.Builder.CreateStructGEP(headerAddr, 0, layout));
+  auto isaAddr = IGF.Builder.CreateStructGEP(headerAddr, 0, layout);
+  llvm::Value *isaVal = NSConcreteStackBlock;
+  if (auto &schema = IGF.getOptions().PointerAuth.ObjCIsaPointers) {
+    auto isaAuthInfo = PointerAuthInfo::emit(IGF, schema, isaAddr.getAddress(),
+                                             PointerAuthEntity());
+    isaVal = emitPointerAuthSign(IGF, isaVal, isaAuthInfo);
+  }
+  IGF.Builder.CreateStore(isaVal, isaAddr);
   IGF.Builder.CreateStore(flagsVal,
                           IGF.Builder.CreateStructGEP(headerAddr, 1, layout));
   IGF.Builder.CreateStore(reserved,

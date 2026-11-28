@@ -644,11 +644,22 @@ IRGenModule::getAddrOfAsyncFunctionPointer(SILFunction *function) {
       LinkEntity::forSILFunction(function));
 }
 
+/// Put an async or coroutine function pointer record in true-const memory,
+/// except on ELF. The record can't be marked constant, because CoroSplit
+/// updates its context size, and on ELF a mutable global makes the .rodata
+/// section it is placed in writable.
+static void setFunctionPointerRecordTrueConst(IRGenModule &IGM,
+                                              llvm::GlobalVariable *var) {
+  if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF)
+    IGM.setTrueConstGlobal(var);
+}
+
 llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
                                                         ConstantInit init) {
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
+  setFunctionPointerRecordTrueConst(*this, var);
   return var;
 }
 
@@ -711,6 +722,7 @@ llvm::Constant *IRGenModule::defineCoroFunctionPointer(LinkEntity entity,
   auto coroEntity = LinkEntity::forCoroFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(coroEntity, init, DebugTypeInfo()));
+  setFunctionPointerRecordTrueConst(*this, var);
   return var;
 }
 
@@ -811,8 +823,16 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
         return;
       }
       
-      auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
-      
+      llvm::Value *methodDesc =
+          IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+      // Callers pass the method descriptor signed.
+      if (auto &schema =
+              IGM.getOptions().PointerAuth.ClassMethodDescriptorsAsArguments) {
+        auto authInfo =
+            PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
+        methodDesc = emitPointerAuthSign(IGF, methodDesc, authInfo);
+      }
+
       auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
       
       auto falseBB = IGF.createBasicBlock("");
@@ -855,7 +875,14 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
   
   // Use the runtime to look up vtable entries.
+  llvm::Value *signedDescription = description;
+  if (auto &schema = getOptions().PointerAuth.TypeDescriptorsAsArguments) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::TypeDescriptorAsArgument);
+    signedDescription = emitPointerAuthSign(IGF, description, authInfo);
+  }
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFunctionPointer(),
-                                        {metadata, method, description});
+                                        {metadata, method, signedDescription});
   IGF.Builder.CreateRet(result);
 }

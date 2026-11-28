@@ -12,7 +12,7 @@ public func useConformance<T : OtherResilientProtocol>(_: T) {}
 public func getConformance<T>(_ w: Wrapper<T>) {
   // CHECK: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @"$s18resilient_protocol7WrapperVMa"([[INT]] 0, ptr %T)
   // CHECK: [[META:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
-  // CHECK: [[WTABLE:%.*]] = call ptr @swift_getWitnessTable(ptr @"$s18resilient_protocol7WrapperVyxGAA22OtherResilientProtocolAAMc", ptr [[META]], ptr undef)
+  // CHECK: [[WTABLE:%.*]] = call ptr @swift_getWitnessTable(ptr @"$s18resilient_protocol7WrapperVyxGAA22OtherResilientProtocolAAMc{{(\.ptrauth(\.[0-9]+)?)?}}", ptr [[META]], ptr undef)
   // CHECK: call swiftcc void @"$s22conformance_resilience14useConformanceyyx18resilient_protocol22OtherResilientProtocolRzlF"(ptr noalias %0, ptr [[META]], ptr [[WTABLE]])
   // CHECK: ret void
   useConformance(w)

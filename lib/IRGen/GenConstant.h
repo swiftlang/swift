@@ -40,8 +40,13 @@ Explosion emitConstantValue(IRGenModule &IGM, SILValue value,
 
 /// Construct an object (with a HeapObject header) from an ObjectInst
 /// containing constant values.
+///
+/// \p objectAddress is the address of the object, if it is known. It is
+/// needed to sign the isa of a read-only object with an address-discriminated
+/// schema.
 llvm::Constant *emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
-                                   StructLayout *ClassLayout);
+                                   StructLayout *ClassLayout,
+                                   llvm::Constant *objectAddress = nullptr);
 }
 }
 
