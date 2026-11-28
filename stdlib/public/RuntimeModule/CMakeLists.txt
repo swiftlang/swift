@@ -167,6 +167,7 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
     ${backtracing_availability}
     ${runtime_compile_flags}
     -parse-stdlib
+    -Xfrontend -enable-sil-opaque-values
 
   LINK_FLAGS
     ${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}
