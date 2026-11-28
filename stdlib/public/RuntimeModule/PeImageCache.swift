@@ -20,6 +20,7 @@ import Swift
 /// Provides a per-thread image cache for PE-COFF image processing.  This means
 /// if you take multiple backtraces from a thread, you won't load the same
 /// image multiple times.
+@available(BacktracingDT 6.2, *)
 final class PeImageCache {
   var cache: [String: PeCoffImage] = [:]
 
