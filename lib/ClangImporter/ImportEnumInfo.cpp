@@ -254,7 +254,7 @@ ImportedType importer::findOptionSetEnum(clang::QualType type,
     return ImportedType();
   }
 
-  auto clangEnum = findAnonymousEnumForTypedef(Impl.SwiftContext, typedefType);
+  auto clangEnum = findAnonymousEnumForTypedef(Impl, typedefType);
   if (!clangEnum)
     return ImportedType();
 

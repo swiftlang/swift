@@ -974,8 +974,7 @@ synthesizeInheritedRefCountOperations(ClassDecl *decl,
 
   // Update the Swift type
   auto importRefCountOp = [&](const clang::CXXMethodDecl *op) {
-    auto importedOp =
-        cast<ValueDecl>(context.getClangModuleLoader()->importDeclDirectly(op));
+    auto importedOp = cast<ValueDecl>(Impl.importDecl(op, Impl.CurrentVersion));
     Impl.markMemberSynthesizedPerType(importedOp);
     decl->addMember(importedOp);
     decl->addMemberToLookupTable(importedOp);

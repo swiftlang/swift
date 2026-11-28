@@ -2719,10 +2719,10 @@ static inline Type applyToFunctionType(
 }
 
 inline std::optional<const clang::EnumDecl *>
-findAnonymousEnumForTypedef(const ASTContext &ctx,
+findAnonymousEnumForTypedef(ClangImporter::Implementation &Impl,
                             const clang::TypedefType *typedefType) {
   auto *typedefDecl = typedefType->getDecl();
-  auto *lookupTable = ctx.getClangModuleLoader()->findLookupTable(typedefDecl->getOwningModule());
+  auto *lookupTable = Impl.findLookupTable(typedefDecl->getOwningModule());
 
   auto foundDecls = lookupTable->lookup(
       SerializedSwiftName(typedefDecl->getName()), EffectiveClangContext());
@@ -2743,7 +2743,7 @@ findAnonymousEnumForTypedef(const ASTContext &ctx,
   swiftPrivateName += "__";
   swiftPrivateName += typedefDecl->getName();
   foundDecls = lookupTable->lookup(
-      SerializedSwiftName(ctx.getIdentifier(swiftPrivateName)),
+      SerializedSwiftName(Impl.SwiftContext.getIdentifier(swiftPrivateName)),
       EffectiveClangContext());
 
   auto swiftPrivateFound =
@@ -2784,6 +2784,9 @@ bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
+
+/// Whether \p method is imported as a \c mutating Swift method.
+bool isCXXMethodMutating(const clang::CXXMethodDecl *method);
 
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);

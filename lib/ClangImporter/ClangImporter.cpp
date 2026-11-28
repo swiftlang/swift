@@ -4642,7 +4642,6 @@ void ClangModuleUnit::lookupObjCMethods(
 void ClangModuleUnit::lookupAvailabilityDomains(
     Identifier identifier, SmallVectorImpl<AvailabilityDomain> &results) const {
   auto domainName = identifier.str();
-  auto &ctx = getASTContext();
   auto &clangASTContext = getClangASTContext();
 
   auto domainInfo = clangASTContext.getFeatureAvailInfo(domainName);
@@ -4658,7 +4657,7 @@ void ClangModuleUnit::lookupAvailabilityDomains(
     return;
 
   auto *imported = dyn_cast_or_null<ValueDecl>(
-      ctx.getClangModuleLoader()->importDeclDirectly(varDecl));
+      owner.importDecl(varDecl, owner.CurrentVersion));
   if (!imported)
     return;
 
@@ -6240,8 +6239,7 @@ ClangImporter::Implementation::importDiagnosticTargetFromLookupTableEntry(
 static void
 diagnoseForeignReferenceTypeFixit(ClangImporter::Implementation &Impl,
                                   HeaderLoc loc, const Diagnostic &diag) {
-  auto importedLoc =
-    Impl.SwiftContext.getClangModuleLoader()->importSourceLocation(loc.clangLoc);
+  auto importedLoc = Impl.importSourceLoc(loc.clangLoc);
   Impl.diagnose(loc, diag).fixItInsert(
       importedLoc, "SWIFT_SHARED_REFERENCE(<#retain#>, <#release#>) ");
 }
@@ -6784,7 +6782,7 @@ static MemberRefExpr *getSelfInteropStaticCast(FuncDecl *funcDecl,
 // to the imported base member, or it's the synthesized C++ method thunk
 // used in another synthesized derived thunk that acts as a base member here.
 static const clang::CXXMethodDecl *
-getCalledBaseCxxMethod(const FuncDecl *baseMember) {
+getCalledBaseCxxMethod(ClangImporter &importer, const FuncDecl *baseMember) {
   if (baseMember->getClangDecl())
     return dyn_cast<clang::CXXMethodDecl>(baseMember->getClangDecl());
   // Another synthesized derived thunk is used as a base member here,
@@ -6818,9 +6816,7 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
   if (!callExpr)
     return nullptr;
   auto *cv = callExpr->getCalledValue();
-  if (auto orig = baseMember->getASTContext()
-                      .getClangModuleLoader()
-                      ->getOriginalForClonedMember(cv))
+  if (auto orig = importer.getOriginalForClonedMember(cv))
     cv = orig;
   if (!cv)
     return nullptr;
@@ -6831,22 +6827,22 @@ getCalledBaseCxxMethod(const FuncDecl *baseMember) {
 
 // Construct a Swift method that represents the synthesized C++ method
 // that invokes the base C++ method.
-static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
+static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &importer,
                                                 NominalTypeDecl *derivedStruct,
                                                 NominalTypeDecl *baseStruct,
                                                 FuncDecl *baseMember) {
-  auto *cxxMethod = getCalledBaseCxxMethod(baseMember);
+  auto *cxxMethod = getCalledBaseCxxMethod(importer, baseMember);
   if (!cxxMethod)
     return nullptr;
   auto *newClangMethod =
-      SwiftDeclSynthesizer(&impl).synthesizeCXXForwardingMethod(
+      SwiftDeclSynthesizer(&importer).synthesizeCXXForwardingMethod(
           cast<clang::CXXRecordDecl>(derivedStruct->getClangDecl()),
           cast<clang::CXXRecordDecl>(baseStruct->getClangDecl()), cxxMethod,
           ForwardingMethodKind::Base);
   if (!newClangMethod)
     return nullptr;
   auto *forwardingMethod =
-      cast_or_null<FuncDecl>(impl.importDeclDirectly(newClangMethod));
+      cast_or_null<FuncDecl>(importer.importDeclDirectly(newClangMethod));
 
   // Switch C array projections if we got the wrong one.
   return importer::getDeclForCArrayProjectionMatching(forwardingMethod,
@@ -7138,7 +7134,8 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   if (baseClassVar->getClangDecl())
     baseClangDecl = baseClassVar->getClangDecl();
   else
-    baseClangDecl = getCalledBaseCxxMethod(baseClassVar->getAccessor(kind));
+    baseClangDecl =
+        getCalledBaseCxxMethod(importer, baseClassVar->getAccessor(kind));
 
   clang::CXXMethodDecl *baseGetterCxxMethod = nullptr;
   if (auto *md = dyn_cast_or_null<clang::CXXMethodDecl>(baseClangDecl)) {
@@ -7960,7 +7957,8 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     return dyn_cast<AbstractFunctionDecl>(result);
   };
 
-  auto *clangLoader = func->getASTContext().getClangModuleLoader();
+  auto *importer = static_cast<ClangImporter *>(
+      func->getASTContext().getClangModuleLoader());
   for (ValueDecl *result : results) {
     AbstractFunctionDecl *resultFunc = asFunc(result);
     if (!resultFunc)
@@ -7971,7 +7969,7 @@ findFunctionInterfaceAndImplementation(AbstractFunctionDecl *func) {
     // known by the name of the virtual method it forwards to.
     const ValueDecl *named = resultFunc;
     if (auto *thunk = dyn_cast<FuncDecl>(resultFunc))
-      if (auto *original = clangLoader->getOriginalForVirtualThunk(thunk))
+      if (auto *original = importer->getOriginalForVirtualThunk(thunk))
         named = original;
     if (named->getCDeclName() != clangName)
       continue;
@@ -8115,9 +8113,12 @@ ClangCategoryLookupRequest::evaluate(Evaluator &evaluator,
   if (!clangClass)
     return {};
 
+  auto *importer =
+      static_cast<ClangImporter *>(CD->getASTContext().getClangModuleLoader());
+  ClangImporter::Implementation &impl = importer->Impl;
+
   auto importCategory = [&](const clang::ObjCCategoryDecl *clangCat) -> Decl * {
-    return CD->getASTContext().getClangModuleLoader()
-                  ->importDeclDirectly(clangCat);
+    return impl.importDecl(clangCat, impl.CurrentVersion);
   };
 
   if (categoryName.empty()) {
@@ -8125,10 +8126,6 @@ ClangCategoryLookupRequest::evaluate(Evaluator &evaluator,
     // `clangClass`, as well as any class extensions.
     llvm::TinyPtrVector<Decl *> results;
     results.push_back(const_cast<ClassDecl *>(CD));
-
-    auto importer =
-       static_cast<ClangImporter *>(CD->getASTContext().getClangModuleLoader());
-    ClangImporter::Implementation &impl = importer->Impl;
 
     for (auto clangExt : clangClass->known_extensions()) {
       if (impl.getClangSema().isVisible(clangExt))
@@ -9186,13 +9183,13 @@ bool ClangImporter::isSynthesizedAndVisibleFromAllModules(
   return Impl.synthesizedAndAlwaysVisibleDecls.contains(decl);
 }
 
-bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
+bool importer::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
   if (isa<clang::CXXConstructorDecl>(method) || !method->isConst())
     return true;
-  if (isAnnotatedWith(method, "mutating"))
+  if (ClangImporter::isAnnotatedWith(method, "mutating"))
     return true;
   if (method->getParent()->hasMutableFields()) {
-    if (isAnnotatedWith(method, "nonmutating"))
+    if (ClangImporter::isAnnotatedWith(method, "nonmutating"))
       return false;
     // FIXME(rdar://91961524): figure out a way to handle mutable fields
     // without breaking classes from the C++ standard library (e.g.
@@ -9201,6 +9198,10 @@ bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
     return false;
   }
   return false;
+}
+
+bool ClangImporter::isCXXMethodMutating(const clang::CXXMethodDecl *method) {
+  return importer::isCXXMethodMutating(method);
 }
 
 bool ClangImporter::isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) {
@@ -9506,8 +9507,8 @@ ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
 }
 
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {
-  return cast<ValueDecl>(
-      importDeclDirectly(::getCalledBaseCxxMethod(cast<FuncDecl>(decl))));
+  return cast<ValueDecl>(importDeclDirectly(
+      ::getCalledBaseCxxMethod(*this, cast<FuncDecl>(decl))));
 }
 
 bool ClangImporter::isMemberSynthesizedPerType(const ValueDecl *decl) {
