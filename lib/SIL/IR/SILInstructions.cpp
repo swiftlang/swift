@@ -698,7 +698,7 @@ void DebugValueInst::killOperand(unsigned operandIdx, SILType operandType) {
 
   Operand &operandRef = getAllOperands()[operandIdx];
   SILValue operand = operandRef.get();
-  if (isa<SILUndef>(operand)) {
+  if (isa<SILUndef>(operand) && !operandType) {
     // Already undef: no operand to kill.
     return;
   }
@@ -736,105 +736,37 @@ SILType DebugValueInst::getVarType() const {
   return getSingleOperand()->getType().getObjectType();
 }
 
-bool DebugValueInst::isExprTypeValid() const {
-  // Ignore trace debug values.
-  if (hasTrace())
-    return true;
-
-  SILFunction *F = getFunction();
-  if (!F)
-    return false;
-
-  // A debug_value with no operands need a debug reconstruction block.
-  if (getAllOperands().empty() && !getDebugReconstructionBlock())
-    return false;
-
-  auto varInfo = getCompleteVarInfo();
-
-  auto operands = getAllOperands();
-  auto *debugBB = getDebugReconstructionBlock();
-  SILType valueType;
-
-  if (!debugBB) {
-    // Without a debug reconstruction block, there must be exactly one operand.
-    if (operands.size() != 1)
-      return false;
-
-    SILValue operand = getSingleOperand();
-    valueType = operand->getType();
-
-    // Special case: a DebugValueInst with an alloc_box operand is equivalent to
-    // the alloc_box.
-    if (auto *box = dyn_cast<AllocBoxInst>(operand))
-      if (varInfo.DIExpr.elements().empty() &&
-          varInfo.Type == box->getAddressType().getObjectType())
-        return true;
-
-    // Cannot have an object category undef value of an address-only type,
-    // except for the $error variable, which is handled differently.
-    if (isa<SILUndef>(operand) && valueType.isObject() &&
-        !valueType.isLoadableOrOpaque(*getFunction()) &&
-        !varInfo.isErrorVariable()) {
-      return false;
-    }
-  } else {
-    // Transform: debug BB transforms the SSA values to its return type.
-    if (debugBB->getNumArguments() != operands.size())
-      return false;
-    for (unsigned idx : indices(operands)) {
-      if (debugBB->getArgument(idx)->getType() != operands[idx].get()->getType())
-        return false;
-    }
-    auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
-    valueType = terminator->getOperand()->getType();
-    // Cannot have both an op_deref and a debug reconstruction block, unless
-    // the type is genuinely address-only (not loadable or opaque).
-    if (hasDeref() && valueType.isLoadableOrOpaque(*getFunction()))
-      return false;
-  }
-
-  // Fragments are in the opposite direction, process from right to left.
-  SILType RunningType = *varInfo.Type;
-  unsigned derefCount = 0;
-
-  for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands()) {
+std::optional<SILType>
+SILDebugVariable::getFragmentType(SILFunction const &F) const {
+  ASSERT(Type && "The fragments are narrowed from the variable type");
+  SILType RunningType = *Type;
+  for (const SILDIExprOperand &Operand : DIExpr.operands()) {
     switch (Operand.getOperator()) {
     case SILDIExprOperator::Dereference:
-      ++derefCount;
       break;
     case SILDIExprOperator::Fragment: {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
       auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
       if (!FieldParent ||
           RunningType.getNominalDecl() != FieldParent)
-        return false;
-      RunningType = RunningType.getFieldType(Field, F);
+        return std::nullopt;
+      RunningType = RunningType.getFieldType(Field, F.getModule(),
+                                             F.getTypeExpansionContext());
       break;
     }
     case SILDIExprOperator::TupleFragment: {
       if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
-        return false;
+        return std::nullopt;
       unsigned Idx = Operand.args()[1].getAsConstInt().value();
       RunningType = RunningType.getTupleElementType(Idx);
       break;
     }
     default:
       // Invalid operator
-      return false;
+      return std::nullopt;
     }
   }
-
-  // There must be as many op_derefs as SIL type indirection levels.
-  // SIL only supports one level of indirection, so op_deref too.
-  if (derefCount != valueType.isAddress())
-    return false;
-
-  // The op_deref must be stored in the prependDeref bit.
-  if (derefCount != hasDeref())
-    return false;
-
-  return RunningType.removingMoveOnlyWrapper() ==
-         valueType.getObjectType().removingMoveOnlyWrapper();
+  return RunningType;
 }
 
 VarDecl *DebugValueInst::getDecl() const {

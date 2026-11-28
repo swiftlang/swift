@@ -1988,28 +1988,95 @@ public:
 
   void checkDebugValueInst(DebugValueInst *inst) {
     // Verify debug basic block and type chain.
-    if (auto *DebugBB = inst->getDebugReconstructionBlock()) {
+    auto *debugBB = inst->getDebugReconstructionBlock();
+    if (debugBB) {
       // Structural checks.
-      require(DebugBB->isDebugReconstructionBlock(),
+      require(debugBB->isDebugReconstructionBlock(),
               "debug block must be marked as such");
-      require(DebugBB->getParent() == inst->getFunction(),
+      require(debugBB->getParent() == inst->getFunction(),
               "debug block must belong to the same function");
-      require(!DebugBB->empty(),
-              "debug block must not be empty");
-      require(isa<ReturnInst>(DebugBB->getTerminator()),
+      require(!debugBB->empty(), "debug block must not be empty");
+      require(isa<ReturnInst>(debugBB->getTerminator()),
               "debug block must end with a return instruction");
 
       // Verify basic block content.
       {
         VerifierErrorEmitter::VerifierErrorEmitterUnguard unguard(this);
-        for (auto &I : *DebugBB) {
+        for (auto &I : *debugBB) {
           visit(&I);
         }
       }
     }
 
+    if (inst->hasTrace())
+      return;
+
     // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-    require(inst->isExprTypeValid(), "debug_value type chain should hold");
+    auto operands = inst->getAllOperands();
+    auto varInfo = inst->getCompleteVarInfo();
+    SILType valueType;
+
+    if (!debugBB) {
+      require(operands.size() == 1,
+              "debug_value without a reconstruction block must have a single"
+              " operand");
+      if (operands.size() != 1)
+        return;
+
+      SILValue operand = inst->getSingleOperand();
+      valueType = operand->getType();
+
+      // Special case: a debug_value with an alloc_box operand is equivalent
+      // to the alloc_box.
+      if (auto *box = dyn_cast<AllocBoxInst>(operand))
+        if (varInfo.DIExpr.elements().empty() &&
+            varInfo.Type == box->getAddressType().getObjectType())
+          return;
+
+      require(!isa<SILUndef>(operand) || valueType.isAddress() ||
+                  valueType.isLoadableOrOpaque(F) || varInfo.isErrorVariable(),
+              "undef debug_value of an address-only type must be an address");
+    } else {
+      require(debugBB->getNumArguments() == operands.size(),
+              "debug reconstruction block argument count must match"
+              " debug_value operand count");
+      if (debugBB->getNumArguments() != operands.size())
+        return;
+      for (unsigned idx : indices(operands))
+        requireSameType(debugBB->getArgument(idx)->getType(),
+                        operands[idx].get()->getType(),
+                        "debug reconstruction block argument type must match"
+                        " its operand type");
+
+      auto *ret = dyn_cast<ReturnInst>(debugBB->getTerminator());
+      if (!ret)
+        return;
+      valueType = ret->getOperand()->getType();
+      require(!inst->hasDeref() || !valueType.isLoadableOrOpaque(F),
+              "debug_value cannot have both a reconstruction block and an"
+              " op_deref unless its type is address-only");
+    }
+
+    auto RunningType = varInfo.getFragmentType(F);
+    require(RunningType, "debug_value fragments must narrow the variable type");
+    if (!RunningType)
+      return;
+
+    unsigned derefCount = 0;
+    for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands())
+      if (Operand.getOperator() == SILDIExprOperator::Dereference)
+        ++derefCount;
+
+    require(derefCount <= 1,
+            "SIL does not support more than one level of indirection");
+    require((derefCount == 1 && valueType.isAddress()) ||
+                (derefCount == 0 && valueType.isObject()),
+            "debug_value op_deref must match type category");
+    require(derefCount == 0 || inst->hasDeref(),
+            "debug_value op_deref must be returned by hasDeref");
+    require(RunningType->removingMoveOnlyWrapper() ==
+                valueType.getObjectType().removingMoveOnlyWrapper(),
+            "debug_value type must match the fragment-narrowed variable type");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {

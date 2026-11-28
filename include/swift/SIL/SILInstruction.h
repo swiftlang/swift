@@ -6072,13 +6072,6 @@ public:
   /// variable as optimized away.
   void stripDeref(unsigned operandIdx);
 
-  /// Validates the type chain of the DIExpr.
-  /// Starting from VarType, narrows through fragments (outermost first)
-  /// and checks that the result matches the SSA operand type, and that there
-  /// is the right amount of op_deref.
-  /// Returns false if the type chain is invalid, true otherwise.
-  bool isExprTypeValid() const;
-
   /// Returns the optional debug basic block attached to this instruction.
   /// The debug BB contains reconstruction instructions for the debug value.
   /// If this debug value does not have a reconstruction block, this returns
