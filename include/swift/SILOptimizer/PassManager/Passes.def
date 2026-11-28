@@ -93,6 +93,8 @@ PASS(ImplicitDestroyChecker, "implicit-destroy-checker",
      "Diagnoses implicit destroys of values that must be consumed")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
      "Initializes static global variables")
+PASS(ForwardChainSinking, "forward-chain-sinking",
+     "Sinks instructions closer to their uses")
 PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
      "Mandatory Redundant Load Elimination")
 PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",

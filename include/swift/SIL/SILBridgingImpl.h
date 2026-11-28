@@ -1418,6 +1418,10 @@ bool BridgedInstruction::maySuspend() const {
   return unbridged()->maySuspend();
 }
 
+bool BridgedInstruction::isAllocatingStack() const {
+  return unbridged()->isAllocatingStack();
+}
+
 bool BridgedInstruction::shouldBeForwarding() const {
   return llvm::isa<swift::OwnershipForwardingSingleValueInstruction>(unbridged()) ||
          llvm::isa<swift::OwnershipForwardingTermInst>(unbridged()) ||
