@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -x c %S/Inputs/reflect_synchronous_operation_task.c -o %t/shims.c.o -c
-// RUN: %target-build-swift -c -target %target-swift-6.2-abi-triple -parse-as-library -enable-builtin-module -lswiftSwiftReflectionTest %s -o %t/main.swift.o -module-name reflect_synchronous_operation_task
-// RUN: %target-build-swift %t/main.swift.o %t/shims.c.o -o %t/reflect_synchronous_operation_task
+// RUN: %target-build-swift -c -target %target-swift-6.2-abi-triple -parse-as-library -enable-builtin-module -lswiftSwiftReflectionTest %import-libdispatch %s -o %t/main.swift.o -module-name reflect_synchronous_operation_task
+// RUN: %target-build-swift %t/main.swift.o %t/shims.c.o %import-libdispatch -o %t/reflect_synchronous_operation_task
 // RUN: %target-codesign %t/reflect_synchronous_operation_task
 
 // RUN: %target-run %target-swift-reflection-test %t/reflect_synchronous_operation_task | %FileCheck %s --dump-input=always
