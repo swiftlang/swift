@@ -2872,13 +2872,19 @@ template <typename FunctionPtrType>
 static CancellationNotificationStatusRecord*
 addCancellationHandlerCommon(FunctionPtrType handler, void *context,
                              unsigned discriminator) {
+  auto *task = swift_task_getCurrent();
+  if (!task) {
+    // Synchronous code running on a thread without a task cannot observe *task* cancellation,
+    // since there is no task to cancel; so we can entirely avoid any record creation.
+    return nullptr; // indicate to the remove... method, that there was no record added
+  }
+
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
   auto unsigned_handler = swift_auth_code(handler, discriminator);
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
-  auto *task = swift_task_getCurrent();
   std::optional<size_t> immediateReason;
   addStatusRecordObservingCancellation(
       task, record,
@@ -2927,8 +2933,8 @@ SWIFT_CC(swift)
 static void swift_task_removeCancellationHandlerImpl(
     CancellationNotificationStatusRecord *record) {
   if (!record) {
-    // seems we never added the record but have run it immediately,
-    // so we make no attempts to remove it.
+    // seems we never added the record but have run it immediately, or there
+    // was no task to add it to, so we make no attempts to remove it.
     return;
   }
 
@@ -2945,6 +2951,14 @@ static EscalationNotificationStatusRecord*
 swift_task_addPriorityEscalationHandlerImpl(
     EscalationNotificationStatusRecord::FunctionType handler,
     void *context) {
+  auto *task = swift_task_getCurrent();
+  if (!task) {
+    // Synchronous code running on a thread without a task.
+    // Without a task, there cannot be task priority escalation to react to,
+    // so we don't create the handler record at all.
+    return nullptr; // indicate to the remove... method, that there was no record added
+  }
+
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
   auto unsigned_handler = swift_auth_code(handler,
@@ -2952,7 +2966,6 @@ swift_task_addPriorityEscalationHandlerImpl(
   auto *record = ::new (allocation)
       EscalationNotificationStatusRecord(unsigned_handler, context);
 
-  auto *task = swift_task_getCurrent();
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;
   });
@@ -2971,6 +2984,11 @@ swift_task_addPriorityEscalationHandlerImpl(
 SWIFT_CC(swift)
 static void swift_task_removePriorityEscalationHandlerImpl(
     EscalationNotificationStatusRecord *record) {
+  if (!record) {
+    // There was no task to add the record to, so there is nothing to remove.
+    return;
+  }
+
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);
 }
