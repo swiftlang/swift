@@ -17,7 +17,6 @@
 
 // rdar://116686158
 // UNSUPPORTED: asan
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // NB: Ridiculous formatting to test that we do not include leading trivia in locations.
 
