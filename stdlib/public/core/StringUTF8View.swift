@@ -683,6 +683,16 @@ extension String.Index {
 }
 
 extension String.UTF8View {
+  /// Calls a closure with a buffer containing this view's UTF-8 code units
+  /// when they are already available in contiguous storage.
+  ///
+  /// If the string would require conversion to provide that storage, as can
+  /// happen with a string bridged from `NSString`, this method returns `nil`
+  /// without calling `body`.
+  ///
+  /// - Parameter body: A closure that receives the buffer. The buffer is valid
+  ///   only for the duration of the closure.
+  /// - Returns: The result of `body`, or `nil` if the buffer is unavailable.
   @inlinable
   @safe
   public func withContiguousStorageIfAvailable<R>(
