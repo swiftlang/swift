@@ -25,6 +25,13 @@ if(CMAKE_MAKE_PROGRAM)
   set(MAKE_PROGRAM_FLAG "-DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}")
 endif()
 
+# Distributed defaults its threading package to the one Core's config file
+# exports, else to the platform's; forward an explicit override when given.
+if(DEFINED SwiftDistributed_THREADING_PACKAGE)
+  set(SwiftDistributed_THREADING_PACKAGE_FLAG
+    "-DSwiftDistributed_THREADING_PACKAGE=${SwiftDistributed_THREADING_PACKAGE}")
+endif()
+
 set(COMMON_OPTIONS
   -DBUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}
   -DSwift_SDKROOT=${Swift_SDKROOT}
@@ -82,7 +89,8 @@ if(SwiftRuntime_ENABLE_distributed)
     # To ensure incremental builds work as expected
     BUILD_ALWAYS 1
     CMAKE_ARGS
-      ${COMMON_OPTIONS})
+      ${COMMON_OPTIONS}
+      ${SwiftDistributed_THREADING_PACKAGE_FLAG})
 endif()
 
 # COM
