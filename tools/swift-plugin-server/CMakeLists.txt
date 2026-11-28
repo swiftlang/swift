@@ -4,6 +4,12 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     SwiftLibraryPluginProvider)
 
   if(SWIFT_ENABLE_WASM_PLUGINS)
+    set(toolchain_host_triple "${SWIFT_HOST_TRIPLE}")
+    if(SWIFT_HOST_VARIANT_SDK STREQUAL "OSX" AND
+       SWIFT_SDK_OSX_DEPLOYMENT_VERSION VERSION_LESS "15.0")
+      get_versioned_target_triple(SWIFT_HOST_TRIPLE OSX "${SWIFT_HOST_VARIANT_ARCH}" "15.0")
+    endif()
+
     # TODO: create new variables instead of piggybacking off of SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE
     file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
     FetchContent_Declare(SwiftSystem SOURCE_DIR "${swift_syntax_path}/../swift-system")
@@ -39,6 +45,7 @@ if (SWIFT_BUILD_SWIFT_SYNTAX)
     PACKAGE_NAME Toolchain
   )
   if(SWIFT_ENABLE_WASM_PLUGINS)
+    set(SWIFT_HOST_TRIPLE "${toolchain_host_triple}")
     target_compile_definitions(swift-plugin-server PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SWIFT_PLUGIN_SERVER_SUPPORTS_WASM>")
   endif()
