@@ -303,6 +303,13 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
+SendExpr *SendExpr::createImplicit(ASTContext &ctx, SourceLoc sendLoc,
+                                   Expr *sub) {
+  auto *send = new (ctx) SendExpr(sendLoc, sub, /*implicit=*/true);
+  send->setType(ctx.TheEmptyTupleType);
+  return send;
+}
+
 ConcreteDeclRef
 Expr::getReferencedDecl(ReferencedDeclLookThrough lookThrough) const {
   // clang-format off
@@ -370,6 +377,7 @@ Expr::getReferencedDecl(ReferencedDeclLookThrough lookThrough) const {
   PASS_THROUGH_REFERENCE(Unsafe, getSubExpr);
   PASS_THROUGH_REFERENCE(Consume, getSubExpr);
   PASS_THROUGH_REFERENCE(Copy, getSubExpr);
+  PASS_THROUGH_REFERENCE(Send, getSubExpr);
   PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
   PASS_THROUGH_REFERENCE(Try, getSubExpr);
   PASS_THROUGH_REFERENCE(ForceTry, getSubExpr);
@@ -746,6 +754,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::Await:
+  case ExprKind::Send:
   case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:
@@ -964,6 +973,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Sequence:
   case ExprKind::Paren:
   case ExprKind::Await:
+  case ExprKind::Send:
   case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:

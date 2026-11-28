@@ -95,6 +95,8 @@ extension ASTGenVisitor {
       return self.generate(prefixOperatorExpr: node)
     case .regexLiteralExpr(let node):
       return self.generate(regexLiteralExpr: node).asExpr
+    case .sendExpr(let node):
+      return self.generate(sendExpr: node).asExpr
     case .sequenceExpr(let node):
       return self.generate(sequenceExpr: node)
     case .simpleStringLiteralExpr:
@@ -1290,6 +1292,14 @@ extension ASTGenVisitor {
     return .createParsed(
       self.ctx,
       unsafeLoc: self.generateSourceLoc(node.unsafeKeyword),
+      subExpr: self.generate(expr: node.expression)
+    )
+  }
+
+  func generate(sendExpr node: SendExprSyntax) -> BridgedSendExpr {
+    return .createParsed(
+      self.ctx,
+      sendLoc: self.generateSourceLoc(node.sendKeyword),
       subExpr: self.generate(expr: node.expression)
     )
   }
