@@ -134,6 +134,9 @@
         "swift-subprocess": {
           "remote": { "id": "swiftlang/swift-subprocess" }
         },
+        "swift-platform-executors": {
+          "remote": { "id": "swiftlang/swift-platform-executors" }
+        },
         "boringssl": {
           "remote": {
             "id": "google/boringssl",
@@ -201,6 +204,7 @@
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
                 "swift-subprocess": "1.0.1",
+                "swift-platform-executors": "wip-swift-build-all",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
@@ -1116,6 +1120,7 @@
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
                 "swift-subprocess": "1.0.1",
+                "swift-platform-executors": "wip-swift-build-all",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         },
@@ -1179,6 +1184,7 @@
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.5.0",
                 "swift-subprocess": "1.0.1",
+                "swift-platform-executors": "wip-swift-build-all",
                 "boringssl": "0226f30467f540a3f62ef48d453f93927da199b6"
             }
         }

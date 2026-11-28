@@ -1191,6 +1191,8 @@ enum Project {
   DynamicRuntimeModule
   DynamicStringProcessing
   DynamicSynchronization
+  DynamicPlatformExecutorsCore
+  DynamicPlatformExecutors
   DynamicDistributed
   DynamicObservation
   DynamicDispatch
@@ -1203,6 +1205,8 @@ enum Project {
   StaticRuntimeModule
   StaticStringProcessing
   StaticSynchronization
+  StaticPlatformExecutorsCore
+  StaticPlatformExecutors
   StaticDistributed
   StaticObservation
   StaticDifferentiation
@@ -4604,6 +4608,8 @@ function Repair-WindowsSDKAssemblyManifests([Hashtable] $Platform, [string] $Run
 $SDKSupplementalRuntimes = @(
   "StringProcessing",
   "Synchronization",
+  "PlatformExecutorsCore",
+  "PlatformExecutors",
   "Distributed",
   "Observation",
   "Differentiation",
@@ -4771,6 +4777,67 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
             # FIXME(compnerd) this currently causes a build failure on Windows, but
             # this should be enabled when building the dynamic runtime.
             SwiftSynchronization_ENABLE_LIBRARY_EVOLUTION = "NO";
+          })
+      }
+    }
+
+    # The platform executors are built from the swift-platform-executors and
+    # swift-collections checkouts, when the swift-platform-executors checkout
+    # has the `_PlatformExecutorsCore` target, like in the CMake build of the
+    # standard library. Resync.cmake copies the sources only in that case.
+    $PlatformExecutorsAvailable = Test-Path "$SourceCache\swift-platform-executors\Sources\_PlatformExecutorsCore"
+    if ($SupplementalRuntimes -contains "PlatformExecutorsCore" -and $PlatformExecutorsAvailable) {
+      Record-OperationTime $Platform "Build-${Variant}PlatformExecutorsCore" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\_PlatformExecutorsCore `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}PlatformExecutorsCore")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines ($SDKInstallDefines + @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
+
+            SwiftCore_DIR    = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR = "$OverlayBinaryCache\cmake\SwiftOverlay";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftPlatformExecutorsCore_ENABLE_LIBRARY_EVOLUTION = "NO";
+          })
+      }
+    }
+
+    if ($SupplementalRuntimes -contains "PlatformExecutors" -and $PlatformExecutorsAvailable -and
+        (Test-Path "$SourceCache\swift-collections\Sources\BasicContainers")) {
+      Record-OperationTime $Platform "Build-${Variant}PlatformExecutors" {
+        Build-CMakeProject `
+          -Src $SourceCache\swift\Runtimes\Supplemental\PlatformExecutors `
+          -Bin (Get-ProjectBinaryCache $Platform ([Project]"${Variant}PlatformExecutors")) `
+          -InstallTo "$SDKRoot\usr" `
+          -Platform $Platform `
+          -CCompiler $Compilers.GNUC `
+          -SwiftCompiler $Compilers.Swift `
+          -SwiftSDK $null `
+          -Defines ($SDKInstallDefines + @{
+            BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+            CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+            SWIFT_ASSEMBLY_VERSION = "$ProductVersion";
+            SWIFT_PUBLIC_KEY_TOKEN = "$WindowsSxSAssemblyPublicKeyToken";
+
+            SwiftCore_DIR                  = "$RuntimeBinaryCache\cmake\SwiftCore";
+            SwiftOverlay_DIR               = "$OverlayBinaryCache\cmake\SwiftOverlay";
+            SwiftSynchronization_DIR       = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}Synchronization"))\cmake\SwiftSynchronization";
+            SwiftPlatformExecutorsCore_DIR = "$(Get-ProjectBinaryCache $Platform ([Project]"${Variant}PlatformExecutorsCore"))\cmake\SwiftPlatformExecutorsCore";
+            SwiftPlatformExecutors_SWIFT_COLLECTIONS_SOURCE_DIR = "$SourceCache\swift-collections";
+
+            # FIXME(compnerd) this currently causes a build failure on Windows, but
+            # this should be enabled when building the dynamic runtime.
+            SwiftPlatformExecutors_ENABLE_LIBRARY_EVOLUTION = "NO";
           })
       }
     }

@@ -65,6 +65,8 @@ class SwiftTestCase(unittest.TestCase):
             swift_enable_wasm_plugins=False,
             enable_synchronization=False,
             enable_volatile=False,
+            enable_platform_executors=False,
+            enable_platform_executors_io_uring=False,
             enable_runtime_module=False,
             build_early_swiftsyntax=False,
             build_swift_stdlib_static_print=False,
@@ -121,6 +123,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
+            '-DSWIFT_ENABLE_PLATFORM_EXECUTORS:BOOL=FALSE',
+            '-DSWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING:BOOL=FALSE',
             '-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
@@ -164,6 +168,8 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
+            '-DSWIFT_ENABLE_PLATFORM_EXECUTORS:BOOL=FALSE',
+            '-DSWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING:BOOL=FALSE',
             '-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
@@ -485,6 +491,32 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_VOLATILE' in x])
+
+    def test_platform_executors_flags(self):
+        self.args.enable_platform_executors = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_PLATFORM_EXECUTORS:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if x.startswith('-DSWIFT_ENABLE_PLATFORM_EXECUTORS:')])
+
+    def test_platform_executors_io_uring_flags(self):
+        self.args.enable_platform_executors_io_uring = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if x.startswith('-DSWIFT_ENABLE_PLATFORM_EXECUTORS_IO_URING:')])
 
     def test_runtime_module_flags(self):
         self.args.enable_runtime_module = True

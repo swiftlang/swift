@@ -1971,6 +1971,7 @@ endfunction()
 #     [INSTALL]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [IS_FRAGILE]
 #     [IS_OSLOG]
 #     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
@@ -2084,6 +2085,10 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the Swift standard library core.
 #
+# IS_FRAGILE
+#   Disable library evolution even if the library is part of the standard
+#   library or the SDK.
+#
 # IS_OSLOG
 #   Treat the library as OSLog library.
 #
@@ -2176,6 +2181,7 @@ function(add_swift_target_library name)
         IS_SDK_OVERLAY
         IS_STDLIB
         IS_STDLIB_CORE
+        IS_FRAGILE
         IS_OSLOG
         IS_SWIFT_ONLY
         NOSWIFTRT
@@ -2804,6 +2810,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
         ${SWIFTLIB_IS_STDLIB_keyword}
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
+        ${SWIFTLIB_IS_FRAGILE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
         ${SWIFTLIB_NO_SWIFTMODULE_keyword}

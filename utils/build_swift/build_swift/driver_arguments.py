@@ -1672,6 +1672,17 @@ def create_argument_parser():
            default=True,
            help='Enable Volatile module.')
 
+    option('--enable-platform-executors', toggle_true,
+           default=True,
+           help='Enable the platform executors modules, if the '
+                'swift-platform-executors checkout is present.')
+
+    option('--enable-platform-executors-io-uring', toggle_true,
+           default=False,
+           help='Enable the experimental io_uring backend of the platform '
+                'executors on Linux, if the swift-system checkout has its '
+                'socket support.')
+
     option('--enable-runtime-module', toggle_true,
            default=True,
            help='Enable Runtime module.')
