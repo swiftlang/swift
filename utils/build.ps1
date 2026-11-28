@@ -118,7 +118,22 @@ Default: @("X64","X86","ARM64")
 Remove selected build outputs before building.
 
 .PARAMETER Toolchain
-Build the toolchain.
+The parts of the toolchain to build, in this order:
+- Bootstrap: the tools that the build uses, the Stage1 compilers, and the SDK of
+  the host, which the rest of the toolchain is built against.
+- Compilers: the Stage2 compilers.
+- Tools: the developer tools that only need the Stage1 compilers and the SDK of
+  the host.
+- Finish: what needs the Stage2 compilers or the tools: the compiler runtime, the
+  macros, the makeOptions tool of swift-driver, SwiftPM, swift-format and
+  SourceKit-LSP, then the binding of the executables of the toolchain to the
+  runtime.
+Stage2 is Compilers, Tools and Finish. All (the default) builds every part, and
+Skip none of them, for example to run tests with a toolchain that is built.
+$true and $false are All and Skip. The runs that build some of the parts only
+build the compiler runtime of the SDKs of -Windows and -Android, and not these
+SDKs, which build with All or Skip. BuildMulti.ps1 builds Compilers and Tools
+at the same time, in separate runs of this script.
 
 .PARAMETER Package
 Build the MSI installers and packaging.
@@ -128,6 +143,14 @@ An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
 Use 'swift-prepare' to configure and build everything the Swift test suite needs, without running it
 (for example, so that utils\run-test.cmd can be used afterwards). It is not included in '*'.
+
+.PARAMETER TestPhase
+What -Test does with the test suites of the compilers (clang, lld, lldb,
+lldb-swift, llvm and swift): Build builds what they need, Run runs them without
+building them, and All (the default) does both. The suites of the compilers
+share the Stage2 build tree, so BuildMulti.ps1 builds what they need once, then
+runs them at the same time in separate runs of this script. The other test
+suites build and run in their own build trees, with All and Run.
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -228,12 +251,14 @@ param
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
   # Build Phases
-  [switch] $Toolchain = $true,
+  [object] $Toolchain = "All",
   [switch] $Package = $false,
 
   # Incremental Build Support
   [switch] $Clean,
   [string[]] $Test = @(),
+  [ValidateSet("All", "Build", "Run")]
+  [string] $TestPhase = "All",
 
   [switch] $IncludeDS2 = $false,
   [ValidateSet("none", "full", "thin")]
@@ -291,6 +316,17 @@ if ($Test -contains "*") {
 if ($UseHostToolchain -is [string]) {
   $UseHostToolchain = [System.Convert]::ToBoolean($UseHostToolchain)
 }
+
+# -Toolchain was a switch, so $true and $false still work.
+$AllToolchainPhases = @("Bootstrap", "Compilers", "Tools", "Finish")
+$ToolchainPhases = @(switch -Regex ("$Toolchain") {
+  '^(\$?true|All)$' { $AllToolchainPhases }
+  '^Stage2$' { @("Compilers", "Tools", "Finish") }
+  '^(Bootstrap|Compilers|Tools|Finish)$' { $Matches[1] }
+  '^(\$?false|Skip)$' { }
+  default { throw "Unknown -Toolchain '$Toolchain', expected All, Bootstrap, Stage2, Compilers, Tools, Finish or Skip" }
+})
+$BuildSDKs = (-not $ToolchainPhases) -or ($ToolchainPhases.Count -eq $AllToolchainPhases.Count)
 
 ## Declare static build and build tool parameters.
 
@@ -924,6 +960,7 @@ function Write-TimingTrace([string] $Path) {
       args = [ordered]@{
         Platform = $Entry.Platform
         Arch = $Entry.Arch
+        Variant = $Entry.Variant
         CPU = [math]::Round($Entry.CPU, 2)
       }
     }
@@ -1720,6 +1757,42 @@ function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   }
 }
 
+# Runs $Block while no other run of this script runs a block with this name, as
+# BuildMulti.ps1 runs several of them at the same time.
+function Invoke-Exclusively([string] $Name, [ScriptBlock] $Block) {
+  $Mutex = New-Object System.Threading.Mutex($false, "Global\swift-build-$Name")
+  try {
+    try {
+      [void]$Mutex.WaitOne()
+    } catch [System.Threading.AbandonedMutexException] {
+      # The previous owner died; the mutex is ours now.
+    }
+    & $Block
+  } finally {
+    $Mutex.ReleaseMutex()
+    $Mutex.Dispose()
+  }
+}
+
+# Enter-VsDevShell runs VsDevCmd.bat, which starts many processes and takes
+# long when the processors are busy, so the changes that it makes to the
+# environment are reused for the next calls with the same arguments, and by the
+# runs of this script that BuildMulti.ps1 starts, through files in a directory
+# that the first run creates.
+$VsDevShellChanges = @{}
+$OwnVsDevShellCache = -not $env:SWIFT_BUILD_VSDEVSHELL_CACHE
+if ($OwnVsDevShellCache) {
+  $env:SWIFT_BUILD_VSDEVSHELL_CACHE = [IO.Path]::Combine([IO.Path]::GetTempPath(), "swift-vsdevshell-$([Guid]::NewGuid())")
+}
+
+function Get-EnvironmentVariables {
+  $Variables = @{}
+  foreach ($Variable in [Environment]::GetEnvironmentVariables().GetEnumerator()) {
+    $Variables[$Variable.Key] = $Variable.Value
+  }
+  return $Variables
+}
+
 function Invoke-VsDevShell([Hashtable] $Platform) {
   if (($Platform.OS -ne [OS]::Windows) -or ($BuildPlatform.OS -ne [OS]::Windows)) {
     Write-Warning "Invoke-VsDevShell called on non-Windows platform."
@@ -1734,8 +1807,62 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
   }
 
   # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
-  Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
-  Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+  $CacheFile = [IO.Path]::Combine($env:SWIFT_BUILD_VSDEVSHELL_CACHE, "$($DevCmdArguments -replace '[^A-Za-z0-9.=]+', '_').json")
+  if (-not $script:VsDevShellChanges.Contains($DevCmdArguments) -and (Test-Path $CacheFile)) {
+    # Windows PowerShell does not enumerate the array that ConvertFrom-Json returns.
+    $Cached = Get-Content -Raw -ErrorAction Stop $CacheFile | ConvertFrom-Json
+    $script:VsDevShellChanges[$DevCmdArguments] = @(foreach ($Change in $Cached) {
+      @{ Name = $Change.Name; Value = $Change.Value; Prefix = $Change.Prefix; Suffix = $Change.Suffix }
+    })
+  }
+
+  if ($script:VsDevShellChanges.Contains($DevCmdArguments)) {
+    foreach ($Change in $script:VsDevShellChanges[$DevCmdArguments]) {
+      $Value = $Change.Value
+      if ($null -ne $Change.Prefix) {
+        $Value = $Change.Prefix + [Environment]::GetEnvironmentVariable($Change.Name) + $Change.Suffix
+      }
+      [Environment]::SetEnvironmentVariable($Change.Name, $Value)
+    }
+  } else {
+    $Before = Get-EnvironmentVariables
+
+    Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
+    Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
+
+    # VsDevCmd.bat adds entries around the values of lists like PATH.
+    $After = Get-EnvironmentVariables
+    $Changes = @()
+    foreach ($Name in $After.Keys) {
+      $Old = $Before[$Name]
+      $New = $After[$Name]
+      if ($Old -ceq $New) { continue }
+      $Index = if ($Old -and $New.Contains(";")) { $New.IndexOf($Old, [StringComparison]::Ordinal) } else { -1 }
+      if ($Index -ge 0) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $New.Substring(0, $Index); Suffix = $New.Substring($Index + $Old.Length) }
+      } else {
+        $Changes += @{ Name = $Name; Value = $New; Prefix = $null; Suffix = $null }
+      }
+    }
+    foreach ($Name in $Before.Keys) {
+      if (-not $After.Contains($Name)) {
+        $Changes += @{ Name = $Name; Value = $null; Prefix = $null; Suffix = $null }
+      }
+    }
+    $script:VsDevShellChanges[$DevCmdArguments] = $Changes
+
+    # Written to another file first, as other runs may read it at any time.
+    # The first run to write it wins.
+    New-Item -ItemType Directory -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE | Out-Null
+    $TemporaryFile = "$CacheFile.$PID.tmp"
+    ConvertTo-Json -InputObject $Changes -Depth 3 | Set-Content -Path $TemporaryFile -Encoding UTF8
+    try {
+      Move-Item -ErrorAction Stop $TemporaryFile $CacheFile
+    } catch {
+      Remove-Item -ErrorAction Ignore $TemporaryFile
+    }
+  }
+
 
   if ($CustomWinSDKRoot) {
     # Using a non-installed Windows SDK. Setup environment variables manually.
@@ -1896,7 +2023,11 @@ function Get-Dependencies {
 
         Invoke-Program -OutNull subst.exe X: "$InstallRoot"
         $DriveMapped = $true
-        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | ForEach-Object {
+        # The build only uses the compilers with assertions, the SDKs and the
+        # runtime of the pinned toolchain.
+        Get-ChildItem $BundleRoot -Filter "*.msi" -Recurse | Where-Object {
+          $_.Name -notmatch "noasserts|^(dbg|ide|python)\." -and ($Android -or $_.Name -ne "android.msi")
+        } | ForEach-Object {
           $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
           # Administrative installs do not run rtl.msi's SetDirectory actions.
           $TargetDirectory = if ($_.Name -eq "rtl.msi") { $RuntimeTarget } else { "X:\" }
@@ -2007,7 +2138,7 @@ function Get-Dependencies {
 
     # WiX is needed both for packaging and for extracting the pinned toolchain
     # installer that bootstraps toolchain builds.
-    if ($Toolchain -or $Package) {
+    if ($ToolchainPhases -or $Package) {
       $DotNetRuntimeInfo = Get-DotNetRuntime
       $DotNetArchive = "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier).zip"
       DownloadAndVerify $DotNetRuntimeInfo.URL "$ArtifactCache\$DotNetArchive" $DotNetRuntimeInfo.SHA256
@@ -2028,7 +2159,7 @@ function Get-Dependencies {
       Write-Success "GNUWin32 make 4.4.1"
     }
 
-    if (-not $Toolchain) { return }
+    if (-not $ToolchainPhases) { return }
 
     DownloadAndVerify $PinnedBuild "$ArtifactCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -2354,6 +2485,10 @@ $Assemblers = @{
 }
 
 $Assemblers.Host = if ($UseHostToolchain) { $Assemblers.MSVC } else { $Assemblers.Pinned }
+
+# Build-CMakeProject configures the projects before building them, unless this is
+# "Build" and they are configured.
+$CMakeMode = "All"
 
 function Build-CMakeProject {
   [CmdletBinding(PositionalBinding = $false)]
@@ -2784,8 +2919,12 @@ function Build-CMakeProject {
       $cmakeGenerateArgs += @("-D", "$($Define.Key)=$Value")
     }
 
-    Write-Host "$CMakeBin $cmakeGenerateArgs"
-    Invoke-Program $CMakeBin @cmakeGenerateArgs
+    if ($CMakeMode -ne "Build" -or -not (Test-Path "$Bin\CMakeCache.txt")) {
+      Write-Host "$CMakeBin $cmakeGenerateArgs"
+      Invoke-Program $CMakeBin @cmakeGenerateArgs
+    } else {
+      Write-Host "Using the configuration of '$Bin'"
+    }
 
     # Build all requested targets in one invocation. Test targets such as
     # ExperimentalTest do not depend on the default target, so build it first.
@@ -3159,13 +3298,18 @@ function Get-CompilersDefines([Hashtable] $Platform,
     @{}
   }
 
+  # The C and C++ compilations use as many jobs as there are processors, and
+  # ninja runs a few more jobs, so that the long chains of Swift modules, which
+  # build with custom commands and link rules, start as soon as they can.
+  $PoolDefines = @{ LLVM_PARALLEL_COMPILE_JOBS = "$([Environment]::ProcessorCount)" }
+
   $DispatchDefines = if ($DispatchPackage) {
     @{ dispatch_DIR = $DispatchPackage }
   } else {
     @{}
   }
 
-  return $TestDefines + $DebugDefines + $DispatchDefines + @{
+  return $TestDefines + $DebugDefines + $PoolDefines + $DispatchDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -3251,19 +3395,22 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
 
-  Build-CMakeProject `
-    -Src $SourceCache\llvm-project\llvm `
-    -Bin (Get-ProjectBinaryCache $Platform $Project) `
-    -InstallTo "$ToolchainRoot\usr" `
-    -Platform $Platform `
-    -Assembler $Assembler `
-    -CCompiler $CCompiler `
-    -CXXCompiler $CXXCompiler `
-    -SwiftCompiler $SwiftCompiler `
-    -SwiftSDK $SwiftSDK `
-    -BuildTargets @("install-distribution") `
-    -CacheScript $CacheScript `
-    -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  Invoke-IsolatingEnvVars {
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = [Environment]::ProcessorCount + 4
+    Build-CMakeProject `
+      -Src $SourceCache\llvm-project\llvm `
+      -Bin (Get-ProjectBinaryCache $Platform $Project) `
+      -InstallTo "$ToolchainRoot\usr" `
+      -Platform $Platform `
+      -Assembler $Assembler `
+      -CCompiler $CCompiler `
+      -CXXCompiler $CXXCompiler `
+      -SwiftCompiler $SwiftCompiler `
+      -SwiftSDK $SwiftSDK `
+      -BuildTargets @("install-distribution") `
+      -CacheScript $CacheScript `
+      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
+  }
 
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
   if ($RuntimeLocation) {
@@ -3609,7 +3756,86 @@ function Get-LLVMDylibVersion([string] $LLVMBinaryCache) {
   return "$($Version.Major)$($Version.Suffix)"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [switch] $PrepareSwift) {
+# The test suites of the compilers, with the targets that build what they need
+# and the targets that run them.
+$CompilerTestSuites = [ordered]@{
+  "llvm"       = @{ Depends = @("llvm-test-depends");  Target = "check-llvm" };
+  "clang"      = @{ Depends = @("clang-test-depends"); Target = "check-clang" };
+  "lld"        = @{ Depends = @("lld-test-depends");   Target = "check-lld" };
+  # check-swift does not depend on SwiftCompilerPlugin, but the macro tests need it.
+  "swift"      = @{ Depends = @("SwiftCompilerPlugin", "swift-test-depends"); Target = "check-swift" };
+  "lldb"       = @{ Depends = @("lldb-api-test-deps", "lldb-shell-test-deps", "lldb-unit-test-deps"); Target = "check-lldb" };
+  "lldb-swift" = @{ Depends = @("lldb-test-deps", "lldb-unit-test-deps"); Target = "check-lldb-swift" };
+}
+
+# Runs the lit command of a check target, without building what it depends on.
+# Ninja runs these commands one at a time, so running them directly lets the
+# suites of one build tree run at the same time. With $Paths, the command runs
+# these tests instead of the test directories of the target.
+function Invoke-LitTarget([string] $Bin, [string] $Target, [string[]] $Paths = @()) {
+  $Ninja = (Get-Ninja).Path
+
+  # Follow the phony targets of CMake to the custom command that runs lit.
+  $Nodes = New-Object System.Collections.Queue
+  $Nodes.Enqueue($Target)
+  $Commands = @()
+  while ($Nodes.Count -gt 0) {
+    $Node = $Nodes.Dequeue()
+    $Query = @(& $Ninja -C $Bin -t query $Node)
+    if ($LastExitCode -ne 0) {
+      throw "ninja could not find '$Node' in '$Bin'"
+    }
+    $Rule = ""
+    $Inputs = @()
+    foreach ($Line in $Query) {
+      if ($Line -match "^  input: (.+)$") {
+        $Rule = $Matches[1]
+      } elseif ($Line -match "^  outputs:") {
+        break
+      } elseif ($Line -match "^    ([^|].*)$") {
+        $Inputs += $Matches[1]
+      }
+    }
+    if ($Rule -eq "phony") {
+      foreach ($InputNode in $Inputs) {
+        if ($InputNode -match "/CMakeFiles/|(^|/)check-[^/]*$") {
+          $Nodes.Enqueue($InputNode)
+        }
+      }
+    } elseif ($Rule) {
+      $Commands += @(& $Ninja -C $Bin -t commands -s $Node | Where-Object { $_ -match "lit" })
+    }
+  }
+  if ($Commands.Count -ne 1) {
+    throw "Expected one command for '$Target', found $($Commands.Count)."
+  }
+
+  $Command = $Commands[0]
+  if ($Paths) {
+    # The command ends with the test directories, in the build tree.
+    $Pattern = '^(.*?)((?:\s+' + [Regex]::Escape($Bin.Replace("\", "/")) + '/[^\s"]*)+)("?)$'
+    if ($Command -notmatch $Pattern) {
+      throw "Cannot find the test directories in the command of '$Target': $Command"
+    }
+    $QuotedPaths = @($Paths | ForEach-Object { '"' + $_ + '"' }) -join " "
+    $Command = $Matches[1] + " " + $QuotedPaths + $Matches[3]
+  }
+
+  # Run the command line as ninja would.
+  if ($Command -notmatch '^("[^"]+"|\S+)\s+(.*)$') {
+    throw "Cannot parse the command of '$Target': $Command"
+  }
+  Write-Host $Command
+  $Process = Start-Process -FilePath $Matches[1].Trim('"') -ArgumentList $Matches[2] -NoNewWindow -PassThru
+  # Windows PowerShell only reports the exit code after the handle was opened.
+  $null = $Process.Handle
+  $Process.WaitForExit()
+  if ($Process.ExitCode -ne 0) {
+    throw "$Target failed with exit code $($Process.ExitCode)"
+  }
+}
+
+function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Build, [switch] $Run) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3617,186 +3843,197 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
     $env:Path = "$SwiftRuntime;$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $env:PYTHONUTF8 = "1"
-    $TestingDefines = Get-CompilersDefines $Platform $Variant -Test -SwiftSDK $SwiftSDK
-    # Stage2 tests must use the freshly-built native tools, not Stage1.
-    $TestingDefines["SWIFT_NATIVE_SWIFT_TOOLS_PATH"] = $Stage2BinDir
-    # check-swift depends on swift-backtrace-${SDK}; build the libexec helpers
-    # with the rest of the test targets.
-    $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
-    # Keep %host-build-swift on the same platform SDK that Stage2 uses.
-    $TestingDefines["SWIFT_HOST_SDKROOT"] = $SwiftSDK
-    $Targets = @()
-    if ($TestLLVM) { $Targets += @("check-llvm") }
-    if ($TestClang) { $Targets += @("check-clang") }
-    if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift -or $PrepareSwift) {
-      # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
-      # need it, so it is built before check-swift starts.
-      $Targets += @("SwiftCompilerPlugin")
-    }
-    $LLDBTargets = @()
-    if ($TestLLDB) { $LLDBTargets += @("check-lldb") }
-    elseif ($TestLLDBSwift) { $LLDBTargets += @("check-lldb-swift") }
-    if ($TestLLDB -or $TestLLDBSwift) {
-      # Override test filter for known issues in downstream LLDB
-      Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
+    # lit writes the tests that failed to stdout and its warnings to stderr, which
+    # BuildMulti.ps1 logs to the same file, so they must not be buffered.
+    $env:PYTHONUNBUFFERED = "1"
+    $CompilerCache = Get-ProjectBinaryCache $Platform Stage2Compilers
 
-      $CompilerCache = Get-ProjectBinaryCache $Platform Stage2Compilers
-      $SwiftRTSubdir = "lib\swift\windows"
-
-      # Transitive dependency closure of _lldb.pyd.
-      $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
-      New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
-      foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
-        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
-      }
-      $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
-      $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
-      # In the LLVM DLL build, liblldb.dll (and so _lldb.pyd) imports LLVM-<version>.dll.
-      $LLDBRuntimeDLLs += Get-Item "$CompilerCache\bin\LLVM-$(Get-LLVMDylibVersion $CompilerCache).dll"
-      foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
-        Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+    if ($Build) {
+      # CMake keeps the configuration of the toolchain build, and only changes
+      # what the tests need.
+      $TestingDefines = @{
+        # The NoAsserts compilers of -IncludeNoAsserts build in this tree too.
+        LLVM_ENABLE_ASSERTIONS = "YES";
+        SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
+        SWIFT_BUILD_DYNAMIC_STDLIB = "YES";
+        SWIFT_BUILD_REMOTE_MIRROR = "YES";
+        # Stage2 tests must use the freshly-built native tools, not Stage1.
+        SWIFT_NATIVE_SWIFT_TOOLS_PATH = $Stage2BinDir;
+        # check-swift depends on swift-backtrace-${SDK}; build the libexec helpers
+        # with the rest of the test targets.
+        SWIFT_BUILD_LIBEXEC = "YES";
+        # Keep %host-build-swift on the same platform SDK that Stage2 uses.
+        SWIFT_HOST_SDKROOT = $SwiftSDK;
       }
 
-      # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
-      # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
-      # against, so only swiftrt.obj needs to be staged from the SDK here.
-      New-Item -ItemType Directory -Force "$CompilerCache\$SwiftRTSubdir" | Out-Null
-      Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$CompilerCache\$SwiftRTSubdir'"
-      Copy-Item `
-        -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
-        -Destination "$CompilerCache\$SwiftRTSubdir"
-      $TestingDefines += @{
-        LLDB_INCLUDE_TESTS = "YES";
-        # Check for required Python modules in CMake
-        LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
-        # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
-        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
-        LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
-        LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
-        # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
-        LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
-        # LLDB Unit tests link against this library
-        LLVM_UNITTEST_LINK_FLAGS = "$SwiftSDK\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
+      if ($Suites -contains "lldb" -or $Suites -contains "lldb-swift") {
+        $SwiftRTSubdir = "lib\swift\windows"
+
+        # Transitive dependency closure of _lldb.pyd.
+        $LLDBSitePackages = "$CompilerCache\lib\site-packages\lldb"
+        New-Item -ItemType Directory -Force $LLDBSitePackages | Out-Null
+        foreach ($RuntimeDLL in @(Get-WindowsSxSRuntimeDLLs $SwiftRuntime)) {
+          Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+        }
+        $LLDBRuntimeDLLs = @(Get-ChildItem -Path "$CompilerCache\bin" -Filter "_CompilerSwift*.dll" -File)
+        $LLDBRuntimeDLLs += Get-Item "$(Get-CMarkBinaryCache $Platform)\src\cmark-gfm.dll"
+        # In the LLVM DLL build, liblldb.dll (and so _lldb.pyd) imports LLVM-<version>.dll.
+        $LLDBRuntimeDLLs += Get-Item "$CompilerCache\bin\LLVM-$(Get-LLVMDylibVersion $CompilerCache).dll"
+        foreach ($RuntimeDLL in $LLDBRuntimeDLLs) {
+          Copy-Item -Path $RuntimeDLL.FullName -Destination $LLDBSitePackages -Force
+        }
+
+        # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
+        # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
+        # against, so only swiftrt.obj needs to be staged from the SDK here.
+        New-Item -ItemType Directory -Force "$CompilerCache\$SwiftRTSubdir" | Out-Null
+        Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$CompilerCache\$SwiftRTSubdir'"
+        Copy-Item `
+          -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
+          -Destination "$CompilerCache\$SwiftRTSubdir"
+        $TestingDefines += @{
+          LLDB_INCLUDE_TESTS = "YES";
+          # Check for required Python modules in CMake
+          LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
+          # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
+          LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
+          LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
+          LLDB_TEST_INFERIOR_RUNTIME_BIN = "$SwiftRuntime";
+          # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
+          LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
+          # LLDB Unit tests link against this library
+          LLVM_UNITTEST_LINK_FLAGS = "$SwiftSDK\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
+        }
       }
-    }
 
-    if ((-not $Targets) -and (-not $LLDBTargets)) {
-      Write-Warning "Test-Compilers invoked without specifying test target(s)."
-    }
+      # Build and bind the runtime-loading tools before swift-test-stdlib can
+      # repopulate bin\ with freshly-built runtime DLLs.  This path intentionally
+      # uses the bundle SxS helper rather than the per-DLL install-layout helper
+      # because the test build keeps producing flat runtime DLLs in bin\.  Reuse
+      # the same configure arguments for the final build so ninja does not relink
+      # away the manifests.
+      $BuildCMakeArgs = @{
+        Src           = [IO.Path]::Combine($SourceCache, "llvm-project", "llvm")
+        Bin           = (Get-ProjectBinaryCache $Platform Stage2Compilers)
+        InstallTo     = "$($Platform.ToolchainInstallRoot)\usr"
+        Platform      = $Platform
+        CCompiler     = $Compilers.Stage1.C
+        CXXCompiler   = $Compilers.Stage1.CXX
+        CacheScript   = [IO.Path]::Combine($SourceCache, "swift", "cmake", "caches", "Windows-$($Platform.Architecture.LLVMName).cmake")
+        Defines       = $TestingDefines
+      }
 
-    # Build and bind the runtime-loading tools before swift-test-stdlib can
-    # repopulate bin\ with freshly-built runtime DLLs.  This path intentionally
-    # uses the bundle SxS helper rather than the per-DLL install-layout helper
-    # because the test build keeps producing flat runtime DLLs in bin\.  Reuse
-    # the same configure arguments for the final build so ninja does not relink
-    # away the manifests.
-    $BuildCMakeArgs = @{
-      Src           = [IO.Path]::Combine($SourceCache, "llvm-project", "llvm")
-      Bin           = (Get-ProjectBinaryCache $Platform Stage2Compilers)
-      InstallTo     = "$($Platform.ToolchainInstallRoot)\usr"
-      Platform      = $Platform
-      CCompiler     = $Compilers.Stage1.C
-      CXXCompiler   = $Compilers.Stage1.CXX
-      SwiftCompiler = $Compilers.Stage1.Swift
-      SwiftSDK      = $SwiftSDK
-      CacheScript   = [IO.Path]::Combine($SourceCache, "swift", "cmake", "caches", "Windows-$($Platform.Architecture.LLVMName).cmake")
-      Defines       = $TestingDefines
-    }
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+        "swift-frontend",
+        "sourcekitd-test",
+        "swift-refactor",
+        "swift-ide-test",
+        "swift-plugin-server"
+      )
 
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
-      "swift-frontend",
-      "sourcekitd-test",
-      "swift-refactor",
-      "swift-ide-test",
-      "swift-plugin-server"
-    )
+      # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
+      # running without -Toolchain usable when the install image is absent.
+      $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
+      $RuntimeSourceCandidates = @(
+        $SwiftRuntime,
+        (Join-Path $Stage2BinDir "swiftToolchainRuntime")
+      )
+      Write-Host "SxS bind: searching for toolchain runtime source dir:"
+      $RuntimeSource = $null
+      foreach ($Candidate in $RuntimeSourceCandidates) {
+        $Exists = Test-Path $Candidate
+        $DllCount = if ($Exists) { (Get-ChildItem $Candidate -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count } else { 0 }
+        $Marker = if ($RuntimeSource) { "skip" } elseif ($Exists -and $DllCount -gt 0) { "USE" } else { "miss" }
+        Write-Host ("  [{0,-4}] {1} ({2} dlls)" -f $Marker, $Candidate, $DllCount)
+        if (-not $RuntimeSource -and $Exists -and $DllCount -gt 0) { $RuntimeSource = $Candidate }
+      }
+      if (-not $RuntimeSource) {
+        throw "Test-Compilers: no Swift runtime DLLs found in any candidate ($($RuntimeSourceCandidates -join ', ')). The platform SDK runtime was not staged; build the toolchain/SDK (e.g. with -Toolchain) before running the test phase."
+      }
 
-    # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
-    # running without -Toolchain usable when the install image is absent.
-    $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
-    $RuntimeSourceCandidates = @(
-      $SwiftRuntime,
-      (Join-Path $Stage2BinDir "swiftToolchainRuntime")
-    )
-    Write-Host "SxS bind: searching for toolchain runtime source dir:"
-    $RuntimeSource = $null
-    foreach ($Candidate in $RuntimeSourceCandidates) {
-      $Exists = Test-Path $Candidate
-      $DllCount = if ($Exists) { (Get-ChildItem $Candidate -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count } else { 0 }
-      $Marker = if ($RuntimeSource) { "skip" } elseif ($Exists -and $DllCount -gt 0) { "USE" } else { "miss" }
-      Write-Host ("  [{0,-4}] {1} ({2} dlls)" -f $Marker, $Candidate, $DllCount)
-      if (-not $RuntimeSource -and $Exists -and $DllCount -gt 0) { $RuntimeSource = $Candidate }
-    }
-    if (-not $RuntimeSource) {
-      throw "Test-Compilers: no Swift runtime DLLs found in any candidate ($($RuntimeSourceCandidates -join ', ')). The platform SDK runtime was not staged; build the toolchain/SDK (e.g. with -Toolchain) before running the test phase."
-    }
-
-    Invoke-IsolatingEnvVars {
-      # Test-time tools execute on the build host.
-      # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
-      # the test reconfigure here makes lldb compile expressions against the in-
-      # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
-      # uses the shipped runtime instead.
-      # See https://github.com/swiftlang/swift/issues/91537 for details.
-      Invoke-VsDevShell $BuildPlatform
-      Set-WindowsSxSToolchainRuntime `
-        -BinaryDir              $Stage2BinDir `
-        -RuntimeSourceDir       $RuntimeSource `
-        -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
-        -Tools                  @(
-                                   "swift.exe",
-                                   "swiftc.exe",
-                                   "swift-driver.exe",
-                                   "swift-frontend.exe",
-                                   "swift-synthesize-interface.exe",
-                                   "sil-opt.exe",
-                                   "sourcekitd-test.exe",
-                                   "swift-refactor.exe",
-                                   "swift-ide-test.exe",
-                                   "swift-plugin-server.exe",
-                                   "swiftc-legacy-driver.exe",
-                                   "lldb.exe"
-                                 )
-      # SxS only probes the EXE's own directory for the named assembly.
-      if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
+      Invoke-IsolatingEnvVars {
+        # Test-time tools execute on the build host.
+        # TODO(Steelskin): `repl_swift.exe` is explicitly excluded here because
+        # the test reconfigure here makes lldb compile expressions against the in-
+        # tree resilient stdlib, which breaks SwiftREPL tests if `repl_swift.exe`
+        # uses the shipped runtime instead.
+        # See https://github.com/swiftlang/swift/issues/91537 for details.
+        Invoke-VsDevShell $BuildPlatform
         Set-WindowsSxSToolchainRuntime `
-          -BinaryDir              $Stage2LibexecSwiftDir `
+          -BinaryDir              $Stage2BinDir `
           -RuntimeSourceDir       $RuntimeSource `
           -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
-          -Tools                  @("swift-backtrace.exe")
-      } else {
-        Write-Warning "SxS bind: '$Stage2LibexecSwiftDir\swift-backtrace.exe' not present; skipping backtracer bind (Build-TestBacktrace did not run or failed)"
+          -Tools                  @(
+                                     "swift.exe",
+                                     "swiftc.exe",
+                                     "swift-driver.exe",
+                                     "swift-frontend.exe",
+                                     "swift-synthesize-interface.exe",
+                                     "sil-opt.exe",
+                                     "sourcekitd-test.exe",
+                                     "swift-refactor.exe",
+                                     "swift-ide-test.exe",
+                                     "swift-plugin-server.exe",
+                                     "swiftc-legacy-driver.exe",
+                                     "lldb.exe"
+                                   )
+        # SxS only probes the EXE's own directory for the named assembly.
+        if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
+          Set-WindowsSxSToolchainRuntime `
+            -BinaryDir              $Stage2LibexecSwiftDir `
+            -RuntimeSourceDir       $RuntimeSource `
+            -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
+            -Tools                  @("swift-backtrace.exe")
+        } else {
+          Write-Warning "SxS bind: '$Stage2LibexecSwiftDir\swift-backtrace.exe' not present; skipping backtracer bind (Build-TestBacktrace did not run or failed)"
+        }
+      }
+
+      # TODO(roman-bcny): Workaround for https://github.com/swiftlang/swift/issues/87970
+      # Stdlib DLLs must be fully linked before swift-frontend compilations
+      # that load them, otherwise the linker races with memory-mapped DLLs
+      # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
+      # Some tests run Stage2 tools with a scrubbed PATH, so cmark's DLLs can't
+      # be found via the PATH set above; put them beside the executables.
+      foreach ($DLL in @("src\cmark-gfm.dll", "extensions\cmark-gfm-extensions.dll")) {
+        $CMarkDLL = Join-Path (Get-CMarkBinaryCache $Platform) $DLL
+        if (Test-Path $CMarkDLL) {
+          Copy-Item -Force -Path $CMarkDLL -Destination $Stage2BinDir
+        }
+      }
+
+      # The configuration is the same, so CMake does not run again. The suites
+      # other than swift only build C++ before they run, which does not load the
+      # stdlib DLLs, so it builds while the stdlib builds one module at a time.
+      $CMakeMode = "Build"
+      $OtherDepends = @($Suites | Where-Object { $_ -ne "swift" } | ForEach-Object { $CompilerTestSuites[$_].Depends })
+      Build-CMakeProject @BuildCMakeArgs -BuildTargets (@("swift-test-stdlib") + $OtherDepends)
+      if ($Suites -contains "swift") {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets $CompilerTestSuites["swift"].Depends
       }
     }
 
-    # TODO(roman-bcny): Workaround for https://github.com/swiftlang/swift/issues/87970
-    # Stdlib DLLs must be fully linked before swift-frontend compilations
-    # that load them, otherwise the linker races with memory-mapped DLLs
-    # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
-    # Some tests run Stage2 tools with a scrubbed PATH, so cmark's DLLs can't
-    # be found via the PATH set above; put them beside the executables.
-    foreach ($DLL in @("src\cmark-gfm.dll", "extensions\cmark-gfm-extensions.dll")) {
-      $CMarkDLL = Join-Path (Get-CMarkBinaryCache $Platform) $DLL
-      if (Test-Path $CMarkDLL) {
-        Copy-Item -Force -Path $CMarkDLL -Destination $Stage2BinDir
-      }
-    }
-
-    Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
-    Invoke-WithLitTimeTraces "$($BuildCMakeArgs.Bin)\lit-time-traces" {
-      if ($Targets) {
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
-      }
-      if ($TestSwift) {
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
-      }
-    }
-
-    if ($LLDBTargets) {
-      Invoke-IsolatingEnvVars {
-        $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+    if ($Run) {
+      foreach ($Suite in $Suites) {
+        Record-OperationTime $Platform $CompilerTestSuites[$Suite].Target {
+          Invoke-IsolatingEnvVars {
+            # The tests build C and C++ code, as when ninja runs them.
+            Invoke-VsDevShell $Platform
+            if ($Suite -eq "lldb" -or $Suite -eq "lldb-swift") {
+              # Override test filter for known issues in downstream LLDB
+              Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
+              $env:SDKROOT = $SwiftSDK
+              # These runs exclude tests, which lit fails to write traces for.
+              Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target
+            } else {
+              # The suites of a build tree can run at the same time, so each one
+              # writes its traces to its own directory.
+              Invoke-WithLitTimeTraces "$CompilerCache\lit-time-traces\$Suite" {
+                Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -4287,7 +4524,12 @@ function Write-SDKSettings([OS] $OS, [string] $Identifier = $OS.ToString()) {
       $SDKSettings.SupportedTargets.windows.LLVMTargetVendor = "unknown"
       $SDKSettings.SupportedTargets.windows.LLVMTargetSys = "windows"
       $SDKSettings.SupportedTargets.windows.LLVMTargetTripleEnvironment = "msvc"
-      $SDKSettings.SupportedTargets.windows.Archs = $WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName } | Sort-Object
+      # BuildMulti.ps1 builds the SDKs of the other architectures in other runs,
+      # and installs them before the run that builds the SDK of the host.
+      $InstalledArchs = @("WindowsX64", "WindowsX86", "WindowsArm64") | ForEach-Object { $KnownPlatforms[$_].Architecture.LLVMName } | Where-Object {
+        Test-Path "$(Get-SwiftSDK -OS $OS -Identifier $Identifier)\usr\lib\swift\windows\$_"
+      }
+      $SDKSettings.SupportedTargets.windows.Archs = @($WindowsSDKBuilds | ForEach-Object { $_.Architecture.LLVMName }) + @($InstalledArchs) | Sort-Object -Unique
     }
     Android {
       $SDKSettings.SupportedTargets.android.LLVMTargetVendor = "unknown"
@@ -4636,15 +4878,18 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
   $RuntimeBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Runtime")
   $OverlayBinaryCache    = Get-ProjectBinaryCache $Platform ([Project]"${Variant}Overlay")
 
-  # TODO: remove this once the migration is completed.
-  Invoke-IsolatingEnvVars {
-    Invoke-VsDevShell $BuildPlatform
+  # TODO: remove this once the migration is completed. Resync writes into the
+  # source tree, which the runs that build other architectures share.
+  Invoke-Exclusively "Resync" {
+    Invoke-IsolatingEnvVars {
+      Invoke-VsDevShell $BuildPlatform
 
-    Push-Location "${SourceCache}\swift\Runtimes"
-    $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
-    $CMakeBin = (Get-CMake).Path
-    Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
-    Pop-Location
+      Push-Location "${SourceCache}\swift\Runtimes"
+      $env:CMAKE_ROOT = (Get-CMake).CMakeRoot
+      $CMakeBin = (Get-CMake).Path
+      Start-Process -Wait -WindowStyle Hidden -FilePath $CMakeBin -ArgumentList @("-P", "Resync.cmake")
+      Pop-Location
+    }
   }
 
   Invoke-IsolatingEnvVars {
@@ -5296,6 +5541,31 @@ function Build-Driver([Hashtable] $Platform,
                       [string]    $LLVM_DIR,
                       [string]    $Clang_DIR,
                       [string]    $Swift_DIR) {
+  $Defines = @{
+    BUILD_SHARED_LIBS = "YES";
+    CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+    TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
+    LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
+    ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+    SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+    SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
+    } else {
+      "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
+    };
+    SWIFT_DRIVER_BUILD_TOOLS = "NO";
+  }
+  # makeOptions uses the headers of the Stage2 compilers, so it only builds
+  # with their build tree.
+  if ($Swift_DIR) {
+    $Defines.SWIFT_DRIVER_BUILD_TOOLS = "YES"
+    $Defines += @{
+      LLVM_DIR = $LLVM_DIR;
+      Clang_DIR = $Clang_DIR;
+      Swift_DIR = $Swift_DIR;
+    }
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-driver `
     -Bin (Get-ProjectBinaryCache $Platform Driver) `
@@ -5305,23 +5575,7 @@ function Build-Driver([Hashtable] $Platform,
     -CXXCompiler $Compilers.CXX `
     -SwiftCompiler $Compilers.Swift `
     -SwiftSDK $SwiftSDK `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
-      SQLite3_LIBRARY = if ($Platform.OS -eq [OS]::Windows) {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib"
-      } else {
-        "$(Get-ProjectBinaryCache $Platform SQLite)\libsqlite3.lib"
-      };
-      SWIFT_DRIVER_BUILD_TOOLS = "YES";
-      LLVM_DIR = $LLVM_DIR;
-      Clang_DIR = $Clang_DIR;
-      Swift_DIR = $Swift_DIR;
-    }
+    -Defines $Defines
 }
 
 function Build-Crypto([Hashtable] $Platform,
@@ -5702,6 +5956,12 @@ function Test-SourceKitLSP {
     # The Windows build doesn't build the SourceKit plugins into the SwiftPM build directory (it builds them using CMake).
     # Tell the tests where to find the just-built plugins.
     $env:SOURCEKIT_LSP_TEST_PLUGIN_PATHS="$($HostPlatform.ToolchainInstallRoot)\usr\lib"
+
+    # The tests wait for the background indexing, which runs at the lowest
+    # priority, so they wait longer when other tests run at the same time.
+    if (-not $env:SOURCEKIT_LSP_TEST_TIMEOUT) {
+      $env:SOURCEKIT_LSP_TEST_TIMEOUT = "600"
+    }
 
     Build-SPMProject `
       -Action TestParallel `
@@ -6194,7 +6454,7 @@ if ($Clean) {
   }
 }
 
-if ($Toolchain) {
+if ($ToolchainPhases -contains "Bootstrap") {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
   if ($HostPlatform.OS -eq [OS]::Windows) {
     (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
@@ -6244,9 +6504,13 @@ if ($Toolchain) {
     SupplementalRuntimes = $SDKSupplementalRuntimes;
   }
 
-  # ── Stage2 Compiler ───────────────────────────────────────────────────────
+  # The Stage2 compilers and the tools use these too.
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
+}
+
+if ($ToolchainPhases -contains "Compilers") {
+  # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
@@ -6257,24 +6521,9 @@ if ($Toolchain) {
   }
   Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
+}
 
-  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
-  Get-SelectedSDKBuilds | ForEach-Object {
-    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
-  }
-
-  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
-  Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-  Invoke-BuildStep Build-TestingMacros $HostPlatform @{
-    SwiftCompiler   = $Compilers.Stage1.Swift;
-    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
-
+if ($ToolchainPhases -contains "Tools") {
   # ── Stage2 Toolchain ──────────────────────────────────────────────────────
   Invoke-BuildStep Build-SQLite $HostPlatform -CCompiler $Compilers.Stage1.C -Phase ""
   Invoke-BuildStep Build-ToolsSupportCore $HostPlatform @{
@@ -6292,10 +6541,6 @@ if ($Toolchain) {
   Invoke-BuildStep Build-Driver $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-
-    LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
-    Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
-    Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
   }
   Invoke-BuildStep Build-ASN1 $HostPlatform @{
     Compilers = $Compilers.Stage1;
@@ -6330,19 +6575,9 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
   }
-  Invoke-BuildStep Build-PackageManager $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
-  }
   Invoke-BuildStep Build-Markdown $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-  }
-  Invoke-BuildStep Build-Format $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
-    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
   Invoke-BuildStep Build-LMDB $HostPlatform -CCompiler $Compilers.Stage1.C
   Invoke-BuildStep Build-IndexStoreDB $HostPlatform @{
@@ -6357,14 +6592,54 @@ if ($Toolchain) {
     Compilers = $Compilers.Stage1;
     SwiftSDK = Get-SwiftSDK -OS $HostPlatform.OS;
   }
-  Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
+  Invoke-BuildStep Build-Inspect $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  }
+}
+
+if ($ToolchainPhases -contains "Finish") {
+  # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
+  Get-SelectedSDKBuilds | ForEach-Object {
+    Invoke-BuildStep Build-CompilerRuntime $_ -Assembler $Assemblers.Stage1 -Compilers $Compilers.Stage1
+  }
+
+  # ── Stage2 Compiler Macros ────────────────────────────────────────────────
+  Invoke-BuildStep Build-FoundationMacros $HostPlatform @{
+    SwiftCompiler   = $Compilers.Stage1.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+  Invoke-BuildStep Build-TestingMacros $HostPlatform @{
+    SwiftCompiler   = $Compilers.Stage1.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+
+  # ── Stage2 Tools ──────────────────────────────────────────────────────────
+  # swift-driver again, with its makeOptions tool.
+  Invoke-BuildStep Build-Driver $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+
+    LLVM_DIR  = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\llvm";
+    Clang_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\lib\cmake\clang";
+    Swift_DIR = "$(Get-ProjectBinaryCache $HostPlatform Stage2Compilers)\tools\swift\lib\cmake\swift";
+  }
+  Invoke-BuildStep Build-PackageManager $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
     SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
-  Invoke-BuildStep Build-Inspect $HostPlatform @{
+  Invoke-BuildStep Build-Format $HostPlatform @{
     Compilers = $Compilers.Stage1;
     SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
+  }
+  Invoke-BuildStep Build-SourceKitLSP $HostPlatform @{
+    Compilers = $Compilers.Stage1;
+    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    SwiftSyntax_DIR = Get-ProjectCMakeModules $HostPlatform Stage2Compilers;
   }
 
   Repair-Toolchain $HostPlatform.ToolchainInstallRoot
@@ -6414,11 +6689,12 @@ if ($Toolchain) {
   }
 }
 
-if ($IncludeDS2) {
-  Invoke-BuildStep Build-RegsGen2 $BuildPlatform
+if ($IncludeDS2 -and $BuildSDKs) {
+  # The runs that build the SDKs of other platforms share its build tree.
+  Invoke-Exclusively "RegsGen2" { Invoke-BuildStep Build-RegsGen2 $BuildPlatform }
 }
 
-if ($Windows) {
+if ($Windows -and $BuildSDKs) {
   Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Windows
@@ -6455,9 +6731,13 @@ if ($Windows) {
 
   Write-PlatformInfoPlist Windows
 
-  Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform @{
-    Compilers = $Compilers.Stage1;
-    SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+  # It builds against the SDK of the host, which BuildMulti.ps1 does not build
+  # with the SDKs of the other architectures.
+  if ($WindowsSDKBuilds -contains $HostPlatform) {
+    Invoke-BuildStep Build-PackageManagerRuntime $HostPlatform @{
+      Compilers = $Compilers.Stage1;
+      SwiftSDK  = Get-SwiftSDK -OS $HostPlatform.OS;
+    }
   }
 
   # Copy static dependencies
@@ -6479,7 +6759,7 @@ if ($Windows) {
   ).Count -gt 0
   # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
   # copies after the final runtime image is in place.
-  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
+  if (($ToolchainPhases -contains "Finish") -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
@@ -6495,7 +6775,7 @@ if ($Windows) {
   }
 }
 
-if ($Android) {
+if ($Android -and $BuildSDKs) {
   Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
@@ -6571,7 +6851,7 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
+  if (($ToolchainPhases -notcontains "Finish") -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0 -and $TestPhase -ne "Run") {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
@@ -6580,30 +6860,34 @@ if (-not $IsCrossCompiling) {
     }
   }
 
-  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift", "swift-prepare")
-  if ($Test | Where-Object { $CompilersTests -contains $_ }) {
-    $Tests = @{
-      "-TestClang" = $Test -contains "clang";
-      "-TestLLD" = $Test -contains "lld";
-      "-TestLLDB" = $Test -contains "lldb";
-      "-TestLLDBSwift" = $Test -contains "lldb-swift";
-      "-TestLLVM" = $Test -contains "llvm";
-      "-TestSwift" = $Test -contains "swift";
-      "-PrepareSwift" = $Test -contains "swift-prepare";
-    }
-    Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
+  # The suites of the compilers build what they need in the Stage2 build tree
+  # once, and then their lit commands can run at the same time.
+  $CompilerSuites = @($CompilerTestSuites.Keys | Where-Object { $Test -contains $_ })
+  # check-lldb includes the tests of check-lldb-swift.
+  if ($CompilerSuites -contains "lldb") {
+    $CompilerSuites = @($CompilerSuites | Where-Object { $_ -ne "lldb-swift" })
+  }
+  # swift-prepare builds what check-swift needs, without running it.
+  $BuildSuites = @($CompilerSuites + @(if ($Test -contains "swift-prepare" -and $CompilerSuites -notcontains "swift") { "swift" }))
+  if ($BuildSuites -and $TestPhase -ne "Run") {
+    Invoke-BuildStep Test-Compilers $HostPlatform -Suites $BuildSuites -Build -SummaryVariant "Build"
+  }
+  if ($CompilerSuites -and $TestPhase -ne "Build") {
+    Invoke-BuildStep Test-Compilers $HostPlatform -Suites $CompilerSuites -Run -SummaryVariant "Run"
   }
 
-  # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
-  # functions hardcode their platform needs.
-  if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
-  if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
-  if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
-  if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
-  if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
-  if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
-  if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
-  if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+  if ($TestPhase -ne "Build") {
+    # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-
+    # functions hardcode their platform needs.
+    if ($Test -contains "dispatch") { Invoke-BuildStep Test-Dispatch $BuildPlatform }
+    if ($Test -contains "foundation") { Invoke-BuildStep Test-Foundation $BuildPlatform }
+    if ($Test -contains "xctest") { Invoke-BuildStep Test-XCTest $BuildPlatform }
+    if ($Test -contains "testing") { Invoke-BuildStep Test-Testing $BuildPlatform }
+    if ($Test -contains "llbuild") { Invoke-BuildStep Test-LLBuild $BuildPlatform }
+    if ($Test -contains "swiftpm") { Invoke-BuildStep Test-PackageManager $BuildPlatform }
+    if ($Test -contains "swift-format") { Invoke-BuildStep Test-Format $BuildPlatform }
+    if ($Test -contains "sourcekit-lsp") { Invoke-BuildStep Test-SourceKitLSP $BuildPlatform}
+  }
 
   # TODO: restore Android Swift runtime tests against the new Runtimes/* layout.
   # The previous `Test-Runtime` reconfigured the in-tree stdlib build (built by
@@ -6677,4 +6961,10 @@ if ($IncludeSBoM) {
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
     Write-TimingTrace "$TimingTraceDir\build-timings.json"
   }
+  if ($OwnVsDevShellCache) {
+    Remove-Item -Recurse -Force $env:SWIFT_BUILD_VSDEVSHELL_CACHE -ErrorAction Ignore
+  }
 }
+
+# BuildMulti.ps1 reads the exit code, which a native command could have set.
+exit 0
