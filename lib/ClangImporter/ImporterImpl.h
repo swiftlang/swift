@@ -463,12 +463,35 @@ public:
     DiagnosticWalker(ClangImporter::Implementation &Impl);
     bool TraverseDecl(clang::Decl *D);
     bool TraverseParmVarDecl(clang::ParmVarDecl *D);
+    // Import diagnostics are never attached to anything in a function body or
+    // constructor initializer, so only walk the signature. This also avoids
+    // deserializing bodies of functions from modules.
+    bool TraverseFunctionDecl(clang::FunctionDecl *D) {
+      return traverseFunctionSignature(D);
+    }
+    bool TraverseCXXMethodDecl(clang::CXXMethodDecl *D) {
+      return traverseFunctionSignature(D);
+    }
+    bool TraverseCXXConstructorDecl(clang::CXXConstructorDecl *D) {
+      return traverseFunctionSignature(D);
+    }
+    bool TraverseCXXDestructorDecl(clang::CXXDestructorDecl *D) {
+      return traverseFunctionSignature(D);
+    }
+    bool TraverseCXXConversionDecl(clang::CXXConversionDecl *D) {
+      return traverseFunctionSignature(D);
+    }
+    bool TraverseCXXDeductionGuideDecl(clang::CXXDeductionGuideDecl *D) {
+      return traverseFunctionSignature(D);
+    }
     bool VisitDecl(clang::Decl *D);
     bool VisitMacro(const clang::MacroInfo *MI);
     bool VisitObjCObjectPointerType(clang::ObjCObjectPointerType *T);
     bool VisitType(clang::Type *T);
 
   private:
+    bool traverseFunctionSignature(clang::FunctionDecl *D);
+
     Implementation &Impl;
     clang::SourceLocation TypeReferenceSourceLocation;
   };

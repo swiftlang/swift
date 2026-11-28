@@ -3220,6 +3220,20 @@ bool ClangImporter::Implementation::DiagnosticWalker::VisitDecl(
   return true;
 }
 
+bool ClangImporter::Implementation::DiagnosticWalker::traverseFunctionSignature(
+    clang::FunctionDecl *D) {
+  // Mirrors RecursiveASTVisitor::TraverseFunctionHelper, without the body and
+  // constructor initializers. The type covers the return type and parameters.
+  if (!WalkUpFromFunctionDecl(D))
+    return false;
+  if (!TraverseNestedNameSpecifierLoc(D->getQualifierLoc()) ||
+      !TraverseDeclarationNameInfo(D->getNameInfo()))
+    return false;
+  if (auto *typeInfo = D->getTypeSourceInfo())
+    return TraverseTypeLoc(typeInfo->getTypeLoc());
+  return true;
+}
+
 bool ClangImporter::Implementation::DiagnosticWalker::VisitMacro(
     const clang::MacroInfo *MI) {
   Impl.emitDiagnosticsForTarget(MI);
