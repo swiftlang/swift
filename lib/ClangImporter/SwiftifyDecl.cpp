@@ -1943,9 +1943,9 @@ std::string UnswiftifyMacro::expandAttached(ASTContext &ctx,
   return result;
 }
 
-} // namespace
+constexpr llvm::StringLiteral UnswiftifyMacroName = "_Unswiftify";
 
-static constexpr llvm::StringLiteral UnswiftifyMacroName = "_Unswiftify";
+} // namespace
 
 MacroDecl *ClangImporter::Implementation::createUnswiftifyMacroDecl(
     DeclName introducedName) {
