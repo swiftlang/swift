@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -sil-verify-all -temp-rvalue-elimination %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-verify-all -mandatory-temp-rvalue-elimination %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+sil_stage canonical
+
+import Builtin
+
+sil @use : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+
+// Eliminating a temporary initialized by a load/store pair from a variable
+// must not kill that variable, which still lives in its alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @load_store_from_var :
+// CHECK:       [[X1:%[0-9]+]] = alloc_stack [var_decl] $Builtin.Int64, var, name "x"
+// CHECK-NEXT:  store %0 to [trivial] [[X1]]
+// CHECK-ONONE-NEXT: debug_step
+// CHECK-NEXT:  // function_ref use
+// CHECK-NEXT:  [[F1:%[0-9]+]] = function_ref @use
+// CHECK-NEXT:  apply [[F1]]([[X1]])
+// CHECK-NEXT:  apply [[F1]]([[X1]])
+// CHECK-LABEL: } // end sil function 'load_store_from_var'
+sil [ossa] @load_store_from_var : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_stack [var_decl] $Builtin.Int64, var, name "x"
+  store %0 to [trivial] %1
+  %3 = alloc_stack $Builtin.Int64
+  %4 = load [trivial] %1
+  store %4 to [trivial] %3
+  %6 = function_ref @use : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  dealloc_stack %3
+  %9 = apply %6(%1) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  dealloc_stack %1
+  %11 = tuple ()
+  return %11
+}
+
+// The variable of the eliminated temporary moves to the source address, and
+// neither variable is killed.
+//
+// CHECK-LABEL: sil [ossa] @load_store_var_to_var :
+// CHECK:       [[X2:%[0-9]+]] = alloc_stack [var_decl] $Builtin.Int64, var, name "x"
+// CHECK-NEXT:  store %0 to [trivial] [[X2]]
+// CHECK-OPT-NEXT:   debug_value [[X2]], var, name "y", expr op_deref
+// CHECK-OPT-NEXT:   // function_ref use
+// CHECK-OPT-NEXT:   [[F2:%[0-9]+]] = function_ref @use
+// CHECK-OPT-NEXT:   apply [[F2]]([[X2]])
+// CHECK-OPT-NEXT:   apply [[F2]]([[X2]])
+// CHECK-ONONE-NEXT: alloc_stack [var_decl] $Builtin.Int64, var, name "y"
+// CHECK-LABEL: } // end sil function 'load_store_var_to_var'
+sil [ossa] @load_store_var_to_var : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_stack [var_decl] $Builtin.Int64, var, name "x"
+  store %0 to [trivial] %1
+  %3 = alloc_stack [var_decl] $Builtin.Int64, var, name "y"
+  %4 = load [trivial] %1
+  store %4 to [trivial] %3
+  %6 = function_ref @use : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  dealloc_stack %3
+  %9 = apply %6(%1) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
+  dealloc_stack %1
+  %11 = tuple ()
+  return %11
+}
