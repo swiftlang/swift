@@ -1545,6 +1545,494 @@ bb0:
   unreachable
 }
 
+sil @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+sil @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+
+// The on-stack closure borrows %0, whose lifetime ends in bb2 before the
+// unreachable in bb3. The closure's lifetime is completed at the beginning of
+// bb2, where it isn't live anymore, rather than at the unreachable.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_on_stack_closure :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_on_stack_closure'
+sil [ossa] @dead_end_store_of_on_stack_closure : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = function_ref @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = alloc_stack $@noescape @callee_guaranteed () -> ()
+  store %3 to [init] %4
+  cond_br %1, bb1, bb2
+
+bb1:
+  %7 = load [take] %4
+  %8 = apply %7() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %7
+  destroy_value [dead_end] %0
+  unreachable
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// The closure is live through the dead-end block bb2 into bb3, so its
+// lifetime isn't completed at the beginning of bb2.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_on_stack_closure_live_through_dead_end :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NOT:     destroy_value [dead_end] [[C]]
+// CHECK:         apply [[C]]()
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NOT:     destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_on_stack_closure_live_through_dead_end'
+sil [ossa] @dead_end_store_of_on_stack_closure_live_through_dead_end : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = function_ref @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = alloc_stack $@noescape @callee_guaranteed () -> ()
+  store %3 to [init] %4
+  cond_br %1, bb1, bb2
+
+bb1:
+  destroy_addr %4
+  dealloc_stack %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  br bb3
+
+bb3:
+  %10 = load [take] %4
+  %11 = apply %10() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %10
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// A borrow of the stored value ends in the dead-end block bb3 before the end
+// of %0's lifetime, so the value's lifetime is completed right after the
+// end_borrow.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_dependent_value_borrowed_in_dead_end :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[D:%.*]] = mark_dependence [nonescaping] %1 on %0
+// CHECK:         [[B:%.*]] = begin_borrow [[D]]
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [dead_end] [[D]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_dependent_value_borrowed_in_dead_end'
+sil [ossa] @dead_end_store_of_dependent_value_borrowed_in_dead_end : $@convention(thin) (@owned Klass, @owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = mark_dependence [nonescaping] %1 on %0
+  %4 = alloc_stack $Klass
+  store %3 to [init] %4
+  %6 = load_borrow %4
+  cond_br %2, bb1, bb2
+
+bb1:
+  end_borrow %6
+  %9 = load [take] %4
+  destroy_value %9
+  dealloc_stack %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  br bb3
+
+bb3:
+  end_borrow %6
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// The same for a value that depends on %0 through a mark_dependence.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_dependent_value :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[D:%.*]] = mark_dependence [nonescaping] %1 on %0
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[D]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_dependent_value'
+sil [ossa] @dead_end_store_of_dependent_value : $@convention(thin) (@owned Klass, @owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = mark_dependence [nonescaping] %1 on %0
+  %4 = alloc_stack $Klass
+  store %3 to [init] %4
+  cond_br %2, bb1, bb2
+
+bb1:
+  %7 = load [take] %4
+  destroy_value %7
+  destroy_value [dead_end] %0
+  unreachable
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// The stored closure is defined in the dead-end block bb2 and has no uses, so
+// its lifetime is completed right after its definition.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_on_stack_closure_without_uses :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_on_stack_closure_without_uses'
+sil [ossa] @dead_end_store_of_on_stack_closure_without_uses : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = function_ref @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = alloc_stack $@noescape @callee_guaranteed () -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  destroy_value %3
+  dealloc_stack %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  store %3 to [init] %4
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// The same, but the defining block branches to the unreachable.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_on_stack_closure_without_uses_before_branch :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_on_stack_closure_without_uses_before_branch'
+sil [ossa] @dead_end_store_of_on_stack_closure_without_uses_before_branch : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = function_ref @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = alloc_stack $@noescape @callee_guaranteed () -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  destroy_value %3
+  dealloc_stack %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  store %3 to [init] %4
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// The stored value doesn't depend on %0, but the mark_dependence_addr makes
+// the promoted value depend on %0.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_mark_dependence_addr :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[D:%.*]] = mark_dependence [nonescaping] %1 on %0
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[D]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_mark_dependence_addr'
+sil [ossa] @dead_end_mark_dependence_addr : $@convention(thin) (@owned Klass, @owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Klass
+  store %1 to [init] %3
+  mark_dependence_addr [nonescaping] %3 on %0
+  cond_br %2, bb1, bb2
+
+bb1:
+  %6 = load [take] %3
+  destroy_value %6
+  dealloc_stack %3
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// The stored value is forwarded from a value that depends on %0.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_moved_dependent_value :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[M:%.*]] = move_value
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[M]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_moved_dependent_value'
+sil [ossa] @dead_end_store_of_moved_dependent_value : $@convention(thin) (@owned Klass, @owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : $Builtin.Int1):
+  %3 = mark_dependence [nonescaping] %1 on %0
+  %4 = move_value %3
+  %5 = alloc_stack $Klass
+  store %4 to [init] %5
+  cond_br %2, bb1, bb2
+
+bb1:
+  %8 = load [take] %5
+  destroy_value %8
+  dealloc_stack %5
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// The promoted value is the base of a trivial dependence in the dead end, so
+// its lifetime is completed after that use.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_trivial_dependence_on_stored_dependent_value :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[D:%.*]] = mark_dependence [nonescaping] %1 on %0
+// CHECK:       bb3:
+// CHECK-NEXT:    mark_dependence [nonescaping] %3 on [[D]]
+// CHECK-NEXT:    destroy_value [dead_end] [[D]]
+// CHECK-LABEL: } // end sil function 'dead_end_trivial_dependence_on_stored_dependent_value'
+sil [ossa] @dead_end_trivial_dependence_on_stored_dependent_value : $@convention(thin) (@guaranteed Klass, @owned Klass, Builtin.Int1, Builtin.Int64) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @owned $Klass, %2 : $Builtin.Int1, %3 : $Builtin.Int64):
+  %4 = mark_dependence [nonescaping] %1 on %0
+  %5 = alloc_stack $Klass
+  store %4 to [init] %5
+  cond_br %2, bb1, bb2
+
+bb1:
+  %8 = load [take] %5
+  destroy_value %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+
+bb2:
+  br bb3
+
+bb3:
+  %14 = mark_dependence [nonescaping] %3 on %5
+  %15 = function_ref @use_int64 : $@convention(thin) (Builtin.Int64) -> ()
+  %16 = apply %15(%14) : $@convention(thin) (Builtin.Int64) -> ()
+  unreachable
+}
+
+// The promoted value in the dead end is a phi.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_dependent_values_merged_by_phi :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb3([[P:%.*]] : @owned $Klass):
+// CHECK:       bb5:
+// CHECK-NEXT:    destroy_value [dead_end] [[P]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb6:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_dependent_values_merged_by_phi'
+sil [ossa] @dead_end_store_of_dependent_values_merged_by_phi : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass, Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass, %2 : @owned $Klass, %3 : $Builtin.Int1, %4 : $Builtin.Int1):
+  %5 = mark_dependence [nonescaping] %1 on %0
+  %6 = mark_dependence [nonescaping] %2 on %0
+  %7 = alloc_stack $Klass
+  cond_br %3, bb1, bb2
+
+bb1:
+  store %5 to [init] %7
+  destroy_value %6
+  br bb3
+
+bb2:
+  store %6 to [init] %7
+  destroy_value %5
+  br bb3
+
+bb3:
+  cond_br %4, bb4, bb5
+
+bb4:
+  %15 = load [take] %7
+  destroy_value %15
+  dealloc_stack %7
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb5:
+  destroy_value [dead_end] %0
+  br bb6
+
+bb6:
+  unreachable
+}
+
+// The same for a dependent value which is stored to a field of an object.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_dependent_value_to_object :
+// CHECK-NOT:     alloc_ref
+// CHECK:         [[D:%.*]] = mark_dependence [nonescaping] %1 on %0
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] [[D]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK:       bb3:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_dependent_value_to_object'
+sil [ossa] @dead_end_store_of_dependent_value_to_object : $@convention(thin) (@owned Kl, @owned Kl, Builtin.Int1) -> () {
+bb0(%0 : @owned $Kl, %1 : @owned $Kl, %2 : $Builtin.Int1):
+  %3 = mark_dependence [nonescaping] %1 on %0
+  %4 = alloc_ref [stack] $NontrivialDestructor
+  %5 = begin_borrow %4
+  %6 = ref_element_addr %5, #NontrivialDestructor.p
+  store %3 to [init] %6
+  end_borrow %5
+  cond_br %2, bb1, bb2
+
+bb1:
+  %10 = begin_dealloc_ref %4 of %4
+  %11 = begin_borrow %10
+  %12 = unchecked_ref_cast %11 to $Builtin.NativeObject
+  %13 = unchecked_ownership_conversion %12, @guaranteed to @owned
+  %14 = begin_borrow %13
+  %15 = unchecked_ref_cast %14 to $NontrivialDestructor
+  %16 = ref_element_addr %15, #NontrivialDestructor.p
+  %17 = load [take] %16
+  destroy_value %17
+  end_borrow %14
+  end_borrow %11
+  end_lifetime %10
+  %22 = unchecked_ref_cast %13 to $NontrivialDestructor
+  dealloc_ref %22
+  dealloc_stack_ref %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+
+bb2:
+  destroy_value [dead_end] %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+// Every path deallocates the stack location, so no lifetime is completed in a
+// dead end.
+//
+// CHECK-LABEL: sil [ossa] @on_stack_closure_deallocated_on_all_paths :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack]
+// CHECK:       bb1:
+// CHECK-NEXT:    end_lifetime undef
+// CHECK-NEXT:    apply [[C]]()
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-NOT:     destroy_value [dead_end] [[C]]
+// CHECK-LABEL: } // end sil function 'on_stack_closure_deallocated_on_all_paths'
+sil [ossa] @on_stack_closure_deallocated_on_all_paths : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %2 = function_ref @closure_borrowing_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %4 = alloc_stack $@noescape @callee_guaranteed () -> ()
+  store %3 to [init] %4
+  cond_br %1, bb1, bb2
+
+bb1:
+  %7 = load [take] %4
+  %8 = apply %7() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %7
+  dealloc_stack %4
+  destroy_value [dead_end] %0
+  unreachable
+
+bb2:
+  destroy_addr %4
+  dealloc_stack %4
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// A value whose lifetime isn't constrained is still promoted when its
+// lifetime is completed in a dead end.
+//
+// CHECK-LABEL: sil [ossa] @dead_end_store_of_independent_value :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'dead_end_store_of_independent_value'
+sil [ossa] @dead_end_store_of_independent_value : $@convention(thin) (@owned Klass, Builtin.Int1) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.Int1):
+  %4 = alloc_stack $Klass
+  store %0 to [init] %4
+  cond_br %1, bb1, bb2
+
+bb1:
+  %7 = load [take] %4
+  destroy_value %7
+  unreachable
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+}
+
 sil shared [noinline] @blackhole_spl : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : $Klass):
   %1 = tuple ()

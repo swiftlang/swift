@@ -626,9 +626,9 @@ extension InteriorUseWalker: OwnershipUseVisitor {
 
   // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
   mutating func dependentUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
-    // OSSA lifetime ignores trivial types.
+    // OSSA lifetime ignores trivial types. But the dependence itself is a use of the base.
     if value.type.isTrivial(in: function) {
-      return .continueWalk
+      return useVisitor(operand)
     }
     guard value.mayEscape else {
       // Non-escapable dependent values can be lifetime-extended by copying, which is not handled by
