@@ -1388,6 +1388,63 @@ namespace {
                : AccessLevel::Public;
   }
 
+  /// Bind type parameters that come from an Objective-C generic context
+  /// outside of \p dc to their existential types.
+  ///
+  /// A method imported into a non-generic subclass of a generic
+  /// Objective-C class can otherwise mention the base class's parameters
+  /// with no generic environment available to map them into. This mirrors
+  /// the binding ImportType applies to a raw class reference.
+  ///
+  /// Returns the original type when there is nothing to bind or when a
+  /// parameter cannot be bound.
+  static Type bindObjCGenericParamsFromOutsideContext(Type type,
+                                                      const DeclContext *dc) {
+    if (!type || !type->hasTypeParameter() ||
+        dc->getGenericEnvironmentOfContext())
+      return type;
+
+    llvm::DenseMap<GenericTypeParamType *, Type> bindings;
+    bool failed = false;
+    type.findIf([&](Type t) -> bool {
+      auto *param = t->getAs<GenericTypeParamType>();
+      if (!param || bindings.count(param))
+        return false;
+      auto *paramDecl = param->getDecl();
+      auto *nominal =
+          paramDecl ? dyn_cast<NominalTypeDecl>(paramDecl->getDeclContext())
+                    : nullptr;
+      auto *env = nominal && nominal->hasClangNode()
+                      ? nominal->getGenericEnvironment()
+                      : nullptr;
+      auto *archetype =
+          env ? dyn_cast<ArchetypeType>(env->mapTypeIntoEnvironment(param))
+              : nullptr;
+      if (!archetype) {
+        failed = true;
+        return false;
+      }
+      bindings[param] = archetype->getExistentialType();
+      return false;
+    });
+    if (failed)
+      return type;
+
+    auto bound = type.subst(
+        [&](SubstitutableType *t) -> Type {
+          if (auto *param = dyn_cast<GenericTypeParamType>(t)) {
+            auto it = bindings.find(param);
+            if (it != bindings.end())
+              return it->second;
+          }
+          return Type(t);
+        },
+        LookUpConformanceInModule());
+    if (!bound || bound->hasTypeParameter())
+      return type;
+    return bound;
+  }
+
   /// Convert Clang declarations into the corresponding Swift
   /// declarations.
   class SwiftDeclConverter
@@ -1691,8 +1748,36 @@ namespace {
           dc, clangDecl, params, isVariadic, isFromSystemModule, bodyParams,
           importedName, asyncConv, errorConv, kind);
 
-      return didImportType(result, bodyParams,
-                           asyncConv ? &asyncConv.value() : nullptr);
+      result = didImportType(result, bodyParams,
+                             asyncConv ? &asyncConv.value() : nullptr);
+
+      // A method imported into a non-generic subclass of a generic
+      // Objective-C class can mention the base class's parameters with no
+      // generic environment available. Bind them now, updating the body
+      // parameters to match.
+      if (result && result.getType()->hasTypeParameter() &&
+          !dc->getGenericEnvironmentOfContext()) {
+        auto boundType =
+            bindObjCGenericParamsFromOutsideContext(result.getType(), dc);
+        if (boundType.getPointer() != result.getType().getPointer() &&
+            !boundType->hasTypeParameter()) {
+          result = ImportedType(boundType, result.isImplicitlyUnwrapped());
+          if (bodyParams && *bodyParams) {
+            for (auto *param : **bodyParams) {
+              param->setInterfaceType(bindObjCGenericParamsFromOutsideContext(
+                  param->getInterfaceType(), dc));
+            }
+          }
+          if (asyncConv) {
+            if (auto boundHandler = bindObjCGenericParamsFromOutsideContext(
+                    asyncConv->CompletionHandlerType, dc))
+              asyncConv->CompletionHandlerType =
+                  boundHandler->getCanonicalType();
+          }
+        }
+      }
+
+      return result;
     }
 
     /// Import the given function type.
