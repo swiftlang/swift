@@ -867,6 +867,16 @@ public:
   /// count of the array as an integer.
   std::optional<APInt> getInlineArrayCount();
 
+  /// Determine whether this type is one of the types ClangImporter would use to
+  /// import a C array (an \c InlineArray with a known count, an unlabeled
+  /// homogeneous tuple, or a \c swift_newtype wrapping one of those). This
+  /// method is not sensitive to the visible C array projection and it does not
+  /// check whether the element type is representable.
+  ///
+  /// \param assumingFeatureAllowed Don't check whether the current language
+  ///        features call for C arrays to be representable.
+  bool isStructurallyCArray(bool assumingFeatureAllowed = false);
+
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
   /// type is not a pointer.

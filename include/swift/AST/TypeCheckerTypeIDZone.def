@@ -94,6 +94,10 @@ SWIFT_REQUEST(TypeChecker, DynamicallyReplacedDeclRequest,
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ABIMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ModuleInterfaceDependenciesRequest,
+              ArrayRef<Decl *>(Decl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IndirectFeatureUseCheckRequest,
+              bool(Feature, Decl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AllMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SpecializeAttrTargetDeclRequest,

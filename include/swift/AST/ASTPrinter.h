@@ -472,6 +472,10 @@ InterfaceVisibility getInterfaceVisibility(const Decl *D);
 /// references. A type that references no decls is public.
 InterfaceVisibility getInterfaceVisibility(Type ty);
 
+/// Whether a module interface prints \p VD even when its access level would
+/// otherwise keep it out.
+bool isPrintedInModuleInterfaceDespiteAccessLevel(const ValueDecl *VD);
+
 StringRef getAccessorKindString(AccessorKind value);
 
 /// Call the given function nested appropriately within #if checks

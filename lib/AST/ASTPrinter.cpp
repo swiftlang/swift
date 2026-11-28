@@ -193,6 +193,11 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
+bool swift::isPrintedInModuleInterfaceDespiteAccessLevel(const ValueDecl *VD) {
+  // Keep this in sync with `ShouldPrintForModuleInterface`.
+  return isPrespecilizationDeclWithTarget(VD);
+}
+
 static bool isInObjCImpl(const ValueDecl *VD) {
   auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext());
   return ED && ED->isObjCImplementation();

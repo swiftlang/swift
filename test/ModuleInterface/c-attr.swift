@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -emit-module %t/Lib.swift -o %t -I %t \
 // RUN:   -swift-version 6 -enable-library-evolution \
+// RUN:   -enable-experimental-feature ObjCAttrAllowsCArrays \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t \
@@ -12,6 +13,7 @@
 // RUN: %FileCheck %s --input-file %t/Lib.swiftinterface
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCAttrAllowsCArrays
 
 //--- module.modulemap
 module Lib {
@@ -55,3 +57,18 @@ public func namedCDecl() {}
 public func namedLegacyCDecl() {}
 // CHECK: @_cdecl("objc_name")
 // CHECK-NEXT: public func namedLegacyCDecl
+
+/// Pointers to C arrays in @c declarations need the feature that allows them.
+/// Without it, the declaration is left out because dropping @c would change
+/// the function's symbol.
+@c
+public func cArrayPointer(_ p: UnsafeMutablePointer<(Int32, Int32)>) {}
+// CHECK: #if compiler(>=5.3) && $ObjCAttrAllowsCArrays
+// CHECK-NEXT: #if compiler(>=5.3) && hasAttribute(c)
+// CHECK-NEXT: @c
+// CHECK-NEXT: public func cArrayPointer
+// CHECK-NEXT: #else
+// CHECK-NEXT: @_cdecl("cArrayPointer")
+// CHECK-NEXT: public func cArrayPointer
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif
