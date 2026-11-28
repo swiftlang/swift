@@ -133,6 +133,11 @@ class Traversal : public TypeVisitor<Traversal, bool>
         return true;
     }
 
+    if (Type globalActor = ty->getGlobalActor()) {
+      if (doIt(globalActor))
+        return true;
+    }
+
     for (auto dependentType : ty->getTypeDependencies()) {
       if (doIt(dependentType.getPointer()))
         return true;

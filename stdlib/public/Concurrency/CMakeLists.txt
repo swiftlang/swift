@@ -86,7 +86,7 @@ list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature"
 
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "Extern")
 list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "BackDeployFrozenValueTypes")
-
+list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-enable-experimental-feature" "AllowIsolatedGlobalActorAttribute")
 if(SWIFT_STDLIB_ENABLE_LAZY_LINK)
   list(APPEND SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS "-DSWIFT_STDLIB_ENABLE_LAZY_LINK")
 endif()
