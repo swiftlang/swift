@@ -943,8 +943,26 @@ extension Substring.UTF8View {
 }
 
 extension Substring.UTF8View {
-  /// Returns a boolean value indicating whether this UTF8 view
-  /// is trivially identical to `other`.
+  /// Returns a Boolean value indicating whether this view is trivially
+  /// identical to `other`.
+  ///
+  /// Two UTF-8 views are trivially identical if they are views of substrings
+  /// that share the same underlying string and range, such as copies of a
+  /// substring with no intervening mutations. This check doesn't inspect the
+  /// code units, so it's much faster than comparing the views element by
+  /// element.
+  ///
+  /// If `a.isTriviallyIdentical(to: b)` is `true`, then `a` and `b` contain the
+  /// same code units, so `a.elementsEqual(b)` is also `true`. The reverse isn't
+  /// guaranteed: views of equal substrings that are stored separately aren't
+  /// trivially identical.
+  ///
+  /// ```swift
+  /// let greeting = "Hello, world!".prefix(5)
+  /// let copy = greeting
+  /// print(greeting.utf8.isTriviallyIdentical(to: copy.utf8))
+  /// // Prints "true"
+  /// ```
   ///
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)
@@ -1160,8 +1178,26 @@ extension Substring.UTF16View {
 }
 
 extension Substring.UTF16View {
-  /// Returns a boolean value indicating whether this UTF16 view
-  /// is trivially identical to `other`.
+  /// Returns a Boolean value indicating whether this view is trivially
+  /// identical to `other`.
+  ///
+  /// Two UTF-16 views are trivially identical if they are views of substrings
+  /// that share the same underlying string and range, such as copies of a
+  /// substring with no intervening mutations. This check doesn't inspect the
+  /// code units, so it's much faster than comparing the views element by
+  /// element.
+  ///
+  /// If `a.isTriviallyIdentical(to: b)` is `true`, then `a` and `b` contain the
+  /// same code units, so `a.elementsEqual(b)` is also `true`. The reverse isn't
+  /// guaranteed: views of equal substrings that are stored separately aren't
+  /// trivially identical.
+  ///
+  /// ```swift
+  /// let greeting = "Hello, world!".prefix(5)
+  /// let copy = greeting
+  /// print(greeting.utf16.isTriviallyIdentical(to: copy.utf16))
+  /// // Prints "true"
+  /// ```
   ///
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)
@@ -1416,8 +1452,27 @@ extension Substring.UnicodeScalarView: RangeReplaceableCollection {
 }
 
 extension Substring.UnicodeScalarView {
-  /// Returns a boolean value indicating whether this unicode scalar view
-  /// is trivially identical to `other`.
+  /// Returns a Boolean value indicating whether this view is trivially
+  /// identical to `other`.
+  ///
+  /// Two Unicode scalar views are trivially identical if they are views of
+  /// substrings that share the same underlying string and range, such as copies
+  /// of a substring with no intervening mutations. This check doesn't inspect
+  /// the Unicode scalars, so it's much faster than comparing the views element
+  /// by element.
+  ///
+  /// If `a.isTriviallyIdentical(to: b)` is `true`, then `a` and `b` contain the
+  /// same Unicode scalars, so `a.elementsEqual(b)` is also `true`. The reverse
+  /// isn't guaranteed: views of equal substrings that are stored separately
+  /// aren't trivially identical.
+  ///
+  /// ```swift
+  /// let greeting = "Hello, world!".prefix(5)
+  /// let copy = greeting
+  /// print(greeting.unicodeScalars.isTriviallyIdentical(
+  ///     to: copy.unicodeScalars))
+  /// // Prints "true"
+  /// ```
   ///
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)
@@ -1562,15 +1617,17 @@ extension Substring {
   /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
   /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
   /// (Transitivity)
-  /// - `a.isTriviallyIdentical(b)` implies `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  /// - `a.isTriviallyIdentical(to: b)` implies `a == b`. `a == b` does not
+  /// imply `a.isTriviallyIdentical(to: b)`.
   ///
   /// Values produced by copying the same value, with no intervening mutations,
   /// will compare identical:
   ///
   /// ```swift
+  /// let c = "Hello, world!".prefix(5)
   /// let d = c
   /// print(c.isTriviallyIdentical(to: d))
-  /// // Prints true
+  /// // Prints "true"
   /// ```
   ///
   /// Comparing substrings this way includes comparing (normally) hidden
