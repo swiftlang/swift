@@ -12,11 +12,13 @@
 
 #define DEBUG_TYPE "sil-mark-never-written-mutable-closure-boxes-as-immutable"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
+#include "llvm/ADT/SetVector.h"
 
 using namespace swift;
 
@@ -24,8 +26,12 @@ using namespace swift;
 //                            MARK: Implementation
 //===----------------------------------------------------------------------===//
 
-static bool isImmutable(SILValue start, StoreWeakInst *allowableWeakStore,
-                        llvm::DenseSet<SILFunctionArgument *> &visitedArgs) {
+/// Adds each function whose argument it marks to \p changedFunctions.
+static bool
+isImmutable(SILValue start, StoreWeakInst *allowableWeakStore,
+            llvm::DenseSet<SILFunctionArgument *> &visitedArgs,
+            SILClosureGroupTransform &transform,
+            llvm::SmallSetVector<SILFunction *, 8> &changedFunctions) {
   LLVM_DEBUG(llvm::dbgs() << "Checking in function "
                           << start->getFunction()->getName() << ": " << *start);
   // We store the partial apply that we are going to visit serially after we
@@ -85,6 +91,17 @@ static bool isImmutable(SILValue start, StoreWeakInst *allowableWeakStore,
       // finite amount of them at the same time.
       if (auto *pai = dyn_cast<PartialApplyInst>(user)) {
         if (auto *calleeFunc = pai->getReferencedFunctionOrNull()) {
+          // SILGen output keeps the callees in the same closure group, but
+          // (e.g. hand-written) SIL without the [closure] marker may not. Don't
+          // read outside the group: treat the box as mutable.
+          bool calleeInGroup = transform.isInGroup(calleeFunc);
+          CONDITIONAL_ASSERT(calleeInGroup &&
+                             "partial_apply callee outside the closure group");
+          if (!calleeInGroup) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "        Callee outside the closure group!\n");
+            return false;
+          }
           auto *fArg = cast<SILFunctionArgument>(
               ApplySite(pai).getCalleeArgument(calleeFunc, *use));
           if (fArg->isInferredImmutable()) {
@@ -119,8 +136,9 @@ static bool isImmutable(SILValue start, StoreWeakInst *allowableWeakStore,
   for (auto *fArg : funcArgsToVisit) {
     assert(!fArg->isInferredImmutable() && "Should have been checked earlier");
     visitedArgs.insert(fArg);
-    if (isImmutable(fArg, nullptr, visitedArgs)) {
+    if (isImmutable(fArg, nullptr, visitedArgs, transform, changedFunctions)) {
       fArg->setInferredImmutable(true);
+      changedFunctions.insert(fArg->getFunction());
       continue;
     }
     allFArgUsersImmutable = false;
@@ -233,31 +251,38 @@ static StoreWeakInst *isPatternMatchableBox(AllocBoxInst *abi) {
 
 namespace {
 
+/// Runs per closure group. From a box, the pass follows only the callees of
+/// the partial_applys that capture it. Only a closure receives a box, and the
+/// function_ref that forms it links it to the function
+/// (ClosureGroupSchedule.h), so the callee is in that function's group. With
+/// assertions enabled the pass checks that; otherwise it treats a box whose
+/// callee is outside the group as mutable.
 class MarkNeverWrittenMutableClosureBoxesAsImmutable
-    : public SILModuleTransform {
+    : public SILClosureGroupTransform {
   void run() override {
-    bool madeChange = false;
     llvm::DenseSet<SILFunctionArgument *> visitedArgs;
-    for (auto &fn : *getModule()) {
-      for (auto &block : fn) {
+    llvm::SmallSetVector<SILFunction *, 8> changedFunctions;
+    for (SILFunction *fn : getGroup()) {
+      for (auto &block : *fn) {
         for (auto &inst : block) {
           auto *abi = dyn_cast<AllocBoxInst>(&inst);
           if (!abi)
             continue;
           auto *singleInitialization = isPatternMatchableBox(abi);
           if (!singleInitialization ||
-              !isImmutable(abi, singleInitialization, visitedArgs))
+              !isImmutable(abi, singleInitialization, visitedArgs, *this,
+                           changedFunctions))
             continue;
 
           abi->setInferredImmutable(true);
           LLVM_DEBUG(llvm::dbgs() << "Marking Box as Inferred Immutable!\n");
-          madeChange = true;
+          changedFunctions.insert(fn);
         }
       }
     }
 
-    if (madeChange)
-      invalidateAll();
+    for (SILFunction *fn : changedFunctions)
+      invalidateAnalysis(fn, SILAnalysis::InvalidationKind::Instructions);
   };
 };
 

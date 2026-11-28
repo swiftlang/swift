@@ -1,0 +1,109 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion -access-enforcement-selection | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion -access-enforcement-selection -sil-verify-around-pass=capture-promotion,access-enforcement-selection | %FileCheck %s
+// RUN: %target-sil-opt %s -capture-promotion -access-enforcement-selection -sil-print-closure-groups -o /dev/null 2>&1 | %FileCheck %s --check-prefix=GROUPS
+// RUN: %target-sil-opt %s -capture-promotion -access-enforcement-selection -sil-print-after=capture-promotion -sil-print-function='$s7closureTf2i_n' -o /dev/null 2>&1 | %FileCheck %s --check-prefix=PRINT
+// RUN: %target-sil-opt %s -capture-promotion -access-enforcement-selection -sil-disable-pass=capture-promotion -sil-print-closure-groups -o /dev/null 2>&1 | %FileCheck %s --check-prefix=DISABLED
+
+// CapturePromotion and AccessEnforcementSelection run as one closure group
+// block, with one schedule computed before CapturePromotion. A clone that
+// CapturePromotion creates joins the group of the function it is created for,
+// so AccessEnforcementSelection selects enforcement in it, and the group lists
+// it after the scheduled members, in joining order.
+
+// GROUPS:      Closure group for capture-promotion: closure parent parent_twice{{$}}
+// GROUPS-NEXT: Closure group for access-enforcement-selection: closure parent parent_twice $s7closureTf2i_n{{$}}
+// GROUPS-NOT:  Closure group for
+
+// The clone prints as a declaration when SILOptFunctionBuilder creates it, and
+// with its body after the pass, before AccessEnforcementSelection runs on it.
+// PRINT:      *** New SIL function in {{.*}} pass: CapturePromotion (capture-promotion), Function: $s7closureTf2i_n
+// PRINT:      sil private @$s7closureTf2i_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64{{$}}
+// PRINT:      *** SIL function after {{.*}} pass 0: CapturePromotion (capture-promotion)
+// PRINT:      sil private [closure] [ossa] @$s7closureTf2i_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// PRINT:      begin_access [modify] [unknown]
+// PRINT:      } // end sil function '$s7closureTf2i_n'
+
+// DISABLED-NOT: Closure group for capture-promotion
+// DISABLED:     Closure group for access-enforcement-selection: closure parent parent_twice{{$}}
+// DISABLED-NOT: Closure group for
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil @escape : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+
+// The closure only reads its box, so CapturePromotion clones it to capture the
+// value instead. Its own stack access stays [unknown] until
+// AccessEnforcementSelection.
+//
+// CHECK-LABEL: sil private [closure] [ossa] @$s7closureTf2i_n : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK:         begin_access [modify] [static]
+// CHECK-LABEL: } // end sil function '$s7closureTf2i_n'
+//
+// CHECK-LABEL: sil private [closure] [_semantics "sil.optimizer.delete_if_unused"] [ossa] @closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64 {
+// CHECK:         begin_access [modify] [static]
+// CHECK-LABEL: } // end sil function 'closure'
+sil private [closure] [ossa] @closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64 {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int64 }):
+  %1 = project_box %0, 0
+  %2 = load [trivial] %1
+  %3 = alloc_stack $Builtin.Int64
+  %4 = begin_access [modify] [unknown] %3
+  store %2 to [trivial] %4
+  end_access %4
+  %7 = load [trivial] %3
+  dealloc_stack %3
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @parent : $@convention(thin) (Builtin.Int64) -> () {
+// CHECK:         [[CLONE:%.*]] = function_ref @$s7closureTf2i_n
+// CHECK:         partial_apply [callee_guaranteed] [[CLONE]](
+// CHECK-LABEL: } // end sil function 'parent'
+sil [ossa] @parent : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_box ${ var Builtin.Int64 }
+  %2 = project_box %1, 0
+  store %0 to [trivial] %2
+  %4 = function_ref @closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %5 = copy_value %1
+  %6 = partial_apply [callee_guaranteed] %4(%5) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %7 = function_ref @escape : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  destroy_value %6
+  destroy_value %1
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// Each partial_apply asks for the clone by name. The first finds the one that
+// CapturePromotion created for parent, which is in the group.
+//
+// CHECK-LABEL: sil [ossa] @parent_twice : $@convention(thin) (Builtin.Int64) -> () {
+// CHECK:         [[CLONE1:%.*]] = function_ref @$s7closureTf2i_n
+// CHECK:         partial_apply [callee_guaranteed] [[CLONE1]](
+// CHECK:         [[CLONE2:%.*]] = function_ref @$s7closureTf2i_n
+// CHECK:         partial_apply [callee_guaranteed] [[CLONE2]](
+// CHECK-LABEL: } // end sil function 'parent_twice'
+sil [ossa] @parent_twice : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_box ${ var Builtin.Int64 }
+  %2 = project_box %1, 0
+  store %0 to [trivial] %2
+  %4 = function_ref @closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %5 = copy_value %1
+  %6 = partial_apply [callee_guaranteed] %4(%5) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %7 = copy_value %1
+  %8 = partial_apply [callee_guaranteed] %4(%7) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %9 = function_ref @escape : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  %10 = apply %9(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  %11 = apply %9(%8) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  destroy_value %8
+  destroy_value %6
+  destroy_value %1
+  %15 = tuple ()
+  return %15 : $()
+}
+
