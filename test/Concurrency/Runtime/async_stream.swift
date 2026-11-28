@@ -38,11 +38,102 @@ final class UncheckedExpectation: @unchecked Sendable {
   }
 }
 
+// Check that the `Failure == any Error` overloads still work
+// for backwards compatibility.
+
+@MainActor func testContinuationInitAnyError() {
+  _ = AsyncThrowingStream.init(Void.self) { _ in }
+  _ = AsyncThrowingStream<Void, Error> { _ in }
+  _ = AsyncThrowingStream { continuation in
+    continuation.yield()
+  }
+}
+
+@MainActor func testUnfoldingInitAnyError() {
+  // `onCancel` is missing from the `Failure == any Error` overload.
+  // Adopters will use the new typed throws overload to supply an `onCancel` closure.
+  _ = AsyncThrowingStream<Void, Error>.init(unfolding: {})
+  _ = AsyncThrowingStream.init(unfolding: {
+    return Void()
+  })
+}
+
+@MainActor func testMakeStreamAnyError() {
+  _ = AsyncThrowingStream.makeStream(of: Void.self)
+  _ = AsyncThrowingStream.makeStream(of: Void.self, throwing: Error.self)
+  _ = AsyncThrowingStream<Void, Error>.makeStream()
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testContinuationInitTypedThrows() {
+  // The new typed throws overload doesn't have a `Failure`
+  // parameter currently.
+  //_ = AsyncThrowingStream<Void, SomeError>.init(Void.self) { _ in }
+  _ = AsyncThrowingStream<Void, SomeError> { _ in }
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testUnfoldingInitTypedThrows() {
+  _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {}, onCancel: {})
+  _ = AsyncThrowingStream<Void, SomeError>.init(unfolding: {})
+  _ = AsyncThrowingStream { () throws(SomeError) -> Void in
+    return Void()
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+@MainActor func testMakeStreamTypedThrows() {
+  _ = AsyncThrowingStream.makeStream(of: Void.self, throwing: SomeError.self)
+  _ = AsyncThrowingStream<Void, SomeError>.makeStream()
+}
+
 @MainActor var tests = TestSuite("AsyncStream")
 
 @main struct Main {
   static func main() async {
-    if #available(SwiftStdlib 6.2, *) {
+    if #available(SwiftStdlib 6.5, *) {
+    // MARK: - Typed Throws
+      
+      tests.test("continuation typed throws Never") {
+        let stream = AsyncThrowingStream<Void, Never> { continuation in
+          continuation.finish()
+        }
+        for await _ in stream {}
+      }
+
+      tests.test("unfolding typed throws Never") {
+        let stream = AsyncThrowingStream<Void, Never>(unfolding: {
+          return nil
+        })
+        for await _ in stream {}
+      }
+
+      tests.test("continuation typed throws SomeError") {
+        let stream = AsyncThrowingStream<Void, SomeError> { continuation in
+          continuation.finish(throwing: SomeError())
+        }
+        do throws(SomeError) {
+          for try await _ in stream {}
+          expectUnreachable("stream should have thrown")
+        } catch {
+          // access member of `SomeError`
+          _ = error.value
+        }
+      }
+
+      tests.test("unfolding typed throws SomeError") {
+        let stream = AsyncThrowingStream(unfolding: { () throws(SomeError) in
+          throw SomeError()
+        })
+        do throws(SomeError) {
+          for try await _ in stream {}
+          expectUnreachable("stream should have thrown")
+        } catch {
+          // access member of `SomeError`
+          _ = error.value
+        }
+      }
+
       tests.test("factory method") {
         let (stream, continuation) = AsyncStream.makeStream(of: String.self)
         continuation.yield("hello")
@@ -910,6 +1001,46 @@ final class UncheckedExpectation: @unchecked Sendable {
 
       // MARK: - Unfolding Initializer
 
+      // Check that the nonisolated(nonsending) unfolding closure executes
+      // on the caller's actor ("caller" in this case refers to the actor
+      // on which the `AsyncIteratorProtocol` `next()` / `next(isolation:)`
+      // method runs). Because of some kind of bug with the `#isolation` macro
+      // we first need to explicitly cast to `(any Actor)?` before retrieving
+      // the `SerialExecutor`.
+      tests.test("unfolding closure executes on the caller's actor") {
+        let expectation = UncheckedExpectation()
+        let stream = AsyncStream<Void>(unfolding: {
+          let currentActor = #isolation as (any Actor)?
+          let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
+          let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
+          expectTrue(mainExecutor === currentExecutor)
+          expectation.fulfilled = true
+          return nil
+        })
+        for await _ in stream {}
+        expectTrue(expectation.fulfilled) // Check that the unfolding closure ran
+      }
+
+      // Check that the nonisolated(nonsending) unfolding closure executes
+      // on the caller's actor ("caller" in this case refers to the actor
+      // on which the `AsyncIteratorProtocol` `next()` / `next(isolation:)`
+      // method runs). Because of some kind of bug with the `#isolation` macro
+      // we first need to explicitly cast to `(any Actor)?` before retrieving
+      // the `SerialExecutor`.
+      tests.test("unfolding closure executes on the caller's actor throwing") {
+        let expectation = UncheckedExpectation()
+        let stream = AsyncThrowingStream<Void, Never>(unfolding: {
+          let currentActor = #isolation as (any Actor)?
+          let currentExecutor = currentActor?.unownedExecutor.asSerialExecutor()
+          let mainExecutor = MainActor.sharedUnownedExecutor.asSerialExecutor()
+          expectTrue(mainExecutor === currentExecutor)
+          expectation.fulfilled = true
+          return nil
+        })
+        for await _ in stream {}
+        expectTrue(expectation.fulfilled) // Check that the unfolding closure ran
+      }
+
       tests.test("unfolding basic") {
         nonisolated(unsafe) var counter = 0
         let stream = AsyncStream<Int>(unfolding: {
@@ -966,6 +1097,59 @@ final class UncheckedExpectation: @unchecked Sendable {
           // Now we should be terminated
           let three = await it.next(isolation: #isolation)
           expectNil(three)
+        }
+
+        await task.value
+      }
+
+      tests.test("unfolding init onCancel called on task cancel throwing") {
+        let expectation = UncheckedExpectation()
+
+        var counter = 0
+        let stream = AsyncThrowingStream<Int, Never>(unfolding: { @MainActor in
+          counter += 1
+          if counter == 2 {
+            withUnsafeCurrentTask { $0?.cancel() }
+          }
+          return counter
+        }, onCancel: { @Sendable in
+          expectation.fulfilled = true
+        })
+
+        let task = Task { @MainActor in
+          var it = stream.makeAsyncIterator()
+          let one = await it.next(isolation: #isolation)
+          expectEqual(one, 1)
+
+          let two = await it.next(isolation: #isolation)
+          expectTrue(expectation.fulfilled)
+          expectEqual(two, 2)
+
+          // Now we should be terminated
+          let three = await it.next(isolation: #isolation)
+          expectNil(three)
+        }
+
+        await task.value
+      }
+
+      tests.test("unfolding init onCancel called on cancelled task throwing") {
+        let expectation = UncheckedExpectation()
+
+        let stream = AsyncThrowingStream<Int, Never>(unfolding: { @MainActor in
+          return nil
+        }, onCancel: { @Sendable in
+          expectation.fulfilled = true
+        })
+
+        let task = Task { @MainActor in
+          withUnsafeCurrentTask { $0?.cancel() }
+
+          var it = stream.makeAsyncIterator()
+          let nilValue = await it.next(isolation: #isolation)
+
+          expectTrue(expectation.fulfilled)
+          expectNil(nilValue)
         }
 
         await task.value
