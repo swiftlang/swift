@@ -591,6 +591,26 @@ static bool sdkIsOlderThan(const clang::DarwinSDKInfo *sdkInfo,
   }
 }
 
+static void addDefaultPICArgument(std::vector<std::string> &invocationArgStrs,
+                                  const LangOptions &LangOpts,
+                                  const llvm::Triple &triple) {
+  // Swift generates position-independent code by default, so establish `-fPIC`
+  // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
+  //
+  // Embedded Swift targeting a bare-metal ("-none-" OS) triple is an
+  // exception: we let Clang use the target's default relocation model
+  // (typically static) rather than forcing firmware into PIC. Users can still
+  // opt in explicitly with -Xcc -fPIC.
+  //
+  // This is only a default: because the last PIC-related flag wins, a
+  // subsequent `-Xcc -fno-pic` (etc.) overrides it, and the resulting
+  // relocation model is read back from Clang for Swift's own code generation.
+  bool bareMetalEmbedded =
+      LangOpts.hasFeature(Feature::Embedded) && triple.getOSName() == "none";
+  if (!triple.isOSWindows() && !bareMetalEmbedded)
+    llvm::append_values(invocationArgStrs, "-fPIC");
+}
+
 void importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
     bool ignoreClangTarget) {
@@ -647,21 +667,7 @@ void importer::getNormalInvocationArguments(
     llvm::append_values(invocationArgStrs, "-D__swift_embedded__");
   }
 
-  // Swift generates position-independent code by default, so establish `-fPIC`
-  // as the baseline for any code Clang emits (e.g. inline functions). `-fPIC`
-  //
-  // Embedded Swift targeting a bare-metal ("-none-" OS) triple is an
-  // exception: we let Clang use the target's default relocation model
-  // (typically static) rather than forcing firmware into PIC. Users can still
-  // opt in explicitly with -Xcc -fPIC.
-  //
-  // This is only a default: because the last PIC-related flag wins, a
-  // subsequent `-Xcc -fno-pic` (etc.) overrides it, and the resulting
-  // relocation model is read back from Clang for Swift's own code generation.
-  bool bareMetalEmbedded =
-      LangOpts.hasFeature(Feature::Embedded) && triple.getOSName() == "none";
-  if (!triple.isOSWindows() && !bareMetalEmbedded)
-    llvm::append_values(invocationArgStrs, "-fPIC");
+  addDefaultPICArgument(invocationArgStrs, LangOpts, triple);
 
   // Enable modules.
   llvm::append_values(invocationArgStrs, "-fmodules", "-Xclang",
@@ -985,6 +991,8 @@ getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
     "-x", "ir"
   );
+
+  addDefaultPICArgument(invocationArgStrs, ctx.LangOpts, ctx.LangOpts.Target);
 }
 
 void importer::addCommonInvocationArguments(
