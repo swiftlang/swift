@@ -10,24 +10,26 @@
 #
 # -----------------------------------------------------------------------------
 
+@LIT_SITE_CFG_IN_HEADER@
+
 import os
 import platform
 import sys
 import lit.util
 
 config.cmake = "@CMAKE_COMMAND@"
-config.cmake_binary_dir = "@CMAKE_BINARY_DIR@"
-config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
-config.llvm_obj_root = "@LLVM_BINARY_DIR@"
-config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
-config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.cmake_binary_dir = path(r"@CMAKE_BINARY_DIR@")
+config.llvm_src_root = path(r"@LLVM_MAIN_SRC_DIR@")
+config.llvm_obj_root = path(r"@LLVM_BINARY_DIR@")
+config.llvm_tools_dir = path(r"@LLVM_TOOLS_DIR@")
+config.llvm_libs_dir = path(r"@LLVM_LIBS_DIR@")
 config.llvm_plugin_ext = "@LLVM_PLUGIN_EXT@"
 config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
 config.llvm_version_major = "@LLVM_VERSION_MAJOR@"
 config.llvm_version_major_conditions = "@SWIFT_LLVM_VERSION_MAJOR_CONDITIONS@".split(";")
-config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
-config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_DIR@")
-config.swift_obj_root = "@SWIFT_BINARY_DIR@"
+config.lit_tools_dir = path(r"@LLVM_LIT_TOOLS_DIR@")
+config.swift_src_root = lit_config.params.get("swift_src_root", path(r"@SWIFT_SOURCE_DIR@"))
+config.swift_obj_root = path(r"@SWIFT_BINARY_DIR@")
 config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_module_triple = "@VARIANT_MODULE_TRIPLE@"
@@ -36,17 +38,17 @@ config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
 config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"
 config.external_embedded_device = "@VARIANT_EXTERNAL_EMBEDDED_DEVICE@"
-config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
+config.swiftlib_dir = path(r"@LIT_SWIFTLIB_DIR@")
 config.swift_test_results_dir = \
-    lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+    lit_config.params.get("swift_test_results_dir", path(r"@SWIFT_TEST_RESULTS_DIR@"))
 
 config.host_triple = "@SWIFT_HOST_TRIPLE@"
-config.host_sdkroot = "@SWIFT_HOST_SDKROOT@"
+config.host_sdkroot = path(r"@SWIFT_HOST_SDKROOT@")
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
-config.lldb_build_root = "@LLDB_BUILD_DIR@"
-config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
-config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@"
+config.lldb_build_root = path(r"@LLDB_BUILD_DIR@")
+config.libdispatch_build_path = path(r"@SWIFT_PATH_TO_LIBDISPATCH_BUILD@")
+config.libdispatch_static_build_path = path(r"@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@")
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
 config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
@@ -63,11 +65,11 @@ config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
 config.darwin_supported_archs = "@SWIFT_STDLIB_DARWIN_ARCHS@"
 
 # --- android ---
-config.android_ndk_path = "@SWIFT_ANDROID_NDK_PATH@"
+config.android_ndk_path = path(r"@SWIFT_ANDROID_NDK_PATH@")
 config.android_api_level = "@SWIFT_ANDROID_API_LEVEL@"
 
 # --- Windows ---
-config.windows_sdk_module_map = r'''@SWIFT_WINDOWS_MODULE_MAP@'''
+config.windows_sdk_module_map = path(r'''@SWIFT_WINDOWS_MODULE_MAP@''')
 
 msvc_runtime_flags = {
   'MultiThreaded': 'MT',
