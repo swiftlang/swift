@@ -28,10 +28,22 @@ protocol ILeaf: IMiddle, IBase, Sendable, LocalMarker {}
 @com(interface: "10000000-0000-0000-0000-000000000004")
 protocol IReverseLeaf: IBase, IMiddle {}
 
-// AnyObject continues to carry the class-bound invariant until COM-reference
-// existentials and conformance checking enforce it directly.
+// A COM interface is not a native class reference, so it cannot be constrained
+// to AnyObject (COM conformances are class-only by construction).
 @com(interface: "20000000-0000-0000-0000-000000000001")
 protocol IClassBound: AnyObject {}
+// expected-error@-1 {{COM interface 'IClassBound' cannot be constrained to 'AnyObject'}}
+// expected-note@-2 {{COM conformances are class-only by construction; a COM interface is not a native Swift class reference}}
+
+@com(interface: "20000000-0000-0000-0000-000000000006")
+protocol IClassBoundWhere where Self: AnyObject {}
+// expected-error@-1 {{COM interface 'IClassBoundWhere' cannot be constrained to 'AnyObject'}}
+// expected-note@-2 {{COM conformances are class-only by construction; a COM interface is not a native Swift class reference}}
+
+@com(interface: "20000000-0000-0000-0000-000000000007")
+protocol IClassBoundRefined: IBase, AnyObject {}
+// expected-error@-1 {{COM interface 'IClassBoundRefined' cannot be constrained to 'AnyObject'}}
+// expected-note@-2 {{COM conformances are class-only by construction; a COM interface is not a native Swift class reference}}
 
 @com(interface: "20000000-0000-0000-0000-000000000002")
 protocol ISwiftRefinement: SwiftProtocol {}

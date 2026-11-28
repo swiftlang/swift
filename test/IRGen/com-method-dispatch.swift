@@ -27,7 +27,7 @@ public protocol ILeaf: IDerived, IBase, Sendable {
 }
 
 @com(interface: "10000000-0000-0000-0000-000000000004")
-public protocol IProperties: AnyObject {
+public protocol IProperties {
   var value: CInt { get set }
   subscript(_ index: CInt) -> CInt { get }
   func reset()

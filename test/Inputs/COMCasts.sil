@@ -3,9 +3,9 @@ sil_stage canonical
 import Swift
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol ITarget: AnyObject {}
+public protocol ITarget {}
 
 sil [ossa] @com_cast_conditional : $@convention(thin) (@owned any ISource) -> @owned Optional<any ITarget> {
 bb0(%source : @owned $any ISource):
@@ -42,7 +42,7 @@ bb3(%result : @owned $Optional<any ITarget>):
 }
 
 @com(interface: "10000000-0000-0000-0000-000000000004")
-public protocol IMissing: AnyObject {}
+public protocol IMissing {}
 
 sil [ossa] @com_cast_missing : $@convention(thin) (@owned any ISource) -> @owned Optional<any IMissing> {
 bb0(%source : @owned $any ISource):

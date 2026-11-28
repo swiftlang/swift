@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -sil-verify-all -emit-sil %s -o /dev/null
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol IProperties: AnyObject {
+public protocol IProperties {
   var value: CInt { get set }
   subscript(_ index: CInt) -> CInt { get set }
 }

@@ -11,7 +11,7 @@ protocol IExtended: IValue {
 }
 
 @com(interface: "10000000-0000-0000-0000-000000000003")
-protocol IProperty: AnyObject {
+protocol IProperty {
   var value: Int32 { get set }
   subscript(_ index: Int32) -> Int32 { get }
   func reset()

@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -emit-ir -sil-verify-all %s | %FileCheck %s --check-prefix=IR
 
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol IClassItem: AnyObject {}
+public protocol IClassItem {}
 
 // AnyObject does not establish Swift reference counting for a COM argument.
 // CHECK-LABEL: sil {{.*}}@$s{{.*}}4copy{{.*}} : $@convention(thin) <T where T : IClassItem> (@in_guaranteed T) -> @out T

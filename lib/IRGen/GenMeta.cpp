@@ -914,7 +914,7 @@ namespace {
 
     uint16_t getKindSpecificFlags() {
       ProtocolContextDescriptorFlags flags;
-      flags.setClassConstraint(Proto->requiresClass()
+      flags.setClassConstraint(Proto->requiresNativeClass()
                                  ? ProtocolClassConstraint::Class
                                  : ProtocolClassConstraint::Any);
       flags.setSpecialProtocol(getSpecialProtocolID(Proto));

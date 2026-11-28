@@ -515,6 +515,18 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
+bool ExistentialLayout::requiresNativeClass() const {
+  if (hasExplicitAnyObject || explicitSuperclass)
+    return true;
+
+  for (auto proto : getProtocols()) {
+    if (proto->requiresNativeClass())
+      return true;
+  }
+
+  return false;
+}
+
 COMExistentialInterfaceResolution
 ExistentialLayout::resolveCOMInterface() const {
   COMExistentialInterfaceResolution resolution;

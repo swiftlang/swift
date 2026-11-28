@@ -2405,7 +2405,7 @@ private:
 
         if (PD->isObjC())
           addFlag("swift.ObjCProtocol");
-        else if (PD->requiresClass())
+        else if (PD->requiresNativeClass())
           addFlag("swift.ClassConstrainedProtocol");
 
         if (!Annots.empty())

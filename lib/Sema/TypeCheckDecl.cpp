@@ -680,6 +680,11 @@ ProtocolRequiresClassRequest::evaluate(Evaluator &evaluator,
   if (decl->isObjC())
     return true;
 
+  // COM conformances are class-only, but a COM interface is not constrained to
+  // AnyObject, which would make it a native reference.
+  if (decl->isCOMInterface())
+    return true;
+
   // Determine the set of nominal types that this protocol inherits.
   InvertibleProtocolSet inverses;
   bool anyObject = false;

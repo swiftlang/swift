@@ -48,7 +48,7 @@ public func forwardPack<each T: IItem>(_ values: repeat each T) -> Int {
 }
 
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol IClassItem: AnyObject {
+public protocol IClassItem {
   var value: Int32 { get set }
 }
 

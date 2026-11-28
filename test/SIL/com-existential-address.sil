@@ -11,7 +11,7 @@ import Swift
 @com(interface: "10000000-0000-0000-0000-000000000001")
 public protocol IItem {}
 @com(interface: "10000000-0000-0000-0000-000000000003")
-public protocol IClassItem: AnyObject {}
+public protocol IClassItem {}
 
 // Opening an address does not copy the interface or allocate a container.
 // Keep the address live so the performance check examines the opening.

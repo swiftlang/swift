@@ -2689,7 +2689,9 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   }
 
   // If the protocol requires a class, non-classes are a non-starter.
-  if (Proto->requiresClass() && !DC->getSelfClassDecl()) {
+  // COM interfaces are class-only too, but COM conformance checking owns that
+  // diagnostic.
+  if (Proto->requiresNativeClass() && !DC->getSelfClassDecl()) {
     Context.Diags.diagnose(ComplainLoc,
                            diag::non_class_cannot_conform_to_class_protocol, T,
                            ProtoType);

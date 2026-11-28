@@ -6,7 +6,7 @@
 @com(interface: "10000000-0000-0000-0000-000000000001")
 public protocol ISource {}
 @com(interface: "10000000-0000-0000-0000-000000000002")
-public protocol ITarget: AnyObject {}
+public protocol ITarget {}
 
 // CHECK-LABEL: define{{.*}} @"$s1M11conditional
 // CHECK: call zeroext i1 @swift_dynamicCast(

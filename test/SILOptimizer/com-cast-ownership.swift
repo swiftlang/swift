@@ -3,9 +3,9 @@
 // RUN: %target-swift-frontend -enable-experimental-com-interop -I %t -O -emit-sil -sil-verify-all %s | %FileCheck %s
 
 @com(interface: "10000000-0000-0000-0000-000000000001")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 @com(interface: "10000000-0000-0000-0000-000000000002")
-public protocol ITarget: AnyObject {}
+public protocol ITarget {}
 
 // QueryInterface creates an owned result even when the source is borrowed.
 // CHECK-LABEL: sil{{.*}} @$s{{.*}}11conditional

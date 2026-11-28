@@ -7,7 +7,7 @@
 sil_stage canonical
 import Swift
 @com(interface: "10000000-0000-0000-0000-000000000006")
-public protocol ISource: AnyObject {}
+public protocol ISource {}
 
 // A foreign implementation need not have any Swift nominal conforming type.
 // CHECK: COM existential_metatype result must be Any.Type

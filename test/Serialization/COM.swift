@@ -4,7 +4,7 @@
 // RUN: %llvm-bcanalyzer -dump %t/serialization.swiftmodule | %FileCheck -check-prefix CHECK -implicit-check-not UnknownCode %s
 
 @com(interface: "00000000-0000-0000-C000-000000000046")
-public protocol IUnknown: AnyObject { }
+public protocol IUnknown { }
 // CHECK-DAG: <COM_DECL_ATTR abbrevid={{[0-9]+}} op0=0 op1=1 op2=0/> blob data = '00000000-0000-0000-C000-000000000046'
 
 @com(implementation: "00000000-0000-0000-0000-000000000001")

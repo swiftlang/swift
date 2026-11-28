@@ -6,7 +6,7 @@
 protocol IValue {}
 
 @com(interface: "10000000-0000-0000-0000-000000000002")
-protocol IClassValue: IValue, AnyObject {}
+protocol IClassValue: IValue {}
 
 func invalidReferences(_ value: any IValue, _ classValue: any IClassValue) {
   weak var weakValue: (any IValue)? = value
