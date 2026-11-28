@@ -207,6 +207,11 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
   }
   case PartitionOpKind::Merge: {
     os << "merge ";
+    if (features) {
+      os << '[';
+      printRegionFeatures(os, features);
+      os << "] ";
+    }
     if (extraSpace)
       os << extraSpaceLiteral;
     os << "%%" << getOpArg1() << " with %%" << getOpArg2();
@@ -246,6 +251,18 @@ void PartitionOp::print(llvm::raw_ostream &os, bool extraSpace) const {
     break;
   }
   os << ": " << *getSourceInst();
+}
+
+//===----------------------------------------------------------------------===//
+//                            MARK: RegionFeatures
+//===----------------------------------------------------------------------===//
+
+void swift::printRegionFeatures(llvm::raw_ostream &os,
+                                RegionFeatures features) {
+  SmallVector<StringRef, 1> names;
+  if (features.contains(RegionFeature::ClosureCalleeMerge))
+    names.push_back("closure_callee_merge");
+  llvm::interleaveComma(names, os);
 }
 
 //===----------------------------------------------------------------------===//
@@ -406,6 +423,7 @@ void Partition::trackNewElement(Element newElt, bool updateHistory) {
     }
   } else {
     regionToSendingOpMap.erase(oldRegion);
+    regionToFeaturesMap.erase(oldRegion);
     if (updateHistory) {
       pushRemoveLastElementFromRegion(newElt);
       pushNewElementRegion(newElt);
@@ -472,6 +490,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
     }
   } else {
     regionToSendingOpMap.erase(oldRegion);
+    regionToFeaturesMap.erase(oldRegion);
     if (updateHistory) {
       pushRemoveLastElementFromRegion(oldElt);
       pushNewElementRegion(oldElt);
@@ -535,6 +554,11 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd,
                 resultIter.first->second->merge(sndIter->second);
           }
         }
+
+        // Likewise, make sure that mergedRegion has all of the features of
+        // sndRegionNumber.
+        if (auto features = snd.getRegionFeatures(sndRegionNumber))
+          result.regionToFeaturesMap[resultRegion] |= features;
         continue;
       }
     }
@@ -592,6 +616,8 @@ Partition Partition::join(const Partition &fst, Partition &mutableSnd,
       if (!fstIter.second)
         fstIter.first->second = fstIter.first->second->merge(sndIter->second);
     }
+    if (auto features = snd.getRegionFeatures(sndRegionNumber))
+      result.regionToFeaturesMap[sndRegionNumber] |= features;
     if (result.nextAvailableRegionNum <= sndRegionNumber)
       result.nextAvailableRegionNum = Region(sndEltNumber + 1);
   }
@@ -681,6 +707,11 @@ void Partition::printVerbose(llvm::raw_ostream &os) const {
       os << ')';
     }
     os << "\n";
+    if (auto features = getRegionFeatures(regionNo)) {
+      os << "Features: ";
+      printRegionFeatures(os, features);
+      os << "\n";
+    }
     os << "SentInsts:\n";
     if (wasSent) {
       for (auto op : iter->second->data()) {
@@ -809,6 +840,12 @@ Region Partition::merge(Element fst, Element snd, bool updateHistory) {
     regionToSendingOpMap.erase(iter);
     regionToSendingOpMap.insert({fstRegion, operand});
   }
+  auto featuresIter = regionToFeaturesMap.find(sndRegion);
+  if (featuresIter != regionToFeaturesMap.end()) {
+    auto features = featuresIter->second;
+    regionToFeaturesMap.erase(featuresIter);
+    regionToFeaturesMap[fstRegion] |= features;
+  }
 
   assert(is_canonical_correct());
   assert(elementToRegionMap.at(fst) == elementToRegionMap.at(snd));
@@ -886,7 +923,25 @@ void Partition::canonicalizeImpl() {
     regionToSendingOpMap[iter->second] = op;
   }
 
+  // And do the same for our regionToFeaturesMap.
+  decltype(regionToFeaturesMap) oldFeaturesMap = std::move(regionToFeaturesMap);
+  for (auto &[oldReg, features] : oldFeaturesMap) {
+    auto iter = std::lower_bound(oldRegionToRelabeledRegionMap.begin(),
+                                 oldRegionToRelabeledRegionMap.end(), oldReg,
+                                 [](const std::pair<Region, Region> &lhs,
+                                    Region rhs) { return lhs.first < rhs; });
+    assert(iter != oldRegionToRelabeledRegionMap.end() &&
+           iter->first == oldReg);
+    regionToFeaturesMap[iter->second] = features;
+  }
+
   assert(is_canonical_correct());
+}
+
+void Partition::addRegionFeatures(Element elt, RegionFeatures features) {
+  if (!features)
+    return;
+  regionToFeaturesMap[getRegion(elt)] |= features;
 }
 
 void Partition::horizontalUpdate(
@@ -942,6 +997,7 @@ Partition::popHistoryOnce(SmallVectorImpl<SILBasicBlock *> &foundJoinedBlocks) {
     assert(iter != elementToRegionMap.end());
     Region oldRegion = iter->second;
     regionToSendingOpMap.erase(oldRegion);
+    regionToFeaturesMap.erase(oldRegion);
     elementToRegionMap.erase(iter);
     assert(llvm::none_of(elementToRegionMap,
                          [&](std::pair<Element, Region> pair) {
