@@ -244,8 +244,12 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBl
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
   if (auto allocation = I->getStackAllocation()) {
-    for (auto *UI : allocation->getValue()->getUses()) {
-      if (UI->getUser()->isDeallocatingStack()) {
+    SILValue allocValue = allocation->getValue();
+    // A non-address stack allocation (e.g. alloc_ref [stack]) used outside the
+    // loop, such as by an exit terminator, would be merged through a phi.
+    bool requireAllUsersInLoop = !allocValue->getType().isAddress();
+    for (auto *UI : allocValue->getUses()) {
+      if (UI->getUser()->isDeallocatingStack() || requireAllUsersInLoop) {
         if (!L->contains(UI->getUser()->getParent()))
           return false;
       }
