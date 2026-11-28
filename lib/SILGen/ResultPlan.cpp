@@ -1223,19 +1223,20 @@ ResultPlanPtr ResultPlanBuilder::build(Initialization *init,
   // Otherwise, grab the next result.
   auto result = allResults.pop_back_val();
 
-  return buildForScalar(init, origType, substType, result);
+  return buildForScalar(init, origType, substType, result,
+                        SGF.silConv.isSILIndirect(result));
 }
 
 ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
                                                 AbstractionPattern origType,
                                                 CanType substType,
-                                                SILResultInfo result) {
+                                                SILResultInfo result,
+                                                bool isIndirect) {
   auto calleeTy = calleeTypeInfo.substFnType;
   
   // If the result is indirect, and we have an address to emit into, and
   // there are no abstraction differences, then just do it.
-  if (init && init->canPerformInPlaceInitialization() &&
-      SGF.silConv.isSILIndirect(result) &&
+  if (init && init->canPerformInPlaceInitialization() && isIndirect &&
       !SGF.getLoweredType(substType).getAddressType().hasAbstractionDifference(
           calleeTypeInfo.getOverrideRep(),
           result.getSILStorageType(SGF.SGM.M, calleeTy,
@@ -1258,14 +1259,14 @@ ResultPlanPtr ResultPlanBuilder::buildForScalar(Initialization *init,
           .getReturnValueType(SGF.SGM.M, calleeTy,
                               SGF.getTypeExpansionContext())
           ->hasOpenedExistential() &&
-      SGF.silConv.isSILIndirect(result)) {
+      isIndirect) {
     return ResultPlanPtr(
       new IndirectOpenedSelfResultPlan(SGF, origType, substType));
   }
 
   // Create a temporary if the result is indirect.
   TemporaryInitializationPtr temporary;
-  if (SGF.silConv.isSILIndirect(result)) {
+  if (isIndirect) {
     auto &resultTL = SGF.getTypeLowering(result.getReturnValueType(
         SGF.SGM.M, calleeTy, SGF.getTypeExpansionContext()));
     SILLocation tmpLoc(loc);
@@ -1382,8 +1383,11 @@ ResultPlanBuilder::buildScalarIntoPack(SILValue packAddr,
   SILResultInfo resultInfo(loweredEltType, ResultConvention::Indirect);
 
   // Use the normal scalar emission path to gather an indirect result
-  // of that type.
-  auto plan = buildForScalar(init, origType, substType, resultInfo);
+  // of that type. Pack elements are always passed by address.
+  // FIXME: Pass the element directly, and drop isIndirect, once packs are
+  // opaque values.
+  auto plan = buildForScalar(init, origType, substType, resultInfo,
+                             /*isIndirect=*/true);
 
   // Immediately gather the indirect result.
   SmallVector<SILValue, 1> indirectResults;

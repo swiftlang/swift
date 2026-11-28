@@ -96,7 +96,8 @@ struct ResultPlanBuilder {
   ResultPlanPtr buildForScalar(Initialization *emitInto,
                                AbstractionPattern origType,
                                CanType substType,
-                               SILResultInfo result);
+                               SILResultInfo result,
+                               bool isIndirect);
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
                               CanType substType);
