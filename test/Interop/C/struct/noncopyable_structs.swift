@@ -48,6 +48,10 @@ func testNCWithDeinit() {
   #endif
 }
 
+func discardNCWithDeinit() {
+  _ = NonCopyableWithDeinit()
+}
+
 #if ERRORS
 // expected-warning@+1{{destroy operation 'freeCopyableType' is only allowed on non-copyable types; did you mean to use SWIFT_NONCOPYABLE?}}
 func copyableType(_: CopyableType) { }
@@ -81,6 +85,10 @@ func extra(_: borrowing ExtraDestroy) { }
 
 // CHECK-IR-LABEL: define {{.*}} swiftcc void @"$sSo21NonCopyableWithDeinitVfD"
 // CHECK-IR: {{(call|invoke)}} void @{{.*}}freeNonCopyableWithDeinit
+
+// Consuming a loadable value by value runs the deinit too.
+// CHECK-IR-LABEL: define hidden swiftcc void @"$s19noncopyable_structs19discardNCWithDeinityyF"
+// CHECK-IR: call swiftcc void @"$sSo21NonCopyableWithDeinitVfD"
 
 // CHECK-SIL-LABEL: sil_moveonlydeinit NonCopyableWithDeinit {
 // CHECK-SIL: @$sSo21NonCopyableWithDeinitVfD
