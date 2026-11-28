@@ -570,6 +570,15 @@ extension TaskGroup: Sendable { }
 ///
 /// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
+/// ### Waiting for child tasks
+/// When the closure passed to `withThrowingTaskGroup` returns, the function
+/// waits for any remaining child tasks to finish. This implicit wait discards
+/// their results and errors. To observe child errors, call a method such as
+/// ``next()`` or ``waitForAll()`` inside the closure.
+///
+/// If an error escapes the closure, the function cancels the remaining child
+/// tasks and waits for them to finish before propagating that error.
+///
 /// ### Cancellation behavior
 /// A task group becomes canceled in one of the following ways:
 ///
