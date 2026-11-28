@@ -782,6 +782,8 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void clearType();
   BRIDGED_INLINE void clearDIExpr();
+  BRIDGED_INLINE bool isSameVariable(const BridgedSILDebugVariable &other) const;
+  BRIDGED_INLINE SwiftInt getVariableHash() const;
 };
 
 struct BridgedInstruction {
@@ -1117,7 +1119,6 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj
   RefElementAddr_getDecl() const;
 
-  BRIDGED_INLINE bool DebugValue_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable DebugValue_getVarInfo() const;
   BRIDGED_INLINE BridgedType DebugValue_getVarType() const;
 
@@ -1503,6 +1504,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createExtendLifetime(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugValue(BridgedValue src,
                                                                          BridgedSILDebugVariable var) const;
+  /// Creates a debug value which describes `var` as optimized out. `var` must have a type.
+  SWIFT_IMPORT_UNSAFE BridgedInstruction createKilledDebugValue(BridgedSILDebugVariable var) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugStep() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
   createApply(BridgedValue function, BridgedSubstitutionMap subMap,

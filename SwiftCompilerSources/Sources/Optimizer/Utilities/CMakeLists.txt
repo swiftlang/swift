@@ -21,6 +21,7 @@ swift_compiler_sources(Optimizer
   OptUtils.swift
   OwnershipLiveness.swift
   OwnershipUtilities.swift
+  ReachingDebugValues.swift
   SignatureOptimizationUtilities.swift
   Test.swift
 )

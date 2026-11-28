@@ -96,3 +96,50 @@ bb6:
   %19 = tuple ()
   return %19 : $()
 }
+
+sil @foo : $@convention(thin) () -> ()
+sil @bar : $@convention(thin) () -> ()
+sil @use : $@convention(thin) (Builtin.Int64) -> ()
+
+// Debug values don't count when merging bb1 into bb3: bb1 has fewer
+// instructions, so the merged block stays at the position of bb3.
+
+// CHECK-LABEL: sil @test_merge_block_order_ignores_debug_values
+// CHECK:       bb0([[X:%[0-9]+]] : $Builtin.Int64, [[C:%[0-9]+]] : $Builtin.Int1):
+// CHECK-NEXT:    cond_br [[C]], bb2, bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    // function_ref foo
+// CHECK:       bb2:
+// CHECK-NEXT:    debug_value [[X]] : $Builtin.Int64, let, name "a"
+// CHECK-NEXT:    debug_value [[X]] : $Builtin.Int64, let, name "b"
+// CHECK-NEXT:    debug_value [[X]] : $Builtin.Int64, let, name "c"
+// CHECK-NEXT:    // function_ref use
+// CHECK:       } // end sil function 'test_merge_block_order_ignores_debug_values'
+sil @test_merge_block_order_ignores_debug_values : $@convention(thin) (Builtin.Int64, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb2
+
+bb1:
+  debug_value %0 : $Builtin.Int64, let, name "a"
+  debug_value %0 : $Builtin.Int64, let, name "b"
+  debug_value %0 : $Builtin.Int64, let, name "c"
+  %5 = function_ref @use : $@convention(thin) (Builtin.Int64) -> ()
+  %6 = apply %5(%0) : $@convention(thin) (Builtin.Int64) -> ()
+  br bb3
+
+bb2:
+  %8 = function_ref @foo : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  br bb4
+
+bb3:
+  %11 = function_ref @bar : $@convention(thin) () -> ()
+  %12 = apply %11() : $@convention(thin) () -> ()
+  %13 = function_ref @bar : $@convention(thin) () -> ()
+  %14 = apply %13() : $@convention(thin) () -> ()
+  br bb4
+
+bb4:
+  %16 = tuple ()
+  return %16 : $()
+}

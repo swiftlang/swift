@@ -7,6 +7,8 @@
 
 // CHECK-LABEL: sil @{{.*}}propagate_roundingmode
 // CHECK:      bb0:
+// CHECK-NEXT:   debug_value {{.*}}, let, name "rm"
+// CHECK-NEXT:   debug_value {{.*}}, let, name "rm"
 // CHECK-NEXT:   %0 = integer_literal {{.*}}, 0
 // CHECK-NEXT:   %1 = struct $Int (%0 {{.*}})
 // CHECK-NEXT:   return %1

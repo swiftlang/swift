@@ -467,9 +467,10 @@ public:
             getOpASTType(Ty->getCanonicalType()));
       }
     }
-    // Don't remap variable locations.
+    // Never remap variable locations. Subclasses decide whether to remap the
+    // variable scope: cloning within the same function must generally keep it.
     if (VarInfo->Scope)
-      VarInfo->Scope = getOpScope(VarInfo->Scope);
+      VarInfo->Scope = asImpl().remapVariableScope(VarInfo->Scope);
   }
 
   ProtocolConformanceRef getOpConformance(ProtocolConformanceRef conformance) {
@@ -569,6 +570,10 @@ protected:
     return asImpl().remapLocation(Loc);
   }
   const SILDebugScope *remapScope(const SILDebugScope *DS) { return DS; }
+
+  const SILDebugScope *remapVariableScope(const SILDebugScope *DS) {
+    return getOpScope(DS);
+  }
 
   bool shouldSubstOpaqueArchetypes() const { return false; }
 

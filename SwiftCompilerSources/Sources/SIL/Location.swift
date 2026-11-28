@@ -175,3 +175,14 @@ extension BridgedSILDebugVariable {
     clearDIExpr()
   }
 }
+
+/// Debug variables are equal if they are the same source variable, in the same scope, with the same fragment.
+extension BridgedSILDebugVariable : /*@retroactive*/ Hashable {
+  public static func ==(lhs: BridgedSILDebugVariable, rhs: BridgedSILDebugVariable) -> Bool {
+    lhs.isSameVariable(rhs)
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(getVariableHash())
+  }
+}

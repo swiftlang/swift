@@ -1238,24 +1238,9 @@ static bool isSameDebugValue(DebugValueInst *a, DebugValueInst *b) {
 /// \p dvi as optimized out.
 static void createKilledDebugValue(DebugValueInst *dvi,
                                    SILInstruction *insertPt) {
-  SILFunction *f = dvi->getFunction();
-  // When fragments are removed, this could just use the vartype.
-  SILValue described;
-  if (auto *debugBB = dvi->getDebugReconstructionBlock())
-    described = cast<ReturnInst>(debugBB->getTerminator())->getOperand();
-  else
-    described = dvi->getSingleOperand();
-  SILType type = described->getType().getObjectType();
-  SILDebugVariable var = dvi->getCompleteVarInfo();
-  // Like killOperand: address-only types keep the address and deref.
-  if (!type.isLoadableOrOpaque(*f)) {
-    type = type.getAddressType();
-  } else if (var.DIExpr.startsWithDeref()) {
-    var.DIExpr.eraseElement(var.DIExpr.element_begin());
-  }
-  SILBuilder builder(insertPt, dvi->getDebugScope());
-  builder.createDebugValue(dvi->getLoc(), SILUndef::get(f, type), var,
-                           dvi->usesMoveableValueDebugInfo(), dvi->hasTrace());
+  SILBuilderWithScope builder(insertPt);
+  builder.createKilledDebugValue(dvi->getLoc(), dvi->getCompleteVarInfo(),
+                                 dvi->usesMoveableValueDebugInfo());
 }
 
 /// Joins the debug_values of \p trampolineBBs, the paths to a common
@@ -1322,11 +1307,17 @@ static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
     "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
 
 /// Returns true if \p block has less instructions than \p other.
+/// Debug instructions are not counted, so they cannot change the block order.
 static bool hasLessInstructions(SILBasicBlock *block, SILBasicBlock *other) {
-  auto blockIter = block->begin();
-  auto blockEnd = block->end();
-  auto otherIter = other->begin();
-  auto otherEnd = other->end();
+  auto isNonDebug = [](SILInstruction &inst) {
+    return !inst.isDebugInstruction();
+  };
+  auto blockInsts = llvm::make_filter_range(*block, isNonDebug);
+  auto otherInsts = llvm::make_filter_range(*other, isNonDebug);
+  auto blockIter = blockInsts.begin();
+  auto blockEnd = blockInsts.end();
+  auto otherIter = otherInsts.begin();
+  auto otherEnd = otherInsts.end();
   while (true) {
     if (otherIter == otherEnd)
       return false;

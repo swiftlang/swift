@@ -717,6 +717,10 @@ BridgedInstruction BridgedBuilder::createSwitchEnumInst(BridgedValue enumVal, Op
                                        convertCases(enumVal.getSILValue()->getType(), enumCases, numEnumCases))};
 }
 
+BridgedInstruction BridgedBuilder::createKilledDebugValue(BridgedSILDebugVariable var) const {
+  return {unbridged().createKilledDebugValue(regularLoc(), var.unbridge())};
+}
+
 BridgedInstruction BridgedBuilder::createSwitchEnumAddrInst(BridgedValue enumAddr,
                                                             OptionalBridgedBasicBlock defaultBlock,
                                                             const void * _Nullable enumCases,
@@ -820,6 +824,13 @@ public:
     if (hasFixedLocation)
       return fixedLocation.getScope();
     return scopeCloner.getOrCreateClonedScope(DS);
+  }
+
+  const SILDebugScope *remapVariableScope(const SILDebugScope *DS) {
+    // Never remap a variable to a fixed location.
+    if (hasFixedLocation)
+      return DS;
+    return remapScope(DS);
   }
 
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {

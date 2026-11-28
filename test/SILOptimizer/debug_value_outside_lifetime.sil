@@ -113,3 +113,22 @@ bb0(%0 : @owned $Klass):
   destroy_value %0
   return %2
 }
+
+// A debug_value of a value taken from a dead alloc_stack, after its
+// end_lifetime. Dead object elimination must not insert another end_lifetime
+// after the debug use.
+// CHECK-LABEL: sil [ossa] @debug_value_after_end_lifetime_of_dead_alloc_stack :
+// CHECK:         debug_value %
+// CHECK:       } // end sil function 'debug_value_after_end_lifetime_of_dead_alloc_stack'
+sil [ossa] @debug_value_after_end_lifetime_of_dead_alloc_stack : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = alloc_stack $Klass
+  store %0 to [init] %1
+  %3 = load [take] %1
+  end_lifetime %3
+  debug_value %3, let, name "self"
+  debug_value %3, let, name "self"
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}

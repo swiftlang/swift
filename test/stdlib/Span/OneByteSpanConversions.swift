@@ -111,6 +111,7 @@ public func mutatingViewAsInt8(
 
 // SIL-LABEL: sil {{.*}}@$s{{.*}}consumingViewAsInt8{{.*}} :
 // SIL:         bb0({{.*}} : $MutableRawSpan):
+// SIL-NEXT:      debug_value undef
 // SIL-NEXT:      debug_value
 // SIL-NEXT:      debug_value undef
 // SIL-NEXT:      struct_extract {{.*}}, #MutableRawSpan._count
