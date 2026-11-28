@@ -150,9 +150,50 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
   if (!resolverSupports || !resolve)
     return;
 
-  auto machine = O->getELFFile().getHeader().e_machine;
+  const auto &elf = O->getELFFile();
+  auto machine = elf.getHeader().e_machine;
   auto relativeRelocType = llvm::object::getELFRelativeRelocationType(machine);
   auto globDatRelocType = getELFGlobDatRelocationType(machine);
+
+  // `getSymbolName` is only invoked for relocations that refer to a symbol.
+  auto addRelocation = [&](uint32_t type, uint64_t relocOffset, int64_t addend,
+                           bool isRela, auto getSymbolName) {
+    // `getRelocationResolver` doesn't handle RELATIVE relocations, so we
+    // have to do that ourselves.
+    if (isRela && type == relativeRelocType) {
+      DynamicRelocations.insert({relocOffset, {{}, HeaderAddress + addend}});
+      return;
+    }
+
+    // `getRelocationResolver` doesn't handle GLOB_DAT relocations, so we
+    // also have to do that ourselves.
+    if (globDatRelocType && type == globDatRelocType) {
+      llvm::Expected<llvm::StringRef> name = getSymbolName();
+      if (!name) {
+        llvm::consumeError(name.takeError());
+        return;
+      }
+
+      // On x86-64, this is just S, but on other architectures it is
+      // usually S + A.
+      uint64_t symbolAddend = 0;
+      if (isRela && machine != llvm::ELF::EM_X86_64)
+        symbolAddend = addend;
+
+      DynamicRelocations.insert({relocOffset, {*name, symbolAddend}});
+      return;
+    }
+
+    if (!resolverSupports(type))
+      return;
+    llvm::Expected<llvm::StringRef> name = getSymbolName();
+    if (!name) {
+      llvm::consumeError(name.takeError());
+      return;
+    }
+    uint64_t offset = resolve(type, relocOffset, 0, 0, 0);
+    DynamicRelocations.insert({relocOffset, {*name, offset}});
+  };
 
   for (auto &S : static_cast<const llvm::object::ELFObjectFileBase *>(O)
                      ->dynamic_relocation_sections()) {
@@ -160,47 +201,58 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
         O->getSection(S.getRawDataRefImpl())->sh_type == llvm::ELF::SHT_RELA;
 
     for (const llvm::object::RelocationRef &R : S.relocations()) {
-      // `getRelocationResolver` doesn't handle RELATIVE relocations, so we
-      // have to do that ourselves.
-      if (isRela && R.getType() == relativeRelocType) {
-        auto rela = O->getRela(R.getRawDataRefImpl());
-        DynamicRelocations.insert(
-            {R.getOffset(), {{}, HeaderAddress + rela->r_addend}});
-        continue;
-      }
+      int64_t addend = 0;
+      if (isRela)
+        addend = O->getRela(R.getRawDataRefImpl())->r_addend;
+      addRelocation(R.getType(), R.getOffset(), addend, isRela,
+                    [&] { return R.getSymbol()->getName(); });
+    }
+  }
 
-      // `getRelocationResolver` doesn't handle GLOB_DAT relocations, so we
-      // also have to do that ourselves.
-      if (globDatRelocType && R.getType() == globDatRelocType) {
-        auto symbol = R.getSymbol();
-        auto name = symbol->getName();
-        if (!name) {
-          llvm::consumeError(name.takeError());
-          continue;
-        }
+  // FIXME: Remove once LLVM's `dynamic_relocation_sections` also returns
+  // sections in Android's packed relocation format (lld's
+  // --pack-dyn-relocs=android). RELR sections need no handling: RELR
+  // relocations are always relative, and the linker writes their addends into
+  // the relocated words.
+  auto sections = elf.sections();
+  if (!sections) {
+    llvm::consumeError(sections.takeError());
+    return;
+  }
+  for (const auto &section : *sections) {
+    if (section.sh_type != SHT_ANDROID_REL &&
+        section.sh_type != SHT_ANDROID_RELA)
+      continue;
+    bool isRela = section.sh_type == SHT_ANDROID_RELA;
 
-        // On x86-64, this is just S, but on other architectures it is
-        // usually S + A.
-        uint64_t addend = 0;
-        if (isRela && machine != llvm::ELF::EM_X86_64) {
-          auto rela = O->getRela(R.getRawDataRefImpl());
-          addend = rela->r_addend;
-        }
+    auto relocations = elf.android_relas(section);
+    if (!relocations) {
+      llvm::consumeError(relocations.takeError());
+      continue;
+    }
+    auto symbolTable = elf.getSection(section.sh_link);
+    if (!symbolTable) {
+      llvm::consumeError(symbolTable.takeError());
+      continue;
+    }
+    auto stringTable = elf.getStringTableForSymtab(**symbolTable);
+    if (!stringTable) {
+      llvm::consumeError(stringTable.takeError());
+      continue;
+    }
 
-        DynamicRelocations.insert({R.getOffset(), {*name, addend}});
-        continue;
-      }
-
-      if (!resolverSupports(R.getType()))
-        continue;
-      auto symbol = R.getSymbol();
-      auto name = symbol->getName();
-      if (!name) {
-        llvm::consumeError(name.takeError());
-        continue;
-      }
-      uint64_t offset = resolve(R.getType(), R.getOffset(), 0, 0, 0);
-      DynamicRelocations.insert({R.getOffset(), {*name, offset}});
+    for (const auto &R : *relocations) {
+      addRelocation(R.getType(elf.isMips64EL()), R.r_offset, R.r_addend, isRela,
+                    [&]() -> llvm::Expected<llvm::StringRef> {
+                      auto symbol = elf.getRelocationSymbol(R, *symbolTable);
+                      if (!symbol)
+                        return symbol.takeError();
+                      if (!*symbol)
+                        return llvm::createStringError(
+                            llvm::inconvertibleErrorCode(),
+                            "relocation has no symbol");
+                      return (*symbol)->getName(*stringTable);
+                    });
     }
   }
 }

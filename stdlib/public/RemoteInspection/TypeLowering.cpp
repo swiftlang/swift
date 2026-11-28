@@ -3043,6 +3043,10 @@ public:
 
     const TypeInfo *representationTI;
     auto pointerTI = TC.getRawPointerTypeInfo();
+    if (!pointerTI) {
+      TC.setError("no TypeInfo for Builtin.RawPointer", BA);
+      return nullptr;
+    }
 
     // The borrow uses pointer representation if:
     // - it's larger than four pointers; or
