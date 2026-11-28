@@ -44,12 +44,41 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 #include <stdint.h>
 #endif
 
+#if defined(_WIN32)
+#include <Windows.h>
+#include <cstdio>
+#endif
+
 bool swift::runtime::_swift_isPrivilegedProcess() {
 #if defined(__linux__)
   return getauxval(AT_SECURE);
 #elif TARGET_OS_OSX || TARGET_OS_IPHONE || defined(__FreeBSD__) ||             \
     defined(__OpenBSD__)
   return issetugid();
+#elif defined(_WIN32)
+  HANDLE hToken = NULL;
+
+  if (OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &hToken)) {
+    TOKEN_ELEVATION elevation;
+    DWORD dwSize;
+
+    // if in doubt, return true, protect by default
+    BOOL isElevated = true;
+
+    if (GetTokenInformation(hToken, TokenElevation, &elevation, sizeof(elevation), &dwSize)) {
+      isElevated = elevation.TokenIsElevated;
+    } else {
+      fprintf(stderr,"\nFailed to get token info when checking privilege: %d.\n",GetLastError());
+    }
+
+    CloseHandle(hToken);
+
+    return isElevated;
+  } else {
+    fprintf(stderr,"\nFailed to get process token when checking privilege: %d.\n",GetLastError());
+    // if in doubt, return true, protect by default
+    return true;
+  }
 #else
   return false;
 #endif
