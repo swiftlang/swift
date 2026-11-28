@@ -3122,6 +3122,13 @@ ManglingError Remangler::mangleReabstractionThunkHelper(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleValueConversionThunk(Node *node,
+                                                    unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));
+  Buffer << "TTv";
+  return ManglingError::Success;
+}
+
 ManglingError
 Remangler::mangleReabstractionThunkHelperWithSelf(Node *node, unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodesReversed(node, depth + 1));

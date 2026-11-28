@@ -446,34 +446,16 @@ void SILGenFunction::emitCheckedCastBranch(
 /// \param conditional Whether to emit a conditional downcast; if
 /// false, this will emit a forced downcast.
 static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
-                                         ManagedValue source,
-                                         Type sourceType,
-                                         SILLocation loc,
-                                         Type destType,
-                                         SGFContext C,
-                                         bool conditional) {
-  // Compute substitutions for the intrinsic call.
+                                         ManagedValue source, Type sourceType,
+                                         SILLocation loc, Type destType,
+                                         SGFContext C, bool conditional) {
   auto fromCollection = sourceType->getCanonicalType();
   auto toCollection = destType->getCanonicalType();
-  // Get the intrinsic function.
-  FuncDecl *fn = nullptr;
-  if (fromCollection->isArray()) {
-    fn = conditional ? SGF.SGM.getArrayConditionalCast(loc)
-                     : SGF.SGM.getArrayForceCast(loc);
-  } else if (fromCollection->isDictionary()) {
-    fn = (conditional
-           ? SGF.SGM.getDictionaryDownCastConditional(loc)
-           : SGF.SGM.getDictionaryDownCast(loc));
-  } else if (fromCollection->isSet()) {
-    fn = (conditional
-           ? SGF.SGM.getSetDownCastConditional(loc)
-           : SGF.SGM.getSetDownCast(loc));
-  } else {
-    llvm_unreachable("unsupported collection upcast kind");
-  }
-
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection,
-                                      source, C);
+  auto castKind = conditional
+                      ? SILGenFunction::CollectionCastKind::ConditionalDowncast
+                      : SILGenFunction::CollectionCastKind::ForceDowncast;
+  return SGF.emitCollectionConversion(loc, fromCollection, toCollection, source,
+                                      castKind, C);
 }
 
 static ManagedValue

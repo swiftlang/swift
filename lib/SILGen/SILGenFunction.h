@@ -1859,12 +1859,15 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
-  RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
-                                  SGFContext C);
+  enum class CollectionCastKind {
+    Upcast,
+    ForceDowncast,
+    ConditionalDowncast,
+  };
+
+  RValue emitCollectionConversion(SILLocation loc, CanType fromCollection,
+                                  CanType toCollection, ManagedValue mv,
+                                  CollectionCastKind castKind, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points
