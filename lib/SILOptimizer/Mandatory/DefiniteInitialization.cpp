@@ -533,7 +533,6 @@ namespace {
                                std::optional<DIKind> &Result);
 
     bool shouldEmitError(const SILInstruction *Inst);
-    std::string getUninitElementName(const DIMemoryUse &Use);
     void noteUninitializedMembers(const DIMemoryUse &Use);
     void diagnoseInitError(const DIMemoryUse &Use,
                            Diag<StringRef, bool> DiagMessage);
@@ -709,6 +708,9 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
          "Not a designated initializer");
 
+  if (TheMemory.hasDummyElement())
+    return;
+
   // Determine which members, specifically are uninitialized.
   AvailabilitySet Liveness =
     getLivenessAtInst(Use.Inst, Use.FirstElement, Use.NumElements);
@@ -772,9 +774,11 @@ void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
     emitter();
 }
 
-/// Given a use that has at least one uninitialized element in it, produce a
-/// nice symbolic name for the element being accessed.
-std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
+void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
+                                        Diag<StringRef, bool> DiagMessage) {
+  auto *Inst = Use.Inst;
+  if (!shouldEmitError(Inst))
+    return;
 
   // If the overall memory allocation has multiple elements, then dive in to
   // explain *which* element is being used uninitialized.  Start by rerunning
@@ -782,9 +786,9 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
   // In a multi-element query, the first element may already be defined and
   // we want to point to the second one.
   unsigned firstUndefElement =
-    getAnyUninitializedMemberAtInst(Use.Inst, Use.FirstElement,Use.NumElements);
+      getAnyUninitializedMemberAtInst(Inst, Use.FirstElement, Use.NumElements);
   assert(firstUndefElement != ~0U && "No undef elements found?");
-  
+
   // Verify that it isn't the super.init marker that failed.  The client should
   // handle this, not pass it down to diagnoseInitError.
   assert((!TheMemory.isDerivedClassSelf() ||
@@ -792,38 +796,22 @@ std::string LifetimeChecker::getUninitElementName(const DIMemoryUse &Use) {
          "super.init failure not handled in the right place");
 
   // If the definition is a declaration, try to reconstruct a name and
-  // optionally an access path to the uninitialized element.
+  // optionally an access path to the uninitialized element, along with whether
+  // it is a 'let' property.
   //
   // TODO: Given that we know the range of elements being accessed, we don't
   // need to go all the way deep into a recursive tuple here.  We could print
   // an error about "v" instead of "v.0" when "v" has tuple type and the whole
   // thing is accessed inappropriately.
+  bool isLet = false;
   std::string Name;
-  TheMemory.getPathStringToElement(firstUndefElement, Name);
-
-  return Name;
-}
-
-void LifetimeChecker::diagnoseInitError(const DIMemoryUse &Use,
-                                        Diag<StringRef, bool> DiagMessage) {
-  auto *Inst = Use.Inst;
-  if (!shouldEmitError(Inst))
-    return;
-
-  // If the definition is a declaration, try to reconstruct a name and
-  // optionally an access path to the uninitialized element.
-  std::string Name = getUninitElementName(Use);
+  TheMemory.getPathStringToElement(firstUndefElement, Name, &isLet);
 
   // Figure out the source location to emit the diagnostic to.  If this is null,
   // it is probably implicitly generated code, so we'll adjust it.
   SILLocation DiagLoc = Inst->getLoc();
   if (DiagLoc.isNull() || DiagLoc.getSourceLoc().isInvalid())
     DiagLoc = Inst->getFunction()->getLocation();
-
-  // Determine whether the field we're touching is a let property.
-  bool isLet = true;
-  for (unsigned i = 0, e = Use.NumElements; i != e; ++i)
-    isLet &= TheMemory.isElementLetProperty(i);
 
   diagnose(Module, DiagLoc, DiagMessage, StringRef(Name), isLet);
 
@@ -2014,8 +2002,11 @@ void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
     noteUninitializedMembers(Use);
     return;
   }
-  
-  if (isa<PartialApplyInst>(Inst) && TheMemory.isClassInitSelf()) {
+
+  if (isa<PartialApplyInst>(Inst) && TheMemory.isAnyInitSelf() &&
+      // Ensure the use covers the entirety of self
+      Use.FirstElement == 0 &&
+      Use.NumElements == TheMemory.getNumElements()) {
     if (!shouldEmitError(Inst)) return;
     
     diagnose(Module, Inst->getLoc(), diag::self_closure_use_uninit);

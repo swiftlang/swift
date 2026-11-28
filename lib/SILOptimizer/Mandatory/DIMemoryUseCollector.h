@@ -241,9 +241,10 @@ public:
 
   /// Push the symbolic path name to the specified element number onto the
   /// specified std::string.  If the actual decl (or a subelement thereof) can
-  /// be determined, return it.  Otherwise, return null.
-  ValueDecl *getPathStringToElement(unsigned Element,
-                                    std::string &Result) const;
+  /// be determined, return it.  Otherwise, return null.  If \p isLet is
+  /// non-null, set it to whether the element is a 'let' property/constant.
+  ValueDecl *getPathStringToElement(unsigned Element, std::string &Result,
+                                    bool *isLet = nullptr) const;
 
   /// If the specified value is a 'let' property in an initializer, return true.
   bool isElementLetProperty(unsigned Element) const;
