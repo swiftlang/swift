@@ -598,8 +598,12 @@ struct StructLoweringState {
   irgen::IRGenModule &Mod;
   LargeSILTypeMapper &Mapper;
 
-  // All large loadable function arguments that we modified
+  // All large loadable function arguments that we modified, as well as local
+  // alloc_stack results created by allocateForApply().
   SmallVector<SILValue, 16> largeLoadableArgs;
+  // Whether any function argument (as opposed to an allocateForApply()
+  // alloc_stack) was rewritten to an indirect address.
+  bool hasLargeLoadableFuncArgs = false;
   // All modified function signature function arguments
   SmallVector<SILValue, 16> funcSigArgs;
   // All args for which we did a load
@@ -1601,6 +1605,7 @@ void LoadableStorageAllocation::convertIndirectFunctionArgs() {
         // Add to largeLoadableArgs if and only if it wasn't a modified function
         // signature arg
         pass.largeLoadableArgs.push_back(arg);
+        pass.hasLargeLoadableFuncArgs = true;
       } else {
         arg->setOwnershipKind(ownership);
         pass.funcSigArgs.push_back(arg);
@@ -2720,7 +2725,7 @@ static bool rewriteFunctionReturn(StructLoweringState &pass) {
   SILType resultTy = loweredTy->getAllResultsInterfaceType();
   SILType newSILType = pass.getNewSILType(loweredTy, resultTy);
   // We (currently) only care about function signatures
-  if (pass.isLargeLoadableType(loweredTy, resultTy)) {
+  if (modNonFuncTypeResultType(pass.F, pass.Mod)) {
     return true;
   } else if (pass.containsDifferentFunctionSignature(loweredTy, resultTy)) {
     llvm::SmallVector<SILResultInfo, 2> newSILResultInfo;
@@ -2800,10 +2805,13 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
 
   invalidateAnalysis(F, SILAnalysis::InvalidationKind::Instructions);
 
-  // If we modified the function arguments - add to list of functions to clone
+  // If we modified the function's lowered type, record it so its callers and
+  // references are updated. Note that pass.largeLoadableArgs may also contain
+  // local alloc_stacks created for apply results, which do not change F's own
+  // signature.
   if (modifiableFunction(funcType) &&
       (rewrittenReturn ||
-       !pass.largeLoadableArgs.empty() ||
+       pass.hasLargeLoadableFuncArgs ||
        !pass.funcSigArgs.empty() ||
        pass.hasLargeLoadableYields())) {
     modFuncs.insert(F);
