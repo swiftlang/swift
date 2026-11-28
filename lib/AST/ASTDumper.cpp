@@ -5734,6 +5734,7 @@ public:
                                     Label label) {
     printCommon(Attr, "synthesized_protocol_attr", label);
     printFlag(Attr->isUnchecked(), "unchecked");
+    printFlag(Attr->isFromConformsTo(), "from_conforms_to");
     if (Writer.isParsable() && isTypeChecked()) {
       printFieldQuoted(declUSR(Attr->getProtocol()),
                        Label::optional("protocol"));

@@ -260,9 +260,10 @@ protected:
       kind : NumExternKindBits
     );
 
-    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 2,
+    SWIFT_INLINE_BITFIELD(SynthesizedProtocolAttr, DeclAttribute, 3,
       isUnchecked : 1,
-      isSuppressed: 1
+      isSuppressed: 1,
+      isFromConformsTo : 1
     );
 
     SWIFT_INLINE_BITFIELD(ObjCImplementationAttr, DeclAttribute, 3,
@@ -1932,13 +1933,15 @@ class SynthesizedProtocolAttr : public DeclAttribute {
 
 public:
   SynthesizedProtocolAttr(ProtocolDecl *protocol, LazyConformanceLoader *Loader,
-                          bool isUnchecked, bool isSuppressed)
+                          bool isUnchecked, bool isSuppressed,
+                          bool isFromConformsTo = false)
       : DeclAttribute(DeclAttrKind::SynthesizedProtocol, SourceLoc(),
                       SourceRange(),
                       /*Implicit=*/true),
         Loader(Loader), protocol(protocol) {
     Bits.SynthesizedProtocolAttr.isUnchecked = unsigned(isUnchecked);
     Bits.SynthesizedProtocolAttr.isSuppressed = unsigned(isSuppressed);
+    Bits.SynthesizedProtocolAttr.isFromConformsTo = unsigned(isFromConformsTo);
   }
 
   /// Retrieve the known protocol kind naming the protocol to be
@@ -1955,6 +1958,12 @@ public:
     return bool(Bits.SynthesizedProtocolAttr.isSuppressed);
   }
 
+  /// Whether the conformance was requested with swift_attr("conforms_to:...")
+  /// on a Clang declaration.
+  bool isFromConformsTo() const {
+    return bool(Bits.SynthesizedProtocolAttr.isFromConformsTo);
+  }
+
   /// Retrieve the lazy loader that will be used to populate the
   /// synthesized conformance.
   LazyConformanceLoader *getLazyLoader() const { return Loader; }
@@ -1964,14 +1973,16 @@ public:
   }
 
   SynthesizedProtocolAttr *clone(ASTContext &ctx) const {
-    return new (ctx) SynthesizedProtocolAttr(
-        protocol, getLazyLoader(), isUnchecked(), isSuppressed());
+    return new (ctx) SynthesizedProtocolAttr(protocol, getLazyLoader(),
+                                             isUnchecked(), isSuppressed(),
+                                             isFromConformsTo());
   }
 
   bool isEquivalent(const SynthesizedProtocolAttr *other,
                     Decl *attachedTo) const {
     return isUnchecked() == other->isUnchecked()
             && isSuppressed() == other->isSuppressed()
+            && isFromConformsTo() == other->isFromConformsTo()
             && getProtocol() == other->getProtocol()
             && getLazyLoader() == other->getLazyLoader();
   }

@@ -6263,12 +6263,86 @@ void ConformanceChecker::resolveValueWitnesses() {
   }
 }
 
+/// Whether the conformance, or the conformance implying it, was requested with
+/// swift_attr("conforms_to:...") on a Clang declaration.
+static bool isRequestedByConformsTo(NormalProtocolConformance *conformance) {
+  auto *dc = conformance->getDeclContext();
+  if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    return false;
+
+  auto *nominal = dc->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  auto attrs = nominal->getAttrs().getAttributes<SynthesizedProtocolAttr>();
+  if (llvm::none_of(attrs, [](const SynthesizedProtocolAttr *attr) {
+        return attr->isFromConformsTo();
+      }))
+    return false;
+
+  auto *explicitConformance = conformance;
+  while (explicitConformance->getSourceKind() == ConformanceEntryKind::Implied)
+    explicitConformance = explicitConformance->getImplyingConformance();
+
+  return llvm::any_of(attrs, [&](const SynthesizedProtocolAttr *attr) {
+    return attr->isFromConformsTo() &&
+           attr->getProtocol() == explicitConformance->getProtocol();
+  });
+}
+
+/// Conformances requested with conforms_to are not checked as part of any
+/// source file, so diagnose requirements left without a witness, e.g. missing
+/// or ambiguous ones, once the witnesses are resolved.
+static void
+diagnoseUnsatisfiedConformsToRequirements(
+    NormalProtocolConformance *conformance) {
+  if (!isRequestedByConformsTo(conformance))
+    return;
+
+  auto *proto = conformance->getProtocol();
+  // The importer diagnoses a missing associated type and records an error
+  // type as its witness; requirements that mention it cannot be matched.
+  if (llvm::any_of(proto->getAssociatedTypeMembers(),
+                   [&](AssociatedTypeDecl *assocType) {
+                     return conformance->getTypeWitness(assocType)->hasError();
+                   }))
+    return;
+
+  bool hasUnsatisfied =
+      llvm::any_of(proto->getProtocolRequirements(), [&](ValueDecl *req) {
+        return !isa<TypeDecl>(req) && !req->isInvalid() &&
+               !conformance->hasWitness(req);
+      });
+  if (!hasUnsatisfied)
+    return;
+
+  auto *dc = conformance->getDeclContext();
+  auto &ctx = dc->getASTContext();
+  proto->diagnose(diag::type_does_not_conform, conformance->getType(),
+                  proto->getDeclaredInterfaceType());
+  for (const auto &missing : ctx.takeDelayedMissingWitnesses(conformance)) {
+    auto *requirement = missing.requirement;
+    // The importer diagnoses missing associated types.
+    if (isa<TypeDecl>(requirement))
+      continue;
+    requirement->diagnose(diag::no_witnesses,
+                          getProtocolRequirementKind(requirement), requirement,
+                          getRequirementTypeForDisplay(conformance, requirement));
+    for (const auto &match : missing.matches)
+      diagnoseMatch(dc->getParentModule(), conformance, requirement, match);
+  }
+  // These explain, e.g., ambiguous witnesses.
+  for (const auto &diag : ctx.takeDelayedConformanceDiags(conformance))
+    diag.Callback(conformance);
+}
+
 evaluator::SideEffect
 ResolveValueWitnessesRequest::evaluate(Evaluator &evaluator,
                                 NormalProtocolConformance *conformance) const {
   auto &ctx = conformance->getDeclContext()->getASTContext();
   ConformanceChecker checker(ctx, conformance);
   checker.resolveValueWitnesses();
+  diagnoseUnsatisfiedConformsToRequirements(conformance);
   return evaluator::SideEffect();
 }
 
