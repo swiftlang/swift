@@ -2064,6 +2064,12 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       OVERRIDE_PRINT_OPTION(scope, PrintPatternBindingIntroducerAsWritten,
                             true);
 
+      // The counterpart is always printed inside its API counterpart's
+      // declaration, so never qualify its name with its type, as generated
+      // interfaces would otherwise do: `@abi(func S.foo())`.
+      OVERRIDE_PRINT_OPTION(scope, ShouldQualifyNestedDeclarations,
+                            PrintOptions::QualifyNestedDeclarations::Never);
+
       // Don't print any attributes marked with `ForbiddenInABIAttr`.
       // (Reminder: There is manual logic in `PrintAST::printAttributes()`
       // to handle non-ABI attributes when `PrintImplicitAttrs` is set.)
