@@ -15,12 +15,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+// main.swift only builds the backtracer for x86_64 and arm64, and this file uses it.
+#if (os(Linux) || os(Android)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 import Runtime
@@ -303,4 +306,4 @@ class Target {
   }
 }
 
-#endif // os(Linux)
+#endif // (os(Linux) || os(Android)) && (arch(x86_64) || arch(arm64))

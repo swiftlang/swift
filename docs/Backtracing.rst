@@ -249,7 +249,8 @@ Additionally, the runtime will configure an alternate signal handling stack, so
 that stack overflows can be successfully trapped.
 
 Note that the runtime will not install its signal handlers for a signal if it
-finds that there is already a handler for that signal.  Similarly if something
+finds that there is already a handler for that signal (except on Android; see
+below).  Similarly if something
 else has already configured an alternate signal stack, it will leave that
 stack alone.
 
@@ -355,6 +356,19 @@ of the backtracer using
 
 If the runtime is unable to locate the backtracer, it will allow your program to
 crash as it would have done anyway.
+
+Android
+^^^^^^^
+
+Crash catching is not enabled by default on Android, because the system already
+writes a crash report (a tombstone) for every crashing process.  You can enable
+it for programs you run from ``adb shell``, such as test runners: copy
+``swift-backtrace`` to the device and set
+``SWIFT_BACKTRACE=enable=yes,swift-backtrace=<path-to-swift-backtrace>``.
+
+The runtime installs its signal handlers over the ones installed by the system,
+and passes the signal back to them after the backtrace, so the tombstone is
+still written.
 
 Backtrace Storage
 -----------------

@@ -23,6 +23,8 @@ import Darwin
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #endif
 
 import Swift
@@ -31,7 +33,7 @@ internal import BacktracingImpl.Runtime
 
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 
-#if os(Linux)
+#if os(Linux) || canImport(Android)
 typealias thread = swift.runtime.backtrace.thread
 #endif
 
@@ -79,7 +81,7 @@ internal func parseUInt64<S: StringProtocol>(_ s: S) -> UInt64? {
   }
 }
 
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || canImport(Android)
 
 struct PosixError: Error {
   var errno: Int32
@@ -199,7 +201,8 @@ internal func isDir(_ path: String) -> Bool {
   guard stat(path, &st) == 0 else {
     return false
   }
-  return (st.st_mode & S_IFMT) == S_IFDIR
+  // On 32-bit Android, `st_mode` is 32 bits but `mode_t` is 16 bits.
+  return (mode_t(truncatingIfNeeded: st.st_mode) & S_IFMT) == S_IFDIR
   #endif
 }
 
@@ -230,8 +233,15 @@ extension Sequence {
   }
 }
 
+#if canImport(Android)
+// Bionic's `FILE` is an incomplete type, so it is imported as an opaque pointer.
+typealias CFilePointer = OpaquePointer
+#else
+typealias CFilePointer = UnsafeMutablePointer<FILE>
+#endif
+
 struct CFileStream: TextOutputStream {
-  var fp: UnsafeMutablePointer<FILE>
+  var fp: CFilePointer
 
   public func write(_ string: String) {
     fputs(string, fp)

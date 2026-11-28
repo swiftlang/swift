@@ -372,6 +372,10 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.enabled == OnOffTty::Default) {
 #if TARGET_OS_OSX
     _swift_backtraceSettings.enabled = OnOffTty::TTY;
+#elif defined(__ANDROID__)
+    // Android writes its own crash report (a tombstone), so only catch
+    // crashes when SWIFT_BACKTRACE asks for it.
+    _swift_backtraceSettings.enabled = OnOffTty::Off;
 #elif defined(__linux__) || defined(_WIN32)
     _swift_backtraceSettings.enabled = OnOffTty::On;
 #else

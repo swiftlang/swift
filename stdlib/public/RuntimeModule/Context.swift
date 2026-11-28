@@ -492,12 +492,12 @@ extension arm_gprs {
     gprs.setR(I386Register.ebp.rawValue, to: UInt32(bitPattern: mctx.gregs.6))
     gprs.setR(I386Register.esi.rawValue, to: UInt32(bitPattern: mctx.gregs.5))
     gprs.setR(I386Register.edi.rawValue, to: UInt32(bitPattern: mctx.gregs.4))
-    gprs.segreg.0 = UInt16(bitPattern: mctx.gregs.2 & 0xffff)  // es
-    gprs.segreg.1 = UInt16(bitPattern: mctx.gregs.15 & 0xffff) // cs
-    gprs.segreg.2 = UInt16(bitPattern: mctx.gregs.18 & 0xffff) // ss
-    gprs.segreg.3 = UInt16(bitPattern: mctx.gregs.3 & 0xffff)  // ds
-    gprs.segreg.4 = UInt16(bitPattern: mctx.gregs.1 & 0xffff)  // fs
-    gprs.segreg.5 = UInt16(bitPattern: mctx.gregs.0 & 0xffff)  // gs
+    gprs.segreg.0 = UInt16(truncatingIfNeeded: mctx.gregs.2)  // es
+    gprs.segreg.1 = UInt16(truncatingIfNeeded: mctx.gregs.15) // cs
+    gprs.segreg.2 = UInt16(truncatingIfNeeded: mctx.gregs.18) // ss
+    gprs.segreg.3 = UInt16(truncatingIfNeeded: mctx.gregs.3)  // ds
+    gprs.segreg.4 = UInt16(truncatingIfNeeded: mctx.gregs.1)  // fs
+    gprs.segreg.5 = UInt16(truncatingIfNeeded: mctx.gregs.0)  // gs
     gprs.eip = UInt32(bitPattern: mctx.gregs.14)
     gprs.eflags = UInt32(bitPattern: mctx.gregs.16)
     gprs.valid = 0xffff

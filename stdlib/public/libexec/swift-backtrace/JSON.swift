@@ -10,12 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+// main.swift only builds the backtracer for x86_64 and arm64, and this file uses it.
+#if arch(x86_64) || arch(arm64)
+
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
 #elseif canImport(Musl)
 import Musl
+#elseif canImport(Android)
+import Android
 #elseif canImport(CRT)
 import CRT
 #endif
@@ -125,3 +130,5 @@ struct SwiftBacktraceWriter: BacktraceJSONWriter {
     SwiftBacktrace.writeln(string, flush: flush)
   }
 }
+
+#endif
