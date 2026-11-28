@@ -1,0 +1,114 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-lifetime-fixup -sil-move-only-checker %s | %FileCheck %s --check-prefix=CHECKED
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -closure-lifetime-fixup -sil-move-only-checker -address-lowering %s | %FileCheck %s --check-prefix=LOWERED
+
+// With opaque values, SILGen expresses the move-only patterns on address-only
+// values with objects: a copy_value or load [copy] feeding a
+// mark_unresolved_non_copyable_value. The object move-only checker handles
+// those, and then AddressLowering sees no marks. If AddressLowering runs first,
+// it turns each mark into an address mark that comes after the storage is
+// initialized, which the address checker cannot track: for the first function
+// below it asserts, and for the second it reports a missed copy.
+//
+// These tests run the checker and then AddressLowering directly on that SIL,
+// in that order (sil-opt runs passes in the order of its flags), so they do not
+// depend on where address lowering sits in the pipeline.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+sil [ossa] @closure : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed Optional<T>) -> Bool
+sil [ossa] @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+
+// let temp = consume a
+// a = consume b
+// b = consume temp
+//
+// The last statement is a load [copy] of `temp` that is moved and marked as an
+// object. The checker turns it into a take and removes the destroy.
+//
+// CHECKED-LABEL: sil [ossa] {{.*}}@consume_through_temporary :
+// CHECKED-NOT:     mark_unresolved_non_copyable_value
+// CHECKED-NOT:     load [copy]
+// CHECKED-NOT:     destroy_addr
+// CHECKED:       } // end sil function 'consume_through_temporary'
+//
+// LOWERED-LABEL: sil [ossa] {{.*}}@consume_through_temporary :
+// LOWERED-NOT:     mark_unresolved_non_copyable_value
+// LOWERED-NOT:     copy_addr %
+// LOWERED-NOT:     destroy_addr
+// LOWERED:       } // end sil function 'consume_through_temporary'
+sil [ossa] @consume_through_temporary : $@convention(thin) <T where T : ~Copyable> (@inout T, @inout T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %a = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*T
+  %b = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*T
+  %temp = alloc_stack [lexical] [var_decl] $T, let, name "temp"
+  %temp_mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %temp : $*T
+
+  %a_access = begin_access [modify] [static] %a : $*T
+  %a_tmp = alloc_stack $T
+  %a_tmp_mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %a_tmp : $*T
+  copy_addr %a_access to [init] %a_tmp_mark : $*T
+  %a_val = load [take] %a_tmp_mark : $*T
+  end_access %a_access : $*T
+  store %a_val to [init] %temp_mark : $*T
+  dealloc_stack %a_tmp : $*T
+
+  %b_access = begin_access [modify] [static] %b : $*T
+  %b_tmp = alloc_stack $T
+  %b_tmp_mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %b_tmp : $*T
+  copy_addr %b_access to [init] %b_tmp_mark : $*T
+  %b_val = load [take] %b_tmp_mark : $*T
+  end_access %b_access : $*T
+  %a_access2 = begin_access [modify] [static] %a : $*T
+  store %b_val to [assign] %a_access2 : $*T
+  end_access %a_access2 : $*T
+  dealloc_stack %b_tmp : $*T
+
+  %temp_val = load [copy] %temp_mark : $*T
+  %temp_moved = move_value [allows_diagnostics] %temp_val : $T
+  %temp_obj = mark_unresolved_non_copyable_value [consumable_and_assignable] %temp_moved : $T
+  %b_access2 = begin_access [modify] [static] %b : $*T
+  store %temp_obj to [assign] %b_access2 : $*T
+  end_access %b_access2 : $*T
+  destroy_addr %temp_mark : $*T
+  dealloc_stack %temp : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// A closure captures a guaranteed parameter of a possibly-noncopyable generic
+// type. SILGen copies and marks the parameter, and copies it again for the
+// escaping closure. ClosureLifetimeFixup makes the closure non-escaping, and
+// the checker removes both copies so that the closure captures the parameter.
+//
+// CHECKED-LABEL: sil [ossa] {{.*}}@capture_guaranteed_parameter :
+// CHECKED-NOT:     copy_value
+// CHECKED-NOT:     mark_unresolved_non_copyable_value
+// CHECKED:         partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>(%0)
+// CHECKED:       } // end sil function 'capture_guaranteed_parameter'
+//
+// LOWERED-LABEL: sil [ossa] {{.*}}@capture_guaranteed_parameter :
+// LOWERED:       bb0(%0 : $*Optional<T>):
+// LOWERED-NOT:     alloc_stack
+// LOWERED-NOT:     copy_addr
+// LOWERED:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] {{%[^,]+}}<T>(%0)
+// LOWERED:         mark_dependence [nonescaping] [[CLOSURE]] : {{.*}} on %0 : $*Optional<T>
+// LOWERED:       } // end sil function 'capture_guaranteed_parameter'
+sil [ossa] @capture_guaranteed_parameter : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed Optional<T>) -> () {
+bb0(%0 : @guaranteed $Optional<T>):
+  %copy = copy_value %0 : $Optional<T>
+  %mark = mark_unresolved_non_copyable_value [no_consume_or_assign] %copy : $Optional<T>
+  %f = function_ref @closure : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed Optional<T>) -> Bool
+  %capture = copy_value %mark : $Optional<T>
+  %pa = partial_apply [callee_guaranteed] %f<T>(%capture) : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed Optional<T>) -> Bool
+  %cvt = convert_escape_to_noescape [not_guaranteed] %pa : $@callee_guaranteed () -> Bool to $@noescape @callee_guaranteed () -> Bool
+  %u = function_ref @use : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+  %res = apply %u(%cvt) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Bool) -> ()
+  destroy_value %cvt : $@noescape @callee_guaranteed () -> Bool
+  destroy_value %pa : $@callee_guaranteed () -> Bool
+  destroy_value %mark : $Optional<T>
+  %r = tuple ()
+  return %r : $()
+}

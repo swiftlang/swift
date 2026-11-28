@@ -14,9 +14,6 @@
 
 // REQUIRES: executable_test
 
-// Blocked by https://github.com/swiftlang/swift/issues/91660 (rdar://181604244)
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
-
 import StdlibUnittest
 
 var suite = TestSuite("RawSpan Tests")
