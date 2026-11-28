@@ -1,62 +1,80 @@
-// RUN: %target-sil-opt %s -module-name WitnessTableWithGP | %FileCheck %s
+// RUN: %target-sil-opt %s -module-name WitnessTableWithGP | %target-sil-opt -module-name WitnessTableWithGP | %FileCheck %s
 
-// REQUIRES: disabled
-// FIXME: <rdar://problem/20592011>
-// test/SIL/Parser/witness_with_inherited_gp.sil depends on stdlib
-// implementation details and was XFAIL'ed
+// Tests parsing and printing of witness tables for generic conformances whose
+// associated conformances are specialized conformances of other generic types,
+// substituted with the conforming type's (inherited) generic parameters.
+//
+// This test intentionally defines all of its own protocols instead of
+// importing the standard library, so that it does not depend on stdlib
+// implementation details.
 
-import Swift
+sil_stage raw
 
-public struct mmEnumerateGenerator<
-  Base: GeneratorType
-> : GeneratorType, Sequence {
-  public typealias Element = (index: Int, element: Base.Element)
+import Builtin
+
+public protocol _SequenceBase {}
+
+public protocol IteratorProtocol {
+  associatedtype Element
+}
+
+public protocol _Sequence : _SequenceBase {
+  associatedtype Iterator : IteratorProtocol
+}
+
+public protocol Collection : _Sequence {
+  associatedtype Element
+  associatedtype Index
+}
+
+// A generic iterator whose generic parameter is itself constrained to a
+// protocol with an associated type.
+public struct mmEnumerateIterator<Base : IteratorProtocol> : IteratorProtocol {
+  public typealias Element = (index: Builtin.Int64, element: Base.Element)
   var base: Base
-  var count: Int
-
-  public init(_ base: Base)
-  public mutating func next() -> Element?
-  public typealias Generator = mmEnumerateGenerator<Base>
-  public func makeIterator() -> Generator
+  var count: Builtin.Int64
 }
 
-public struct mmEnumerateSequence<
-  Base: Sequence
-> : Sequence {
+// A generic sequence whose associated Iterator type is a specialization of
+// another generic type, using a dependent member type (Base.Iterator).
+public struct mmEnumerateSequence<Base : _Sequence> : _Sequence {
+  public typealias Iterator = mmEnumerateIterator<Base.Iterator>
   var base: Base
-  public init(_ base: Base)
-  public func makeIterator() -> mmEnumerateGenerator<Base.Generator>
 }
 
-// CHECK: sil_witness_table <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
-// CHECK:  base_protocol _SequenceType: <Base where Base : Sequence, Base.Generator : GeneratorType> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
-// CHECK:  associated_type Generator: mmEnumerateGenerator<Base.Generator>
-// CHECK:  associated_conformance (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base where Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
-sil_witness_table <Base : Sequence> mmEnumerateSequence<Base>: _Sequence_Type module WitnessTableWithGP {
-  base_protocol _SequenceType: <Base : Sequence> mmEnumerateSequence<Base>: _SequenceType module WitnessTableWithGP
-  associated_type Generator: mmEnumerateGenerator<Base.Generator>
-  associated_conformance (Generator: GeneratorType): mmEnumerateGenerator<Base.Generator>: specialize <Base = Base.Generator, Base.Element = Base.Generator.Element> (<Base : GeneratorType> mmEnumerateGenerator<Base>: GeneratorType module WitnessTableWithGP)
+// CHECK-LABEL: sil_witness_table <Base where Base : _Sequence> mmEnumerateSequence<Base>: _Sequence module WitnessTableWithGP {
+// CHECK-NEXT:    base_protocol _SequenceBase: <Base where Base : _Sequence> mmEnumerateSequence<Base>: _SequenceBase module WitnessTableWithGP
+// CHECK-NEXT:    associated_type Iterator: mmEnumerateIterator<Base.Iterator>
+// CHECK-NEXT:    associated_conformance (Iterator: IteratorProtocol): mmEnumerateIterator<Base.Iterator>: specialize <Base.Iterator> (<Base where Base : IteratorProtocol> mmEnumerateIterator<Base>: IteratorProtocol module WitnessTableWithGP)
+// CHECK-NEXT:  }
+sil_witness_table <Base : _Sequence> mmEnumerateSequence<Base>: _Sequence module WitnessTableWithGP {
+  base_protocol _SequenceBase: <Base : _Sequence> mmEnumerateSequence<Base>: _SequenceBase module WitnessTableWithGP
+  associated_type Iterator: mmEnumerateIterator<Base.Iterator>
+  associated_conformance (Iterator: IteratorProtocol): mmEnumerateIterator<Base.Iterator>: specialize <Base.Iterator> (<Base : IteratorProtocol> mmEnumerateIterator<Base>: IteratorProtocol module WitnessTableWithGP)
 }
 
+// A locally-defined stand-in for the stdlib's IndexingIterator.
+public struct mmIndexingIterator<Elements : Collection> : IteratorProtocol {
+  public typealias Element = Elements.Element
+  var _elements: Elements
+  var _position: Elements.Index
+}
+
+// A generic collection whose associated Iterator is a specialization of
+// mmIndexingIterator with the collection type itself.
 public struct _mmArrayBuffer<T> : Collection {
   public typealias Element = T
-  public var startIndex: Int { get }
-  public var endIndex: Int { get }
-  public subscript(i: Int) -> T { get }
-  public func makeIterator() -> IndexingIterator<_mmArrayBuffer>
+  public typealias Index = Builtin.Int64
+  public typealias Iterator = mmIndexingIterator<_mmArrayBuffer<T>>
 }
 
-sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
-  base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
-  associated_type Generator: IndexingIterator<_mmArrayBuffer<T>>
-  associated_conformance (Generator: GeneratorType): IndexingIterator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>, C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C : _CollectionType> IndexingIterator<C>: GeneratorType module Swift)
+// CHECK-LABEL: sil_witness_table <T> _mmArrayBuffer<T>: _Sequence module WitnessTableWithGP {
+// CHECK-NEXT:    base_protocol _SequenceBase: <T> _mmArrayBuffer<T>: _SequenceBase module WitnessTableWithGP
+// CHECK-NEXT:    associated_type Iterator: mmIndexingIterator<_mmArrayBuffer<T>>
+// CHECK-NEXT:    associated_conformance (Iterator: IteratorProtocol): mmIndexingIterator<_mmArrayBuffer<T>>: specialize <_mmArrayBuffer<T>> (<Elements where Elements : Collection> mmIndexingIterator<Elements>: IteratorProtocol module WitnessTableWithGP)
+// CHECK-NEXT:  }
+sil_witness_table <T> _mmArrayBuffer<T>: _Sequence module WitnessTableWithGP {
+  base_protocol _SequenceBase: <T> _mmArrayBuffer<T>: _SequenceBase module WitnessTableWithGP
+  associated_type Iterator: mmIndexingIterator<_mmArrayBuffer<T>>
+  associated_conformance (Iterator: IteratorProtocol): mmIndexingIterator<_mmArrayBuffer<T>>: specialize <_mmArrayBuffer<T>> (<Elements : Collection> mmIndexingIterator<Elements>: IteratorProtocol module WitnessTableWithGP)
 }
-
-// CHECK: sil_witness_table <T> _mmArrayBuffer<T>: _Sequence_Type module WitnessTableWithGP {
-// CHECK: base_protocol _SequenceType: <T> _mmArrayBuffer<T>: _SequenceType module WitnessTableWithGP
-// CHECK: associated_type Generator: IndexingIterator<_mmArrayBuffer<T>>
-// CHECK: associated_conformance (Generator: GeneratorType):
-// IndexingIterator<_mmArrayBuffer<T>>: specialize <C = _mmArrayBuffer<T>,
-// C.Index = Int, C.Index.Distance = Int, C.Index.Distance.IntegerLiteralType
-// = Int, C.Index._DisabledRangeIndex = Int, C._Element = T> (<C where
-// C : _CollectionType, C.Index : ForwardIndex, C.Index.Distance : _SignedInteger, C.Index.Distance.IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral> IndexingIterator<C>: GeneratorType module Swift)
