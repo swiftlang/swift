@@ -218,6 +218,12 @@ public:
   ArrayRef<std::pair<const SourceFile *, ValueDecl *>>
   getUniqueMacroNameDecls(const ModuleDecl &module, DeclBaseName name);
 
+  /// Register the introduced names of an attached macro that was resolved and
+  /// attached to \p anchor after this cache was already populated. Necessary
+  /// for compiler synthesized macros.
+  void recordMacroIntroducedNames(Decl *anchor, CustomAttr *attr,
+                                  MacroDecl *macro, MacroRole role);
+
   /// Retrieves all the operator decls. The order of the results is not
   /// guaranteed to be meaningful.
   void getOperatorDecls(SmallVectorImpl<OperatorDecl *> &results);
@@ -536,6 +542,21 @@ void SourceLookupCache::populateAuxiliaryDeclCache() {
   }
 
   MayHaveAuxiliaryDecls.clear();
+}
+
+void SourceLookupCache::recordMacroIntroducedNames(Decl *anchor,
+                                                   CustomAttr *attr,
+                                                   MacroDecl *macro,
+                                                   MacroRole role) {
+  SmallVector<DeclName, 2> introducedNames;
+  macro->getIntroducedNames(role, dyn_cast<ValueDecl>(anchor), introducedNames);
+  for (auto name : introducedNames) {
+    auto *placeholder = MissingDecl::forUnexpandedMacro(attr, anchor);
+    if (name == MacroDecl::getArbitraryName())
+      TopLevelArbitraryMacros.push_back(placeholder);
+    else
+      name.addToLookupTable(TopLevelAuxiliaryDecls, placeholder);
+  }
 }
 
 SourceLookupCache::SourceLookupCache(ASTContext &ctx)
@@ -943,6 +964,11 @@ SourceLookupCache &ModuleDecl::getSourceLookupCache() const {
         std::make_unique<SourceLookupCache>(*this);
   }
   return *Cache;
+}
+
+void ModuleDecl::recordMacroIntroducedNames(Decl *anchor, CustomAttr *attr,
+                                            MacroDecl *macro, MacroRole role) {
+  Cache->recordMacroIntroducedNames(anchor, attr, macro, role);
 }
 
 ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
