@@ -2,7 +2,6 @@
    and use it with libswift_Concurrency.a. */
 
 #include <SwiftPlatform/Concurrency.h>
-#include <swift/ExecutorImpl.h>
 
 #include <assert.h>
 #include <stdio.h>
@@ -149,16 +148,6 @@ void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
   _swift_concurrency_enqueueGlobal(job);
 }
 
-/// Get a reference to the main executor.
-SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
-  return swift_executor_generic();
-}
-
-/// Check if the specified executor is the main executor.
-bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
-  return swift_executor_isGeneric(executor);
-}
-
 /// Drain the main executor's queue, processing jobs enqueued on it; this
 /// should never return.
 void _swift_concurrency_asyncMain(void) {
@@ -169,5 +158,9 @@ void _swift_concurrency_asyncMain(void) {
     debug("executor: job %p running\n", job);
     swift_job_runSynchronously(job, swift_executor_generic());
   }
+}
+
+__swift_ptrdiff_t _swift_concurrency_mainExecutorIsGlobal(void) {
+  return 1;
 }
 

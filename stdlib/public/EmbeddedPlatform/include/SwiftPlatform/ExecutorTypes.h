@@ -141,6 +141,13 @@ static inline SwiftExecutorRef swift_executor_generic(void) {
   return (SwiftExecutorRef){ NULL, 0 };
 }
 
+/// Return the main executor.
+static inline SwiftExecutorRef swift_executor_main(void) {
+  extern SwiftExecutorRef _swift_task_getMainExecutor_c(void);
+
+  return _swift_task_getMainExecutor_c();
+}
+
 /// Return an ordinary executor with the specified identity and witness table.
 static inline SwiftExecutorRef
 swift_executor_ordinary(

@@ -231,6 +231,7 @@ set(LLVM_OPTIONAL_SOURCES
   CooperativeGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
   CFExecutor.cpp
+  ThreadPoolGlobalExecutor.cpp
 )
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
@@ -309,8 +310,10 @@ endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency)
   add_custom_target(embedded-concurrency-default-executor)
+  add_custom_target(embedded-concurrency-thread-pool-executor)
   add_dependencies(embedded-libraries embedded-concurrency)
   add_dependencies(embedded-concurrency embedded-concurrency-default-executor)
+  add_dependencies(embedded-concurrency embedded-concurrency-thread-pool-executor)
   if(SWIFT_HOST_VARIANT STREQUAL "macosx" OR
      SWIFT_HOST_VARIANT STREQUAL "linux")
     add_custom_target(embedded-concurrency-dispatch-executor)
@@ -381,29 +384,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
-    if(NOT "${triple}" MATCHES "-none-")
-      list(APPEND extra_c_compile_flags
-        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
-    endif()
-
-    if("${arch}" MATCHES "wasm32")
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        ExecutorImpl.swift
-        PlatformExecutorCooperative.swift
-      )
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
-        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-        ExecutorImpl.cpp
-      )
-    else()
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
-        PlatformExecutorNone.swift
-      )
-      set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES
-        ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
-      )
-    endif()
-
     # Restrict each call below to the current triple by temporarily narrowing
     # the triple list visible to add_embedded_swift_target_library.
     set(EMBEDDED_STDLIB_TARGET_TRIPLES "${entry}")
@@ -421,9 +401,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       swift_Concurrency
       IS_STDLIB
 
-      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_C_SOURCES}
+      ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
-      ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
+      PlatformExecutorNone.swift
+      EmbeddedMainExecutor.swift
 
       GYB_SOURCES
         ${SWIFT_CONCURRENCY_GYB_SOURCES}
@@ -452,6 +433,22 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       INSTALL_IN_COMPONENT stdlib
       )
 
+    if("${triple}" MATCHES "-wasip1-threads$|-linux-gnu$" OR
+       ("${triple}" MATCHES "-apple-" AND NOT "${triple}" MATCHES "-none-"))
+      # lib/swift/embedded/<triple>/libswift_ConcurrencyThreadPoolExecutor.a
+      add_embedded_swift_target_library(
+        embedded-concurrency-thread-pool-executor
+        swift_ConcurrencyThreadPoolExecutor
+
+        ThreadPoolGlobalExecutor.cpp
+
+        C_COMPILE_FLAGS
+          ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
+          -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        INSTALL_IN_COMPONENT stdlib
+        )
+    endif()
+
     set(build_embedded_dispatch_executor FALSE)
     if(SWIFT_HOST_VARIANT STREQUAL "macosx" AND
        "${mod}" MATCHES "-apple-macos$")
@@ -467,15 +464,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         embedded-concurrency-dispatch-executor
         swift_ConcurrencyDispatchExecutor
         PARTIAL_SOURCES_INTENDED
-        NON_EMPTY_OBJECT_FILE
         # Dispatch requires a hosted environment, including hosted C++ headers.
         NO_FREESTANDING_CXX
 
         DispatchGlobalExecutor.cpp
-        DispatchExecutor.swift
-
-        DEPENDS
-          "embedded-concurrency-${mod}"
 
         SWIFT_COMPILE_FLAGS
           -Xfrontend -enable-sil-opaque-values

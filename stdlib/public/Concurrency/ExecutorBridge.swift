@@ -139,7 +139,7 @@ internal func _jobGetExecutorPrivateData(
   _ job: Builtin.Job
 ) -> UnsafeMutableRawPointer
 
-#if os(WASI) || os(Emscripten) || !$Embedded
+#if !$Embedded
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getMainExecutor")
@@ -152,7 +152,7 @@ internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor {
 @_silgen_name("swift_getMainExecutor")
 internal func _getMainExecutorAsSerialExecutor() -> UnownedSerialExecutor
 #endif // SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-#endif // os(WASI) || os(Emscripten) || !$Embedded
+#endif // !$Embedded
 
 @available(StdlibDeploymentTarget 6.3, *)
 @_silgen_name("swift_getDefaultExecutor")
