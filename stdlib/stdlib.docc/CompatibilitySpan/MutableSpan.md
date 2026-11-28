@@ -29,10 +29,14 @@
 
 ### Performing Unsafe Access
 
-- ``withUnsafeBytes(_:)``
-- ``withUnsafeMutableBytes(_:)``
-- ``withUnsafeBufferPointer(_:)``
-- ``withUnsafeMutableBufferPointer(_:)``
+- ``withUnsafeBytes(_:)-2n0wp``
+- ``withUnsafeBytes(_:)-7o5r7``
+- ``withUnsafeMutableBytes(_:)-726et``
+- ``withUnsafeMutableBytes(_:)-6dzd9``
+- ``withUnsafeBufferPointer(_:)-5j3g2``
+- ``withUnsafeBufferPointer(_:)-8ehzs``
+- ``withUnsafeMutableBufferPointer(_:)-5ywpm``
+- ``withUnsafeMutableBufferPointer(_:)-2u9ju``
 
 ### Swapping Span Contents
 

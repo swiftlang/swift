@@ -517,6 +517,42 @@ extension OutputRawSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
+  /// The address of the viewed memory, or `nil` if the span is empty and
+  /// has no address.
+  ///
+  /// This is an implementation detail of the standard library. It lets the
+  /// async variants of the pointer-providing methods, which are in the
+  /// `_Concurrency` module, build their pointers like the synchronous ones.
+  @export(implementation)
+  @unsafe
+  public var _unsafePointer: UnsafeMutableRawPointer? {
+    unsafe _pointer
+  }
+
+  /// Sets the number of initialized bytes.
+  ///
+  /// This is an implementation detail of the standard library. It lets the
+  /// async variant of `withUnsafeMutableBytes(_:)`, which is in the
+  /// `_Concurrency` module, update the initialized count like the synchronous
+  /// one.
+  ///
+  /// - Parameter initializedCount: The new number of initialized bytes.
+  ///   The bytes up to this count must be initialized.
+  @export(implementation)
+  @_lifetime(self: copy self)
+  @unsafe
+  public mutating func _unsafeSetInitializedCount(_ initializedCount: Int) {
+    _precondition(
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: _nnCapacity()),
+      "OutputRawSpan capacity overflow"
+    )
+    _count = initializedCount
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension OutputRawSpan {
   /// Consume the output span and return the number of initialized bytes.
   ///
   /// This method should be invoked in the scope where the `OutputRawSpan` was

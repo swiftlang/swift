@@ -49,5 +49,6 @@
 
 ### Performing Unsafe Access
 
-- ``withUnsafeMutableBufferPointer(_:)``
+- ``withUnsafeMutableBufferPointer(_:)-g6gk``
+- ``withUnsafeMutableBufferPointer(_:)-3mj8a``
 

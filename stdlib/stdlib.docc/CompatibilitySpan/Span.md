@@ -30,8 +30,10 @@
 
 ### Performing Unsafe Access
 
-- ``withUnsafeBufferPointer(_:)``
-- ``withUnsafeBytes(_:)``
+- ``withUnsafeBufferPointer(_:)-30kri``
+- ``withUnsafeBufferPointer(_:)-1aby6``
+- ``withUnsafeBytes(_:)-8xgx``
+- ``withUnsafeBytes(_:)-8vpd5``
 
 ### Extracting Span Contents
 
