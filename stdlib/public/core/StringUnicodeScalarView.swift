@@ -529,8 +529,27 @@ extension String.UnicodeScalarView {
 }
 
 extension String.UnicodeScalarView {
-  /// Returns a boolean value indicating whether this unicode scalar view
-  /// is trivially identical to `other`.
+  /// Returns a Boolean value indicating whether this view is trivially
+  /// identical to `other`.
+  ///
+  /// Two Unicode scalar views are trivially identical if they are views of
+  /// strings that share the same underlying representation, such as copies of a
+  /// string with no intervening mutations. This check doesn't inspect the
+  /// Unicode scalars, so it's much faster than comparing the views element by
+  /// element.
+  ///
+  /// If `a.isTriviallyIdentical(to: b)` is `true`, then `a` and `b` contain the
+  /// same Unicode scalars, so `a.elementsEqual(b)` is also `true`. The reverse
+  /// isn't guaranteed: views of equal strings that are stored separately aren't
+  /// trivially identical.
+  ///
+  /// ```swift
+  /// let greeting = "Hello"
+  /// let copy = greeting
+  /// print(greeting.unicodeScalars.isTriviallyIdentical(
+  ///     to: copy.unicodeScalars))
+  /// // Prints "true"
+  /// ```
   ///
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)

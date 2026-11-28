@@ -1291,15 +1291,17 @@ extension String {
   /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
   /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
   /// (Transitivity)
-  /// - `a.isTriviallyIdentical(b)` implies `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  /// - `a.isTriviallyIdentical(to: b)` implies `a == b`. `a == b` does not
+  /// imply `a.isTriviallyIdentical(to: b)`.
   ///
   /// Values produced by copying the same value, with no intervening mutations,
   /// will compare identical:
   ///
   /// ```swift
+  /// let c = "Hello"
   /// let d = c
   /// print(c.isTriviallyIdentical(to: d))
-  /// // Prints true
+  /// // Prints "true"
   /// ```
   ///
   /// Comparing strings this way includes comparing (normally) hidden

@@ -694,8 +694,25 @@ extension String.UTF8View {
 }
 
 extension String.UTF8View {
-  /// Returns a boolean value indicating whether this UTF8 view
-  /// is trivially identical to `other`.
+  /// Returns a Boolean value indicating whether this view is trivially
+  /// identical to `other`.
+  ///
+  /// Two UTF-8 views are trivially identical if they are views of strings that
+  /// share the same underlying representation, such as copies of a string with
+  /// no intervening mutations. This check doesn't inspect the code units, so
+  /// it's much faster than comparing the views element by element.
+  ///
+  /// If `a.isTriviallyIdentical(to: b)` is `true`, then `a` and `b` contain the
+  /// same code units, so `a.elementsEqual(b)` is also `true`. The reverse isn't
+  /// guaranteed: views of equal strings that are stored separately aren't
+  /// trivially identical.
+  ///
+  /// ```swift
+  /// let greeting = "Hello"
+  /// let copy = greeting
+  /// print(greeting.utf8.isTriviallyIdentical(to: copy.utf8))
+  /// // Prints "true"
+  /// ```
   ///
   /// - Complexity: O(1)
   @available(StdlibDeploymentTarget 6.4, *)
